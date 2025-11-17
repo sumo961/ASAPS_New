@@ -4,9 +4,10 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Beat, type Location } from '@asaps/core';
+import { Beat, type Location, type AnimationPath } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
 import { VisualPropertiesPanel } from './VisualPropertiesPanel';
+import { AnimationPanel } from './AnimationPanel';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
@@ -52,6 +53,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const [showProperties, setShowProperties] = useState(true);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [activeTab, setActiveTab] = useState<'elements' | 'animations'>('elements');
+  const [animations, setAnimations] = useState<AnimationPath[]>([]);
 
   // Use refs to track current state for cleanup
   const beatRef = useRef(beat);
@@ -422,6 +425,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     setVisualElements(elements);
     setBackgroundAssetId(bgId);
     setBackgroundSound(params.backgroundSound || '');
+    setAnimations(params.animations || []);
     setHasChanges(false);
 
     // Reset parameter tracking so second useEffect will run for this beat
@@ -861,14 +865,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     });
     
     console.log(`[VisualWorkspace] Saved ${beat.locations.size} locations to beat`);
-    
+
     // Save visual data to parameters
     beat.updateParameters({
       ...params,
       visualElements,
       backgroundAssetId,
       node: backgroundAssetId,
-      backgroundSound
+      backgroundSound,
+      animations
     });
 
     setHasChanges(false);
@@ -904,84 +909,133 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
   return (
     <div className="h-full flex bg-gray-100 relative">
-      {/* Left Panel - Visual Properties Panel */}
+      {/* Left Panel with Tabs */}
       {showProperties && (
-        <VisualPropertiesPanel
-          backgroundAssetId={backgroundAssetId}
-          elements={visualElements}
-          selectedElement={selectedElementId}
-          onBackgroundSelect={handleBackgroundSelect}
-          onElementSelect={setSelectedElementId}
-          onElementUpdate={(elementId, updates) => {
-            setVisualElements(prev => prev.map(el =>
-              el.id === elementId ? { ...el, ...updates } : el
-            ));
-            setHasChanges(true);
-          }}
-          onElementDelete={(elementId) => {
-            setVisualElements(prev => prev.filter(el => el.id !== elementId));
-            if (selectedElementId === elementId) {
-              setSelectedElementId(null);
-            }
-            setHasChanges(true);
-          }}
-          onElementAdd={(type) => {
-            const stageWidth = projectSettings?.width || 1024;
-            const stageHeight = projectSettings?.height || 768;
-            const newElement: VisualElement = {
-              id: `element_${Date.now()}`,
-              type,
-              name: type.charAt(0).toUpperCase() + type.slice(1),
-              x: Math.floor(stageWidth / 2) - 50,
-              y: Math.floor(stageHeight / 2) - 50,
-              z: visualElements.length,
-              width: type === 'text' ? 200 : 100,
-              height: type === 'text' ? 40 : 100,
-              rotation: 0,
-              scale: 1,
-              visible: true,
-              locked: false,
-              text: type === 'text' ? 'New Text' : undefined,
-              // Add font properties for text, dialog, and button elements
-              font: (type === 'text' || type === 'hotspot') ? 'Arial' : undefined,
-              fontSize: (type === 'text' || type === 'hotspot') ? 16 : undefined,
-              textAlign: (type === 'text' || type === 'hotspot') ? 'center' : undefined,
-            };
-            setVisualElements(prev => [...prev, newElement]);
-            setSelectedElementId(newElement.id);
-            setHasChanges(true);
-          }}
-          onElementReorder={(elementId, direction) => {
-            const sortedElements = [...visualElements].sort((a, b) => b.z - a.z);
-            const index = sortedElements.findIndex(el => el.id === elementId);
-            if (index === -1) return;
-            
-            if (direction === 'up' && index > 0) {
-              // Swap z values
-              const currentZ = sortedElements[index].z;
-              const targetZ = sortedElements[index - 1].z;
-              setVisualElements(prev => prev.map(el => {
-                if (el.id === elementId) return { ...el, z: targetZ };
-                if (el.id === sortedElements[index - 1].id) return { ...el, z: currentZ };
-                return el;
-              }));
-              setHasChanges(true);
-            } else if (direction === 'down' && index < sortedElements.length - 1) {
-              // Swap z values
-              const currentZ = sortedElements[index].z;
-              const targetZ = sortedElements[index + 1].z;
-              setVisualElements(prev => prev.map(el => {
-                if (el.id === elementId) return { ...el, z: targetZ };
-                if (el.id === sortedElements[index + 1].id) return { ...el, z: currentZ };
-                return el;
-              }));
-              setHasChanges(true);
-            }
-          }}
-          assets={assets}
-          stageWidth={projectSettings?.width || 1024}
-          stageHeight={projectSettings?.height || 768}
-        />
+        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+          {/* Tab Buttons */}
+          <div className="flex border-b border-gray-200">
+            <button
+              className={`flex-1 px-4 py-2 font-medium text-sm transition-colors ${
+                activeTab === 'elements'
+                  ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('elements')}
+            >
+              Elements
+            </button>
+            <button
+              className={`flex-1 px-4 py-2 font-medium text-sm transition-colors ${
+                activeTab === 'animations'
+                  ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('animations')}
+            >
+              Animations
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          <div className="flex-1 overflow-hidden">
+            {activeTab === 'elements' && (
+              <VisualPropertiesPanel
+                backgroundAssetId={backgroundAssetId}
+                elements={visualElements}
+                selectedElement={selectedElementId}
+                onBackgroundSelect={handleBackgroundSelect}
+                onElementSelect={setSelectedElementId}
+                onElementUpdate={(elementId, updates) => {
+                  setVisualElements(prev => prev.map(el =>
+                    el.id === elementId ? { ...el, ...updates } : el
+                  ));
+                  setHasChanges(true);
+                }}
+                onElementDelete={(elementId) => {
+                  setVisualElements(prev => prev.filter(el => el.id !== elementId));
+                  if (selectedElementId === elementId) {
+                    setSelectedElementId(null);
+                  }
+                  setHasChanges(true);
+                }}
+                onElementAdd={(type) => {
+                  const stageWidth = projectSettings?.width || 1024;
+                  const stageHeight = projectSettings?.height || 768;
+                  const newElement: VisualElement = {
+                    id: `element_${Date.now()}`,
+                    type,
+                    name: type.charAt(0).toUpperCase() + type.slice(1),
+                    x: Math.floor(stageWidth / 2) - 50,
+                    y: Math.floor(stageHeight / 2) - 50,
+                    z: visualElements.length,
+                    width: type === 'text' ? 200 : 100,
+                    height: type === 'text' ? 40 : 100,
+                    rotation: 0,
+                    scale: 1,
+                    visible: true,
+                    locked: false,
+                    text: type === 'text' ? 'New Text' : undefined,
+                    // Add font properties for text, dialog, and button elements
+                    font: (type === 'text' || type === 'hotspot') ? 'Arial' : undefined,
+                    fontSize: (type === 'text' || type === 'hotspot') ? 16 : undefined,
+                    textAlign: (type === 'text' || type === 'hotspot') ? 'center' : undefined,
+                  };
+                  setVisualElements(prev => [...prev, newElement]);
+                  setSelectedElementId(newElement.id);
+                  setHasChanges(true);
+                }}
+                onElementReorder={(elementId, direction) => {
+                  const sortedElements = [...visualElements].sort((a, b) => b.z - a.z);
+                  const index = sortedElements.findIndex(el => el.id === elementId);
+                  if (index === -1) return;
+
+                  if (direction === 'up' && index > 0) {
+                    // Swap z values
+                    const currentZ = sortedElements[index].z;
+                    const targetZ = sortedElements[index - 1].z;
+                    setVisualElements(prev => prev.map(el => {
+                      if (el.id === elementId) return { ...el, z: targetZ };
+                      if (el.id === sortedElements[index - 1].id) return { ...el, z: currentZ };
+                      return el;
+                    }));
+                    setHasChanges(true);
+                  } else if (direction === 'down' && index < sortedElements.length - 1) {
+                    // Swap z values
+                    const currentZ = sortedElements[index].z;
+                    const targetZ = sortedElements[index + 1].z;
+                    setVisualElements(prev => prev.map(el => {
+                      if (el.id === elementId) return { ...el, z: targetZ };
+                      if (el.id === sortedElements[index + 1].id) return { ...el, z: currentZ };
+                      return el;
+                    }));
+                    setHasChanges(true);
+                  }
+                }}
+                assets={assets}
+                stageWidth={projectSettings?.width || 1024}
+                stageHeight={projectSettings?.height || 768}
+              />
+            )}
+
+            {activeTab === 'animations' && (
+              <AnimationPanel
+                animations={animations}
+                elements={visualElements}
+                stageWidth={projectSettings?.width || 1024}
+                stageHeight={projectSettings?.height || 768}
+                backgroundUrl={
+                  backgroundAssetId && assets
+                    ? assets.find(a => a.id === backgroundAssetId)?.url
+                    : undefined
+                }
+                onAnimationsChange={(newAnimations) => {
+                  setAnimations(newAnimations);
+                  setHasChanges(true);
+                }}
+              />
+            )}
+          </div>
+        </div>
       )}
 
       {/* Main Visual Editor Canvas - uses VisualBeatEditor */}
