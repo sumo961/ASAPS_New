@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
@@ -14,6 +14,7 @@ import { useSave, useProject } from './contexts/PersistenceContext';
 import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
 import type { GlobalSettings } from './components/settings/GlobalSettingsInspector';
+import { loadProjectData } from './utils/projectDeserializer';
 
 function App() {
   const { state, actions, initializeStory } = useStoryBuilder();
@@ -110,12 +111,62 @@ function App() {
   const { markChanged } = useSave();
   const { updateStory, project: currentProject } = useProject();
 
+  // Track loaded project to avoid re-loading the same project
+  const loadedProjectIdRef = useRef<string | null>(null);
+
   // Initialize with a basic story on mount
   useEffect(() => {
-    if (state.beats.length === 0) {
+    if (state.beats.length === 0 && !currentProject) {
       initializeStory();
     }
   }, []);
+
+  // Load project data when currentProject changes
+  useEffect(() => {
+    if (currentProject && currentProject.id !== loadedProjectIdRef.current) {
+      console.log('[App] Loading project into editor:', currentProject.id);
+
+      try {
+        // Deserialize and load project data
+        const projectData = loadProjectData(currentProject);
+
+        // Load into story builder
+        actions.loadStoryData({
+          title: projectData.title,
+          author: projectData.author,
+          beats: projectData.beats,
+          connections: [], // Connections are stored in beats
+          story: currentProject.story,
+          settings: projectData.settings,
+          environment: projectData.environment,
+          characters: projectData.characters,
+          clusters: projectData.clusters
+        });
+
+        // Update characters and settings state
+        setCharacters(projectData.characters || []);
+        if (projectData.settings) {
+          actions.updateSettings(projectData.settings);
+        }
+
+        // Mark as loaded
+        loadedProjectIdRef.current = currentProject.id;
+
+        console.log('[App] Project loaded successfully:', {
+          beats: projectData.beats.length,
+          characters: projectData.characters?.length || 0,
+          clusters: projectData.clusters?.length || 0
+        });
+      } catch (error) {
+        console.error('[App] Failed to load project:', error);
+        alert('Failed to load project. See console for details.');
+      }
+    } else if (!currentProject && loadedProjectIdRef.current) {
+      // Project was unloaded (e.g., deleted)
+      console.log('[App] Project unloaded');
+      loadedProjectIdRef.current = null;
+    }
+  }, [currentProject, actions]);
 
   // Handler functions
   const handleBeatSelect = useCallback((beat: Beat) => {

@@ -51,7 +51,10 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git config:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(for file in MovementChoiceBeat.ts PickPropBeat.ts DialogTreeBeat.ts HyperTextBeat.ts VideoBeat.ts)",
+      "Bash(do filepath=\"/Users/hartmut/Library/Mobile Documents/com~apple~CloudDocs/Coding/Project Phoenix/asaps-modern/packages/core/src/beats/$file\" if [ -f \"$filepath\" ])",
+      "Bash(then echo \"=== $file ===\" grep -n \"protected async performAction\" \"$filepath\")"
     ],
     "deny": [],
     "ask": []
