@@ -15,6 +15,7 @@ import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
 import type { GlobalSettings } from './components/settings/GlobalSettingsInspector';
 import { loadProjectData } from './utils/projectDeserializer';
+import { downloadProjectAsZip, importProjectFromZip } from './utils/projectZipManager';
 
 function App() {
   const { state, actions, initializeStory } = useStoryBuilder();
@@ -108,8 +109,8 @@ function App() {
   });
 
   // Persistence hooks
-  const { markChanged } = useSave();
-  const { updateStory, project: currentProject } = useProject();
+  const { markChanged, saveNow } = useSave();
+  const { updateStory, project: currentProject, load: loadProject } = useProject();
 
   // Track loaded project to avoid re-loading the same project
   const loadedProjectIdRef = useRef<string | null>(null);
@@ -239,6 +240,57 @@ function App() {
     input.click();
   }, [actions]);
 
+  const handleExportZip = useCallback(async () => {
+    if (!currentProject) {
+      alert('No project loaded. Please save or create a project first.');
+      return;
+    }
+
+    try {
+      // First save the current state
+      await saveNow();
+
+      // Then export as ZIP
+      await downloadProjectAsZip(currentProject.id, currentProject.name);
+
+      alert('Project exported successfully!');
+    } catch (error) {
+      console.error('ZIP export failed:', error);
+      alert('Failed to export project as ZIP. See console for details.');
+    }
+  }, [currentProject, saveNow]);
+
+  const handleImportZip = useCallback(async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.zip,.asaps.zip';
+
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const result = await importProjectFromZip(file, {
+          generateNewId: true // Always generate new ID to avoid conflicts
+        });
+
+        if (result.success && result.projectId) {
+          // Load the imported project
+          await loadProject(result.projectId);
+
+          alert('Project imported successfully!');
+        } else {
+          throw new Error(result.error || 'Import failed');
+        }
+      } catch (error) {
+        console.error('ZIP import failed:', error);
+        alert(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    input.click();
+  }, [loadProject]);
+
   const handlePreview = useCallback(() => {
     if (state.beats.length === 0) {
       alert('Please add some beats to your story first!');
@@ -325,6 +377,8 @@ function App() {
         projectName={currentProject?.name}
         onExport={handleExport}
         onImport={handleImport}
+        onExportZip={handleExportZip}
+        onImportZip={handleImportZip}
         onPreview={handlePreview}
         onCharacters={handleOpenCharacterManager}
         onAssets={handleOpenAssetManager}

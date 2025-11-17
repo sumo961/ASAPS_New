@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Archive } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
@@ -13,6 +13,8 @@ interface HeaderProps {
   projectName?: string | null;
   onExport: () => void;
   onImport: () => void;
+  onExportZip?: () => void;
+  onImportZip?: () => void;
   onPreview?: () => void;
   onSettings?: () => void;
   onAssets?: () => void;
@@ -25,6 +27,8 @@ export const Header: React.FC<HeaderProps> = ({
   projectName,
   onExport,
   onImport,
+  onExportZip,
+  onImportZip,
   onPreview,
   onSettings,
   onAssets,
@@ -138,21 +142,45 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
           
-          <button 
+          <button
             className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
             onClick={onExport}
+            title="Export as ASML XML"
           >
             <Download className="w-4 h-4" />
-            Export
+            Export ASML
           </button>
-          
+
           <button
             className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
             onClick={onImport}
+            title="Import ASML XML"
           >
             <Upload className="w-4 h-4" />
-            Import
+            Import ASML
           </button>
+
+          {onExportZip && (
+            <button
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center gap-2"
+              onClick={onExportZip}
+              title="Export complete project as ZIP with all assets"
+            >
+              <Archive className="w-4 h-4" />
+              Export ZIP
+            </button>
+          )}
+
+          {onImportZip && (
+            <button
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center gap-2"
+              onClick={onImportZip}
+              title="Import project from ZIP file"
+            >
+              <Archive className="w-4 h-4" />
+              Import ZIP
+            </button>
+          )}
         </div>
       </div>
 
