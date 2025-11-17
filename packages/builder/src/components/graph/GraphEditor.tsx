@@ -82,70 +82,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const mountRef = useRef(false);
 
   // Watch ReactFlow initialization with enhanced debugging
-  useEffect(() => {
-    console.log('[GraphEditor] ReactFlow instance state changed:', typeof reactFlowInstance, 'timestamp:', Date.now());
-    if (reactFlowInstance) {
-      console.log('[GraphEditor] ReactFlow instance created, checking viewport');
-      console.log('[GraphEditor] ReactFlow instance available:', Object.keys(reactFlowInstance).length, 'methods available');
-
-      try {
-        // Get current viewport to understand the coordinate system
-        const viewport = reactFlowInstance.getViewport?.();
-        console.log('[GraphEditor] Current viewport:', viewport);
-
-        // Check if fitView has been called
-        console.log('[GraphEditor] Viewport details:', {
-          viewport: viewport,
-          windowX: window.innerWidth,
-          windowY: window.innerHeight,
-          transform: viewport?.transform,
-          zoom: viewport?.zoom,
-          x: viewport?.x,
-          y: viewport?.y
-        });
-
-        // Get flow bounds/container info
-        const container = reactFlowInstance.getContainerRect?.();
-        console.log('[GraphEditor] ReactFlow container:', container);
-
-        // Force immediate viewport debugging by trying to center all nodes
-        setTimeout(() => {
-          try {
-            console.log('[GraphEditor] Calling fitView() to center all nodes...');
-            reactFlowInstance.fitView?.({
-              padding: 0.2,
-              maxZoom: 1,
-              duration: 0 // immediate test
-            });
-
-            setTimeout(() => {
-              const finalViewport = reactFlowInstance.getViewport?.();
-              console.log('[GraphEditor] After fitView - new viewport:', finalViewport);
-            }, 100);
-          } catch (fitError) {
-            console.error('[GraphEditor] Error calling fitView:', fitError);
-          }
-        }, 300);
-
-        // Test if we can manually set viewport to known coordinates
-        setTimeout(() => {
-          try {
-            console.log('[GraphEditor] setting viewport to center all nodes...');
-            reactFlowInstance.setViewport?.({x: 200, y: 100, zoom: 0.5});
-            const testViewport = reactFlowInstance.getViewport?.();
-            console.log('[GraphEditor] Manual viewport set result:', testViewport);
-          } catch (setError) {
-            console.error('[GraphEditor] Error setting viewport:', setError);
-          }
-        }, 800);
-
-      } catch (e) {
-        console.log('[GraphEditor] Could not get viewport:', e);
-      }
-    } else {
-      console.log('[GraphEditor] ReactFlow instance is null/undefined');
-    }
-  }, [reactFlowInstance]);
+  // ReactFlow instance is available for manual controls
+  // Removed automatic fitView/zoom debugging code
 
   // Convert beats to ReactFlow nodes with viewport-aware debugging
   const nodes = useMemo(() => {
@@ -602,28 +540,13 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         onInit={(instance) => {
           // Set the instance for viewport controls
           setReactFlowInstance(instance);
-
-          // Once we know the effect works, we can uncomment the rest
-          // For now, just log once that ReactFlow is ready
           console.log('🎯 ReactFlow ready');
-
-          // Optional: Try to center once when ready (less aggressive)
-          setTimeout(() => {
-            if (instance) {
-              try {
-                instance.fitView({ padding: 0.2, maxZoom: 1, duration: 300 });
-              } catch (e) {
-                console.log('fitView failed:', e instanceof Error ? e.message : String(e));
-              }
-            }
-          }, 200);
         }}
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
-        fitView
         attributionPosition="bottom-left"
       >
         <Background color="#aaa" gap={16} />
