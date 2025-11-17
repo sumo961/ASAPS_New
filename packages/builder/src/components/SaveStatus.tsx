@@ -163,10 +163,12 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
       {onSave && (
         <button
           onClick={onSave}
-          disabled={status === 'saving'}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-300 ${
-            status === 'saving'
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          disabled={status === 'saving' || status === 'idle'}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+            status === 'idle'
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+              : status === 'saving'
+              ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
               : status === 'saved'
               ? 'bg-green-500 text-white'
               : status === 'pending'
@@ -174,15 +176,19 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
               : 'bg-blue-500 text-white hover:bg-blue-600'
           }`}
           title={
-            status === 'saving'
+            status === 'idle'
+              ? 'Nothing to save'
+              : status === 'saving'
               ? 'Saving...'
               : status === 'saved'
-              ? 'Saved successfully!'
+              ? `Saved ${lastSaved ? formatTimeAgo(lastSaved) : 'just now'}`
+              : status === 'pending'
+              ? 'Save changes'
               : 'Save project'
           }
         >
-          {status === 'saved' ? <Check size={16} /> : <Save size={16} />}
-          {status === 'saved' ? 'Saved' : 'Save'}
+          {status === 'saved' ? <Check size={16} /> : status === 'saving' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          {status === 'saved' ? 'Saved' : status === 'saving' ? 'Saving…' : 'Save'}
         </button>
       )}
     </div>

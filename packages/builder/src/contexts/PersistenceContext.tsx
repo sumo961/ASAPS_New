@@ -22,6 +22,10 @@ export interface PersistenceContextValue {
   currentProject: Project | null;
   projectId: string | null;
 
+  // Untitled project state
+  isUntitledProject: boolean;
+  hasUnsavedChanges: boolean;
+
   // Storage
   storage: StorageManager;
 
@@ -46,6 +50,10 @@ export interface PersistenceContextValue {
   deleteProject: (projectId: string) => Promise<boolean>;
   updateProjectMetadata: (updates: Partial<Pick<Project, 'name' | 'description'>>) => Promise<void>;
   updateProjectStory: (storyData: Partial<any>) => void;
+
+  // Untitled project management
+  setIsUntitledProject: (isUntitled: boolean) => void;
+  clearUntitledState: () => void;
 
   // Initialization
   initialized: boolean;
@@ -86,6 +94,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   const [projectId, setProjectId] = useState<string | null>(initialProjectId || null);
   const [initialized, setInitialized] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
+  const [isUntitledProject, setIsUntitledProject] = useState(false);
+  const [pendingNavigationAction, setPendingNavigationAction] = useState<string | null>(null);
 
   // Managers (created once)
   const [storage] = useState(() => getStorageManager({ debug }));
@@ -332,10 +342,20 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     // Note: Don't call markChanged() here - let the caller decide when to trigger auto-save
   }, [currentProject]);
 
+  /**
+   * Clear untitled project state (mark as not untitled)
+   */
+  const clearUntitledState = useCallback(() => {
+    setIsUntitledProject(false);
+    setPendingNavigationAction(null);
+  }, []);
+
   // Context value
   const value: PersistenceContextValue = {
     currentProject,
     projectId,
+    isUntitledProject,
+    hasUnsavedChanges: saveStatus === 'pending',
     storage,
     commandManager,
     executeCommand,
@@ -353,6 +373,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     deleteProject,
     updateProjectMetadata,
     updateProjectStory,
+    setIsUntitledProject,
+    clearUntitledState,
     initialized,
     initError,
   };

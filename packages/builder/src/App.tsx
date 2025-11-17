@@ -10,12 +10,13 @@ import { CharacterManager } from './components/characters/CharacterManager';
 import { AssetManager } from './components/assets/AssetManager';
 import { Story } from '@asaps/core';
 import type { Beat, Cluster } from '@asaps/core';
-import { useSave, useProject } from './contexts/PersistenceContext';
+import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
 import type { GlobalSettings } from './components/settings/GlobalSettingsInspector';
 import { loadProjectData } from './utils/projectDeserializer';
 import { downloadProjectAsZip, importProjectFromZip } from './utils/projectZipManager';
+import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 
 function App() {
   const { state, actions, initializeStory } = useStoryBuilder();
@@ -26,6 +27,8 @@ function App() {
   const [showCharacterManager, setShowCharacterManager] = useState(false);
   const [showAssetManager, setShowAssetManager] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string>('');
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -110,7 +113,8 @@ function App() {
 
   // Persistence hooks
   const { markChanged, saveNow } = useSave();
-  const { updateStory, project: currentProject, load: loadProject } = useProject();
+  const { updateStory, project: currentProject, load: loadProject, create: createProject } = useProject();
+  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges } = usePersistence();
 
   // Track loaded project to avoid re-loading the same project
   const loadedProjectIdRef = useRef<string | null>(null);
@@ -119,6 +123,7 @@ function App() {
   useEffect(() => {
     if (state.beats.length === 0 && !currentProject) {
       initializeStory();
+      setIsUntitledProject(true);
     }
   }, []);
 
@@ -153,6 +158,9 @@ function App() {
         // Mark as loaded
         loadedProjectIdRef.current = currentProject.id;
 
+        // Clear untitled state since we're now working with a real project
+        setIsUntitledProject(false);
+
         console.log('[App] Project loaded successfully:', {
           beats: projectData.beats.length,
           characters: projectData.characters?.length || 0,
@@ -166,8 +174,10 @@ function App() {
       // Project was unloaded (e.g., deleted)
       console.log('[App] Project unloaded');
       loadedProjectIdRef.current = null;
+      // Clear untitled state when project is unloaded
+      setIsUntitledProject(false);
     }
-  }, [currentProject, actions]);
+  }, [currentProject, actions, setIsUntitledProject]);
 
   // Handler functions
   const handleBeatSelect = useCallback((beat: Beat) => {
@@ -369,6 +379,41 @@ function App() {
     return story;
   }, [state]);
 
+  // Save unsaved work dialog handlers
+  const handleShowSaveDialog = useCallback((action: string) => {
+    if (isUntitledProject && hasUnsavedChanges) {
+      setShowSaveDialog(true);
+      setPendingAction(action);
+    }
+    // If no unsaved changes, do nothing - let Header handle the navigation
+  }, [isUntitledProject, hasUnsavedChanges]);
+
+  const handleSaveUnsavedWork = useCallback(async () => {
+    // Create a new project with current work
+    try {
+      await createProject('Untitled Project');
+      // Project is automatically loaded by createProject
+      // Clear the dialog and pending action
+      setShowSaveDialog(false);
+      setPendingAction('');
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      alert('Failed to save project. Please try again.');
+    }
+  }, [createProject]);
+
+  const handleDiscardUnsavedWork = useCallback(() => {
+    // Clear the dialog and pending action
+    setShowSaveDialog(false);
+    setPendingAction('');
+  }, []);
+
+  const handleCancelSaveDialog = useCallback(() => {
+    // Just close the dialog, don't execute any action
+    setShowSaveDialog(false);
+    setPendingAction('');
+  }, []);
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
@@ -383,6 +428,8 @@ function App() {
         onCharacters={handleOpenCharacterManager}
         onAssets={handleOpenAssetManager}
         onSettings={handleOpenSettings}
+        onInterceptNewProject={() => handleShowSaveDialog('newProject')}
+        onInterceptProjectLibrary={() => handleShowSaveDialog('projectLibrary')}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -516,6 +563,15 @@ function App() {
           onClose={handleCloseSettings}
         />
       )}
+
+      {/* Save Unsaved Work Dialog */}
+      <SaveUnsavedWorkDialog
+        isOpen={showSaveDialog}
+        onClose={handleCancelSaveDialog}
+        onSave={handleSaveUnsavedWork}
+        onDiscard={handleDiscardUnsavedWork}
+        action={pendingAction === 'newProject' ? 'creating a new project' : 'opening the project library'}
+      />
     </div>
   );
 }

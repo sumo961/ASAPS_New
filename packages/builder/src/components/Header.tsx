@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Archive } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
 import { UndoRedoToolbar } from './UndoRedoToolbar';
 import { SaveStatus } from './SaveStatus';
-import { useSave, useProject } from '../contexts/PersistenceContext';
+import { useSave, useProject, usePersistence } from '../contexts/PersistenceContext';
 
 interface HeaderProps {
   title: string;
@@ -19,6 +19,8 @@ interface HeaderProps {
   onSettings?: () => void;
   onAssets?: () => void;
   onCharacters?: () => void;
+  onInterceptNewProject?: () => void;
+  onInterceptProjectLibrary?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -32,10 +34,13 @@ export const Header: React.FC<HeaderProps> = ({
   onPreview,
   onSettings,
   onAssets,
-  onCharacters
+  onCharacters,
+  onInterceptNewProject,
+  onInterceptProjectLibrary
 }) => {
   const { status, lastSaved, error, saveNow } = useSave();
   const { load } = useProject();
+  const { isUntitledProject, hasUnsavedChanges } = usePersistence();
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showProjectLibrary, setShowProjectLibrary] = useState(false);
 
@@ -59,19 +64,19 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Project Name Display */}
           {projectName ? (
-            <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg font-medium">
-              {projectName}
+            <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg font-medium" title={hasUnsavedChanges ? "Unsaved changes" : ""}>
+              {hasUnsavedChanges && isUntitledProject ? "● " : ""}{projectName}
             </span>
           ) : (
-            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-lg font-medium italic">
-              Untitled Project
+            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-lg font-medium italic" title={hasUnsavedChanges ? "Unsaved changes" : ""}>
+              {hasUnsavedChanges && isUntitledProject ? "● " : ""}Untitled Project
             </span>
           )}
 
           {/* Project Selector */}
           <ProjectSelector
-            onOpenLibrary={() => setShowProjectLibrary(true)}
-            onCreateProject={() => setShowNewProjectDialog(true)}
+            onOpenLibrary={() => onInterceptProjectLibrary ? onInterceptProjectLibrary() : setShowProjectLibrary(true)}
+            onCreateProject={() => onInterceptNewProject ? onInterceptNewProject() : setShowNewProjectDialog(true)}
           />
 
           {/* Story Title */}
@@ -160,27 +165,6 @@ export const Header: React.FC<HeaderProps> = ({
             Import ASML
           </button>
 
-          {onExportZip && (
-            <button
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center gap-2"
-              onClick={onExportZip}
-              title="Export complete project as ZIP with all assets"
-            >
-              <Archive className="w-4 h-4" />
-              Export ZIP
-            </button>
-          )}
-
-          {onImportZip && (
-            <button
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center gap-2"
-              onClick={onImportZip}
-              title="Import project from ZIP file"
-            >
-              <Archive className="w-4 h-4" />
-              Import ZIP
-            </button>
-          )}
         </div>
       </div>
 
@@ -206,6 +190,8 @@ export const Header: React.FC<HeaderProps> = ({
             setShowProjectLibrary(false);
             setShowNewProjectDialog(true);
           }}
+          onExportZip={onExportZip}
+          onImportZip={onImportZip}
           isModal={true}
           onClose={() => setShowProjectLibrary(false)}
         />
