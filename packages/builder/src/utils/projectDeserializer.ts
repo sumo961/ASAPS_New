@@ -95,10 +95,10 @@ export function loadProjectData(project: Project): {
   }
 
   // Check if beats are already Beat instances or need deserialization
-  const needsDeserialization = beatsData.length > 0 && !(beatsData[0] instanceof Object.getPrototypeOf(beatsData[0]).constructor.name);
-  const beats = needsDeserialization || !beatsData[0]?.getParameters
-    ? deserializeBeats(beatsData)
-    : beatsData as Beat[];
+  // If they have getParameters method, they're already Beat instances
+  const beats = beatsData.length > 0 && beatsData[0]?.getParameters && typeof beatsData[0].getParameters === 'function'
+    ? beatsData as Beat[]
+    : deserializeBeats(beatsData);
 
   console.log('[loadProjectData] Deserialized beats:', beats.length);
 
