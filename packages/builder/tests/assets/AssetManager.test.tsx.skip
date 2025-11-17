@@ -1,0 +1,314 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { AssetManager, Asset } from '../../src/components/assets/AssetManager';
+
+describe('AssetManager - Type-Specific Import', () => {
+  const mockAssets: Asset[] = [];
+  const mockOnAssetAdd = vi.fn();
+  const mockOnAssetRemove = vi.fn();
+  const mockOnAssetUpdate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should render all type-specific import buttons', () => {
+    render(
+      <AssetManager
+        assets={mockAssets}
+        onAssetAdd={mockOnAssetAdd}
+        onAssetRemove={mockOnAssetRemove}
+        onAssetUpdate={mockOnAssetUpdate}
+      />
+    );
+
+    // Check for all import buttons
+    expect(screen.getByTitle('Import Characters')).toBeInTheDocument();
+    expect(screen.getByTitle('Import Props')).toBeInTheDocument();
+    expect(screen.getByTitle('Import Backgrounds')).toBeInTheDocument();
+    expect(screen.getByTitle('Import Videos')).toBeInTheDocument();
+    expect(screen.getByTitle('Import Audio')).toBeInTheDocument();
+  });
+
+  it('should have correct accept attributes for character input', () => {
+    const { container } = render(
+      <AssetManager
+        assets={mockAssets}
+        onAssetAdd={mockOnAssetAdd}
+        onAssetRemove={mockOnAssetRemove}
+        onAssetUpdate={mockOnAssetUpdate}
+      />
+    );
+
+    // Find the hidden character input
+    const inputs = container.querySelectorAll('input[type="file"]');
+    const characterInput = Array.from(inputs).find((input) =>
+      input.getAttribute('accept')?.includes('.png')
+    );
+
+    expect(characterInput).toBeDefined();
+  });
+
+  it('should call onAssetAdd with character subType when character file is uploaded', async () => {
+    const { container } = render(
+      <AssetManager
+        assets={mockAssets}
+        onAssetAdd={mockOnAssetAdd}
+        onAssetRemove={mockOnAssetRemove}
+        onAssetUpdate={mockOnAssetUpdate}
+      />
+    );
+
+    // Create a mock file
+    const file = new File(['dummy content'], 'hero.png', { type: 'image/png' });
+
+    // Find the character input (it's the second file input after the main one)
+    const inputs = container.querySelectorAll('input[type="file"]');
+    const characterInput = inputs[1]; // First is main, second is character
+
+    // Mock URL.createObjectURL
+    global.URL.createObjectURL = vi.fn(() => 'blob:character');
+
+    // Mock image loading for dimensions
+    Object.defineProperty(global.Image.prototype, 'onload', {
+      get() {
+        return this._onload;
+      },
+      set(fn) {
+        this._onload = fn;
+        // Simulate image load
+        setTimeout(() => {
+          this.width = 200;
+          this.height = 300;
+          fn();
+        }, 0);
+      },
+    });
+
+    // Trigger file upload
+    fireEvent.change(characterInput, { target: { files: [file] } });
+
+    // Wait for asset to be added
+    await waitFor(
+      () => {
+        expect(mockOnAssetAdd).toHaveBeenCalled();
+      },
+      { timeout: 1000 }
+    );
+
+    // Check that the asset has character subType
+    const addedAsset = mockOnAssetAdd.mock.calls[0][0];
+    expect(addedAsset.subType).toBe('character');
+    expect(addedAsset.name).toBe('hero.png');
+    expect(addedAsset.type).toBe('image');
+  });
+
+  it('should call onAssetAdd with prop subType when prop file is uploaded', async () => {
+    const { container } = render(
+      <AssetManager
+        assets={mockAssets}
+        onAssetAdd={mockOnAssetAdd}
+        onAssetRemove={mockOnAssetRemove}
+        onAssetUpdate={mockOnAssetUpdate}
+      />
+    );
+
+    const file = new File(['dummy content'], 'sword.png', { type: 'image/png' });
+    const inputs = container.querySelectorAll('input[type="file"]');
+    const propInput = inputs[2]; // Third is prop
+
+    global.URL.createObjectURL = vi.fn(() => 'blob:prop');
+
+    Object.defineProperty(global.Image.prototype, 'onload', {
+      get() {
+        return this._onload;
+      },
+      set(fn) {
+        this._onload = fn;
+        setTimeout(() => {
+          this.width = 100;
+          this.height = 150;
+          fn();
+        }, 0);
+      },
+    });
+
+    fireEvent.change(propInput, { target: { files: [file] } });
+
+    await waitFor(
+      () => {
+        expect(mockOnAssetAdd).toHaveBeenCalled();
+      },
+      { timeout: 1000 }
+    );
+
+    const addedAsset = mockOnAssetAdd.mock.calls[0][0];
+    expect(addedAsset.subType).toBe('prop');
+    expect(addedAsset.name).toBe('sword.png');
+  });
+
+  it('should call onAssetAdd with background subType when background file is uploaded', async () => {
+    const { container } = render(
+      <AssetManager
+        assets={mockAssets}
+        onAssetAdd={mockOnAssetAdd}
+        onAssetRemove={mockOnAssetRemove}
+        onAssetUpdate={mockOnAssetUpdate}
+      />
+    );
+
+    const file = new File(['dummy content'], 'forest.jpg', { type: 'image/jpeg' });
+    const inputs = container.querySelectorAll('input[type="file"]');
+    const backgroundInput = inputs[3]; // Fourth is background
+
+    global.URL.createObjectURL = vi.fn(() => 'blob:background');
+
+    Object.defineProperty(global.Image.prototype, 'onload', {
+      get() {
+        return this._onload;
+      },
+      set(fn) {
+        this._onload = fn;
+        setTimeout(() => {
+          this.width = 1024;
+          this.height = 768;
+          fn();
+        }, 0);
+      },
+    });
+
+    fireEvent.change(backgroundInput, { target: { files: [file] } });
+
+    await waitFor(
+      () => {
+        expect(mockOnAssetAdd).toHaveBeenCalled();
+      },
+      { timeout: 1000 }
+    );
+
+    const addedAsset = mockOnAssetAdd.mock.calls[0][0];
+    expect(addedAsset.subType).toBe('background');
+    expect(addedAsset.name).toBe('forest.jpg');
+  });
+
+  it('should support multiple file selection', async () => {
+    const { container } = render(
+      <AssetManager
+        assets={mockAssets}
+        onAssetAdd={mockOnAssetAdd}
+        onAssetRemove={mockOnAssetRemove}
+        onAssetUpdate={mockOnAssetUpdate}
+      />
+    );
+
+    const file1 = new File(['content1'], 'char1.png', { type: 'image/png' });
+    const file2 = new File(['content2'], 'char2.png', { type: 'image/png' });
+
+    const inputs = container.querySelectorAll('input[type="file"]');
+    const characterInput = inputs[1];
+
+    global.URL.createObjectURL = vi.fn((file) => `blob:${file.name}`);
+
+    Object.defineProperty(global.Image.prototype, 'onload', {
+      get() {
+        return this._onload;
+      },
+      set(fn) {
+        this._onload = fn;
+        setTimeout(() => {
+          this.width = 200;
+          this.height = 300;
+          fn();
+        }, 0);
+      },
+    });
+
+    fireEvent.change(characterInput, { target: { files: [file1, file2] } });
+
+    // Should be called twice, once for each file
+    await waitFor(
+      () => {
+        expect(mockOnAssetAdd).toHaveBeenCalledTimes(2);
+      },
+      { timeout: 1000 }
+    );
+
+    expect(mockOnAssetAdd.mock.calls[0][0].name).toBe('char1.png');
+    expect(mockOnAssetAdd.mock.calls[1][0].name).toBe('char2.png');
+    expect(mockOnAssetAdd.mock.calls[0][0].subType).toBe('character');
+    expect(mockOnAssetAdd.mock.calls[1][0].subType).toBe('character');
+  });
+
+  it('should display asset count for each type filter', () => {
+    const assetsWithTypes: Asset[] = [
+      {
+        id: '1',
+        name: 'char.png',
+        type: 'image',
+        subType: 'character',
+        url: 'blob:1',
+        size: 1024,
+        uploadedAt: new Date(),
+      },
+      {
+        id: '2',
+        name: 'prop.png',
+        type: 'image',
+        subType: 'prop',
+        url: 'blob:2',
+        size: 512,
+        uploadedAt: new Date(),
+      },
+      {
+        id: '3',
+        name: 'music.mp3',
+        type: 'audio',
+        subType: 'music',
+        url: 'blob:3',
+        size: 2048,
+        uploadedAt: new Date(),
+      },
+    ];
+
+    render(
+      <AssetManager
+        assets={assetsWithTypes}
+        onAssetAdd={mockOnAssetAdd}
+        onAssetRemove={mockOnAssetRemove}
+        onAssetUpdate={mockOnAssetUpdate}
+      />
+    );
+
+    // Check that asset counts are displayed
+    expect(screen.getByText(/All Assets/)).toBeInTheDocument();
+    expect(screen.getByText('(3)')).toBeInTheDocument(); // Total count
+  });
+
+  it('should maintain general upload button functionality', () => {
+    render(
+      <AssetManager
+        assets={mockAssets}
+        onAssetAdd={mockOnAssetAdd}
+        onAssetRemove={mockOnAssetRemove}
+        onAssetUpdate={mockOnAssetUpdate}
+      />
+    );
+
+    // Main upload button should still exist
+    expect(screen.getByText('Upload Files')).toBeInTheDocument();
+  });
+
+  it('should maintain URL import functionality', () => {
+    render(
+      <AssetManager
+        assets={mockAssets}
+        onAssetAdd={mockOnAssetAdd}
+        onAssetRemove={mockOnAssetRemove}
+        onAssetUpdate={mockOnAssetUpdate}
+      />
+    );
+
+    // URL import button should still exist
+    expect(screen.getByText('From URL')).toBeInTheDocument();
+  });
+});

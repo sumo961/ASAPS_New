@@ -1,0 +1,673 @@
+import type { Beat } from '@asaps/core';
+import type { Location } from '@asaps/core';
+
+/**
+ * Visual element interface matching the one in VisualWorkspace
+ */
+interface VisualElement {
+  id: string;
+  type: 'text' | 'button' | 'character' | 'prop' | 'dialog' | 'hotspot';
+  name?: string;
+  text?: string;
+  assetId?: string;
+  x: number;
+  y: number;
+  z: number;
+  width: number;
+  height: number;
+  rotation: number;
+  scale: number;
+  visible: boolean;
+  locked: boolean;
+  sound?: string;
+  font?: string;
+  fontSize?: number;
+  textAlign?: 'left' | 'center' | 'right';
+}
+
+/**
+ * Auto-size text elements based on content and font size
+ */
+function autoSizeText(text: string, fontSize: number = 18, minWidth = 100, maxWidth = 824): { width: number; height: number } {
+  if (!text) return { width: minWidth, height: Math.max(40, fontSize * 2) };
+
+  const charCount = text.length;
+  // Use more accurate character width for Arial (approximately 0.5-0.52 of fontSize)
+  const avgCharWidth = fontSize * 0.52;
+  const lineHeight = fontSize * 1.2; // Tighter line height
+  const horizontalPadding = 24; // Fixed horizontal padding
+  const verticalPadding = 16; // Fixed vertical padding
+
+  // Calculate ideal width to fit all text on one line
+  const idealSingleLineWidth = charCount * avgCharWidth + horizontalPadding;
+
+  // Determine actual width (between min and max)
+  let width = Math.min(Math.max(idealSingleLineWidth, minWidth), maxWidth);
+
+  // Calculate how many characters fit per line
+  const availableWidth = width - horizontalPadding;
+  const charsPerLine = Math.floor(availableWidth / avgCharWidth);
+
+  // Calculate number of lines needed (minimum 1)
+  const lineCount = charsPerLine > 0 ? Math.max(1, Math.ceil(charCount / charsPerLine)) : 1;
+
+  // Calculate height based on actual line count
+  const height = lineCount * lineHeight + verticalPadding;
+
+  return { width: Math.round(width), height: Math.round(height) };
+}
+
+/**
+ * Load elements from beat.locations or parameters
+ */
+function loadElementsFromBeat(beat: Beat, params: Record<string, any>): VisualElement[] {
+  let elements: VisualElement[] = [];
+
+  // Priority 1: Load from beat.locations (persisted data)
+  if (beat.locations.size > 0) {
+    elements = Array.from(beat.locations.values()).map((loc: Location) => {
+      const element: any = {
+        id: `element_${Date.now()}_${Math.random()}`,
+        type: loc.kind === 'character' ? 'character' :
+              loc.kind === 'prop' ? 'prop' :
+              loc.kind === 'dialog' ? 'dialog' :
+              loc.kind === 'button' ? 'button' :
+              loc.kind === 'hotspot' ? 'hotspot' :
+              'text',
+        name: loc.name,
+        text: '',
+        assetId: loc.assetId,
+        x: loc.x,
+        y: loc.y,
+        z: loc.zIndex || 0,
+        width: loc.width,
+        height: loc.height,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        sound: loc.sound,
+        font: loc.font,
+        fontSize: loc.fontSize,
+        textAlign: loc.textAlign
+      };
+
+      // Populate text content from beat parameters based on element name
+      const nameLower = loc.name.toLowerCase();
+      if (element.type === 'dialog' || element.type === 'text') {
+        if (beat.type === 'introText' || beat.type === 'durScreen') {
+          element.text = params.text || '';
+        } else if (beat.type === 'endScreen' && nameLower.includes('end')) {
+          element.text = params.message || 'The End';
+        }
+      } else if (element.type === 'button') {
+        if (beat.type === 'titleScreen' && nameLower.includes('start')) {
+          element.text = params.buttonText || 'Start';
+        } else if (beat.type === 'endScreen') {
+          if (nameLower.includes('restart') || nameLower.includes('again')) {
+            element.text = params.restartText || params.buttonText || 'Play Again';
+          } else if (nameLower.includes('credits')) {
+            element.text = params.creditsText || 'Credits';
+          }
+        }
+      }
+
+      return element;
+    }).filter((element: any) => element !== null);
+  }
+
+  return elements;
+}
+
+/**
+ * Auto-create beat-specific elements if not present
+ */
+function autoCreateBeatElements(
+  beat: Beat,
+  params: Record<string, any>,
+  elements: VisualElement[],
+  centerX: number,
+  centerY: number
+): VisualElement[] {
+  let updatedElements = [...elements];
+
+  if (beat.type === 'titleScreen') {
+    // Calculate title dimensions for positioning
+    const title = params.title || 'Untitled Story';
+    const titleDims = autoSizeText(title, 48, 200, 800);
+    const titleY = 120;
+
+    // Update or add Title element
+    const existingTitleIndex = updatedElements.findIndex((e: VisualElement) =>
+      e.type === 'text' && (e.name === 'Title' || e.name?.toLowerCase().includes('title'))
+    );
+
+    if (existingTitleIndex !== -1) {
+      // Update existing title element with correct dimensions
+      const existingTitle = updatedElements[existingTitleIndex];
+      updatedElements[existingTitleIndex] = {
+        ...existingTitle,
+        text: title,
+        width: titleDims.width,
+        height: titleDims.height,
+        x: centerX - titleDims.width / 2,
+        y: titleY,
+        fontSize: existingTitle.fontSize || 48
+      };
+    } else {
+      // Create new title element
+      updatedElements.push({
+        id: `text_title_${Date.now()}`,
+        type: 'text',
+        name: 'Title',
+        text: title,
+        x: centerX - titleDims.width / 2,
+        y: titleY,
+        z: 5,
+        width: titleDims.width,
+        height: titleDims.height,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 48,
+        textAlign: 'center'
+      });
+    }
+
+    // Update or add Author element
+    const author = params.author ? `by ${params.author}` : '';
+    const existingAuthorIndex = updatedElements.findIndex((e: VisualElement) =>
+      e.type === 'text' && (e.name === 'Author' || e.name?.toLowerCase().includes('author'))
+    );
+
+    if (existingAuthorIndex !== -1) {
+      // Update existing author element with correct dimensions
+      if (author) {
+        const authorDims = autoSizeText(author, 24, 100, 600);
+        const existingAuthor = updatedElements[existingAuthorIndex];
+        updatedElements[existingAuthorIndex] = {
+          ...existingAuthor,
+          text: author,
+          width: authorDims.width,
+          height: authorDims.height,
+          x: centerX - authorDims.width / 2,
+          y: titleY + titleDims.height + 10,
+          fontSize: existingAuthor.fontSize || 24
+        };
+      } else {
+        // Remove author element if author is empty
+        updatedElements.splice(existingAuthorIndex, 1);
+      }
+    } else if (author) {
+      // Create new author element if author text exists
+      const authorDims = autoSizeText(author, 24, 100, 600);
+      updatedElements.push({
+        id: `text_author_${Date.now()}`,
+        type: 'text',
+        name: 'Author',
+        text: author,
+        x: centerX - authorDims.width / 2,
+        y: titleY + titleDims.height + 10,
+        z: 5,
+        width: authorDims.width,
+        height: authorDims.height,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 24,
+        textAlign: 'center'
+      });
+    }
+
+    // Add Start button if not present
+    if (!updatedElements.some((e: VisualElement) => e.type === 'button' && e.name === 'Start')) {
+      const buttonText = params.buttonText || 'Start';
+      const buttonDims = autoSizeText(buttonText, 18, 120, 400);
+      const buttonWidth = Math.max(buttonDims.width, 180); // Minimum 180px for buttons
+      const buttonHeight = Math.max(buttonDims.height, 50); // Minimum 50px height, scales with text
+
+      updatedElements.push({
+        id: `button_start_${Date.now()}`,
+        type: 'button',
+        name: 'Start',
+        text: buttonText,
+        x: centerX - buttonWidth / 2,
+        y: 500,
+        z: 10,
+        width: buttonWidth,
+        height: buttonHeight,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 18,
+        textAlign: 'center'
+      });
+    }
+  } else if (beat.type === 'introText') {
+    // IntroText: Main text + Continue button
+    const text = params.text || '';
+    const existingTextIndex = updatedElements.findIndex((e: VisualElement) =>
+      (e.type === 'text' || e.type === 'dialog') && (e.name === 'Main Text' || e.name?.toLowerCase().includes('text'))
+    );
+
+    if (existingTextIndex !== -1) {
+      // Update existing text element with correct dimensions
+      const existingText = updatedElements[existingTextIndex];
+      const fontSize = existingText.fontSize || 18;
+      const textDims = autoSizeText(text, fontSize, 300, 800);
+      updatedElements[existingTextIndex] = {
+        ...existingText,
+        text: text,
+        width: textDims.width,
+        height: textDims.height,
+        x: centerX - textDims.width / 2,
+        y: centerY - textDims.height / 2,
+        fontSize: fontSize
+      };
+    } else {
+      // Create new text element
+      const textDims = autoSizeText(text, 18, 300, 800);
+      updatedElements.push({
+        id: `text_main_${Date.now()}`,
+        type: 'text',
+        name: 'Main Text',
+        text: text,
+        x: centerX - textDims.width / 2,
+        y: centerY - textDims.height / 2,
+        z: 5,
+        width: textDims.width,
+        height: textDims.height,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 18,
+        textAlign: 'left'
+      });
+    }
+
+    // Add Continue button if not present
+    if (!updatedElements.some((e: VisualElement) => e.type === 'button' && (e.name === 'Continue' || e.name?.toLowerCase().includes('button')))) {
+      const buttonText = params.buttonText || 'Continue';
+      const buttonDims = autoSizeText(buttonText, 18, 120, 400);
+      const buttonWidth = Math.max(buttonDims.width, 180); // Minimum 180px for buttons
+      const buttonHeight = Math.max(buttonDims.height, 50); // Minimum 50px height, scales with text
+
+      updatedElements.push({
+        id: `button_continue_${Date.now()}`,
+        type: 'button',
+        name: 'Continue',
+        text: buttonText,
+        x: centerX - buttonWidth / 2,
+        y: 600,
+        z: 10,
+        width: buttonWidth,
+        height: buttonHeight,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 18,
+        textAlign: 'center'
+      });
+    }
+  } else if (beat.type === 'durScreen') {
+    // DurScreen: Main text ONLY (no button, auto-continues after duration)
+    const text = params.text || '';
+    const existingTextIndex = updatedElements.findIndex((e: VisualElement) =>
+      (e.type === 'text' || e.type === 'dialog') && (e.name === 'Main Text' || e.name?.toLowerCase().includes('text'))
+    );
+
+    if (existingTextIndex !== -1) {
+      // Update existing text element with correct dimensions
+      const existingText = updatedElements[existingTextIndex];
+      const fontSize = existingText.fontSize || 18;
+      const textDims = autoSizeText(text, fontSize, 300, 800);
+      updatedElements[existingTextIndex] = {
+        ...existingText,
+        text: text,
+        width: textDims.width,
+        height: textDims.height,
+        x: centerX - textDims.width / 2,
+        y: centerY - textDims.height / 2,
+        fontSize: fontSize
+      };
+    } else {
+      // Create new text element
+      const textDims = autoSizeText(text, 18, 300, 800);
+      updatedElements.push({
+        id: `text_main_${Date.now()}`,
+        type: 'text',
+        name: 'Main Text',
+        text: text,
+        x: centerX - textDims.width / 2,
+        y: centerY - textDims.height / 2,
+        z: 5,
+        width: textDims.width,
+        height: textDims.height,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 18,
+        textAlign: 'left'
+      });
+    }
+    // NO BUTTON for durScreen - it auto-continues after duration
+  } else if (beat.type === 'endScreen') {
+    // Calculate button positioning based on which buttons are shown
+    const restartWidth = 180;
+    const creditsWidth = 180;
+    const buttonSpacing = 20;
+    const showRestart = params.showRestart !== false;
+    const showCredits = params.showCredits === true;
+
+    let restartX: number;
+    let creditsX: number;
+
+    if (showRestart && showCredits) {
+      const totalButtonWidth = restartWidth + creditsWidth + buttonSpacing;
+      const buttonsStartX = centerX - totalButtonWidth / 2;
+      restartX = buttonsStartX;
+      creditsX = buttonsStartX + restartWidth + buttonSpacing;
+    } else if (showRestart) {
+      restartX = centerX - restartWidth / 2;
+      creditsX = 0;
+    } else if (showCredits) {
+      restartX = 0;
+      creditsX = centerX - creditsWidth / 2;
+    } else {
+      restartX = 0;
+      creditsX = 0;
+    }
+
+    // Update or add End Message element
+    const message = params.message || 'The End';
+    const existingMessageIndex = updatedElements.findIndex((e: VisualElement) =>
+      e.type === 'text' && (e.name === 'End Message' || e.name?.toLowerCase().includes('end'))
+    );
+
+    if (existingMessageIndex !== -1) {
+      // Update existing message element with correct dimensions
+      const existingMessage = updatedElements[existingMessageIndex];
+      const fontSize = existingMessage.fontSize || 36;
+      const messageDims = autoSizeText(message, fontSize, 200, 800);
+      updatedElements[existingMessageIndex] = {
+        ...existingMessage,
+        text: message,
+        width: messageDims.width,
+        height: messageDims.height,
+        x: centerX - messageDims.width / 2,
+        y: 200,
+        fontSize: fontSize
+      };
+    } else {
+      // Create new message element
+      const messageDims = autoSizeText(message, 36, 200, 800);
+      updatedElements.push({
+        id: `text_end_${Date.now()}`,
+        type: 'text',
+        name: 'End Message',
+        text: message,
+        x: centerX - messageDims.width / 2,
+        y: 200,
+        z: 5,
+        width: messageDims.width,
+        height: messageDims.height,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 36,
+        textAlign: 'center'
+      });
+    }
+
+    // Add Restart button if showRestart is true and not present
+    if (showRestart && !updatedElements.some((e: VisualElement) => e.type === 'button' && (e.name === 'Restart' || e.name?.toLowerCase().includes('restart')))) {
+      updatedElements.push({
+        id: `button_restart_${Date.now()}`,
+        type: 'button',
+        name: 'Restart',
+        text: params.restartText || params.buttonText || 'Play Again',
+        x: restartX,
+        y: 500,
+        z: 10,
+        width: restartWidth,
+        height: 50,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 18,
+        textAlign: 'center'
+      });
+    }
+
+    // Add Credits button if showCredits is true and not present
+    if (showCredits && !updatedElements.some((e: VisualElement) => e.type === 'button' && (e.name === 'Credits' || e.name?.toLowerCase().includes('credits')))) {
+      updatedElements.push({
+        id: `button_credits_${Date.now()}`,
+        type: 'button',
+        name: 'Credits',
+        text: params.creditsText || 'Credits',
+        x: creditsX,
+        y: 500,
+        z: 10,
+        width: creditsWidth,
+        height: 50,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 18,
+        textAlign: 'center'
+      });
+    }
+  } else if (beat.type === 'inputText') {
+    // Input Text beat: prompt (text), inputField (input), submitButton (button)
+    const prompt = params.prompt || 'Please enter your response:';
+    const promptDims = autoSizeText(prompt, 20, 200, 700);
+    const promptY = 150;
+
+    // Update or add Prompt text element
+    const existingPromptIndex = updatedElements.findIndex((e: VisualElement) =>
+      e.type === 'text' && (e.name === 'Prompt' || e.name?.toLowerCase().includes('prompt'))
+    );
+
+    if (existingPromptIndex !== -1) {
+      const existingPrompt = updatedElements[existingPromptIndex];
+      updatedElements[existingPromptIndex] = {
+        ...existingPrompt,
+        text: prompt,
+        width: promptDims.width,
+        height: promptDims.height,
+        x: centerX - promptDims.width / 2,
+        y: promptY,
+        fontSize: existingPrompt.fontSize || 20
+      };
+    } else {
+      updatedElements.push({
+        id: `text_prompt_${Date.now()}`,
+        type: 'text',
+        name: 'Prompt',
+        text: prompt,
+        x: centerX - promptDims.width / 2,
+        y: promptY,
+        z: 5,
+        width: promptDims.width,
+        height: promptDims.height,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 20,
+        textAlign: 'center'
+      });
+    }
+
+    // Add Input Field element (visual representation using text type)
+    const existingInputIndex = updatedElements.findIndex((e: VisualElement) =>
+      e.type === 'text' && (e.name === 'Input Field' || e.name?.toLowerCase().includes('input'))
+    );
+
+    if (existingInputIndex !== -1) {
+      const existingInput = updatedElements[existingInputIndex];
+      updatedElements[existingInputIndex] = {
+        ...existingInput,
+        x: centerX - 200,
+        y: promptY + promptDims.height + 30,
+        width: 400,
+        height: 40
+      };
+    } else {
+      updatedElements.push({
+        id: `text_input_field_${Date.now()}`,
+        type: 'text',
+        name: 'Input Field',
+        text: params.placeholder || '[Input Field]',
+        x: centerX - 200,
+        y: promptY + promptDims.height + 30,
+        z: 5,
+        width: 400,
+        height: 40,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 16,
+        textAlign: 'left'
+      });
+    }
+
+    // Add Submit Button
+    const buttonText = params.buttonText || 'Continue';
+    const buttonDims = autoSizeText(buttonText, 18, 120, 200);
+    const buttonY = promptY + promptDims.height + 90;
+    const buttonX = centerX - buttonDims.width / 2 - 20; // -20 for padding
+
+    const existingButtonIndex = updatedElements.findIndex((e: VisualElement) =>
+      e.type === 'button' && (e.name === 'Submit Button' || e.name?.toLowerCase().includes('submit') || e.name?.toLowerCase().includes('continue'))
+    );
+
+    if (existingButtonIndex !== -1) {
+      const existingButton = updatedElements[existingButtonIndex];
+      updatedElements[existingButtonIndex] = {
+        ...existingButton,
+        text: buttonText,
+        width: buttonDims.width + 40,
+        height: buttonDims.height + 20,
+        x: buttonX,
+        y: buttonY,
+        fontSize: existingButton.fontSize || 18
+      };
+    } else {
+      updatedElements.push({
+        id: `button_submit_${Date.now()}`,
+        type: 'button',
+        name: 'Submit Button',
+        text: buttonText,
+        x: buttonX,
+        y: buttonY,
+        z: 10,
+        width: buttonDims.width + 40,
+        height: buttonDims.height + 20,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: 'Arial',
+        fontSize: 18,
+        textAlign: 'center'
+      });
+    }
+  }
+
+  return updatedElements;
+}
+
+/**
+ * Initialize beat.locations for all beats that support visual editing
+ * This ensures preview works correctly even if the visual editor hasn't been opened
+ */
+export function initializeBeatLocations(
+  beats: Beat[],
+  projectWidth: number = 1024,
+  projectHeight: number = 768
+): void {
+  const centerX = projectWidth / 2;
+  const centerY = projectHeight / 2;
+
+  const visualBeatTypes = [
+    'titleScreen',
+    'introText',
+    'durScreen',
+    'endScreen',
+    'inputText',
+    // Add more as needed
+  ];
+
+  beats.forEach((beat: Beat) => {
+    // Skip if not a visual beat type
+    if (!visualBeatTypes.includes(beat.type)) {
+      return;
+    }
+
+    console.log(`[initializeBeatLocations] ${beat.locations.size > 0 ? 'Updating' : 'Initializing'} ${beat.type} (${beat.id})`);
+
+    const params = beat.getParameters ? beat.getParameters() : {};
+
+    // Load existing elements from beat.locations (if any)
+    let elements = loadElementsFromBeat(beat, params);
+
+    // Auto-create missing elements or update existing ones with correct dimensions
+    elements = autoCreateBeatElements(beat, params, elements, centerX, centerY);
+
+    // Update beat.locations with the elements
+    beat.locations.clear();
+    elements.forEach((el: VisualElement) => {
+      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog';
+      if (el.type === 'character') kind = 'character';
+      else if (el.type === 'prop') kind = 'prop';
+      else if (el.type === 'dialog') kind = 'dialog';
+      else if (el.type === 'button') kind = 'button';
+      else if (el.type === 'hotspot') kind = 'hotspot';
+      else kind = 'text';
+
+      const location: any = {
+        kind,
+        name: el.name || el.text || '',
+        x: Math.round(el.x),
+        y: Math.round(el.y),
+        width: Math.round(el.width),
+        height: Math.round(el.height),
+        zIndex: el.z
+      };
+
+      if (el.assetId) location.assetId = el.assetId;
+      if (el.sound) location.sound = el.sound;
+      if (el.font) location.font = el.font;
+      if (el.fontSize !== undefined) location.fontSize = el.fontSize;
+      if (el.textAlign) location.textAlign = el.textAlign;
+      location.autosize = el.fontSize === undefined;
+
+      beat.locations.set(el.name || el.id, location);
+    });
+
+    console.log(`[initializeBeatLocations] Initialized ${beat.type} (${beat.id}) with ${beat.locations.size} locations`);
+  });
+}

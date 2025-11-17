@@ -1,0 +1,618 @@
+import React, { useState, useCallback } from 'react';
+import { 
+  MessageSquare, 
+  Plus, 
+  Trash2, 
+  ChevronRight, 
+  ChevronDown, 
+  User, 
+  Users,
+  AlertCircle,
+  Zap,
+  GitBranch,
+  Edit3,
+  Save,
+  X,
+  Link2,
+  ArrowRight,
+  CornerDownRight,
+  Minimize2,
+  Maximize2
+} from 'lucide-react';
+import type { Beat } from '@asaps/core';
+
+interface DialogNode {
+  id: string;
+  speaker: string;
+  text: string;
+  conditions?: Condition[];
+  choices?: DialogChoice[];
+  next?: string | DialogNode;
+  effects?: Effect[];
+}
+
+interface DialogChoice {
+  id: string;
+  text: string;
+  target?: string | DialogNode;
+  conditions?: Condition[];
+  effects?: Effect[];
+  visible?: boolean;
+  counter?: string;
+  counterOperation?: 'change' | 'set';
+  counterValue?: number;
+}
+
+interface Condition {
+  type: 'variable' | 'counter' | 'inventory' | 'visitedBeat';
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=';
+  left: string;
+  right: any;
+}
+
+interface Effect {
+  type: 'setVariable' | 'setCounter' | 'addInventory' | 'removeInventory';
+  target: string;
+  value: any;
+  operation?: 'add' | 'subtract' | 'set';
+}
+
+interface DialogTreeEditorProps {
+  dialogTree: DialogNode;
+  onChange: (tree: DialogNode) => void;
+  characters?: string[];
+  variables?: string[];
+  counters?: string[];
+  allBeats?: Beat[];
+  expanded?: boolean;
+}
+
+export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
+  dialogTree,
+  onChange,
+  characters = ['Old Wizard', 'Merchant', 'Guard', 'Innkeeper', 'Mysterious Stranger', 'Village Elder', 'Narrator'],
+  variables = [],
+  counters = [],
+  allBeats = [],
+  expanded = false
+}) => {
+  // Track expanded state for each node by its path - always start with root expanded
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
+    // Always include root in initial expanded state
+    return new Set(['root']);
+  });
+  const [expandedChoices, setExpandedChoices] = useState<Set<string>>(new Set());
+  const [editingNode, setEditingNode] = useState<{node: DialogNode, path: string[]} | null>(null);
+  const [showConditions, setShowConditions] = useState(false);
+  const [showEffects, setShowEffects] = useState(false);
+  const [globalExpanded, setGlobalExpanded] = useState(true);
+
+  // Get available counters from characters or use defaults
+  const availableCounters = counters.length > 0 ? counters : ['health', 'courage', 'gold', 'experience', 'reputation'];
+
+  // Deep clone helper
+  const cloneNode = (node: DialogNode): DialogNode => {
+    return JSON.parse(JSON.stringify(node));
+  };
+
+  // Navigate to node at path
+  const getNodeAtPath = (tree: DialogNode, path: string[]): DialogNode | null => {
+    let current: any = tree;
+    
+    for (let i = 1; i < path.length; i++) { // Skip 'root'
+      const key = path[i];
+      if (key.startsWith('choice_')) {
+        const choiceIndex = parseInt(key.split('_')[1]);
+        if (current.choices && current.choices[choiceIndex]) {
+          const target = current.choices[choiceIndex].target;
+          if (typeof target === 'object' && target !== null) {
+            current = target;
+          } else {
+            return null;
+          }
+        } else {
+          return null;
+        }
+      }
+    }
+    
+    return current;
+  };
+
+  // Update node at path
+  const updateNodeAtPath = (tree: DialogNode, path: string[], updates: Partial<DialogNode>): DialogNode => {
+    const newTree = cloneNode(tree);
+    
+    if (path.length === 1 && path[0] === 'root') {
+      // Updating root node
+      Object.assign(newTree, updates);
+      return newTree;
+    }
+    
+    // Navigate to the target node
+    let current: any = newTree;
+    for (let i = 1; i < path.length; i++) { // Skip 'root'
+      const key = path[i];
+      if (key.startsWith('choice_')) {
+        const choiceIndex = parseInt(key.split('_')[1]);
+        if (current.choices && current.choices[choiceIndex]) {
+          const target = current.choices[choiceIndex].target;
+          if (typeof target === 'object' && target !== null) {
+            if (i === path.length - 1) {
+              // This is the target to update
+              Object.assign(current.choices[choiceIndex].target, updates);
+            } else {
+              current = current.choices[choiceIndex].target;
+            }
+          }
+        }
+      }
+    }
+    
+    return newTree;
+  };
+
+  // Add choice at any level
+  const addChoiceAtPath = (path: string[]) => {
+    const node = getNodeAtPath(dialogTree, path);
+    if (!node) return;
+    
+    const updates: Partial<DialogNode> = {
+      choices: [
+        ...(node.choices || []),
+        {
+          id: `choice_${Date.now()}`,
+          text: 'Player response...',
+          visible: true
+        }
+      ]
+    };
+    
+    const updated = updateNodeAtPath(dialogTree, path, updates);
+    onChange(updated);
+    
+    // Auto-expand the node to show the new choice
+    const nodeId = path.join('.');
+    if (!expandedNodes.has(nodeId)) {
+      setExpandedNodes(new Set([...expandedNodes, nodeId]));
+    }
+  };
+
+  // Update choice at path
+  const updateChoiceAtPath = (path: string[], choiceIndex: number, updates: Partial<DialogChoice>) => {
+    const node = getNodeAtPath(dialogTree, path);
+    if (!node || !node.choices || !node.choices[choiceIndex]) return;
+    
+    const newChoices = [...node.choices];
+    newChoices[choiceIndex] = { ...newChoices[choiceIndex], ...updates };
+    
+    const updated = updateNodeAtPath(dialogTree, path, { choices: newChoices });
+    onChange(updated);
+  };
+
+  // Create nested dialog
+  const createNestedDialog = (path: string[], choiceIndex: number) => {
+    const newNode: DialogNode = {
+      id: `node_${Date.now()}`,
+      speaker: characters[0],
+      text: 'NPC response...'
+    };
+    
+    updateChoiceAtPath(path, choiceIndex, { target: newNode });
+    
+    // Auto-expand the choice to show the new nested dialog
+    const choiceId = `${path.join('.')}.choice_${choiceIndex}`;
+    setExpandedChoices(new Set([...expandedChoices, choiceId]));
+  };
+
+  // Remove choice
+  const removeChoiceAtPath = (path: string[], choiceIndex: number) => {
+    const node = getNodeAtPath(dialogTree, path);
+    if (!node || !node.choices) return;
+    
+    const newChoices = node.choices.filter((_, i) => i !== choiceIndex);
+    const updated = updateNodeAtPath(dialogTree, path, { choices: newChoices });
+    onChange(updated);
+  };
+
+  // Toggle node expansion (for nodes with choices)
+  const toggleNodeExpansion = (nodeId: string) => {
+    const newExpanded = new Set(expandedNodes);
+    if (newExpanded.has(nodeId)) {
+      newExpanded.delete(nodeId);
+    } else {
+      newExpanded.add(nodeId);
+    }
+    setExpandedNodes(newExpanded);
+  };
+
+  // Toggle choice expansion (for individual choice threads)
+  const toggleChoiceExpansion = (choiceId: string) => {
+    const newExpanded = new Set(expandedChoices);
+    if (newExpanded.has(choiceId)) {
+      newExpanded.delete(choiceId);
+    } else {
+      newExpanded.add(choiceId);
+    }
+    setExpandedChoices(newExpanded);
+  };
+
+  // Expand/Collapse all
+  const toggleAllExpanded = () => {
+    if (globalExpanded) {
+      // Collapse all (but keep root expanded to show "Add Player Response")
+      setExpandedNodes(new Set(['root']));
+      setExpandedChoices(new Set());
+    } else {
+      // Expand all - need to traverse tree to find all nodes
+      const allNodeIds = new Set<string>(['root']); // Always include root
+      const allChoiceIds = new Set<string>();
+      
+      const traverse = (node: DialogNode, path: string[]) => {
+        const nodeId = path.join('.');
+        // Add all nodes, even those without choices (for NPC nodes)
+        allNodeIds.add(nodeId);
+        if (node.choices) {
+          node.choices.forEach((choice, index) => {
+            const choiceId = `${nodeId}.choice_${index}`;
+            if (typeof choice.target === 'object' && choice.target) {
+              allChoiceIds.add(choiceId);
+              traverse(choice.target, [...path, `choice_${index}`]);
+            }
+          });
+        }
+      };
+      
+      traverse(dialogTree, ['root']);
+      setExpandedNodes(allNodeIds);
+      setExpandedChoices(allChoiceIds);
+    }
+    setGlobalExpanded(!globalExpanded);
+  };
+
+  // Render dialog node recursively with unlimited depth
+  const renderDialogNode = (node: DialogNode, path: string[] = ['root'], depth: number = 0): JSX.Element => {
+    const nodeId = path.join('.');
+    const isExpanded = expandedNodes.has(nodeId);
+    const isNPC = depth % 2 === 0; // Even depths are NPC, odd are player
+    const hasChoices = node.choices && node.choices.length > 0;
+    // For root node or nodes without choices, always show as expanded to display "Add Player Response"
+    const shouldShowContent = isExpanded || (!hasChoices && isNPC);
+    
+    return (
+      <div key={nodeId} className={`${depth > 0 ? 'ml-4' : ''}`}>
+        {/* Node Header */}
+        <div className={`flex items-start gap-2 p-2 rounded-lg mb-1 ${
+          isNPC ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+        }`}>
+          {/* Expand/Collapse for nodes with choices */}
+          {hasChoices ? (
+            <button
+              onClick={() => toggleNodeExpansion(nodeId)}
+              className="p-0.5 hover:bg-gray-200 rounded mt-0.5"
+              title={isExpanded ? "Collapse choices" : "Expand choices"}
+            >
+              {isExpanded ? 
+                <ChevronDown className="w-4 h-4" /> : 
+                <ChevronRight className="w-4 h-4" />
+              }
+            </button>
+          ) : (
+            <div className="w-5" />  // Keep spacing consistent
+          )}
+          
+          {/* Node Content */}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              {isNPC ? <Users className="w-4 h-4 text-blue-600" /> : <User className="w-4 h-4 text-orange-600" />}
+              <span className="font-medium text-sm">{node.speaker}</span>
+              {hasChoices && (
+                <span className="text-xs text-gray-500">
+                  ({node.choices?.length} choice{node.choices?.length !== 1 ? 's' : ''})
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-700">{node.text}</p>
+          </div>
+          
+          {/* Edit button for NPC nodes */}
+          {isNPC && (
+            <button
+              onClick={() => {
+                // Get the actual node from the tree at this path
+                const actualNode = getNodeAtPath(dialogTree, path);
+                if (actualNode) {
+                  setEditingNode({ node: actualNode, path });
+                }
+              }}
+              className="p-1 hover:bg-gray-200 rounded"
+              title="Edit dialog"
+            >
+              <Edit3 className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+        
+        {/* Choices (Player responses) - show if expanded OR if it's an NPC without choices */}
+        {(shouldShowContent) && (
+          <div className="ml-6 border-l-2 border-gray-200 pl-2">
+            {node.choices && node.choices.map((choice, index) => {
+              const choiceId = `${nodeId}.choice_${index}`;
+              const isChoiceExpanded = expandedChoices.has(choiceId);
+              const hasNestedDialog = typeof choice.target === 'object' && choice.target;
+              
+              return (
+                <div key={choice.id} className="mb-2">
+                  <div className="flex items-start gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                    {/* Expand/collapse for choice with nested dialog */}
+                    {hasNestedDialog && (
+                      <button
+                        onClick={() => toggleChoiceExpansion(choiceId)}
+                        className="p-0.5 hover:bg-orange-100 rounded mt-0.5"
+                        title={isChoiceExpanded ? "Collapse thread" : "Expand thread"}
+                      >
+                        {isChoiceExpanded ? 
+                          <ChevronDown className="w-3 h-3" /> : 
+                          <ChevronRight className="w-3 h-3" />
+                        }
+                      </button>
+                    )}
+                    {!hasNestedDialog && <div className="w-4" />}
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <User className="w-3 h-3 text-orange-600" />
+                        <span className="text-xs font-medium text-orange-700">Player says:</span>
+                        {hasNestedDialog && !isChoiceExpanded && (
+                          <span className="text-xs text-orange-600 bg-orange-100 px-1 rounded">
+                            Has response →
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={choice.text}
+                        onChange={(e) => updateChoiceAtPath(path, index, { text: e.target.value })}
+                        className="w-full px-2 py-1 text-sm border rounded bg-white"
+                        placeholder="Player response..."
+                      />
+                      
+                      {/* Counter effect controls */}
+                      <div className="mt-2 flex gap-2 items-center">
+                        <span className="text-xs text-gray-600">Counter:</span>
+                        <select
+                          value={choice.counter || ''}
+                          onChange={(e) => updateChoiceAtPath(path, index, { 
+                            counter: e.target.value || undefined,
+                            counterOperation: e.target.value ? 'change' : undefined,
+                            counterValue: e.target.value ? 0 : undefined
+                          })}
+                          className="flex-1 px-2 py-1 text-xs border rounded"
+                        >
+                          <option value="">None</option>
+                          {availableCounters.map(counter => (
+                            <option key={counter} value={counter}>{counter}</option>
+                          ))}
+                        </select>
+                        {choice.counter && (
+                          <>
+                            <select
+                              value={choice.counterOperation || 'change'}
+                              onChange={(e) => updateChoiceAtPath(path, index, { 
+                                counterOperation: e.target.value as 'change' | 'set' 
+                              })}
+                              className="px-2 py-1 text-xs border rounded"
+                            >
+                              <option value="change">Change</option>
+                              <option value="set">Set to</option>
+                            </select>
+                            <input
+                              type="number"
+                              value={choice.counterValue || 0}
+                              onChange={(e) => updateChoiceAtPath(path, index, { 
+                                counterValue: parseInt(e.target.value) || 0 
+                              })}
+                              className="w-20 px-2 py-1 text-xs border rounded"
+                              placeholder="0"
+                            />
+                          </>
+                        )}
+                      </div>
+                      
+                      {/* Target selection or nested dialog */}
+                      {!hasNestedDialog && (
+                        <div className="mt-2 flex gap-2 items-center">
+                          <span className="text-xs text-gray-600">→</span>
+                          <select
+                            value={typeof choice.target === 'string' ? choice.target : ''}
+                            onChange={(e) => {
+                              if (e.target.value === '__nested__') {
+                                createNestedDialog(path, index);
+                              } else {
+                                updateChoiceAtPath(path, index, { target: e.target.value });
+                              }
+                            }}
+                            className="flex-1 px-2 py-1 text-xs border rounded"
+                          >
+                            <option value="">Select action...</option>
+                            <option value="__nested__">➕ Add NPC response...</option>
+                            <optgroup label="Connect to beat">
+                              {allBeats?.map(beat => (
+                                <option key={beat.id} value={beat.id}>
+                                  → {beat.name} ({beat.id})
+                                </option>
+                              ))}
+                            </optgroup>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={() => removeChoiceAtPath(path, index)}
+                      className="p-1 text-red-500 hover:bg-red-50 rounded"
+                      title="Remove choice"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                  
+                  {/* Nested dialog (rendered recursively) */}
+                  {isChoiceExpanded && hasNestedDialog && (
+                    <div className="mt-1">
+                      {/* Increment depth by 2 to account for player choice layer */}
+                      {renderDialogNode(choice.target as DialogNode, [...path, `choice_${index}`], depth + 2)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            
+            {/* Add choice button for NPC nodes */}
+            {isNPC && (
+              <button
+                onClick={() => addChoiceAtPath(path)}
+                className="mt-2 px-3 py-1 bg-orange-100 text-orange-700 rounded text-sm hover:bg-orange-200 flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" />
+                Add Player Response
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Edit node modal
+  const renderEditModal = () => {
+    if (!editingNode) return null;
+    
+    const { node, path } = editingNode;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+          <h3 className="text-lg font-medium mb-4">Edit NPC Dialog</h3>
+          
+          <div className="space-y-3">
+            {/* Speaker */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">NPC Speaker</label>
+              <select
+                value={node.speaker}
+                onChange={(e) => {
+                  const updated = { ...node, speaker: e.target.value };
+                  setEditingNode({ node: updated, path });
+                }}
+                className="w-full px-2 py-1 border rounded text-sm"
+              >
+                {characters.map(char => (
+                  <option key={char} value={char}>{char}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Text */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Dialog Text</label>
+              <textarea
+                value={node.text}
+                onChange={(e) => {
+                  const updated = { ...node, text: e.target.value };
+                  setEditingNode({ node: updated, path });
+                }}
+                className="w-full px-2 py-1 border rounded text-sm"
+                rows={4}
+                placeholder="What does the NPC say?"
+              />
+            </div>
+            
+            {/* Buttons */}
+            <div className="flex gap-2 justify-end mt-4">
+              <button
+                onClick={() => setEditingNode(null)}
+                className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (editingNode) {
+                    // Create a partial update with only the fields we're editing
+                    const updates: Partial<DialogNode> = {
+                      speaker: editingNode.node.speaker,
+                      text: editingNode.node.text
+                    };
+                    const updated = updateNodeAtPath(dialogTree, editingNode.path, updates);
+                    onChange(updated);
+                    setEditingNode(null);
+                  }
+                }}
+                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <MessageSquare className="w-4 h-4" />
+          Dialog Tree Editor
+        </h3>
+        <div className="flex gap-1">
+          <button
+            onClick={toggleAllExpanded}
+            className="p-1 hover:bg-gray-100 rounded"
+            title={globalExpanded ? "Collapse all" : "Expand all"}
+          >
+            {globalExpanded ? 
+              <Minimize2 className="w-4 h-4" /> : 
+              <Maximize2 className="w-4 h-4" />
+            }
+          </button>
+          <button
+            onClick={() => setShowConditions(!showConditions)}
+            className={`p-1 rounded ${showConditions ? 'bg-yellow-100' : 'hover:bg-gray-100'}`}
+            title="Toggle Conditions"
+          >
+            <AlertCircle className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowEffects(!showEffects)}
+            className={`p-1 rounded ${showEffects ? 'bg-purple-100' : 'hover:bg-gray-100'}`}
+            title="Toggle Effects"
+          >
+            <Zap className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      
+      {/* Dialog Tree */}
+      <div className="border rounded-lg p-3 bg-gray-50 max-h-[500px] overflow-y-auto">
+        {renderDialogNode(dialogTree)}
+      </div>
+      
+      {/* Edit Modal */}
+      {renderEditModal()}
+      
+      {/* Instructions */}
+      <div className="text-xs text-gray-500 space-y-1 p-3 bg-gray-50 rounded">
+        <p>👤 <strong>NPCs speak</strong> (blue) → Players respond (orange) → NPCs reply...</p>
+        <p>🔄 <strong>Unlimited depth</strong> - Build complex branching conversations</p>
+        <p>📁 <strong>Click arrows</strong> to expand/collapse individual threads or choices</p>
+        <p>✏️ <strong>Click edit icon</strong> on NPC dialogs to modify speaker and text</p>
+        <p>⚡ <strong>Counter effects</strong> - Each choice can modify counters (courage, health, etc.)</p>
+        <p>🎯 <strong>Every choice leads somewhere</strong> - Add NPC response or connect to another beat</p>
+      </div>
+    </div>
+  );
+};

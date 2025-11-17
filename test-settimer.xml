@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story title="Timer Test">
+  <settings></settings>
+  <environment></environment>
+  <characters></characters>
+  <plot>
+    <clusters />
+    <beat>
+      <id id="start" name="Start" />
+      <function kind="introText" text="Starting timer...">
+        <connection target="timer_beat"/>
+      </function>
+    </beat>
+    <beat>
+      <id id="timer_beat" name="Set Timer" />
+      <function kind="setTimer">
+        <timer name="countdown" val="30" target="timeout_beat"/>
+        <connection target="continue_beat"/>
+      </function>
+    </beat>
+    <beat>
+      <id id="continue_beat" name="Continue" />
+      <function kind="introText" text="Timer is running in background...">
+        <connection target="end_beat"/>
+      </function>
+    </beat>
+    <beat>
+      <id id="timeout_beat" name="Timeout" />
+      <function kind="introText" text="Timer expired!">
+        <connection target="end_beat"/>
+      </function>
+    </beat>
+    <beat>
+      <id id="end_beat" name="End" />
+      <function kind="endScreen" message="The End"/>
+    </beat>
+  </plot>
+</story>

@@ -1,0 +1,1714 @@
+import React from 'react';
+import { Beat } from '@asaps/core';
+import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette } from 'lucide-react';
+import beatDefinitions from '../../../../beat-definitions/core-beats.json';
+import { DialogTreeEditor } from '../editors/DialogTreeEditor';
+import { VisualBeatEditor, VisualElement } from './visual/VisualBeatEditor';
+import { AssetSelector } from './assets/AssetSelector';
+import type { Asset } from './assets/AssetManager';
+
+/**
+ * ENHANCED INSPECTOR WITH PROPER SCROLLING
+ * 
+ * Fixed:
+ * 1. Proper scrolling - Save button always accessible
+ * 2. Unlimited dialog tree depth support
+ * 3. Fixed layout with scrollable content area
+ */
+
+interface InspectorProps {
+  beat: Beat | null;
+  onUpdate: (beatId: string, updates: Partial<Beat>) => void;
+  onDelete: (beatId: string) => void;
+  allBeats?: Beat[];
+  onConnect?: (sourceBeatId: string, targetBeatId: string) => void;
+  onDisconnect?: (sourceBeatId: string, targetBeatId: string) => void;
+  expanded?: boolean;
+  assets?: Asset[];
+  onAssetAdd?: (asset: Asset) => void;
+  onAssetRemove?: (assetId: string) => void;
+  onAssetUpdate?: (assetId: string, updates: Partial<Asset>) => void;
+  onOpenAssetManager?: () => void;
+}
+
+interface ChoiceWithCounter {
+  id: string;
+  text: string;
+  location?: string;
+  target: string;
+  counter?: string;
+  counterOperation?: 'change' | 'set';
+  counterValue?: number;
+}
+
+interface PropWithEffect {
+  id: string;
+  name: string;
+  description: string;
+  target: string;
+  counter?: string;
+  counterOperation?: 'change' | 'set';
+  counterValue?: number;
+  effect?: {
+    type: 'inventory' | 'variable';
+    name: string;
+    value: any;
+  };
+}
+
+export const Inspector: React.FC<InspectorProps> = ({
+  beat,
+  onUpdate,
+  onDelete,
+  allBeats = [],
+  onConnect,
+  onDisconnect,
+  expanded = false,
+  assets = [],
+  onAssetAdd,
+  onAssetRemove,
+  onAssetUpdate,
+  onOpenAssetManager,
+}) => {
+  const [localBeat, setLocalBeat] = React.useState<any>(null);
+  const [hasChanges, setHasChanges] = React.useState(false);
+  const [showAdvanced, setShowAdvanced] = React.useState(false);
+  const [validationErrors, setValidationErrors] = React.useState<string[]>([]);
+  const [activeTab, setActiveTab] = React.useState<'properties' | 'visual'>('properties');
+  const [visualElements, setVisualElements] = React.useState<VisualElement[]>([]);
+
+  // Get beat definition from schema
+  const getBeatDefinition = (beatType: string) => {
+    return beatDefinitions.beatTypes[beatType as keyof typeof beatDefinitions.beatTypes];
+  };
+
+  // Get available characters - NPCs who can speak
+  const getAvailableCharacters = () => {
+    return ['Old Wizard', 'Merchant', 'Guard', 'Innkeeper', 'Mysterious Stranger', 'Village Elder', 'Narrator'];
+  };
+
+  // Check if beat type supports visual editor
+  const supportsVisualEditor = (beatType: string) => {
+    return ['introText', 'durScreen', 'pickProp', 'movementChoice'].includes(beatType);
+  };
+
+  // Handle visual elements change
+  const handleVisualElementsChange = (elements: VisualElement[]) => {
+    setVisualElements(elements);
+    setHasChanges(true);
+  };
+
+  // Handle asset selection for visual editor
+  const handleAssetSelection = (assetType: 'background' | 'character' | 'prop') => {
+    if (onOpenAssetManager) {
+      onOpenAssetManager();
+    }
+  };
+
+  // Add visual element from asset
+  const addVisualElementFromAsset = (assetId: string, elementType: 'character' | 'prop') => {
+    const asset = assets.find(a => a.id === assetId);
+    if (!asset) return;
+
+    const newElement: VisualElement = {
+      id: `element_${Date.now()}`,
+      type: elementType,
+      assetId,
+      x: 200,
+      y: 200,
+      z: visualElements.length,
+      width: 150,
+      height: 150,
+      rotation: 0,
+      scale: 1,
+      visible: true,
+      locked: false,
+      name: asset.name
+    };
+
+    setVisualElements(prev => [...prev, newElement]);
+    setHasChanges(true);
+  };
+
+  React.useEffect(() => {
+    if (beat) {
+      const beatData = beat.toJSON();
+      
+      const connections = beat.getConnections ? beat.getConnections() : [];
+      const uniqueConnections = Array.from(
+        new Map(connections.map(c => [`${c.targetId}-${c.label}`, c])).values()
+        );
+      beatData.connections = uniqueConnections;
+      
+      beatData.parameters = beat.getParameters ? beat.getParameters() : {};
+      
+      const beatDef = getBeatDefinition(beat.type);
+      if (beatDef?.connectionType === 'multiple') {
+        if (beat.type === 'movementChoice' && !beatData.parameters.choices) {
+          beatData.parameters.choices = [];
+        } else if (beat.type === 'pickProp' && !beatData.parameters.props) {
+          beatData.parameters.props = [];
+        } else if (beat.type === 'dialogTree' && !beatData.parameters.dialogTree) {
+          const npcCharacters = getAvailableCharacters();
+          beatData.parameters.dialogTree = {
+            id: 'root',
+            speaker: beatData.parameters.speaker || npcCharacters[0],
+            text: beatData.parameters.text || 'Greetings, traveler...',
+            emotion: beatData.parameters.emotion || 'neutral'
+          };
+        }
+      }
+      
+      setLocalBeat(beatData);
+      setHasChanges(false);
+      setValidationErrors([]);
+      
+      // Load visual elements from beat parameters
+      const savedVisualElements = beatData.parameters?.visualElements || [];
+      setVisualElements(savedVisualElements);
+      
+      // Set default tab based on beat type
+      if (supportsVisualEditor(beat.type)) {
+        setActiveTab('properties');
+      }
+    }
+  }, [beat?.id, beat?.name]);
+
+  if (!beat || !localBeat) {
+    return (
+      <div className={`${expanded ? 'w-[640px]' : 'w-80'} h-full bg-white border-l border-gray-200 flex flex-col`}>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center text-gray-500">
+            <Info className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm">Select a beat to view its properties</p>
+          </div>
+        </div>
+      </div>
+      );
+  }
+
+  const beatDef = getBeatDefinition(beat.type);
+  const connectionType = beatDef?.connectionType || 'single';
+
+  const validateBeat = (): string[] => {
+    const errors: string[] = [];
+    
+    switch (beat.type) {
+    case 'titleScreen':
+      if (!localBeat.parameters?.title) errors.push('Title is required');
+      break;
+    case 'introText':
+      if (!localBeat.parameters?.text) errors.push('Text content is required');
+      break;
+    case 'dialogTree':
+      if (!localBeat.parameters?.dialogTree) {
+        errors.push('Dialog tree is required');
+      } else {
+        if (!localBeat.parameters.dialogTree.speaker) errors.push('Speaker is required');
+        if (!localBeat.parameters.dialogTree.text) errors.push('Dialog text is required');
+      }
+      break;
+    case 'movementChoice':
+      if (!localBeat.parameters?.choices?.length) {
+        errors.push('At least one choice is required');
+      } else {
+        localBeat.parameters.choices.forEach((choice: any, i: number) => {
+          if (!choice.target) errors.push(`Choice ${i + 1} needs a target`);
+        });
+      }
+      break;
+    case 'pickProp':
+      if (!localBeat.parameters?.props?.length) {
+        errors.push('At least one prop is required');
+      } else {
+        localBeat.parameters.props.forEach((prop: any, i: number) => {
+          if (!prop.target) errors.push(`Prop ${i + 1} needs a target`);
+        });
+      }
+      break;
+    case 'conditionBeat':
+      if (!localBeat.parameters?.condition) errors.push('Condition is required');
+      const conns = localBeat.connections || [];
+      const hasTrue = conns.some((c: any) => c.label === 'true');
+      if (!hasTrue) errors.push('True connection is required');
+      break;
+    }
+    
+    if (connectionType === 'single' && beat.type !== 'endScreen' && beat.type !== 'dialogTree') {
+      if (!localBeat.connections?.length) {
+        errors.push('Connection is required');
+      }
+    }
+    
+    return errors;
+  };
+
+  const handleChange = (field: string, value: any) => {
+    setLocalBeat((prev: any) => ({
+      ...prev,
+      [field]: value,
+    }));
+    setHasChanges(true);
+  };
+
+  const handleParameterChange = (param: string, value: any) => {
+    setLocalBeat((prev: any) => ({
+      ...prev,
+      parameters: {
+        ...prev.parameters,
+        [param]: value,
+      },
+    }));
+    setHasChanges(true);
+  };
+
+  const handleDialogTreeChange = (tree: any) => {
+    setLocalBeat((prev: any) => ({
+      ...prev,
+      parameters: {
+        ...prev.parameters,
+        dialogTree: tree,
+        speaker: tree.speaker,
+        text: tree.text,
+        emotion: tree.emotion
+      },
+    }));
+    setHasChanges(true);
+  };
+
+  const handleSave = () => {
+    const errors = validateBeat();
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    
+    if (beat) {
+      beat.name = localBeat.name;
+      beat.cluster = localBeat.cluster;
+      beat.defaultTarget = localBeat.defaultTarget || undefined;
+      beat.transition = localBeat.transition;
+      beat.sound = localBeat.sound;
+      
+      if (localBeat.parameters && beat.updateParameters) {
+        // Include visual elements in parameters if beat supports visual editor
+        const parameters = { ...localBeat.parameters };
+        if (supportsVisualEditor(beat.type)) {
+          parameters.visualElements = visualElements;
+        }
+        beat.updateParameters(parameters);
+      }
+      
+      const beatAny = beat as any;
+      if (typeof beatAny.clearConnections === 'function') {
+        beatAny.clearConnections();
+      } else {
+        beat.connections = [];
+      }
+      
+      if (beat.type === 'dialogTree') {
+        const extractConnections = (node: any): any[] => {
+          const connections: any[] = [];
+          
+          if (node.choices) {
+            node.choices.forEach((choice: any) => {
+              if (typeof choice.target === 'string' && choice.target) {
+                connections.push({
+                  targetId: choice.target,
+                  label: choice.text
+                });
+              } else if (typeof choice.target === 'object' && choice.target) {
+                connections.push(...extractConnections(choice.target));
+              }
+            });
+          }
+          
+          if (typeof node.next === 'string' && node.next) {
+            connections.push({
+              targetId: node.next,
+              label: 'Continue'
+            });
+          } else if (typeof node.next === 'object' && node.next) {
+            connections.push(...extractConnections(node.next));
+          }
+          
+          return connections;
+        };
+        
+        const dialogConnections = extractConnections(localBeat.parameters.dialogTree);
+        
+        if (localBeat.connections?.length > 0) {
+          const defaultConn = localBeat.connections.find((c: any) => !c.label || c.label === 'Continue');
+          if (defaultConn) {
+            dialogConnections.push(defaultConn);
+          }
+        }
+        
+        const uniqueConns = Array.from(
+          new Map(dialogConnections.map(c => [`${c.targetId}-${c.label}`, c])).values()
+          );
+        uniqueConns.forEach(conn => beat.addConnection(conn));
+        
+      } else if (connectionType === 'single' && localBeat.connections.length > 0) {
+        beat.addConnection(localBeat.connections[0]);
+      } else if (connectionType === 'multiple') {
+        if (beat.type === 'movementChoice' && localBeat.parameters?.choices) {
+          localBeat.parameters.choices.forEach((choice: ChoiceWithCounter) => {
+            if (choice.target) {
+              beat.addConnection({
+                targetId: choice.target,
+                label: choice.text
+              });
+            }
+          });
+        } else if (beat.type === 'pickProp' && localBeat.parameters?.props) {
+          localBeat.parameters.props.forEach((prop: PropWithEffect) => {
+            if (prop.target) {
+              beat.addConnection({
+                targetId: prop.target,
+                label: prop.name
+              });
+            }
+          });
+        }
+      } else if (connectionType === 'conditional') {
+        localBeat.connections.forEach((conn: any) => beat.addConnection(conn));
+      } else {
+        localBeat.connections.forEach((conn: any) => beat.addConnection(conn));
+      }
+      
+      onUpdate(beat.id, beat);
+      setHasChanges(false);
+      setValidationErrors([]);
+    }
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Are you sure you want to delete "${beat.name}"?`)) {
+      onDelete(beat.id);
+    }
+  };
+
+  const handleAddChoice = () => {
+    setLocalBeat((prev: any) => ({
+      ...prev,
+      parameters: {
+        ...prev.parameters,
+        choices: [
+          ...(prev.parameters.choices || []),
+          {
+            id: `choice_${Date.now()}`,
+            text: 'New Choice',
+            location: 'Location',
+            target: '',
+            counter: undefined,
+            counterOperation: 'change',
+            counterValue: 0
+          }
+        ]
+      }
+    }));
+    setHasChanges(true);
+  };
+
+  const handleUpdateChoice = (index: number, field: string, value: any) => {
+    setLocalBeat((prev: any) => {
+      const choices = [...(prev.parameters.choices || [])];
+      choices[index] = { ...choices[index], [field]: value };
+      return {
+        ...prev,
+        parameters: {
+          ...prev.parameters,
+          choices
+        }
+      };
+    });
+    setHasChanges(true);
+  };
+
+  const handleRemoveChoice = (index: number) => {
+    setLocalBeat((prev: any) => ({
+      ...prev,
+      parameters: {
+        ...prev.parameters,
+        choices: prev.parameters.choices.filter((_: any, i: number) => i !== index)
+      }
+    }));
+    setHasChanges(true);
+  };
+
+  const handleAddProp = () => {
+    setLocalBeat((prev: any) => ({
+      ...prev,
+      parameters: {
+        ...prev.parameters,
+        props: [
+          ...(prev.parameters.props || []),
+          {
+            id: `prop_${Date.now()}`,
+            name: 'New Prop',
+            description: 'Description',
+            target: '',
+            counter: undefined,
+            counterOperation: 'change',
+            counterValue: 0,
+            effect: undefined
+          }
+        ]
+      }
+    }));
+    setHasChanges(true);
+  };
+
+  const handleUpdateProp = (index: number, field: string, value: any) => {
+    setLocalBeat((prev: any) => {
+      const props = [...(prev.parameters.props || [])];
+      if (field.startsWith('effect.')) {
+        const subField = field.split('.')[1];
+        props[index] = {
+          ...props[index],
+          effect: {
+            ...props[index].effect,
+            [subField]: value
+          }
+        };
+      } else {
+        props[index] = { ...props[index], [field]: value };
+      }
+      return {
+        ...prev,
+        parameters: {
+          ...prev.parameters,
+          props
+        }
+      };
+    });
+    setHasChanges(true);
+  };
+
+  const handleRemoveProp = (index: number) => {
+    setLocalBeat((prev: any) => ({
+      ...prev,
+      parameters: {
+        ...prev.parameters,
+        props: prev.parameters.props.filter((_: any, i: number) => i !== index)
+      }
+    }));
+    setHasChanges(true);
+  };
+
+  const handleAddConnection = (targetId: string, label?: string) => {
+    if (!targetId) return;
+
+    if (connectionType === 'single') {
+      setLocalBeat((prev: any) => ({
+        ...prev,
+        connections: [{
+          targetId: targetId,
+          label: label || prev.parameters?.buttonText || 'Continue'
+        }]
+      }));
+    } else if (connectionType === 'conditional') {
+      const hasTrue = localBeat.connections.some((c: any) => c.label === 'true');
+      setLocalBeat((prev: any) => ({
+        ...prev,
+        connections: [
+          ...prev.connections.filter((c: any) => c.label !== (hasTrue ? 'false' : 'true')),
+          {
+            targetId: targetId,
+            label: hasTrue ? 'false' : 'true'
+          }
+        ]
+      }));
+    }
+    
+    setHasChanges(true);
+  };
+
+  const handleRemoveConnection = (targetId: string, label?: string) => {
+    setLocalBeat((prev: any) => ({
+      ...prev,
+      connections: prev.connections.filter((c: any) => 
+        !(c.targetId === targetId && (!label || c.label === label))
+        )
+    }));
+    setHasChanges(true);
+  };
+
+  const availableTargets = allBeats.filter(b => b.id !== beat.id);
+  const inspectorWidthClass = expanded ? 'w-[640px]' : 'w-80';
+
+  return (
+    <div className={`${inspectorWidthClass} h-full bg-white border-l border-gray-200 flex flex-col`}>
+      {/* Fixed Header */}
+      <div className="flex-shrink-0 p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold text-gray-800">Properties</h2>
+          {hasChanges && (
+            <span className="text-xs text-orange-500 font-medium">Unsaved changes</span>
+            )}
+        </div>
+        <div className="text-sm text-gray-500">
+          {beat.type} • ID: {beat.id}
+        </div>
+        <div className="text-xs text-gray-400 mt-1">
+          Connection Type: {connectionType}
+        </div>
+      </div>
+
+      {/* Validation Errors */}
+      {validationErrors.length > 0 && (
+        <div className="flex-shrink-0 p-3 bg-red-50 border-b border-red-200">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
+            <div className="text-sm text-red-700">
+              <div className="font-medium mb-1">Please fix the following:</div>
+              {validationErrors.map((error, i) => (
+                <div key={i} className="text-xs">• {error}</div>
+                ))}
+            </div>
+          </div>
+        </div>
+        )}
+
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-4">
+          {/* Basic Properties */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name
+            </label>
+            <input
+              type="text"
+              value={localBeat.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Tab Navigation for beats with visual editor */}
+          {supportsVisualEditor(beat.type) && (
+            <div className="flex border-b border-gray-200 mb-4">
+              <button
+                onClick={() => setActiveTab('properties')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'properties'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Settings className="w-4 h-4 inline mr-2" />
+                Properties
+              </button>
+              <button
+                onClick={() => setActiveTab('visual')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'visual'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Palette className="w-4 h-4 inline mr-2" />
+                Visual Editor
+              </button>
+            </div>
+          )}
+
+          {/* Beat-specific Parameters */}
+          {(!supportsVisualEditor(beat.type) || activeTab === 'properties') && (
+            <div className="space-y-4">
+              {beat.type === 'titleScreen' && (
+            <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <input
+                type="text"
+                value={localBeat.parameters?.title || ''}
+                onChange={(e) => handleParameterChange('title', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Author</label>
+              <input
+                type="text"
+                value={localBeat.parameters?.author || ''}
+                onChange={(e) => handleParameterChange('author', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
+            </>
+            )}
+
+          {beat.type === 'introText' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Text Content</label>
+              <textarea
+                value={localBeat.parameters?.text || ''}
+                onChange={(e) => handleParameterChange('text', e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
+            )}
+
+          {/* DIALOG TREE EDITOR */}
+          {beat.type === 'dialogTree' && (
+            <div className="space-y-3">
+              <DialogTreeEditor
+                dialogTree={localBeat.parameters?.dialogTree || {
+                  id: 'root',
+                  speaker: getAvailableCharacters()[0],
+                  text: 'Greetings, traveler...',
+                  emotion: 'neutral'
+                }}
+                onChange={handleDialogTreeChange}
+                characters={getAvailableCharacters()}
+                allBeats={availableTargets}
+                expanded={expanded}
+              />
+              
+              {/* Default connection after dialog ends */}
+              <div className="border-t pt-3">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">
+                  After Dialog Ends
+                </h3>
+                <select
+                  value={localBeat.connections?.[0]?.targetId || ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleAddConnection(e.target.value, 'Continue');
+                    } else {
+                      setLocalBeat((prev: any) => ({
+                        ...prev,
+                        connections: []
+                      }));
+                      setHasChanges(true);
+                    }
+                  }}
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                >
+                  <option value="">End story here</option>
+                  {availableTargets.map(target => (
+                    <option key={target.id} value={target.id}>
+                      {target.name} ({target.id})
+                    </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            )}
+
+          {beat.type === 'movementChoice' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
+                <input
+                  type="text"
+                  value={localBeat.parameters?.question || 'Where do you want to go?'}
+                  onChange={(e) => handleParameterChange('question', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Choices</span>
+                  <button
+                    onClick={handleAddChoice}
+                    className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                  >
+                    <Plus className="w-3 h-3 inline" /> Add
+                  </button>
+                </div>
+                
+                <div className={expanded ? 'grid grid-cols-2 gap-3' : 'space-y-2'}>
+                  {localBeat.parameters?.choices?.map((choice: ChoiceWithCounter, index: number) => (
+                    <div key={choice.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-xs font-medium">Choice {index + 1}</span>
+                        <button
+                          onClick={() => handleRemoveChoice(index)}
+                          className="text-red-500 hover:bg-red-50 p-1 rounded"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      
+                      <input
+                        type="text"
+                        value={choice.text}
+                        onChange={(e) => handleUpdateChoice(index, 'text', e.target.value)}
+                        placeholder="Choice text"
+                        className="w-full px-2 py-1 text-sm border rounded"
+                      />
+                      
+                      <input
+                        type="text"
+                        value={choice.location || ''}
+                        onChange={(e) => handleUpdateChoice(index, 'location', e.target.value)}
+                        placeholder="Location description"
+                        className="w-full px-2 py-1 text-sm border rounded"
+                      />
+                      
+                      <select
+                        value={choice.target || ''}
+                        onChange={(e) => handleUpdateChoice(index, 'target', e.target.value)}
+                        className="w-full px-2 py-1 text-sm border rounded"
+                      >
+                        <option value="">Select target beat...</option>
+                        {availableTargets.map(target => (
+                          <option key={target.id} value={target.id}>
+                            {target.name} ({target.id})
+                          </option>
+                          ))}
+                      </select>
+                      
+                      
+                      {/* Counter Effect */}
+                      <div className="flex gap-2 items-center">
+                        <select
+                          value={choice.counter || ''}
+                          onChange={(e) => {
+                            handleUpdateChoice(index, 'counter', e.target.value || undefined);
+                            if (e.target.value && !choice.counterOperation) {
+                              handleUpdateChoice(index, 'counterOperation', 'change');
+                              handleUpdateChoice(index, 'counterValue', 0);
+                            }
+                          }}
+                          className="flex-1 px-2 py-1 text-sm border rounded"
+                        >
+                          <option value="">No counter effect</option>
+                          <option value="health">Health</option>
+                          <option value="courage">Courage</option>
+                          <option value="gold">Gold</option>
+                          <option value="experience">Experience</option>
+                          <option value="reputation">Reputation</option>
+                        </select>
+                        {choice.counter && (
+                          <>
+                          <select
+                            value={choice.counterOperation || 'change'}
+                            onChange={(e) => handleUpdateChoice(index, 'counterOperation', e.target.value)}
+                            className="px-2 py-1 text-sm border rounded"
+                          >
+                            <option value="change">Change</option>
+                            <option value="set">Set to</option>
+                          </select>
+                          <input
+                            type="number"
+                            value={choice.counterValue || 0}
+                            onChange={(e) => handleUpdateChoice(index, 'counterValue', parseInt(e.target.value) || 0)}
+                            className="w-20 px-2 py-1 text-sm border rounded"
+                            placeholder="0"
+                          />
+                          </>
+                          )}
+                      </div>
+                    </div>
+                    ))}
+</div>
+</div>
+</div>
+)}
+
+{beat.type === 'pickProp' && (
+  <div className="space-y-3">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
+      <input
+        type="text"
+        value={localBeat.parameters?.question || 'What do you want to pick up?'}
+        onChange={(e) => handleParameterChange('question', e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+      />
+    </div>
+
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-gray-700">Props</span>
+        <button
+          onClick={handleAddProp}
+          className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+        >
+          <Plus className="w-3 h-3 inline" /> Add
+        </button>
+      </div>
+
+      <div className={expanded ? 'grid grid-cols-2 gap-3' : 'space-y-2'}>
+        {localBeat.parameters?.props?.map((prop: PropWithEffect, index: number) => (
+          <div key={prop.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
+            <div className="flex justify-between">
+              <span className="text-xs font-medium">Prop {index + 1}</span>
+              <button
+                onClick={() => handleRemoveProp(index)}
+                className="text-red-500 hover:bg-red-50 p-1 rounded"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+
+            <input
+              type="text"
+              value={prop.name}
+              onChange={(e) => handleUpdateProp(index, 'name', e.target.value)}
+              placeholder="Prop name"
+              className="w-full px-2 py-1 text-sm border rounded"
+            />
+
+            <input
+              type="text"
+              value={prop.description}
+              onChange={(e) => handleUpdateProp(index, 'description', e.target.value)}
+              placeholder="Description"
+              className="w-full px-2 py-1 text-sm border rounded"
+            />
+
+            <select
+              value={prop.target || ''}
+              onChange={(e) => handleUpdateProp(index, 'target', e.target.value)}
+              className="w-full px-2 py-1 text-sm border rounded"
+            >
+              <option value="">Select target beat...</option>
+              {availableTargets.map(target => (
+                <option key={target.id} value={target.id}>
+                  {target.name} ({target.id})
+                </option>
+                ))}
+            </select>
+
+                      {/* Counter Effect */}
+            <div className="flex gap-2 items-center">
+              <select
+                value={prop.counter || ''}
+                onChange={(e) => {
+                  handleUpdateProp(index, 'counter', e.target.value || undefined);
+                  if (e.target.value && !prop.counterOperation) {
+                    handleUpdateProp(index, 'counterOperation', 'change');
+                    handleUpdateProp(index, 'counterValue', 0);
+                  }
+                }}
+                className="flex-1 px-2 py-1 text-sm border rounded"
+              >
+                <option value="">No counter effect</option>
+                <option value="health">Health</option>
+                <option value="courage">Courage</option>
+                <option value="gold">Gold</option>
+                <option value="experience">Experience</option>
+                <option value="reputation">Reputation</option>
+              </select>
+              {prop.counter && (
+                <>
+                <select
+                  value={prop.counterOperation || 'change'}
+                  onChange={(e) => handleUpdateProp(index, 'counterOperation', e.target.value)}
+                  className="px-2 py-1 text-sm border rounded"
+                >
+                  <option value="change">Change</option>
+                  <option value="set">Set to</option>
+                </select>
+                <input
+                  type="number"
+                  value={prop.counterValue || 0}
+                  onChange={(e) => handleUpdateProp(index, 'counterValue', parseInt(e.target.value) || 0)}
+                  className="w-20 px-2 py-1 text-sm border rounded"
+                  placeholder="0"
+                />
+                </>
+                )}
+            </div>
+
+            {showAdvanced && (
+              <div className="p-2 bg-green-50 rounded space-y-2">
+                <div className="text-xs font-medium text-green-700">Inventory Effect (Optional)</div>
+                <select
+                  value={prop.effect?.type || 'inventory'}
+                  onChange={(e) => handleUpdateProp(index, 'effect.type', e.target.value)}
+                  className="w-full px-2 py-1 text-xs border rounded"
+                >
+                  <option value="inventory">Add to Inventory</option>
+                  <option value="variable">Set Variable</option>
+                </select>
+                <input
+                  type="text"
+                  value={prop.effect?.name || prop.name}
+                  onChange={(e) => handleUpdateProp(index, 'effect.name', e.target.value)}
+                  placeholder="Item/Variable name"
+                  className="w-full px-2 py-1 text-xs border rounded"
+                />
+              </div>
+              )}
+          </div>
+          ))}
+</div>
+</div>
+</div>
+)}
+
+          {/* Set Variable Beat Editor */}
+          {beat.type === 'setVariable' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <select
+                  value={localBeat.parameters?.type || 'variable'}
+                  onChange={(e) => handleParameterChange('type', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  <option value="variable">Variable</option>
+                  <option value="counter">Counter</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={localBeat.parameters?.name || ''}
+                  onChange={(e) => handleParameterChange('name', e.target.value)}
+                  placeholder={localBeat.parameters?.type === 'counter' ? 'e.g., health, courage' : 'e.g., hasKey, questComplete'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              
+              {localBeat.parameters?.type === 'counter' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Operation</label>
+                  <select
+                    value={localBeat.parameters?.operation || 'set'}
+                    onChange={(e) => handleParameterChange('operation', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  >
+                    <option value="set">Set to</option>
+                    <option value="change">Change by</option>
+                  </select>
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
+                <input
+                  type={localBeat.parameters?.type === 'counter' ? 'number' : 'text'}
+                  value={localBeat.parameters?.value || ''}
+                  onChange={(e) => handleParameterChange('value', localBeat.parameters?.type === 'counter' ? parseInt(e.target.value) || 0 : e.target.value)}
+                  placeholder={localBeat.parameters?.type === 'counter' ? '0' : 'true, false, or custom value'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Duration Screen Editor */}
+          {beat.type === 'durScreen' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Display Text</label>
+                <textarea
+                  value={localBeat.parameters?.text || ''}
+                  onChange={(e) => handleParameterChange('text', e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  placeholder="Text to display..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Duration (milliseconds)</label>
+                <input
+                  type="number"
+                  value={localBeat.parameters?.duration || 3000}
+                  onChange={(e) => handleParameterChange('duration', parseInt(e.target.value) || 3000)}
+                  min="100"
+                  step="100"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">{((localBeat.parameters?.duration || 3000) / 1000).toFixed(1)} seconds</p>
+              </div>
+            </div>
+          )}
+
+          {/* Random Target Editor */}
+          {beat.type === 'randomTarget' && (
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Random Choices</span>
+                  <button
+                    onClick={() => {
+                      const newChoice = { id: `choice_${Date.now()}`, target: '' };
+                      handleParameterChange('choices', [...(localBeat.parameters?.choices || []), newChoice]);
+                    }}
+                    className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                  >
+                    <Plus className="w-3 h-3 inline" /> Add
+                  </button>
+                </div>
+                
+                <div className="space-y-2">
+                  {localBeat.parameters?.choices?.map((choice: any, index: number) => (
+                    <div key={choice.id} className="flex gap-2 items-center">
+                      <span className="text-xs text-gray-500 w-8">{index + 1}.</span>
+                      <select
+                        value={choice.target || ''}
+                        onChange={(e) => {
+                          const newChoices = [...localBeat.parameters.choices];
+                          newChoices[index] = { ...choice, target: e.target.value };
+                          handleParameterChange('choices', newChoices);
+                        }}
+                        className="flex-1 px-2 py-1 text-sm border rounded"
+                      >
+                        <option value="">Select target beat...</option>
+                        {availableTargets.map(target => (
+                          <option key={target.id} value={target.id}>
+                            {target.name} ({target.id})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          const newChoices = localBeat.parameters.choices.filter((_: any, i: number) => i !== index);
+                          handleParameterChange('choices', newChoices);
+                        }}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                {localBeat.parameters?.choices?.length >= 2 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Each choice has equal probability ({(100 / localBeat.parameters.choices.length).toFixed(1)}%)
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Set Timer Editor */}
+          {beat.type === 'setTimer' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Timer Name</label>
+                <input
+                  type="text"
+                  value={localBeat.parameters?.name || ''}
+                  onChange={(e) => handleParameterChange('name', e.target.value)}
+                  placeholder="e.g., countdown, questTimer"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Timer Value (seconds)</label>
+                <input
+                  type="number"
+                  value={localBeat.parameters?.value || 0}
+                  onChange={(e) => handleParameterChange('value', parseInt(e.target.value) || 0)}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {localBeat.parameters?.value === 0 ? 'Timer will be cleared' : `Timer will expire after ${localBeat.parameters?.value || 0} seconds`}
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Timer Target (when expires) <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={localBeat.parameters?.timerTarget || ''}
+                  onChange={(e) => handleParameterChange('timerTarget', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  required
+                >
+                  <option value="">Select target beat...</option>
+                  {availableTargets.map(target => (
+                    <option key={target.id} value={target.id}>
+                      {target.name} ({target.id})
+                    </option>
+                  ))}
+                </select>
+                {!localBeat.parameters?.timerTarget && (
+                  <p className="text-xs text-red-500 mt-1">Timer target is required</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Inventory Management Editor */}
+          {beat.type === 'addRemoveInventory' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Action</label>
+                <select
+                  value={localBeat.parameters?.action || 'add'}
+                  onChange={(e) => handleParameterChange('action', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  <option value="add">Add Item</option>
+                  <option value="remove">Remove Item</option>
+                  <option value="transfer">Transfer Item</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                <input
+                  type="text"
+                  value={localBeat.parameters?.item || ''}
+                  onChange={(e) => handleParameterChange('item', e.target.value)}
+                  placeholder="e.g., Magic Sword, Health Potion"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              
+              {localBeat.parameters?.action === 'transfer' ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">From Character</label>
+                    <input
+                      type="text"
+                      value={localBeat.parameters?.fromChar || ''}
+                      onChange={(e) => handleParameterChange('fromChar', e.target.value)}
+                      placeholder="e.g., player, merchant"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">To Character</label>
+                    <input
+                      type="text"
+                      value={localBeat.parameters?.toChar || ''}
+                      onChange={(e) => handleParameterChange('toChar', e.target.value)}
+                      placeholder="e.g., player, merchant"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Character</label>
+                  <input
+                    type="text"
+                    value={localBeat.parameters?.character || 'player'}
+                    onChange={(e) => handleParameterChange('character', e.target.value)}
+                    placeholder="e.g., player, merchant"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* End Screen Editor */}
+          {beat.type === 'endScreen' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ending Message</label>
+                <input
+                  type="text"
+                  value={localBeat.parameters?.message || 'The End'}
+                  onChange={(e) => handleParameterChange('message', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={localBeat.parameters?.showRestart !== false}
+                    onChange={(e) => handleParameterChange('showRestart', e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Show Restart Button</span>
+                </label>
+                
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={localBeat.parameters?.showCredits === true}
+                    onChange={(e) => handleParameterChange('showCredits', e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Show Credits</span>
+                </label>
+                
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={localBeat.parameters?.reset === true}
+                    onChange={(e) => handleParameterChange('reset', e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Reset All Values on Restart</span>
+                </label>
+              </div>
+              
+              {localBeat.parameters?.reset && (
+                <div className="p-3 bg-yellow-50 rounded text-xs text-yellow-800">
+                  <strong>Note:</strong> When enabled, all counters, variables, and timers will be reset to their initial values when the story restarts.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Condition Beat Editor */}
+{beat.type === 'conditionBeat' && (
+  <div className="space-y-3">
+    <h3 className="text-sm font-medium text-gray-700 mb-2">Condition</h3>
+
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">Condition Type</label>
+      <select
+        value={localBeat.parameters?.condition?.type || 'counter'}
+        onChange={(e) => handleParameterChange('condition', {
+          ...localBeat.parameters?.condition,
+          type: e.target.value
+        })}
+        className="w-full px-2 py-1 text-sm border rounded"
+      >
+        <option value="counter">Counter</option>
+        <option value="counterCompare">Compare Counters</option>
+        <option value="variable">Variable</option>
+        <option value="inventory">Inventory</option>
+        <option value="timer">Timer</option>
+        <option value="visitedBeat">Visited Beat</option>
+      </select>
+    </div>
+
+    {localBeat.parameters?.condition?.type === 'counter' && (
+      <>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Counter Name</label>
+        <input
+          type="text"
+          value={localBeat.parameters?.condition?.left || ''}
+          onChange={(e) => handleParameterChange('condition', {
+            ...localBeat.parameters?.condition,
+            left: e.target.value
+          })}
+          placeholder="e.g., courage, health"
+          className="w-full px-2 py-1 text-sm border rounded"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Operator</label>
+          <select
+            value={localBeat.parameters?.condition?.operator || '>='}
+            onChange={(e) => handleParameterChange('condition', {
+              ...localBeat.parameters?.condition,
+              operator: e.target.value
+            })}
+            className="w-full px-2 py-1 text-sm border rounded"
+          >
+            <option value="==">Equal to</option>
+            <option value="!=">Not equal to</option>
+            <option value=">">Greater than</option>
+            <option value=">=">Greater or equal</option>
+            <option value="<">Less than</option>
+              <option value="<=">Less or equal</option>
+              </select>
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Value</label>
+              <input
+                type="number"
+                value={localBeat.parameters?.condition?.right || 0}
+                onChange={(e) => handleParameterChange('condition', {
+                  ...localBeat.parameters?.condition,
+                  right: parseInt(e.target.value) || 0
+                })}
+                className="w-full px-2 py-1 text-sm border rounded"
+              />
+            </div>
+          </div>
+          </>
+          )}
+
+    {localBeat.parameters?.condition?.type === 'variable' && (
+      <>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Variable Name</label>
+        <input
+          type="text"
+          value={localBeat.parameters?.condition?.left || ''}
+          onChange={(e) => handleParameterChange('condition', {
+            ...localBeat.parameters?.condition,
+            left: e.target.value
+          })}
+          placeholder="e.g., hasKey, questComplete"
+          className="w-full px-2 py-1 text-sm border rounded"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Operator</label>
+          <select
+            value={localBeat.parameters?.condition?.operator || '=='}
+            onChange={(e) => handleParameterChange('condition', {
+              ...localBeat.parameters?.condition,
+              operator: e.target.value
+            })}
+            className="w-full px-2 py-1 text-sm border rounded"
+          >
+            <option value="==">Equal to</option>
+            <option value="!=">Not equal to</option>
+          </select>
+        </div>
+
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Value</label>
+          <input
+            type="text"
+            value={localBeat.parameters?.condition?.right || ''}
+            onChange={(e) => handleParameterChange('condition', {
+              ...localBeat.parameters?.condition,
+              right: e.target.value
+            })}
+            placeholder="true, false, or custom"
+            className="w-full px-2 py-1 text-sm border rounded"
+          />
+        </div>
+      </div>
+      </>
+      )}
+
+    {localBeat.parameters?.condition?.type === 'counterCompare' && (
+      <>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">First Counter</label>
+        <input
+          type="text"
+          value={localBeat.parameters?.condition?.counter1 || ''}
+          onChange={(e) => handleParameterChange('condition', {
+            ...localBeat.parameters?.condition,
+            counter1: e.target.value,
+            left: e.target.value  // Also set left for compatibility
+          })}
+          placeholder="e.g., courage"
+          className="w-full px-2 py-1 text-sm border rounded"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Operator</label>
+          <select
+            value={localBeat.parameters?.condition?.operator || '>'}
+            onChange={(e) => handleParameterChange('condition', {
+              ...localBeat.parameters?.condition,
+              operator: e.target.value
+            })}
+            className="w-full px-2 py-1 text-sm border rounded"
+          >
+            <option value="==">Equal to</option>
+            <option value="!=">Not equal to</option>
+            <option value=">">Greater than</option>
+            <option value=">=">Greater or equal</option>
+            <option value="<">Less than</option>
+            <option value="<=">Less or equal</option>
+          </select>
+        </div>
+
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Second Counter</label>
+          <input
+            type="text"
+            value={localBeat.parameters?.condition?.counter2 || ''}
+            onChange={(e) => handleParameterChange('condition', {
+              ...localBeat.parameters?.condition,
+              counter2: e.target.value,
+              right: e.target.value  // Also set right for compatibility
+            })}
+            placeholder="e.g., health"
+            className="w-full px-2 py-1 text-sm border rounded"
+          />
+        </div>
+      </div>
+      </>
+      )}
+
+    {localBeat.parameters?.condition?.type === 'timer' && (
+      <>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Timer Name</label>
+        <input
+          type="text"
+          value={localBeat.parameters?.condition?.timer || ''}
+          onChange={(e) => handleParameterChange('condition', {
+            ...localBeat.parameters?.condition,
+            timer: e.target.value,
+            left: e.target.value  // Also set left for compatibility
+          })}
+          placeholder="e.g., countdown"
+          className="w-full px-2 py-1 text-sm border rounded"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Operator</label>
+          <select
+            value={localBeat.parameters?.condition?.operator || '>'}
+            onChange={(e) => handleParameterChange('condition', {
+              ...localBeat.parameters?.condition,
+              operator: e.target.value
+            })}
+            className="w-full px-2 py-1 text-sm border rounded"
+          >
+            <option value="==">Equal to</option>
+            <option value="!=">Not equal to</option>
+            <option value=">">Greater than</option>
+            <option value=">=">Greater or equal</option>
+            <option value="<">Less than</option>
+            <option value="<=">Less or equal</option>
+          </select>
+        </div>
+
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Value (seconds)</label>
+          <input
+            type="number"
+            value={localBeat.parameters?.condition?.val || 0}
+            onChange={(e) => handleParameterChange('condition', {
+              ...localBeat.parameters?.condition,
+              val: parseInt(e.target.value) || 0,
+              right: parseInt(e.target.value) || 0  // Also set right for compatibility
+            })}
+            className="w-full px-2 py-1 text-sm border rounded"
+          />
+        </div>
+      </div>
+      </>
+      )}
+
+    {localBeat.parameters?.condition?.type === 'inventory' && (
+      <>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Character</label>
+        <input
+          type="text"
+          value={localBeat.parameters?.condition?.left || 'player'}
+          onChange={(e) => handleParameterChange('condition', {
+            ...localBeat.parameters?.condition,
+            left: e.target.value
+          })}
+          placeholder="player or character name"
+          className="w-full px-2 py-1 text-sm border rounded"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Item Name</label>
+        <input
+          type="text"
+          value={localBeat.parameters?.condition?.right || ''}
+          onChange={(e) => handleParameterChange('condition', {
+            ...localBeat.parameters?.condition,
+            right: e.target.value,
+            operator: 'has'
+          })}
+          placeholder="e.g., sword, key, potion"
+          className="w-full px-2 py-1 text-sm border rounded"
+        />
+      </div>
+      </>
+      )}
+
+    {localBeat.parameters?.condition?.type === 'visitedBeat' && (
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Beat to Check</label>
+        <select
+          value={localBeat.parameters?.condition?.right || ''}
+          onChange={(e) => handleParameterChange('condition', {
+            ...localBeat.parameters?.condition,
+            right: e.target.value,
+            left: 'visitedBeat',
+            operator: '=='
+          })}
+          className="w-full px-2 py-1 text-sm border rounded"
+        >
+          <option value="">Select beat...</option>
+          {availableTargets.map(target => (
+            <option key={target.id} value={target.id}>
+              {target.name} ({target.id})
+            </option>
+            ))}
+        </select>
+      </div>
+      )}
+
+    <div className="p-3 bg-yellow-50 rounded text-xs text-yellow-800">
+      <strong>Condition:</strong> 
+      {localBeat.parameters?.condition?.type === 'counter' && (
+        <span> If {localBeat.parameters.condition.left || '[counter]'} {localBeat.parameters.condition.operator || '>='} {localBeat.parameters.condition.right || 0}</span>
+        )}
+      {localBeat.parameters?.condition?.type === 'variable' && (
+        <span> If {localBeat.parameters.condition.left || '[variable]'} {localBeat.parameters.condition.operator || '=='} {localBeat.parameters.condition.right || 'value'}</span>
+        )}
+      {localBeat.parameters?.condition?.type === 'inventory' && (
+        <span> If {localBeat.parameters.condition.left || 'player'} has {localBeat.parameters.condition.right || '[item]'}</span>
+        )}
+      {localBeat.parameters?.condition?.type === 'visitedBeat' && (
+        <span> If player visited beat {localBeat.parameters.condition.right || '[beat]'}</span>
+        )}
+    </div>
+  </div>
+  )}
+            </div>
+          )}
+
+          {/* Visual Editor Tab */}
+          {supportsVisualEditor(beat.type) && activeTab === 'visual' && (
+            <div className="space-y-4">
+              {/* Background Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Background</label>
+                <AssetSelector
+                  assets={assets}
+                  selectedAssetId={localBeat.parameters?.backgroundAssetId}
+                  onAssetSelect={(assetId) => handleParameterChange('backgroundAssetId', assetId)}
+                  assetType="image"
+                  assetSubType="background"
+                  placeholder="Select background image..."
+                />
+                {!assets.some(a => a.type === 'image' && a.subType === 'background') && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => onOpenAssetManager?.()}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Add background images in Asset Manager
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Visual Editor */}
+              <div className="border border-gray-300 rounded-lg overflow-hidden">
+                <VisualBeatEditor
+                  backgroundAssetId={localBeat.parameters?.backgroundAssetId}
+                  elements={visualElements}
+                  onElementsChange={handleVisualElementsChange}
+                  assets={assets}
+                  onSelectAsset={handleAssetSelection}
+                />
+              </div>
+
+              {/* Quick Asset Actions */}
+              <div className="flex gap-2 text-sm">
+                <button
+                  onClick={() => onOpenAssetManager?.()}
+                  className="flex items-center gap-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  <Image className="w-4 h-4" />
+                  Manage Assets
+                </button>
+                <div className="text-xs text-gray-500 mt-2">
+                  Add characters, props, and backgrounds from the Asset Manager,
+                  then use the Visual Editor to position them in your scene.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Connections for single/conditional beats (NOT dialog tree) */}
+{(connectionType === 'single' || connectionType === 'conditional') && beat.type !== 'dialogTree' && (
+  <div className="border-t pt-3">
+    <h3 className="text-sm font-medium text-gray-700 mb-2">
+      Connections
+    </h3>
+
+    {localBeat.connections?.map((conn: any) => {
+      const targetBeat = allBeats.find(b => b.id === conn.targetId);
+      return (
+        <div key={`${conn.targetId}-${conn.label}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded mb-2">
+          {connectionType === 'conditional' && (
+            <span className={`text-xs font-medium px-2 py-1 rounded ${
+              conn.label === 'true' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>
+            {conn.label?.toUpperCase()}
+          </span>
+          )}
+          <span className="flex-1 text-sm">
+            → {targetBeat?.name || conn.targetId}
+          </span>
+          <button
+            onClick={() => handleRemoveConnection(conn.targetId, conn.label)}
+            className="p-1 text-red-500 hover:bg-red-50 rounded"
+          >
+            <Unlink className="w-3 h-3" />
+          </button>
+        </div>
+        );
+    })}
+
+    {(connectionType === 'single' && !localBeat.connections?.length) ||
+    (connectionType === 'conditional' && localBeat.connections?.length < 2) ? (
+      <div className="flex gap-2">
+        <select
+          onChange={(e) => handleAddConnection(e.target.value)}
+          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+          value=""
+        >
+          <option value="">Add connection...</option>
+          {availableTargets.map(target => (
+            <option key={target.id} value={target.id}>
+              {target.name} ({target.id})
+            </option>
+            ))}
+        </select>
+      </div>
+      ) : null}
+  </div>
+  )}
+</div>
+</div>
+
+      {/* Fixed Footer Actions */}
+<div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
+  <div className="space-y-2">
+    <div className="flex gap-2 mb-2">
+      <button
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+      >
+        <Settings className="w-4 h-4" />
+        {showAdvanced ? 'Hide' : 'Show'} Advanced
+      </button>
+    </div>
+
+    <button
+      onClick={handleSave}
+      disabled={!hasChanges}
+      className={`w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+        hasChanges
+        ? 'bg-blue-500 text-white hover:bg-blue-600'
+        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+      }`}
+    >
+      <Save className="w-4 h-4" />
+      Save Changes
+    </button>
+
+    <button
+      onClick={handleDelete}
+      className="w-full py-2 px-4 border border-red-300 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+    >
+      <Trash2 className="w-4 h-4" />
+      Delete Beat
+    </button>
+  </div>
+</div>
+</div>
+);
+};

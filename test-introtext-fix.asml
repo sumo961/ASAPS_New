@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story title="IntroText Fix Test" author="Test" version="1.0">
+  <plot>
+    <beat>
+      <id id="0" name="Title" />
+      <function kind="titleScreen" title="IntroText Fix Test" author="Test" buttonText="Begin" />
+    </beat>
+
+    <beat>
+      <id id="1" name="Intro Text Test" />
+      <function kind="introText" text="This is a test of the introText fix. There should be only one text element, properly positioned." buttonText="Continue" />
+      <!-- This location should be ignored due to being "Main Text" -->
+      <locs>
+        <loc kind="text" name="Main Text" x="50" y="100" width="400" height="100" />
+        <!-- This location should be used instead -->
+        <loc kind="text" name="text" x="312" y="200" width="400" height="100" />
+      </locs>
+    </beat>
+
+    <beat>
+      <id id="2" name="End" />
+      <function kind="endScreen" message="Test Complete!" showRestart="true" />
+    </beat>
+  </plot>
+</story>

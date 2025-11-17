@@ -1,0 +1,373 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import { VisualPropertiesPanel } from '../../src/components/visual/VisualPropertiesPanel';
+import type { VisualElement } from '../../src/components/visual/VisualBeatEditor';
+import type { Asset } from '../../src/components/assets/AssetManager';
+
+describe('VisualPropertiesPanel - Asset Management', () => {
+  const mockAssets: Asset[] = [
+    {
+      id: 'char-1',
+      name: 'Hero.png',
+      type: 'image',
+      subType: 'character',
+      url: 'blob:character1',
+      size: 1024,
+      dimensions: { width: 200, height: 300 },
+      uploadedAt: new Date(),
+    },
+    {
+      id: 'prop-1',
+      name: 'Sword.png',
+      type: 'image',
+      subType: 'prop',
+      url: 'blob:prop1',
+      size: 512,
+      dimensions: { width: 100, height: 150 },
+      uploadedAt: new Date(),
+    },
+  ];
+
+  const characterElement: VisualElement = {
+    id: 'elem-1',
+    type: 'character',
+    assetId: 'char-1',
+    x: 100,
+    y: 100,
+    z: 0,
+    width: 150,
+    height: 150,
+    rotation: 0,
+    scale: 1,
+    visible: true,
+    locked: false,
+    name: 'Hero',
+  };
+
+  const propElement: VisualElement = {
+    id: 'elem-2',
+    type: 'prop',
+    assetId: 'prop-1',
+    x: 200,
+    y: 200,
+    z: 1,
+    width: 100,
+    height: 100,
+    rotation: 0,
+    scale: 1,
+    visible: true,
+    locked: false,
+    name: 'Sword',
+  };
+
+  const textElement: VisualElement = {
+    id: 'elem-3',
+    type: 'text',
+    text: 'Sample text',
+    x: 300,
+    y: 300,
+    z: 2,
+    width: 200,
+    height: 40,
+    rotation: 0,
+    scale: 1,
+    visible: true,
+    locked: false,
+    name: 'Text Element',
+  };
+
+  const mockOnBackgroundSelect = vi.fn();
+  const mockOnElementSelect = vi.fn();
+  const mockOnElementUpdate = vi.fn();
+  const mockOnElementDelete = vi.fn();
+  const mockOnElementAdd = vi.fn();
+  const mockOnElementReorder = vi.fn();
+  const mockOnSelectAsset = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should show asset section for character element', () => {
+    render(
+      <VisualPropertiesPanel
+        elements={[characterElement]}
+        selectedElement="elem-1"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    // Should show Asset label
+    expect(screen.getByText('Asset')).toBeInTheDocument();
+  });
+
+  it('should show asset section for prop element', () => {
+    render(
+      <VisualPropertiesPanel
+        elements={[propElement]}
+        selectedElement="elem-2"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    // Should show Asset label
+    expect(screen.getByText('Asset')).toBeInTheDocument();
+  });
+
+  it('should NOT show asset section for text element', () => {
+    render(
+      <VisualPropertiesPanel
+        elements={[textElement]}
+        selectedElement="elem-3"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    // Should NOT show Asset label (only shows for character/prop)
+    expect(screen.queryByText('Asset')).not.toBeInTheDocument();
+  });
+
+  it('should display asset preview with thumbnail and dimensions', () => {
+    render(
+      <VisualPropertiesPanel
+        elements={[characterElement]}
+        selectedElement="elem-1"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    // Should show asset name
+    expect(screen.getByText('Hero.png')).toBeInTheDocument();
+
+    // Should show dimensions
+    expect(screen.getByText('200 × 300px')).toBeInTheDocument();
+
+    // Should show thumbnail image
+    const img = screen.getByAlt('Hero.png');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('src', 'blob:character1');
+  });
+
+  it('should show "Select Asset" button when no asset is assigned', () => {
+    const elementWithoutAsset: VisualElement = {
+      ...characterElement,
+      assetId: undefined,
+    };
+
+    render(
+      <VisualPropertiesPanel
+        elements={[elementWithoutAsset]}
+        selectedElement="elem-1"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    // Should show "Select Asset" button
+    expect(screen.getByText('Select Asset')).toBeInTheDocument();
+  });
+
+  it('should show "Change Asset" button when asset is already assigned', () => {
+    render(
+      <VisualPropertiesPanel
+        elements={[characterElement]}
+        selectedElement="elem-1"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    // Should show "Change Asset" button
+    expect(screen.getByText('Change Asset')).toBeInTheDocument();
+  });
+
+  it('should call onSelectAsset with correct type when button is clicked', () => {
+    render(
+      <VisualPropertiesPanel
+        elements={[characterElement]}
+        selectedElement="elem-1"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    const changeAssetButton = screen.getByText('Change Asset');
+    fireEvent.click(changeAssetButton);
+
+    expect(mockOnSelectAsset).toHaveBeenCalledWith(
+      'character',
+      expect.any(Function)
+    );
+  });
+
+  it('should update element assetId when new asset is selected', () => {
+    mockOnSelectAsset.mockImplementation((type, callback) => {
+      // Simulate selecting a new asset
+      callback(mockAssets[1]); // Select prop asset
+    });
+
+    render(
+      <VisualPropertiesPanel
+        elements={[characterElement]}
+        selectedElement="elem-1"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    const changeAssetButton = screen.getByText('Change Asset');
+    fireEvent.click(changeAssetButton);
+
+    expect(mockOnElementUpdate).toHaveBeenCalledWith('elem-1', {
+      assetId: 'prop-1',
+    });
+  });
+
+  it('should show error message when asset ID does not match any asset', () => {
+    const elementWithMissingAsset: VisualElement = {
+      ...characterElement,
+      assetId: 'missing-asset-id',
+    };
+
+    render(
+      <VisualPropertiesPanel
+        elements={[elementWithMissingAsset]}
+        selectedElement="elem-1"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    // Should show error message with asset ID
+    expect(screen.getByText(/Asset not found: missing-asset-id/i)).toBeInTheDocument();
+  });
+
+  it('should pass correct type for prop element', () => {
+    render(
+      <VisualPropertiesPanel
+        elements={[propElement]}
+        selectedElement="elem-2"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    const changeAssetButton = screen.getByText('Change Asset');
+    fireEvent.click(changeAssetButton);
+
+    expect(mockOnSelectAsset).toHaveBeenCalledWith('prop', expect.any(Function));
+  });
+
+  it('should display all transform properties along with asset section', () => {
+    render(
+      <VisualPropertiesPanel
+        elements={[characterElement]}
+        selectedElement="elem-1"
+        onBackgroundSelect={mockOnBackgroundSelect}
+        onElementSelect={mockOnElementSelect}
+        onElementUpdate={mockOnElementUpdate}
+        onElementDelete={mockOnElementDelete}
+        onElementAdd={mockOnElementAdd}
+        onElementReorder={mockOnElementReorder}
+        onSelectAsset={mockOnSelectAsset}
+        assets={mockAssets}
+        stageWidth={1024}
+        stageHeight={768}
+      />
+    );
+
+    // Should show transform properties
+    expect(screen.getByText('Position')).toBeInTheDocument();
+    expect(screen.getByText('Size')).toBeInTheDocument();
+    expect(screen.getByText('Scale')).toBeInTheDocument();
+    expect(screen.getByText('Rotation')).toBeInTheDocument();
+    expect(screen.getByText('Name')).toBeInTheDocument();
+
+    // Should also show asset section
+    expect(screen.getByText('Asset')).toBeInTheDocument();
+  });
+});

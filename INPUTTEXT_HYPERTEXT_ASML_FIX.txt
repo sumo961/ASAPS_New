@@ -1,0 +1,20 @@
+// Add these cases to the ASMLGenerator.ts generateBeatFunction method switch statement
+// Insert after line 392 (after addRemoveInventory case)
+
+      case 'inputText':
+        if (params.prompt) attrs.push(`prompt="${this.escapeXml(params.prompt)}"`);
+        if (params.variable) attrs.push(`variable="${this.escapeXml(params.variable)}"`);
+        if (params.placeholder) attrs.push(`placeholder="${this.escapeXml(params.placeholder)}"`);
+        if (params.validation) attrs.push(`validation="${params.validation}"`);
+        if (params.minLength !== undefined) attrs.push(`minLength="${params.minLength}"`);
+        if (params.maxLength !== undefined) attrs.push(`maxLength="${params.maxLength}"`);
+        if (params.required !== undefined) attrs.push(`required="${params.required}"`);
+        if (params.buttonText) attrs.push(`buttonText="${this.escapeXml(params.buttonText)}"`);
+        break;
+        
+      case 'hyperText':
+        if (params.text) attrs.push(`text="${this.escapeXml(params.text)}"`);
+        if (params.allowMultipleClicks !== undefined) attrs.push(`allowMultipleClicks="${params.allowMultipleClicks}"`);
+        if (params.highlightColor) attrs.push(`highlightColor="${params.highlightColor}"`);
+        if (params.hoverColor) attrs.push(`hoverColor="${params.hoverColor}"`);
+        break;

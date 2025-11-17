@@ -1,0 +1,50 @@
+{
+  "name": "asaps-modern",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Advanced Story Authoring and Presentation System - Modern Implementation",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @asaps/builder",
+    "dev:all": "concurrently \"npm run dev -w @asaps/core\" \"npm run dev -w @asaps/builder\"",
+    "build": "npm run generate:types && npm run build -w @asaps/core && npm run build -w @asaps/renderer && npm run build -w @asaps/builder",
+    "build:core": "npm run build -w @asaps/core",
+    "build:builder": "npm run build -w @asaps/builder",
+    "generate:types": "tsx scripts/generate-beat-types.ts",
+    "test": "npm run test --workspaces",
+    "lint": "eslint packages/*/src",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,css}\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rimraf packages/*/dist packages/*/node_modules node_modules",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.0.0",
+    "eslint": "^9.8.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.0.0",
+    "jsdom": "^27.0.0",
+    "prettier": "^3.3.0",
+    "rimraf": "^6.0.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vite": "^5.4.0",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=7.0.0"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
+}

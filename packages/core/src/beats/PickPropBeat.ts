@@ -1,0 +1,80 @@
+import { Beat } from './Beat';
+import type { BeatConfig, Effect } from '../types';
+import type { IRenderer } from '../types';
+import { StoryContext } from '../engine/StoryContext';
+import type { PickPropParameters, PropOption } from '../generated/beat-types';
+
+export class PickPropBeat extends Beat {
+  public question: string;
+  public props: PropOption[];
+
+  constructor(config: BeatConfig & {
+    parameters?: Partial<PickPropParameters>;
+  } & Partial<PickPropParameters>) {
+    super(config);
+    this.question = config.question || config.parameters?.question || 'What do you want to interact with?';
+    this.props = config.props || config.parameters?.props || [];
+  }
+
+  getParameters(): Record<string, any> {
+    return {
+      question: this.question,
+      props: this.props,
+      node: this.node
+    };
+  }
+
+  updateParameters(params: Record<string, any>): void {
+    if (params.question !== undefined) this.question = params.question;
+    if (params.props !== undefined) this.props = params.props;
+    if (params.node !== undefined) this.node = params.node;
+  }
+
+  protected async performAction(
+    context: StoryContext,
+    renderer: IRenderer
+  ): Promise<string | null> {
+    // Filter props based on conditions
+    const availableProps = this.props.filter(prop => {
+      if (!prop.conditions) return true;
+      return prop.conditions.every(condition => context.checkCondition(condition));
+    });
+
+    if (availableProps.length === 0) {
+      console.warn(`No available props for beat ${this.id}`);
+      return this.getNextBeat(context);
+    }
+
+    // Process text with variable interpolation
+    const processedQuestion = this.processText(this.question, context);
+
+    // Get locations array for positioned rendering
+    const locations = Array.from(this.locations.values());
+
+    // Render the prop selection interface with locations
+    const propId = await renderer.renderPropSelection(
+      processedQuestion,
+      availableProps.map(p => ({
+        id: p.id,
+        name: this.processText(p.name, context),
+        description: this.processText(p.description, context)
+      })),
+      locations
+    );
+
+    const selectedProp = availableProps.find(p => p.id === propId);
+    if (selectedProp) {
+      // Apply prop effects (e.g., add to inventory)
+      if (selectedProp.effects) {
+        selectedProp.effects.forEach(effect => context.applyEffect(effect));
+      }
+      
+      // Add prop to inventory by default
+      context.addToInventory(selectedProp.name);
+      
+      return selectedProp.target;
+    }
+
+    return this.getNextBeat(context);
+  }
+}

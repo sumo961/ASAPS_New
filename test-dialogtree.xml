@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story title="Dialog Test">
+  <settings></settings>
+  <environment></environment>
+  <characters></characters>
+  <plot>
+    <clusters />
+    <beat>
+      <id id="dialog_test" name="Nested Dialog Test" />
+      <function kind="dialogTree" speaker="Player" text="Hello there!">
+        <choice id="c1" text="How are you?" counter="friendliness" operation="add" val="5">
+          <target>
+            <dialogTree id="d2" speaker="NPC" text="I'm doing well, thanks for asking!">
+              <choice id="c2" text="That's great!" target="end_beat"/>
+              <choice id="c3" text="Tell me more">
+                <target>
+                  <dialogTree id="d3" speaker="NPC" text="Well, it's been quite a journey...">
+                    <choice id="c4" text="I see" counter="wisdom" operation="add" val="3" target="end_beat"/>
+                  </dialogTree>
+                </target>
+              </choice>
+            </dialogTree>
+          </target>
+        </choice>
+        <choice id="c5" text="Goodbye" target="end_beat"/>
+      </function>
+    </beat>
+    <beat>
+      <id id="end_beat" name="End" />
+      <function kind="endScreen" message="The End"/>
+    </beat>
+  </plot>
+</story>

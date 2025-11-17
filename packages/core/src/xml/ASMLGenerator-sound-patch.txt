@@ -1,0 +1,26 @@
+// Add to generateSettings method:
+if (settings.sound) {
+  // Sound settings
+  if (settings.sound.backgroundMusic) {
+    settingsElements.push(`<bgmusic id="${settings.sound.backgroundMusic}" />`);
+  }
+  if (settings.sound.musicVolume !== undefined) {
+    settingsElements.push(`<musicvolume val="${settings.sound.musicVolume}" />`);
+  }
+  if (settings.sound.effectsVolume !== undefined) {
+    settingsElements.push(`<effectsvolume val="${settings.sound.effectsVolume}" />`);
+  }
+  if (settings.sound.muteAll) {
+    settingsElements.push(`<muteall val="true" />`);
+  }
+}
+
+// Add to beat generation for sound support:
+if (beat.parameters?.backgroundSound) {
+  functionElement += ` sound="${beat.parameters.backgroundSound}"`;
+}
+
+// Add to visual element generation for clickable sounds:
+if (element.sound) {
+  locElement += ` sound="${element.sound}"`;
+}

@@ -1,0 +1,157 @@
+// Core type definitions
+import type { AnimationPath } from './animation';
+export * from './ClusterTypes';
+
+export interface Location {
+  kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input';
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex?: number;
+  assetId?: string;  // Asset reference for character/prop elements
+  imageUrl?: string;  // Direct image URL (for base64 data or when assetId is not available)
+  sound?: string;    // Sound to play when element is interacted with
+  // Transform properties for visual elements
+  rotation?: number;  // Rotation in degrees
+  scale?: number;     // Scale factor (1 = 100%)
+  // Font properties for text/button/dialog elements
+  font?: string;
+  fontSize?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  autosize?: boolean;  // Auto-calculate font size based on box dimensions
+  visible?: boolean;   // Element visibility (false = hidden, true/undefined = visible)
+}
+
+export interface Transition {
+  type: 'none' | 'fade' | 'slide' | 'zoom' | 'dissolve';
+  duration: number;
+  direction?: 'in' | 'out';
+  easing?: 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+}
+
+export interface Sound {
+  file: string;
+  volume?: number;
+  loop?: boolean;
+  fadeIn?: number;
+  fadeOut?: number;
+}
+
+export interface Video {
+  file: string;
+  //volume?: number;
+  autoplay?: boolean;
+  skipButton?: boolean;
+}
+
+export interface Connection {
+  targetId: string;
+  condition?: Condition;
+  label?: string;
+}
+
+export interface Condition {
+  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare';
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains';
+  left?: string;
+  right?: any;
+  // For counterCompare type
+  counter1?: string;
+  counter2?: string;
+}
+
+export interface Effect {
+  type: 'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter';
+  target: string;
+  value?: any;
+}
+
+export interface BeatConfig {
+  id: string;
+  name: string;
+  type: string;
+  cluster?: string;
+  transition?: Transition;
+  sound?: Sound;
+  locations?: Location[];
+  connections?: Connection[];
+  animations?: AnimationPath[];
+  defaultTarget?: string;
+  parameters?: Record<string, any>;
+  x?: number;
+  y?: number;
+}
+
+export interface StoryMetadata {
+  title?: string;
+  author?: string;
+  version?: string;
+  created?: string;
+  modified?: string;
+  firstBeatId: string;
+  clusters?: import('./ClusterTypes').Cluster[]; // Optional cluster definitions
+}
+
+/**
+ * IRenderer interface defines the contract for all renderers
+ * Moved to core package to avoid circular dependencies
+ */
+export interface IRenderer {
+  // Core rendering methods (with optional locations for positioned rendering)
+  renderTitleScreen(title: string, author: string, buttonText: string, locations?: Location[]): Promise<void>;
+  renderText(text: string, buttonText: string, locations?: Location[]): Promise<void>;
+  renderDialog(speaker: string, text: string, emotion?: string, locations?: Location[]): Promise<void>;
+  renderChoices(choices: { id: string; text: string }[], locations?: Location[]): Promise<string>;
+  renderMovement(question: string, choices: { id: string; text: string; location: string }[], locations?: Location[]): Promise<string>;
+  renderPropSelection(question: string, props: { id: string; name: string; description: string }[], locations?: Location[]): Promise<string>;
+  renderVideo(videoFile: string, autoplay: boolean, controls: boolean): Promise<void>;
+  renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<void>;
+  renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void>;
+
+  // New beat types
+  renderInputText(prompt: string, placeholder?: string, buttonText?: string, options?: {
+    validation?: 'none' | 'numeric' | 'email' | 'alphanumeric';
+    minLength?: number;
+    maxLength?: number;
+    required?: boolean;
+  }, locations?: Location[]): Promise<string>;
+  renderHyperText(data: {
+    text: string;
+    links: Array<{
+      word: string;
+      targetBeatId: string;
+      style: {
+        color: string;
+        hoverColor: string;
+        underline: boolean;
+        bold: boolean;
+      };
+    }>;
+    allowMultiple: boolean;
+  }, locations?: Location[]): Promise<string>;
+  
+  // Transition and effects
+  applyTransition(transition: Transition): Promise<void>;
+  playSound(sound: Sound): Promise<void>;
+  
+  // User interaction
+  waitForUserInput(): Promise<void>;
+  
+  // State management
+  clear(): void;
+  setState(key: string, value: any): void;
+  getState(key: string): any;
+}
+
+export interface BeatTypeDefinition {
+  category: 'visible' | 'invisible' | 'custom';
+  displayName: string;
+  icon: string;
+  parameters: Record<string, any>;
+  locations?: string[];
+  transitions?: boolean;
+  sound?: boolean;
+  renderer?: string;
+}

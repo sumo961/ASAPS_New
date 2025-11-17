@@ -1,0 +1,40 @@
+{
+  "name": "asaps-modern",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Advanced Story Authoring and Presentation System - Modern Implementation",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @asaps/builder",
+    "dev:all": "concurrently \"npm run dev -w @asaps/core\" \"npm run dev -w @asaps/builder\"",
+    "build": "npm run build --workspaces",
+    "build:core": "npm run build -w @asaps/core",
+    "build:builder": "npm run build -w @asaps/builder",
+    "test": "npm run test --workspaces",
+    "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,css}\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.54.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.2",
+    "vite": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=7.0.0"
+  }
+}

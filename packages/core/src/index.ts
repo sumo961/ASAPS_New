@@ -1,0 +1,12 @@
+// Main exports for @asaps/core
+export * from './beats';
+export * from './engine';
+export * from './xml';
+export * from './types';
+export * from './types/animation';
+export * from './audio/presetSounds';
+export * from './generated/beat-types';
+
+// Package info
+export const version = '2.0.0';
+export const name = 'ASAPS Core';

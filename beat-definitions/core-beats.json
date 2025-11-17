@@ -1,0 +1,859 @@
+{
+  "schema": "asaps-beat-definitions-v2.2",
+  "version": "2.2.0",
+  "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture and cluster container support",
+  
+  "connectionModel": {
+    "description": "Defines how connections are structured within beats",
+    "principles": [
+      "Connections are semantically part of the function's behavior",
+      "Single-connection beats have connection within function",
+      "Multi-connection beats have choices/props that contain targets",
+      "All connections support labels, conditions, and effects"
+    ]
+  },
+
+  "customTypes": {
+    "dialogNode": {
+      "description": "A node in a dialog tree",
+      "schema": {
+        "id": "string",
+        "speaker": "string", 
+        "text": "string",
+        "emotion": "string?",
+        "conditions": "condition[]?",
+        "choices": "dialogChoice[]?",
+        "next": "string | dialogNode?",
+        "effects": "effect[]?"
+      }
+    },
+    "dialogChoice": {
+      "description": "A choice option in dialog",
+      "schema": {
+        "id": "string",
+        "text": "string",
+        "target": "string | dialogNode?",
+        "conditions": "condition[]?",
+        "effects": "effect[]?",
+        "visible": "boolean?"
+      }
+    },
+    "movementOption": {
+      "description": "A movement choice",
+      "schema": {
+        "id": "string",
+        "text": "string",
+        "location": "string",
+        "target": "string",
+        "conditions": "condition[]?",
+        "effects": "effect[]?"
+      }
+    },
+    "propOption": {
+      "description": "A prop interaction choice",
+      "schema": {
+        "id": "string",
+        "name": "string",
+        "description": "string",
+        "target": "string",
+        "conditions": "condition[]?",
+        "effects": "effect[]?"
+      }
+    },
+    "condition": {
+      "description": "Condition for beat logic",
+      "schema": {
+        "type": "'variable' | 'inventory' | 'counter' | 'counterCompare' | 'timer' | 'visitedBeat'",
+        "operator": "'==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'has'",
+        "left": "string",
+        "right": "any",
+        "counter1": "string?",
+        "counter2": "string?",
+        "timer": "string?",
+        "val": "any?"
+      }
+    },
+    "effect": {
+      "description": "Effect to apply to story state", 
+      "schema": {
+        "type": "'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter'",
+        "target": "string",
+        "value": "any?"
+      }
+    },
+    "connection": {
+      "description": "Single connection for linear beats",
+      "schema": {
+        "target": "string",
+        "label": "string?",
+        "condition": "condition?",
+        "effects": "effect[]?"
+      }
+    }
+  },
+
+  "clusterContainerTypes": {
+    "spatial": {
+      "icon": "🏠",
+      "description": "Spatial organization containers with embedded reference graphics",
+      "supportsMapGraphics": true,
+      "supportsExpandCollapse": true,
+      "supportsBeatContainment": true
+    },
+    "organizational": {
+      "icon": "📂",
+      "description": "Logical grouping containers for story organization",
+      "supportsMapGraphics": false,
+      "supportsExpandCollapse": true,
+      "supportsBeatContainment": true
+    }
+  },
+
+  "beatTypes": {
+    "titleScreen": {
+      "category": "visible",
+      "displayName": "Title Screen",
+      "icon": "🎬",
+      "description": "Opening title screen with start button",
+      "connectionType": "single",
+      "parameters": {
+        "title": {
+          "type": "string",
+          "required": true,
+          "default": "Untitled Story",
+          "description": "Story title text"
+        },
+        "author": {
+          "type": "string", 
+          "required": false,
+          "default": "Anonymous",
+          "description": "Author name"
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Start",
+          "description": "Start button text"
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat when start is clicked"
+        }
+      },
+      "locations": ["title", "author", "startButton"],
+      "locationMapping": {
+        "title": "title",
+        "author": "author",
+        "startButton": "buttonText"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "titleScreen"
+    },
+
+    "introText": {
+      "category": "visible", 
+      "displayName": "Intro Text",
+      "icon": "📝",
+      "description": "Text display with continue button",
+      "connectionType": "single",
+      "parameters": {
+        "text": {
+          "type": "string",
+          "required": true,
+          "default": "",
+          "description": "Text content to display"
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Continue",
+          "description": "Continue button text (also used as connection label)"
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat when button is clicked"
+        }
+      },
+      "locations": ["text", "continueButton"],
+      "locationMapping": {
+        "text": "text",
+        "continueButton": "buttonText"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "textDisplay"
+    },
+
+    "dialogTree": {
+      "category": "visible",
+      "displayName": "Dialog Tree", 
+      "icon": "🌳",
+      "description": "Complex branching conversation system",
+      "connectionType": "multiple",
+      "parameters": {
+        "dialogTree": {
+          "type": "dialogNode",
+          "required": true,
+          "description": "Root dialog node with full conversation tree"
+        },
+        "defaultConnection": {
+          "type": "connection",
+          "required": false,
+          "description": "Default target after dialog completes"
+        }
+      },
+      "locations": ["dialog", "choices"],
+      "locationMapping": {
+        "dialog": "text"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "dialogTree"
+    },
+
+    "movementChoice": {
+      "category": "visible",
+      "displayName": "Movement Choice",
+      "icon": "🚶",
+      "description": "Location-based navigation choices",
+      "connectionType": "multiple",
+      "parameters": {
+        "question": {
+          "type": "string",
+          "required": true,
+          "default": "Where do you want to go?",
+          "description": "Question prompt"
+        },
+        "choices": {
+          "type": "array<movementOption>",
+          "required": true,
+          "minItems": 1,
+          "description": "Array of movement options (each contains a target)"
+        }
+      },
+      "locations": ["question", "choices"],
+      "locationMapping": {
+        "question": "question"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "movementChoice"
+    },
+
+    "pickProp": {
+      "category": "visible",
+      "displayName": "Pick Prop",
+      "icon": "🎒", 
+      "description": "Interactive object selection",
+      "connectionType": "multiple",
+      "parameters": {
+        "question": {
+          "type": "string",
+          "required": true,
+          "default": "What do you want to interact with?",
+          "description": "Interaction prompt"
+        },
+        "props": {
+          "type": "array<propOption>",
+          "required": true,
+          "minItems": 1,
+          "description": "Available props to interact with (each contains a target)"
+        }
+      },
+      "locations": ["question", "props"],
+      "locationMapping": {
+        "question": "question"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "propSelection"
+    },
+
+    "videoBeat": {
+      "category": "visible",
+      "displayName": "Video Beat",
+      "icon": "🎥",
+      "description": "Video playback with optional controls",
+      "connectionType": "single",
+      "parameters": {
+        "videoFile": {
+          "type": "string",
+          "required": true,
+          "description": "Path to video file"
+        },
+        "autoplay": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Start playing automatically"
+        },
+        "controls": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Show video controls"
+        },
+        "skipButton": {
+          "type": "boolean",
+          "required": false, 
+          "default": true,
+          "description": "Allow skipping video"
+        },
+        "connection": {
+          "type": "connection",
+          "required": false,
+          "description": "Target beat after video ends"
+        }
+      },
+      "locations": ["video", "controls"],
+      "locationMapping": {
+        "video": "videoFile"
+      },
+      "transitions": true,
+      "sound": false,
+      "renderer": "videoPlayer"
+    },
+
+    "endScreen": {
+      "category": "visible",
+      "displayName": "End Screen",
+      "icon": "🏁",
+      "description": "Story conclusion screen",
+      "connectionType": "single",
+      "parameters": {
+        "message": {
+          "type": "string",
+          "required": false,
+          "default": "The End",
+          "description": "Ending message"
+        },
+        "showRestart": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Show restart button"
+        },
+        "showCredits": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Show credits button"
+        },
+        "reset": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Reset all values (counters, variables, timers) on restart"
+        },
+        "restartText": {
+          "type": "string",
+          "required": false,
+          "default": "Play Again",
+          "description": "Text for restart button"
+        },
+        "creditsText": {
+          "type": "string",
+          "required": false,
+          "default": "Credits",
+          "description": "Text for credits button"
+        },
+        "restartConnection": {
+          "type": "connection",
+          "required": false,
+          "description": "Target beat for restart (usually beat 0)"
+        }
+      },
+      "locations": ["message", "restartButton", "creditsButton"],
+      "locationMapping": {
+        "message": "message",
+        "restartButton": "restartText",
+        "creditsButton": "creditsText"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "endScreen"
+    },
+
+    "setVariable": {
+      "category": "invisible",
+      "displayName": "Set Variable/Counter",
+      "icon": "🔧",
+      "description": "Modify story variables or counters",
+      "connectionType": "single",
+      "parameters": {
+        "type": {
+          "type": "string",
+          "required": true,
+          "default": "variable",
+          "description": "Type: variable or counter"
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Variable or counter name"
+        },
+        "value": {
+          "type": "any",
+          "required": true,
+          "description": "New value (string for variables, number for counters)"
+        },
+        "operation": {
+          "type": "string",
+          "required": false,
+          "default": "set",
+          "description": "For counters: set or change. For variables: set only"
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Next beat after variable/counter is set"
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "none"
+    },
+
+    "conditionBeat": {
+      "category": "invisible",
+      "displayName": "Condition Check",
+      "icon": "❓",
+      "description": "Conditional branching logic",
+      "connectionType": "conditional",
+      "parameters": {
+        "condition": {
+          "type": "condition",
+          "required": true,
+          "description": "Condition to evaluate"
+        },
+        "trueConnection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target if condition is true"
+        },
+        "falseConnection": {
+          "type": "connection",
+          "required": false,
+          "description": "Target if condition is false"
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "none"
+    },
+
+
+    "durScreen": {
+      "category": "visible",
+      "displayName": "Duration Screen", 
+      "icon": "⏳",
+      "description": "Timed display screen",
+      "connectionType": "single",
+      "parameters": {
+        "text": {
+          "type": "string",
+          "required": true,
+          "default": "",
+          "description": "Text to display"
+        },
+        "duration": {
+          "type": "number",
+          "required": true,
+          "default": 3000,
+          "description": "Display duration in milliseconds"
+        },
+        "connection": {
+          "type": "connection",
+          "required": false,
+          "description": "Target beat after duration expires"
+        }
+      },
+      "locations": ["text"],
+      "locationMapping": {
+        "text": "text"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "timedText"
+    },
+
+    "randomTarget": {
+      "category": "invisible",
+      "displayName": "Random Target",
+      "icon": "🎲",
+      "description": "Randomly select next beat from choices",
+      "connectionType": "multiple",
+      "parameters": {
+        "choices": {
+          "type": "array<connection>",
+          "required": true,
+          "minItems": 2,
+          "description": "Array of possible target beats"
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "none"
+    },
+
+    "setTimer": {
+      "category": "invisible",
+      "displayName": "Set Timer",
+      "icon": "⏱️",
+      "description": "Set or clear a named timer",
+      "connectionType": "single",
+      "parameters": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Timer name"
+        },
+        "value": {
+          "type": "number",
+          "required": true,
+          "description": "Timer value in seconds (0 to clear)"
+        },
+        "timerTarget": {
+          "type": "string",
+          "required": true,
+          "description": "Beat to jump to when timer expires"
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Next beat after timer is set"
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "none"
+    },
+
+    "addRemoveInventory": {
+      "category": "invisible",
+      "displayName": "Inventory Management",
+      "icon": "📦",
+      "description": "Add, remove, or transfer inventory items",
+      "connectionType": "single",
+      "parameters": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "default": "add",
+          "description": "Action: add, remove, or transfer"
+        },
+        "item": {
+          "type": "string",
+          "required": true,
+          "description": "Item name"
+        },
+        "character": {
+          "type": "string",
+          "required": true,
+          "default": "player",
+          "description": "Character name (for add/remove)"
+        },
+        "fromChar": {
+          "type": "string",
+          "required": false,
+          "description": "Source character (for transfer)"
+        },
+        "toChar": {
+          "type": "string",
+          "required": false,
+          "description": "Target character (for transfer)"
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Next beat after inventory change"
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "none"
+    },
+
+    "inputText": {
+      "category": "visible",
+      "displayName": "Input Text",
+      "icon": "✏️",
+      "description": "Prompts user for text input and stores in a variable or character display name",
+      "connectionType": "single",
+      "parameters": {
+        "prompt": {
+          "type": "string",
+          "required": true,
+          "default": "Please enter your response:",
+          "description": "Question or prompt text to display"
+        },
+        "saveToType": {
+          "type": "string",
+          "required": true,
+          "default": "variable",
+          "description": "Save input to: 'variable' or 'characterName'"
+        },
+        "variable": {
+          "type": "string",
+          "required": false,
+          "default": "userInput",
+          "description": "Variable name to store the input (when saveToType='variable')"
+        },
+        "characterId": {
+          "type": "string",
+          "required": false,
+          "description": "Character ID to update display name (when saveToType='characterName')"
+        },
+        "placeholder": {
+          "type": "string",
+          "required": false,
+          "description": "Optional placeholder text for input field"
+        },
+        "validation": {
+          "type": "string",
+          "required": false,
+          "default": "none",
+          "description": "Validation type: none, numeric, email, alphanumeric"
+        },
+        "minLength": {
+          "type": "number",
+          "required": false,
+          "description": "Minimum character length"
+        },
+        "maxLength": {
+          "type": "number",
+          "required": false,
+          "description": "Maximum character length"
+        },
+        "required": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Whether input is required"
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Continue",
+          "description": "Text for submit button"
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat after input is submitted"
+        }
+      },
+      "locations": ["prompt", "inputField", "submitButton"],
+      "locationMapping": {
+        "prompt": "prompt",
+        "inputField": "placeholder",
+        "submitButton": "buttonText"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "inputText"
+    },
+
+    "hyperText": {
+      "category": "visible",
+      "displayName": "Hyper Text",
+      "icon": "🔗",
+      "description": "Text with clickable hyperlinked words that branch to different beats",
+      "connectionType": "multiple",
+      "parameters": {
+        "text": {
+          "type": "string",
+          "required": true,
+          "default": "Click on any word to explore.",
+          "description": "Main text content with hyperlinked words"
+        },
+        "hyperlinks": {
+          "type": "array<object>",
+          "required": true,
+          "minItems": 1,
+          "description": "Array of { word: string, targetBeatId: string, style?: object }"
+        },
+        "allowMultipleClicks": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Whether user can click multiple links"
+        },
+        "highlightColor": {
+          "type": "string",
+          "required": false,
+          "default": "#0066cc",
+          "description": "Color for hyperlinked text"
+        },
+        "hoverColor": {
+          "type": "string",
+          "required": false,
+          "default": "#003366",
+          "description": "Color when hovering over hyperlinks"
+        }
+      },
+      "locations": ["text", "hyperlinks"],
+      "locationMapping": {
+        "text": "text"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "hyperText"
+    }
+  },
+
+  "connectionTypes": {
+    "single": {
+      "description": "Beat has exactly one outgoing connection",
+      "maxConnections": 1,
+      "structure": "nested"
+    },
+    "multiple": {
+      "description": "Beat has multiple outgoing connections through choices",
+      "maxConnections": null,
+      "structure": "embedded"
+    },
+    "conditional": {
+      "description": "Beat has conditional branching",
+      "maxConnections": 2,
+      "structure": "nested"
+    },
+    "none": {
+      "description": "Beat has no outgoing connections",
+      "maxConnections": 0,
+      "structure": null
+    }
+  },
+
+  "validationRules": {
+    "connections": {
+      "singleConnection": "Beats with connectionType='single' must have exactly one connection",
+      "multipleConnections": "Beats with connectionType='multiple' must embed targets in choices/props",
+      "conditionalConnections": "Beats with connectionType='conditional' must have trueConnection",
+      "noOrphans": "All beats except endScreen should have at least one outgoing connection"
+    }
+  },
+
+  "exportFormat": {
+    "connectionLocation": {
+      "single": "Within <function> element as nested <connection>",
+      "multiple": "As 'target' attribute within <choice> or <prop> elements",
+      "conditional": "As separate trueConnection and falseConnection within <function>"
+    },
+    "example": {
+      "introText": "<function kind='introText' text='...'><connection target='beat_2' label='Continue' /></function>",
+      "movementChoice": "<function kind='movementChoice'><choice text='Go left' target='beat_3' /></function>"
+    }
+  },
+
+  "aiIntegration": {
+    "enabled": true,
+    "providers": ["openai", "claude", "custom"],
+    "contextAwareness": true
+  },
+
+  "clusterDefinitions": {
+    "schema": "asaps-cluster-definitions-v1.0",
+    "description": "Cluster container definitions for spatial story organization with embedded reference graphics",
+
+    "customTypes": {
+      "ContainerBeatPosition": {
+        "description": "Position of beat within cluster container",
+        "schema": {
+          "beatId": "string",
+          "containerId": "string",
+          "position": {
+            "x": "number",
+            "y": "number",
+            "z": "number"
+          },
+          "mapStyle": "ContainerBeatStyle?"
+        }
+      },
+
+      "ContainerBeatStyle": {
+        "description": "Visual styling for beat within container",
+        "schema": {
+          "icon": "string?",
+          "color": "string?",
+          "size": "string?",
+          "label": "string?"
+        }
+      }
+    },
+
+    "clusterTypes": {
+      "spatial": {
+        "displayName": "Spatial Cluster",
+        "icon": "🏠",
+        "description": "Spatial organization with floorplan or map reference",
+        "parameters": {
+          "name": {
+            "type": "string",
+            "required": true,
+            "default": "Location Cluster",
+            "description": "Cluster name"
+          },
+          "mapAssetId": {
+            "type": "string",
+            "required": false,
+            "description": "Reference graphic asset ID (floorplan, map, etc.)"
+          },
+          "isExpanded": {
+            "type": "boolean",
+            "required": false,
+            "default": false,
+            "description": "Initial expand/collapse state"
+          },
+          "containerPosition": {
+            "type": "object",
+            "required": true,
+            "schema": {
+              "x": "number",
+              "y": "number"
+            },
+            "description": "Position in main flowchart"
+          },
+          "containerBounds": {
+            "type": "object",
+            "required": true,
+            "schema": {
+              "width": "number",
+              "height": "number"
+            },
+            "description": "Container dimensions in flowchart"
+          }
+        }
+      },
+
+      "organizational": {
+        "displayName": "Organizational Cluster",
+        "icon": "📂",
+        "description": "Logical grouping for story organization",
+        "parameters": {
+          "name": {
+            "type": "string",
+            "required": true,
+            "default": "Story Segment",
+            "description": "Cluster name"
+          },
+          "color": {
+            "type": "string",
+            "required": false,
+            "default": "#3b82f6",
+            "description": "Container color theme"
+          },
+          "isExpanded": {
+            "type": "boolean",
+            "required": false,
+            "default": false,
+            "description": "Initial expand/collapse state"
+          }
+        }
+      }
+    }
+  }
+}

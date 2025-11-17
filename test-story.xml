@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story title="Test Story - January 2025 Fixes" author="ASAPS Modern Testing" version="1.0">
+  <settings>
+    <project width="1024" height="768" aspectRatio="4:3" scalingMode="fit" />
+    <debug firstbeat="beat_intro" showvals="off" />
+    <colors pcolor="#7D8DA3" palpha="90" nonpcolor="#CCCCCC" nonpalpha="90" bgColor="#1a1a1a" textBoxBg="#000000" textBoxBorder="#333333" />
+    <fonts titleFont="Gothic" textFont="Handwriting2" btnFont="Handwriting2" titleSize="48" textSize="18" buttonSize="16" />
+    <textbox radius="20" padding="20" borderWidth="2" opacity="80" position="bottom" />
+    <texteffects animation="typewriter" typewriterSpeed="30" fadeInDuration="500" />
+    <hotspots visible="true" labels="true" highlightColor="#ffff00" />
+    <backgroundsound name="" volume="70" mute="false" />
+    <copyright notice="Copyright © 2025 ASAPS Modern Testing. All Rights Reserved" />
+  </settings>
+  
+  <environment>
+    <assets />
+    <node id="bg_default" name="Default Background" file="bg_default.jpg" />
+  </environment>
+  
+  <characters />
+  
+  <plot>
+    <clusters />
+    
+    <!-- Test 1: IntroText Beat with Auto-Generated Continue Button -->
+    <beat>
+      <id id="beat_intro" name="Introduction (IntroText Test)" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Main Text" x="63" y="96" z="0" width="500" height="70" text="Welcome to the ASAPS Modern Test Story!" />
+        <!-- Continue button should be auto-generated at x=412, y=668 -->
+      </locs>
+      <function kind="introText" text="Welcome to the ASAPS Modern Test Story! This beat tests the auto-generated Continue button feature.">
+        <!-- Connection should have NO label attribute -->
+        <connection target="beat_durscreen" />
+      </function>
+    </beat>
+    
+    <!-- Test 2: DurScreen Beat with Auto-Generated Continue Button -->
+    <beat>
+      <id id="beat_durscreen" name="Timed Screen (DurScreen Test)" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Main Text" x="63" y="96" z="0" width="500" height="70" text="This is a timed screen that displays for 5 seconds." />
+        <!-- Continue button should be auto-generated -->
+      </locs>
+      <function kind="durScreen" text="This is a timed screen that displays for 5 seconds." duration="5000">
+        <!-- No label on connection -->
+        <connection target="beat_choice" />
+      </function>
+    </beat>
+    
+    <!-- Test 3: ChoiceBeat with Multiple Labeled Connections -->
+    <beat>
+      <id id="beat_choice" name="Make a Choice (ChoiceBeat Test)" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Question" x="63" y="96" z="0" width="700" height="50" text="What would you like to test next?" />
+      </locs>
+      <function kind="choiceBeat">
+        <!-- Each choice should have a label -->
+        <choice id="choice_1" text="Test Conditions" target="beat_condition" />
+        <choice id="choice_2" text="Test Variables" target="beat_variable" />
+        <choice id="choice_3" text="Test Dialog Tree" target="beat_dialog" />
+      </function>
+    </beat>
+    
+    <!-- Test 4: SetVariable Beat (Invisible - No Label) -->
+    <beat>
+      <id id="beat_variable" name="Set Counter (SetVariable Test)" />
+      <function kind="setVariable">
+        <variable type="counter" name="testCounter" val="10" operation="set" />
+        <!-- No label on connection -->
+        <connection target="beat_condition_test" />
+      </function>
+    </beat>
+    
+    <!-- Test 5: ConditionBeat with True/False Paths -->
+    <beat>
+      <id id="beat_condition" name="Check Condition (ConditionBeat Test)" />
+      <function kind="conditionBeat">
+        <condition type="counter" counter="testCounter" operator=">" val="5" />
+        <trueTarget targetBeat="beat_condition_true" />
+        <falseTarget targetBeat="beat_condition_false" />
+      </function>
+    </beat>
+    
+    <beat>
+      <id id="beat_condition_test" name="Test Condition" />
+      <function kind="conditionBeat">
+        <condition type="counter" counter="testCounter" operator=">=" val="10" />
+        <trueTarget targetBeat="beat_condition_true" />
+        <falseTarget targetBeat="beat_condition_false" />
+      </function>
+    </beat>
+    
+    <!-- Test 6: Condition True Result -->
+    <beat>
+      <id id="beat_condition_true" name="Condition True" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Result" x="63" y="96" z="0" width="700" height="50" text="Condition was TRUE! Counter is 10 or greater." />
+        <!-- Auto-generated Continue button -->
+      </locs>
+      <function kind="introText" text="Condition was TRUE! Counter is 10 or greater.">
+        <connection target="beat_timer_setup" />
+      </function>
+    </beat>
+    
+    <!-- Test 7: Condition False Result -->
+    <beat>
+      <id id="beat_condition_false" name="Condition False" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Result" x="63" y="96" z="0" width="700" height="50" text="Condition was FALSE! Counter is less than 10." />
+      </locs>
+      <function kind="introText" text="Condition was FALSE! Counter is less than 10.">
+        <connection target="beat_timer_setup" />
+      </function>
+    </beat>
+    
+    <!-- Test 8: SetTimer Beat (Invisible - No Label) -->
+    <beat>
+      <id id="beat_timer_setup" name="Setup Timer (SetTimer Test)" />
+      <function kind="setTimer">
+        <timer name="countdownTimer" val="3000" target="beat_timer_timeout" />
+        <!-- No label on connection -->
+        <connection target="beat_timer_wait" />
+      </function>
+    </beat>
+    
+    <!-- Test 9: Timer Wait Screen -->
+    <beat>
+      <id id="beat_timer_wait" name="Waiting for Timer" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Message" x="63" y="96" z="0" width="700" height="50" text="Timer is counting down... (3 seconds)" />
+      </locs>
+      <function kind="introText" text="Timer is counting down... (3 seconds)">
+        <connection target="beat_timer_timeout" />
+      </function>
+    </beat>
+    
+    <!-- Test 10: Timer Timeout -->
+    <beat>
+      <id id="beat_timer_timeout" name="Timer Complete" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Result" x="63" y="96" z="0" width="700" height="50" text="Timer completed! Moving to dialog tree test." />
+      </locs>
+      <function kind="introText" text="Timer completed! Moving to dialog tree test.">
+        <connection target="beat_dialog" />
+      </function>
+    </beat>
+    
+    <!-- Test 11: DialogTree Beat -->
+    <beat>
+      <id id="beat_dialog" name="Dialog Tree (DialogTree Test)" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Speaker Name" x="63" y="50" z="1" width="200" height="30" text="Test NPC" />
+        <loc kind="text" name="Dialog Text" x="63" y="96" z="0" width="700" height="100" text="Hello! This is a dialog tree test. How can I help you?" />
+      </locs>
+      <function kind="dialogTree" speaker="Test NPC" text="Hello! This is a dialog tree test. How can I help you?">
+        <choice id="dialog_choice_1" text="Tell me about the system" target="beat_dialog_info" />
+        <choice id="dialog_choice_2" text="I need help" target="beat_dialog_help" />
+        <choice id="dialog_choice_3" text="Goodbye" target="beat_random" />
+      </function>
+    </beat>
+    
+    <!-- Test 12: Dialog Info Response -->
+    <beat>
+      <id id="beat_dialog_info" name="System Info" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Speaker Name" x="63" y="50" z="1" width="200" height="30" text="Test NPC" />
+        <loc kind="text" name="Dialog Text" x="63" y="96" z="0" width="700" height="100" text="ASAPS Modern is a complete rewrite of the ASPS authoring system in TypeScript!" />
+      </locs>
+      <function kind="introText" text="ASAPS Modern is a complete rewrite of the ASPS authoring system in TypeScript!">
+        <connection target="beat_random" />
+      </function>
+    </beat>
+    
+    <!-- Test 13: Dialog Help Response -->
+    <beat>
+      <id id="beat_dialog_help" name="Help Response" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Speaker Name" x="63" y="50" z="1" width="200" height="30" text="Test NPC" />
+        <loc kind="text" name="Dialog Text" x="63" y="96" z="0" width="700" height="100" text="Check the comprehensive test plan for detailed testing instructions!" />
+      </locs>
+      <function kind="introText" text="Check the comprehensive test plan for detailed testing instructions!">
+        <connection target="beat_random" />
+      </function>
+    </beat>
+    
+    <!-- Test 14: RandomTarget Beat (Invisible - No Label) -->
+    <beat>
+      <id id="beat_random" name="Random Choice (RandomTarget Test)" />
+      <function kind="randomTarget">
+        <choice targetBeat="beat_inventory" />
+        <choice targetBeat="beat_endscreen" />
+      </function>
+    </beat>
+    
+    <!-- Test 15: AddRemoveInventory Beat (Invisible - No Label) -->
+    <beat>
+      <id id="beat_inventory" name="Add Item (Inventory Test)" />
+      <function kind="addRemoveInventory">
+        <itemAction action="add" item="test_key" char="player" />
+        <!-- No label on connection -->
+        <connection target="beat_endscreen" />
+      </function>
+    </beat>
+    
+    <!-- Test 16: EndScreen (Terminal Beat - No Label) -->
+    <beat>
+      <id id="beat_endscreen" name="The End (EndScreen Test)" />
+      <node>bg_default</node>
+      <locs>
+        <loc kind="text" name="Title" x="262" y="284" z="1" width="500" height="60" text="Test Complete!" />
+        <loc kind="text" name="Message" x="262" y="360" z="0" width="500" height="100" text="All beat types have been tested. Thank you for testing ASAPS Modern!" />
+        <!-- Auto-generated button (if endScreen supports it) -->
+      </locs>
+      <function kind="endScreen" message="Test Complete! All beat types have been tested." showRestart="true" showCredits="false" reset="true">
+        <!-- No connection - terminal beat -->
+      </function>
+    </beat>
+  </plot>
+</story>

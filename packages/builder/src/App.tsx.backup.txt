@@ -1,0 +1,171 @@
+import { useState, useCallback, useEffect } from 'react';
+import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
+import { Canvas } from './components/Canvas';
+import { Inspector } from './components/Inspector';
+import { StoryPreview } from './components/preview/StoryPreview';
+import { useStoryBuilder } from './hooks/useStoryBuilder';
+import { Story } from '@asaps/core';
+import type { Beat } from '@asaps/core';
+
+function App() {
+  const { state, actions, initializeStory } = useStoryBuilder();
+  const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Initialize with a basic story on mount
+  useEffect(() => {
+    if (state.beats.length === 0) {
+      initializeStory();
+    }
+  }, []);
+
+  const handleBeatSelect = useCallback((beat: Beat) => {
+    setSelectedBeat(beat);
+  }, []);
+
+  const handleBeatUpdate = useCallback((beatId: string, updates: Partial<Beat>) => {
+    actions.updateBeat(beatId, updates);
+    // Force re-render by updating selected beat reference
+    const updatedBeat = state.beats.find(b => b.id === beatId);
+    if (updatedBeat && selectedBeat?.id === beatId) {
+      setSelectedBeat(updatedBeat);
+    }
+  }, [actions, state.beats, selectedBeat]);
+
+  const handleBeatDelete = useCallback((beatId: string) => {
+    actions.deleteBeat(beatId);
+    setSelectedBeat(null);
+  }, [actions]);
+
+  const handleBeatAdd = useCallback((type: string, position: { x: number; y: number }) => {
+    const newBeat = actions.addBeat(type, position);
+    setSelectedBeat(newBeat);
+  }, [actions]);
+
+  const handleExport = useCallback(async () => {
+    try {
+      const asml = actions.exportStory();
+      
+      // Create a blob and download
+      const blob = new Blob([asml], { type: 'text/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${state.title.replace(/\s+/g, '_')}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      console.log('Story exported successfully');
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export story. See console for details.');
+    }
+  }, [actions, state.title]);
+
+  const handleImport = useCallback(async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xml';
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      try {
+        const text = await file.text();
+        await actions.importStory(text);
+        setSelectedBeat(null);
+        console.log('Story imported successfully');
+        alert('Story imported successfully!');
+      } catch (error) {
+        console.error('Import failed:', error);
+        alert('Failed to import story. Please check that it\'s a valid ASML file.');
+      }
+    };
+    
+    input.click();
+  }, [actions]);
+
+  const handlePreview = useCallback(() => {
+    if (state.beats.length === 0) {
+      alert('Please add some beats to your story first!');
+      return;
+    }
+    setShowPreview(true);
+  }, [state.beats]);
+
+  const handleClosePreview = useCallback(() => {
+    setShowPreview(false);
+  }, []);
+
+  // Create a Story object for preview
+  const getStoryForPreview = useCallback((): Story => {
+    const story = new Story({
+      title: state.title,
+      author: state.author || 'Unknown',
+      firstBeatId: state.beats[0]?.id || '0',
+    });
+    
+    // Add all beats to story
+    state.beats.forEach(beat => {
+      story.addBeat(beat);
+    });
+    
+    return story;
+  }, [state]);
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-50">
+      <Header 
+        title={state.title}
+        onTitleChange={actions.setTitle}
+        onExport={handleExport}
+        onImport={handleImport}
+        onPreview={handlePreview}
+      />
+      
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar 
+          beats={state.beats}
+          selectedBeat={selectedBeat}
+          onBeatSelect={handleBeatSelect}
+          onAddBeat={(type) => actions.addBeat(type)}
+        />
+        
+        <Canvas 
+          beats={state.beats}
+          connections={state.connections}
+          selectedBeat={selectedBeat}
+          onBeatSelect={handleBeatSelect}
+          onBeatMove={actions.moveBeat}
+          onConnect={actions.connectBeats}
+          onBeatAdd={handleBeatAdd}
+        />
+        
+        {selectedBeat && (
+          <Inspector 
+            beat={selectedBeat}
+            onUpdate={handleBeatUpdate}
+            onDelete={handleBeatDelete}
+            allBeats={state.beats}
+            onConnect={actions.connectBeats}
+            onDisconnect={actions.disconnectBeats}
+          />
+        )}
+      </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <StoryPreview 
+          story={getStoryForPreview()}
+          onClose={handleClosePreview}
+        />
+      )}
+    </div>
+  );
+}
+
+export default App;

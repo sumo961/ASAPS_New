@@ -1,0 +1,274 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { VisualBeatEditor, VisualElement } from '../../src/components/visual/VisualBeatEditor';
+import type { Asset } from '../../src/components/assets/AssetManager';
+
+describe('VisualBeatEditor - Character/Prop Placement', () => {
+  const mockAssets: Asset[] = [
+    {
+      id: 'char-1',
+      name: 'Hero.png',
+      type: 'image',
+      subType: 'character',
+      url: 'blob:character1',
+      size: 1024,
+      dimensions: { width: 200, height: 300 },
+      uploadedAt: new Date(),
+    },
+    {
+      id: 'prop-1',
+      name: 'Sword.png',
+      type: 'image',
+      subType: 'prop',
+      url: 'blob:prop1',
+      size: 512,
+      dimensions: { width: 100, height: 150 },
+      uploadedAt: new Date(),
+    },
+    {
+      id: 'bg-1',
+      name: 'Forest.jpg',
+      type: 'image',
+      subType: 'background',
+      url: 'blob:background1',
+      size: 2048,
+      dimensions: { width: 1024, height: 768 },
+      uploadedAt: new Date(),
+    },
+  ];
+
+  const mockElements: VisualElement[] = [];
+  const mockOnElementsChange = vi.fn();
+  const mockOnSelectAsset = vi.fn();
+  const mockOnSelectElement = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should render character and prop toolbar buttons', () => {
+    render(
+      <VisualBeatEditor
+        elements={mockElements}
+        onElementsChange={mockOnElementsChange}
+        assets={mockAssets}
+        onSelectAsset={mockOnSelectAsset}
+        onSelectElement={mockOnSelectElement}
+      />
+    );
+
+    // Check for toolbar buttons by their title attributes
+    expect(screen.getByTitle('Add Character')).toBeInTheDocument();
+    expect(screen.getByTitle('Add Prop')).toBeInTheDocument();
+  });
+
+  it('should call onSelectAsset when character tool is used', async () => {
+    const { container } = render(
+      <VisualBeatEditor
+        elements={mockElements}
+        onElementsChange={mockOnElementsChange}
+        assets={mockAssets}
+        onSelectAsset={mockOnSelectAsset}
+        onSelectElement={mockOnSelectElement}
+      />
+    );
+
+    // Click character button to activate tool
+    const characterButton = screen.getByTitle('Add Character');
+    fireEvent.click(characterButton);
+
+    // Click on the canvas
+    const canvas = container.querySelector('[style*="scale"]');
+    expect(canvas).toBeInTheDocument();
+
+    if (canvas) {
+      fireEvent.click(canvas);
+    }
+
+    // Should have called onSelectAsset with 'character' type
+    await waitFor(() => {
+      expect(mockOnSelectAsset).toHaveBeenCalledWith(
+        'character',
+        expect.any(Function)
+      );
+    });
+  });
+
+  it('should call onSelectAsset when prop tool is used', async () => {
+    const { container } = render(
+      <VisualBeatEditor
+        elements={mockElements}
+        onElementsChange={mockOnElementsChange}
+        assets={mockAssets}
+        onSelectAsset={mockOnSelectAsset}
+        onSelectElement={mockOnSelectElement}
+      />
+    );
+
+    // Click prop button to activate tool
+    const propButton = screen.getByTitle('Add Prop');
+    fireEvent.click(propButton);
+
+    // Click on the canvas
+    const canvas = container.querySelector('[style*="scale"]');
+    if (canvas) {
+      fireEvent.click(canvas);
+    }
+
+    // Should have called onSelectAsset with 'prop' type
+    await waitFor(() => {
+      expect(mockOnSelectAsset).toHaveBeenCalledWith(
+        'prop',
+        expect.any(Function)
+      );
+    });
+  });
+
+  it('should add character element with asset ID when asset is selected', async () => {
+    // Mock onSelectAsset to immediately call the callback with a selected asset
+    mockOnSelectAsset.mockImplementation((type, callback) => {
+      callback(mockAssets[0]); // Select the character asset
+    });
+
+    const { container } = render(
+      <VisualBeatEditor
+        elements={mockElements}
+        onElementsChange={mockOnElementsChange}
+        assets={mockAssets}
+        onSelectAsset={mockOnSelectAsset}
+        onSelectElement={mockOnSelectElement}
+      />
+    );
+
+    // Click character button
+    const characterButton = screen.getByTitle('Add Character');
+    fireEvent.click(characterButton);
+
+    // Click on the canvas
+    const canvas = container.querySelector('[style*="scale"]');
+    if (canvas) {
+      fireEvent.click(canvas);
+    }
+
+    // Should have added a character element with the asset ID
+    await waitFor(() => {
+      expect(mockOnElementsChange).toHaveBeenCalled();
+      const addedElements = mockOnElementsChange.mock.calls[0][0];
+      expect(addedElements).toHaveLength(1);
+      expect(addedElements[0]).toMatchObject({
+        type: 'character',
+        assetId: 'char-1',
+        width: 150,
+        height: 150,
+      });
+    });
+  });
+
+  it('should add prop element with asset ID when asset is selected', async () => {
+    // Mock onSelectAsset to immediately call the callback with a selected asset
+    mockOnSelectAsset.mockImplementation((type, callback) => {
+      callback(mockAssets[1]); // Select the prop asset
+    });
+
+    const { container } = render(
+      <VisualBeatEditor
+        elements={mockElements}
+        onElementsChange={mockOnElementsChange}
+        assets={mockAssets}
+        onSelectAsset={mockOnSelectAsset}
+        onSelectElement={mockOnSelectElement}
+      />
+    );
+
+    // Click prop button
+    const propButton = screen.getByTitle('Add Prop');
+    fireEvent.click(propButton);
+
+    // Click on the canvas
+    const canvas = container.querySelector('[style*="scale"]');
+    if (canvas) {
+      fireEvent.click(canvas);
+    }
+
+    // Should have added a prop element with the asset ID
+    await waitFor(() => {
+      expect(mockOnElementsChange).toHaveBeenCalled();
+      const addedElements = mockOnElementsChange.mock.calls[0][0];
+      expect(addedElements).toHaveLength(1);
+      expect(addedElements[0]).toMatchObject({
+        type: 'prop',
+        assetId: 'prop-1',
+        width: 150,
+        height: 150,
+      });
+    });
+  });
+
+  it('should resolve asset URLs for character elements', () => {
+    const elementsWithCharacter: VisualElement[] = [
+      {
+        id: 'elem-1',
+        type: 'character',
+        assetId: 'char-1',
+        x: 100,
+        y: 100,
+        z: 0,
+        width: 150,
+        height: 150,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        name: 'Hero',
+      },
+    ];
+
+    render(
+      <VisualBeatEditor
+        elements={elementsWithCharacter}
+        onElementsChange={mockOnElementsChange}
+        assets={mockAssets}
+        onSelectAsset={mockOnSelectAsset}
+        onSelectElement={mockOnSelectElement}
+      />
+    );
+
+    // The asset URL should be resolved and passed to the renderer
+    // We can verify this by checking that no placeholder is shown
+    // (In a real test, we'd check the rendered output more thoroughly)
+    expect(screen.queryByText(/Asset not found/i)).not.toBeInTheDocument();
+  });
+
+  it('should show placeholder when asset ID does not match any asset', () => {
+    const elementsWithMissingAsset: VisualElement[] = [
+      {
+        id: 'elem-1',
+        type: 'character',
+        assetId: 'missing-asset',
+        x: 100,
+        y: 100,
+        z: 0,
+        width: 150,
+        height: 150,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        name: 'Missing Character',
+      },
+    ];
+
+    render(
+      <VisualBeatEditor
+        elements={elementsWithMissingAsset}
+        onElementsChange={mockOnElementsChange}
+        assets={mockAssets}
+        onSelectAsset={mockOnSelectAsset}
+        onSelectElement={mockOnSelectElement}
+      />
+    );
+
+    // Should show the element name (placeholder will be shown by PositionedBeatView)
+    expect(screen.getByText('Missing Character')).toBeInTheDocument();
+  });
+});

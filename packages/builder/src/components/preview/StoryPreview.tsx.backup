@@ -1,0 +1,339 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { X, Play, RotateCcw, ChevronRight, Info } from 'lucide-react';
+import { Story, StoryEngine, Beat } from '@asaps/core';
+import { ReactRenderer } from '@asaps/renderer';
+
+interface StoryPreviewProps {
+  story: Story;
+  settings?: any;
+  onClose: () => void;
+}
+
+export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, onClose }) => {
+  const [isRunning, setIsRunning] = useState(false);
+  const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>({});
+  const [activeTimers, setActiveTimers] = useState<any[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Use refs instead of state to avoid re-initialization
+  const rendererRef = useRef<ReactRenderer | null>(null);
+  const engineRef = useRef<StoryEngine | null>(null);
+
+  useEffect(() => {
+    // Only initialize once when container is ready
+    if (!containerRef.current) return;
+    
+    console.log('[StoryPreview] Effect running, current renderer:', !!rendererRef.current);
+    
+    // CRITICAL FIX: Always ensure we have a valid renderer
+    // In Strict Mode, the renderer might exist but its root might be invalid
+    if (!rendererRef.current) {
+      console.log('[StoryPreview] Creating new renderer and engine');
+      
+      // Create renderer with the preview container
+      const reactRenderer = new ReactRenderer({
+        container: containerRef.current,
+        width: 1024,
+        height: 768,
+      });
+
+      // Create story engine
+      const engine = new StoryEngine(reactRenderer);
+      
+      rendererRef.current = reactRenderer;
+      engineRef.current = engine;
+      
+      console.log('[StoryPreview] Renderer and engine created');
+    } else {
+      console.log('[StoryPreview] Renderer exists, ensuring it is valid');
+      // Ensure the renderer has a valid root for the current container
+      // This handles Strict Mode remounts where the root might be lost
+      const renderer = rendererRef.current as any;
+      if (!renderer.root && renderer.initialize) {
+        console.log('[StoryPreview] Re-initializing renderer for current container');
+        renderer.context.container = containerRef.current;
+        renderer.initialize();
+      }
+    }
+
+    return () => {
+      console.log('[StoryPreview] Cleanup - stopping engine');
+      // Cleanup - stop engine
+      if (engineRef.current) {
+        engineRef.current.stop();
+      }
+      // In Strict Mode, don't destroy the renderer - just stop the engine
+      // This allows the renderer to be reused on remount
+    };
+  }, []); // Empty deps - only run once per mount
+
+  const startPreview = useCallback(async () => {
+    if (!engineRef.current || !rendererRef.current) return;
+
+    try {
+      setIsRunning(true);
+      
+      // Load the story
+      await engineRef.current.loadStory(story);
+      
+      // Get context and track changes
+      const context = engineRef.current.getContext();
+      
+      // Track beat changes
+      const originalMarkVisited = context.markBeatVisited.bind(context);
+      context.markBeatVisited = (beatId: string) => {
+        originalMarkVisited(beatId);
+        const beat = story.getBeat(beatId);
+        setCurrentBeat(beat || null);
+        setDebugInfo({
+          currentBeatId: beatId,
+          visitedBeats: context.getVisitedBeats(),
+          variables: context.getVariables(),
+          counters: context.getCounters(),
+          inventory: context.getInventory(),
+        });
+      };
+      
+      // Listen for timer events
+      const timerManager = context.getTimerManager();
+      
+      const updateTimers = () => {
+        setActiveTimers(timerManager.getActiveTimers());
+      };
+      
+      timerManager.on('timerStarted', updateTimers);
+      timerManager.on('timerTick', updateTimers);
+      timerManager.on('timerStopped', updateTimers);
+      
+      // Handle timer expiration - navigate to timer target
+      timerManager.on('timerExpired', async ({ name, targetBeat }) => {
+        if (targetBeat && rendererRef.current) {
+          console.log(`Timer "${name}" expired, navigating to: ${targetBeat}`);
+          const beat = story.getBeat(targetBeat);
+          if (beat) {
+            // Stop current story execution
+            if (engineRef.current) {
+              engineRef.current.stop();
+            }
+            // Mark beat as visited
+            context.markBeatVisited(targetBeat);
+            // Execute the timer target beat
+            try {
+              const nextBeatId = await beat.execute(context, rendererRef.current);
+              if (nextBeatId) {
+                // Continue story from next beat
+                const nextBeat = story.getBeat(nextBeatId);
+                if (nextBeat) {
+                  context.markBeatVisited(nextBeatId);
+                  await nextBeat.execute(context, rendererRef.current);
+                }
+              }
+            } catch (error) {
+              console.error('Error executing timer target beat:', error);
+            }
+          }
+        }
+      });
+
+      // Start the story
+      await engineRef.current.start();
+      
+    } catch (error) {
+      console.error('Preview error:', error);
+      alert('Error during preview: ' + error);
+    } finally {
+      setIsRunning(false);
+    }
+  }, [story]);
+
+  const handleRestart = useCallback(() => {
+    if (rendererRef.current) {
+      rendererRef.current.clear();
+    }
+    setCurrentBeat(null);
+    setDebugInfo({});
+    setActiveTimers([]);
+    startPreview();
+  }, [startPreview]);
+
+  const stopPreview = useCallback(() => {
+    if (engineRef.current) {
+      const context = engineRef.current.getContext();
+      const timerManager = context.getTimerManager();
+      timerManager.stopAllTimers();
+      engineRef.current.stop();
+    }
+    if (rendererRef.current) {
+      rendererRef.current.clear();
+    }
+    setIsRunning(false);
+    setCurrentBeat(null);
+    setActiveTimers([]);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-5/6 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Play className="w-5 h-5" />
+            Story Preview
+          </h2>
+          <div className="flex items-center gap-2">
+            {!isRunning && !currentBeat && (
+              <button
+                onClick={startPreview}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+              >
+                <Play className="w-4 h-4" />
+                Start Preview
+              </button>
+            )}
+            {isRunning && (
+              <button
+                onClick={stopPreview}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Stop
+              </button>
+            )}
+            {currentBeat && !isRunning && (
+              <button
+                onClick={handleRestart}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Restart
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Preview Area - Full ReactRenderer Output */}
+          <div className="flex-1 bg-gray-50">
+            <div 
+              ref={containerRef}
+              className="h-full w-full bg-white overflow-auto"
+            >
+              {/* ReactRenderer will inject content here */}
+              {!currentBeat && !isRunning && (
+                <div className="h-full flex items-center justify-center text-gray-400">
+                  <div className="text-center">
+                    <Play className="w-16 h-16 mx-auto mb-4" />
+                    <p>Click "Start Preview" to test your story</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Debug Panel */}
+          <div className="w-80 bg-gray-100 p-4 border-l overflow-y-auto">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <Info className="w-4 h-4" />
+              Debug Info
+            </h3>
+            
+            {currentBeat && (
+              <div className="space-y-3">
+                <div className="bg-white p-3 rounded-lg">
+                  <div className="text-sm font-medium text-gray-600">Current Beat</div>
+                  <div className="font-semibold">{currentBeat.name}</div>
+                  <div className="text-xs text-gray-500">{currentBeat.type} • {currentBeat.id}</div>
+                </div>
+
+                {debugInfo.visitedBeats && debugInfo.visitedBeats.length > 0 && (
+                  <div className="bg-white p-3 rounded-lg">
+                    <div className="text-sm font-medium text-gray-600 mb-2">Visited Beats ({debugInfo.visitedBeats.length})</div>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {debugInfo.visitedBeats.map((beatId: string) => (
+                        <div key={beatId} className="text-xs text-gray-600 flex items-center gap-1">
+                          <ChevronRight className="w-3 h-3" />
+                          {beatId}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {debugInfo.variables && Object.keys(debugInfo.variables).length > 0 && (
+                  <div className="bg-white p-3 rounded-lg">
+                    <div className="text-sm font-medium text-gray-600 mb-2">Variables</div>
+                    <div className="space-y-1">
+                      {Object.entries(debugInfo.variables).map(([key, value]) => (
+                        <div key={key} className="text-xs">
+                          <span className="font-mono text-gray-600">{key}:</span>
+                          <span className="ml-2">{JSON.stringify(value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {debugInfo.counters && Object.keys(debugInfo.counters).length > 0 && (
+                  <div className="bg-white p-3 rounded-lg">
+                    <div className="text-sm font-medium text-gray-600 mb-2">Counters</div>
+                    <div className="space-y-1">
+                      {Object.entries(debugInfo.counters).map(([key, value]) => (
+                        <div key={key} className="text-xs">
+                          <span className="font-mono text-gray-600">{key}:</span>
+                          <span className="ml-2 font-bold">{value as number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {debugInfo.inventory && debugInfo.inventory.length > 0 && (
+                  <div className="bg-white p-3 rounded-lg">
+                    <div className="text-sm font-medium text-gray-600 mb-2">Inventory</div>
+                    <div className="space-y-1">
+                      {debugInfo.inventory.map((item: string) => (
+                        <div key={item} className="text-xs text-gray-600">
+                          • {item}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {activeTimers.length > 0 && (
+                  <div className="bg-white p-3 rounded-lg">
+                    <div className="text-sm font-medium text-gray-600 mb-2">Active Timers</div>
+                    <div className="space-y-2">
+                      {activeTimers.map((timer: any) => (
+                        <div key={timer.name} className="bg-blue-50 p-2 rounded">
+                          <div className="text-xs font-bold text-blue-900">{timer.name}</div>
+                          <div className="text-sm font-mono text-blue-700">{timer.remainingTime}s</div>
+                          {timer.targetBeat && (
+                            <div className="text-xs text-blue-600">Target: {timer.targetBeat}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!currentBeat && !isRunning && (
+              <div className="text-sm text-gray-500 text-center mt-8">
+                <p>Debug information will appear here when the story is running.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
