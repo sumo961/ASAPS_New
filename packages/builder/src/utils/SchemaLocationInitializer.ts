@@ -271,7 +271,7 @@ export function initializeLocationsFromSchema(
       height,
       rotation: 0,
       scale: 1,
-      visible: elementType === 'text' || elementType === 'dialog' ? false : true,
+      visible: true,
       locked: false,
       font: 'Arial',
       fontSize: locationDef.fontSize || 16,

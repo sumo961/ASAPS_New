@@ -257,12 +257,15 @@ export const Inspector: React.FC<InspectorProps> = ({
     switch (beat?.type) {
       case 'titleScreen':
         return {
-          text: `${params.title || 'Untitled'}\nby ${params.author || 'Unknown'}`,
+          title: params.title || 'Untitled',
+          author: params.author || 'Unknown Author',
+          buttonText: params.buttonText || 'Start',
         };
       case 'introText':
       case 'durScreen':
         return {
           text: params.text || '',
+          buttonText: params.buttonText || 'Continue',
         };
       case 'dialogTree':
         return {
@@ -283,6 +286,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       case 'endScreen':
         return {
           text: params.message || 'The End',
+          buttonText: params.buttonText || 'Play Again',
         };
       default:
         return undefined;
@@ -465,14 +469,18 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   const handleParameterChange = (param: string, value: any) => {
-    setLocalBeat((prev: any) => ({
-      ...prev,
+    const updatedBeat = {
+      ...localBeat,
       parameters: {
-        ...prev.parameters,
+        ...localBeat.parameters,
         [param]: value,
       },
-    }));
+    };
+    setLocalBeat(updatedBeat);
     setHasChanges(true);
+
+    // Immediately save parameter changes like we do for connections
+    rebuildConnectionsAndUpdate(updatedBeat);
   };
 
   // Helper function to rebuild connections from local state and immediately update
@@ -1858,23 +1866,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* BUTTON TEXT - FIXED beat.type === 'durScreen' || */}
-                {(beat.type === 'titleScreen' || beat.type === 'introText' || 
-                  beat.type === 'endScreen') && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Button Text
-                    </label>
-                    <input
-                      type="text"
-                      value={localBeat.parameters?.buttonText || 'Continue'}
-                      onChange={(e) => handleParameterChange('buttonText', e.target.value)}
-                      placeholder="Continue"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    />
                   </div>
                 )}
 

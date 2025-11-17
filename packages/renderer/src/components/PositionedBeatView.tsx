@@ -908,7 +908,7 @@ function getContentForLocation(
     if (nameLower.includes('author')) {
       return content.author ? `by ${content.author}` : '';
     }
-    if (nameLower.includes('start') || nameLower.includes('button')) {
+    if (nameLower === 'startbutton' || (nameLower.includes('start') && nameLower.includes('button'))) {
       return content.buttonText || 'Start';
     }
   }

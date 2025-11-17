@@ -267,10 +267,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             element.text = params.text || '';
           } else if (beat.type === 'hyperText') {
             element.text = params.text || '';
-          } else if (beat.type === 'endScreen' && nameLower.includes('end')) {
+          } else if (beat.type === 'endScreen' && nameLower.includes('message')) {
             element.text = params.message || 'The End';
           } else if (beat.type === 'dialogTree') {
             element.text = params.text || '';
+          } else if (beat.type === 'titleScreen') {
+            if (nameLower.includes('title')) {
+              element.text = params.title || 'Untitled Story';
+            } else if (nameLower.includes('author')) {
+              element.text = params.author || 'Anonymous';
+            }
           }
         } else if (element.type === 'button') {
           // Populate button text from params
@@ -398,71 +404,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     }
 
     // Fallback: Auto-add beat-specific elements if not already present (legacy)
-    if (beat.type === 'titleScreen') {
-      if (!elements.some((e: VisualElement) => e.type === 'button' && e.name === 'Start')) {
-        elements.push({
-          id: `button_start_${Date.now()}`,
-          type: 'button',
-          name: 'Start',
-          text: params.buttonText || 'Start',
-          x: centerX - 100,
-          y: 500,
-          z: 10,
-          width: 200,
-          height: 50,
-          rotation: 0,
-          scale: 1,
-          visible: true,
-          locked: false,
-          font: 'Arial',
-          fontSize: 18,
-          textAlign: 'center'
-        });
-      }
-      
-      if (!elements.some((e: VisualElement) => (e.type === 'text' || e.type === 'dialog') && e.name === 'Title')) {
-        elements.push({
-          id: `text_title_${Date.now()}`,
-          type: 'text',
-          name: 'Title',
-          text: params.title || 'Untitled',
-          x: centerX - 200,
-          y: 200,
-          z: 8,
-          width: 400,
-          height: 60,
-          rotation: 0,
-          scale: 1,
-          visible: getElementVisibility('text'),
-          locked: false,
-          font: 'Arial',
-          fontSize: 32,
-          textAlign: 'center'
-        });
-      }
+    // Note: titleScreen now uses schema-driven initialization only
 
-      if (!elements.some((e: VisualElement) => (e.type === 'text' || e.type === 'dialog') && e.name === 'Author')) {
-        elements.push({
-          id: `text_author_${Date.now()}`,
-          type: 'text',
-          name: 'Author',
-          text: `by ${params.author || 'Unknown'}`,
-          x: centerX - 150,
-          y: 270,
-          z: 9,
-          width: 300,
-          height: 40,
-          rotation: 0,
-          scale: 1,
-          visible: getElementVisibility('text'),
-          locked: false,
-          font: 'Arial',
-          fontSize: 20,
-          textAlign: 'center'
-        });
-      }
-    }
-    
     // Auto-add text and Continue button for introText beats - CENTERED
     if (beat.type === 'introText') {
       // Add the main text content - check for both text and dialog types since text locations get converted to dialog
@@ -552,149 +495,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       }
     }
     
-    // Auto-add elements for endScreen beats
-    if (beat.type === 'endScreen') {
-      // Add "The End" message text
-      if (!elements.some((e: VisualElement) => (e.type === 'text' || e.type === 'dialog') && e.name === 'End Message')) {
-        const message = params.message || 'The End';
-        const { width, height } = autoSizeText(message, 150); // Increased minWidth to prevent truncation
-        elements.push({
-          id: `text_end_message_${Date.now()}`,
-          type: 'text',
-          name: 'End Message',
-          text: message,
-          x: centerX - width / 2,
-          y: 250,
-          z: 10,
-          width,
-          height,
-          rotation: 0,
-          scale: 1,
-          visible: getElementVisibility('text'),
-          locked: false,
-          font: 'Arial',
-          fontSize: 24,
-          textAlign: 'center'
-        });
-      }
+    // Note: endScreen now uses schema-driven initialization only
 
-      // Calculate button positioning based on which buttons are shown
-      const restartWidth = 180;
-      const creditsWidth = 180;
-      const buttonSpacing = 20;
-      const showRestart = params.showRestart !== false;
-      const showCredits = params.showCredits === true;
-
-      let restartX: number;
-      let creditsX: number;
-
-      if (showRestart && showCredits) {
-        // Both buttons: center them as a pair
-        const totalButtonWidth = restartWidth + creditsWidth + buttonSpacing;
-        const buttonsStartX = centerX - totalButtonWidth / 2;
-        restartX = buttonsStartX;
-        creditsX = buttonsStartX + restartWidth + buttonSpacing;
-      } else if (showRestart) {
-        // Only restart button: center it alone
-        restartX = centerX - restartWidth / 2;
-        creditsX = 0; // Not used
-      } else if (showCredits) {
-        // Only credits button: center it alone
-        restartX = 0; // Not used
-        creditsX = centerX - creditsWidth / 2;
-      } else {
-        // No buttons
-        restartX = 0;
-        creditsX = 0;
-      }
-
-      // Add Restart button if showRestart is true
-      if (showRestart && !elements.some((e: VisualElement) => e.type === 'button' && e.name === 'Restart')) {
-        elements.push({
-          id: `button_restart_${Date.now()}`,
-          type: 'button',
-          name: 'Restart',
-          text: params.restartText || params.buttonText || 'Play Again',
-          x: restartX,
-          y: 450,
-          z: 11,
-          width: 180,
-          height: 50,
-          rotation: 0,
-          scale: 1,
-          visible: getElementVisibility('button'),
-          locked: false,
-          font: 'Arial',
-          fontSize: 18,
-          textAlign: 'center'
-        });
-      }
-
-      // Add Credits button if showCredits is true
-      if (showCredits && !elements.some((e: VisualElement) => e.type === 'button' && e.name === 'Credits')) {
-        elements.push({
-          id: `button_credits_${Date.now()}`,
-          type: 'button',
-          name: 'Credits',
-          text: params.creditsText || 'Credits',
-          x: creditsX,
-          y: 450,
-          z: 12,
-          width: 180,
-          height: 50,
-          rotation: 0,
-          scale: 1,
-          visible: getElementVisibility('button'),
-          locked: false,
-          font: 'Arial',
-          fontSize: 18,
-          textAlign: 'center'
-        });
-      }
-
-      // Update existing EndScreen elements to ensure proper sizing and positioning
-      elements.forEach((element: VisualElement) => {
-        if (element.name === 'End Message') {
-          // Fix text width if it's too narrow
-          const message = params.message || 'The End';
-          if (element.width < 150) {
-            const { width, height } = autoSizeText(message, 150);
-            element.width = width;
-            element.height = height;
-            element.x = centerX - width / 2;
-          }
-        } else if (element.name === 'Restart' && element.type === 'button') {
-          // Reposition Restart button based on whether Credits button exists
-          const creditsButtonExists = elements.some((e: VisualElement) =>
-            e.type === 'button' && e.name === 'Credits'
-          );
-          if (creditsButtonExists) {
-            // Both buttons: position as a pair
-            const totalButtonWidth = restartWidth + creditsWidth + buttonSpacing;
-            const buttonsStartX = centerX - totalButtonWidth / 2;
-            element.x = buttonsStartX;
-          } else {
-            // Only restart button: center it
-            element.x = centerX - restartWidth / 2;
-          }
-        } else if (element.name === 'Credits' && element.type === 'button') {
-          // Position Credits button
-          const restartButtonExists = elements.some((e: VisualElement) =>
-            e.type === 'button' && e.name === 'Restart'
-          );
-          if (restartButtonExists) {
-            // Both buttons: position as a pair
-            const totalButtonWidth = restartWidth + creditsWidth + buttonSpacing;
-            const buttonsStartX = centerX - totalButtonWidth / 2;
-            element.x = buttonsStartX + restartWidth + buttonSpacing;
-          } else {
-            // Only credits button: center it
-            element.x = centerX - creditsWidth / 2;
-          }
-        }
-      });
-    }
-    
     // Auto-add elements for inputText beats
     if (beat.type === 'inputText') {
       // Add prompt text
@@ -1224,20 +1026,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         const showCredits = params.showCredits === true;
 
         // Check which buttons currently exist
-        const hasRestartButton = updated.some(e => e.type === 'button' && e.name === 'Restart');
-        const hasCreditsButton = updated.some(e => e.type === 'button' && e.name === 'Credits');
+        const hasRestartButton = updated.some(e => e.type === 'button' && e.name?.toLowerCase().includes('restart'));
+        const hasCreditsButton = updated.some(e => e.type === 'button' && e.name?.toLowerCase().includes('credits'));
 
         // Remove Restart button if showRestart is false
         if (!showRestart && hasRestartButton) {
           console.log('[VisualWorkspace] Removing Restart button (showRestart=false)');
-          updated = updated.filter(e => !(e.type === 'button' && e.name === 'Restart'));
+          updated = updated.filter(e => !(e.type === 'button' && e.name?.toLowerCase().includes('restart')));
           changed = true;
         }
 
         // Remove Credits button if showCredits is false
         if (!showCredits && hasCreditsButton) {
           console.log('[VisualWorkspace] Removing Credits button (showCredits=false)');
-          updated = updated.filter(e => !(e.type === 'button' && e.name === 'Credits'));
+          updated = updated.filter(e => !(e.type === 'button' && e.name?.toLowerCase().includes('credits')));
           changed = true;
         }
 
@@ -1315,7 +1117,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               let newX = e.x;
 
               // Recalculate position based on whether Credits button exists
-              const creditsExists = updated.some(el => el.type === 'button' && el.name === 'Credits');
+              const creditsExists = updated.some(el => el.type === 'button' && el.name?.toLowerCase().includes('credits'));
               if (creditsExists) {
                 const totalButtonWidth = restartWidth + creditsWidth + buttonSpacing;
                 newX = centerX - totalButtonWidth / 2;
@@ -1335,7 +1137,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               let newX = e.x;
 
               // Recalculate position based on whether Restart button exists
-              const restartExists = updated.some(el => el.type === 'button' && el.name === 'Restart');
+              const restartExists = updated.some(el => el.type === 'button' && el.name?.toLowerCase().includes('restart'));
               if (restartExists) {
                 const totalButtonWidth = restartWidth + creditsWidth + buttonSpacing;
                 newX = centerX - totalButtonWidth / 2 + restartWidth + buttonSpacing;
@@ -1354,15 +1156,29 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         });
       }
 
-      // Update TitleScreen button text
+      // Update TitleScreen text elements and button
       if (beat.type === 'titleScreen') {
         updated = updated.map((e: VisualElement) => {
-          if (e.type === 'button') {
-            const nameLower = e.name?.toLowerCase() || '';
-            if (nameLower.includes('start')) {
-              const newText = params.buttonText || 'Start';
+          const nameLower = e.name?.toLowerCase() || '';
+          if (e.type === 'button' && nameLower.includes('start')) {
+            const newText = params.buttonText || 'Start';
+            if (e.text !== newText) {
+              console.log(`[VisualWorkspace] Updating Start button text from "${e.text}" to "${newText}"`);
+              changed = true;
+              return { ...e, text: newText };
+            }
+          } else if (e.type === 'text' || e.type === 'dialog') {
+            if (nameLower.includes('title')) {
+              const newText = params.title || 'Untitled Story';
               if (e.text !== newText) {
-                console.log(`[VisualWorkspace] Updating Start button text from "${e.text}" to "${newText}"`);
+                console.log(`[VisualWorkspace] Updating Title text from "${e.text}" to "${newText}"`);
+                changed = true;
+                return { ...e, text: newText };
+              }
+            } else if (nameLower.includes('author')) {
+              const newText = params.author || 'Anonymous';
+              if (e.text !== newText) {
+                console.log(`[VisualWorkspace] Updating Author text from "${e.text}" to "${newText}"`);
                 changed = true;
                 return { ...e, text: newText };
               }
