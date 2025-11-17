@@ -57,6 +57,11 @@ export class MovementChoiceBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
+    // Set background asset ID in renderer state so it can be resolved
+    if (this.node) {
+      renderer.setState('backgroundAssetId', this.node);
+    }
+
     // Filter choices based on conditions
     const availableChoices = this.choices.filter(choice => {
       if (!choice.conditions) return true;

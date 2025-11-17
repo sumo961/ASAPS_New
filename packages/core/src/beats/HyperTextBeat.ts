@@ -94,6 +94,11 @@ export class HyperTextBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
+    // Set background asset ID in renderer state so it can be resolved
+    if (this.node) {
+      renderer.setState('backgroundAssetId', this.node);
+    }
+
     // Process text with variable interpolation
     const processedText = this.processText(this.text, context);
 

@@ -42,6 +42,11 @@ export class VideoBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
+    // Set background asset ID in renderer state so it can be resolved
+    if (this.node) {
+      renderer.setState('backgroundAssetId', this.node);
+    }
+
     if (!this.videoFile) {
       console.error(`VideoBeat ${this.id} has no video file specified`);
       return this.getNextBeat(context);

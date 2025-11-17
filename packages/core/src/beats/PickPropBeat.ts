@@ -34,6 +34,11 @@ export class PickPropBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
+    // Set background asset ID in renderer state so it can be resolved
+    if (this.node) {
+      renderer.setState('backgroundAssetId', this.node);
+    }
+
     // Filter props based on conditions
     const availableProps = this.props.filter(prop => {
       if (!prop.conditions) return true;
