@@ -132,6 +132,16 @@ export const Inspector: React.FC<InspectorProps> = ({
   // Helper functions for Dialog Tree
   const handleDialogTreeChange = (newDialogTree: any) => {
     handleParameterChange('dialogTree', newDialogTree);
+
+    // Rebuild connections immediately when dialog tree changes
+    const updatedBeat = {
+      ...localBeat,
+      parameters: {
+        ...localBeat.parameters,
+        dialogTree: newDialogTree
+      }
+    };
+    rebuildConnectionsAndUpdate(updatedBeat);
   };
 
   const handleAddConnection = (targetId: string, label?: string) => {
@@ -176,6 +186,18 @@ export const Inspector: React.FC<InspectorProps> = ({
       };
     }
     handleParameterChange('choices', newChoices);
+
+    // If target changed, rebuild connections immediately
+    if (field === 'target') {
+      const updatedBeat = {
+        ...localBeat,
+        parameters: {
+          ...localBeat.parameters,
+          choices: newChoices
+        }
+      };
+      rebuildConnectionsAndUpdate(updatedBeat);
+    }
   };
 
   // Helper functions for Pick Prop
@@ -212,6 +234,18 @@ export const Inspector: React.FC<InspectorProps> = ({
       };
     }
     handleParameterChange('props', newProps);
+
+    // If target changed, rebuild connections immediately
+    if (field === 'target') {
+      const updatedBeat = {
+        ...localBeat,
+        parameters: {
+          ...localBeat.parameters,
+          props: newProps
+        }
+      };
+      rebuildConnectionsAndUpdate(updatedBeat);
+    }
   };
 
   // Get beat content for visual editor
@@ -441,6 +475,157 @@ export const Inspector: React.FC<InspectorProps> = ({
     setHasChanges(true);
   };
 
+  // Helper function to rebuild connections from local state and immediately update
+  const rebuildConnectionsAndUpdate = (updatedLocalBeat?: any) => {
+    if (!beat || !onUpdate) return;
+
+    const beatToUpdate = updatedLocalBeat || localBeat;
+    const beatAny = beat as any;
+
+    // Clear existing connections
+    if (typeof beatAny.clearConnections === 'function') {
+      beatAny.clearConnections();
+    } else {
+      beat.connections = [];
+    }
+
+    // Apply all basic properties from local state
+    beat.name = beatToUpdate.name;
+    beat.cluster = beatToUpdate.cluster;
+    beat.defaultTarget = beatToUpdate.defaultTarget || undefined;
+    beat.transition = beatToUpdate.transition;
+    beat.sound = beatToUpdate.sound;
+
+    // Update parameters
+    if (beatToUpdate.parameters && beat.updateParameters) {
+      const parameters = { ...beatToUpdate.parameters };
+
+      // Ensure button text is saved for applicable beats
+      if (['titleScreen', 'introText', 'durScreen', 'endScreen'].includes(beat.type)) {
+        parameters.buttonText = beatToUpdate.parameters.buttonText ||
+          (beat.type === 'titleScreen' ? 'Start' :
+           beat.type === 'endScreen' ? 'Play Again' :
+           'Continue');
+      }
+
+      beat.updateParameters(parameters);
+    }
+
+    // Use the connection type from the component scope
+    const beatDef = getBeatDefinition(beat.type);
+    const connectionType = beatDef?.connectionType || 'single';
+
+    // Rebuild connections based on beat type
+    if (beat.type === 'dialogTree') {
+      // Handle dialog tree connections
+      const extractConnections = (node: any): any[] => {
+        const connections: any[] = [];
+
+        if (node.choices) {
+          node.choices.forEach((choice: any) => {
+            if (typeof choice.target === 'string' && choice.target) {
+              connections.push({
+                targetId: choice.target,
+                label: choice.text
+              });
+            } else if (typeof choice.target === 'object' && choice.target) {
+              connections.push(...extractConnections(choice.target));
+            }
+          });
+        }
+
+        if (typeof node.next === 'string' && node.next) {
+          connections.push({
+            targetId: node.next,
+            label: 'Continue'
+          });
+        } else if (typeof node.next === 'object' && node.next) {
+          connections.push(...extractConnections(node.next));
+        }
+
+        return connections;
+      };
+
+      const dialogConnections = extractConnections(beatToUpdate.parameters.dialogTree);
+
+      if (beatToUpdate.connections?.length > 0) {
+        const defaultConn = beatToUpdate.connections.find((c: any) => !c.label || c.label === 'Continue');
+        if (defaultConn) {
+          dialogConnections.push(defaultConn);
+        }
+      }
+
+      const uniqueConns = Array.from(
+        new Map(dialogConnections.map(c => [`${c.targetId}-${c.label}`, c])).values()
+      );
+      uniqueConns.forEach(conn => beat.addConnection(conn));
+
+    } else if (beat.type === 'setTimer') {
+      // Timer target connection (from parameters)
+      if (beatToUpdate.parameters?.target) {
+        beat.addConnection({
+          targetId: beatToUpdate.parameters.target,
+          label: 'Timer Target'
+        });
+      }
+      // Normal connection (where to continue immediately)
+      const normalConn = beatToUpdate.connections?.find((c: any) => c.label !== 'Timer Target');
+      if (normalConn) {
+        beat.addConnection(normalConn);
+      }
+
+    } else if (beat.type === 'randomTarget') {
+      // Random target connections
+      const choices = beatToUpdate.parameters?.choices || [];
+      choices.forEach((choice: any, index: number) => {
+        if (choice && choice.trim() !== '') {
+          beat.addConnection({
+            targetId: choice,
+            label: `Random ${index + 1}`
+          });
+        }
+      });
+
+    } else if (connectionType === 'single' && beatToUpdate.connections?.length > 0) {
+      beat.addConnection(beatToUpdate.connections[0]);
+
+    } else if (connectionType === 'multiple') {
+      // Handle multiple connections for choice beats
+      if (beat.type === 'movementChoice' && beatToUpdate.parameters?.choices) {
+        beatToUpdate.parameters.choices.forEach((choice: any) => {
+          if (choice.target) {
+            beat.addConnection({
+              targetId: choice.target,
+              label: choice.text
+            });
+          }
+        });
+      } else if (beat.type === 'pickProp' && beatToUpdate.parameters?.props) {
+        beatToUpdate.parameters.props.forEach((prop: any) => {
+          if (prop.target) {
+            beat.addConnection({
+              targetId: prop.target,
+              label: prop.name
+            });
+          }
+        });
+      }
+
+    } else if (connectionType === 'conditional') {
+      beatToUpdate.connections.forEach((conn: any) => beat.addConnection(conn));
+
+    } else {
+      beatToUpdate.connections.forEach((conn: any) => beat.addConnection(conn));
+    }
+
+    // Call onUpdate with the updated beat and connections
+    const updatedConnections = beat.getConnections ? beat.getConnections() : [];
+    onUpdate(beat.id, {
+      ...beat,
+      connections: updatedConnections
+    });
+  };
+
   const handleSave = () => {
     const errors = validateBeat();
     if (errors.length > 0) {
@@ -580,8 +765,14 @@ export const Inspector: React.FC<InspectorProps> = ({
       } else {
         localBeat.connections.forEach((conn: any) => beat.addConnection(conn));
       }
-      
-      onUpdate(beat.id, beat);
+
+      // CRITICAL FIX: Extract connections and include them in the update to force React re-render
+      const updatedConnections = beat.getConnections ? beat.getConnections() : [];
+
+      onUpdate(beat.id, {
+        ...beat,
+        connections: updatedConnections
+      });
       setHasChanges(false);
       setValidationErrors([]);
     }
@@ -1063,16 +1254,19 @@ export const Inspector: React.FC<InspectorProps> = ({
                         //onChange={(e) => handleParameterChange('target', e.target.value)}
                         onChange={(e) => {
                           const targetId = e.target.value;
-                            handleParameterChange('target', targetId);          // ← keep param in sync
+                          handleParameterChange('target', targetId);          // ← keep param in sync
                           //const timerConn = localBeat.connections?.find((c) => c.label === 'Timer Target');
                          // const timerConn = localBeat.connections?.find((c: any) => c.label === 'Timer Target');
                           const timerConn = localBeat.connections?.find((c: { label?: string }) => c.label === 'Timer Target');
                           const newConnections: { targetId: string; label: string }[] = [];
                           if (timerConn) newConnections.push(timerConn);      // preserve existing timer conn
                           if (targetId) newConnections.push({ targetId, label: '' }); // continue conn
-                            //setLocalBeat((prev) => ({ ...prev, connections: newConnections }));
-                            setLocalBeat((prev: typeof localBeat) => ({ ...prev, connections: newConnections }));
-                            setHasChanges(true);
+                          const updatedBeat = { ...localBeat, connections: newConnections };
+                          setLocalBeat(updatedBeat);
+                          setHasChanges(true);
+
+                          // Rebuild connections immediately when timer target changes
+                          rebuildConnectionsAndUpdate(updatedBeat);
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       >
@@ -1104,11 +1298,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                           if (targetId) {
                             newConnections.push({ targetId, label: '' });
                           }
-                          setLocalBeat((prev: any) => ({
-                            ...prev,
-                            connections: newConnections
-                          }));
+                          const updatedBeat = { ...localBeat, connections: newConnections };
+                          setLocalBeat(updatedBeat);
                           setHasChanges(true);
+
+                          // Rebuild connections immediately when continue target changes
+                          rebuildConnectionsAndUpdate(updatedBeat);
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       >
@@ -1571,12 +1766,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                             value={localBeat.connections?.[0]?.targetId || localBeat.defaultTarget || ''}
                             onChange={(e) => {
                               const targetId = e.target.value;
-                              setLocalBeat((prev: any) => ({
-                                ...prev,
+                              const updatedBeat = {
+                                ...localBeat,
                                 connections: targetId ? [{ targetId, label: '' }] : [],
                                 defaultTarget: targetId || undefined
-                              }));
+                              };
+                              setLocalBeat(updatedBeat);
                               setHasChanges(true);
+
+                              // Rebuild connections immediately when target changes
+                              rebuildConnectionsAndUpdate(updatedBeat);
                             }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
@@ -1603,13 +1802,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             onChange={(e) => {
                               const targetId = e.target.value;
                               const otherConns = localBeat.connections?.filter((c: any) => c.label !== 'true') || [];
-                              setLocalBeat((prev: any) => ({
-                                ...prev,
-                                connections: targetId 
+                              const updatedBeat = {
+                                ...localBeat,
+                                connections: targetId
                                   ? [...otherConns, { targetId, label: 'true' }]
                                   : otherConns
-                              }));
+                              };
+                              setLocalBeat(updatedBeat);
                               setHasChanges(true);
+
+                              // Rebuild connections immediately when true target changes
+                              rebuildConnectionsAndUpdate(updatedBeat);
                             }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
@@ -1631,13 +1834,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             onChange={(e) => {
                               const targetId = e.target.value;
                               const otherConns = localBeat.connections?.filter((c: any) => c.label !== 'false') || [];
-                              setLocalBeat((prev: any) => ({
-                                ...prev,
-                                connections: targetId 
+                              const updatedBeat = {
+                                ...localBeat,
+                                connections: targetId
                                   ? [...otherConns, { targetId, label: 'false' }]
                                   : otherConns
-                              }));
+                              };
+                              setLocalBeat(updatedBeat);
                               setHasChanges(true);
+
+                              // Rebuild connections immediately when false target changes
+                              rebuildConnectionsAndUpdate(updatedBeat);
                             }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
