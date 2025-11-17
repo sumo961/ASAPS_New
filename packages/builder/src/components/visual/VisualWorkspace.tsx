@@ -11,6 +11,7 @@ import { AnimationPanel } from './AnimationPanel';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
+import { calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '../../utils/textSizeCalculator';
 import { Info } from 'lucide-react';
 
 import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
@@ -89,6 +90,26 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     type: 'background' | 'character' | 'prop' | 'sound' | null;
     callback: ((asset: Asset) => void) | null;
   }>({ isOpen: false, type: null, callback: null });
+
+  // Helper functions to auto-size text elements based on content and font
+  // These use the improved textSizeCalculator utility with font awareness
+  const autoSizeTextBox = useCallback((element: VisualElement, text: string) => {
+    const fontSize = element.fontSize || 16;
+    const fontFamily = element.font || 'Arial';
+    return calculateTextBoxDimensions(text, fontSize, fontFamily);
+  }, []);
+
+  const autoSizeButton = useCallback((element: VisualElement, text: string) => {
+    const fontSize = element.fontSize || 16;
+    const fontFamily = element.font || 'Arial';
+    return calculateButtonDimensions(text, fontSize, fontFamily);
+  }, []);
+
+  const autoSizeDialog = useCallback((element: VisualElement, text: string) => {
+    const fontSize = element.fontSize || 16;
+    const fontFamily = element.font || 'Arial';
+    return calculateDialogDimensions(text, fontSize, fontFamily);
+  }, []);
 
   // Save changes when switching to a different beat - MUST run before load
   const prevBeatIdRef = useRef(beat?.id);
@@ -180,45 +201,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       return true;
     };
 
-    // Helper function to auto-size text elements based on content
-    const autoSizeText = (text: string, minWidth = 100, maxWidth = 824): { width: number; height: number } => {
-      if (!text) return { width: minWidth, height: 40 };
-      
-      const charCount = text.length;
-      const avgCharWidth = 7.5; // Average character width in pixels
-      const lineHeight = 20; // Line height in pixels  
-      const padding = 24; // Padding (top + bottom or left + right)
-      
-      // Smart width calculation based on content length
-      let targetWidth: number;
-      
-      if (charCount <= 15) {
-        // Very short text: tight width
-        targetWidth = Math.max(charCount * avgCharWidth + padding, minWidth);
-      } else if (charCount <= 40) {
-        // Short text: aim for 1-2 lines, compact width
-        targetWidth = Math.min(charCount * avgCharWidth + padding, 300);
-      } else if (charCount <= 80) {
-        // Medium text: aim for 2-3 lines
-        targetWidth = 400;
-      } else {
-        // Long text: wider box for readability
-        targetWidth = 500;
-      }
-      
-      // Ensure within bounds
-      const width = Math.min(Math.max(targetWidth, minWidth), maxWidth);
-      
-      // Calculate number of lines needed
-      const charsPerLine = Math.floor((width - padding) / avgCharWidth);
-      const lineCount = Math.max(1, Math.ceil(charCount / charsPerLine));
-      
-      // Calculate height based on line count
-      const height = Math.max(40, lineCount * lineHeight + padding);
-      
-      return { width: Math.round(width), height: Math.round(height) };
-    };
-    
     // CRITICAL FIX: Load from beat.locations FIRST (this is the source of truth)
     // Only fall back to params.visualElements or params.locs if beat.locations is empty
     let elements: VisualElement[] = [];
@@ -468,35 +450,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     }
     console.log('[VisualWorkspace] Syncing visual elements with params:', relevantParams);
 
-    // Helper function to auto-size text elements based on content
-    const autoSizeText = (text: string, minWidth = 100, maxWidth = 824): { width: number; height: number } => {
-      if (!text) return { width: minWidth, height: 40 };
-
-      const charCount = text.length;
-      const avgCharWidth = 7.5;
-      const lineHeight = 20;
-      const padding = 24;
-
-      let targetWidth: number;
-
-      if (charCount <= 15) {
-        targetWidth = Math.max(charCount * avgCharWidth + padding, minWidth);
-      } else if (charCount <= 40) {
-        targetWidth = Math.min(charCount * avgCharWidth + padding, 300);
-      } else if (charCount <= 80) {
-        targetWidth = 400;
-      } else {
-        targetWidth = 500;
-      }
-
-      const width = Math.min(Math.max(targetWidth, minWidth), maxWidth);
-      const charsPerLine = Math.floor((width - padding) / avgCharWidth);
-      const lineCount = Math.max(1, Math.ceil(charCount / charsPerLine));
-      const height = Math.max(40, lineCount * lineHeight + padding);
-
-      return { width: Math.round(width), height: Math.round(height) };
-    };
-
     setVisualElements(prev => {
       let updated = [...prev];
       let changed = false;
@@ -508,13 +461,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             if (e.text !== params.text) {
               changed = true;
               console.log('[VisualWorkspace] Updating text element, fontSize:', e.fontSize);
-              // If fontSize is not explicitly set, auto-resize the textbox
-              if (e.fontSize === undefined) {
-                const { width, height } = autoSizeText(params.text);
-                console.log('[VisualWorkspace] Auto-resizing textbox to:', { width, height });
-                return { ...e, text: params.text, width, height };
-              }
-              return { ...e, text: params.text };
+              // Auto-resize the textbox based on new text and font properties
+              const { width, height } = autoSizeTextBox(e, params.text);
+              console.log('[VisualWorkspace] Auto-resizing textbox to:', { width, height });
+              return { ...e, text: params.text, width, height };
             }
           }
           return e;
@@ -690,14 +640,31 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               if (e.text !== newText) {
                 console.log(`[VisualWorkspace] Updating Title text from "${e.text}" to "${newText}"`);
                 changed = true;
-                return { ...e, text: newText };
+                // Auto-size the element based on new text and font properties
+                const sizeFunc = e.type === 'dialog' ? autoSizeDialog : autoSizeTextBox;
+                const { width, height } = sizeFunc(e, newText);
+                return { ...e, text: newText, width, height };
               }
             } else if (nameLower.includes('author')) {
               const newText = params.author || 'Anonymous';
               if (e.text !== newText) {
                 console.log(`[VisualWorkspace] Updating Author text from "${e.text}" to "${newText}"`);
                 changed = true;
-                return { ...e, text: newText };
+                // Auto-size the element based on new text and font properties
+                const sizeFunc = e.type === 'dialog' ? autoSizeDialog : autoSizeTextBox;
+                const { width, height } = sizeFunc(e, newText);
+                return { ...e, text: newText, width, height };
+              }
+            } else if (nameLower.includes('message')) {
+              // Handle message box for endScreen
+              const newText = params.message || 'The End';
+              if (e.text !== newText) {
+                console.log(`[VisualWorkspace] Updating message text from "${e.text}" to "${newText}"`);
+                changed = true;
+                // Auto-size the element based on new text and font properties
+                const sizeFunc = e.type === 'dialog' ? autoSizeDialog : autoSizeTextBox;
+                const { width, height } = sizeFunc(e, newText);
+                return { ...e, text: newText, width, height };
               }
             }
           }
@@ -946,9 +913,41 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 onBackgroundSelect={handleBackgroundSelect}
                 onElementSelect={setSelectedElementId}
                 onElementUpdate={(elementId, updates) => {
-                  setVisualElements(prev => prev.map(el =>
-                    el.id === elementId ? { ...el, ...updates } : el
-                  ));
+                  setVisualElements(prev => prev.map(el => {
+                    if (el.id === elementId) {
+                      const updatedElement = { ...el, ...updates };
+
+                      // Auto-resize if fontSize, font, or text changes for text/button/dialog elements
+                      if ((el.type === 'text' || el.type === 'dialog' || el.type === 'button') &&
+                          (updates.fontSize !== undefined || updates.font !== undefined || updates.text !== undefined)) {
+                        const text = updatedElement.text || '';
+                        const fontSize = updatedElement.fontSize || 16;
+                        const fontFamily = updatedElement.font || 'Arial';
+
+                        // Choose appropriate sizing function based on element type
+                        let newDimensions;
+                        if (el.type === 'button') {
+                          newDimensions = calculateButtonDimensions(text, fontSize, fontFamily);
+                        } else if (el.type === 'dialog') {
+                          newDimensions = calculateDialogDimensions(text, fontSize, fontFamily);
+                        } else {
+                          newDimensions = calculateTextBoxDimensions(text, fontSize, fontFamily);
+                        }
+
+                        console.log(`[VisualWorkspace] Auto-resizing ${el.type} element`, {
+                          text: text.substring(0, 30) + '...',
+                          fontSize,
+                          fontFamily,
+                          newDimensions
+                        });
+
+                        return { ...updatedElement, width: newDimensions.width, height: newDimensions.height };
+                      }
+
+                      return updatedElement;
+                    }
+                    return el;
+                  }));
                   setHasChanges(true);
                 }}
                 onElementDelete={(elementId) => {

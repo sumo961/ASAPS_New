@@ -3,14 +3,18 @@ import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown } from
 import { Story, StoryEngine, Beat } from '@asaps/core';
 import { ReactRenderer } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
+import type { Asset } from '../assets/AssetManager';
+import type { Character } from '../../types/character';
 
 interface StoryPreviewProps {
   story: Story;
   settings?: any;
+  assets?: Asset[];
+  characters?: Character[];
   onClose: () => void;
 }
 
-export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, onClose }) => {
+export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, assets = [], characters = [], onClose }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
@@ -25,12 +29,12 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, onC
   useEffect(() => {
     // Only initialize once when container is ready
     if (!containerRef.current) return;
-    
+
     console.log('[StoryPreview] Effect running, current renderer:', !!rendererRef.current);
-    
+
     if (!rendererRef.current) {
       console.log('[StoryPreview] Creating new renderer and engine');
-      
+
       // Create renderer with the preview container
       const reactRenderer = new ReactRenderer({
         container: containerRef.current,
@@ -38,13 +42,22 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, onC
         height: 768,
       });
 
+      // Set up asset resolver to provide URLs for assetIds
+      if (assets && assets.length > 0) {
+        reactRenderer.setAssetResolver((assetId: string) => {
+          const asset = assets.find(a => a.id === assetId);
+          return asset ? asset.url : undefined;
+        });
+        console.log('[StoryPreview] Asset resolver set up with', assets.length, 'assets');
+      }
+
       // Create story engine - cast renderer to any to bypass type check
       // ReactRenderer DOES implement IRenderer, but TS can't see it across packages
       const engine = new StoryEngine(reactRenderer as any);
-      
+
       rendererRef.current = reactRenderer;
       engineRef.current = engine;
-      
+
       console.log('[StoryPreview] Renderer and engine created');
     } else {
       console.log('[StoryPreview] Renderer exists, ensuring it is valid');
@@ -62,7 +75,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, onC
         engineRef.current.stop();
       }
     };
-  }, []);
+  }, [assets]); // Re-run if assets change
 
   // Update renderer visibility settings when dropdown changes
   useEffect(() => {

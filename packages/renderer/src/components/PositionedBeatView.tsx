@@ -491,7 +491,9 @@ const TextElement: React.FC<{
           overflow: 'hidden',
           lineHeight: '1.4',
           boxSizing: 'border-box',
-          display: 'block',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: computedTextAlign === 'center' ? 'center' : (computedTextAlign === 'right' ? 'flex-end' : 'flex-start'),
         }}
       >
         {displayedText}

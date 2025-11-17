@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
 import { Inspector } from './components/Inspector';
 import { StoryPreview } from './components/preview/StoryPreview';
+import { GlobalSettingsInspector } from './components/settings/GlobalSettingsInspector';
 import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
 import { AssetManager } from './components/assets/AssetManager';
@@ -22,6 +23,7 @@ function App() {
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [showCharacterManager, setShowCharacterManager] = useState(false);
   const [showAssetManager, setShowAssetManager] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -241,6 +243,14 @@ function App() {
     setShowAssetManager(false);
   }, []);
 
+  const handleOpenSettings = useCallback(() => {
+    setShowSettings(true);
+  }, []);
+
+  const handleCloseSettings = useCallback(() => {
+    setShowSettings(false);
+  }, []);
+
   // Create a Story object for preview
   const getStoryForPreview = useCallback((): Story => {
     const story = new Story({
@@ -261,11 +271,13 @@ function App() {
       <Header
         title={state.title}
         onTitleChange={actions.setTitle}
+        projectName={currentProject?.name}
         onExport={handleExport}
         onImport={handleImport}
         onPreview={handlePreview}
         onCharacters={handleOpenCharacterManager}
         onAssets={handleOpenAssetManager}
+        onSettings={handleOpenSettings}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -335,6 +347,8 @@ function App() {
       {showPreview && (
         <StoryPreview
           story={getStoryForPreview()}
+          assets={assets}
+          characters={characters}
           onClose={handleClosePreview}
         />
       )}
@@ -387,6 +401,15 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <GlobalSettingsInspector
+          settings={globalSettings}
+          onUpdate={(newSettings) => setGlobalSettings(newSettings)}
+          onClose={handleCloseSettings}
+        />
       )}
     </div>
   );

@@ -336,6 +336,46 @@ export const EnhancedVisualEditor: React.FC<EnhancedVisualEditorProps> = ({
     setSelectedElement(null);
   };
 
+  // Auto-size text element based on content
+  const autoSizeElement = (element: VisualElement, text: string): { width: number; height: number } => {
+    if (!text || (element.kind !== 'text' && element.kind !== 'dialog' && element.kind !== 'button')) {
+      return { width: element.width || 100, height: element.height || 40 };
+    }
+
+    const charCount = text.length;
+    const avgCharWidth = 7.5; // Average character width in pixels
+    const lineHeight = 20; // Line height in pixels
+    const padding = 24; // Padding (top + bottom or left + right)
+
+    let targetWidth: number;
+
+    if (charCount <= 15) {
+      // Very short text: tight width
+      targetWidth = Math.max(charCount * avgCharWidth + padding, 100);
+    } else if (charCount <= 40) {
+      // Short text: aim for 1-2 lines, compact width
+      targetWidth = Math.min(charCount * avgCharWidth + padding, 300);
+    } else if (charCount <= 80) {
+      // Medium text: aim for 2-3 lines
+      targetWidth = 400;
+    } else {
+      // Long text: wider box for readability
+      targetWidth = 500;
+    }
+
+    // Ensure within bounds
+    const width = Math.min(Math.max(targetWidth, 100), 824);
+
+    // Calculate number of lines needed
+    const charsPerLine = Math.floor((width - padding) / avgCharWidth);
+    const lineCount = Math.max(1, Math.ceil(charCount / charsPerLine));
+
+    // Calculate height based on line count
+    const height = Math.max(40, lineCount * lineHeight + padding);
+
+    return { width: Math.round(width), height: Math.round(height) };
+  };
+
   const duplicateElement = (id: string) => {
     const element = elements.find(el => el.id === id);
     if (!element) return;
@@ -701,7 +741,15 @@ export const EnhancedVisualEditor: React.FC<EnhancedVisualEditorProps> = ({
                   <label className="block text-xs text-gray-600 mb-1">Text</label>
                   <textarea
                     value={selectedEl.text || ''}
-                    onChange={(e) => updateElement(selectedEl.id, { text: e.target.value })}
+                    onChange={(e) => {
+                      const newText = e.target.value;
+                      const { width, height } = autoSizeElement(selectedEl, newText);
+                      updateElement(selectedEl.id, {
+                        text: newText,
+                        width,
+                        height
+                      });
+                    }}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                     rows={3}
                   />
