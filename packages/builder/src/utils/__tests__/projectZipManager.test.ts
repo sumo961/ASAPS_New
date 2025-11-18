@@ -55,7 +55,7 @@ describe('projectZipManager', () => {
         },
         characters: [{ id: 'char_1', name: 'Hero' }],
         clusters: []
-      },
+      } as any,
       settings: { width: 1024, height: 768, fonts: ['Arial'] },
       assetIds: ['asset_1', 'asset_2'],
       createdAt: new Date('2024-01-01'),
