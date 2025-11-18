@@ -7,6 +7,7 @@ import { VisualBeatEditor, VisualElement } from './visual/VisualBeatEditor';
 import { AssetSelector } from './assets/AssetSelector';
 import { AssetSelectionModal } from './assets/AssetSelectionModal';
 import { SchemaFormGenerator } from './SchemaFormGenerator';
+import { BeatSuggestions } from './ai/BeatSuggestions';
 import type { BeatDefinition } from './SchemaFormGenerator';
 import type { Asset } from './assets/AssetManager';
 
@@ -1885,8 +1886,26 @@ export const Inspector: React.FC<InspectorProps> = ({
         </div>
 
         {/* Fixed Footer Actions - Delete button only (Save is handled by central Save button in header) */}
-        <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
-          <div className="space-y-2">
+        <div className="flex-shrink-0 border-t border-gray-200 bg-white">
+          {/* AI Beat Suggestions */}
+          <div className="p-4 border-b border-gray-200">
+            <BeatSuggestions
+              currentBeat={beat as any}
+              allBeats={allBeats as any}
+              storyMetadata={{
+                title: 'Current Story',
+                genre: beatDef?.category || 'adventure',
+              }}
+              onAddBeat={(suggestion) => {
+                // Create a new beat based on the suggestion
+                // This would need to be wired up to the actual beat creation logic
+                console.log('Add beat from suggestion:', suggestion);
+              }}
+              count={3}
+            />
+          </div>
+
+          <div className="p-4 space-y-2">
             <button
               onClick={handleDelete}
               className="w-full py-2 px-4 border border-red-300 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-2"

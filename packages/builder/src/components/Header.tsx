@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
 import { UndoRedoToolbar } from './UndoRedoToolbar';
 import { SaveStatus } from './SaveStatus';
+import { AIConfigDialog } from './ai/AIConfigDialog';
 import { useSave, useProject, usePersistence } from '../contexts/PersistenceContext';
 
 interface HeaderProps {
@@ -19,8 +20,8 @@ interface HeaderProps {
   onSettings?: () => void;
   onAssets?: () => void;
   onCharacters?: () => void;
-  onInterceptNewProject?: () => void;
-  onInterceptProjectLibrary?: () => void;
+  onInterceptNewProject?: () => boolean;
+  onInterceptProjectLibrary?: () => boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -43,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { isUntitledProject, hasUnsavedChanges } = usePersistence();
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showProjectLibrary, setShowProjectLibrary] = useState(false);
+  const [showAIConfig, setShowAIConfig] = useState(false);
 
   const handleLoadProject = async (projectId: string) => {
     const success = await load(projectId);
@@ -75,8 +77,26 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Project Selector */}
           <ProjectSelector
-            onOpenLibrary={() => onInterceptProjectLibrary ? onInterceptProjectLibrary() : setShowProjectLibrary(true)}
-            onCreateProject={() => onInterceptNewProject ? onInterceptNewProject() : setShowNewProjectDialog(true)}
+            onOpenLibrary={() => {
+              if (onInterceptProjectLibrary) {
+                const intercepted = onInterceptProjectLibrary();
+                if (!intercepted) {
+                  setShowProjectLibrary(true);
+                }
+              } else {
+                setShowProjectLibrary(true);
+              }
+            }}
+            onCreateProject={() => {
+              if (onInterceptNewProject) {
+                const intercepted = onInterceptNewProject();
+                if (!intercepted) {
+                  setShowNewProjectDialog(true);
+                }
+              } else {
+                setShowNewProjectDialog(true);
+              }
+            }}
           />
 
           {/* Story Title */}
@@ -128,7 +148,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
           
           {onSettings && (
-            <button 
+            <button
               className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors flex items-center gap-2"
               onClick={onSettings}
             >
@@ -136,7 +156,17 @@ export const Header: React.FC<HeaderProps> = ({
               Settings
             </button>
           )}
-          
+
+          {/* AI Configuration Button */}
+          <button
+            className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-2"
+            onClick={() => setShowAIConfig(true)}
+            title="Configure AI Assistant"
+          >
+            <Sparkles className="w-4 h-4" />
+            AI
+          </button>
+
           {onPreview && (
             <button 
               className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors flex items-center gap-2"
@@ -196,6 +226,12 @@ export const Header: React.FC<HeaderProps> = ({
           onClose={() => setShowProjectLibrary(false)}
         />
       )}
+
+      {/* AI Configuration Dialog */}
+      <AIConfigDialog
+        isOpen={showAIConfig}
+        onClose={() => setShowAIConfig(false)}
+      />
     </header>
   );
 };
