@@ -119,13 +119,13 @@ class XMLConverter:
                 })
         return effects
 
-    def convert_buttonsoun(_to_effects(self, sound_name: str) -> List[Dict[str, Any]]:
-        """Convert buttonsoun( to effects"""
+    def convert_buttonsound_to_effects(self, sound_name: str) -> List[Dict[str, Any]]:
+        """Convert buttonsound to effects"""
         if not sound_name or sound_name == 'undefined':
             return []
 
         return [{
-            'type': 'playsoun(',
+            'type': 'playsound',
             'name': sound_name
         }]
 
