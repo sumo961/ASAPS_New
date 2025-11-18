@@ -17,9 +17,12 @@ import type {
   NaturalLanguageBeatResponse,
   AIProviderConfig
 } from '../../types/ai';
-import * as StoryPrompts from '../prompts/storyGeneration';
 import * as DialogPrompts from '../prompts/dialogGeneration';
 import * as BeatSuggestionsPrompts from '../prompts/beatSuggestions';
+import {
+  buildEnhancedStoryGenerationSystemPrompt,
+  buildEnhancedUserPrompt
+} from '../prompts/storyGenerationEnhanced';
 import { getAIValidator } from '../AIValidator';
 
 /**
@@ -58,9 +61,9 @@ export class ClaudeProvider extends BaseAIProvider {
     await validator.ensureSchemaLoaded();
     const schema = validator.getSchema();
 
-    // Build prompts
-    const systemPrompt = StoryPrompts.buildStoryGenerationSystemPrompt(schema);
-    const userPrompt = StoryPrompts.buildStoryGenerationUserPrompt(request);
+    // Build enhanced prompts with deep beat type understanding
+    const systemPrompt = buildEnhancedStoryGenerationSystemPrompt(schema);
+    const userPrompt = buildEnhancedUserPrompt(request);
 
     console.log('[ClaudeProvider] Generating story with Claude...');
 

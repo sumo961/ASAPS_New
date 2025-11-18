@@ -11,6 +11,7 @@ This script:
 
 import xml.etree.ElementTree as ET
 import re
+import sys
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 
@@ -50,7 +51,7 @@ class XMLConverter:
                 'id': choice.get('id'),
                 'content': choice.get('content'),
                 'counter': choice.get('counter'),
-                'buttonsoun(': choice.get('buttonsoun('),
+                'buttonsound': choice.get('buttonsound'),
                 'targetBeat': choice.get('targetBeat')
             }
             choices.append(choice_dict)
@@ -158,7 +159,7 @@ class XMLConverter:
                     effect_elem.set('name', effect['name'])
                     effect_elem.set('operation', effect['operation'])
                     effect_elem.set('value', str(effect['value']))
-                elif effect['type'] == 'playsoun(',
+                elif effect['type'] == 'playsound':
                     effect_elem.set('name', effect['name'])
 
         # Add choices
@@ -174,8 +175,8 @@ class XMLConverter:
             choice_effects = []
             if choice.get('counter'):
                 choice_effects.extend(self.convert_counter_to_effects(choice['counter']))
-            if choice.get('buttonsoun('):
-                choice_effects.extend(self.convert_buttonsoun(_to_effects(choice['buttonsoun(']))
+            if choice.get('buttonsound'):
+                choice_effects.extend(self.convert_buttonsound_to_effects(choice['buttonsound']))
 
             for effect in choice_effects:
                 effect_elem = ET.SubElement(choice_elem, 'effect')
@@ -184,7 +185,7 @@ class XMLConverter:
                     effect_elem.set('name', effect['name'])
                     effect_elem.set('operation', effect['operation'])
                     effect_elem.set('value', str(effect['value']))
-                elif effect['type'] == 'playsoun(',
+                elif effect['type'] == 'playsound':
                     effect_elem.set('name', effect['name'])
 
         return dialog_tree
