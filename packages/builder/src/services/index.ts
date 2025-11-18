@@ -8,8 +8,10 @@
 export { AIService, getAIService, resetAIService } from './AIService';
 export { AIValidator, getAIValidator } from './AIValidator';
 
-// Provider base
+// Provider base and implementations
 export { BaseAIProvider } from './providers/IProvider';
+export { ClaudeProvider } from './providers/ClaudeProvider';
+export { OpenAIProvider } from './providers/OpenAIProvider';
 
 // Types
 export type {
