@@ -384,8 +384,9 @@ function App() {
     if (isUntitledProject && hasUnsavedChanges) {
       setShowSaveDialog(true);
       setPendingAction(action);
+      return true; // Intercepted
     }
-    // If no unsaved changes, do nothing - let Header handle the navigation
+    return false; // Not intercepted, let Header proceed
   }, [isUntitledProject, hasUnsavedChanges]);
 
   const handleSaveUnsavedWork = useCallback(async () => {
@@ -414,6 +415,74 @@ function App() {
     setPendingAction('');
   }, []);
 
+  /**
+   * Handle AI-generated story
+   */
+  const handleStoryGenerated = useCallback((story: any) => {
+    console.log('[App] Story generated:', story);
+
+    // Clear existing beats and connections
+    actions.clearStory();
+
+    // Add metadata
+    if (story.metadata) {
+      actions.setTitle(story.metadata.title || 'Generated Story');
+    }
+
+    // Add all generated beats
+    if (story.beats && Array.isArray(story.beats)) {
+      story.beats.forEach((beatData: any) => {
+        const beat = actions.addBeat(beatData.type || 'introText', beatData.position);
+        // Update beat with generated parameters
+        if (beatData.parameters) {
+          actions.updateBeat(beat.id, { ...beatData.parameters });
+        }
+        // Update name if provided
+        if (beatData.label || beatData.name) {
+          actions.updateBeat(beat.id, { name: beatData.label || beatData.name });
+        }
+      });
+    }
+
+    // Add connections after all beats are created
+    if (story.connections && Array.isArray(story.connections)) {
+      setTimeout(() => {
+        story.connections.forEach((conn: any) => {
+          try {
+            actions.connectBeats(conn.sourceId || conn.from, conn.targetId || conn.to);
+          } catch (error) {
+            console.warn('[App] Failed to create connection:', conn, error);
+          }
+        });
+      }, 100);
+    }
+
+    markChanged();
+  }, [actions, markChanged]);
+
+  /**
+   * Handle AI-generated beat from natural language description
+   */
+  const handleBeatCreated = useCallback((beatData: any) => {
+    console.log('[App] Beat created from NL:', beatData);
+
+    // Create beat at center or specified position
+    const position = beatData.position || { x: 400, y: 300 };
+    const beat = actions.addBeat(beatData.type || 'introText', position);
+
+    // Apply AI-generated parameters
+    if (beatData.parameters) {
+      actions.updateBeat(beat.id, { ...beatData.parameters });
+    }
+
+    // Update name if provided
+    if (beatData.label || beatData.name) {
+      actions.updateBeat(beat.id, { name: beatData.label || beatData.name });
+    }
+
+    markChanged();
+  }, [actions, markChanged]);
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
@@ -430,6 +499,8 @@ function App() {
         onSettings={handleOpenSettings}
         onInterceptNewProject={() => handleShowSaveDialog('newProject')}
         onInterceptProjectLibrary={() => handleShowSaveDialog('projectLibrary')}
+        onStoryGenerated={handleStoryGenerated}
+        onBeatCreated={handleBeatCreated}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -488,6 +559,7 @@ function App() {
               allBeats={state.beats}
               onConnect={actions.connectBeats}
               onDisconnect={actions.disconnectBeats}
+              onBeatAdd={actions.addBeat}
               onAssetSelect={handleAssetSelect}
               onOpenCharacterManager={handleOpenCharacterManager}
             />

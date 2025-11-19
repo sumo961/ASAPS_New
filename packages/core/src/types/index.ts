@@ -53,13 +53,15 @@ export interface Connection {
 }
 
 export interface Condition {
-  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare';
-  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains';
+  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat';
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
   left?: string;
   right?: any;
   // For counterCompare type
   counter1?: string;
   counter2?: string;
+  // For visitedBeat type
+  beatId?: string;
 }
 
 export interface Effect {

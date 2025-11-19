@@ -43,6 +43,7 @@ interface InspectorProps {
   allBeats?: Beat[];
   onConnect?: (sourceBeatId: string, targetBeatId: string) => void;
   onDisconnect?: (sourceBeatId: string, targetBeatId: string) => void;
+  onBeatAdd?: (type: string, position?: { x: number; y: number }) => Beat;
   expanded?: boolean;
   assets?: Asset[];
   onAssetAdd?: (asset: Asset) => Promise<boolean>;
@@ -60,6 +61,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   allBeats = [],
   onConnect,
   onDisconnect,
+  onBeatAdd,
   expanded = false,
   assets = [],
   onAssetAdd,
@@ -1897,9 +1899,29 @@ export const Inspector: React.FC<InspectorProps> = ({
                 genre: beatDef?.category || 'adventure',
               }}
               onAddBeat={(suggestion) => {
-                // Create a new beat based on the suggestion
-                // This would need to be wired up to the actual beat creation logic
-                console.log('Add beat from suggestion:', suggestion);
+                if (!onBeatAdd) {
+                  console.warn('[Inspector] onBeatAdd not provided');
+                  return;
+                }
+
+                // Create beat from AI suggestion
+                // Position it to the right of current beat
+                const position = beat ? {
+                  x: (beat.x || 0) + 300,
+                  y: (beat.y || 0)
+                } : undefined;
+
+                const newBeat = onBeatAdd(suggestion.beatType, position);
+
+                // If suggestion has parameters, update the beat
+                if (suggestion.parameters && Object.keys(suggestion.parameters).length > 0) {
+                  onUpdate(newBeat.id, { ...suggestion.parameters });
+                }
+
+                // Auto-connect if we have a source beat
+                if (beat && onConnect) {
+                  onConnect(beat.id, newBeat.id);
+                }
               }}
               count={3}
             />

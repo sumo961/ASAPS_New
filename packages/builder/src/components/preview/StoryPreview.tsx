@@ -19,6 +19,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [activeTimers, setActiveTimers] = useState<any[]>([]);
+  const [debugStartBeat, setDebugStartBeat] = useState<string | null>(null);
   const boxVisibility = settings?.textbox?.boxVisibility || 'all';
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -184,15 +185,26 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         }
       });
 
-      await engineRef.current.start();
-      
+      // Check for debug start beat override
+      const debugFirstBeat = settings?.debug?.firstbeat;
+      const startBeatId = (debugFirstBeat && debugFirstBeat.trim() !== '') ? debugFirstBeat.trim() : undefined;
+
+      if (startBeatId && startBeatId !== story.getFirstBeatId()) {
+        console.log(`[StoryPreview] DEBUG MODE: Starting from beat "${startBeatId}" (Story normally starts at "${story.getFirstBeatId()}")`);
+        setDebugStartBeat(startBeatId);
+      } else {
+        setDebugStartBeat(null);
+      }
+
+      await engineRef.current.start(startBeatId);
+
     } catch (error) {
       console.error('Preview error:', error);
       alert('Error during preview: ' + error);
     } finally {
       setIsRunning(false);
     }
-  }, [story]);
+  }, [story, settings]);
 
   const handleRestart = useCallback(() => {
     if (rendererRef.current) {
@@ -263,6 +275,18 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
             </button>
           </div>
         </div>
+
+        {/* Debug Mode Indicator */}
+        {debugStartBeat && (
+          <div className="bg-yellow-100 border-b border-yellow-300 px-4 py-2 flex items-center gap-2 text-sm">
+            <Info className="w-4 h-4 text-yellow-700" />
+            <span className="text-yellow-900 font-medium">DEBUG MODE:</span>
+            <span className="text-yellow-800">
+              Starting from beat <code className="bg-yellow-200 px-1 rounded">{debugStartBeat}</code>
+              {' '}(Story normally starts at <code className="bg-yellow-200 px-1 rounded">{story.getFirstBeatId()}</code>)
+            </span>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 flex overflow-hidden">

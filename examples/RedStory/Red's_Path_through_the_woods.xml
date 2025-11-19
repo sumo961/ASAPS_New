@@ -1,0 +1,1023 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story title="Red&apos;s Path through the woods" author="ASG">
+  <settings>
+    <project width="1024" height="768" aspectRatio="4:3" scalingMode="fit" />
+    <debug firstbeat="0" showvals="on" />
+    <colors pcolor="#7D8DA3" palpha="90" />
+    <fonts titleFont="Gothic" textFont="Handwriting2" />
+    <textbox radius="20" />
+    <texteffects animation="none" />
+    <hotspots visible="true" labels="true" />
+    <backgroundsound name="" volume="70" mute="false" />
+  </settings>
+  <environment>
+    <prop id="3" name="sweets" file="Sweets.png">Some pinata candy</prop>
+    <prop id="4" name="book" file="Book.png">An illustrated version of Lady Chatterley&apos;s Lover</prop>
+    <prop id="5" name="gift" file="Present.png">A mysterious present</prop>
+    <prop id="6" name="axe" file="Axe.png">A sharp woodcutting axe</prop>
+    <prop id="9" name="knife" file="knife.png">A sharp knife</prop>
+    <node id="1" name="titleNode" file="Hut_ext.jpg" />
+    <node id="2" name="hutInterior" file="Hut_interior_new.jpg" />
+    <node id="3" name="forest" file="forest_complete.jpg" />
+    <node id="4" name="GrannyOutside" file="Grannys_outdoors-1.jpg" />
+    <node id="5" name="GrannyInside" file="Grannys_indoors-1.jpg" />
+    <node id="6" name="GrannyInsideDetail" file="Grannys_indoors-detail.jpg" />
+    <node id="7" name="forestDetail" file="forest_detail.jpg" />
+    <node id="8" name="wolfBelly" file="Belly.jpg" />
+    <node id="0" name="GrannyInsideKitchen" file="kitchen.jpg" />
+  </environment>
+  <characters>
+  </characters>
+  <plot>
+    <clusters />
+    <beat x="520" y="100" cluster="undefined">
+      <id id="0" name="Start" />
+      <transition type="None" duration="500" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="button1" x="541" y="356" width="180" height="38" />
+        <loc kind="text" name="author" x="49" y="212" width="160" height="64" />
+        <loc kind="text" name="title" x="49" y="49" width="450" height="64" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="titleScreen" title="Untitled Story">
+        <connection target="1" label="click to continue" />
+      </function>
+    </beat>
+    <beat x="520" y="300" cluster="undefined">
+      <id id="1" name="Beat 1" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="49" y="51" width="690" height="129" />
+        <loc kind="text" name="button1" x="560" y="345" width="175" height="129" />
+        <loc kind="char" name="Red" x="320" y="250" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="introText" text="Red lives a difficult life at the edge of the woods. She and her mother eke out a meager living selling hand-crafted pinatas on e-bay. Their craftsmanship is of unusual quality but under-appreciated by the majority of e-bay&apos;s clientele.">
+        <connection target="2" />
+      </function>
+    </beat>
+    <beat x="520" y="500" cluster="undefined">
+      <id id="2" name="Beat 2" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="46" y="46" width="690" height="188" />
+        <loc kind="text" name="button1" x="560" y="345" width="175" height="129" />
+        <loc kind="char" name="Red" x="320" y="250" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="introText" text="Red enjoys all her classes at the newly established progressive school. Red particularly enjoys Mz. Madden&apos;s Health class. Mz. Madden delivers frank discussions on &quot;anatomical gender difference&quot; and &quot;reproductive issues.&quot; In the school library Red finds an illustrated version of Lady Chatterley&apos;s Lovers. She isn&apos;t impressed with the plot but several pictures piqued her curiosity. She brings the book home hoping to hear her mother&apos;s explanation of the drawings.">
+        <connection target="3" />
+      </function>
+    </beat>
+    <beat x="520" y="700" cluster="Mom's House">
+      <id id="3" name="Mom convo 1" />
+      <transition type="Blinds" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="81" y="73" width="310" height="129" />
+        <loc kind="text" name="button1" x="465" y="131" width="310" height="129" />
+        <loc kind="char" name="Mom" x="147" y="196" width="100" height="100" />
+        <loc kind="char" name="Red" x="477" y="239" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="100" y="900" cluster="Mom's House">
+      <id id="4" name="Mom ask book" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="49" y="41" width="690" height="188" />
+        <loc kind="text" name="button1" x="529" y="418" width="175" height="129" />
+        <loc kind="char" name="Red" x="477" y="239" width="100" height="100" />
+        <loc kind="char" name="Mom" x="147" y="196" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="introText" text="Red, darling, I was a perfectly dreadful student. Your Grandmama no doubt surpasses my skill. Now remember, we need to stay in your Grandmama&apos;s good graces. If you&apos;re especially sweet, she may remember us in her will. Now here&apos;s the basket.">
+        <connection target="5" />
+      </function>
+    </beat>
+    <beat x="300" y="900" cluster="Mom's House">
+      <id id="5" name="Pick something" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="50" y="51" width="580" height="129" />
+        <loc kind="prop" name="knife" x="313" y="270" width="100" height="100" />
+        <loc kind="prop" name="sweets" x="29" y="342" width="100" height="100" />
+        <loc kind="prop" name="book" x="565" y="319" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="pickProp" question="What do you want to interact with?">
+      </function>
+    </beat>
+    <beat x="500" y="900" cluster="Mom's House">
+      <id id="6" name="Mom sendoff" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="41" y="94" width="690" height="129" />
+        <loc kind="char" name="Mom" x="52" y="168" width="100" height="100" />
+        <loc kind="char" name="Red" x="420" y="250" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="7" />
+      </function>
+    </beat>
+    <beat x="700" y="900" cluster="Forest">
+      <id id="7" name="Where to in the Forest?" />
+      <transition type="Wipe" duration="1" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="28" y="122" width="230" height="38" />
+        <loc kind="hotspot" name="tree" x="435" y="205" width="130" height="203" />
+        <loc kind="hotspot" name="path" x="633" y="501" width="166" height="73" />
+        <loc kind="char" name="wolf" x="504" y="24" width="100" height="100" />
+        <loc kind="char" name="Red" x="31" y="200" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="movementChoice" question="Where do you want to go?">
+        <choice id="1" />
+        <choice id="2" />
+        <choice id="3" />
+      </function>
+    </beat>
+    <beat x="900" y="900" cluster="undefined">
+      <id id="8" name="Beat 8" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="1100" y="900" cluster="Forest">
+      <id id="9" name="Hide behind tree" />
+      <transition type="Rotate" duration="1" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="170" y="126" width="300" height="39" />
+        <loc kind="char" name="Red" x="445" y="50" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="10" />
+      </function>
+    </beat>
+    <beat x="1300" y="900" cluster="Forest">
+      <id id="10" name="Set WolfMet" />
+      <function kind="setGlobal">
+        <connection target="11" label="Continue" />
+      </function>
+    </beat>
+    <beat x="1500" y="900" cluster="Forest">
+      <id id="11" name="Wold Convo 1" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="208" y="118" width="250" height="129" />
+        <loc kind="text" name="button1" x="496" y="201" width="260" height="129" />
+        <loc kind="text" name="button2" x="496" y="44" width="260" height="129" />
+        <loc kind="text" name="button3" x="496" y="109" width="260" height="129" />
+        <loc kind="char" name="WOLF" x="67" y="190" width="100" height="100" />
+        <loc kind="char" name="Red" x="434" y="213" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="1700" y="900" cluster="Forest">
+      <id id="20" name="Check for sweets" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="1900" y="900" cluster="Forest">
+      <id id="21" name="Offer Candy" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="318" y="149" width="110" height="129" />
+        <loc kind="text" name="button1" x="497" y="142" width="190" height="129" />
+        <loc kind="char" name="WOLF" x="67" y="190" width="100" height="100" />
+        <loc kind="char" name="Red" x="434" y="213" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="2100" y="900" cluster="undefined">
+      <id id="22" name="Beat 22" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="336" y="147" width="110" height="129" />
+        <loc kind="text" name="button1" x="493" y="144" width="230" height="129" />
+        <loc kind="char" name="WOLF" x="67" y="190" width="100" height="100" />
+        <loc kind="char" name="Red" x="434" y="213" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="2300" y="900" cluster="Forest">
+      <id id="25" name="Check for book" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="2500" y="900" cluster="Forest">
+      <id id="26" name="Check for knife" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="2700" y="900" cluster="Forest">
+      <id id="27" name="Wold convo book" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="336" y="147" width="101" height="129" />
+        <loc kind="text" name="button1" x="494" y="121" width="230" height="129" />
+        <loc kind="char" name="WOLF" x="67" y="190" width="100" height="100" />
+        <loc kind="char" name="Red" x="434" y="213" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="2900" y="900" cluster="Forest">
+      <id id="28" name="Wolf convo neither" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="352" y="152" width="87" height="129" />
+        <loc kind="text" name="button1" x="483" y="122" width="250" height="129" />
+        <loc kind="char" name="WOLF" x="67" y="190" width="100" height="100" />
+        <loc kind="char" name="Red" x="434" y="213" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="3100" y="900" cluster="Forest">
+      <id id="30" name="Wolf convo book 3" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="289" y="114" width="150" height="129" />
+        <loc kind="char" name="WOLF" x="63" y="155" width="100" height="100" />
+        <loc kind="char" name="Red" x="433" y="137" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="31" />
+      </function>
+    </beat>
+    <beat x="3300" y="900" cluster="Forest">
+      <id id="31" name="Red on path" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="272" y="102" width="330" height="129" />
+        <loc kind="char" name="Red" x="337" y="172" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="32" />
+      </function>
+    </beat>
+    <beat x="3500" y="900" cluster="undefined">
+      <id id="32" name="Beat 32" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="3700" y="900" cluster="Forest">
+      <id id="33" name="Grandma&apos;s wolf met" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="170" y="126" width="300" height="129" />
+        <loc kind="hotspot" name="door" x="396" y="230" width="60" height="101" />
+        <loc kind="char" name="Red" x="238" y="374" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="movementChoice" question="Where do you want to go?">
+        <choice id="1" />
+      </function>
+    </beat>
+    <beat x="3900" y="900" cluster="Forest">
+      <id id="34" name="Grandma&apos;s house" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="143" y="364" width="280" height="129" />
+        <loc kind="hotspot" name="door" x="396" y="230" width="63" height="104" />
+        <loc kind="char" name="Red" x="243" y="390" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="movementChoice" question="Where do you want to go?">
+        <choice id="1" />
+      </function>
+    </beat>
+    <beat x="4100" y="900" cluster="Grandma's House">
+      <id id="35" name="Present or Grandma?" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="19" y="81" width="240" height="38" />
+        <loc kind="hotspot" name="gift" x="317" y="215" width="168" height="53" />
+        <loc kind="char" name="Red" x="20" y="139" width="100" height="100" />
+        <loc kind="char" name="gran" x="523" y="242" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="movementChoice" question="Where do you want to go?">
+        <choice id="1" />
+        <choice id="2" />
+      </function>
+    </beat>
+    <beat x="4300" y="900" cluster="Grandma's House">
+      <id id="36" name="Present or wolf?" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="170" y="126" width="300" height="39" />
+        <loc kind="hotspot" name="gift" x="317" y="215" width="165" height="50" />
+        <loc kind="char" name="wolf" x="506" y="236" width="100" height="100" />
+        <loc kind="char" name="Red" x="20" y="139" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="movementChoice" question="Where do you want to go?">
+        <choice id="1" />
+        <choice id="2" />
+      </function>
+    </beat>
+    <beat x="4500" y="900" cluster="Grandma's House">
+      <id id="37" name="Wolf conver 1" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="432" y="123" width="250" height="129" />
+        <loc kind="text" name="button1" x="146" y="192" width="235" height="129" />
+        <loc kind="text" name="button2" x="149" y="103" width="235" height="129" />
+        <loc kind="text" name="button3" x="149" y="21" width="235" height="129" />
+        <loc kind="char" name="WOLF" x="427" y="201" width="100" height="100" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="4700" y="900" cluster="Forest">
+      <id id="40" name="Wolf convo knife" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="371" y="157" width="110" height="129" />
+        <loc kind="text" name="button1" x="486" y="123" width="250" height="129" />
+        <loc kind="char" name="WOLF" x="67" y="190" width="100" height="100" />
+        <loc kind="char" name="Red" x="434" y="213" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="4900" y="900" cluster="Grandma's House">
+      <id id="45" name="Look at present" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="266" y="104" width="300" height="129" />
+        <loc kind="char" name="Red" x="322" y="184" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="46" />
+      </function>
+    </beat>
+    <beat x="5100" y="900" cluster="Grandma's House">
+      <id id="46" name="Finding Axe" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="308" y="121" width="210" height="129" />
+        <loc kind="prop" name="axe" x="478" y="345" width="100" height="100" />
+        <loc kind="char" name="Red" x="332" y="184" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="47" />
+      </function>
+    </beat>
+    <beat x="5300" y="900" cluster="Grandma's House">
+      <id id="47" name="Set Axefound" />
+      <function kind="setGlobal">
+        <connection target="48" label="Continue" />
+      </function>
+    </beat>
+    <beat x="5500" y="900" cluster="undefined">
+      <id id="48" name="Beat 48" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="5700" y="900" cluster="Grandma's House">
+      <id id="50" name="Gradma surprised" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="GRAN" x="427" y="201" width="100" height="100" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="text" name="text" x="420" y="129" width="265" height="131" />
+        <loc kind="text" name="button1" x="158" y="12" width="255" height="131" />
+        <loc kind="text" name="button2" x="158" y="98" width="255" height="131" />
+        <loc kind="text" name="button3" x="158" y="188" width="255" height="131" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="5900" y="900" cluster="Grandma's House">
+      <id id="63" name="Wolf coming in" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="GRAN" x="427" y="201" width="100" height="100" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="-20" y="265" width="100" height="100" />
+        <loc kind="text" name="text" x="5" y="204" width="230" height="131" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="64" />
+      </function>
+    </beat>
+    <beat x="6100" y="900" cluster="Grandma's House">
+      <id id="64" name="You&apos;ve eaten grandma" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="Red" x="617" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="246" y="166" width="100" height="100" />
+        <loc kind="text" name="button1" x="649" y="94" width="140" height="131" />
+        <loc kind="text" name="text" x="285" y="119" width="175" height="131" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="6300" y="900" cluster="undefined">
+      <id id="65" name="Beat 65" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="6500" y="900" cluster="undefined">
+      <id id="66" name="Beat 66" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="389" y="162" width="230" height="129" />
+        <loc kind="text" name="button1" x="125" y="78" width="255" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="GRAN" x="427" y="201" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="6700" y="900" cluster="undefined">
+      <id id="68" name="Beat 68" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="383" y="153" width="290" height="129" />
+        <loc kind="text" name="button1" x="196" y="118" width="145" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="GRAN" x="427" y="201" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="6900" y="900" cluster="undefined">
+      <id id="82" name="Beat 82 new" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="394" y="97" width="200" height="129" />
+        <loc kind="char" name="WOLF" x="411" y="172" width="100" height="100" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="100" />
+      </function>
+    </beat>
+    <beat x="7100" y="900" cluster="undefined">
+      <id id="90" name="Beat 90" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="7300" y="900" cluster="undefined">
+      <id id="91" name="Beat 91" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="404" y="130" width="220" height="129" />
+        <loc kind="text" name="button1" x="138" y="79" width="260" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="427" y="201" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="7500" y="900" cluster="undefined">
+      <id id="93" name="Beat 93 new" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="461" y="136" width="111" height="129" />
+        <loc kind="char" name="WOLF" x="422" y="185" width="100" height="100" />
+        <loc kind="char" name="Red" x="279" y="173" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="100" />
+      </function>
+    </beat>
+    <beat x="7700" y="900" cluster="undefined">
+      <id id="96" name="Beat 96 new" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="449" y="149" width="140" height="129" />
+        <loc kind="char" name="WOLF" x="427" y="201" width="100" height="100" />
+        <loc kind="char" name="Red" x="301" y="178" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="100" />
+      </function>
+    </beat>
+    <beat x="7900" y="900" cluster="undefined">
+      <id id="100" name="Beat 100" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="8100" y="900" cluster="undefined">
+      <id id="101" name="Beat 101" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="8300" y="900" cluster="undefined">
+      <id id="102" name="Beat 102" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="8500" y="900" cluster="undefined">
+      <id id="103" name="Beat 103" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="8700" y="900" cluster="undefined">
+      <id id="105" name="Beat 105" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="418" y="157" width="150" height="129" />
+        <loc kind="text" name="button1" x="192" y="95" width="170" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="427" y="201" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="8900" y="900" cluster="undefined">
+      <id id="110" name="Beat 110" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="421" y="159" width="150" height="129" />
+        <loc kind="text" name="button1" x="180" y="7" width="200" height="129" />
+        <loc kind="text" name="button2" x="180" y="90" width="200" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="427" y="201" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="9100" y="900" cluster="undefined">
+      <id id="120" name="Beat 120" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="401" y="163" width="190" height="129" />
+        <loc kind="text" name="button1" x="180" y="13" width="200" height="129" />
+        <loc kind="text" name="button2" x="180" y="94" width="200" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="427" y="201" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="9300" y="900" cluster="undefined">
+      <id id="130" name="Beat 130" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="395" y="159" width="250" height="129" />
+        <loc kind="text" name="button1" x="180" y="9" width="200" height="129" />
+        <loc kind="text" name="button2" x="180" y="85" width="200" height="129" />
+        <loc kind="text" name="button3" x="180" y="185" width="200" height="129" />
+        <loc kind="char" name="WOLF" x="427" y="201" width="100" height="100" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="9500" y="900" cluster="undefined">
+      <id id="200" name="Beat 200" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="482" y="39" width="103" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="293" y="28" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="201" />
+      </function>
+    </beat>
+    <beat x="9700" y="900" cluster="undefined">
+      <id id="201" name="Beat 201" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="187" y="107" width="180" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="202" />
+      </function>
+    </beat>
+    <beat x="9900" y="900" cluster="undefined">
+      <id id="202" name="Beat 202" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="title" x="314" y="49" width="150" height="129" />
+        <loc kind="text" name="button1" x="530" y="402" width="130" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="endScreen" message="The End" showRestart="true" showCredits="false" reset="false">
+        <connection target="1" />
+      </function>
+    </beat>
+    <beat x="10100" y="900" cluster="undefined">
+      <id id="209" name="Beat 209 new" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="179" y="121" width="120" height="129" />
+        <loc kind="char" name="WOLF" x="411" y="172" width="100" height="100" />
+        <loc kind="char" name="Red" x="99" y="151" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="211" />
+      </function>
+    </beat>
+    <beat x="10300" y="900" cluster="undefined">
+      <id id="210" name="Beat 210" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="190" y="121" width="130" height="129" />
+        <loc kind="char" name="WOLF" x="411" y="172" width="100" height="100" />
+        <loc kind="char" name="Red" x="97" y="146" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="211" />
+      </function>
+    </beat>
+    <beat x="10500" y="900" cluster="undefined">
+      <id id="211" name="Beat 211" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="249" y="100" width="270" height="129" />
+        <loc kind="char" name="WOLF" x="282" y="369" width="100" height="100" />
+        <loc kind="char" name="Red" x="276" y="165" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="212" />
+      </function>
+    </beat>
+    <beat x="10700" y="900" cluster="undefined">
+      <id id="212" name="Beat 212" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="206" y="87" width="150" height="129" />
+        <loc kind="text" name="button1" x="47" y="101" width="130" height="129" />
+        <loc kind="char" name="Red" x="28" y="168" width="100" height="100" />
+        <loc kind="char" name="GRAN" x="168" y="167" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="282" y="369" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="10900" y="900" cluster="undefined">
+      <id id="213" name="Beat 213" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="title" x="318" y="33" width="150" height="129" />
+        <loc kind="text" name="button1" x="564" y="309" width="130" height="129" />
+        <loc kind="char" name="GRAN" x="168" y="167" width="100" height="100" />
+        <loc kind="char" name="Red" x="28" y="168" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="282" y="369" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="endScreen" message="The End" showRestart="true" showCredits="false" reset="false">
+        <connection target="1" />
+      </function>
+    </beat>
+    <beat x="11100" y="900" cluster="undefined">
+      <id id="221" name="Beat 221" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="152" y="91" width="280" height="129" />
+        <loc kind="char" name="WOLF" x="282" y="369" width="100" height="100" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="WOODSMAN" x="12" y="124" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="222" />
+      </function>
+    </beat>
+    <beat x="11300" y="900" cluster="undefined">
+      <id id="222" name="Beat 222" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="373" y="100" width="170" height="129" />
+        <loc kind="text" name="button1" x="197" y="93" width="130" height="129" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="WOODSMAN" x="12" y="124" width="100" height="100" />
+        <loc kind="char" name="GRAN" x="340" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="282" y="369" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="11500" y="900" cluster="undefined">
+      <id id="223" name="Beat 223" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="title" x="327" y="24" width="150" height="129" />
+        <loc kind="text" name="button1" x="600" y="303" width="130" height="129" />
+        <loc kind="char" name="WOODSMAN" x="12" y="124" width="100" height="100" />
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="282" y="369" width="100" height="100" />
+        <loc kind="char" name="GRAN" x="340" y="166" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="endScreen" message="The End" showRestart="true" showCredits="false" reset="false">
+        <connection target="1" />
+      </function>
+    </beat>
+    <beat x="11700" y="900" cluster="undefined">
+      <id id="300" name="Beat 300" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="11900" y="900" cluster="undefined">
+      <id id="301" name="Beat 301" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="12100" y="900" cluster="undefined">
+      <id id="302" name="Beat 302" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="12300" y="900" cluster="undefined">
+      <id id="303" name="Beat 303" />
+      <function kind="conditionCheck">
+      </function>
+    </beat>
+    <beat x="12500" y="900" cluster="undefined">
+      <id id="305" name="Beat 305" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="258" y="119" width="200" height="129" />
+        <loc kind="text" name="button1" x="622" y="100" width="170" height="129" />
+        <loc kind="char" name="WOLF" x="250" y="166" width="100" height="100" />
+        <loc kind="char" name="Red" x="617" y="166" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="12700" y="900" cluster="undefined">
+      <id id="310" name="Beat 310" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="252" y="126" width="200" height="129" />
+        <loc kind="text" name="button1" x="590" y="9" width="200" height="129" />
+        <loc kind="text" name="button2" x="590" y="86" width="200" height="129" />
+        <loc kind="char" name="WOLF" x="250" y="166" width="100" height="100" />
+        <loc kind="char" name="Red" x="617" y="166" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="12900" y="900" cluster="undefined">
+      <id id="320" name="Beat 320" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="264" y="129" width="200" height="129" />
+        <loc kind="text" name="button1" x="590" y="11" width="200" height="129" />
+        <loc kind="text" name="button2" x="590" y="90" width="200" height="129" />
+        <loc kind="char" name="Red" x="617" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="250" y="166" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="13100" y="900" cluster="undefined">
+      <id id="330" name="Beat 330" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="246" y="125" width="220" height="129" />
+        <loc kind="text" name="button1" x="590" y="13" width="200" height="129" />
+        <loc kind="text" name="button2" x="590" y="87" width="200" height="129" />
+        <loc kind="text" name="button3" x="590" y="185" width="200" height="129" />
+        <loc kind="char" name="WOLF" x="250" y="166" width="100" height="100" />
+        <loc kind="char" name="Red" x="617" y="166" width="100" height="100" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="13300" y="900" cluster="undefined">
+      <id id="400" name="Beat 400" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="text" name="text" x="515" y="124" width="110" height="129" />
+        <loc kind="char" name="WOLF" x="250" y="166" width="100" height="100" />
+        <loc kind="char" name="Red" x="617" y="166" width="100" height="100" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="401" />
+      </function>
+    </beat>
+    <beat x="13500" y="900" cluster="Grandma's House">
+      <id id="401" name="In the belly" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="text" name="text" x="177" y="102" width="185" height="131" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="402" />
+      </function>
+    </beat>
+    <beat x="13700" y="900" cluster="Grandma's House">
+      <id id="402" name="End belly" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="Red" x="182" y="166" width="100" height="100" />
+        <loc kind="text" name="button1" x="562" y="403" width="135" height="131" />
+        <loc kind="text" name="title" x="302" y="41" width="155" height="131" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="endScreen" message="The End" showRestart="true" showCredits="false" reset="false">
+        <connection target="1" />
+      </function>
+    </beat>
+    <beat x="13900" y="900" cluster="Grandma's House">
+      <id id="409" name="Slash Wolf axe" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="WOLF" x="250" y="166" width="100" height="100" />
+        <loc kind="char" name="Red" x="482" y="207" width="100" height="100" />
+        <loc kind="text" name="text" x="567" y="159" width="140" height="131" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="411" />
+      </function>
+    </beat>
+    <beat x="14100" y="900" cluster="Grandma's House">
+      <id id="410" name="Slash wolf knife" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="wolf" x="250" y="166" width="100" height="100" />
+        <loc kind="char" name="Red" x="482" y="212" width="100" height="100" />
+        <loc kind="text" name="text" x="571" y="153" width="135" height="131" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="411" />
+      </function>
+    </beat>
+    <beat x="14300" y="900" cluster="Grandma's House">
+      <id id="411" name="Cut him open" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="Red" x="482" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="130" y="190" width="100" height="100" />
+        <loc kind="text" name="text" x="490" y="90" width="280" height="131" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="412" />
+      </function>
+    </beat>
+    <beat x="14500" y="900" cluster="Grandma's House">
+      <id id="412" name="Grandma&apos;s thanks" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="Red" x="482" y="166" width="100" height="100" />
+        <loc kind="char" name="GRAN" x="335" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="130" y="190" width="100" height="100" />
+        <loc kind="text" name="button1" x="563" y="96" width="135" height="131" />
+        <loc kind="text" name="text" x="367" y="97" width="155" height="131" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="14700" y="900" cluster="Grandma's House">
+      <id id="413" name="Red rescues grandma end" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="Red" x="482" y="166" width="100" height="100" />
+        <loc kind="char" name="GRAN" x="335" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="130" y="190" width="100" height="100" />
+        <loc kind="text" name="button1" x="605" y="457" width="135" height="131" />
+        <loc kind="text" name="title" x="327" y="33" width="155" height="131" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="endScreen" message="The End" showRestart="true" showCredits="false" reset="false">
+        <connection target="1" />
+      </function>
+    </beat>
+    <beat x="14900" y="900" cluster="Grandma's House">
+      <id id="421" name="We should cut it open" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="Red" x="482" y="166" width="100" height="100" />
+        <loc kind="char" name="WOODSMAN" x="41" y="137" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="130" y="190" width="100" height="100" />
+        <loc kind="text" name="text" x="15" y="60" width="285" height="131" />
+      </locs>
+      <function kind="durScreen" duration="3000">
+        <connection target="422" />
+      </function>
+    </beat>
+    <beat x="15100" y="900" cluster="Grandma's House">
+      <id id="422" name="You are my hero" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="WOODSMAN" x="41" y="137" width="100" height="100" />
+        <loc kind="char" name="Red" x="482" y="166" width="100" height="100" />
+        <loc kind="char" name="GRAN" x="335" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="130" y="190" width="100" height="100" />
+        <loc kind="text" name="button1" x="567" y="94" width="135" height="131" />
+        <loc kind="text" name="text" x="359" y="115" width="165" height="131" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="dialogTree">
+      </function>
+    </beat>
+    <beat x="15300" y="900" cluster="Grandma's House">
+      <id id="423" name="Rescued by huntsman end" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" volume="1" loop="false" />
+      <locs>
+        <loc kind="char" name="Red" x="482" y="166" width="100" height="100" />
+        <loc kind="char" name="WOODSMAN" x="41" y="137" width="100" height="100" />
+        <loc kind="char" name="GRAN" x="335" y="166" width="100" height="100" />
+        <loc kind="char" name="WOLF" x="130" y="190" width="100" height="100" />
+        <loc kind="text" name="button1" x="597" y="417" width="135" height="131" />
+        <loc kind="text" name="title" x="319" y="35" width="155" height="131" />
+      </locs>
+      <defaulttarget targetBeat="undefined" val="0" />
+      <function kind="endScreen" message="The End" showRestart="true" showCredits="false" reset="false">
+        <connection target="1" />
+      </function>
+    </beat>
+  </plot>
+</story>

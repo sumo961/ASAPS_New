@@ -1,0 +1,1359 @@
+<?xml version='1.0' encoding='utf-8'?>
+<story title="Red's Path through the woods" author="ASG" version="2.0.0">
+  <settings>
+    <debug firstbeat="0" showvals="on" />
+  </settings>
+  <environment>
+    <prop id="3" name="sweets" file="Sweets.png">Some pinata candy</prop>
+    <prop id="4" name="book" file="Book.png">An illustrated version of Lady Chatterley's Lover</prop>
+    <prop id="5" name="gift" file="Present.png">A mysterious present</prop>
+    <prop id="6" name="axe" file="Axe.png">A sharp woodcutting axe</prop>
+    <prop id="9" name="knife" file="knife.png">A sharp knife</prop>
+    <node id="1" name="titleNode" file="Hut_ext.jpg" />
+    <node id="2" name="hutInterior" file="Hut_interior_new.jpg" />
+    <node id="3" name="forest" file="forest_complete.jpg" />
+    <node id="4" name="GrannyOutside" file="Grannys_outdoors-1.jpg" />
+    <node id="5" name="GrannyInside" file="Grannys_indoors-1.jpg" />
+    <node id="6" name="GrannyInsideDetail" file="Grannys_indoors-detail.jpg" />
+    <node id="7" name="forestDetail" file="forest_detail.jpg" />
+    <node id="8" name="wolfBelly" file="Belly.jpg" />
+    <node id="0" name="GrannyInsideKitchen" file="kitchen.jpg" />
+    <sound id="14" name="Sound2" file="Sound2.mp3" />
+    <sound id="15" name="Redmusic" file="Redmusic.mp3" />
+    <sound id="16" name="ToggleSwitch" file="ToggleSwitch.mp3" />
+    <sound id="17" name="Pushbutton" file="Pushbutton.mp3" />
+    <sound id="18" name="MembraneButton" file="MembraneButton.mp3" />
+    <sound id="19" name="ElectronicClick" file="ElectronicClick.mp3" />
+    <sound id="20" name="ElectronicButton" file="ElectronicButton.mp3" />
+    <sound id="21" name="ButtonEffect" file="ButtonEffect.mp3" />
+    <sound id="22" name="gunshot" file="gunshot.mp3" />
+    <sound id="23" name="footsteps" file="footsteps.mp3" />
+    <sound id="24" name="wolf" file="wolf.mp3" />
+    <sound id="25" name="door" file="door.mp3" />
+    <sound id="26" name="forest" file="forest.mp3" />
+    <sound id="27" name="redmusic2" file="redmusic2.mp3" />
+    <sound id="28" name="redmusic3" file="redmusic3.mp3" />
+    <sound id="29" name="sword" file="sword.mp3" />
+  </environment>
+  <characters>
+    <character id="0" name="Red">
+      <appearance state="default" file="Redsm.png" />
+      <appearance state="right" file="RedSmR.png" />
+      <appearance state="attacking" file="LLRH_fightSM.png" />
+      <appearance state="attackingAxe" file="LLRH_fightAxe.png" />
+      <appearance state="attackingR" file="LLRH_fightSMR.png" />
+      <appearance state="attackingAxeR" file="LLRH_fightAxeR.png" />
+      <counter name="friendly" value="00" min="0" max="100" />
+      <counter name="adult" value="00" min="0" max="100" />
+      <counter name="aggressive" value="00" min="0" max="100" />
+    </character>
+    <character id="1" name="Wolf">
+      <appearance state="default" file="Wolf-sideSM.png" />
+      <appearance state="right" file="Wolf-sideSMR.png" />
+      <appearance state="attacking" file="Wolf-frontSM.png" />
+      <appearance state="asgran" file="Wolf_gran.png" />
+      <appearance state="asgranmad" file="Wolf_mad_gran.png" />
+      <appearance state="mad" file="Wolf_mad1.png" />
+      <appearance state="asgrandead" file="Wolf_gran_dead.png" />
+      <appearance state="maddead" file="Wolf-mad-dead.png" />
+    </character>
+    <character id="2" name="Gran">
+      <appearance state="default" file="Gran.png" />
+      <appearance state="standing" file="GranStandingSM.png" />
+    </character>
+    <character id="3" name="Mom">
+      <appearance state="default" file="MomSM.png" />
+    </character>
+    <character id="4" name="Woodsman">
+      <appearance state="default" file="WoodsmanSM.png" />
+      <appearance state="gun" file="WoodmanGunSM.png" />
+    </character>
+  </characters>
+  <plot>
+    <beat>
+      <id id="0" name="Start" cluster="undefined" />
+      <transition type="None" />
+      <sound name="undefined" />
+      <node>titleNode</node>
+      <locs>
+        <loc kind="text" name="button1" x="541" y="356" width="180" height="38.9" />
+        <loc kind="text" name="author" x="49" y="212" width="160" height="64.55" />
+        <loc kind="text" name="title" x="49" y="49" width="450" height="64.55" />
+      </locs>
+      
+      <function kind="titleScreen">
+        <title>Red's Path through the woods</title>
+        <author>ASG</author>
+        <button>click to continue</button>
+        <buttonsound name="ToggleSwitch" />
+        <target targetBeat="1" />
+      </function>
+    </beat>
+    <beat>
+      <id id="1" name="Beat 1" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>titleNode</node>
+      <locs>
+        <loc kind="text" name="text" x="49" y="51" width="690" height="129.25" />
+        <loc kind="text" name="button1" x="560" y="345" width="175" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="320" y="250" />
+      </locs>
+      
+      <function kind="introText">
+        <intro>Red lives a difficult life at the edge of the woods. She and her mother eke out a meager living selling hand-crafted pinatas on e-bay. Their craftsmanship is of unusual quality but under-appreciated by the majority of e-bay's clientele.</intro>
+        <button>click to continue</button>
+        <buttonsound name="Pushbutton" />
+        <target targetBeat="2" />
+      </function>
+    </beat>
+    <beat>
+      <id id="2" name="Beat 2" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>titleNode</node>
+      <locs>
+        <loc kind="text" name="text" x="46" y="46" width="690" height="188.3" />
+        <loc kind="text" name="button1" x="560" y="345" width="175" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="320" y="250" />
+      </locs>
+      
+      <function kind="introText">
+        <intro>Red enjoys all her classes at the newly established progressive school. Red particularly enjoys Mz. Madden's Health class. Mz. Madden delivers frank discussions on "anatomical gender difference" and "reproductive issues." In the school library Red finds an illustrated version of Lady Chatterley's Lovers. She isn't impressed with the plot but several pictures piqued her curiosity. She brings the book home hoping to hear her mother's explanation of the drawings.</intro>
+        <button>click to continue</button>
+        <buttonsound name="MembraneButton" />
+        <target targetBeat="3" />
+      </function>
+    </beat>
+    <beat>
+      <id id="3" name="Mom convo 1" cluster="Mom's House" />
+      <transition type="Blinds" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_3" speaker="Mom" text="Red, darling, you've made enough pinatas for today. You should visit your Grandmama. We'll make her a nice basket" node="hutInterior">
+          <choice id="1" text="Mother, before I go, I'd like to ask you some questions about I book I found in the library." target="4">
+            <effect type="playsound" name="ElectronicClick" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="81" y="73" width="310" height="129.25" />
+        <loc kind="text" name="button1" x="465" y="131" width="310" height="129.25" />
+        <loc kind="char" name="Mom" state="default" size="100" x="147" y="196" />
+        <loc kind="char" name="Red" state="right" size="100" x="477" y="239" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="4" name="Mom ask book" cluster="Mom's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>hutInterior</node>
+      <locs>
+        <loc kind="text" name="text" x="49" y="41" width="690" height="188.3" />
+        <loc kind="text" name="button1" x="529" y="418" width="175" height="129.25" />
+        <loc kind="char" name="Red" state="right" size="100" x="477" y="239" />
+        <loc kind="char" name="Mom" state="default" size="100" x="147" y="196" />
+      </locs>
+      
+      <function kind="introText">
+        <intro>Red, darling, I was a perfectly dreadful student. Your Grandmama no doubt surpasses my skill. Now remember, we need to stay in your Grandmama's good graces. If you're especially sweet, she may remember us in her will. Now here's the basket.</intro>
+        <button>click to continue</button>
+        <buttonsound name="ElectronicButton" />
+        <target targetBeat="5" />
+      </function>
+    </beat>
+    <beat>
+      <id id="5" name="Pick something" cluster="Mom's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>hutInterior</node>
+      <locs>
+        <loc kind="text" name="text" x="50" y="51" width="580" height="129.25" />
+        <loc kind="prop" name="knife" size="100" x="313" y="270" />
+        <loc kind="prop" name="sweets" size="100" x="29" y="342" />
+        <loc kind="prop" name="book" size="100" x="565" y="319" />
+      </locs>
+      
+      <function kind="pickProp">
+        <questioner>1</questioner>
+        <question>And before kissing her mother goodbye, Red adds to her basket:</question>
+        <choice id="1" loc="sweets" desc="Some pinata candy" counter="friendly,02" buttonsound="ButtonEffect" targetBeat="6" />
+        <choice id="2" loc="knife" desc="A knife" counter="aggressive,02" buttonsound="sword" targetBeat="6" />
+        <choice id="3" loc="book" desc="Her illustrated Lady Chatterley's Lover" counter="adult,02" buttonsound="ToggleSwitch" targetBeat="6" />
+      </function>
+    </beat>
+    <beat>
+      <id id="6" name="Mom sendoff" cluster="Mom's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>hutInterior</node>
+      <locs>
+        <loc kind="text" name="text" x="41" y="94" width="690" height="129.25" />
+        <loc kind="char" name="Mom" state="default" size="100" x="52" y="168" />
+        <loc kind="char" name="Red" state="right" size="100" x="420" y="250" />
+      </locs>
+      <function kind="durScreen" text="Now Red. Get along. And don't stray from the path. The woods can be dangerous for young girls." duration="5000">
+        <connection target="beat_7" /></function>
+    </beat>
+    <beat>
+      <id id="7" name="Where to in the Forest?" cluster="Forest" />
+      <transition type="Wipe" duration="1" direction="IN" />
+      <sound name="forest" />
+      <node>forest</node>
+      <locs>
+        <loc kind="text" name="text" x="28" y="122" width="230" height="38.9" />
+        <loc kind="hotspot" name="tree" x="435" y="205" width="130" height="203" />
+        <loc kind="hotspot" name="path" x="633" y="501" width="166" height="73" />
+        <loc kind="char" name="wolf" state="attacking" size="20" x="504" y="24" />
+        <loc kind="char" name="Red" state="default" size="70" x="31" y="200" />
+      </locs>
+      
+      <function kind="movementChoice">
+        <questioner>1</questioner>
+        <question>Where should I go now?</question>
+        <choice id="1" loc="tree" counter="aggressive,01" buttonsound="undefined" targetBeat="8" />
+        <choice id="2" loc="wolf" counter="adult,02" buttonsound="wolf" targetBeat="8" />
+        <choice id="3" loc="path" counter="friendly,02" buttonsound="footsteps" targetBeat="8" />
+      </function>
+    </beat>
+    <beat>
+      <id id="8" name="Beat 8" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="visitedBeat" name="choice_1" operator="==" right="true" />
+        <trueTarget targetBeat="9" />
+        <condition type="visitedBeat" name="choice_2" operator="==" right="true" />
+        <trueTarget targetBeat="10" />
+        <condition type="visitedBeat" name="choice_3" operator="==" right="true" />
+        <trueTarget targetBeat="31" />
+      </function>
+    </beat>
+    <beat>
+      <id id="9" name="Hide behind tree" cluster="Forest" />
+      <transition type="Rotate" duration="1" direction="IN" />
+      <sound name="forest" />
+      <node>forestDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="170" y="126" width="300" height="39.45" />
+        <loc kind="char" name="Red" x="445" y="50" width="100" height="100" size="90" />
+      </locs>
+      <function kind="durScreen" text="I should be safe here. The wolf won't find me..." duration="5000">
+        <connection target="beat_10" /></function>
+    </beat>
+    <beat>
+      <id id="10" name="Set WolfMet" cluster="Forest" />
+      <function kind="setGlobal">
+        <global name="WolfMet" val="true" />
+        <target targetBeat="11" />
+      </function>
+    </beat>
+    <beat>
+      <id id="11" name="Wold Convo 1" cluster="Forest" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" />
+      <function kind="dialogTree">
+        <dialogTree id="node_11" speaker="Mom" text="Hello there. What a pretty red hat you have." node="forestDetail">
+          <effect type="counter" name="friendly" operation="change" value="2" />
+          <effect type="counter" name="adult" operation="change" value="2" />
+          <effect type="counter" name="aggressive" operation="change" value="2" />
+          <choice id="1" text="Thank you. My name is Red. What is yours?" target="12">
+            <effect type="counter" name="friendly" operation="change" value="2" />
+          </choice>
+          <choice id="2" text="What pretty eyes you have." target="14">
+            <effect type="counter" name="adult" operation="change" value="2" />
+          </choice>
+          <choice id="3" text="I'm not supposed to talk to wolves." target="16">
+            <effect type="counter" name="aggressive" operation="change" value="2" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="208" y="118" width="250" height="129.25" />
+        <loc kind="text" name="button1" x="496" y="201" width="260" height="129.25" />
+        <loc kind="text" name="button2" x="496" y="44" width="260" height="129.25" />
+        <loc kind="text" name="button3" x="496" y="109" width="260" height="129.25" />
+        <loc kind="char" name="WOLF" state="right" size="80" x="67" y="190" />
+        <loc kind="char" name="Red" state="right" size="90" x="434" y="213" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="20" name="Check for sweets" cluster="Forest" />
+      <function kind="conditionBeat">
+        <condition type="inventory" item="sweets" character="Red" operator="has" />
+        <trueTarget targetBeat="21" />
+        <falseTarget targetBeat="22" />
+      </function>
+    </beat>
+    <beat>
+      <id id="21" name="Offer Candy" cluster="Forest" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" />
+      <function kind="dialogTree">
+        <dialogTree id="node_21" speaker="Mom" text="Well?" node="forestDetail">
+          <effect type="counter" name="adult" operation="change" value="3" />
+          <choice id="1" text="Would you like some candy?" target="23">
+            <effect type="counter" name="adult" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="318" y="149" width="110.15" height="129.25" />
+        <loc kind="text" name="button1" x="497" y="142" width="190" height="129.25" />
+        <loc kind="char" name="WOLF" state="right" size="80" x="67" y="190" />
+        <loc kind="char" name="Red" state="right" size="90" x="434" y="213" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="22" name="Beat 22" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_22" speaker="Mom" text="Well?" node="forestDetail">
+          <effect type="counter" name="adult" operation="change" value="3" />
+          <choice id="1" text="I have a can of pickled pears in my basket." target="24">
+            <effect type="counter" name="adult" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="336" y="147" width="110.15" height="129.25" />
+        <loc kind="text" name="button1" x="493" y="144" width="230" height="129.25" />
+        <loc kind="char" name="WOLF" state="right" size="80" x="67" y="190" />
+        <loc kind="char" name="Red" state="right" size="90" x="434" y="213" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="25" name="Check for book" cluster="Forest" />
+      <function kind="conditionBeat">
+        <condition type="inventory" item="book" character="Red" operator="has" />
+        <trueTarget targetBeat="27" />
+        <falseTarget targetBeat="26" />
+      </function>
+    </beat>
+    <beat>
+      <id id="26" name="Check for knife" cluster="Forest" />
+      <function kind="conditionBeat">
+        <condition type="inventory" item="knife" character="Red" operator="has" />
+        <trueTarget targetBeat="40" />
+        <falseTarget targetBeat="28" />
+      </function>
+    </beat>
+    <beat>
+      <id id="27" name="Wold convo book" cluster="Forest" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" />
+      <function kind="dialogTree">
+        <dialogTree id="node_27" speaker="Mom" text="Yes?" node="forestDetail">
+          <effect type="counter" name="adult" operation="change" value="3" />
+          <choice id="1" text="Could you tell me something about this picture book I have?" target="29">
+            <effect type="counter" name="adult" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="336" y="147" width="101.9" height="129.25" />
+        <loc kind="text" name="button1" x="494" y="121" width="230" height="129.25" />
+        <loc kind="char" name="WOLF" state="right" size="80" x="67" y="190" />
+        <loc kind="char" name="Red" state="right" size="90" x="434" y="213" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="28" name="Wolf convo neither" cluster="Forest" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" />
+      <function kind="dialogTree">
+        <dialogTree id="node_28" speaker="Mom" text="Yes?" node="forestDetail">
+          <effect type="counter" name="adult" operation="change" value="3" />
+          <choice id="1" text="Could you show me the quickest path to my Grandmama's house?" target="30">
+            <effect type="counter" name="adult" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="352" y="152" width="87.35" height="129.25" />
+        <loc kind="text" name="button1" x="483" y="122" width="250" height="129.25" />
+        <loc kind="char" name="WOLF" state="right" size="80" x="67" y="190" />
+        <loc kind="char" name="Red" state="right" size="90" x="434" y="213" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="30" name="Wolf convo book 3" cluster="Forest" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" />
+      <node>forestDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="289" y="114" width="150" height="129.25" />
+        <loc kind="char" name="WOLF" state="right" size="80" x="63" y="155" />
+        <loc kind="char" name="Red" state="right" size="90" x="433" y="137" />
+      </locs>
+      <function kind="durScreen" text="With Pleasure." duration="3000">
+        <connection target="beat_31" /></function>
+    </beat>
+    <beat>
+      <id id="31" name="Red on path" cluster="Forest" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" />
+      <node>forestDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="272" y="102" width="330" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="80" x="337" y="172" />
+      </locs>
+      <function kind="durScreen" text="I need to hurry along. Grandmama will be so happy to see me." duration="4000">
+        <connection target="beat_32" /></function>
+    </beat>
+    <beat>
+      <id id="32" name="Beat 32" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="variable" name="WolfMet" operator="==" right="true" />
+        <trueTarget targetBeat="33" />
+        <falseTarget targetBeat="34" />
+      </function>
+    </beat>
+    <beat>
+      <id id="33" name="Grandma's wolf met" cluster="Forest" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" />
+      <node>GrannyOutside</node>
+      <locs>
+        <loc kind="text" name="text" x="170" y="126" width="300" height="129.25" />
+        <loc kind="hotspot" name="door" x="396" y="230" width="60" height="101" />
+        <loc kind="char" name="Red" state="default" size="70" x="238" y="374" />
+      </locs>
+      
+      <function kind="movementChoice">
+        <questioner>1</questioner>
+        <question>That's strange. I've never known Grandmama to leave the door ajar.</question>
+        <delay>1500</delay>
+        <choice id="1" loc="door" counter="aggressive,00" buttonsound="door" targetBeat="36" />
+      </function>
+    </beat>
+    <beat>
+      <id id="34" name="Grandma's house" cluster="Forest" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" />
+      <node>GrannyOutside</node>
+      <locs>
+        <loc kind="text" name="text" x="143" y="364" width="280" height="129.25" />
+        <loc kind="hotspot" name="door" x="396" y="230" width="63" height="104" />
+        <loc kind="char" name="Red" state="default" size="70" x="243" y="390" />
+      </locs>
+      
+      <function kind="movementChoice">
+        <questioner>1</questioner>
+        <question>At last, Grandmama's house</question>
+        <choice id="1" loc="door" counter="aggressive,00" buttonsound="door" targetBeat="35" />
+      </function>
+    </beat>
+    <beat>
+      <id id="35" name="Present or Grandma?" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInside</node>
+      <locs>
+        <loc kind="text" name="text" x="19" y="81" width="240" height="38.9" />
+        <loc kind="hotspot" name="gift" x="317" y="215" width="168" height="53" />
+        <loc kind="char" name="Red" state="default" size="70" x="20" y="139" />
+        <loc kind="char" name="gran" state="default" size="90" x="523" y="242" />
+      </locs>
+      
+      <function kind="movementChoice">
+        <questioner>1</questioner>
+        <question>Where should I go now?</question>
+        <choice id="1" loc="gift" counter="aggressive,00" buttonsound="undefined" targetBeat="45" />
+        <choice id="2" loc="gran" counter="aggressive,00" buttonsound="undefined" targetBeat="50" />
+      </function>
+    </beat>
+    <beat>
+      <id id="36" name="Present or wolf?" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInside</node>
+      <locs>
+        <loc kind="text" name="text" x="170" y="126" width="300" height="39.45" />
+        <loc kind="hotspot" name="gift" x="317" y="215" width="165" height="50" />
+        <loc kind="char" name="wolf" state="asgran" x="506" y="236" width="100" height="100" size="90" />
+        <loc kind="char" name="Red" x="20" y="139" width="100" height="100" size="70" />
+      </locs>
+      
+      <function kind="movementChoice">
+        <questioner>1</questioner>
+        <question>Where should I go now?</question>
+        <choice id="1" loc="gift" counter="aggressive,00" buttonsound="undefined" targetBeat="45" />
+        <choice id="2" loc="wolf" counter="aggressive,00" buttonsound="undefined" targetBeat="37" />
+      </function>
+    </beat>
+    <beat>
+      <id id="37" name="Wolf conver 1" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_37" speaker="Mom" text="So good to see you my dear..." node="GrannyInsideDetail">
+          <effect type="counter" name="adult" operation="change" value="3" />
+          <effect type="counter" name="friendly" operation="change" value="1" />
+          <effect type="counter" name="friendly" operation="change" value="2" />
+          <choice id="1" text="What a lovely dress, Grandmama" target="80">
+            <effect type="counter" name="adult" operation="change" value="3" />
+          </choice>
+          <choice id="2" text="I've brought you a basket, Grandmama" target="85">
+            <effect type="counter" name="friendly" operation="change" value="1" />
+          </choice>
+          <choice id="3" text="Perhaps I could help you tidy up, Grandmama" target="87">
+            <effect type="counter" name="friendly" operation="change" value="2" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="432" y="123" width="250" height="129.25" />
+        <loc kind="text" name="button1" x="146" y="192" width="235" height="129.25" />
+        <loc kind="text" name="button2" x="149" y="103" width="235" height="129.25" />
+        <loc kind="text" name="button3" x="149" y="21" width="235" height="129.25" />
+        <loc kind="char" name="WOLF" state="asgran" size="115" x="427" y="201" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="40" name="Wolf convo knife" cluster="Forest" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="forest" />
+      <function kind="dialogTree">
+        <dialogTree id="node_40" speaker="Mom" text="So?" node="forestDetail">
+          <effect type="counter" name="adult" operation="change" value="3" />
+          <choice id="1" text="If wolves as clever as they say, why would you come so close to a sharp knife?" target="41">
+            <effect type="counter" name="adult" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="371" y="157" width="110.15" height="129.25" />
+        <loc kind="text" name="button1" x="486" y="123" width="250" height="129.25" />
+        <loc kind="char" name="WOLF" state="right" size="80" x="67" y="190" />
+        <loc kind="char" name="Red" state="right" size="90" x="434" y="213" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="45" name="Look at present" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideKitchen</node>
+      <locs>
+        <loc kind="text" name="text" x="266" y="104" width="300" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="322" y="184" />
+      </locs>
+      <function kind="durScreen" text="I wonder if this present is for me. I'll just take a peek inside." duration="4000">
+        <connection target="beat_46" /></function>
+    </beat>
+    <beat>
+      <id id="46" name="Finding Axe" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideKitchen</node>
+      <locs>
+        <loc kind="text" name="text" x="308" y="121" width="210" height="129.25" />
+        <loc kind="prop" name="axe" size="100" x="478" y="345" />
+        <loc kind="char" name="Red" state="default" size="90" x="332" y="184" />
+      </locs>
+      <function kind="durScreen" text="Strange, it's an axe" duration="3000">
+        <connection target="beat_47" /></function>
+    </beat>
+    <beat>
+      <id id="47" name="Set Axefound" cluster="Grandma's House" />
+      <function kind="setGlobal">
+        <global name="AxeFound" val="true" />
+        <target targetBeat="48" />
+      </function>
+    </beat>
+    <beat>
+      <id id="48" name="Beat 48" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="variable" name="WolfMet" operator="==" right="true" />
+        <trueTarget targetBeat="36" />
+        <falseTarget targetBeat="35" />
+      </function>
+    </beat>
+    <beat>
+      <id id="50" name="Gradma surprised" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_50" speaker="Mom" text="Hello...this is such a surprise" node="GrannyInsideDetail">
+          <effect type="counter" name="adult" operation="change" value="1" />
+          <effect type="counter" name="friendly" operation="change" value="1" />
+          <effect type="counter" name="aggressive" operation="change" value="1" />
+          <choice id="1" text="What a lovely dress, Grandmama." target="51">
+            <effect type="counter" name="adult" operation="change" value="1" />
+          </choice>
+          <choice id="2" text="I've brought you a basket, Grandmama." target="55">
+            <effect type="counter" name="friendly" operation="change" value="1" />
+          </choice>
+          <choice id="3" text="Perhaps I could help you tidy up, Grandmama" target="57">
+            <effect type="counter" name="aggressive" operation="change" value="1" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="char" name="GRAN" state="default" size="115" x="427" y="201" z="1" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" z="0" />
+        <loc kind="text" name="text" x="420" y="129" width="265.4" height="131.4" />
+        <loc kind="text" name="button1" x="158" y="12" width="255.4" height="131.4" />
+        <loc kind="text" name="button2" x="158" y="98" width="255.4" height="131.4" />
+        <loc kind="text" name="button3" x="158" y="188" width="255.4" height="131.4" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="63" name="Wolf coming in" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="char" name="GRAN" state="default" size="115" x="427" y="201" z="0" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" z="1" />
+        <loc kind="char" name="WOLF" state="mad" size="90" x="-20" y="265" z="2" />
+        <loc kind="text" name="text" x="5" y="204" width="230" height="131.3" />
+      </locs>
+      <function kind="durScreen" text="What a feast: two to eat. And I'm so hungry..." duration="4000">
+        <connection target="beat_64" /></function>
+    </beat>
+    <beat>
+      <id id="64" name="You've eaten grandma" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_64" speaker="Mom" text="That was tasty..." node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="0" />
+          <choice id="1" text="You've eaten Grandmama" target="300">
+            <effect type="counter" name="friendly" operation="change" value="0" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="char" name="Red" state="right" size="90" x="617" y="166" z="1" />
+        <loc kind="char" name="WOLF" state="mad" size="90" x="246" y="166" z="0" />
+        <loc kind="text" name="button1" x="649" y="94" width="140.4" height="131.4" />
+        <loc kind="text" name="text" x="285" y="119" width="175.4" height="131.4" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="65" name="Beat 65" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="inventory" item="book" character="Red" operator="has" />
+        <trueTarget targetBeat="66" />
+        <falseTarget targetBeat="68" />
+      </function>
+    </beat>
+    <beat>
+      <id id="66" name="Beat 66" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_66" speaker="Mom" text="I have very little time..." node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="1" />
+          <choice id="1" text="I'm a little confused about some passages in this book. Perhaps you could help." target="67">
+            <effect type="counter" name="friendly" operation="change" value="1" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="389" y="162" width="230" height="129.25" />
+        <loc kind="text" name="button1" x="125" y="78" width="255" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="GRAN" state="default" size="115" x="427" y="201" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="68" name="Beat 68" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_68" speaker="Mom" text="I'm sorry dear, but you've caught me at an awkward time" node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="1" />
+          <choice id="1" text="Oh, I'm sorry" target="63">
+            <effect type="counter" name="friendly" operation="change" value="1" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="383" y="153" width="290" height="129.25" />
+        <loc kind="text" name="button1" x="196" y="118" width="145" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="GRAN" state="default" size="115" x="427" y="201" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="82" name="Beat 82 new" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="394" y="97" width="200" height="129.25" />
+        <loc kind="char" name="WOLF" state="asgranmad" size="115" x="411" y="172" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+      </locs>
+      <function kind="durScreen" text="Yes, that's exactly what I was thinking." duration="4000">
+        <connection target="beat_100" /></function>
+    </beat>
+    <beat>
+      <id id="90" name="Beat 90" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="inventory" item="book" character="Red" operator="has" />
+        <trueTarget targetBeat="91" />
+        <falseTarget targetBeat="95" />
+      </function>
+    </beat>
+    <beat>
+      <id id="91" name="Beat 91" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_91" speaker="Mom" text="What would you like to chat about my dear?" node="GrannyInsideDetail">
+          <effect type="counter" name="adult" operation="change" value="3" />
+          <choice id="1" text="I'm a little confused about some passages in this book. Perhaps you could help" target="92">
+            <effect type="counter" name="adult" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="404" y="130" width="220" height="129.25" />
+        <loc kind="text" name="button1" x="138" y="79" width="260" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="WOLF" state="asgran" size="115" x="427" y="201" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="93" name="Beat 93 new" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="461" y="136" width="111" height="129.25" />
+        <loc kind="char" name="WOLF" state="asgranmad" size="115" x="422" y="185" />
+        <loc kind="char" name="Red" state="default" size="90" x="279" y="173" />
+      </locs>
+      <function kind="durScreen" text="Oh,yes..." duration="4000">
+        <connection target="beat_100" /></function>
+    </beat>
+    <beat>
+      <id id="96" name="Beat 96 new" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="449" y="149" width="140" height="129.25" />
+        <loc kind="char" name="WOLF" state="asgranmad" size="115" x="427" y="201" />
+        <loc kind="char" name="Red" state="default" size="90" x="301" y="178" />
+      </locs>
+      <function kind="durScreen" text="Come closer..." duration="4000">
+        <connection target="beat_100" /></function>
+    </beat>
+    <beat>
+      <id id="100" name="Beat 100" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="inventory" item="knife" character="Red" operator="has" />
+        <trueTarget targetBeat="210" />
+        <falseTarget targetBeat="101" />
+      </function>
+    </beat>
+    <beat>
+      <id id="101" name="Beat 101" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="variable" name="AxeFound" operator="==" right="true" />
+        <trueTarget targetBeat="103" />
+        <falseTarget targetBeat="102" />
+      </function>
+    </beat>
+    <beat>
+      <id id="102" name="Beat 102" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="counter" name="adult" operator="over" right="7" />
+        <trueTarget targetBeat="120" />
+        <falseTarget targetBeat="105" />
+      </function>
+    </beat>
+    <beat>
+      <id id="103" name="Beat 103" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="counter" name="adult" operator="over" right="7" />
+        <trueTarget targetBeat="130" />
+        <falseTarget targetBeat="110" />
+      </function>
+    </beat>
+    <beat>
+      <id id="105" name="Beat 105" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_105" speaker="Mom" text="I'm so hungry" node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <choice id="1" text="This might be a good time to run" target="200">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="418" y="157" width="150" height="129.25" />
+        <loc kind="text" name="button1" x="192" y="95" width="170" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="WOLF" state="asgran" size="115" x="427" y="201" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="110" name="Beat 110" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_110" speaker="Mom" text="I'm so hungry" node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <effect type="counter" name="aggressive" operation="change" value="1" />
+          <choice id="1" text="This might be a good time to run" target="200">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+          <choice id="2" text="Perhaps I should open Grandmama's present now" target="209">
+            <effect type="counter" name="aggressive" operation="change" value="1" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="421" y="159" width="150" height="129.25" />
+        <loc kind="text" name="button1" x="180" y="7" width="200" height="129.25" />
+        <loc kind="text" name="button2" x="180" y="90" width="200" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="WOLF" state="asgran" size="115" x="427" y="201" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="120" name="Beat 120" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_120" speaker="Mom" text="You will be so tasty" node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <effect type="counter" name="friendly" operation="change" value="2" />
+          <choice id="1" text="This might be a good time to run" target="200">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+          <choice id="2" text="Maybe I can talk my way out of that" target="150">
+            <effect type="counter" name="friendly" operation="change" value="2" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="401" y="163" width="190" height="129.25" />
+        <loc kind="text" name="button1" x="180" y="13" width="200" height="129.25" />
+        <loc kind="text" name="button2" x="180" y="94" width="200" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="WOLF" state="asgran" size="115" x="427" y="201" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="130" name="Beat 130" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_130" speaker="Mom" text="Finally something to eat..." node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <effect type="counter" name="aggressive" operation="change" value="1" />
+          <effect type="counter" name="friendly" operation="change" value="2" />
+          <choice id="1" text="This might be a good time to run" target="200">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+          <choice id="2" text="Perhaps I should open Grandmama's present now" target="209">
+            <effect type="counter" name="aggressive" operation="change" value="1" />
+          </choice>
+          <choice id="3" text="Maybe I can talk my way out of that" target="150">
+            <effect type="counter" name="friendly" operation="change" value="2" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="395" y="159" width="250" height="129.25" />
+        <loc kind="text" name="button1" x="180" y="9" width="200" height="129.25" />
+        <loc kind="text" name="button2" x="180" y="85" width="200" height="129.25" />
+        <loc kind="text" name="button3" x="180" y="185" width="200" height="129.25" />
+        <loc kind="char" name="WOLF" state="asgran" size="115" x="427" y="201" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="200" name="Beat 200" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="482" y="39" width="103.15" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="WOLF" state="asgranmad" size="250" x="293" y="28" />
+      </locs>
+      <function kind="durScreen" text="Got you" duration="4000">
+        <connection target="beat_201" /></function>
+    </beat>
+    <beat>
+      <id id="201" name="Beat 201" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>wolfBelly</node>
+      <locs>
+        <loc kind="text" name="text" x="187" y="107" width="180" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+      </locs>
+      <function kind="durScreen" text="It's so dark here.." duration="5000">
+        <connection target="beat_202" /></function>
+    </beat>
+    <beat>
+      <id id="202" name="Beat 202" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>wolfBelly</node>
+      <locs>
+        <loc kind="text" name="title" x="314" y="49" width="150" height="129.25" />
+        <loc kind="text" name="button1" x="530" y="402" width="130" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+      </locs>
+      
+      <function kind="endScreen">
+        <title>The End</title>
+        <button>Another Go</button>
+        <buttonsound name="ElectronicButton" />
+        <target targetBeat="1" />
+      </function>
+    </beat>
+    <beat>
+      <id id="209" name="Beat 209 new" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="179" y="121" width="120" height="129.25" />
+        <loc kind="char" name="WOLF" state="asgranmad" size="115" x="411" y="172" />
+        <loc kind="char" name="Red" state="attackingAxe" size="90" x="99" y="151" />
+      </locs>
+      <function kind="durScreen" text="Take this..." duration="4000">
+        <connection target="beat_211" /></function>
+    </beat>
+    <beat>
+      <id id="210" name="Beat 210" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="190" y="121" width="130" height="129.25" />
+        <loc kind="char" name="WOLF" state="asgranmad" size="115" x="411" y="172" />
+        <loc kind="char" name="Red" state="attacking" size="90" x="97" y="146" />
+      </locs>
+      <function kind="durScreen" text="Take this..." duration="4000">
+        <connection target="beat_211" /></function>
+    </beat>
+    <beat>
+      <id id="211" name="Beat 211" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="249" y="100" width="270" height="129.25" />
+        <loc kind="char" name="WOLF" state="asgrandead" size="115" x="282" y="369" />
+        <loc kind="char" name="Red" state="default" size="90" x="276" y="165" />
+      </locs>
+      <function kind="durScreen" text="I wonder why his belly is so swollen, I should cut it open" duration="4000">
+        <connection target="beat_212" /></function>
+    </beat>
+    <beat>
+      <id id="212" name="Beat 212" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_212" speaker="Mom" text="Thank you so much my dear" node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <choice id="1" text="I'm so happy you're alive" target="213">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="206" y="87" width="150" height="129.25" />
+        <loc kind="text" name="button1" x="47" y="101" width="130" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="28" y="168" />
+        <loc kind="char" name="GRAN" state="standing" size="115" x="168" y="167" />
+        <loc kind="char" name="WOLF" state="asgrandead" size="115" x="282" y="369" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="213" name="Beat 213" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="title" x="318" y="33" width="150" height="129.25" />
+        <loc kind="text" name="button1" x="564" y="309" width="130" height="129.25" />
+        <loc kind="char" name="GRAN" state="standing" size="115" x="168" y="167" />
+        <loc kind="char" name="Red" state="default" size="90" x="28" y="168" />
+        <loc kind="char" name="WOLF" state="asgrandead" size="115" x="282" y="369" />
+      </locs>
+      
+      <function kind="endScreen">
+        <title>The End</title>
+        <button>Another Go</button>
+        <buttonsound name="ElectronicButton" />
+        <target targetBeat="1" />
+      </function>
+    </beat>
+    <beat>
+      <id id="221" name="Beat 221" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="152" y="91" width="280" height="129.25" />
+        <loc kind="char" name="WOLF" state="asgrandead" size="115" x="282" y="369" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="WOODSMAN" state="default" size="90" x="12" y="124" />
+      </locs>
+      <function kind="durScreen" text="I wonder why his belly is so swollen, we should cut it open" duration="4000">
+        <connection target="beat_222" /></function>
+    </beat>
+    <beat>
+      <id id="222" name="Beat 222" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_222" speaker="Mom" text="You are my hero" node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <choice id="1" text="I'm so happy you're alive" target="223">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="373" y="100" width="170" height="129.25" />
+        <loc kind="text" name="button1" x="197" y="93" width="130" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="WOODSMAN" state="default" size="90" x="12" y="124" />
+        <loc kind="char" name="GRAN" state="standing" size="115" x="340" y="166" />
+        <loc kind="char" name="WOLF" state="asgrandead" size="115" x="282" y="369" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="223" name="Beat 223" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="title" x="327" y="24" width="150" height="129.25" />
+        <loc kind="text" name="button1" x="600" y="303" width="130" height="129.25" />
+        <loc kind="char" name="WOODSMAN" state="default" size="90" x="12" y="124" />
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" />
+        <loc kind="char" name="WOLF" state="asgrandead" size="115" x="282" y="369" />
+        <loc kind="char" name="GRAN" state="standing" size="115" x="340" y="166" />
+      </locs>
+      
+      <function kind="endScreen">
+        <title>The End</title>
+        <button>Another Go</button>
+        <buttonsound name="ElectronicClick" />
+        <target targetBeat="1" />
+      </function>
+    </beat>
+    <beat>
+      <id id="300" name="Beat 300" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="inventory" item="knife" character="Red" operator="has" />
+        <trueTarget targetBeat="410" />
+        <falseTarget targetBeat="301" />
+      </function>
+    </beat>
+    <beat>
+      <id id="301" name="Beat 301" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="variable" name="AxeFound" operator="==" right="true" />
+        <trueTarget targetBeat="303" />
+        <falseTarget targetBeat="302" />
+      </function>
+    </beat>
+    <beat>
+      <id id="302" name="Beat 302" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="counter" name="adult" operator="over" right="7" />
+        <trueTarget targetBeat="320" />
+        <falseTarget targetBeat="305" />
+      </function>
+    </beat>
+    <beat>
+      <id id="303" name="Beat 303" cluster="undefined" />
+      <function kind="conditionBeat">
+        <condition type="counter" name="adult" operator="over" right="7" />
+        <trueTarget targetBeat="330" />
+        <falseTarget targetBeat="310" />
+      </function>
+    </beat>
+    <beat>
+      <id id="305" name="Beat 305" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_305" speaker="Mom" text="And now for desert..." node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <choice id="1" text="This might be a good time to run" target="400">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="258" y="119" width="200" height="129.25" />
+        <loc kind="text" name="button1" x="622" y="100" width="170" height="129.25" />
+        <loc kind="char" name="WOLF" state="mad" size="90" x="250" y="166" />
+        <loc kind="char" name="Red" state="right" size="90" x="617" y="166" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="310" name="Beat 310" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_310" speaker="Mom" text="And now for desert..." node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <effect type="counter" name="aggressive" operation="change" value="1" />
+          <choice id="1" text="This might be a good time to run" target="400">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+          <choice id="2" text="Perhaps I should open Grandmama's present now" target="409">
+            <effect type="counter" name="aggressive" operation="change" value="1" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="252" y="126" width="200" height="129.25" />
+        <loc kind="text" name="button1" x="590" y="9" width="200" height="129.25" />
+        <loc kind="text" name="button2" x="590" y="86" width="200" height="129.25" />
+        <loc kind="char" name="WOLF" state="mad" size="90" x="250" y="166" />
+        <loc kind="char" name="Red" state="right" size="90" x="617" y="166" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="320" name="Beat 320" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_320" speaker="Mom" text="You will be so tasty" node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <effect type="counter" name="friendly" operation="change" value="2" />
+          <choice id="1" text="This might be a good time to run" target="400">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+          <choice id="2" text="Maybe I can talk my way out of that" target="350">
+            <effect type="counter" name="friendly" operation="change" value="2" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="264" y="129" width="200" height="129.25" />
+        <loc kind="text" name="button1" x="590" y="11" width="200" height="129.25" />
+        <loc kind="text" name="button2" x="590" y="90" width="200" height="129.25" />
+        <loc kind="char" name="Red" state="right" size="90" x="617" y="166" />
+        <loc kind="char" name="WOLF" state="mad" size="90" x="250" y="166" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="330" name="Beat 330" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_330" speaker="Mom" text="And now for desert....." node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <effect type="counter" name="aggressive" operation="change" value="1" />
+          <effect type="counter" name="friendly" operation="change" value="2" />
+          <choice id="1" text="This might be a good time to run" target="400">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+          <choice id="2" text="Perhaps I should open Grandmama's present now" target="409">
+            <effect type="counter" name="aggressive" operation="change" value="1" />
+          </choice>
+          <choice id="3" text="Maybe I can talk my way out of that" target="350">
+            <effect type="counter" name="friendly" operation="change" value="2" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="246" y="125" width="220" height="129.25" />
+        <loc kind="text" name="button1" x="590" y="13" width="200" height="129.25" />
+        <loc kind="text" name="button2" x="590" y="87" width="200" height="129.25" />
+        <loc kind="text" name="button3" x="590" y="185" width="200" height="129.25" />
+        <loc kind="char" name="WOLF" state="mad" size="90" x="250" y="166" />
+        <loc kind="char" name="Red" state="right" size="90" x="617" y="166" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="400" name="Beat 400" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="text" name="text" x="515" y="124" width="110.65" height="129.25" />
+        <loc kind="char" name="WOLF" state="mad" size="200" x="250" y="166" />
+        <loc kind="char" name="Red" state="right" size="90" x="617" y="166" />
+      </locs>
+      <function kind="durScreen" text="Got you" duration="4000">
+        <connection target="beat_401" /></function>
+    </beat>
+    <beat>
+      <id id="401" name="In the belly" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>wolfBelly</node>
+      <locs>
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" z="0" />
+        <loc kind="text" name="text" x="177" y="102" width="185.4" height="131.4" />
+      </locs>
+      <function kind="durScreen" text="It's so dark here.." duration="5000">
+        <connection target="beat_402" /></function>
+    </beat>
+    <beat>
+      <id id="402" name="End belly" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>wolfBelly</node>
+      <locs>
+        <loc kind="char" name="Red" state="default" size="90" x="182" y="166" z="0" />
+        <loc kind="text" name="button1" x="562" y="403" width="135.4" height="131.4" />
+        <loc kind="text" name="title" x="302" y="41" width="155.4" height="131.4" />
+      </locs>
+      
+      <function kind="endScreen">
+        <title>The End</title>
+        <button>Another Go</button>
+        <buttonsound name="ButtonEffect" />
+        <target targetBeat="1" />
+      </function>
+    </beat>
+    <beat>
+      <id id="409" name="Slash Wolf axe" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="char" name="WOLF" state="mad" size="90" x="250" y="166" z="1" />
+        <loc kind="char" name="Red" state="attackingAxeR" size="90" x="482" y="207" z="0" />
+        <loc kind="text" name="text" x="567" y="159" width="140.4" height="131.4" />
+      </locs>
+      <function kind="durScreen" text="Take this..." duration="4000">
+        <connection target="beat_411" /></function>
+    </beat>
+    <beat>
+      <id id="410" name="Slash wolf knife" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="char" name="wolf" state="mad" size="90" x="250" y="166" z="0" />
+        <loc kind="char" name="Red" state="attackingR" size="90" x="482" y="212" z="1" />
+        <loc kind="text" name="text" x="571" y="153" width="135.4" height="131.4" />
+      </locs>
+      <function kind="durScreen" text="Take this..." duration="4000">
+        <connection target="beat_411" /></function>
+    </beat>
+    <beat>
+      <id id="411" name="Cut him open" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="char" name="Red" state="right" size="90" x="482" y="166" z="0" />
+        <loc kind="char" name="WOLF" state="maddead" size="75" x="130" y="190" z="1" />
+        <loc kind="text" name="text" x="490" y="90" width="280.4" height="131.3" />
+      </locs>
+      <function kind="durScreen" text="Perhaps I can save Grandmama if I cut open the belly" duration="4000">
+        <connection target="beat_412" /></function>
+    </beat>
+    <beat>
+      <id id="412" name="Grandma's thanks" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_412" speaker="Mom" text="Thank you so much my dear" node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <choice id="1" text="I'm so happy you're alive" target="413">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="char" name="Red" state="right" size="90" x="482" y="166" z="2" />
+        <loc kind="char" name="GRAN" state="standing" size="115" x="335" y="166" z="1" />
+        <loc kind="char" name="WOLF" state="maddead" size="75" x="130" y="190" z="0" />
+        <loc kind="text" name="button1" x="563" y="96" width="135.4" height="131.4" />
+        <loc kind="text" name="text" x="367" y="97" width="155.4" height="131.4" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="413" name="Red rescues grandma end" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="char" name="Red" state="right" size="90" x="482" y="166" z="2" />
+        <loc kind="char" name="GRAN" state="standing" size="115" x="335" y="166" z="1" />
+        <loc kind="char" name="WOLF" state="maddead" size="75" x="130" y="190" z="0" />
+        <loc kind="text" name="button1" x="605" y="457" width="135.4" height="131.4" />
+        <loc kind="text" name="title" x="327" y="33" width="155.4" height="131.4" />
+      </locs>
+      
+      <function kind="endScreen">
+        <title>The End</title>
+        <button>Another Go</button>
+        <buttonsound name="ButtonEffect" />
+        <target targetBeat="1" />
+      </function>
+    </beat>
+    <beat>
+      <id id="421" name="We should cut it open" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="char" name="Red" state="right" size="90" x="482" y="166" z="1" />
+        <loc kind="char" name="WOODSMAN" state="default" size="90" x="41" y="137" z="2" />
+        <loc kind="char" name="WOLF" state="maddead" size="90" x="130" y="190" z="0" />
+        <loc kind="text" name="text" x="15" y="60" width="285.4" height="131.4" />
+      </locs>
+      <function kind="durScreen" text="I wonder why his belly is so swollen, we should cut it open" duration="4000">
+        <connection target="beat_422" /></function>
+    </beat>
+    <beat>
+      <id id="422" name="You are my hero" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_422" speaker="Mom" text="You are my hero" node="GrannyInsideDetail">
+          <effect type="counter" name="friendly" operation="change" value="3" />
+          <choice id="1" text="I'm so happy you're alive" target="423">
+            <effect type="counter" name="friendly" operation="change" value="3" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="char" name="WOODSMAN" state="default" size="90" x="41" y="137" z="2" />
+        <loc kind="char" name="Red" state="right" size="90" x="482" y="166" z="3" />
+        <loc kind="char" name="GRAN" state="standing" size="115" x="335" y="166" z="1" />
+        <loc kind="char" name="WOLF" state="maddead" size="90" x="130" y="190" z="0" />
+        <loc kind="text" name="button1" x="567" y="94" width="135.4" height="131.4" />
+        <loc kind="text" name="text" x="359" y="115" width="165.4" height="131.4" />
+      </locs>
+    </beat>
+    <beat>
+      <id id="423" name="Rescued by huntsman end" cluster="Grandma's House" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>GrannyInsideDetail</node>
+      <locs>
+        <loc kind="char" name="Red" state="right" size="90" x="482" y="166" z="1" />
+        <loc kind="char" name="WOODSMAN" state="default" size="90" x="41" y="137" z="3" />
+        <loc kind="char" name="GRAN" state="standing" size="115" x="335" y="166" z="2" />
+        <loc kind="char" name="WOLF" state="maddead" size="90" x="130" y="190" z="0" />
+        <loc kind="text" name="button1" x="597" y="417" width="135.4" height="131.4" />
+        <loc kind="text" name="title" x="319" y="35" width="155.4" height="131.4" />
+      </locs>
+      
+      <function kind="endScreen">
+        <title>The End</title>
+        <button>Another Go</button>
+        <buttonsound name="ButtonEffect" />
+        <target targetBeat="1" />
+      </function>
+    </beat>
+  </plot>
+</story>

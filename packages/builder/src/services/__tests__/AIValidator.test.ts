@@ -259,7 +259,6 @@ describe('AIValidator', () => {
             connections: [],
           },
         ],
-        startBeat: 'beat_1',
         reasoning: 'Test story for validation',
       };
 
@@ -282,7 +281,6 @@ describe('AIValidator', () => {
             connections: [],
           },
         ],
-        startBeat: 'beat_1',
         reasoning: 'Test',
       } as any;
 
@@ -305,13 +303,12 @@ describe('AIValidator', () => {
             connections: [],
           },
         ],
-        startBeat: 'beat_1',
         reasoning: 'Test',
       };
 
       const result = await validator.validateStoryGeneration(story);
 
-      expect(result.warnings.some((w) => w.includes('author'))).toBe(true);
+      expect(result.warnings?.some((w) => w.includes('author'))).toBe(true);
     });
 
     it('should detect invalid beat connections', async () => {
@@ -327,7 +324,6 @@ describe('AIValidator', () => {
             connections: [{ targetId: 'beat_999' }], // Non-existent target
           },
         ],
-        startBeat: 'beat_1',
         reasoning: 'Test',
       };
 
@@ -383,7 +379,6 @@ describe('AIValidator', () => {
             connections: [],
           },
         ],
-        startBeat: 'beat_1',
         reasoning: 'Branching narrative',
       };
 
@@ -405,7 +400,7 @@ describe('AIValidator', () => {
           text: 'Halt! Who goes there?',
           choices: [
             {
-              id: 'choice_1',
+              id: 'choice_1', target: 'next_beat',
               text: 'I am a traveler',
             },
           ],
@@ -562,7 +557,6 @@ describe('AIValidator', () => {
       const story: StoryGenerationResponse = {
         metadata: { title: 'Empty', author: 'AI' },
         beats: [],
-        startBeat: 'beat_1',
         reasoning: 'Empty story',
       };
 
@@ -592,7 +586,6 @@ describe('AIValidator', () => {
             connections: [{ targetId: 'beat_1' }], // Circular
           },
         ],
-        startBeat: 'beat_1',
         reasoning: 'Circular test',
       };
 

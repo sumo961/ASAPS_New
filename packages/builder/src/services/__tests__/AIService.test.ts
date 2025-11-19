@@ -204,7 +204,6 @@ describe('AIService', () => {
           connections: [],
         },
       ],
-      startBeat: 'beat_1',
       reasoning: 'Created a mystery story',
     };
 
@@ -275,8 +274,7 @@ describe('AIService', () => {
   describe('Dialog Generation', () => {
     const mockDialogRequest: DialogGenerationRequest = {
       scene: 'Guard confronts player',
-      characters: ['Guard', 'Player'],
-      context: 'Player is trying to enter the castle',
+      character: 'Guard',
     };
 
     const mockDialogResponse: DialogGenerationResponse = {
@@ -285,7 +283,7 @@ describe('AIService', () => {
         text: 'Halt! Who goes there?',
         choices: [
           {
-            id: 'choice_1',
+            id: 'choice_1', target: 'next_beat',
             text: 'I am a traveler',
           },
         ],
@@ -329,9 +327,7 @@ describe('AIService', () => {
         id: 'beat_1',
         name: 'Current Beat',
         type: 'introText',
-        position: { x: 100, y: 100 },
         parameters: { text: 'Some text' },
-        connections: [],
       },
       existingBeats: [],
       storyMetadata: {
@@ -348,6 +344,7 @@ describe('AIService', () => {
           name: 'Choose Path',
           reasoning: 'Give player a choice',
           confidence: 0.9,
+          connections: [],
           parameters: {
             question: 'Which way?',
             choices: [
@@ -387,6 +384,7 @@ describe('AIService', () => {
             name: 'Valid',
             reasoning: 'Valid suggestion',
             confidence: 0.9,
+            connections: [],
             parameters: {},
           },
           {
@@ -394,6 +392,7 @@ describe('AIService', () => {
             name: 'Invalid',
             reasoning: 'Invalid suggestion',
             confidence: 0.8,
+            connections: [],
             parameters: {},
           },
         ],
@@ -537,7 +536,6 @@ describe('AIService', () => {
       const invalidResponse: StoryGenerationResponse = {
         metadata: { title: '', author: '' }, // Invalid empty title
         beats: [],
-        startBeat: '',
         reasoning: '',
       };
 

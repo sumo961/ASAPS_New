@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
 import { UndoRedoToolbar } from './UndoRedoToolbar';
 import { SaveStatus } from './SaveStatus';
 import { AIConfigDialog } from './ai/AIConfigDialog';
+import { StoryGenerator } from './ai/StoryGenerator';
+import { NaturalLanguageBeatCreator } from './ai/NaturalLanguageBeatCreator';
 import { useSave, useProject, usePersistence } from '../contexts/PersistenceContext';
 
 interface HeaderProps {
@@ -22,6 +24,8 @@ interface HeaderProps {
   onCharacters?: () => void;
   onInterceptNewProject?: () => boolean;
   onInterceptProjectLibrary?: () => boolean;
+  onStoryGenerated?: (story: any) => void;
+  onBeatCreated?: (beat: any) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,7 +41,9 @@ export const Header: React.FC<HeaderProps> = ({
   onAssets,
   onCharacters,
   onInterceptNewProject,
-  onInterceptProjectLibrary
+  onInterceptProjectLibrary,
+  onStoryGenerated,
+  onBeatCreated
 }) => {
   const { status, lastSaved, error, saveNow } = useSave();
   const { load } = useProject();
@@ -45,6 +51,9 @@ export const Header: React.FC<HeaderProps> = ({
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showProjectLibrary, setShowProjectLibrary] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
+  const [showStoryGenerator, setShowStoryGenerator] = useState(false);
+  const [showBeatCreator, setShowBeatCreator] = useState(false);
+  const [showAIMenu, setShowAIMenu] = useState(false);
 
   const handleLoadProject = async (projectId: string) => {
     const success = await load(projectId);
@@ -157,15 +166,61 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* AI Configuration Button */}
-          <button
-            className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-2"
-            onClick={() => setShowAIConfig(true)}
-            title="Configure AI Assistant"
-          >
-            <Sparkles className="w-4 h-4" />
-            AI
-          </button>
+          {/* AI Menu Button */}
+          <div className="relative">
+            <button
+              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-2"
+              onClick={() => setShowAIMenu(!showAIMenu)}
+              title="AI Tools"
+            >
+              <Sparkles className="w-4 h-4" />
+              AI
+              <ChevronDown className="w-4 h-4" />
+            </button>
+
+            {/* AI Dropdown Menu */}
+            {showAIMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowAIMenu(false)}
+                />
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                  <button
+                    onClick={() => {
+                      setShowStoryGenerator(true);
+                      setShowAIMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Generate Story
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBeatCreator(true);
+                      setShowAIMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Create Beat from Description
+                  </button>
+                  <div className="my-2 border-t border-gray-200" />
+                  <button
+                    onClick={() => {
+                      setShowAIConfig(true);
+                      setShowAIMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Configure AI
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {onPreview && (
             <button 
@@ -232,6 +287,24 @@ export const Header: React.FC<HeaderProps> = ({
         isOpen={showAIConfig}
         onClose={() => setShowAIConfig(false)}
       />
+
+      {/* Story Generator Dialog */}
+      {onStoryGenerated && (
+        <StoryGenerator
+          isOpen={showStoryGenerator}
+          onClose={() => setShowStoryGenerator(false)}
+          onStoryGenerated={onStoryGenerated}
+        />
+      )}
+
+      {/* Natural Language Beat Creator Dialog */}
+      {onBeatCreated && (
+        <NaturalLanguageBeatCreator
+          isOpen={showBeatCreator}
+          onClose={() => setShowBeatCreator(false)}
+          onBeatCreated={onBeatCreated}
+        />
+      )}
     </header>
   );
 };

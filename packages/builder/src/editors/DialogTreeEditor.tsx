@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { 
-  MessageSquare, 
-  Plus, 
-  Trash2, 
-  ChevronRight, 
-  ChevronDown, 
-  User, 
+import {
+  MessageSquare,
+  Plus,
+  Trash2,
+  ChevronRight,
+  ChevronDown,
+  User,
   Users,
   AlertCircle,
   Zap,
@@ -17,9 +17,13 @@ import {
   ArrowRight,
   CornerDownRight,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import type { Beat } from '@asaps/core';
+import { useAI } from '../hooks/useAI';
+import type { DialogGenerationRequest } from '../types/ai';
 
 interface DialogNode {
   id: string;
@@ -76,6 +80,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   allBeats = [],
   expanded = false
 }) => {
+  // AI hook
+  const { isConfigured, isGenerating, error: aiError, generateDialog, clearError } = useAI();
+
   // Track expanded state for each node by its path - always start with root expanded
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
     // Always include root in initial expanded state
@@ -86,6 +93,11 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   const [showConditions, setShowConditions] = useState(false);
   const [showEffects, setShowEffects] = useState(false);
   const [globalExpanded, setGlobalExpanded] = useState(true);
+  const [showAIDialog, setShowAIDialog] = useState(false);
+  const [aiScene, setAiScene] = useState('');
+  const [aiCharacter, setAiCharacter] = useState('');
+  const [aiGoal, setAiGoal] = useState('');
+  const [aiBranchingFactor, setAiBranchingFactor] = useState(2);
 
   // Get available counters from characters or use defaults
   const availableCounters = counters.length > 0 ? counters : ['health', 'courage', 'gold', 'experience', 'reputation'];
@@ -247,7 +259,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
       // Expand all - need to traverse tree to find all nodes
       const allNodeIds = new Set<string>(['root']); // Always include root
       const allChoiceIds = new Set<string>();
-      
+
       const traverse = (node: DialogNode, path: string[]) => {
         const nodeId = path.join('.');
         // Add all nodes, even those without choices (for NPC nodes)
@@ -262,12 +274,42 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
           });
         }
       };
-      
+
       traverse(dialogTree, ['root']);
       setExpandedNodes(allNodeIds);
       setExpandedChoices(allChoiceIds);
     }
     setGlobalExpanded(!globalExpanded);
+  };
+
+  // Handle AI dialog generation
+  const handleAIGenerate = async () => {
+    if (!aiScene.trim()) {
+      return;
+    }
+
+    clearError();
+
+    const request: DialogGenerationRequest = {
+      scene: aiScene.trim(),
+      character: aiCharacter || undefined,
+      goal: aiGoal || undefined,
+      branchingFactor: aiBranchingFactor,
+    };
+
+    const result = await generateDialog(request);
+
+    if (result && result.dialogTree) {
+      // Replace the current dialog tree with AI-generated one
+      // Cast AI DialogNode to local DialogNode format
+      onChange(result.dialogTree as any as DialogNode);
+      setShowAIDialog(false);
+      // Reset form
+      setAiScene('');
+      setAiCharacter('');
+      setAiGoal('');
+      setAiBranchingFactor(2);
+    }
   };
 
   // Render dialog node recursively with unlimited depth
@@ -570,12 +612,20 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         </h3>
         <div className="flex gap-1">
           <button
+            onClick={() => setShowAIDialog(true)}
+            className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1 text-xs font-medium"
+            title="Generate dialog with AI"
+          >
+            <Sparkles className="w-3 h-3" />
+            AI Generate
+          </button>
+          <button
             onClick={toggleAllExpanded}
             className="p-1 hover:bg-gray-100 rounded"
             title={globalExpanded ? "Collapse all" : "Expand all"}
           >
-            {globalExpanded ? 
-              <Minimize2 className="w-4 h-4" /> : 
+            {globalExpanded ?
+              <Minimize2 className="w-4 h-4" /> :
               <Maximize2 className="w-4 h-4" />
             }
           </button>
@@ -603,7 +653,158 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
       
       {/* Edit Modal */}
       {renderEditModal()}
-      
+
+      {/* AI Dialog Generation Modal */}
+      {showAIDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Generate Dialog with AI</h2>
+                  <p className="text-sm text-gray-500">Create a branching conversation</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAIDialog(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              {/* Configuration Warning */}
+              {!isConfigured && (
+                <div className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-900">AI Not Configured</p>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Please configure your AI provider in the AI menu before generating dialogs.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {aiError && (
+                <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-900">Generation Failed</p>
+                    <p className="text-sm text-red-700 mt-1">{aiError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Scene Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Scene Context <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={aiScene}
+                  onChange={(e) => setAiScene(e.target.value)}
+                  placeholder="Describe the scene... (e.g., 'The player meets a suspicious merchant in a dark alley')"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                  rows={3}
+                  disabled={isGenerating}
+                />
+              </div>
+
+              {/* Character */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Main Character (Optional)
+                </label>
+                <select
+                  value={aiCharacter}
+                  onChange={(e) => setAiCharacter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  disabled={isGenerating}
+                >
+                  <option value="">Auto-select from scene</option>
+                  {characters.map(char => (
+                    <option key={char} value={char}>{char}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Goal */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Conversation Goal (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={aiGoal}
+                  onChange={(e) => setAiGoal(e.target.value)}
+                  placeholder="e.g., 'Get information about the murder'"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  disabled={isGenerating}
+                />
+              </div>
+
+              {/* Branching Factor */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Player Choices
+                </label>
+                <select
+                  value={aiBranchingFactor}
+                  onChange={(e) => setAiBranchingFactor(parseInt(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  disabled={isGenerating}
+                >
+                  <option value="2">2 choices</option>
+                  <option value="3">3 choices</option>
+                  <option value="4">4 choices</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+              <div className="text-sm text-gray-600">
+                This will replace the current dialog tree
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowAIDialog(false)}
+                  disabled={isGenerating}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAIGenerate}
+                  disabled={!isConfigured || !aiScene.trim() || isGenerating}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generate
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Instructions */}
       <div className="text-xs text-gray-500 space-y-1 p-3 bg-gray-50 rounded">
         <p>👤 <strong>NPCs speak</strong> (blue) → Players respond (orange) → NPCs reply...</p>

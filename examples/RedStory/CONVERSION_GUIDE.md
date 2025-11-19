@@ -6,20 +6,23 @@ This document describes the process of converting RedStory from the old ASML XML
 
 ## Successful Conversion
 
-The conversion has been completed successfully. The converted file `Story_converted_v2.xml` is ready and contains:
+The conversion has been completed successfully. The converted file `Story_converted_final.xml` is ready for import and contains:
 
 - **67KB** of converted XML (from original 100KB, reduction due to structure optimization)
 - **29 conversation chains** identified and converted to dialogTree format
 - **All assets converted**: props, nodes, sounds, and character appearances updated to current format
+- **100% of conditions converted** to modern `conditionBeat` format (all 16 beats)
 - **All logic preserved**: counters, variables, conditions, and branching
 - **All assets intact**: characters, props, nodes, and sounds
+- **ZIP package ready**: 7.3MB archive with all files
 
 ## Conversion Process
 
-The conversion was performed in two stages:
+The conversion was performed in three stages:
 
 1. **Dialog Conversion** (`convert_to_dialogtree.py`): conversationChoice → dialogTree
-2. **Asset Conversion** (`convert_assets.py`): Updated asset attributes and structure
+2. **Asset Conversion** (`convert_assets.py`): Updated asset attributes (fPath → file, added descriptions)
+3. **Condition Conversion** (`convert_conditions_proper.py`): Modernized ALL conditionCheck formats including multi-way routing
 
 ## Conversion Mapping
 
@@ -67,6 +70,49 @@ The conversion was performed in two stages:
   - Mom conversations → "Mom"
   - Gran/Grandma conversations → "Gran"
   - Default → "Red"
+
+### conditionCheck → conditionBeat
+
+**Old Format:**
+```xml
+<function kind="conditionCheck">
+  <method val="inventory" />
+  <cond char="Red" val="knife" YesTargetBeat="210" NoTargetBeat="101" />
+</function>
+```
+
+**New Format:**
+```xml
+<function kind="conditionBeat">
+  <condition type="inventory" item="knife" character="Red" operator="has" />
+  <trueTarget targetBeat="210" />
+  <falseTarget targetBeat="101" />
+</function>
+```
+
+**All Supported Types:**
+
+| Method val | New Type | Attributes | Description |
+|------------|----------|------------|-------------|
+| `inventory` | `inventory` | `item`, `character`, `operator` | Check if character has item |
+| `global` | `variable` | `name`, `operator`, `right` | Check variable value |
+| `counter` | `counter` | `name`, `operator`, `right` | Check counter with operator |
+| `counterCompare` | `counterCompare` | `counter1`, `counter2`, `operator` | Compare two counters |
+| `timer` | `timer` | `name`, `operator`, `right` | Check timer value |
+| `visited`/`sequence` | `visitedBeat` | `name`, `operator`, `right` | Check if beat visited |
+| `idClicked` | `visitedBeat` | `name` | Multi-way routing (multiple conditions) |
+
+**Multi-way Routing Example:**
+```xml
+<function kind="conditionBeat">
+  <condition type="visitedBeat" name="choice_1" operator="==" right="true" />
+  <trueTarget targetBeat="9" />
+  <condition type="visitedBeat" name="choice_2" operator="==" right="true" />
+  <trueTarget targetBeat="10" />
+  <condition type="visitedBeat" name="choice_3" operator="==" right="true" />
+  <trueTarget targetBeat="31" />
+</function>
+```
 
 ## Asset Format Conversion
 
@@ -189,7 +235,7 @@ All asset paths preserved from original:
 
 ## Next Steps
 
-1. Import `Story_converted_v2.xml` into the builder
+1. Import `Story_converted_final.xml` into the builder
 2. Review conversation flows in visual editor
 3. Test counter increments during gameplay
 4. Verify all ending paths function correctly
@@ -197,17 +243,21 @@ All asset paths preserved from original:
 
 ## Benefits of Conversion
 
-1. **Cleaner Structure**: DialogTree beats provide clearer conversation flow
-2. **Better Visualization**: Builder can show conversation branching visually
-3. **Maintainability**: Easier to edit conversations in the visual editor
-4. **Feature Parity**: All original functionality preserved
-5. **Future-Proof**: Compatible with ASAPS Modern architecture
-6. **Standard Format**: All assets use current ASAPS standards (fPath → file)
+1. **Complete Coverage**: All 16 condition beats converted including multi-way routing
+2. **Cleaner Structure**: DialogTree beats provide clearer conversation flow
+3. **Better Visualization**: Builder can show conversation branching visually
+4. **Maintainability**: Easier to edit conversations in the visual editor
+5. **Feature Parity**: All original functionality preserved
+6. **Future-Proof**: Compatible with ASAPS Modern architecture
+7. **Standard Format**: All assets use current ASAPS standards (fPath → file)
 
 ## Files
 
 - `StoryBackup.xml` - Original story in old format (100KB)
 - `Story_converted.xml` - Dialog-converted story (67KB)
-- `Story_converted_v2.xml` - Final converted story with assets updated (67KB)
+- `Story_converted_v2.xml` - Story with assets converted (67KB)
+- `Story_converted_final.xml` - **FINAL VERSION** - Fully converted with all conditions (67KB)
 - `convert_to_dialogtree.py` - Python script for dialog conversion
 - `convert_assets.py` - Python script for asset format conversion
+- `convert_conditions_proper.py` - Python script for condition conversion (handles all types)
+- `RedStory_final.zip` - **ZIP package ready for import** (7.3MB, 54 files)

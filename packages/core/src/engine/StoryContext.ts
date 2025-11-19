@@ -158,10 +158,10 @@ export class StoryContext extends EventEmitter {
         console.warn('counterCompare condition missing counter1 or counter2');
         return false;
       }
-      
+
       const counter1Value = this.state.counters[condition.counter1] || 0;
       const counter2Value = this.state.counters[condition.counter2] || 0;
-      
+
       switch (condition.operator) {
         case '==': return counter1Value === counter2Value;
         case '!=': return counter1Value !== counter2Value;
@@ -172,16 +172,33 @@ export class StoryContext extends EventEmitter {
         default: return false;
       }
     }
-    
+
+    // Handle visitedBeat conditions
+    if (condition.type === 'visitedBeat') {
+      const beatId = condition.beatId || condition.left;
+      if (!beatId) {
+        console.warn('visitedBeat condition missing beatId');
+        return false;
+      }
+
+      const hasVisited = this.state.visitedBeats.has(beatId);
+
+      // Support both boolean and operator-based checks
+      if (condition.operator === '!=' || condition.operator === 'not') {
+        return !hasVisited;
+      }
+      return hasVisited;
+    }
+
     // Handle other condition types that use left/right pattern
     if (!condition.left) {
       console.warn(`Condition of type ${condition.type} missing required left value`);
       return false;
     }
-    
+
     let left: any;
     const right = condition.right;
-    
+
     // Resolve left value based on condition type
     switch (condition.type) {
       case 'counter':
@@ -203,7 +220,7 @@ export class StoryContext extends EventEmitter {
         left = this.resolveValue(condition.left);
         break;
     }
-    
+
     switch (condition.operator) {
       case '==': return left === right;
       case '!=': return left !== right;
@@ -211,7 +228,7 @@ export class StoryContext extends EventEmitter {
       case '<': return left < right;
       case '>=': return left >= right;
       case '<=': return left <= right;
-      case 'contains': 
+      case 'contains':
         return Array.isArray(left) ? left.includes(right) : false;
       default: return false;
     }

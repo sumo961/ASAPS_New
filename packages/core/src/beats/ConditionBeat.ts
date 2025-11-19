@@ -25,37 +25,43 @@ export class ConditionBeat extends Beat {
   public item?: string;
   public character?: string;
   public checkType?: string;
+  // VisitedBeat-specific parameter
+  public beatId?: string;
 
   constructor(config: BeatConfig & {
     conditionType?: string;
     trueTarget?: string;
     falseTarget?: string;
     parameters?: Partial<ConditionBeatParameters>;
+    beatId?: string;
   } & Partial<ConditionBeatParameters>) {
     super(config);
-    
+
     // Initialize from parameters if provided
     const params = config.parameters || {};
-    
+
     this.conditionType = params.conditionType || config.conditionType || 'counter';
     this.trueTarget = params.trueTarget || config.trueTarget || '';
     this.falseTarget = params.falseTarget || config.falseTarget;
-    
+
     // Store individual condition parameters
-    this.left = params.left;
-    this.operator = params.operator || 'eq';
-    this.val = params.val;
-    this.value = params.value;
-    this.right = params.right;
-    this.counter1 = params.counter1;
-    this.counter2 = params.counter2;
-    this.timer = params.timer;
-    this.inventory = params.inventory;
-    this.variable = params.variable;
+    // Try params first, then config (which has Partial<ConditionBeatParameters>)
+    this.left = params.left || (config as any).left;
+    this.operator = params.operator || (config as any).operator || 'eq';
+    this.val = params.val !== undefined ? params.val : (config as any).val;
+    this.value = params.value !== undefined ? params.value : (config as any).value;
+    this.right = params.right !== undefined ? params.right : (config as any).right;
+    this.counter1 = params.counter1 || (config as any).counter1;
+    this.counter2 = params.counter2 || (config as any).counter2;
+    this.timer = params.timer || (config as any).timer;
+    this.inventory = params.inventory || (config as any).inventory;
+    this.variable = params.variable || (config as any).variable;
     // Inventory-specific parameters
-    this.item = params.item;
-    this.character = params.character || (params.conditionType === 'inventory' ? 'player' : undefined);
-    this.checkType = params.checkType || (params.conditionType === 'inventory' ? 'has' : undefined);
+    this.item = params.item || (config as any).item;
+    this.character = params.character || (config as any).character || (params.conditionType === 'inventory' ? 'player' : undefined);
+    this.checkType = params.checkType || (config as any).checkType || (params.conditionType === 'inventory' ? 'has' : undefined);
+    // VisitedBeat-specific parameter
+    this.beatId = params.beatId || (config as any).beatId;
     
     // Build condition object based on type
     this.condition = this.buildCondition();
@@ -66,7 +72,7 @@ export class ConditionBeat extends Beat {
       type: this.conditionType,
       operator: this.operator
     };
-    
+
     switch (this.conditionType) {
       case 'counter':
         condition.left = this.left;
@@ -89,11 +95,14 @@ export class ConditionBeat extends Beat {
         condition.variable = this.variable || this.left;
         condition.val = this.val;
         break;
+      case 'visitedBeat':
+        condition.beatId = this.beatId || this.left;
+        break;
       default:
         condition.left = this.left;
         condition.right = this.right || this.val;
     }
-    
+
     return condition;
   }
 
@@ -115,7 +124,8 @@ export class ConditionBeat extends Beat {
       variable: this.variable,
       item: this.item,
       character: this.character,
-      checkType: this.checkType
+      checkType: this.checkType,
+      beatId: this.beatId
     };
   }
 
@@ -137,10 +147,11 @@ export class ConditionBeat extends Beat {
     if (params.item !== undefined) this.item = params.item;
     if (params.character !== undefined) this.character = params.character;
     if (params.checkType !== undefined) this.checkType = params.checkType;
-    
+    if (params.beatId !== undefined) this.beatId = params.beatId;
+
     // Rebuild condition object
     this.condition = this.buildCondition();
-    
+
     // Also update the generic condition if provided directly
     if (params.condition !== undefined) {
       this.condition = { ...this.condition, ...params.condition };
@@ -153,7 +164,7 @@ export class ConditionBeat extends Beat {
   ): Promise<string | null> {
     // Validate condition based on type
     let isValidCondition = false;
-    
+
     switch (this.conditionType) {
       case 'counterCompare':
         isValidCondition = !!(this.counter1 && this.counter2);
@@ -166,6 +177,9 @@ export class ConditionBeat extends Beat {
         break;
       case 'variable':
         isValidCondition = !!(this.variable || this.left);
+        break;
+      case 'visitedBeat':
+        isValidCondition = !!(this.beatId || this.left);
         break;
       default:
         isValidCondition = !!(this.left);
@@ -184,6 +198,8 @@ export class ConditionBeat extends Beat {
         console.log(`ConditionBeat ${this.id}: ${this.counter1} ${this.operator} ${this.counter2} = ${conditionResult}`);
       } else if (this.conditionType === 'timer') {
         console.log(`ConditionBeat ${this.id}: timer ${this.timer} ${this.operator} ${this.val} = ${conditionResult}`);
+      } else if (this.conditionType === 'visitedBeat') {
+        console.log(`ConditionBeat ${this.id}: visitedBeat ${this.beatId || this.left} = ${conditionResult}`);
       } else {
         console.log(`ConditionBeat ${this.id}: ${this.left} ${this.operator} ${this.val || this.right} = ${conditionResult}`);
       }

@@ -1,0 +1,144 @@
+<?xml version='1.0' encoding='utf-8'?>
+<story title="Red's Path through the woods" author="ASG" version="2.0.0">
+  <settings>
+    <debug firstbeat="0" showvals="on" />
+  </settings>
+  <environment>
+    <prop id="3" name="sweets" file="Sweets.png">Some pinata candy</prop>
+    <prop id="4" name="book" file="Book.png">An illustrated version of Lady Chatterley's Lover</prop>
+    <prop id="5" name="gift" file="Present.png">A mysterious present</prop>
+    <prop id="6" name="axe" file="Axe.png">A sharp woodcutting axe</prop>
+    <prop id="9" name="knife" file="knife.png">A sharp knife</prop>
+    <node id="1" name="titleNode" file="Hut_ext.jpg" />
+    <node id="2" name="hutInterior" file="Hut_interior_new.jpg" />
+    <node id="3" name="forest" file="forest_complete.jpg" />
+    <node id="4" name="GrannyOutside" file="Grannys_outdoors-1.jpg" />
+    <node id="5" name="GrannyInside" file="Grannys_indoors-1.jpg" />
+    <node id="6" name="GrannyInsideDetail" file="Grannys_indoors-detail.jpg" />
+    <node id="7" name="forestDetail" file="forest_detail.jpg" />
+    <node id="8" name="wolfBelly" file="Belly.jpg" />
+    <node id="0" name="GrannyInsideKitchen" file="kitchen.jpg" />
+    <sound id="14" name="Sound2" file="Sound2.mp3" />
+    <sound id="15" name="Redmusic" file="Redmusic.mp3" />
+    <sound id="16" name="ToggleSwitch" file="ToggleSwitch.mp3" />
+    <sound id="17" name="Pushbutton" file="Pushbutton.mp3" />
+    <sound id="18" name="MembraneButton" file="MembraneButton.mp3" />
+    <sound id="19" name="ElectronicClick" file="ElectronicClick.mp3" />
+    <sound id="20" name="ElectronicButton" file="ElectronicButton.mp3" />
+    <sound id="21" name="ButtonEffect" file="ButtonEffect.mp3" />
+    <sound id="22" name="gunshot" file="gunshot.mp3" />
+    <sound id="23" name="footsteps" file="footsteps.mp3" />
+    <sound id="24" name="wolf" file="wolf.mp3" />
+    <sound id="25" name="door" file="door.mp3" />
+    <sound id="26" name="forest" file="forest.mp3" />
+    <sound id="27" name="redmusic2" file="redmusic2.mp3" />
+    <sound id="28" name="redmusic3" file="redmusic3.mp3" />
+    <sound id="29" name="sword" file="sword.mp3" />
+  </environment>
+  <characters>
+    <character id="0" name="Red">
+      <appearance state="default" file="Redsm.png" />
+      <appearance state="right" file="RedSmR.png" />
+      <appearance state="attacking" file="LLRH_fightSM.png" />
+      <appearance state="attackingAxe" file="LLRH_fightAxe.png" />
+      <appearance state="attackingR" file="LLRH_fightSMR.png" />
+      <appearance state="attackingAxeR" file="LLRH_fightAxeR.png" />
+      <counter name="friendly" value="00" min="0" max="100" />
+      <counter name="adult" value="00" min="0" max="100" />
+      <counter name="aggressive" value="00" min="0" max="100" />
+    </character>
+    <character id="1" name="Wolf">
+      <appearance state="default" file="Wolf-sideSM.png" />
+      <appearance state="right" file="Wolf-sideSMR.png" />
+      <appearance state="attacking" file="Wolf-frontSM.png" />
+      <appearance state="asgran" file="Wolf_gran.png" />
+      <appearance state="asgranmad" file="Wolf_mad_gran.png" />
+      <appearance state="mad" file="Wolf_mad1.png" />
+      <appearance state="asgrandead" file="Wolf_gran_dead.png" />
+      <appearance state="maddead" file="Wolf-mad-dead.png" />
+    </character>
+    <character id="2" name="Gran">
+      <appearance state="default" file="Gran.png" />
+      <appearance state="standing" file="GranStandingSM.png" />
+    </character>
+    <character id="3" name="Mom">
+      <appearance state="default" file="MomSM.png" />
+    </character>
+    <character id="4" name="Woodsman">
+      <appearance state="default" file="WoodsmanSM.png" />
+      <appearance state="gun" file="WoodmanGunSM.png" />
+    </character>
+  </characters>
+  <plot>
+    <beat>
+      <id id="0" name="Start" cluster="undefined" />
+      <transition type="None" />
+      <sound name="undefined" />
+      <node>titleNode</node>
+      <locs>
+        <loc kind="text" name="button1" x="541" y="356" width="180" height="38.9" />
+        <loc kind="text" name="author" x="49" y="212" width="160" height="64.55" />
+        <loc kind="text" name="title" x="49" y="49" width="450" height="64.55" />
+      </locs>
+      <function kind="titleScreen">
+        <title>Red's Path through the woods</title>
+        <author>ASG</author>
+        <button>click to continue</button>
+        <buttonsound name="ToggleSwitch" />
+        <target targetBeat="1" />
+      </function>
+    </beat>
+    <beat>
+      <id id="1" name="Beat 1" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>titleNode</node>
+      <locs>
+        <loc kind="text" name="text" x="49" y="51" width="690" height="129.25" />
+        <loc kind="text" name="button1" x="560" y="345" width="175" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="320" y="250" />
+      </locs>
+      <function kind="introText">
+        <intro>Red lives a difficult life at the edge of the woods. She and her mother eke out a meager living selling hand-crafted pinatas on e-bay. Their craftsmanship is of unusual quality but under-appreciated by the majority of e-bay's clientele.</intro>
+        <button>click to continue</button>
+        <buttonsound name="Pushbutton" />
+        <target targetBeat="2" />
+      </function>
+    </beat>
+    <beat>
+      <id id="2" name="Beat 2" cluster="undefined" />
+      <transition type="Fade" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <node>titleNode</node>
+      <locs>
+        <loc kind="text" name="text" x="46" y="46" width="690" height="188.3" />
+        <loc kind="text" name="button1" x="560" y="345" width="175" height="129.25" />
+        <loc kind="char" name="Red" state="default" size="90" x="320" y="250" />
+      </locs>
+      <function kind="introText">
+        <intro>Red enjoys all her classes at the newly established progressive school. Red particularly enjoys Mz. Madden's Health class. Mz. Madden delivers frank discussions on "anatomical gender difference" and "reproductive issues." In the school library Red finds an illustrated version of Lady Chatterley's Lovers. She isn't impressed with the plot but several pictures piqued her curiosity. She brings the book home hoping to hear her mother's explanation of the drawings.</intro>
+        <button>click to continue</button>
+        <buttonsound name="MembraneButton" />
+        <target targetBeat="3" />
+      </function>
+    </beat>
+    <beat>
+      <id id="3" name="Mom convo 1" cluster="Mom's House" />
+      <transition type="Blinds" duration="0.5" direction="IN" />
+      <sound name="undefined" />
+      <function kind="dialogTree">
+        <dialogTree id="node_3" speaker="Mom" text="Red, darling, you've made enough pinatas for today. You should visit your Grandmama. We'll make her a nice basket" node="hutInterior">
+          <choice id="1" text="Mother, before I go, I'd like to ask you some questions about I book I found in the library." target="4">
+            <effect type="playsound" name="ElectronicClick" />
+          </choice>
+        </dialogTree>
+      </function>
+      <locs>
+        <loc kind="text" name="text" x="81" y="73" width="310" height="129.25" />
+        <loc kind="text" name="button1" x="465" y="131" width="310" height="129.25" />
+        <loc kind="char" name="Mom" state="default" size="100" x="147" y="196" />
+        <loc kind="char" name="Red" state="right" size="100" x="477" y="239" />
+      </locs>
+    </beat>
+  </plot>
+</story>

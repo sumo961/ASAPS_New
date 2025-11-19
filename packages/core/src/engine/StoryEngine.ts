@@ -42,13 +42,13 @@ export class StoryEngine extends EventEmitter {
     this.emit('storyLoaded', story);
   }
 
-  async start(): Promise<void> {
+  async start(startBeatId?: string): Promise<void> {
     if (!this.story) {
       throw new Error('No story loaded');
     }
-    
+
     this.running = true;
-    this.currentBeatId = this.story.getFirstBeatId();
+    this.currentBeatId = startBeatId || this.story.getFirstBeatId();
     
     while (this.running && this.currentBeatId) {
       // Check for timer interrupts

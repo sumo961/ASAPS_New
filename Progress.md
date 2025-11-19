@@ -1,6 +1,124 @@
 # ASPS Modern - Development Progress
 
-## Current Session - November 17, 2025 - Project Management & Text Sizing
+## Current Session - November 19, 2025 - AI Integration Complete
+
+### **AI-Powered Story Creation Tools** ✅ **COMPLETE**
+
+**Status:** Full AI integration with Claude/OpenAI for story generation, beat creation, dialog generation, and beat suggestions
+
+**What Was Built:**
+- ✅ Story Generation UI - Generate complete interactive stories from natural language prompts
+- ✅ Natural Language Beat Creation - Create individual beats by describing them in plain English
+- ✅ AI Beat Suggestions - Contextual beat suggestions in Inspector with one-click add
+- ✅ Dialog Generation - Generate branching conversation trees for DialogTreeBeat
+- ✅ AI Configuration Dialog - Configure Claude or OpenAI API keys
+- ✅ Unified AI Menu - Dropdown in header with all AI features
+
+**New Files Created:**
+1. `/packages/builder/src/components/ai/StoryGenerator.tsx` (258 lines)
+   - Complete story generation dialog
+   - Form inputs: prompt, genre, length, complexity
+   - AI configuration check and error handling
+   - Loading states during generation
+
+2. `/packages/builder/src/components/ai/NaturalLanguageBeatCreator.tsx` (223 lines)
+   - Beat creation from plain English descriptions
+   - 4 example prompts users can click
+   - Tips section for better results
+   - Keyboard shortcut support (Cmd/Ctrl+Enter)
+
+**Files Modified:**
+1. `/packages/builder/src/App.tsx`
+   - Added `handleStoryGenerated` callback (lines 421-465)
+   - Added `handleBeatCreated` callback (lines 470-488)
+   - Clears existing story and creates all AI-generated beats
+   - Applies connections between beats
+
+2. `/packages/builder/src/components/Header.tsx`
+   - Converted AI button to dropdown menu (lines 169-223)
+   - Added ChevronDown icon for dropdown indicator
+   - 3 menu options: Generate Story, Create Beat, Configure AI
+   - Integrated StoryGenerator and NaturalLanguageBeatCreator dialogs
+
+3. `/packages/builder/src/components/Inspector.tsx`
+   - Added `onBeatAdd` prop (line 46)
+   - Implemented callback to create beats from AI suggestions (lines 1901-1925)
+   - Auto-positions new beats 300px to the right
+   - Applies AI-generated parameters and creates connections
+
+4. `/packages/builder/src/editors/DialogTreeEditor.tsx`
+   - Added AI imports (Sparkles, Loader2, useAI hook)
+   - Added AI state management (lines 96-100)
+   - Added `handleAIGenerate` function (lines 286-312)
+   - Added "AI Generate" button to toolbar (lines 613-620)
+   - Added complete AI dialog modal (lines 657-805) with:
+     - Scene context textarea
+     - Character selection
+     - Conversation goal input
+     - Branching factor selector (2-4 choices)
+
+**Key Features:**
+
+**1. Story Generation:**
+- Generate complete interactive stories from prompts
+- Options: genre, length (short/medium/long), complexity (linear/moderate/complex)
+- Automatically creates all beats with connections
+- Clears existing story and loads generated content
+
+**2. Natural Language Beat Creation:**
+- Create beats by describing in plain English
+- Example: "Add a choice where the player decides to help the merchant or walk away"
+- AI determines best beat type automatically
+- Keyboard shortcuts for quick creation
+
+**3. Beat Suggestions:**
+- Contextual suggestions based on current beat
+- One-click add with auto-positioning
+- Applies AI-generated parameters
+- Creates connections automatically
+
+**4. Dialog Generation:**
+- Generate branching conversation trees
+- Specify scene context, character, and goal
+- Choose number of player choices (2-4)
+- Replaces current dialog tree
+
+**5. AI Configuration:**
+- Support for Claude and OpenAI providers
+- Secure API key storage
+- Configuration status checks
+- Error handling and validation
+
+**User Experience:**
+
+All AI features include:
+- Configuration status checks (warns if not configured)
+- Loading states during generation
+- Error handling and display
+- Consistent modal UI design
+- Helpful prompts and examples
+- Visual feedback throughout
+
+**Build Status:**
+✅ All code compiles successfully
+✅ Only pre-existing test file errors remain (unrelated to AI features)
+✅ All type errors resolved
+
+**What Users Can Do:**
+1. Click AI menu in header → Configure AI
+2. Choose provider (Claude or OpenAI)
+3. Enter API key
+4. Use AI features:
+   - Generate complete stories from prompts
+   - Create beats from descriptions
+   - Get contextual beat suggestions
+   - Generate dialog trees for conversations
+
+**Impact:** Professional AI-powered story creation tools fully integrated into ASAPS Builder! 🎉
+
+---
+
+## Previous Session - November 17, 2025 - Project Management & Text Sizing
 
 ### **Project Export/Import with ZIP** ✅ **COMPLETE**
 
@@ -1679,3 +1797,45 @@ Key changes to save architecture:
 *Last Updated: November 11, 2025*
 *Current Status: Save system consolidated, all bugs fixed*
 *Progress: 68% complete*
+
+---
+
+## Current Session - November 18, 2025 - RedStory XML Conversion
+
+### **RedStory XML Conversion** ✅ **COMPLETE**
+
+**Status:** RedStory successfully converted from old ASML format to ASAPS Modern architecture
+
+**What Was Done:**
+- ✅ Converted 29 conversationChoice chains to DialogTree format
+- ✅ Converted all 16 condition beats (100% coverage)
+- ✅ Updated all asset formats (fPath → file)
+- ✅ Fixed TypeScript errors in test files
+- ✅ Built complete project successfully
+- ✅ Created ZIP package ready for import
+
+**Deliverables:**
+- `/tmp/RedStory_final.zip` (7.3MB, 54 files)
+- `Story_converted_final.xml` (67KB)
+- Conversion scripts in `examples/RedStory/`
+- Comprehensive documentation in `examples/RedStory/CONVERSION_GUIDE.md`
+
+**Files Modified:**
+- `packages/builder/src/services/__tests__/AIService.test.ts`
+- `packages/builder/src/services/__tests__/AIValidator.test.ts`
+
+**Key Features:**
+- Multi-way routing support (3+ choices in single beat)
+- Counter operations with effects
+- Inventory and variable checks
+- Sound effect preservation
+- All asset references updated
+
+Statistics:
+- 29 dialogTree beats created
+- 16 conditionBeat beats converted
+- 5 movementChoice beats preserved
+- 91 total beats in story
+- 44 assets (PNG, JPG, MP3) included
+- 0 build errors after fixes
+
