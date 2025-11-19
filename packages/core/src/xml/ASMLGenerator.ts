@@ -433,7 +433,15 @@ export class ASMLGenerator {
     
     // Default target
     if (beat.defaultTarget) {
-      lines.push(`${beatIndent}${this.indent}<defaulttarget targetBeat="${beat.defaultTarget}" val="0" />`);
+      const delay = beat.defaultTargetDelay || 0;
+      const attrs = [`targetBeat="${beat.defaultTarget}"`, `val="${delay}"`];
+
+      // Add showTimer attribute if configured
+      if (beat.showTimer) {
+        attrs.push(`showTimer="true"`);
+      }
+
+      lines.push(`${beatIndent}${this.indent}<defaulttarget ${attrs.join(' ')} />`);
     }
     
     // Function element with nested connections based on beat type
@@ -611,20 +619,45 @@ export class ASMLGenerator {
       case 'multiple':
         if (beat.type === 'movementChoice' && params.choices) {
           for (const choice of params.choices) {
-            this.generateChoice(choice, lines, indent + this.indent);
+            // Enrich choice with sound from its location
+            const enrichedChoice = { ...choice };
+            if (choice.location && beat.locations) {
+              const location = Array.from(beat.locations.values()).find(loc => loc.name === choice.location);
+              if (location?.sound) {
+                enrichedChoice.sound = location.sound;
+              }
+            }
+            this.generateChoice(enrichedChoice, lines, indent + this.indent);
           }
         } else if (beat.type === 'pickProp' && params.props) {
           for (const prop of params.props) {
-            this.generateProp(prop, lines, indent + this.indent);
+            // Enrich prop with sound from its location
+            const enrichedProp = { ...prop };
+            if (prop.name && beat.locations) {
+              // Props use 'name' field to match location name
+              const location = Array.from(beat.locations.values()).find(loc => loc.name === prop.name);
+              if (location?.sound) {
+                enrichedProp.sound = location.sound;
+              }
+            }
+            this.generateProp(enrichedProp, lines, indent + this.indent);
           }
         } else if (beat.type === 'dialogTree' && params.dialogTree) {
           // Generate nested dialog choices
           if (params.dialogTree.choices) {
             for (const choice of params.dialogTree.choices) {
-              this.generateDialogChoice(choice, lines, indent + this.indent);
+              // Enrich choice with sound from its location (matched by text)
+              const enrichedChoice = { ...choice };
+              if (choice.text && beat.locations) {
+                const location = Array.from(beat.locations.values()).find(loc => loc.name === choice.text);
+                if (location?.sound) {
+                  enrichedChoice.sound = location.sound;
+                }
+              }
+              this.generateDialogChoice(enrichedChoice, lines, indent + this.indent);
             }
           }
-          
+
           // Add default connection if exists
           const defaultConn = connections.find(c => !c.label || c.label === 'Continue');
           if (defaultConn) {
@@ -709,14 +742,24 @@ export class ASMLGenerator {
         //remaining beats
         if (connections.length > 0) {
           const conn = connections[0];
+
+          // Enrich connection with sound from button location
+          const enrichedConn: any = { ...conn };
+          if (beat.locations) {
+            const buttonLocation = Array.from(beat.locations.values()).find(loc => loc.kind === 'button');
+            if (buttonLocation?.sound) {
+              enrichedConn.sound = buttonLocation.sound;
+            }
+          }
+
           // Invisible beats and simple progression beats should not have labels on connections
           const noLabelBeats = ['setVariable', 'setTimer', 'addRemoveInventory', 'randomTarget', 'introText', 'durScreen', 'endScreen', 'inputText', 'hyperText'];
           if (noLabelBeats.includes(beat.type)) {
             // Don't include label - button text is shown in visual editor instead
-            this.generateConnection({ ...conn, label: undefined }, lines, indent + this.indent);
+            this.generateConnection({ ...enrichedConn, label: undefined }, lines, indent + this.indent);
           } else {
-            const label = conn.label || params.buttonText || 'Continue';
-            this.generateConnection({ ...conn, label }, lines, indent + this.indent);
+            const label = enrichedConn.label || params.buttonText || 'Continue';
+            this.generateConnection({ ...enrichedConn, label }, lines, indent + this.indent);
           }
         }
         break;
@@ -733,16 +776,19 @@ export class ASMLGenerator {
     const attrs: string[] = [];
     if (choice.id) attrs.push(`id="${choice.id}"`);
     if (choice.text) attrs.push(`text="${this.escapeXml(choice.text)}"`);
-    
+
     // Check if target is a string (beat ID) or object (nested dialog)
     const hasNestedDialog = typeof choice.target === 'object' && choice.target;
     const hasStringTarget = typeof choice.target === 'string' && choice.target;
-    
+
     // Only add target attribute if it's a string (beat ID)
     if (hasStringTarget) {
       attrs.push(`target="${choice.target}"`);
     }
-    
+
+    // Add sound effect (from location)
+    if (choice.sound) attrs.push(`buttonsound="${this.escapeXml(choice.sound)}"`);
+
     // Add counter effect as attributes with proper operation and val
     if (choice.counter) {
       attrs.push(`counter="${this.escapeXml(choice.counter)}"`);
@@ -850,7 +896,10 @@ export class ASMLGenerator {
     if (choice.text) attrs.push(`text="${this.escapeXml(choice.text)}"`);
     if (choice.target) attrs.push(`target="${choice.target}"`);
     if (choice.location) attrs.push(`location="${this.escapeXml(choice.location)}"`);
-    
+
+    // Add sound effect (from location)
+    if (choice.sound) attrs.push(`buttonsound="${this.escapeXml(choice.sound)}"`);
+
     // Add counter effect as attributes (for movementChoice)
     if (choice.counter) {
       attrs.push(`counter="${this.escapeXml(choice.counter)}"`);
@@ -897,7 +946,10 @@ export class ASMLGenerator {
     if (prop.name) attrs.push(`name="${this.escapeXml(prop.name)}"`);
     if (prop.description) attrs.push(`description="${this.escapeXml(prop.description)}"`);
     if (prop.target) attrs.push(`target="${prop.target}"`);
-    
+
+    // Add sound effect (from location)
+    if (prop.sound) attrs.push(`buttonsound="${this.escapeXml(prop.sound)}"`);
+
     // Add counter effect as attributes (for pickProp)
     if (prop.counter) {
       attrs.push(`counter="${this.escapeXml(prop.counter)}"`);
@@ -1039,7 +1091,10 @@ export class ASMLGenerator {
     const targetId = connection.targetId || connection.target;
     if (targetId) attrs.push(`target="${targetId}"`);
     if (connection.label) attrs.push(`label="${this.escapeXml(connection.label)}"`);
-    
+
+    // Add sound effect (from button location)
+    if (connection.sound) attrs.push(`buttonsound="${this.escapeXml(connection.sound)}"`);
+
     if (connection.condition) {
       lines.push(`${indent}<connection ${attrs.join(' ')}>`);
       this.generateCondition(connection.condition, lines, indent + this.indent);

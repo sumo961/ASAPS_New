@@ -623,10 +623,25 @@ export class ASMLParser {
     const defaultTargetElement = beatElement.querySelector('defaulttarget');
     if (defaultTargetElement) {
       config.defaultTarget = defaultTargetElement.getAttribute('targetBeat') || undefined;
+
+      // Parse delay (val attribute)
+      const valAttr = defaultTargetElement.getAttribute('val');
+      if (valAttr) {
+        const delay = parseInt(valAttr);
+        if (!isNaN(delay) && delay > 0) {
+          (config as any).defaultTargetDelay = delay;
+        }
+      }
+
+      // Parse showTimer attribute
+      const showTimerAttr = defaultTargetElement.getAttribute('showTimer');
+      if (showTimerAttr === 'true') {
+        (config as any).showTimer = true;
+      }
     }
 
     // Parse beat-specific parameters and connections
-    const { parameters, connections } = this.parseBeatFunction(functionElement, beatType);
+    const { parameters, connections } = this.parseBeatFunction(functionElement, beatType, config);
     config.parameters = parameters;
 
     // Create beat instance
@@ -666,7 +681,7 @@ export class ASMLParser {
   /**
    * Parse beat function element and extract parameters and connections
    */
-  private parseBeatFunction(functionElement: Element, beatType: string): {
+  private parseBeatFunction(functionElement: Element, beatType: string, config: any): {
     parameters: any;
     connections: Connection[];
   } {
@@ -750,7 +765,28 @@ export class ASMLParser {
             target: choiceEl.getAttribute('target')
           };
           choices.push(choice);
-          
+
+          // Import buttonsound attribute → add/update location with sound
+          const buttonsound = choiceEl.getAttribute('buttonsound');
+          if (buttonsound && choice.location && config.locations) {
+            // Find existing location by name and add sound to it
+            const existingLoc = config.locations.find((loc: any) => loc.name === choice.location);
+            if (existingLoc) {
+              existingLoc.sound = buttonsound;
+            } else {
+              // Create a minimal location for this choice with sound
+              config.locations.push({
+                kind: 'hotspot',
+                name: choice.location,
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 100,
+                sound: buttonsound
+              });
+            }
+          }
+
           // Add connection for this choice
           if (choice.target) {
             connections.push({
@@ -774,7 +810,28 @@ export class ASMLParser {
             target: propEl.getAttribute('target')
           };
           props.push(prop);
-          
+
+          // Import buttonsound attribute → add/update location with sound
+          const buttonsound = propEl.getAttribute('buttonsound');
+          if (buttonsound && prop.name && config.locations) {
+            // For props, the location name matches the prop name
+            const existingLoc = config.locations.find((loc: any) => loc.name === prop.name);
+            if (existingLoc) {
+              existingLoc.sound = buttonsound;
+            } else {
+              // Create a minimal location for this prop with sound
+              config.locations.push({
+                kind: 'prop',
+                name: prop.name,
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 100,
+                sound: buttonsound
+              });
+            }
+          }
+
           // Add connection for this prop
           if (prop.target) {
             connections.push({
@@ -788,11 +845,11 @@ export class ASMLParser {
 
       case 'dialogTree':
         // Parse dialog tree - the function element IS the dialog tree
-        parameters.dialogTree = this.parseDialogTree(functionElement);
-        
+        parameters.dialogTree = this.parseDialogTree(functionElement, config);
+
         // Extract connections from dialog choices
         this.extractDialogConnections(parameters.dialogTree, connections);
-        
+
         // Also check for default connection after dialog
         const defaultConnEl = functionElement.querySelector(':scope > connection');
         if (defaultConnEl) {
@@ -898,12 +955,12 @@ export class ASMLParser {
     if (introEl) {
       parameters.text = introEl.textContent;
     }
-    
+
     const buttonEl = functionElement.querySelector('button');
     if (buttonEl) {
       parameters.buttonText = buttonEl.textContent;
     }
-    
+
     const targetEl = functionElement.querySelector('target');
     if (targetEl && connections.length === 0) {
       const targetBeat = targetEl.getAttribute('targetBeat');
@@ -912,6 +969,30 @@ export class ASMLParser {
           targetId: targetBeat,
           label: parameters.buttonText || undefined
         });
+      }
+    }
+
+    // Import buttonsound from connection elements for single-connection beats
+    const connectionEl = functionElement.querySelector('connection');
+    if (connectionEl) {
+      const buttonsound = connectionEl.getAttribute('buttonsound');
+      if (buttonsound && config.locations) {
+        // Create or update a button location with the sound
+        const existingButtonLoc = config.locations.find((loc: any) => loc.kind === 'button');
+        if (existingButtonLoc) {
+          existingButtonLoc.sound = buttonsound;
+        } else {
+          // Create a button location with sound
+          config.locations.push({
+            kind: 'button',
+            name: 'button',
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            sound: buttonsound
+          });
+        }
       }
     }
 
@@ -940,7 +1021,7 @@ export class ASMLParser {
   /**
    * Parse dialog tree structure - FIXED to handle nested dialogs
    */
-  private parseDialogTree(dialogTreeEl: Element): any {
+  private parseDialogTree(dialogTreeEl: Element, config?: any): any {
     const dialogNode: any = {
       id: dialogTreeEl.getAttribute('id'),
       speaker: dialogTreeEl.getAttribute('speaker'),
@@ -959,9 +1040,30 @@ export class ASMLParser {
         // Parse counter effects
         counter: choiceEl.getAttribute('counter'),
         counterOperation: choiceEl.getAttribute('operation'),
-        counterValue: choiceEl.getAttribute('val') ? 
+        counterValue: choiceEl.getAttribute('val') ?
           parseInt(choiceEl.getAttribute('val')!) : undefined
       };
+
+      // Import buttonsound attribute → add/update location with sound
+      const buttonsound = choiceEl.getAttribute('buttonsound');
+      if (buttonsound && choice.text && config?.locations) {
+        // For dialog choices, the location name matches the choice text
+        const existingLoc = config.locations.find((loc: any) => loc.name === choice.text);
+        if (existingLoc) {
+          existingLoc.sound = buttonsound;
+        } else {
+          // Create a minimal location for this dialog choice with sound
+          config.locations.push({
+            kind: 'dialog',
+            name: choice.text,
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            sound: buttonsound
+          });
+        }
+      }
 
       // Check for nested target element containing dialog tree
       const targetEl = choiceEl.querySelector(':scope > target');
@@ -969,7 +1071,7 @@ export class ASMLParser {
         const nestedDialogEl = targetEl.querySelector(':scope > dialogTree');
         if (nestedDialogEl) {
           // RECURSIVE PARSE - this is the critical fix
-          choice.target = this.parseDialogTree(nestedDialogEl);
+          choice.target = this.parseDialogTree(nestedDialogEl, config);
         }
       }
 

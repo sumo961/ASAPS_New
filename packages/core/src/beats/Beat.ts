@@ -19,6 +19,8 @@ export abstract class Beat {
   public locations: Map<string, Location> = new Map();
   public connections: Connection[] = [];
   public defaultTarget?: string;
+  public defaultTargetDelay?: number; // Timeout in seconds before auto-advancing to defaultTarget
+  public showTimer?: boolean; // Whether to show countdown timer to user
   public x?: number;
   public y?: number;
   public node?: string; // Background image/node reference
@@ -31,6 +33,8 @@ export abstract class Beat {
     this.transition = config.transition;
     this.sound = config.sound;
     this.defaultTarget = config.defaultTarget;
+    this.defaultTargetDelay = (config as any).defaultTargetDelay || (config.parameters as any)?.defaultTargetDelay;
+    this.showTimer = (config as any).showTimer || (config.parameters as any)?.showTimer;
     this.node = (config as any).node || (config.parameters as any)?.node;
     this.x = config.x;
     this.y = config.y;
@@ -148,6 +152,29 @@ export abstract class Beat {
 
   protected async onEnter(context: StoryContext, renderer: IRenderer): Promise<void> {
     console.log(`Entering beat: ${this.name} (${this.id})`);
+
+    // Start default target timer only for visible beats with user interaction
+    // Excluded: durScreen (has own timer), logic beats (instant), endScreen (no timeout needed)
+    const supportsDefaultTargetTimeout = [
+      'titleScreen',
+      'introText',
+      'dialogTree',
+      'movementChoice',
+      'pickProp',
+      'hyperText',
+      'inputText',
+      'videoBeat'
+    ].includes(this.type);
+
+    if (supportsDefaultTargetTimeout && this.defaultTarget && this.defaultTargetDelay && this.defaultTargetDelay > 0) {
+      const timerManager = context.getTimerManager();
+      const timerName = `defaultTarget_${this.id}`;
+
+      console.log(`[Beat ${this.id}] Starting default target timer: ${timerName} for ${this.defaultTargetDelay}s → ${this.defaultTarget}`);
+
+      // Note: showTimer support would need to be added to TimerManager.startTimer signature
+      timerManager.startTimer(timerName, this.defaultTargetDelay, this.defaultTarget);
+    }
   }
 
   protected async onExit(context: StoryContext, renderer: IRenderer): Promise<void> {
