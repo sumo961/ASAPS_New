@@ -2,20 +2,35 @@
 
 MCP (Model Context Protocol) server for AI-assisted interactive story creation in ASAPS Modern.
 
+✅ **Week 4 Complete** - Full HTTP API integration implemented and tested!
+
 ## Features
 
-- 🎭 **Story Generation**: Create complete interactive story structures from natural language prompts
-- 💬 **Dialog Writing**: Generate branching dialogue trees for character conversations
-- 🎯 **Beat Suggestions**: Get AI-powered suggestions for next beats based on story context
-- 🔨 **Beat Creation**: Create beats from natural language descriptions
-- 📖 **Story Context**: Read current project state for context-aware AI operations
+- 📖 **Story Context**: Read current project state via HTTP API
+- 📝 **Apply Changes**: Create beats and connections via HTTP API
+- 🎭 **Story Generation**: Create complete interactive story structures (placeholder)
+- 💬 **Dialog Writing**: Generate branching dialogue trees (placeholder)
+- 🎯 **Beat Suggestions**: Get AI-powered suggestions for next beats (placeholder)
+- 🔨 **Beat Creation**: Create beats from natural language (placeholder)
+
+## Prerequisites
+
+**ASAPS Builder API Server must be running:**
+
+```bash
+cd packages/builder
+STORAGE_TYPE=filesystem npm run api:start
+```
+
+Server runs at: `http://localhost:3001`
 
 ## Installation
 
 ```bash
 npm install
-npm run build
 ```
+
+**No build required!** The server is pre-built in `dist/`.
 
 ## Usage
 
@@ -106,38 +121,45 @@ Create a beat from natural language description.
 ```
 
 #### `get_story_context`
-Get the current story state for context.
+Get the current story state for context (HTTP API integration ✅).
+
+**Arguments:**
+- `projectId` (string, optional): Project ID to retrieve. If omitted, lists all projects.
 
 **Returns:**
 - Story metadata
 - All beats
-- Variables
-- Characters
+- Connections
+- Beat count
 
 #### `apply_story_changes`
-Apply AI-generated changes to the active project.
+Apply AI-generated changes to the active project (HTTP API integration ✅).
 
 **Arguments:**
+- `projectId` (string, required): Project ID to apply changes to
 - `changes` (object, required): Story changes to apply
   - `beats` (array, optional): Beats to add
   - `connections` (array, optional): Connections to create
-  - `variables` (array, optional): Variables to define
+  - `metadata` (object, optional): Metadata to update
+- `createIfNotExists` (boolean, optional): Create project if it doesn't exist
 
 ## Configuration
 
 ### Environment Variables
 
-- `ANTHROPIC_API_KEY`: API key for Claude (required)
-- `OPENAI_API_KEY`: API key for OpenAI (optional)
+- `ASAPS_API_URL`: HTTP API server URL (default: `http://localhost:3001`)
+- `ANTHROPIC_API_KEY`: API key for Claude (for AI generation tools - not yet implemented)
+- `OPENAI_API_KEY`: API key for OpenAI (optional, for AI generation tools)
 - `AI_PROVIDER`: Provider to use ("claude" or "openai", default: "claude")
 - `AI_MODEL`: Model to use (e.g., "claude-sonnet-4", default: provider default)
 - `AI_TEMPERATURE`: Creativity setting 0-1 (default: 0.7)
 
-### Project Database
+### Storage Architecture
 
-The server reads and writes to the IndexedDB database used by the ASAPS Builder at:
-- Database: `asaps-builder-db`
-- Stores: `projects`, `assets`, `history`
+The server communicates with the ASAPS Builder via HTTP API:
+- **MCP Server** → HTTP API (port 3001) → **FilesystemStorageAdapter** → `~/.asaps-storage/`
+- Persistent storage with filesystem backend
+- No IndexedDB dependency (Node.js compatible)
 
 ## Development
 
