@@ -3,9 +3,10 @@
  *
  * MCP tool for generating dialogue trees
  */
+import { generateDialog } from '../utils/aiHelper.js';
 export const writeDialogTool = {
     name: 'write_dialog',
-    description: 'Generate a branching dialogue tree for character conversations',
+    description: 'Generate a branching dialogue tree for character conversations using AI',
     inputSchema: {
         type: 'object',
         properties: {
@@ -27,35 +28,46 @@ export const writeDialogTool = {
                 minimum: 2,
                 maximum: 5,
             },
+            context: {
+                type: 'string',
+                description: 'Additional context or requirements',
+            },
         },
         required: ['scene'],
     },
 };
 export async function handleWriteDialog(args) {
-    const { scene, character, goal, branchingFactor = 3 } = args;
+    const { scene, character, goal, branchingFactor = 3, context } = args;
     if (!scene || typeof scene !== 'string') {
-        throw new Error('Scene description is required');
+        return {
+            success: false,
+            error: 'Scene description is required',
+            message: 'Invalid scene description',
+        };
     }
     console.error(`[writeDialog] Generating dialog for scene: "${scene}"`);
-    // Placeholder response
-    const response = {
-        dialogTree: {
-            id: 'root',
-            speaker: character || 'Character',
-            text: `[Dialog about: ${scene}]`,
-            emotion: 'neutral',
-            choices: Array.from({ length: branchingFactor }, (_, i) => ({
-                id: `choice_${i + 1}`,
-                text: `Response option ${i + 1}`,
-                target: `end_${i + 1}`,
-            })),
-        },
-        reasoning: `Generated ${branchingFactor}-choice dialog for scene: ${scene}`,
-    };
-    return {
-        success: true,
-        data: response,
-        message: 'Dialog generated successfully (placeholder)',
-    };
+    try {
+        const dialog = await generateDialog({
+            scene,
+            character,
+            goal,
+            branchingFactor,
+            context,
+        });
+        console.error(`[writeDialog] Generated dialog beat`);
+        return {
+            success: true,
+            data: dialog,
+            message: `Dialog generated successfully for scene: ${scene}`,
+        };
+    }
+    catch (error) {
+        console.error('[writeDialog] Error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            message: 'Failed to generate dialog',
+        };
+    }
 }
 //# sourceMappingURL=writeDialog.js.map

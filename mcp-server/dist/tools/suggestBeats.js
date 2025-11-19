@@ -1,11 +1,12 @@
 /**
  * Suggest Beats Tool
  *
- * MCP tool for suggesting next beats
+ * MCP tool for suggesting next beats using AI
  */
+import { suggestBeats } from '../utils/aiHelper.js';
 export const suggestBeatsTool = {
     name: 'suggest_beats',
-    description: 'Suggest logical next beats based on current story context',
+    description: 'Suggest logical next beats based on current story context using AI',
     inputSchema: {
         type: 'object',
         properties: {
@@ -25,24 +26,34 @@ export const suggestBeatsTool = {
 };
 export async function handleSuggestBeats(args) {
     const { currentBeatId, count = 3 } = args;
-    if (!currentBeatId) {
-        throw new Error('Current beat ID is required');
+    if (!currentBeatId || typeof currentBeatId !== 'string') {
+        return {
+            success: false,
+            error: 'Current beat ID is required',
+            message: 'Invalid currentBeatId provided',
+        };
     }
-    console.error(`[suggestBeats] Suggesting beats after: ${currentBeatId}`);
-    // Placeholder response
-    const suggestions = Array.from({ length: count }, (_, i) => ({
-        beatType: ['dialogTree', 'movementChoice', 'pickProp'][i % 3],
-        name: `Suggested Beat ${i + 1}`,
-        reasoning: `This beat would logically follow ${currentBeatId}`,
-        parameters: {},
-        connections: [],
-        confidence: 0.8 - i * 0.1,
-        position: { x: 100 * (i + 1), y: 200 },
-    }));
-    return {
-        success: true,
-        data: { suggestions },
-        message: `Generated ${count} beat suggestions`,
-    };
+    console.error(`[suggestBeats] Suggesting ${count} beats after: ${currentBeatId}`);
+    try {
+        const result = await suggestBeats({
+            currentBeatId,
+            storyContext: {}, // TODO: Fetch from API in future enhancement
+            count,
+        });
+        console.error(`[suggestBeats] Generated ${result.beats.length} suggestions`);
+        return {
+            success: true,
+            data: result,
+            message: `Generated ${result.beats.length} beat suggestions`,
+        };
+    }
+    catch (error) {
+        console.error('[suggestBeats] Error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            message: 'Failed to suggest beats',
+        };
+    }
 }
 //# sourceMappingURL=suggestBeats.js.map

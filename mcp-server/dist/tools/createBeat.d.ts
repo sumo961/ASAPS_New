@@ -1,7 +1,7 @@
 /**
  * Create Beat Tool
  *
- * MCP tool for creating beats from natural language
+ * MCP tool for creating beats from natural language using AI
  */
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 export declare const createBeatTool: Tool;
