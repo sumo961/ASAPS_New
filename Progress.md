@@ -1,6 +1,120 @@
 # ASPS Modern - Development Progress
 
-## Current Session - November 19, 2025 - AI Integration Complete
+## Current Session - November 24, 2025 - Serialization Fixes
+
+### **Critical Bug Fixes: Beat Serialization & Data Persistence** ✅ **COMPLETE**
+
+**Status:** Fixed data loss bugs causing backgrounds and text to disappear on save/load
+
+**Commit:** `f013cc1` - Fix serialization bugs causing data loss on save/load
+
+**Issues Identified & Fixed:**
+
+**1. DialogTreeBeat Constructor Bug**
+- **Location:** `packages/core/src/beats/DialogTreeBeat.ts:20-44`
+- **Problem:** Constructor wasn't reading `speaker`, `text`, and `emotion` from `config.parameters`
+  - Only read from `config.dialogTree` object
+  - When beats were deserialized from storage, these properties would be undefined
+  - Caused dialog text and speaker names to disappear after save/load
+- **Fix:** Updated constructor to read from both sources with proper fallback:
+  ```typescript
+  this.speaker = config.parameters?.speaker || dialogTreeParam.speaker;
+  this.text = config.parameters?.text || dialogTreeParam.text;
+  this.emotion = config.parameters?.emotion || dialogTreeParam.emotion;
+  ```
+- **Impact:** Dialog trees now properly persist all text and metadata
+
+**2. DialogTreeBeat updateParameters Bug**
+- **Location:** `packages/core/src/beats/DialogTreeBeat.ts:146-171`
+- **Problem:** When `updateParameters()` received a new `dialogTree`, it:
+  1. Set `this.dialogTree = params.dialogTree`
+  2. Didn't extract speaker/text/emotion FROM the new tree
+  3. Then overwrote the tree's properties with OLD instance values
+  - Result: New dialog text would be lost immediately
+- **Fix:** Restructured to:
+  1. Extract properties FROM new dialogTree first
+  2. Apply direct parameter overrides (if provided)
+  3. Sync final values back to dialogTree
+- **Impact:** Dialog editing in Inspector now properly persists changes
+
+**3. Inspector DefaultTarget Visualization**
+- **Location:** `packages/builder/src/components/Inspector.tsx:466-480`
+- **Problem:** Changing `defaultTarget` in Inspector didn't update GraphEditor
+  - Changes only updated local state
+  - Green dashed connection line wouldn't appear until manual save
+- **Fix:** Added immediate parent update for visualization-critical fields:
+  ```typescript
+  if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer') {
+    if (onUpdate && beat) {
+      onUpdate(beat.id, { [field]: value });
+    }
+  }
+  ```
+- **Impact:** DefaultTarget connections now visible immediately in flowchart
+
+**Tests Created:**
+
+**1. Comprehensive Beat Serialization Tests** (`BeatSerialization.test.ts` - 319 lines)
+- Tests all beat types for complete round-trip serialization
+- 8 test cases covering:
+  - IntroTextBeat: text, buttonText, background node, locations
+  - TitleScreenBeat: title, author, buttonText
+  - DefaultTarget properties: defaultTarget, defaultTargetDelay, showTimer
+  - DialogTreeBeat: speaker, dialogTree, choiceDelay
+  - MovementChoiceBeat: question, choices, choiceDelay
+  - Complete serialization: ALL properties including x, y, cluster, node, connections, locations, transitions
+
+**2. Builder Integration Tests** (`BuilderIntegration.test.ts` - 243 lines)
+- Simulates complete builder workflow: create → edit → save → load
+- 4 test cases:
+  - IntroTextBeat text persistence through edit cycle
+  - Background node (asset) persistence
+  - DialogTreeBeat speaker/text persistence after updates
+  - Multiple beats serialization together
+
+**Test Results:**
+- ✅ All 12 tests passing (8 BeatSerialization + 4 BuilderIntegration)
+- ✅ Verified other beat types already correctly implemented:
+  - PickPropBeat ✓
+  - MovementChoiceBeat ✓
+  - HyperTextBeat ✓
+  - VideoBeat ✓
+  - InputTextBeat ✓
+
+**Files Modified:**
+1. `/packages/core/src/beats/DialogTreeBeat.ts`
+   - Fixed constructor to read from parameters (lines 28-30)
+   - Fixed updateParameters to extract from dialogTree first (lines 147-171)
+
+2. `/packages/builder/src/components/Inspector.tsx`
+   - Added immediate parent updates for visualization fields (lines 466-480)
+
+**Files Created:**
+1. `/packages/core/tests/serialization/BeatSerialization.test.ts` (319 lines)
+   - Comprehensive serialization tests for all beat types
+   - Tests text, backgrounds, locations, timing properties, complete round-trip
+
+2. `/packages/core/tests/serialization/BuilderIntegration.test.ts` (243 lines)
+   - Integration tests simulating full builder edit → save → load workflow
+   - Tests data persistence across serialization boundaries
+
+**What's Fixed:**
+- ✅ Text in IntroTextBeat persists after save/load
+- ✅ Background images (node property) persist correctly
+- ✅ DialogTreeBeat speaker and dialog text persist
+- ✅ All timing features (defaultTarget, choiceDelay) persist
+- ✅ Locations and connections persist
+- ✅ DefaultTarget connections visible immediately in flowchart
+
+**Root Causes:**
+- DialogTreeBeat had architectural issue where constructor/updateParameters didn't properly handle the dual storage pattern (instance properties + dialogTree object)
+- Inspector's local state management needed synchronization for real-time visualization updates
+
+**Impact:** Data loss bugs eliminated! All beat properties and assets now persist correctly through save/load cycles. 🎉
+
+---
+
+## Previous Session - November 19, 2025 - AI Integration Complete
 
 ### **AI-Powered Story Creation Tools** ✅ **COMPLETE**
 
