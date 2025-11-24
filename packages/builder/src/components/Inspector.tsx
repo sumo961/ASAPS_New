@@ -464,11 +464,19 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   const handleChange = (field: string, value: any) => {
-    setLocalBeat((prev: any) => ({
-      ...prev,
+    const updatedBeat = {
+      ...localBeat,
       [field]: value,
-    }));
+    };
+    setLocalBeat(updatedBeat);
     setHasChanges(true);
+
+    // For fields that affect graph visualization, update immediately
+    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer') {
+      if (onUpdate && beat) {
+        onUpdate(beat.id, { [field]: value });
+      }
+    }
   };
 
   const handleParameterChange = (param: string, value: any) => {
@@ -1489,7 +1497,26 @@ export const Inspector: React.FC<InspectorProps> = ({
                       characters={getAvailableCharacters()}
                       allBeats={availableTargets}
                     />
-                    
+
+                    {showAdvanced && (
+                      <div className="border-t pt-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Choice Delay (seconds)
+                          <span className="text-xs text-gray-500 block font-normal">
+                            Time before choices appear (optional)
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          value={localBeat.parameters?.choiceDelay || 0}
+                          onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
+                          min="0"
+                          step="0.5"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                    )}
+
                     <div className="border-t pt-3">
                       <h3 className="text-sm font-medium text-gray-700 mb-2">
                         After Dialog Ends
@@ -1532,7 +1559,26 @@ export const Inspector: React.FC<InspectorProps> = ({
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
-                    
+
+                    {showAdvanced && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Choice Delay (seconds)
+                          <span className="text-xs text-gray-500 block font-normal">
+                            Time before choices appear (optional)
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          value={localBeat.parameters?.choiceDelay || 0}
+                          onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
+                          min="0"
+                          step="0.5"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                    )}
+
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Choices</span>
@@ -1637,7 +1683,26 @@ export const Inspector: React.FC<InspectorProps> = ({
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
-                    
+
+                    {showAdvanced && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Choice Delay (seconds)
+                          <span className="text-xs text-gray-500 block font-normal">
+                            Time before choices appear (optional)
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          value={localBeat.parameters?.choiceDelay || 0}
+                          onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
+                          min="0"
+                          step="0.5"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                    )}
+
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Props</span>
@@ -1868,6 +1933,75 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </select>
                         </div>
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Auto-Advance / Timer Settings - shown when advanced is toggled */}
+                {showAdvanced && (
+                  <div className="border-t pt-4 space-y-3">
+                    <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <Timer className="w-4 h-4" />
+                      Auto-Advance Settings
+                    </h4>
+                    <p className="text-xs text-gray-600">
+                      Configure automatic progression to create pressure or self-running stories
+                    </p>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Default Target Beat
+                        <span className="text-xs text-gray-500 block font-normal">
+                          Beat to automatically advance to after delay
+                        </span>
+                      </label>
+                      <select
+                        value={localBeat.defaultTarget || ''}
+                        onChange={(e) => handleChange('defaultTarget', e.target.value || undefined)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="">No auto-advance</option>
+                        {availableTargets.map(target => (
+                          <option key={target.id} value={target.id}>
+                            {target.name} ({target.type})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {localBeat.defaultTarget && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Auto-Advance Delay (seconds)
+                            <span className="text-xs text-gray-500 block font-normal">
+                              Time before auto-advancing to default target
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            value={localBeat.defaultTargetDelay || 5}
+                            onChange={(e) => handleChange('defaultTargetDelay', parseInt(e.target.value))}
+                            min="1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={localBeat.showTimer || false}
+                              onChange={(e) => handleChange('showTimer', e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            <span>Show countdown timer to player</span>
+                          </label>
+                          <p className="text-xs text-gray-500 ml-6 mt-1">
+                            Display a visible timer showing time remaining
+                          </p>
+                        </div>
+                      </>
                     )}
                   </div>
                 )}

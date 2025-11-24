@@ -9,6 +9,7 @@ export class DialogTreeBeat extends Beat {
   public speaker: string;
   public text: string;
   public emotion?: string;
+  public choiceDelay?: number; // Delay in seconds before showing choices
   private currentNode: DialogNode | null = null;
 
   constructor(config: BeatConfig & {
@@ -19,18 +20,19 @@ export class DialogTreeBeat extends Beat {
     // Initialize dialogTree from config or parameters
     // CRITICAL FIX: Ensure dialogTree is ALWAYS a valid object, never undefined
     const dialogTreeParam = config.dialogTree || config.parameters?.dialogTree;
+    this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
 
     if (dialogTreeParam) {
       this.dialogTree = dialogTreeParam;
-      // Use values from dialogTree for basic properties
-      this.speaker = dialogTreeParam.speaker;
-      this.text = dialogTreeParam.text;
-      this.emotion = dialogTreeParam.emotion;
+      // Use values from dialogTree for basic properties, but allow parameter overrides
+      this.speaker = config.parameters?.speaker || dialogTreeParam.speaker;
+      this.text = config.parameters?.text || dialogTreeParam.text;
+      this.emotion = config.parameters?.emotion || dialogTreeParam.emotion;
     } else {
-      // Initialize basic properties first
-      this.speaker = 'Character';
-      this.text = 'Hello!';
-      this.emotion = 'neutral';
+      // Initialize basic properties from parameters or defaults
+      this.speaker = config.parameters?.speaker || 'Character';
+      this.text = config.parameters?.text || 'Hello!';
+      this.emotion = config.parameters?.emotion || 'neutral';
 
       // Create safe default dialogTree
       this.dialogTree = {
@@ -136,18 +138,29 @@ export class DialogTreeBeat extends Beat {
       speaker: this.speaker,
       text: this.text,
       emotion: this.emotion,
-      node: this.node
+      node: this.node,
+      choiceDelay: this.choiceDelay
     };
   }
 
   updateParameters(params: Record<string, any>): void {
-    if (params.dialogTree !== undefined) this.dialogTree = params.dialogTree;
+    // CRITICAL FIX: Update dialogTree first and extract properties FROM it
+    if (params.dialogTree !== undefined) {
+      this.dialogTree = params.dialogTree;
+      // Extract speaker/text/emotion from the new dialogTree
+      if (this.dialogTree.speaker !== undefined) this.speaker = this.dialogTree.speaker;
+      if (this.dialogTree.text !== undefined) this.text = this.dialogTree.text;
+      if (this.dialogTree.emotion !== undefined) this.emotion = this.dialogTree.emotion;
+    }
+
+    // Then allow direct speaker/text/emotion overrides (these take priority)
     if (params.speaker !== undefined) this.speaker = params.speaker;
     if (params.text !== undefined) this.text = params.text;
     if (params.emotion !== undefined) this.emotion = params.emotion;
     if (params.node !== undefined) this.node = params.node;
+    if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
 
-    // Update dialog tree root node if it exists
+    // Sync instance properties back to dialogTree
     if (this.dialogTree && typeof this.dialogTree === 'object') {
       this.dialogTree.speaker = this.speaker;
       this.dialogTree.text = this.text;
@@ -167,7 +180,8 @@ export class DialogTreeBeat extends Beat {
       dialogTree: this.dialogTree || { id: 'root', speaker: this.speaker, text: this.text },
       speaker: this.speaker,
       text: this.text,
-      emotion: this.emotion
+      emotion: this.emotion,
+      choiceDelay: this.choiceDelay
     };
   }
 
@@ -220,12 +234,17 @@ export class DialogTreeBeat extends Beat {
         if (visibleChoices.length === 0) {
           this.currentNode = this.findNextNode(this.currentNode);
         } else {
+          // Apply delay if configured (before showing choices)
+          if (this.choiceDelay && this.choiceDelay > 0) {
+            await new Promise(resolve => setTimeout(resolve, this.choiceDelay! * 1000));
+          }
+
           // Process choice text with variable interpolation
           const choiceId = await renderer.renderChoices(
             visibleChoices.map(c => ({ id: c.id, text: this.processText(c.text, context) })),
             locations
           );
-          
+
           const selectedChoice = visibleChoices.find(c => c.id === choiceId);
           if (selectedChoice) {
             if (selectedChoice.effects) {
