@@ -32,6 +32,8 @@ export class ClaudeProvider extends BaseAIProvider {
   readonly name = 'claude';
   private client: Anthropic | null = null;
   private model: string = 'claude-sonnet-4-20250514';
+  private useProxy: boolean = false;
+  private proxyEndpoint: string = 'http://localhost:3001/api/ai/claude';
 
   /**
    * Configure the provider
@@ -40,16 +42,45 @@ export class ClaudeProvider extends BaseAIProvider {
     super.configure(config);
 
     if (this._isReady) {
-      this.client = new Anthropic({
-        apiKey: config.apiKey,
-        dangerouslyAllowBrowser: true, // For browser usage
-        ...(config.baseUrl && { baseURL: config.baseUrl }),
-      });
+      // If custom baseUrl is provided, use proxy to avoid CORS
+      this.useProxy = !!config.baseUrl;
+
+      if (!this.useProxy) {
+        // Official Anthropic API - use SDK directly with CORS enabled
+        this.client = new Anthropic({
+          apiKey: config.apiKey,
+          dangerouslyAllowBrowser: true,
+        });
+      }
 
       this.model = config.model || 'claude-sonnet-4-20250514';
 
-      console.log(`[ClaudeProvider] Configured with model: ${this.model}${config.baseUrl ? ` and baseURL: ${config.baseUrl}` : ''}`);
+      console.log(`[ClaudeProvider] Configured with model: ${this.model}${config.baseUrl ? ` using proxy for baseURL: ${config.baseUrl}` : ' (direct API)'}`);
     }
+  }
+
+  /**
+   * Make request via proxy for custom baseUrls (to avoid CORS)
+   */
+  private async makeProxyRequest(requestBody: any): Promise<any> {
+    const response = await fetch(this.proxyEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        baseUrl: this.config?.baseUrl,
+        apiKey: this.config?.apiKey,
+        ...requestBody,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Proxy request failed');
+    }
+
+    return response.json();
   }
 
   /**
@@ -69,7 +100,7 @@ export class ClaudeProvider extends BaseAIProvider {
     console.log('[ClaudeProvider] Generating story with Claude...');
 
     return this.withRetry(async () => {
-      const response = await this.client!.messages.create({
+      const requestBody = {
         model: this.model,
         max_tokens: 8000,
         temperature: this.config?.temperature || 0.7,
@@ -80,7 +111,18 @@ export class ClaudeProvider extends BaseAIProvider {
             content: userPrompt,
           },
         ],
-      });
+      };
+
+      let response;
+
+      if (this.useProxy) {
+        // Use proxy for custom providers
+        response = await this.makeProxyRequest(requestBody);
+      } else {
+        // Direct API call for official Anthropic
+        const apiResponse = await this.client!.messages.create(requestBody);
+        response = { content: apiResponse.content };
+      }
 
       // Extract and parse JSON response
       const content = response.content[0];
@@ -113,7 +155,7 @@ export class ClaudeProvider extends BaseAIProvider {
     console.log('[ClaudeProvider] Generating dialog with Claude...');
 
     return this.withRetry(async () => {
-      const response = await this.client!.messages.create({
+      const requestBody = {
         model: this.model,
         max_tokens: 4000,
         temperature: this.config?.temperature || 0.7,
@@ -124,7 +166,16 @@ export class ClaudeProvider extends BaseAIProvider {
             content: userPrompt,
           },
         ],
-      });
+      };
+
+      let response;
+
+      if (this.useProxy) {
+        response = await this.makeProxyRequest(requestBody);
+      } else {
+        const apiResponse = await this.client!.messages.create(requestBody);
+        response = { content: apiResponse.content };
+      }
 
       const content = response.content[0];
       if (content.type !== 'text') {
@@ -160,7 +211,7 @@ export class ClaudeProvider extends BaseAIProvider {
     console.log('[ClaudeProvider] Generating beat suggestions with Claude...');
 
     return this.withRetry(async () => {
-      const response = await this.client!.messages.create({
+      const requestBody = {
         model: this.model,
         max_tokens: 3000,
         temperature: this.config?.temperature || 0.6,
@@ -171,7 +222,16 @@ export class ClaudeProvider extends BaseAIProvider {
             content: userPrompt,
           },
         ],
-      });
+      };
+
+      let response;
+
+      if (this.useProxy) {
+        response = await this.makeProxyRequest(requestBody);
+      } else {
+        const apiResponse = await this.client!.messages.create(requestBody);
+        response = { content: apiResponse.content };
+      }
 
       const content = response.content[0];
       if (content.type !== 'text') {
@@ -226,7 +286,7 @@ Respond with JSON in this format:
     console.log('[ClaudeProvider] Creating beat from natural language with Claude...');
 
     return this.withRetry(async () => {
-      const response = await this.client!.messages.create({
+      const requestBody = {
         model: this.model,
         max_tokens: 2000,
         temperature: this.config?.temperature || 0.7,
@@ -237,7 +297,16 @@ Respond with JSON in this format:
             content: userPrompt,
           },
         ],
-      });
+      };
+
+      let response;
+
+      if (this.useProxy) {
+        response = await this.makeProxyRequest(requestBody);
+      } else {
+        const apiResponse = await this.client!.messages.create(requestBody);
+        response = { content: apiResponse.content };
+      }
 
       const content = response.content[0];
       if (content.type !== 'text') {

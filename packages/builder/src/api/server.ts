@@ -136,6 +136,7 @@ export class APIServer {
     this.app.use('/api/beats', this.createBeatRoutes(ctx));
     this.app.use('/api/assets', this.createAssetRoutes(ctx));
     this.app.use('/api/stories', this.createStoryRoutes(ctx));
+    this.app.use('/api/ai', this.createAIProxyRoutes(ctx));
 
     // Error handler
     this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
@@ -348,6 +349,90 @@ export class APIServer {
         });
       } catch (error) {
         res.status(500).json({ error: (error as Error).message });
+      }
+    });
+
+    return router;
+  }
+
+  /**
+   * Create AI proxy routes
+   */
+  private createAIProxyRoutes(ctx: APIContext): express.Router {
+    const router = express.Router();
+
+    // Proxy for Claude/Anthropic-compatible APIs
+    router.post('/claude', async (req: Request, res: Response) => {
+      try {
+        const { baseUrl, apiKey, ...requestBody } = req.body;
+
+        if (!baseUrl || !apiKey) {
+          return res.status(400).json({
+            error: 'Missing required parameters: baseUrl and apiKey'
+          });
+        }
+
+        // Make the actual request to the third-party API
+        const response = await fetch(`${baseUrl}/v1/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return res.status(response.status).json(data);
+        }
+
+        res.json(data);
+      } catch (error) {
+        console.error('[AI Proxy] Claude error:', error);
+        res.status(500).json({
+          error: 'Proxy request failed',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    });
+
+    // Proxy for OpenAI-compatible APIs
+    router.post('/openai', async (req: Request, res: Response) => {
+      try {
+        const { baseUrl, apiKey, ...requestBody } = req.body;
+
+        if (!baseUrl || !apiKey) {
+          return res.status(400).json({
+            error: 'Missing required parameters: baseUrl and apiKey'
+          });
+        }
+
+        // Make the actual request to the third-party API
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return res.status(response.status).json(data);
+        }
+
+        res.json(data);
+      } catch (error) {
+        console.error('[AI Proxy] OpenAI error:', error);
+        res.status(500).json({
+          error: 'Proxy request failed',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        });
       }
     });
 
