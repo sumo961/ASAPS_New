@@ -41,15 +41,26 @@ export function useAI() {
   const aiService = getAIService();
 
   /**
-   * Check if service is configured on mount
+   * Check if service is configured on mount and periodically
    */
   useEffect(() => {
-    setState(prev => ({
-      ...prev,
-      isConfigured: aiService.isReady(),
-      currentProvider: aiService.getCurrentProvider()?.name || null,
-    }));
-  }, []);
+    const checkConfiguration = () => {
+      setState(prev => ({
+        ...prev,
+        isConfigured: aiService.isReady(),
+        currentProvider: aiService.getCurrentProvider()?.name || null,
+      }));
+    };
+
+    // Initial check
+    checkConfiguration();
+
+    // Set up interval to periodically check configuration status
+    // This ensures components update when API key is added elsewhere
+    const intervalId = setInterval(checkConfiguration, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [aiService]);
 
   /**
    * Configure a provider
