@@ -65,7 +65,7 @@ export function useAI() {
   /**
    * Configure a provider
    */
-  const configure = useCallback((provider: 'claude' | 'openai', apiKey: string, model?: string) => {
+  const configure = useCallback((provider: 'claude' | 'openai', apiKey: string, model?: string, baseUrl?: string) => {
     try {
       // Create and register provider
       let providerInstance;
@@ -80,6 +80,7 @@ export function useAI() {
         apiKey,
         model,
         temperature: 0.7,
+        baseUrl,
       });
 
       aiService.registerProvider(providerInstance);

@@ -25,6 +25,9 @@ export interface AIProviderConfig {
   /** Maximum tokens to generate */
   maxTokens?: number;
 
+  /** Custom base URL for API-compatible providers (e.g., ANTHROPIC_BASE_URL) */
+  baseUrl?: string;
+
   /** Custom provider endpoint (for custom providers) */
   endpoint?: string;
 }

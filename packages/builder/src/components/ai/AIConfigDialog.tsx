@@ -27,6 +27,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
   );
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -42,7 +43,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
     setSuccess(false);
 
     try {
-      configure(provider, apiKey, model || undefined);
+      configure(provider, apiKey, model || undefined, baseUrl || undefined);
       setSuccess(true);
 
       // Close after short delay
@@ -177,6 +178,28 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <p className="mt-1 text-xs text-gray-500">Leave empty for default model</p>
+          </div>
+
+          {/* Base URL (Optional) */}
+          <div>
+            <label htmlFor="baseUrl" className="block text-sm font-medium text-gray-700 mb-2">
+              Base URL (Optional)
+            </label>
+            <input
+              id="baseUrl"
+              type="text"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder={
+                provider === 'claude'
+                  ? 'https://api.anthropic.com'
+                  : 'https://api.openai.com/v1'
+              }
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              For alternative API-compatible providers (leave empty for default)
+            </p>
           </div>
 
           {/* Error */}

@@ -43,11 +43,12 @@ export class OpenAIProvider extends BaseAIProvider {
       this.client = new OpenAI({
         apiKey: config.apiKey,
         dangerouslyAllowBrowser: true, // For browser usage
+        ...(config.baseUrl && { baseURL: config.baseUrl }),
       });
 
       this.model = config.model || 'gpt-4-turbo-preview';
 
-      console.log(`[OpenAIProvider] Configured with model: ${this.model}`);
+      console.log(`[OpenAIProvider] Configured with model: ${this.model}${config.baseUrl ? ` and baseURL: ${config.baseUrl}` : ''}`);
     }
   }
 

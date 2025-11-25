@@ -43,11 +43,12 @@ export class ClaudeProvider extends BaseAIProvider {
       this.client = new Anthropic({
         apiKey: config.apiKey,
         dangerouslyAllowBrowser: true, // For browser usage
+        ...(config.baseUrl && { baseURL: config.baseUrl }),
       });
 
       this.model = config.model || 'claude-sonnet-4-20250514';
 
-      console.log(`[ClaudeProvider] Configured with model: ${this.model}`);
+      console.log(`[ClaudeProvider] Configured with model: ${this.model}${config.baseUrl ? ` and baseURL: ${config.baseUrl}` : ''}`);
     }
   }
 
