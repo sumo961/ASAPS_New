@@ -19,6 +19,7 @@ interface CanvasProps {
   paletteCollapsed?: boolean;
   onTogglePalette?: () => void;
   onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;
+  highlightedBeatIds?: string[];
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -37,6 +38,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   paletteCollapsed = false,
   onTogglePalette,
   onBeatInContainerMove,
+  highlightedBeatIds = [],
 }) => {
   const handleBeatMove = (beatId: string, x: number, y: number) => {
     onBeatMove(beatId, { x, y });
@@ -87,6 +89,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onBeatAdd={handleBeatAdd}
           onClusterExpandCollapse={handleClusterExpandCollapse}
           onBeatInContainerMove={handleBeatInContainerMove}
+          highlightedBeatIds={highlightedBeatIds}
         />
       </div>
       

@@ -160,7 +160,7 @@ const EndScreen: React.FC<{
 } & ScreenProps> = ({ message, showRestart, showCredits, onAction }) => (
   <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-purple-600 to-pink-600 text-white">
     <h1 className="text-6xl font-bold mb-12">{message}</h1>
-    <div className="flex gap-4">
+    <div className="flex gap-4 justify-center">
       {showRestart && (
         <button 
           onClick={() => onAction?.('restart')}
@@ -815,6 +815,63 @@ export class ReactRenderer extends BaseRenderer {
     return new Promise(resolve => {
       this.resolveAction = resolve;
       this.renderComponent(<HyperText data={data} onAction={this.handleAction} />);
+    });
+  }
+
+  // Show choices with fade-in animation
+  async showChoices<TResult = string>(
+    choices: { id: string; text: string; icon?: string }[],
+    options?: { fadeIn?: boolean; duration?: number }
+  ): Promise<TResult> {
+    const fadeIn = options?.fadeIn ?? true;
+    const duration = options?.duration ?? 500;
+
+    return new Promise(resolve => {
+      this.resolveAction = resolve as (value: string) => void;
+
+      const ChoicesDisplayWithFade: React.FC = () => {
+        const [showChoices, setShowChoices] = React.useState(false);
+        const [hasMounted, setHasMounted] = React.useState(false);
+
+        React.useEffect(() => {
+          setHasMounted(true);
+          const timer = setTimeout(() => {
+            setShowChoices(true);
+          }, 10);
+          return () => clearTimeout(timer);
+        }, []);
+
+        return (
+          <div className="flex flex-col items-center justify-center h-screen bg-gray-100 p-8">
+            <div
+              className="max-w-2xl w-full space-y-4"
+              style={{
+                opacity: showChoices ? 1 : 0,
+                transform: showChoices ? 'translateY(0)' : 'translateY(20px)',
+                transition: hasMounted && fadeIn
+                  ? `opacity ${duration}ms ease-out, transform ${duration}ms ease-out`
+                  : 'none'
+              }}
+            >
+              {choices.map((choice, index) => (
+                <button
+                  key={choice.id}
+                  onClick={() => this.handleAction?.(choice.id)}
+                  className="w-full p-4 bg-white hover:bg-blue-50 border-2 border-gray-300 hover:border-blue-500 rounded-lg text-lg transition-all"
+                  style={{
+                    transitionDelay: fadeIn ? `${index * 50}ms` : '0ms'
+                  }}
+                >
+                  {choice.icon && <span className="mr-2">{choice.icon}</span>}
+                  {choice.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      };
+
+      this.renderComponent(<ChoicesDisplayWithFade />);
     });
   }
 

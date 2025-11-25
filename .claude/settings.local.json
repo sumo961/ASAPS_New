@@ -63,7 +63,15 @@
       "Bash(zipinfo:*)",
       "Bash(tar:*)",
       "Bash(bash -c:*)",
-      "Bash(STORAGE_TYPE=filesystem npm run api:start)"
+      "Bash(STORAGE_TYPE=filesystem npm run api:start)",
+      "Bash(npx:*)",
+      "Bash(\"Library/Mobile Documents/com~apple~CloudDocs/Coding/Project Phoenix/asaps-modern/restart-dev.sh\")",
+      "Bash(lsof -ti:*)",
+      "Bash(lsof:*)",
+      "Bash(ps:*)",
+      "Bash(git checkout:*)",
+      "Bash(red-story-export.json)",
+      "Bash(\"/Users/hartmut/Library/Mobile Documents/com~apple~CloudDocs/Coding/Project Phoenix/asaps-modern/packages/builder/public/examples/red-riding-hood-modern.json\")"
     ],
     "deny": [],
     "ask": []

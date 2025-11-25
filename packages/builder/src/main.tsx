@@ -9,7 +9,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <PersistenceProvider
       autoSave={true}
       autoSaveDelay={30000}
-      debug={false}
+      debug={true}
     >
       <App />
     </PersistenceProvider>

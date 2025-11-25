@@ -13,11 +13,54 @@ interface StoryState {
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
 }
 
+/**
+ * Debug session tracking
+ */
+interface DebugSession {
+  sessionId: string;
+  startTime: number;
+  currentPath: string[]; // Beat IDs in current execution path
+  pathHistory: string[][]; // All complete paths taken in this session
+}
+
+/**
+ * Cached analysis results
+ */
+interface AnalysisCache {
+  reachability?: {
+    timestamp: number;
+    results: any;
+    aiAnalysis?: any;
+  };
+  paths?: {
+    timestamp: number;
+    results: any;
+    aiAnalysis?: any;
+  };
+}
+
+/**
+ * AI suggestion tracking
+ */
+interface AISuggestion {
+  id: string;
+  type: string;
+  description: string;
+  applied: boolean;
+  timestamp: number;
+  data?: any;
+}
+
 export class StoryContext extends EventEmitter {
   private state: StoryState;
   private history: string[] = [];
   private story?: Story;
   private timerManager: TimerManager;
+
+  // Debug features
+  private debugSession?: DebugSession;
+  private analysisCache: AnalysisCache = {};
+  private aiSuggestions: AISuggestion[] = [];
 
   constructor(initialState?: Partial<StoryState>, story?: Story) {
     super();
@@ -33,7 +76,7 @@ export class StoryContext extends EventEmitter {
     };
     this.story = story;
     this.timerManager = new TimerManager();
-    
+
     // Forward timer events
     this.timerManager.on('timerExpired', (data) => this.emit('timerExpired', data));
     this.timerManager.on('timerTick', (data) => this.emit('timerTick', data));
@@ -328,15 +371,200 @@ export class StoryContext extends EventEmitter {
       console.warn('Cannot update character display name: story not set in context');
       return;
     }
-    
+
     const characters = this.story.getCharacters();
     const character = characters.find((c: any) => c.id === characterId);
-    
+
     if (character) {
       character.displayName = displayName;
       this.emit('characterRenamed', { characterId, displayName });
     } else {
       console.warn(`Character with id '${characterId}' not found`);
+    }
+  }
+
+  // ======== Debug Session Management ========
+
+  /**
+   * Start a new debug session
+   */
+  startDebugSession(): string {
+    const sessionId = `debug_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    this.debugSession = {
+      sessionId,
+      startTime: Date.now(),
+      currentPath: [],
+      pathHistory: []
+    };
+    this.emit('debugSessionStarted', { sessionId });
+    return sessionId;
+  }
+
+  /**
+   * End the current debug session
+   */
+  endDebugSession(): void {
+    if (this.debugSession) {
+      // Save current path to history if not empty
+      if (this.debugSession.currentPath.length > 0) {
+        this.debugSession.pathHistory.push([...this.debugSession.currentPath]);
+      }
+      this.emit('debugSessionEnded', { sessionId: this.debugSession.sessionId });
+      this.debugSession = undefined;
+    }
+  }
+
+  /**
+   * Get the current path in the debug session
+   */
+  getCurrentPath(): string[] {
+    return this.debugSession ? [...this.debugSession.currentPath] : [];
+  }
+
+  /**
+   * Get all completed paths from the debug session
+   */
+  getPathHistory(): string[][] {
+    return this.debugSession ? [...this.debugSession.pathHistory] : [];
+  }
+
+  /**
+   * Add a beat to the current debug path
+   */
+  addToDebugPath(beatId: string): void {
+    if (this.debugSession) {
+      this.debugSession.currentPath.push(beatId);
+    }
+  }
+
+  /**
+   * Complete the current path and start a new one (e.g., when reaching an end beat)
+   */
+  completeDebugPath(): void {
+    if (this.debugSession && this.debugSession.currentPath.length > 0) {
+      this.debugSession.pathHistory.push([...this.debugSession.currentPath]);
+      this.debugSession.currentPath = [];
+    }
+  }
+
+  // ======== Analysis Caching ========
+
+  /**
+   * Cache reachability analysis results
+   */
+  cacheReachabilityResults(results: any, aiAnalysis?: any): void {
+    this.analysisCache.reachability = {
+      timestamp: Date.now(),
+      results,
+      aiAnalysis
+    };
+  }
+
+  /**
+   * Get cached reachability results
+   */
+  getCachedReachability(): any | null {
+    return this.analysisCache.reachability?.results || null;
+  }
+
+  /**
+   * Cache path analysis results
+   */
+  cachePathResults(results: any, aiAnalysis?: any): void {
+    this.analysisCache.paths = {
+      timestamp: Date.now(),
+      results,
+      aiAnalysis
+    };
+  }
+
+  /**
+   * Get cached path results
+   */
+  getCachedPaths(): any | null {
+    return this.analysisCache.paths?.results || null;
+  }
+
+  /**
+   * Invalidate all analysis caches (call when story structure changes)
+   */
+  invalidateAnalysisCache(): void {
+    this.analysisCache = {};
+    this.emit('analysisCacheInvalidated');
+  }
+
+  /**
+   * Check if cached analysis is still valid (not older than maxAge in milliseconds)
+   */
+  isCacheValid(cacheType: 'reachability' | 'paths', maxAge: number = 60000): boolean {
+    const cache = this.analysisCache[cacheType];
+    if (!cache) return false;
+    return Date.now() - cache.timestamp < maxAge;
+  }
+
+  // ======== AI Suggestion Management ========
+
+  /**
+   * Add an AI-generated suggestion
+   */
+  addAISuggestion(suggestion: Omit<AISuggestion, 'id' | 'timestamp'>): string {
+    const id = `suggestion_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const fullSuggestion: AISuggestion = {
+      ...suggestion,
+      id,
+      timestamp: Date.now(),
+      applied: false
+    };
+    this.aiSuggestions.push(fullSuggestion);
+    this.emit('aiSuggestionAdded', fullSuggestion);
+    return id;
+  }
+
+  /**
+   * Mark a suggestion as applied
+   */
+  applySuggestion(suggestionId: string): void {
+    const suggestion = this.aiSuggestions.find(s => s.id === suggestionId);
+    if (suggestion) {
+      suggestion.applied = true;
+      this.emit('aiSuggestionApplied', suggestion);
+    }
+  }
+
+  /**
+   * Get all AI suggestions, optionally filtered
+   */
+  getSuggestions(filter?: { applied?: boolean; type?: string }): AISuggestion[] {
+    let suggestions = [...this.aiSuggestions];
+
+    if (filter) {
+      if (filter.applied !== undefined) {
+        suggestions = suggestions.filter(s => s.applied === filter.applied);
+      }
+      if (filter.type) {
+        suggestions = suggestions.filter(s => s.type === filter.type);
+      }
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Clear all AI suggestions
+   */
+  clearAISuggestions(): void {
+    this.aiSuggestions = [];
+    this.emit('aiSuggestionsCleared');
+  }
+
+  /**
+   * Remove a specific AI suggestion
+   */
+  removeAISuggestion(suggestionId: string): void {
+    const index = this.aiSuggestions.findIndex(s => s.id === suggestionId);
+    if (index !== -1) {
+      this.aiSuggestions.splice(index, 1);
+      this.emit('aiSuggestionRemoved', { suggestionId });
     }
   }
 }

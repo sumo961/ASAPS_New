@@ -34,6 +34,15 @@ export interface SaveStatusProps {
 
   /** Callback for manual save button */
   onSave?: () => void;
+
+  /** Callback for Save Project button (appears when untitled) */
+  onSaveProject?: () => void;
+
+  /** Whether current project is untitled */
+  isUntitledProject?: boolean;
+
+  /** Whether there are unsaved changes */
+  hasUnsavedChanges?: boolean;
 }
 
 /**
@@ -123,9 +132,13 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
   compact = false,
   className = '',
   onSave,
+  onSaveProject,
+  isUntitledProject,
+  hasUnsavedChanges,
 }) => {
   const info = getStatusInfo(status, lastSaved, error);
   const Icon = info.icon;
+  const showSaveProjectButton = isUntitledProject && hasUnsavedChanges;
 
   if (compact) {
     return (
@@ -159,15 +172,25 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
         </div>
       )}
 
+      {/* Save Project button - appears for untitled projects with changes */}
+      {showSaveProjectButton && onSaveProject && (
+        <button
+          onClick={onSaveProject}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+          title="Save as a named project"
+        >
+          <Save size={16} />
+          Save Project
+        </button>
+      )}
+
       {/* Manual save button (styled to match header buttons) */}
       {onSave && (
         <button
           onClick={onSave}
-          disabled={status === 'saving' || status === 'idle'}
+          disabled={status === 'saving'}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
-            status === 'idle'
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
-              : status === 'saving'
+            status === 'saving'
               ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
               : status === 'saved'
               ? 'bg-green-500 text-white'
@@ -176,9 +199,7 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
               : 'bg-blue-500 text-white hover:bg-blue-600'
           }`}
           title={
-            status === 'idle'
-              ? 'Nothing to save'
-              : status === 'saving'
+            status === 'saving'
               ? 'Saving...'
               : status === 'saved'
               ? `Saved ${lastSaved ? formatTimeAgo(lastSaved) : 'just now'}`

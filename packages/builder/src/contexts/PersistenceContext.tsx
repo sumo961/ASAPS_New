@@ -50,10 +50,15 @@ export interface PersistenceContextValue {
   deleteProject: (projectId: string) => Promise<boolean>;
   updateProjectMetadata: (updates: Partial<Pick<Project, 'name' | 'description'>>) => Promise<void>;
   updateProjectStory: (storyData: Partial<any>) => void;
+  saveCurrentProject: (name: string, description?: string) => Promise<string>;
 
   // Untitled project management
   setIsUntitledProject: (isUntitled: boolean) => void;
   clearUntitledState: () => void;
+
+  // Data sync callback registration
+  registerSyncCallback: (callback: () => void) => void;
+  unregisterSyncCallback: () => void;
 
   // Initialization
   initialized: boolean;
@@ -91,6 +96,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 }) => {
   // State
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [syncCallback, setSyncCallback] = useState<(() => void) | null>(null);
   const [projectId, setProjectId] = useState<string | null>(initialProjectId || null);
   const [initialized, setInitialized] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
@@ -117,8 +123,37 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     if (!currentProject) {
       throw new Error('No current project');
     }
+
+    // CRITICAL FIX: For untitled projects, throw error to prevent auto-save
+    // This forces the user to manually save (which opens Save Project dialog)
+    if (isUntitledProject) {
+      console.log('[PersistenceContext] getProjectData - BLOCKING auto-save for untitled project:', currentProject.name);
+      throw new Error('Cannot auto-save untitled project');
+    }
+
+    // Sync project data before retrieving if sync callback is registered
+    // This ensures current beats, characters, etc. are saved to the project story
+    if (syncCallback && debug) {
+      console.log('[PersistenceContext] getProjectData - Syncing project data before save...');
+    }
+    syncCallback?.();
+
+    const story = (currentProject as any).story;
+    const beats = story?.beats;
+    const beatsCount = beats ? (Array.isArray(beats) ? beats.length : beats.size || 0) : 0;
+
+    if (debug) {
+      console.log('[PersistenceContext] getProjectData - AFTER SYNC:', {
+        projectId: currentProject.id,
+        projectName: currentProject.name,
+        beatsCount: beatsCount,
+        hasStory: !!story,
+        storyKeys: story ? Object.keys(story) : 'no story'
+      });
+    }
+
     return currentProject;
-  }, [currentProject]);
+  }, [currentProject, syncCallback, debug, isUntitledProject]);
 
   /**
    * Auto-save hook
@@ -322,6 +357,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
   /**
    * Update project story data (for syncing story state)
+   * CRITICAL FIX: Handle Story class instances properly
    */
   const updateProjectStory = useCallback((storyData: Partial<any>) => {
     if (!currentProject) {
@@ -329,18 +365,110 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       return;
     }
 
-    const updatedProject = {
-      ...currentProject,
-      story: {
+    // DEBUG: Log what's being updated
+    console.log('[PersistenceContext] updateProjectStory - BEFORE:', {
+      projectId: currentProject.id,
+      projectName: currentProject.name,
+      storyKeys: Object.keys(currentProject.story || {}),
+      storyBeatsCount: (currentProject.story as any)?.beats ? (Array.isArray((currentProject.story as any).beats) ? (currentProject.story as any).beats.length : 'not array') : 0,
+      storyConstructor: currentProject.story?.constructor?.name
+    });
+
+    // CRITICAL FIX: Check if story is a Story class instance
+    // If so, we need to convert it to a plain object before merging
+    const isStoryClass = currentProject.story?.constructor?.name === 'Story';
+    let newStory: any;
+
+    if (isStoryClass) {
+      console.log('[PersistenceContext] Story is a Story class instance, converting to plain object');
+      // Convert Story instance to plain object by extracting its data
+      const story = currentProject.story as any;
+      newStory = {
+        // Start with serialized story data
+        beats: story.getAllBeats ? story.getAllBeats() : (story.beats instanceof Map ? Array.from(story.beats.values()) : []),
+        metadata: story.getMetadata ? story.getMetadata() : story.metadata,
+        settings: story.getSettings ? story.getSettings() : story.settings,
+        environment: story.getEnvironment ? story.getEnvironment() : story.environment,
+        characters: story.getCharacters ? story.getCharacters() : story.characters,
+        clusters: story.getClusters ? story.getClusters() : story.clusters,
+        connections: story.getConnections ? story.getConnections() : story.connections,
+        containerBeatPositions: story.containerBeatPositions || {},
+        assets: story.assets || [],
+        // Then apply the updates from storyData
+        ...storyData,
+      };
+    } else {
+      // Story is already a plain object, use spread operator
+      newStory = {
         ...currentProject.story,
         ...storyData,
-      } as any, // Cast to any to handle Story type flexibility
+      };
+    }
+
+    const updatedProject = {
+      ...currentProject,
+      story: newStory as any,
       modifiedAt: new Date(),
     };
+
+    // DEBUG: Log the updated project
+    console.log('[PersistenceContext] updateProjectStory - AFTER:', {
+      projectId: updatedProject.id,
+      storyKeys: Object.keys(updatedProject.story || {}),
+      storyBeatsCount: (updatedProject.story as any)?.beats ? (Array.isArray((updatedProject.story as any).beats) ? (updatedProject.story as any).beats.length : 'not array') : 0,
+      beatsArrayLength: Array.isArray((updatedProject.story as any)?.beats) ? (updatedProject.story as any).beats.length : (updatedProject.story as any)?.beats?.size || 0
+    });
 
     setCurrentProject(updatedProject);
     // Note: Don't call markChanged() here - let the caller decide when to trigger auto-save
   }, [currentProject]);
+
+  /**
+   * Save current project with a new name (convert from untitled to named)
+   */
+  const saveCurrentProject = useCallback(async (
+    name: string,
+    description?: string
+  ): Promise<string> => {
+    if (!currentProject) {
+      throw new Error('No current project to save');
+    }
+
+    try {
+      const { v4: uuidv4 } = await import('uuid');
+      const newProjectId = uuidv4();
+
+      // Create new named project with current project data
+      const namedProject: Project = {
+        ...currentProject,
+        id: newProjectId,
+        name,
+        description,
+        modifiedAt: new Date(),
+      };
+
+      const result = await storage.createProject(namedProject);
+
+      if (!result.success) {
+        throw result.error || new Error('Failed to save project');
+      }
+
+      // Update state to reflect new named project
+      setCurrentProject(namedProject);
+      setProjectId(newProjectId);
+      setIsUntitledProject(false);
+      commandManager.setProjectId(newProjectId);
+      commandManager.clear();
+
+      // Trigger a save to ensure everything is persisted
+      await saveNow();
+
+      return newProjectId;
+    } catch (error) {
+      console.error('[PersistenceContext] Failed to save current project:', error);
+      throw error;
+    }
+  }, [currentProject, storage, commandManager, saveNow]);
 
   /**
    * Clear untitled project state (mark as not untitled)
@@ -350,12 +478,32 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     setPendingNavigationAction(null);
   }, []);
 
+  /**
+   * Register sync callback for syncing story data before save
+   */
+  const registerSyncCallback = useCallback((callback: () => void) => {
+    if (debug) {
+      console.log('[PersistenceContext] Registering sync callback');
+    }
+    setSyncCallback(() => callback);
+  }, [debug]);
+
+  /**
+   * Unregister sync callback
+   */
+  const unregisterSyncCallback = useCallback(() => {
+    if (debug) {
+      console.log('[PersistenceContext] Unregistering sync callback');
+    }
+    setSyncCallback(null);
+  }, [debug]);
+
   // Context value
   const value: PersistenceContextValue = {
     currentProject,
     projectId,
     isUntitledProject,
-    hasUnsavedChanges: saveStatus === 'pending',
+    hasUnsavedChanges: saveStatus === 'pending' || saveStatus === 'saved',
     storage,
     commandManager,
     executeCommand,
@@ -373,8 +521,11 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     deleteProject,
     updateProjectMetadata,
     updateProjectStory,
+    saveCurrentProject,
     setIsUntitledProject,
     clearUntitledState,
+    registerSyncCallback,
+    unregisterSyncCallback,
     initialized,
     initError,
   };
@@ -446,6 +597,7 @@ export function useProject() {
     deleteProject,
     updateProjectMetadata,
     updateProjectStory,
+    saveCurrentProject,
   } = usePersistence();
 
   return {
@@ -456,5 +608,6 @@ export function useProject() {
     delete: deleteProject,
     updateMetadata: updateProjectMetadata,
     updateStory: updateProjectStory,
+    saveCurrent: saveCurrentProject,
   };
 }

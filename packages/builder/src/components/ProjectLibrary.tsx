@@ -11,7 +11,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Folder, Trash2, Clock, Calendar, Search, Grid, List, Archive } from 'lucide-react';
-import { usePersistence } from '../contexts/PersistenceContext';
+import { usePersistence, useProject } from '../contexts/PersistenceContext';
 import type { Project } from '../storage/types';
 
 export interface ProjectLibraryProps {
@@ -26,6 +26,9 @@ export interface ProjectLibraryProps {
 
   /** ZIP import handler */
   onImportZip?: () => void;
+
+  /** Called when renaming a project */
+  onRenameProject?: (projectId: string, newName: string) => Promise<void>;
 
   /** Show as modal dialog */
   isModal?: boolean;
@@ -60,9 +63,13 @@ const ProjectCard: React.FC<{
   project: Project;
   onLoad: () => void;
   onDelete: () => void;
+  onRename?: (newName: string) => Promise<void>;
   viewMode: 'grid' | 'list';
-}> = ({ project, onLoad, onDelete, viewMode }) => {
+}> = ({ project, onLoad, onDelete, onRename, viewMode }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(project.name);
+  const [isSavingRename, setIsSavingRename] = useState(false);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -71,6 +78,36 @@ const ProjectCard: React.FC<{
       setTimeout(() => setShowDeleteConfirm(false), 3000);
     } else {
       onDelete();
+    }
+  };
+
+  const handleRename = async () => {
+    console.log('[ProjectLibrary] handleRename called - onRename:', !!onRename, 'renameValue:', renameValue);
+    if (!onRename) {
+      console.log('[ProjectLibrary] No onRename handler, aborting');
+      return;
+    }
+    if (renameValue.trim() === project.name.trim()) {
+      console.log('[ProjectLibrary] Name unchanged, cancelling rename');
+      setIsRenaming(false);
+      return;
+    }
+    if (renameValue.trim().length === 0) {
+      console.log('[ProjectLibrary] Name empty, showing error');
+      alert('Project name cannot be empty');
+      return;
+    }
+    console.log('[ProjectLibrary] Starting rename to:', renameValue.trim());
+    setIsSavingRename(true);
+    try {
+      await onRename(renameValue.trim());
+      console.log('[ProjectLibrary] Rename successful');
+      setIsRenaming(false);
+    } catch (error) {
+      console.error('[ProjectLibrary] Rename failed:', error);
+      alert('Failed to rename project');
+    } finally {
+      setIsSavingRename(false);
     }
   };
 
@@ -85,11 +122,65 @@ const ProjectCard: React.FC<{
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-gray-900 truncate">
-            {project.name}
-          </h3>
-          {project.description && (
-            <p className="text-sm text-gray-600 truncate">{project.description}</p>
+          {isRenaming ? (
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="text"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRename();
+                  }
+                  if (e.key === 'Escape') {
+                    setIsRenaming(false);
+                    setRenameValue(project.name);
+                  }
+                }}
+                disabled={isSavingRename}
+                className="px-2 py-1 border border-gray-300 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+                maxLength={100}
+              />
+              <button
+                onClick={handleRename}
+                disabled={isSavingRename}
+                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50"
+              >
+                {isSavingRename ? '...' : 'Save'}
+              </button>
+              <button
+                onClick={() => {
+                  setIsRenaming(false);
+                  setRenameValue(project.name);
+                }}
+                disabled={isSavingRename}
+                className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <>
+              <h3
+                className="text-lg font-semibold text-gray-900 truncate hover:text-blue-600 cursor-pointer flex items-center gap-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onRename) setIsRenaming(true);
+                }}
+                title={onRename ? "Click to rename" : project.name}
+              >
+                <span>{project.name}</span>
+                {onRename && (
+                  <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    ✏️
+                  </span>
+                )}
+              </h3>
+              {project.description && (
+                <p className="text-sm text-gray-600 truncate">{project.description}</p>
+              )}
+            </>
           )}
         </div>
 
@@ -141,12 +232,68 @@ const ProjectCard: React.FC<{
         </button>
       </div>
 
-      <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
-        {project.name}
-      </h3>
+      {isRenaming ? (
+        <div className="mb-4" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="text"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleRename();
+              }
+              if (e.key === 'Escape') {
+                setIsRenaming(false);
+                setRenameValue(project.name);
+              }
+            }}
+            disabled={isSavingRename}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autoFocus
+            maxLength={100}
+          />
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={handleRename}
+              disabled={isSavingRename}
+              className="flex-1 px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50"
+            >
+              {isSavingRename ? '...' : 'Save'}
+            </button>
+            <button
+              onClick={() => {
+                setIsRenaming(false);
+                setRenameValue(project.name);
+              }}
+              disabled={isSavingRename}
+              className="flex-1 px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <h3
+            className="text-lg font-semibold text-gray-900 mb-2 truncate hover:text-blue-600 cursor-pointer flex items-center gap-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onRename) setIsRenaming(true);
+            }}
+            title={onRename ? "Click to rename" : project.name}
+          >
+            <span>{project.name}</span>
+            {onRename && (
+              <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                ✏️
+              </span>
+            )}
+          </h3>
 
-      {project.description && (
-        <p className="text-sm text-gray-600 mb-4 line-clamp-2">{project.description}</p>
+          {project.description && (
+            <p className="text-sm text-gray-600 mb-4 line-clamp-2">{project.description}</p>
+          )}
+        </>
       )}
 
       <div className="space-y-2 text-xs text-gray-500">
@@ -171,10 +318,12 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   onCreateProject,
   onExportZip,
   onImportZip,
+  onRenameProject,
   isModal = false,
   onClose,
 }) => {
   const { storage } = usePersistence();
+  const { updateMetadata } = useProject();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -221,6 +370,30 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
     } catch (error) {
       console.error('[ProjectLibrary] Delete failed:', error);
       alert('Failed to delete project');
+    }
+  };
+
+  /**
+   * Handle project rename
+   */
+  const handleRenameProject = async (projectId: string, newName: string) => {
+    console.log('[ProjectLibrary] handleRenameProject called - projectId:', projectId, 'newName:', newName);
+    try {
+      if (onRenameProject) {
+        console.log('[ProjectLibrary] Using external onRenameProject handler');
+        // Use external handler if provided
+        await onRenameProject(projectId, newName);
+      } else {
+        console.log('[ProjectLibrary] Using updateMetadata directly');
+        // Use updateMetadata directly
+        await updateMetadata({ name: newName });
+      }
+      console.log('[ProjectLibrary] Reloading projects to show updated name');
+      await loadProjects(); // Reload to show updated name
+      console.log('[ProjectLibrary] Projects reloaded after rename');
+    } catch (error) {
+      console.error('[ProjectLibrary] Rename failed:', error);
+      throw error;
     }
   };
 
@@ -375,6 +548,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                   project={project}
                   onLoad={() => onLoadProject(project.id)}
                   onDelete={() => handleDeleteProject(project.id)}
+                  onRename={onRenameProject ? (newName) => handleRenameProject(project.id, newName) : undefined}
                   viewMode={viewMode}
                 />
               ))}

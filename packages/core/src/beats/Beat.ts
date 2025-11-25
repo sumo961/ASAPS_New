@@ -179,6 +179,16 @@ export abstract class Beat {
 
   protected async onExit(context: StoryContext, renderer: IRenderer): Promise<void> {
     console.log(`Exiting beat: ${this.name} (${this.id})`);
+
+    // Cancel default target timer if it exists
+    if (this.defaultTarget) {
+      const timerManager = context.getTimerManager();
+      const timerName = `defaultTarget_${this.id}`;
+
+      // Stop the timer to prevent it from firing after user makes a choice
+      timerManager.stopTimer(timerName);
+      console.log(`[Beat ${this.id}] Stopped default target timer: ${timerName}`);
+    }
   }
 
   addConnection(connection: Connection): void {
@@ -274,6 +284,8 @@ export abstract class Beat {
       locations: Array.from(this.locations.values()),
       connections: this.connections,
       defaultTarget: this.defaultTarget,
+      defaultTargetDelay: this.defaultTargetDelay,
+      showTimer: this.showTimer,
       x: this.x,
       y: this.y,
       node: this.node,

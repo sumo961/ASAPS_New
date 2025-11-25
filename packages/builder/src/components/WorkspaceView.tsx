@@ -37,6 +37,7 @@ interface WorkspaceViewProps {
     boxVisibility: 'all' | 'hideText' | 'hideAll';
   };
   globalSettings?: GlobalSettings;
+  highlightedBeatIds?: string[];
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
@@ -64,6 +65,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onOpenCharacterManager,
   projectSettings,
   globalSettings,
+  highlightedBeatIds = [],
 }) => {
   const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
 
@@ -157,6 +159,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onBeatInContainerMove={onBeatInContainerMove}
               paletteCollapsed={paletteCollapsed}
               onTogglePalette={onTogglePalette}
+              highlightedBeatIds={highlightedBeatIds}
             />
           </div>
         ) : (

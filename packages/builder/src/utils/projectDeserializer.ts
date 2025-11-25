@@ -17,6 +17,8 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
   const registry = BeatTypeRegistry.getInstance();
   const beats: Beat[] = [];
 
+  console.log('[deserializeBeats] Starting to deserialize', beatsData.length, 'beats');
+
   for (const beatData of beatsData) {
     try {
       // Ensure we have the required fields
@@ -24,6 +26,12 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         console.warn('[deserializeBeats] Beat missing type or id:', beatData);
         continue;
       }
+
+      console.log('[deserializeBeats] Processing beat:', {
+        id: beatData.id,
+        name: beatData.name || 'unnamed',
+        type: beatData.type
+      });
 
       // Create beat config from stored data
       const config = {
@@ -37,6 +45,8 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         connections: beatData.connections || [],
         locations: beatData.locations || [],
         defaultTarget: beatData.defaultTarget,
+        defaultTargetDelay: beatData.defaultTargetDelay,
+        showTimer: beatData.showTimer,
         transition: beatData.transition,
         sound: beatData.sound,
         parameters: beatData.parameters || {}
@@ -50,12 +60,14 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         beat.updateParameters(beatData.parameters);
       }
 
+      console.log('[deserializeBeats] Successfully created beat:', beat.id, 'type:', beat.type);
       beats.push(beat);
     } catch (error) {
-      console.error('[deserializeBeats] Failed to deserialize beat:', beatData, error);
+      console.error('[deserializeBeats] FAILED to deserialize beat:', beatData, error);
     }
   }
 
+  console.log('[deserializeBeats] Successfully deserialized', beats.length, 'beats out of', beatsData.length, 'input beats');
   return beats;
 }
 
@@ -71,6 +83,7 @@ export function loadProjectData(project: Project): {
   environment: any;
   characters: any[];
   clusters: any[];
+  connections: any[];
 } {
   console.log('[loadProjectData] Loading project:', project.id);
 
@@ -147,6 +160,22 @@ export function loadProjectData(project: Project): {
     clusters = story.clusters;
   }
 
+  // CRITICAL FIX: Extract connections (these were being lost!)
+  let connections: any[] = [];
+  if (story.getConnections && typeof story.getConnections === 'function') {
+    connections = story.getConnections();
+  } else if (story.connections) {
+    connections = story.connections;
+  }
+
+  console.log('[loadProjectData] Final loaded data:', {
+    title,
+    beats: beats.length,
+    connections: connections.length,
+    characters: characters.length,
+    clusters: clusters.length
+  });
+
   return {
     beats,
     title,
@@ -154,6 +183,7 @@ export function loadProjectData(project: Project): {
     settings,
     environment,
     characters,
-    clusters
+    clusters,
+    connections
   };
 }

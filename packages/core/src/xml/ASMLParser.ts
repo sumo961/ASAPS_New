@@ -754,6 +754,18 @@ export class ASMLParser {
         break;
 
       case 'movementChoice':
+        // Parse delay element if present
+        const movementDelayEl = functionElement.querySelector('delay');
+        if (movementDelayEl) {
+          const val = movementDelayEl.getAttribute('val');
+          if (val) {
+            const delay = parseFloat(val);
+            if (!isNaN(delay) && delay > 0) {
+              parameters.choiceDelay = delay;
+            }
+          }
+        }
+
         // Parse choices which contain targets
         const choices: any[] = [];
         const choiceElements = functionElement.querySelectorAll('choice');
@@ -799,6 +811,18 @@ export class ASMLParser {
         break;
 
       case 'pickProp':
+        // Parse delay element if present
+        const pickPropDelayEl = functionElement.querySelector('delay');
+        if (pickPropDelayEl) {
+          const val = pickPropDelayEl.getAttribute('val');
+          if (val) {
+            const delay = parseFloat(val);
+            if (!isNaN(delay) && delay > 0) {
+              parameters.choiceDelay = delay;
+            }
+          }
+        }
+
         // Parse props which contain targets
         const props: any[] = [];
         const propElements = functionElement.querySelectorAll('prop');
@@ -844,6 +868,18 @@ export class ASMLParser {
         break;
 
       case 'dialogTree':
+        // Parse delay element if present
+        const dialogDelayEl = functionElement.querySelector('delay');
+        if (dialogDelayEl) {
+          const val = dialogDelayEl.getAttribute('val');
+          if (val) {
+            const delay = parseFloat(val);
+            if (!isNaN(delay) && delay > 0) {
+              parameters.choiceDelay = delay;
+            }
+          }
+        }
+
         // Parse dialog tree - the function element IS the dialog tree
         parameters.dialogTree = this.parseDialogTree(functionElement, config);
 

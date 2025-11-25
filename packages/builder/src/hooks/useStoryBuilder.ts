@@ -260,21 +260,40 @@ export function useStoryBuilder() {
       story.setSettings(state.settings);
     } else if (state.story) {
       // Fallback to imported story settings if no manual updates were made
-      story.setSettings(state.story.getSettings());
+      // Check if state.story is a Story instance with methods or a plain object
+      if (typeof state.story.getSettings === 'function') {
+        story.setSettings(state.story.getSettings());
+      } else if (state.story.settings) {
+        // Plain object - extract settings directly
+        story.setSettings(state.story.settings);
+      }
     }
 
     // Apply environment and characters
     if (state.story) {
       // Use data from the imported story (unless overridden)
-      const environment = state.environment || state.story.getEnvironment();
+      // Handle both Story instances and plain objects
+      const storyEnvironment = typeof state.story.getEnvironment === 'function'
+        ? state.story.getEnvironment()
+        : state.story.environment || {};
+      const environment = state.environment || storyEnvironment;
       // Add assets to environment if provided
       if (assets && assets.length > 0) {
         environment.assets = assets;
       }
       story.setEnvironment(environment);
+
       // Use provided characters, fall back to state or imported characters
-      story.setCharacters(characters || state.characters || state.story.getCharacters());
-      story.setClusters(state.story.getClusters());
+      const storyCharacters = typeof state.story.getCharacters === 'function'
+        ? state.story.getCharacters()
+        : state.story.characters || [];
+      story.setCharacters(characters || state.characters || storyCharacters);
+
+      // Set clusters if available
+      const storyClusters = typeof state.story.getClusters === 'function'
+        ? state.story.getClusters()
+        : state.story.clusters || [];
+      story.setClusters(storyClusters);
     } else {
       // Use data from state (for manually created stories)
       const environment = { ...state.environment };

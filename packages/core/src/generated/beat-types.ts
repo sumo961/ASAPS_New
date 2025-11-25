@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2025-11-19T12:38:06.841Z
+ * Generated: 2025-11-22T00:35:13.671Z
  */
 
 // ============================================
@@ -106,6 +106,8 @@ export interface DialogTreeParameters {
   dialogTree: DialogNode;
   /** Default target after dialog completes */
   defaultConnection?: Connection | undefined;
+  /** Delay in seconds before showing choices with fade-in */
+  choiceDelay?: number | undefined;
 }
 
 /**
@@ -118,6 +120,8 @@ export interface MovementChoiceParameters {
   question: string;
   /** Array of movement options (each contains a target) */
   choices: MovementOption[];
+  /** Delay in seconds before showing choices with fade-in */
+  choiceDelay?: number | undefined;
 }
 
 /**
@@ -130,6 +134,8 @@ export interface PickPropParameters {
   question: string;
   /** Available props to interact with (each contains a target) */
   props: PropOption[];
+  /** Delay in seconds before showing choices with fade-in */
+  choiceDelay?: number | undefined;
 }
 
 /**

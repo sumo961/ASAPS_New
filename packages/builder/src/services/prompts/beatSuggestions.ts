@@ -55,7 +55,22 @@ Respond with JSON in this structure:
 - After choice beats → durScreen or dialogTree (show consequences)
 - Before endScreen → climactic beats (dialogTree, conditionBeat)
 - Use setVariable before conditional branches
-- Use conditionBeat to create branching based on variables`;
+- Use conditionBeat to create branching based on variables
+
+## Timing and Pressure Features
+All beats support advanced timing features to create pressure or self-running stories:
+- **defaultTarget**: A beat ID to automatically advance to after a delay (creates time pressure)
+- **defaultTargetDelay**: Seconds before auto-advancing to defaultTarget (default: 5)
+- **showTimer**: Whether to display a countdown timer to the player (boolean)
+
+Choice beats (dialogTree, movementChoice, pickProp) also support:
+- **choiceDelay**: Delay in seconds before choices appear (creates dramatic pauses)
+
+Use these features when suggesting beats that should:
+- Create tension and urgency (e.g., escape sequences, timed decisions)
+- Build dramatic effect (delay choices for impact)
+- Create self-running story sections (cutscenes with auto-advance)
+- Force quick decisions under pressure`;
 }
 
 /**

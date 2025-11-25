@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
@@ -22,10 +22,16 @@ interface HeaderProps {
   onSettings?: () => void;
   onAssets?: () => void;
   onCharacters?: () => void;
+  onSave?: () => void;
+  onDebug?: () => void;
   onInterceptNewProject?: () => boolean;
   onInterceptProjectLibrary?: () => boolean;
   onStoryGenerated?: (story: any) => void;
   onBeatCreated?: (beat: any) => void;
+  onSaveProject?: () => void;
+  onRenameProject?: (projectId: string, newName: string) => Promise<void>;
+  isUntitledProject?: boolean;
+  hasUnsavedChanges?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -40,14 +46,19 @@ export const Header: React.FC<HeaderProps> = ({
   onSettings,
   onAssets,
   onCharacters,
+  onSave,
+  onDebug,
   onInterceptNewProject,
   onInterceptProjectLibrary,
   onStoryGenerated,
-  onBeatCreated
+  onBeatCreated,
+  onSaveProject,
+  onRenameProject,
+  isUntitledProject,
+  hasUnsavedChanges
 }) => {
-  const { status, lastSaved, error, saveNow } = useSave();
+  const { status, lastSaved, error: saveError } = useSave();
   const { load } = useProject();
-  const { isUntitledProject, hasUnsavedChanges } = usePersistence();
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showProjectLibrary, setShowProjectLibrary] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
@@ -130,8 +141,11 @@ export const Header: React.FC<HeaderProps> = ({
           <SaveStatus
             status={status}
             lastSaved={lastSaved}
-            error={error}
-            onSave={saveNow}
+            error={saveError}
+            onSave={onSave}
+            onSaveProject={onSaveProject}
+            isUntitledProject={isUntitledProject}
+            hasUnsavedChanges={hasUnsavedChanges}
             showText={true}
             compact={false}
           />
@@ -163,6 +177,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Settings className="w-4 h-4" />
               Settings
+            </button>
+          )}
+
+          {onDebug && (
+            <button
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors flex items-center gap-2"
+              onClick={onDebug}
+              title="Debug Tools"
+            >
+              <Bug className="w-4 h-4" />
+              Debug
             </button>
           )}
 
@@ -277,6 +302,7 @@ export const Header: React.FC<HeaderProps> = ({
           }}
           onExportZip={onExportZip}
           onImportZip={onImportZip}
+          onRenameProject={onRenameProject}
           isModal={true}
           onClose={() => setShowProjectLibrary(false)}
         />

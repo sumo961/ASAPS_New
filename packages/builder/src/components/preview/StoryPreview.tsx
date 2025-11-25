@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database } from 'lucide-react';
 import { Story, StoryEngine, Beat } from '@asaps/core';
+import type { StatePreset } from '@asaps/core';
 import { ReactRenderer } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import type { Asset } from '../assets/AssetManager';
 import type { Character } from '../../types/character';
+import { StatePresetManager } from '../debug/StatePresetManager';
+import { StatePresetEditor } from '../debug/StatePresetEditor';
 
 interface StoryPreviewProps {
   story: Story;
@@ -26,6 +29,87 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   // Store as ReactRenderer, cast to any when passing to StoryEngine to bypass type checking
   const rendererRef = useRef<ReactRenderer | null>(null);
   const engineRef = useRef<StoryEngine | null>(null);
+
+  // State preset management
+  const [activeTab, setActiveTab] = useState<'preview' | 'presets'>('preview');
+  const [presets, setPresets] = useState<StatePreset[]>([]);
+  const [selectedPreset, setSelectedPreset] = useState<StatePreset | null>(null);
+  const [editingPreset, setEditingPreset] = useState<StatePreset | null | undefined>(undefined);
+  const [showPresetEditor, setShowPresetEditor] = useState(false);
+
+  // Load presets from localStorage
+  useEffect(() => {
+    const loadPresets = () => {
+      const key = `story-presets-${story.getMetadata().title}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        try {
+          setPresets(JSON.parse(saved));
+        } catch (e) {
+          console.error('Failed to load presets:', e);
+        }
+      }
+    };
+    loadPresets();
+  }, [story]);
+
+  // Save presets to localStorage
+  const savePresets = useCallback((newPresets: StatePreset[]) => {
+    const key = `story-presets-${story.getMetadata().title}`;
+    localStorage.setItem(key, JSON.stringify(newPresets));
+    setPresets(newPresets);
+  }, [story]);
+
+  // Preset management handlers
+  const handleCreatePreset = useCallback(() => {
+    setEditingPreset(null);
+    setShowPresetEditor(true);
+  }, []);
+
+  const handleEditPreset = useCallback((preset: StatePreset) => {
+    setEditingPreset(preset);
+    setShowPresetEditor(true);
+  }, []);
+
+  const handleSavePreset = useCallback((presetData: Omit<StatePreset, 'id' | 'createdAt' | 'modifiedAt'>) => {
+    const now = new Date().toISOString();
+
+    if (editingPreset) {
+      // Update existing preset
+      const updated = presets.map(p =>
+        p.id === editingPreset.id
+          ? { ...presetData, id: p.id, createdAt: p.createdAt, modifiedAt: now }
+          : p
+      );
+      savePresets(updated);
+    } else {
+      // Create new preset
+      const newPreset: StatePreset = {
+        ...presetData,
+        id: `preset_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        createdAt: now,
+        modifiedAt: now
+      };
+      savePresets([...presets, newPreset]);
+    }
+
+    setShowPresetEditor(false);
+    setEditingPreset(undefined);
+  }, [editingPreset, presets, savePresets]);
+
+  const handleDeletePreset = useCallback((presetId: string) => {
+    const updated = presets.filter(p => p.id !== presetId);
+    savePresets(updated);
+    if (selectedPreset?.id === presetId) {
+      setSelectedPreset(null);
+    }
+  }, [presets, savePresets, selectedPreset]);
+
+  const handleLoadPreset = useCallback((preset: StatePreset) => {
+    setSelectedPreset(preset);
+    setActiveTab('preview');
+    // We'll apply the preset when starting the preview
+  }, []);
 
   useEffect(() => {
     // Only initialize once when container is ready
@@ -111,7 +195,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
 
     try {
       setIsRunning(true);
-      
+
       // Set up asset resolver for backgrounds
       if (rendererRef.current && 'setAssetResolver' in rendererRef.current) {
         const environment = story.getEnvironment();
@@ -130,10 +214,43 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         });
         console.log('[StoryPreview] Asset resolver configured');
       }
-      
+
       await engineRef.current.loadStory(story);
-      
+
       const context = engineRef.current.getContext();
+
+      // Apply selected preset state if available
+      if (selectedPreset) {
+        console.log('[StoryPreview] Applying preset state:', selectedPreset.name);
+
+        // Apply variables
+        Object.entries(selectedPreset.state.variables).forEach(([key, value]) => {
+          context.setVariable(key, value);
+        });
+
+        // Apply counters
+        Object.entries(selectedPreset.state.counters).forEach(([key, value]) => {
+          context.setCounter(key, value);
+        });
+
+        // Apply inventory
+        selectedPreset.state.inventory.forEach(item => {
+          context.addToInventory(item);
+        });
+
+        // Mark visited beats
+        selectedPreset.state.visitedBeats.forEach(beatId => {
+          context.markBeatVisited(beatId);
+        });
+
+        // Apply timers if provided
+        if (selectedPreset.state.timers) {
+          Object.entries(selectedPreset.state.timers).forEach(([name, timer]) => {
+            const timerData = timer as { value: number; target?: string };
+            context.setTimer(name, timerData.value, timerData.target);
+          });
+        }
+      }
       
       const originalMarkVisited = context.markBeatVisited.bind(context);
       context.markBeatVisited = (beatId: string) => {
@@ -204,7 +321,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
     } finally {
       setIsRunning(false);
     }
-  }, [story, settings]);
+  }, [story, settings, selectedPreset]);
 
   const handleRestart = useCallback(() => {
     if (rendererRef.current) {
@@ -241,16 +358,16 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
             Story Preview
           </h2>
           <div className="flex items-center gap-2">
-            {!isRunning && !currentBeat && (
+            {activeTab === 'preview' && !isRunning && !currentBeat && (
               <button
                 onClick={startPreview}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
               >
                 <Play className="w-4 h-4" />
-                Start Preview
+                {selectedPreset ? `Start with "${selectedPreset.name}"` : 'Start Preview'}
               </button>
             )}
-            {isRunning && (
+            {activeTab === 'preview' && isRunning && (
               <button
                 onClick={stopPreview}
                 className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
@@ -258,7 +375,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
                 Stop
               </button>
             )}
-            {currentBeat && !isRunning && (
+            {activeTab === 'preview' && currentBeat && !isRunning && (
               <button
                 onClick={handleRestart}
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
@@ -276,6 +393,41 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex border-b">
+          <button
+            onClick={() => setActiveTab('preview')}
+            className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+              activeTab === 'preview'
+                ? 'text-blue-600 border-blue-600'
+                : 'text-gray-600 border-transparent hover:text-gray-800'
+            }`}
+          >
+            Preview
+            {selectedPreset && (
+              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                {selectedPreset.name}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('presets')}
+            className={`px-4 py-2 font-medium transition-colors border-b-2 flex items-center gap-2 ${
+              activeTab === 'presets'
+                ? 'text-blue-600 border-blue-600'
+                : 'text-gray-600 border-transparent hover:text-gray-800'
+            }`}
+          >
+            <Database className="w-4 h-4" />
+            State Presets
+            {presets.length > 0 && (
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                {presets.length}
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* Debug Mode Indicator */}
         {debugStartBeat && (
           <div className="bg-yellow-100 border-b border-yellow-300 px-4 py-2 flex items-center gap-2 text-sm">
@@ -290,22 +442,29 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
 
         {/* Content */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Preview Area */}
-          <div className="flex-1 bg-gray-50">
-            <div 
-              ref={containerRef}
-              className="h-full w-full bg-white overflow-auto"
-            >
-              {!currentBeat && !isRunning && (
-                <div className="h-full flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <Play className="w-16 h-16 mx-auto mb-4" />
-                    <p>Click "Start Preview" to test your story</p>
-                  </div>
+          {activeTab === 'preview' ? (
+            <>
+              {/* Preview Area */}
+              <div className="flex-1 bg-gray-50">
+                <div
+                  ref={containerRef}
+                  className="h-full w-full bg-white overflow-auto"
+                >
+                  {!currentBeat && !isRunning && (
+                    <div className="h-full flex items-center justify-center text-gray-400">
+                      <div className="text-center">
+                        <Play className="w-16 h-16 mx-auto mb-4" />
+                        <p>Click "Start Preview" to test your story</p>
+                        {selectedPreset && (
+                          <p className="text-sm mt-2 text-blue-600">
+                            Preset "{selectedPreset.name}" will be loaded
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
 
           {/* Debug Panel */}
           <div className="w-80 bg-gray-100 p-4 border-l overflow-y-auto">
@@ -402,7 +561,36 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
               </div>
             )}
           </div>
+            </>
+          ) : (
+            /* Presets Tab */
+            <div className="flex-1 p-4 overflow-y-auto">
+              <StatePresetManager
+                story={story}
+                presets={presets}
+                selectedPresetId={selectedPreset?.id}
+                onLoad={handleLoadPreset}
+                onEdit={handleEditPreset}
+                onCreate={handleCreatePreset}
+                onDelete={handleDeletePreset}
+              />
+            </div>
+          )}
         </div>
+
+        {/* Preset Editor Modal */}
+        {showPresetEditor && (
+          <StatePresetEditor
+            story={story}
+            preset={editingPreset || undefined}
+            currentContext={engineRef.current?.getContext()}
+            onSave={handleSavePreset}
+            onCancel={() => {
+              setShowPresetEditor(false);
+              setEditingPreset(undefined);
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import type { PickPropParameters, PropOption } from '../generated/beat-types';
 export class PickPropBeat extends Beat {
   public question: string;
   public props: PropOption[];
+  public choiceDelay?: number; // Delay in seconds before showing choices
 
   constructor(config: BeatConfig & {
     parameters?: Partial<PickPropParameters>;
@@ -14,13 +15,15 @@ export class PickPropBeat extends Beat {
     super(config);
     this.question = config.question || config.parameters?.question || 'What do you want to interact with?';
     this.props = config.props || config.parameters?.props || [];
+    this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
   }
 
   getParameters(): Record<string, any> {
     return {
       question: this.question,
       props: this.props,
-      node: this.node
+      node: this.node,
+      choiceDelay: this.choiceDelay
     };
   }
 
@@ -28,6 +31,7 @@ export class PickPropBeat extends Beat {
     if (params.question !== undefined) this.question = params.question;
     if (params.props !== undefined) this.props = params.props;
     if (params.node !== undefined) this.node = params.node;
+    if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
   }
 
   protected async performAction(
@@ -56,6 +60,12 @@ export class PickPropBeat extends Beat {
     // Get locations array for positioned rendering
     const locations = Array.from(this.locations.values());
 
+    // Apply delay if configured (before showing any content)
+    if (this.choiceDelay && this.choiceDelay > 0) {
+      // Wait for the delay duration before rendering
+      await new Promise(resolve => setTimeout(resolve, this.choiceDelay! * 1000));
+    }
+
     // Render the prop selection interface with locations
     const propId = await renderer.renderPropSelection(
       processedQuestion,
@@ -73,10 +83,10 @@ export class PickPropBeat extends Beat {
       if (selectedProp.effects) {
         selectedProp.effects.forEach(effect => context.applyEffect(effect));
       }
-      
+
       // Add prop to inventory by default
       context.addToInventory(selectedProp.name);
-      
+
       return selectedProp.target;
     }
 

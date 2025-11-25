@@ -6,6 +6,7 @@ export * from './types';
 export * from './types/animation';
 export * from './audio/presetSounds';
 export * from './generated/beat-types';
+export * from './analysis';
 
 // Package info
 export const version = '2.0.0';

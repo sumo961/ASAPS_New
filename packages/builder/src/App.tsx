@@ -17,6 +17,8 @@ import type { GlobalSettings } from './components/settings/GlobalSettingsInspect
 import { loadProjectData } from './utils/projectDeserializer';
 import { downloadProjectAsZip, importProjectFromZip } from './utils/projectZipManager';
 import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
+import { SaveProjectDialog } from './components/SaveProjectDialog';
+import { DebugPanel } from './components/debug/DebugPanel';
 
 function App() {
   const { state, actions, initializeStory } = useStoryBuilder();
@@ -28,7 +30,10 @@ function App() {
   const [showAssetManager, setShowAssetManager] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showSaveProjectDialog, setShowSaveProjectDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<string>('');
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -113,35 +118,225 @@ function App() {
 
   // Persistence hooks
   const { markChanged, saveNow } = useSave();
-  const { updateStory, project: currentProject, load: loadProject, create: createProject } = useProject();
-  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges } = usePersistence();
+  const { updateStory, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata } = useProject();
+  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback } = usePersistence();
+
+  /**
+   * Sync current story state to project before saving
+   * This ensures beats, characters, etc. are persisted to the project story
+   */
+  const syncProjectData = useCallback(() => {
+    if (!currentProject) {
+      console.log('[App] syncProjectData - No current project, skipping');
+      return;
+    }
+
+    if (state.beats.length === 0) {
+      console.log('[App] syncProjectData - No beats in state, skipping');
+      return;
+    }
+
+    // CRITICAL DEBUG: Check if beats array reference changes
+    // Store reference to verify it's the same array throughout
+    const beatsBefore = state.beats;
+    const beatsCountBefore = state.beats.length;
+
+    // Log detailed beat information with ACTUAL array check
+    const beatDetails = state.beats.map(b => ({
+      id: b.id,
+      name: b.name || 'unnamed',
+      type: b.type,
+      x: (b as any).x,
+      y: (b as any).y
+    }));
+
+    console.log('[App] syncProjectData - BEFORE updateStory call:', {
+      totalBeats: beatsCountBefore,
+      beats: beatDetails,
+      beatsArrayLength: state.beats.length,
+      beatsReference: beatsBefore,
+      connections: state.connections.length,
+      characters: characters.length,
+      title: state.title,
+      author: state.author
+    });
+
+    const storyData = {
+      title: state.title,
+      author: state.author,
+      beats: state.beats,
+      characters: characters,
+      connections: state.connections,
+    };
+
+    // DEBUG: Verify storyData has all beats
+    console.log('[App] storyData being passed to updateStory:', {
+      beatsCount: storyData.beats.length,
+      beatIds: storyData.beats.map((b: any) => b.id)
+    });
+
+    updateStory(storyData);
+    console.log('[App] syncProjectData - updateStory called, checking if beats reference changed...');
+
+    // DEBUG: Check if state.beats is still the same
+    if (state.beats !== beatsBefore) {
+      console.warn('[App] ⚠️ BEATS ARRAY REFERENCE CHANGED! This could cause data loss!');
+      console.warn('[App] Before:', beatsBefore.length, 'beats');
+      console.warn('[App] After:', state.beats.length, 'beats');
+    } else {
+      console.log('[App] Beats array reference unchanged (good)');
+    }
+
+    // DEBUG: Check the project story after update
+    setTimeout(() => {
+      const story = (currentProject as any).story;
+      const beats = story?.beats;
+      const beatsCount = beats ? (Array.isArray(beats) ? beats.length : beats.size || 0) : 0;
+      console.log('[App] syncProjectData - VERIFICATION after update (setTimeout):', {
+        beatsCount,
+        hasStory: !!story,
+        beatIds: Array.isArray(beats) ? beats.map((b: any) => b.id) : 'not array',
+        storyKeys: story ? Object.keys(story) : 'no story'
+      });
+    }, 100);
+  }, [currentProject, state.beats, state.connections, state.title, state.author, characters, updateStory]);
+
+  /**
+   * Register sync callback with PersistenceContext
+   * This ensures beats are synced before auto-save
+   */
+  useEffect(() => {
+    console.log('[App] Registering sync callback with PersistenceContext');
+    registerSyncCallback(syncProjectData);
+
+    return () => {
+      console.log('[App] Unregistering sync callback from PersistenceContext');
+      unregisterSyncCallback();
+    };
+  }, [syncProjectData, registerSyncCallback, unregisterSyncCallback]);
 
   // Track loaded project to avoid re-loading the same project
   const loadedProjectIdRef = useRef<string | null>(null);
 
-  // Initialize with a basic story on mount
+  // Initialize with a basic story and create untitled project on mount
   useEffect(() => {
-    if (state.beats.length === 0 && !currentProject) {
-      initializeStory();
-      setIsUntitledProject(true);
-    }
-  }, []);
+    const initializeApp = async () => {
+      console.log('[App] Initializing app - currentProject:', currentProject, 'beats.length:', state.beats.length);
+
+      // CRITICAL FIX: Reset loadedProjectIdRef on fresh start
+      // This ensures projects always load fresh when app starts
+      if (!currentProject) {
+        console.log('[App] Resetting loadedProjectIdRef to null (fresh start)');
+        loadedProjectIdRef.current = null;
+      }
+
+      // CRITICAL FIX: Check if there are ANY projects first
+      const hasAnyProjects = currentProject !== null && currentProject !== undefined;
+
+      if (!hasAnyProjects && state.beats.length === 0) {
+        console.log('[App] No projects exist and no beats - initializing from scratch');
+
+        // Initialize the story first (creates the 3-beat base story)
+        // This is async - beats will appear in state shortly
+        initializeStory();
+        console.log('[App] AFTER initializeStory called - beats will appear soon via React state update');
+
+        // CRITICAL: Mark as changed so hasUnsavedChanges becomes true
+        console.log('[App] Marking as changed to trigger save button');
+        markChanged();
+
+        // Create untitled project - the loading effect will handle saving beats when they appear
+        try {
+          console.log('[App] Creating untitled project (beats will be saved by loading effect)');
+          await createProject('Untitled Project', 'Auto-saved untitled work');
+          console.log('[App] SUCCESS: Created untitled project');
+        } catch (error) {
+          console.error('[App] FAILED to create untitled project:', error);
+        }
+      } else {
+        console.log('[App] SKIPPING initialization - hasAnyProjects:', hasAnyProjects, 'beats.length:', state.beats.length);
+      }
+    };
+
+    initializeApp();
+  }, [currentProject, state.beats.length]);
 
   // Load project data when currentProject changes
   useEffect(() => {
-    if (currentProject && currentProject.id !== loadedProjectIdRef.current) {
-      console.log('[App] Loading project into editor:', currentProject.id);
+    console.log('[App] ==========================================');
+    console.log('[App] Project LOAD EFFECT started');
+    console.log('[App] currentProject.id:', currentProject?.id);
+    console.log('[App] loadedProjectIdRef:', loadedProjectIdRef.current);
+    console.log('[App] state.beats.length:', state.beats.length);
+    console.log('[App] currentProject.name:', currentProject?.name);
 
-      try {
-        // Deserialize and load project data
+    // CRITICAL FIX: Only proceed if currentProject exists and isn't already loaded
+    if (!currentProject || currentProject.id === loadedProjectIdRef.current) {
+      console.log('[App] >>> SKIPPED loading - no project or already loaded');
+      console.log('[App] ==========================================');
+      return;
+    }
+
+    console.log('[App] >>> WILL LOAD project:', currentProject.id);
+
+    try {
+      // Check if this is a newly created untitled project (will have no beats)
+      // CRITICAL FIX: Check if the project story actually has beats array with data
+      const projectStory = currentProject.story as any;
+      const beatsExist = projectStory?.beats && Array.isArray(projectStory.beats) && projectStory.beats.length > 0;
+      const isNewUntitledProject = currentProject.name === 'Untitled Project' && !beatsExist;
+
+      console.log('[App] projectStory:', !!projectStory);
+      console.log('[App] beatsExist:', beatsExist, 'beats.length:', projectStory?.beats?.length);
+      console.log('[App] isNewUntitledProject:', isNewUntitledProject);
+      console.log('[App] current state.beats.length:', state.beats.length);
+
+      if (isNewUntitledProject && state.beats.length > 0) {
+        // New untitled project AND beats have been created - save current story state to it
+        console.log('[App] >>> SAVING beats to NEW untitled project');
+
+        const storyData = {
+          title: state.title,
+          author: state.author,
+          beats: state.beats,
+          characters: characters,
+          connections: state.connections,
+        };
+
+        console.log('[App] Story data to save:', {
+          title: storyData.title,
+          beats: storyData.beats.length,
+          characters: storyData.characters.length,
+          connections: storyData.connections.length
+        });
+
+        updateMetadata({ name: 'Untitled Project', description: 'Auto-saved untitled work' });
+        updateStory(storyData);
+        loadedProjectIdRef.current = currentProject.id;
+        setIsUntitledProject(true);
+
+        console.log('[App] >>> SUCCESS: Saved beats to new untitled project');
+        console.log('[App] >>> isUntitledProject set to:', true);
+      } else if (isNewUntitledProject && state.beats.length === 0) {
+        console.log('[App] >>> New untitled project but no beats yet, waiting...');
+        // Don't mark as loaded yet - wait for beats to appear
+      } else if (!isNewUntitledProject) {
+        // This is an existing saved project - load its data
+        console.log('[App] >>> REPLACING state with loaded project data');
         const projectData = loadProjectData(currentProject);
+        console.log('[App] >>> Loaded data:', {
+          title: projectData.title,
+          beats: projectData.beats.length,
+          connections: projectData.connections?.length || 0,
+          characters: projectData.characters?.length || 0,
+          clusters: projectData.clusters?.length || 0
+        });
 
-        // Load into story builder
         actions.loadStoryData({
           title: projectData.title,
           author: projectData.author,
           beats: projectData.beats,
-          connections: [], // Connections are stored in beats
+          connections: projectData.connections || [],
           story: currentProject.story,
           settings: projectData.settings,
           environment: projectData.environment,
@@ -149,35 +344,22 @@ function App() {
           clusters: projectData.clusters
         });
 
-        // Update characters and settings state
         setCharacters(projectData.characters || []);
         if (projectData.settings) {
           actions.updateSettings(projectData.settings);
         }
 
-        // Mark as loaded
-        loadedProjectIdRef.current = currentProject.id;
-
-        // Clear untitled state since we're now working with a real project
         setIsUntitledProject(false);
-
-        console.log('[App] Project loaded successfully:', {
-          beats: projectData.beats.length,
-          characters: projectData.characters?.length || 0,
-          clusters: projectData.clusters?.length || 0
-        });
-      } catch (error) {
-        console.error('[App] Failed to load project:', error);
-        alert('Failed to load project. See console for details.');
+        loadedProjectIdRef.current = currentProject.id;
+        console.log('[App] >>> isUntitledProject set to:', false);
       }
-    } else if (!currentProject && loadedProjectIdRef.current) {
-      // Project was unloaded (e.g., deleted)
-      console.log('[App] Project unloaded');
-      loadedProjectIdRef.current = null;
-      // Clear untitled state when project is unloaded
-      setIsUntitledProject(false);
+    } catch (error) {
+      console.error('[App] >>> FAILED to load project:', error);
+      alert('Failed to load project. See console for details.');
     }
-  }, [currentProject, actions, setIsUntitledProject]);
+    console.log('[App] >>> LOAD EFFECT completed');
+    console.log('[App] ==========================================');
+  }, [currentProject, actions, setIsUntitledProject, state.beats, state.title, state.author, state.connections, characters, updateMetadata, updateStory]);
 
   // Handler functions
   const handleBeatSelect = useCallback((beat: Beat) => {
@@ -364,6 +546,54 @@ function App() {
     setShowSettings(false);
   }, []);
 
+  /**
+   * Handle manual save - for untitled projects, this shows the Save Project dialog
+   */
+  const handleSave = useCallback(async () => {
+    console.log('[App] handleSave called - isUntitledProject:', isUntitledProject, 'should open dialog:', isUntitledProject);
+    if (isUntitledProject) {
+      // For untitled projects, show the Save Project dialog
+      console.log('[App] Opening SaveProjectDialog for untitled project');
+      setShowSaveProjectDialog(true);
+    } else {
+      // For named projects, just save now
+      console.log('[App] Saving named project now');
+      try {
+        await saveNow();
+        console.log('[App] Save completed');
+      } catch (error) {
+        console.error('[App] Save failed:', error);
+      }
+    }
+  }, [isUntitledProject, saveNow]);
+
+  /**
+   * Handle Save Project - shows dialog for naming untitled project
+   */
+  const handleSaveProject = useCallback(() => {
+    setShowSaveProjectDialog(true);
+  }, []);
+
+  /**
+   * Handle confirming Save Project dialog - saves current work as named project
+   */
+  const handleSaveProjectConfirmed = useCallback(async (name: string, description?: string) => {
+    try {
+      await saveCurrent(name, description);
+      alert('Project saved successfully!');
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      alert('Failed to save project. Please try again.');
+    }
+  }, [saveCurrent]);
+
+  /**
+   * Handle closing Save Project dialog
+   */
+  const handleCloseSaveProjectDialog = useCallback(() => {
+    setShowSaveProjectDialog(false);
+  }, []);
+
   // Create a Story object for preview
   const getStoryForPreview = useCallback((): Story => {
     const story = new Story({
@@ -414,6 +644,36 @@ function App() {
     setShowSaveDialog(false);
     setPendingAction('');
   }, []);
+
+  /**
+   * Handle renaming a project
+   */
+  const handleRenameProject = useCallback(async (projectId: string, newName: string) => {
+    console.log('[App] handleRenameProject called - projectId:', projectId, 'newName:', newName);
+    try {
+      // Get the project from storage
+      const getResult = await storage.getProject(projectId);
+      if (!getResult.success || !getResult.data) {
+        throw new Error('Failed to load project for renaming');
+      }
+
+      // Update the project
+      const project = getResult.data;
+      project.name = newName;
+      project.modifiedAt = new Date();
+
+      // Save to storage immediately
+      const updateResult = await storage.updateProject(project);
+      if (!updateResult.success) {
+        throw new Error('Failed to update project name in storage');
+      }
+
+      console.log('[App] Project renamed successfully in storage');
+    } catch (error) {
+      console.error('[App] Failed to rename project:', error);
+      throw error;
+    }
+  }, [storage]);
 
   /**
    * Handle AI-generated story
@@ -483,6 +743,35 @@ function App() {
     markChanged();
   }, [actions, markChanged]);
 
+  /**
+   * Handle opening debug panel
+   */
+  const handleOpenDebugPanel = useCallback(() => {
+    setShowDebugPanel(true);
+  }, []);
+
+  /**
+   * Handle closing debug panel
+   */
+  const handleCloseDebugPanel = useCallback(() => {
+    setShowDebugPanel(false);
+    setHighlightedBeatIds([]); // Clear highlighting when closing
+  }, []);
+
+  /**
+   * Handle highlighting a single beat
+   */
+  const handleHighlightBeat = useCallback((beatId: string) => {
+    setHighlightedBeatIds([beatId]);
+  }, []);
+
+  /**
+   * Handle highlighting a path (multiple beats)
+   */
+  const handleHighlightPath = useCallback((beatIds: string[]) => {
+    setHighlightedBeatIds(beatIds);
+  }, []);
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
@@ -497,10 +786,16 @@ function App() {
         onCharacters={handleOpenCharacterManager}
         onAssets={handleOpenAssetManager}
         onSettings={handleOpenSettings}
+        onDebug={handleOpenDebugPanel}
+        onSave={handleSave}
         onInterceptNewProject={() => handleShowSaveDialog('newProject')}
         onInterceptProjectLibrary={() => handleShowSaveDialog('projectLibrary')}
         onStoryGenerated={handleStoryGenerated}
         onBeatCreated={handleBeatCreated}
+        onSaveProject={handleSaveProject}
+        onRenameProject={handleRenameProject}
+        isUntitledProject={isUntitledProject}
+        hasUnsavedChanges={hasUnsavedChanges}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -549,6 +844,7 @@ function App() {
             onOpenCharacterManager={handleOpenCharacterManager}
             projectSettings={projectSettings}
             globalSettings={globalSettings}
+            highlightedBeatIds={highlightedBeatIds}
           />
 
           {selectedBeat && (
@@ -635,6 +931,24 @@ function App() {
           onClose={handleCloseSettings}
         />
       )}
+
+      {/* Debug Panel */}
+      {showDebugPanel && (
+        <DebugPanel
+          story={getStoryForPreview()}
+          onClose={handleCloseDebugPanel}
+          onHighlightBeat={handleHighlightBeat}
+          onHighlightPath={handleHighlightPath}
+        />
+      )}
+
+      {/* Save Project Dialog */}
+      <SaveProjectDialog
+        isOpen={showSaveProjectDialog}
+        onClose={handleCloseSaveProjectDialog}
+        onSave={handleSaveProjectConfirmed}
+        currentName={state.title}
+      />
 
       {/* Save Unsaved Work Dialog */}
       <SaveUnsavedWorkDialog

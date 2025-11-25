@@ -8,6 +8,7 @@ interface BeatNodeData {
   type: string;
   selected: boolean;
   color: string;
+  highlighted?: boolean;
 }
 
 // Beat type icons
@@ -66,12 +67,15 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
         px-4 py-3 rounded-lg border-2 bg-white shadow-lg
         transition-all duration-200 cursor-pointer
         ${selected ? 'ring-4 ring-blue-400 ring-opacity-50' : ''}
-        ${data.selected ? 'border-blue-500' : 'border-gray-300'}
+        ${data.highlighted ? 'ring-4 ring-yellow-400 ring-opacity-70 border-yellow-500' : ''}
+        ${data.selected && !data.highlighted ? 'border-blue-500' : ''}
+        ${!data.selected && !data.highlighted ? 'border-gray-300' : ''}
         hover:shadow-xl hover:scale-105
       `}
       style={{
-        borderColor: data.selected ? (data.color || '#d1d5db') : '#d1d5db',
+        borderColor: data.highlighted ? '#eab308' : (data.selected ? (data.color || '#d1d5db') : '#d1d5db'),
         minWidth: '150px',
+        backgroundColor: data.highlighted ? '#fef9c3' : 'white',
       }}
     >
       <Handle

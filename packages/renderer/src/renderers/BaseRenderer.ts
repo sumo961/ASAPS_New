@@ -101,6 +101,15 @@ export abstract class BaseRenderer implements IRenderer {
     return new Promise(resolve => setTimeout(resolve, duration));
   }
 
+  // Default implementation for showChoices - returns a promise that never resolves
+  async showChoices<TResult = string>(
+    choices: { id: string; text: string; icon?: string }[],
+    options?: { fadeIn?: boolean; duration?: number }
+  ): Promise<TResult> {
+    console.warn('BaseRenderer.showChoices(): Default implementation - this should be overridden by subclass');
+    return new Promise(() => {}); // Never resolves by default
+  }
+
   // Sound handling - FIXED: Handle missing audio files gracefully
   async playSound(sound: Sound): Promise<void> {
     if (!this.options.soundEnabled) return;

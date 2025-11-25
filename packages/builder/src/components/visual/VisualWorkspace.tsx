@@ -586,10 +586,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               // Recalculate position based on whether Credits button exists
               const creditsExists = updated.some(el => el.type === 'button' && el.name?.toLowerCase().includes('credits'));
               if (creditsExists) {
-                const totalButtonWidth = restartWidth + creditsWidth + buttonSpacing;
+                // Use ACTUAL button widths, not hardcoded values
+                const actualRestartWidth = e.width;
+                const creditsButton = updated.find(el => el.type === 'button' && el.name?.toLowerCase().includes('credits'));
+                const actualCreditsWidth = creditsButton?.width || creditsWidth;
+                const totalButtonWidth = actualRestartWidth + actualCreditsWidth + buttonSpacing;
                 newX = centerX - totalButtonWidth / 2;
               } else {
-                newX = centerX - restartWidth / 2;
+                // Single button - use actual width
+                newX = centerX - e.width / 2;
               }
 
               if (e.text !== newText || e.x !== newX) {
@@ -606,10 +611,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               // Recalculate position based on whether Restart button exists
               const restartExists = updated.some(el => el.type === 'button' && el.name?.toLowerCase().includes('restart'));
               if (restartExists) {
-                const totalButtonWidth = restartWidth + creditsWidth + buttonSpacing;
-                newX = centerX - totalButtonWidth / 2 + restartWidth + buttonSpacing;
+                // Use ACTUAL button widths, not hardcoded values
+                const restartButton = updated.find(el => el.type === 'button' && (el.name?.toLowerCase().includes('restart') || el.name?.toLowerCase().includes('again')));
+                const actualRestartWidth = restartButton?.width || restartWidth;
+                const actualCreditsWidth = e.width;
+                const totalButtonWidth = actualRestartWidth + actualCreditsWidth + buttonSpacing;
+                newX = centerX - totalButtonWidth / 2 + actualRestartWidth + buttonSpacing;
               } else {
-                newX = centerX - creditsWidth / 2;
+                // Single button - use actual width
+                newX = centerX - e.width / 2;
               }
 
               if (e.text !== newText || e.x !== newX) {
@@ -941,7 +951,53 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           newDimensions
                         });
 
-                        return { ...updatedElement, width: newDimensions.width, height: newDimensions.height };
+                        let resizedElement = { ...updatedElement, width: newDimensions.width, height: newDimensions.height };
+
+                        // For buttons, recalculate x position to keep them centered
+                        if (el.type === 'button') {
+                          const stageWidth = projectSettings?.width || 1024;
+                          const centerX = stageWidth / 2;
+                          const nameLower = el.name?.toLowerCase() || '';
+
+                          // Check if this is an EndScreen button (Restart or Credits)
+                          if (nameLower.includes('restart') || nameLower.includes('again') || nameLower.includes('credits')) {
+                            // Find if there are both Restart and Credits buttons
+                            const hasRestartButton = prev.some(e =>
+                              e.type === 'button' && (e.name?.toLowerCase().includes('restart') || e.name?.toLowerCase().includes('again'))
+                            );
+                            const hasCreditsButton = prev.some(e =>
+                              e.type === 'button' && e.name?.toLowerCase().includes('credits')
+                            );
+
+                            if (hasRestartButton && hasCreditsButton) {
+                              // Two buttons - calculate total width and position accordingly
+                              const restartButton = prev.find(e =>
+                                e.type === 'button' && (e.name?.toLowerCase().includes('restart') || e.name?.toLowerCase().includes('again'))
+                              );
+                              const creditsButton = prev.find(e =>
+                                e.type === 'button' && e.name?.toLowerCase().includes('credits')
+                              );
+
+                              const restartWidth = (nameLower.includes('restart') || nameLower.includes('again')) ? newDimensions.width : (restartButton?.width || 180);
+                              const creditsWidth = nameLower.includes('credits') ? newDimensions.width : (creditsButton?.width || 180);
+                              const buttonSpacing = 20;
+                              const totalButtonWidth = restartWidth + creditsWidth + buttonSpacing;
+
+                              if (nameLower.includes('restart') || nameLower.includes('again')) {
+                                // Restart button is on the left
+                                resizedElement.x = centerX - totalButtonWidth / 2;
+                              } else if (nameLower.includes('credits')) {
+                                // Credits button is on the right
+                                resizedElement.x = centerX - totalButtonWidth / 2 + restartWidth + buttonSpacing;
+                              }
+                            } else {
+                              // Single button - center it
+                              resizedElement.x = centerX - newDimensions.width / 2;
+                            }
+                          }
+                        }
+
+                        return resizedElement;
                       }
 
                       return updatedElement;

@@ -36,6 +36,7 @@ interface GraphEditorProps {
   onClusterExpandCollapse: (clusterId: string) => void;
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove: (beatId: string, clusterId: string, x: number, y: number) => void;
+  highlightedBeatIds?: string[];
 }
 
 const nodeTypes: NodeTypes = {
@@ -75,6 +76,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onClusterExpandCollapse,
   onClusterMove,
   onBeatInContainerMove,
+  highlightedBeatIds = [],
 }) => {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
@@ -97,6 +99,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         type: beat.type,
         selected: selectedBeat?.id === beat.id,
         color: beatTypeColors[beat.type] || '#94a3b8',
+        highlighted: highlightedBeatIds.includes(beat.id),
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -146,7 +149,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     return [...beatNodes, ...clusterNodes];
 
     // return totalNodes; // Uncomment to go back to normal
-  }, [beats, clusters, selectedBeat, selectedCluster]);
+  }, [beats, clusters, selectedBeat, selectedCluster, highlightedBeatIds]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(() => {

@@ -564,6 +564,15 @@ export class ASMLGenerator {
           lines.push(`${indent}${this.indent}<variable ${varAttrs.join(' ')} />`);
         }
         break;
+
+      case 'movementChoice':
+      case 'pickProp':
+      case 'dialogTree':
+        // Add delay element for choice-based beats if configured
+        if (params.choiceDelay && params.choiceDelay > 0) {
+          lines.push(`${indent}${this.indent}<delay val="${params.choiceDelay}" />`);
+        }
+        break;
         
       case 'setTimer':
         // Generate nested timer element with target attribute

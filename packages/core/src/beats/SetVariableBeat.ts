@@ -15,12 +15,13 @@ export class SetVariableBeat extends Beat {
     parameters?: Partial<SetVariableParameters>;
   } & Partial<SetVariableParameters>) {
     super(config);
-    
+
     // Support both new and legacy parameter names
-    this.variableType = config.type || config.parameters?.type || 'variable';
-    this.variableName = config.name || config.parameters?.name || config.variable || config.parameters?.variable || '';
-    this.value = config.value ?? config.parameters?.value ?? '';
-    this.operation = config.operation || config.parameters?.operation || 'set';
+    // Note: config.type is the BEAT type ('setVariable'), so we check parameters.type first
+    this.variableType = config.parameters?.type || 'variable';
+    this.variableName = config.parameters?.name || config.name || config.variable || config.parameters?.variable || '';
+    this.value = config.parameters?.value ?? config.value ?? '';
+    this.operation = config.parameters?.operation || config.operation || 'set';
   }
 
   getParameters(): Record<string, any> {
