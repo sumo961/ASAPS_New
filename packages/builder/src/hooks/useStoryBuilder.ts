@@ -27,13 +27,13 @@ interface StoryBuilderState {
 interface StoryBuilderActions {
   setTitle: (title: string) => void;
   setAuthor: (author: string) => void;
-  createBeat: (type: string, position?: { x: number; y: number }) => Beat;
-  addBeat: (type: string, position?: { x: number; y: number }) => Beat;
+  createBeat: (type: string, position?: { x: number; y: number }, options?: { id?: string; name?: string }) => Beat;
+  addBeat: (type: string, position?: { x: number; y: number }, options?: { id?: string; name?: string }) => Beat;
   addExistingBeat: (beat: Beat) => void;
   updateBeat: (beatId: string, updates: Partial<Beat>) => void;
   deleteBeat: (beatId: string) => void;
   moveBeat: (beatId: string, position: { x: number; y: number }) => void;
-  connectBeats: (sourceBeatId: string, targetBeatId: string) => void;
+  connectBeats: (sourceBeatId: string, targetBeatId: string, label?: string) => void;
   disconnectBeats: (sourceBeatId: string, targetBeatId: string) => void;
   expandCollapseCluster: (clusterId: string) => void;
   moveBeatToCluster: (beatId: string, clusterId: string) => void;
@@ -82,9 +82,13 @@ export function useStoryBuilder() {
 
   // Create a new beat instance without adding it to state
   // Used by the command system to avoid double-adding
-  const createBeat = useCallback((type: string, position?: { x: number; y: number }): Beat => {
-    const id = generateBeatId();
-    const name = `${type.charAt(0).toUpperCase() + type.slice(1)} ${id}`;
+  const createBeat = useCallback((
+    type: string,
+    position?: { x: number; y: number },
+    options?: { id?: string; name?: string }
+  ): Beat => {
+    const id = options?.id || generateBeatId();
+    const name = options?.name || `${type.charAt(0).toUpperCase() + type.slice(1)} ${id}`;
 
     const beatConfig = {
       id,
@@ -115,9 +119,14 @@ export function useStoryBuilder() {
   }, [generateBeatId]);
 
   // Add a new beat (creates and adds to state)
-  const addBeat = useCallback((type: string, position?: { x: number; y: number }): Beat => {
-    console.log('[useStoryBuilder] addBeat called with type:', type, 'position:', position);
-    const newBeat = createBeat(type, position);
+  // Options allow specifying a custom ID and name (useful for AI-generated stories)
+  const addBeat = useCallback((
+    type: string,
+    position?: { x: number; y: number },
+    options?: { id?: string; name?: string }
+  ): Beat => {
+    console.log('[useStoryBuilder] addBeat called with type:', type, 'position:', position, 'options:', options);
+    const newBeat = createBeat(type, position, options);
     setState(prev => ({
       ...prev,
       beats: [...prev.beats, newBeat],
@@ -191,29 +200,32 @@ export function useStoryBuilder() {
   }, []);
 
   // Connect two beats
-  const connectBeats = useCallback((sourceBeatId: string, targetBeatId: string) => {
+  const connectBeats = useCallback((sourceBeatId: string, targetBeatId: string, label?: string) => {
     setState(prev => {
       const sourceBeat = prev.beats.find(b => b.id === sourceBeatId);
       const targetBeat = prev.beats.find(b => b.id === targetBeatId);
-      
+
       if (!sourceBeat || !targetBeat) return prev;
-      
-      // Check if connection already exists
-      const existingConnection = sourceBeat.getConnections().find(c => c.targetId === targetBeatId);
+
+      // Check if connection already exists (same target and label)
+      const existingConnection = sourceBeat.getConnections().find(
+        c => c.targetId === targetBeatId && (label ? c.label === label : true)
+      );
       if (existingConnection) return prev;
-      
+
       // Add connection to source beat
+      // Use provided label, or default to "To {targetName}"
       sourceBeat.addConnection({
         targetId: targetBeatId,
-        label: `To ${targetBeat.name}`,
+        label: label || `To ${targetBeat.name}`,
       });
-      
+
       return {
         ...prev,
         beats: [...prev.beats], // Trigger re-render
         connections: [
           ...prev.connections,
-          { source: sourceBeatId, target: targetBeatId },
+          { source: sourceBeatId, target: targetBeatId, label },
         ],
       };
     });
@@ -263,19 +275,19 @@ export function useStoryBuilder() {
       // Check if state.story is a Story instance with methods or a plain object
       if (typeof state.story.getSettings === 'function') {
         story.setSettings(state.story.getSettings());
-      } else if (state.story.settings) {
+      } else if ((state.story as any).settings) {
         // Plain object - extract settings directly
-        story.setSettings(state.story.settings);
+        story.setSettings((state.story as any).settings);
       }
     }
 
     // Apply environment and characters
     if (state.story) {
       // Use data from the imported story (unless overridden)
-      // Handle both Story instances and plain objects
+      // Handle both Story instances and plain objects (use type assertion for plain object access)
       const storyEnvironment = typeof state.story.getEnvironment === 'function'
         ? state.story.getEnvironment()
-        : state.story.environment || {};
+        : (state.story as any).environment || {};
       const environment = state.environment || storyEnvironment;
       // Add assets to environment if provided
       if (assets && assets.length > 0) {
@@ -286,13 +298,13 @@ export function useStoryBuilder() {
       // Use provided characters, fall back to state or imported characters
       const storyCharacters = typeof state.story.getCharacters === 'function'
         ? state.story.getCharacters()
-        : state.story.characters || [];
+        : (state.story as any).characters || [];
       story.setCharacters(characters || state.characters || storyCharacters);
 
       // Set clusters if available
       const storyClusters = typeof state.story.getClusters === 'function'
         ? state.story.getClusters()
-        : state.story.clusters || [];
+        : (state.story as any).clusters || [];
       story.setClusters(storyClusters);
     } else {
       // Use data from state (for manually created stories)

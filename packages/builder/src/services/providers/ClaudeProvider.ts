@@ -60,6 +60,63 @@ export class ClaudeProvider extends BaseAIProvider {
   }
 
   /**
+   * Attempt to repair truncated JSON by closing open brackets/braces
+   */
+  private repairTruncatedJson(json: string): string {
+    let repaired = json.trim();
+
+    // Remove any trailing incomplete string (text after last complete property)
+    // Find the last complete property value
+    const lastCompleteMatch = repaired.match(/^([\s\S]*"[^"]*"\s*:\s*(?:"[^"]*"|true|false|null|\d+|\{[\s\S]*?\}|\[[\s\S]*?\]))\s*,?\s*[^,\]\}]*$/);
+    if (lastCompleteMatch) {
+      repaired = lastCompleteMatch[1];
+    }
+
+    // Count open brackets and braces
+    let openBraces = 0;
+    let openBrackets = 0;
+    let inString = false;
+    let escape = false;
+
+    for (const char of repaired) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (char === '\\') {
+        escape = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+
+      if (char === '{') openBraces++;
+      else if (char === '}') openBraces--;
+      else if (char === '[') openBrackets++;
+      else if (char === ']') openBrackets--;
+    }
+
+    // Close any open structures
+    // Remove trailing comma if present
+    repaired = repaired.replace(/,\s*$/, '');
+
+    // Add closing brackets and braces
+    while (openBrackets > 0) {
+      repaired += ']';
+      openBrackets--;
+    }
+    while (openBraces > 0) {
+      repaired += '}';
+      openBraces--;
+    }
+
+    return repaired;
+  }
+
+  /**
    * Make request via proxy for custom baseUrls (to avoid CORS)
    */
   private async makeProxyRequest(requestBody: any): Promise<any> {
@@ -102,12 +159,12 @@ export class ClaudeProvider extends BaseAIProvider {
     return this.withRetry(async () => {
       const requestBody = {
         model: this.model,
-        max_tokens: 8000,
+        max_tokens: 16000,
         temperature: this.config?.temperature || 0.7,
         system: systemPrompt,
         messages: [
           {
-            role: 'user',
+            role: 'user' as const,
             content: userPrompt,
           },
         ],
@@ -120,7 +177,7 @@ export class ClaudeProvider extends BaseAIProvider {
         response = await this.makeProxyRequest(requestBody);
       } else {
         // Direct API call for official Anthropic
-        const apiResponse = await this.client!.messages.create(requestBody);
+        const apiResponse = await this.client!.messages.create(requestBody as any);
         response = { content: apiResponse.content };
       }
 
@@ -132,12 +189,35 @@ export class ClaudeProvider extends BaseAIProvider {
 
       const jsonMatch = content.text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
+        console.error('[ClaudeProvider] Raw response:', content.text.substring(0, 500));
         throw new Error('Could not extract JSON from Claude response');
       }
 
-      const storyData = JSON.parse(jsonMatch[0]);
+      let storyData;
+      try {
+        storyData = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        // Log the problematic part of the JSON for debugging
+        const errorPos = parseError instanceof SyntaxError ?
+          parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') : 0;
+        const start = Math.max(0, errorPos - 100);
+        const end = Math.min(jsonMatch[0].length, errorPos + 100);
+        console.error('[ClaudeProvider] JSON parse error near position', errorPos);
+        console.error('[ClaudeProvider] Context:', jsonMatch[0].substring(start, end));
+        console.error('[ClaudeProvider] Full response length:', jsonMatch[0].length);
 
-      console.log('[ClaudeProvider] Story generated:', storyData.metadata.title);
+        // Try to repair truncated JSON by closing open brackets
+        console.log('[ClaudeProvider] Attempting to repair truncated JSON...');
+        const repaired = this.repairTruncatedJson(jsonMatch[0]);
+        try {
+          storyData = JSON.parse(repaired);
+          console.log('[ClaudeProvider] JSON repair successful!');
+        } catch (repairError) {
+          throw new Error(`Failed to parse AI response (truncated): The response was cut off. Try generating a shorter story.`);
+        }
+      }
+
+      console.log('[ClaudeProvider] Story generated:', storyData.metadata?.title);
 
       return storyData as StoryGenerationResponse;
     });
@@ -162,7 +242,7 @@ export class ClaudeProvider extends BaseAIProvider {
         system: systemPrompt,
         messages: [
           {
-            role: 'user',
+            role: 'user' as const,
             content: userPrompt,
           },
         ],
@@ -173,7 +253,7 @@ export class ClaudeProvider extends BaseAIProvider {
       if (this.useProxy) {
         response = await this.makeProxyRequest(requestBody);
       } else {
-        const apiResponse = await this.client!.messages.create(requestBody);
+        const apiResponse = await this.client!.messages.create(requestBody as any);
         response = { content: apiResponse.content };
       }
 
@@ -218,7 +298,7 @@ export class ClaudeProvider extends BaseAIProvider {
         system: systemPrompt,
         messages: [
           {
-            role: 'user',
+            role: 'user' as const,
             content: userPrompt,
           },
         ],
@@ -229,7 +309,7 @@ export class ClaudeProvider extends BaseAIProvider {
       if (this.useProxy) {
         response = await this.makeProxyRequest(requestBody);
       } else {
-        const apiResponse = await this.client!.messages.create(requestBody);
+        const apiResponse = await this.client!.messages.create(requestBody as any);
         response = { content: apiResponse.content };
       }
 
@@ -293,7 +373,7 @@ Respond with JSON in this format:
         system: systemPrompt,
         messages: [
           {
-            role: 'user',
+            role: 'user' as const,
             content: userPrompt,
           },
         ],
@@ -304,7 +384,7 @@ Respond with JSON in this format:
       if (this.useProxy) {
         response = await this.makeProxyRequest(requestBody);
       } else {
-        const apiResponse = await this.client!.messages.create(requestBody);
+        const apiResponse = await this.client!.messages.create(requestBody as any);
         response = { content: apiResponse.content };
       }
 

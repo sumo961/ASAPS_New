@@ -383,9 +383,20 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.log('[PersistenceContext] Story is a Story class instance, converting to plain object');
       // Convert Story instance to plain object by extracting its data
       const story = currentProject.story as any;
+
+      // CRITICAL: Serialize beats with toJSON() to capture derived connections
+      // from choices/props arrays (MovementChoice, PickProp, HyperText, etc.)
+      let rawBeats = story.getAllBeats ? story.getAllBeats() : (story.beats instanceof Map ? Array.from(story.beats.values()) : []);
+      const serializedBeats = rawBeats.map((beat: any) => {
+        if (typeof beat.toJSON === 'function') {
+          return beat.toJSON();
+        }
+        return beat;
+      });
+
       newStory = {
         // Start with serialized story data
-        beats: story.getAllBeats ? story.getAllBeats() : (story.beats instanceof Map ? Array.from(story.beats.values()) : []),
+        beats: serializedBeats,
         metadata: story.getMetadata ? story.getMetadata() : story.metadata,
         settings: story.getSettings ? story.getSettings() : story.settings,
         environment: story.getEnvironment ? story.getEnvironment() : story.environment,
@@ -503,7 +514,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     currentProject,
     projectId,
     isUntitledProject,
-    hasUnsavedChanges: saveStatus === 'pending' || saveStatus === 'saved',
+    hasUnsavedChanges: saveStatus === 'pending',
     storage,
     commandManager,
     executeCommand,

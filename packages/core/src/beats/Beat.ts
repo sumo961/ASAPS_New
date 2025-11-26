@@ -274,6 +274,11 @@ export abstract class Beat {
   }
 
   toJSON(): any {
+    // CRITICAL: Use getConnections() to include derived connections from choices/props
+    // For MovementChoice, PickProp, etc., connections are stored in the choices array
+    // and getConnections() extracts them properly
+    const allConnections = this.getConnections();
+
     const json = {
       id: this.id,
       name: this.name,
@@ -282,7 +287,7 @@ export abstract class Beat {
       transition: this.transition,
       sound: this.sound,
       locations: Array.from(this.locations.values()),
-      connections: this.connections,
+      connections: allConnections,
       defaultTarget: this.defaultTarget,
       defaultTargetDelay: this.defaultTargetDelay,
       showTimer: this.showTimer,
@@ -293,6 +298,7 @@ export abstract class Beat {
     };
     console.log(`[${this.type} ${this.id}].toJSON():`, {
       node: this.node,
+      connectionsCount: allConnections.length,
       parameters_node: json.parameters.node,
       has_node_in_params: json.parameters.node !== undefined
     });

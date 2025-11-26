@@ -12,9 +12,10 @@ export class ConditionBeat extends Beat {
 
   // Store all possible condition parameters
   public left?: string;
+  public variableName?: string;  // New canonical name for variable/counter name
   public operator?: string;
   public val?: any;
-  public value?: any;
+  public value?: any;  // New canonical name for comparison value
   public right?: any;
   public counter1?: string;
   public counter2?: string;
@@ -46,6 +47,8 @@ export class ConditionBeat extends Beat {
 
     // Store individual condition parameters
     // Try params first, then config (which has Partial<ConditionBeatParameters>)
+    // Support both new (variableName/value) and legacy (left/right) field names
+    this.variableName = params.variableName || (config as any).variableName;
     this.left = params.left || (config as any).left;
     this.operator = params.operator || (config as any).operator || 'eq';
     this.val = params.val !== undefined ? params.val : (config as any).val;
@@ -75,8 +78,8 @@ export class ConditionBeat extends Beat {
 
     switch (this.conditionType) {
       case 'counter':
-        condition.left = this.left;
-        condition.right = this.val;
+        condition.variableName = this.variableName || this.variable || this.left;
+        condition.value = this.value ?? this.val ?? this.right;
         break;
       case 'counterCompare':
         condition.counter1 = this.counter1;
@@ -84,7 +87,7 @@ export class ConditionBeat extends Beat {
         break;
       case 'timer':
         condition.timer = this.timer;
-        condition.val = this.val;
+        condition.value = this.value ?? this.val ?? this.right;
         break;
       case 'inventory':
         condition.item = this.item;
@@ -92,15 +95,15 @@ export class ConditionBeat extends Beat {
         condition.checkType = this.checkType || 'has';
         break;
       case 'variable':
-        condition.variable = this.variable || this.left;
-        condition.val = this.val;
+        condition.variableName = this.variableName || this.variable || this.left;
+        condition.value = this.value ?? this.val ?? this.right;
         break;
       case 'visitedBeat':
-        condition.beatId = this.beatId || this.left;
+        condition.beatId = this.beatId || this.variableName || this.left;
         break;
       default:
-        condition.left = this.left;
-        condition.right = this.right || this.val;
+        condition.variableName = this.variableName || this.variable || this.left;
+        condition.value = this.value ?? this.val ?? this.right;
     }
 
     return condition;
@@ -112,10 +115,13 @@ export class ConditionBeat extends Beat {
       condition: this.condition,
       trueTarget: this.trueTarget,
       falseTarget: this.falseTarget,
+      // New canonical field names
+      variableName: this.variableName,
+      value: this.value,
+      // Legacy field names for backwards compatibility
       left: this.left,
       operator: this.operator,
       val: this.val,
-      value: this.value,
       right: this.right,
       counter1: this.counter1,
       counter2: this.counter2,
@@ -134,10 +140,13 @@ export class ConditionBeat extends Beat {
     if (params.conditionType !== undefined) this.conditionType = params.conditionType;
     if (params.trueTarget !== undefined) this.trueTarget = params.trueTarget;
     if (params.falseTarget !== undefined) this.falseTarget = params.falseTarget;
+    // New canonical field names
+    if (params.variableName !== undefined) this.variableName = params.variableName;
+    if (params.value !== undefined) this.value = params.value;
+    // Legacy field names
     if (params.left !== undefined) this.left = params.left;
     if (params.operator !== undefined) this.operator = params.operator;
     if (params.val !== undefined) this.val = params.val;
-    if (params.value !== undefined) this.value = params.value;
     if (params.right !== undefined) this.right = params.right;
     if (params.counter1 !== undefined) this.counter1 = params.counter1;
     if (params.counter2 !== undefined) this.counter2 = params.counter2;

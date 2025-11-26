@@ -1123,37 +1123,37 @@ export class ASMLGenerator {
     
     switch (condition.type) {
       case 'counter':
-        if (condition.left || condition.counter) {
-          attrs.push(`counter="${this.escapeXml(String(condition.left || condition.counter))}"`);
+        if (condition.variableName || condition.left || condition.counter) {
+          attrs.push(`counter="${this.escapeXml(String(condition.variableName || condition.left || condition.counter))}"`);
         }
-        if (condition.right !== undefined || condition.val !== undefined) {
-          attrs.push(`val="${this.escapeXml(String(condition.right ?? condition.val))}"`);
+        if (condition.value !== undefined || condition.right !== undefined || condition.val !== undefined) {
+          attrs.push(`val="${this.escapeXml(String(condition.value ?? condition.right ?? condition.val))}"`);
         }
         break;
-        
+
       case 'counterCompare':
         // Use counter1 and counter2 for counterCompare conditions
-        if (condition.counter1 || condition.left) {
-          attrs.push(`counter1="${this.escapeXml(String(condition.counter1 || condition.left))}"`);
+        if (condition.counter1 || condition.variableName || condition.left) {
+          attrs.push(`counter1="${this.escapeXml(String(condition.counter1 || condition.variableName || condition.left))}"`);
         }
         if (condition.counter2 || condition.right) {
           attrs.push(`counter2="${this.escapeXml(String(condition.counter2 || condition.right))}"`);
         }
         break;
-        
+
       case 'timer':
         // Use timer and val for timer conditions
-        if (condition.timer || condition.left) {
-          attrs.push(`timer="${this.escapeXml(String(condition.timer || condition.left))}"`);
+        if (condition.timer || condition.variableName || condition.left) {
+          attrs.push(`timer="${this.escapeXml(String(condition.timer || condition.variableName || condition.left))}"`);
         }
-        if (condition.val !== undefined || condition.right !== undefined) {
-          attrs.push(`val="${this.escapeXml(String(condition.val ?? condition.right))}"`);
+        if (condition.value !== undefined || condition.val !== undefined || condition.right !== undefined) {
+          attrs.push(`val="${this.escapeXml(String(condition.value ?? condition.val ?? condition.right))}"`);
         }
         break;
-        
+
       case 'variable':
-        if (condition.variable || condition.left || condition.name) {
-          attrs.push(`variable="${this.escapeXml(String(condition.variable || condition.left || condition.name))}"`);
+        if (condition.variableName || condition.variable || condition.left || condition.name) {
+          attrs.push(`variable="${this.escapeXml(String(condition.variableName || condition.variable || condition.left || condition.name))}"`);
         }
         if (condition.value !== undefined || condition.right !== undefined || condition.val !== undefined) {
           attrs.push(`value="${this.escapeXml(String(condition.value ?? condition.right ?? condition.val))}"`);
@@ -1177,8 +1177,8 @@ export class ASMLGenerator {
         break;
         
       default:
-        if (condition.left) attrs.push(`left="${this.escapeXml(String(condition.left))}"`);
-        if (condition.right !== undefined) attrs.push(`val="${this.escapeXml(String(condition.right))}"`);
+        if (condition.variableName || condition.left) attrs.push(`left="${this.escapeXml(String(condition.variableName || condition.left))}"`);
+        if (condition.value !== undefined || condition.right !== undefined) attrs.push(`val="${this.escapeXml(String(condition.value ?? condition.right))}"`);
         break;
     }
     

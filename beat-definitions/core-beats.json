@@ -65,12 +65,12 @@
       "schema": {
         "type": "'variable' | 'inventory' | 'counter' | 'counterCompare' | 'timer' | 'visitedBeat'",
         "operator": "'==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'has'",
-        "left": "string",
-        "right": "any",
+        "variableName": "string",
+        "value": "any",
         "counter1": "string?",
         "counter2": "string?",
         "timer": "string?",
-        "val": "any?"
+        "beatId": "string?"
       }
     },
     "effect": {

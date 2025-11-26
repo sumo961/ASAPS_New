@@ -8,6 +8,16 @@ interface PathVisualizationProps {
   onHighlightPath?: (beatIds: string[]) => void;
 }
 
+// Helper to extract beat IDs from a path
+const getPathBeatIds = (path: StoryPath): string[] => path.nodes.map(n => n.beatId);
+
+// Helper to check if path has a cycle
+const pathHasCycle = (path: StoryPath): boolean => path.endType === 'cycle';
+
+// Helper to get ending beat ID
+const getPathEndingId = (path: StoryPath): string | undefined =>
+  path.endType === 'endBeat' ? path.endBeatId : undefined;
+
 export const PathVisualization: React.FC<PathVisualizationProps> = ({
   story,
   onHighlightPath
@@ -20,7 +30,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   // Run path analysis
   const allPaths = useMemo<StoryPath[]>(() => {
     const analyzer = new PathAnalyzer(story);
-    return analyzer.findAllPaths();
+    return analyzer.analyze().uniquePaths;
   }, [story]);
 
   const getBeatName = (beatId: string): string => {
@@ -35,7 +45,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
     // Filter by search term
     if (searchTerm) {
       paths = paths.filter(path =>
-        path.beats.some(beatId => {
+        getPathBeatIds(path).some((beatId: string) => {
           const name = getBeatName(beatId);
           return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                  beatId.toLowerCase().includes(searchTerm.toLowerCase());
@@ -46,7 +56,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
     // Filter by mode
     switch (filterMode) {
       case 'endings':
-        paths = paths.filter(p => p.endsAt !== null);
+        paths = paths.filter(p => getPathEndingId(p) !== undefined);
         break;
       case 'longest':
         if (paths.length > 0) {
@@ -64,7 +74,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
 
     // Filter cycles
     if (!showCycles) {
-      paths = paths.filter(p => !p.hasCycle);
+      paths = paths.filter(p => !pathHasCycle(p));
     }
 
     return paths;
@@ -73,21 +83,22 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   const handlePathClick = (index: number, path: StoryPath) => {
     setSelectedPath(selectedPath === index ? null : index);
     if (selectedPath !== index) {
-      onHighlightPath?.(path.beats);
+      onHighlightPath?.(getPathBeatIds(path));
     }
   };
 
   const getPathSummary = (path: StoryPath): string => {
     const parts: string[] = [];
-    if (path.hasCycle) parts.push('Contains cycle');
-    if (path.endsAt) parts.push(`Ends at ${getBeatName(path.endsAt)}`);
+    if (pathHasCycle(path)) parts.push('Contains cycle');
+    const endingId = getPathEndingId(path);
+    if (endingId) parts.push(`Ends at ${getBeatName(endingId)}`);
     else parts.push('No ending');
     return parts.join(' • ');
   };
 
   const stats = useMemo(() => {
-    const withCycles = allPaths.filter(p => p.hasCycle).length;
-    const withEndings = allPaths.filter(p => p.endsAt !== null).length;
+    const withCycles = allPaths.filter(p => pathHasCycle(p)).length;
+    const withEndings = allPaths.filter(p => getPathEndingId(p) !== undefined).length;
     const avgLength = allPaths.length > 0
       ? (allPaths.reduce((sum, p) => sum + p.length, 0) / allPaths.length).toFixed(1)
       : 0;
@@ -181,95 +192,101 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
       {/* Path List */}
       <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
         {filteredPaths.length > 0 ? (
-          filteredPaths.map((path, index) => (
-            <div
-              key={index}
-              className={`transition-colors ${
-                selectedPath === index ? 'bg-blue-50' : 'hover:bg-gray-50'
-              }`}
-            >
-              <button
-                onClick={() => handlePathClick(index, path)}
-                className="w-full px-4 py-3 flex items-center justify-between text-left"
+          filteredPaths.map((path, index) => {
+            const beatIds = getPathBeatIds(path);
+            const hasCycle = pathHasCycle(path);
+            const endingId = getPathEndingId(path);
+
+            return (
+              <div
+                key={index}
+                className={`transition-colors ${
+                  selectedPath === index ? 'bg-blue-50' : 'hover:bg-gray-50'
+                }`}
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900">
-                      Path {index + 1}
-                    </span>
-                    {path.hasCycle && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                        Cycle
+                <button
+                  onClick={() => handlePathClick(index, path)}
+                  className="w-full px-4 py-3 flex items-center justify-between text-left"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">
+                        Path {index + 1}
                       </span>
-                    )}
-                    {path.endsAt && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                        Ends
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    {path.length} beats • {getPathSummary(path)}
-                  </div>
-                </div>
-                <ChevronRight
-                  className={`w-4 h-4 text-gray-400 transition-transform ${
-                    selectedPath === index ? 'rotate-90' : ''
-                  }`}
-                />
-              </button>
-
-              {selectedPath === index && (
-                <div className="px-4 pb-3 border-t border-gray-100 bg-gray-50">
-                  <div className="py-2">
-                    <div className="space-y-2">
-                      {path.beats.map((beatId, beatIndex) => {
-                        const isLast = beatIndex === path.beats.length - 1;
-                        const isCyclePoint = path.hasCycle && isLast;
-
-                        return (
-                          <div key={beatIndex} className="flex items-start gap-2">
-                            <div className="flex flex-col items-center">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                                beatIndex === 0
-                                  ? 'bg-blue-500 text-white'
-                                  : isCyclePoint
-                                  ? 'bg-purple-500 text-white'
-                                  : path.endsAt === beatId
-                                  ? 'bg-green-500 text-white'
-                                  : 'bg-gray-300 text-gray-700'
-                              }`}>
-                                {beatIndex + 1}
-                              </div>
-                              {!isLast && (
-                                <div className="w-0.5 h-6 bg-gray-300" />
-                              )}
-                            </div>
-                            <div className="flex-1 pt-1">
-                              <div className="text-sm font-medium text-gray-900">
-                                {getBeatName(beatId)}
-                              </div>
-                              <div className="text-xs text-gray-500">{beatId}</div>
-                              {isCyclePoint && (
-                                <div className="text-xs text-purple-700 mt-1">
-                                  Cycles back to earlier beat
-                                </div>
-                              )}
-                              {path.endsAt === beatId && (
-                                <div className="text-xs text-green-700 mt-1">
-                                  Story ending
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {hasCycle && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                          Cycle
+                        </span>
+                      )}
+                      {endingId && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                          Ends
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      {path.length} beats • {getPathSummary(path)}
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ))
+                  <ChevronRight
+                    className={`w-4 h-4 text-gray-400 transition-transform ${
+                      selectedPath === index ? 'rotate-90' : ''
+                    }`}
+                  />
+                </button>
+
+                {selectedPath === index && (
+                  <div className="px-4 pb-3 border-t border-gray-100 bg-gray-50">
+                    <div className="py-2">
+                      <div className="space-y-2">
+                        {beatIds.map((beatId: string, beatIndex: number) => {
+                          const isLast = beatIndex === beatIds.length - 1;
+                          const isCyclePoint = hasCycle && isLast;
+
+                          return (
+                            <div key={beatIndex} className="flex items-start gap-2">
+                              <div className="flex flex-col items-center">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                                  beatIndex === 0
+                                    ? 'bg-blue-500 text-white'
+                                    : isCyclePoint
+                                    ? 'bg-purple-500 text-white'
+                                    : endingId === beatId
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-gray-300 text-gray-700'
+                                }`}>
+                                  {beatIndex + 1}
+                                </div>
+                                {!isLast && (
+                                  <div className="w-0.5 h-6 bg-gray-300" />
+                                )}
+                              </div>
+                              <div className="flex-1 pt-1">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {getBeatName(beatId)}
+                                </div>
+                                <div className="text-xs text-gray-500">{beatId}</div>
+                                {isCyclePoint && (
+                                  <div className="text-xs text-purple-700 mt-1">
+                                    Cycles back to earlier beat
+                                  </div>
+                                )}
+                                {endingId === beatId && (
+                                  <div className="text-xs text-green-700 mt-1">
+                                    Story ending
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
         ) : (
           <div className="px-4 py-8 text-center text-gray-500">
             <GitBranch className="w-12 h-12 mx-auto mb-2 opacity-50" />

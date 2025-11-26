@@ -3,6 +3,7 @@ import { Beat } from '@asaps/core';
 import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
+import { HyperTextEditor } from '../editors/HyperTextEditor';
 import { VisualBeatEditor, VisualElement } from './visual/VisualBeatEditor';
 import { AssetSelector } from './assets/AssetSelector';
 import { AssetSelectionModal } from './assets/AssetSelectionModal';
@@ -888,7 +889,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                 {/* Schema-driven simple parameters */}
                 {beat.type !== 'dialogTree' && beat.type !== 'movementChoice' &&
                  beat.type !== 'pickProp' && beat.type !== 'conditionBeat' &&
-                 beat.type !== 'setTimer' && beat.type !== 'randomTarget' && (
+                 beat.type !== 'setTimer' && beat.type !== 'randomTarget' &&
+                 beat.type !== 'hyperText' && (
                   <SchemaFormGenerator
                     beatType={beat.type}
                     beatDefinition={getBeatDefinition(beat.type)}
@@ -928,8 +930,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </label>
                           <input
                             type="text"
-                            value={localBeat.parameters?.left || ''}
-                            onChange={(e) => handleParameterChange('left', e.target.value)}
+                            value={localBeat.parameters?.variableName || localBeat.parameters?.left || ''}
+                            onChange={(e) => handleParameterChange('variableName', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             placeholder="e.g., courage"
                           />
@@ -939,16 +941,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Operator
                           </label>
                           <select
-                            value={localBeat.parameters?.operator || 'gt'}
+                            value={localBeat.parameters?.operator || '=='}
                             onChange={(e) => handleParameterChange('operator', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
-                            <option value="gt">Greater Than {'>'}</option>
-                            <option value="gte">Greater Than or Equal (≥)</option>
-                            <option value="lt">Less Than {'<'}</option>
-                            <option value="lte">Less Than or Equal (≤)</option>
-                            <option value="eq">Equal (=)</option>
-                            <option value="neq">Not Equal (≠)</option>
+                            <option value=">">Greater Than (&gt;)</option>
+                            <option value=">=">Greater Than or Equal (≥)</option>
+                            <option value="<">Less Than (&lt;)</option>
+                            <option value="<=">Less Than or Equal (≤)</option>
+                            <option value="==">Equal (=)</option>
+                            <option value="!=">Not Equal (≠)</option>
                           </select>
                         </div>
                         <div>
@@ -957,8 +959,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </label>
                           <input
                             type="number"
-                            value={localBeat.parameters?.val || 0}
-                            onChange={(e) => handleParameterChange('val', parseInt(e.target.value))}
+                            value={localBeat.parameters?.value ?? localBeat.parameters?.val ?? 0}
+                            onChange={(e) => handleParameterChange('value', parseInt(e.target.value))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />
                         </div>
@@ -985,16 +987,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Operator
                           </label>
                           <select
-                            value={localBeat.parameters?.operator || 'gt'}
+                            value={localBeat.parameters?.operator || '=='}
                             onChange={(e) => handleParameterChange('operator', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
-                            <option value="gt">Greater Than {'>'}</option>
-                            <option value="gte">Greater Than or Equal (≥)</option>
-                            <option value="lt">Less Than {'<'}</option>
-                            <option value="lte">Less Than or Equal (≤)</option>
-                            <option value="eq">Equal (=)</option>
-                            <option value="neq">Not Equal (≠)</option>
+                            <option value=">">Greater Than (&gt;)</option>
+                            <option value=">=">Greater Than or Equal (≥)</option>
+                            <option value="<">Less Than (&lt;)</option>
+                            <option value="<=">Less Than or Equal (≤)</option>
+                            <option value="==">Equal (=)</option>
+                            <option value="!=">Not Equal (≠)</option>
                           </select>
                         </div>
                         <div>
@@ -1033,13 +1035,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Check Type
                           </label>
                           <select
-                            value={localBeat.parameters?.operator || 'gt'}
+                            value={localBeat.parameters?.operator || '>'}
                             onChange={(e) => handleParameterChange('operator', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
-                            <option value="gt">Time Remaining {'>'} Value</option>
-                            <option value="lt">Time Remaining {'<'} Value</option>
-                            <option value="eq">Time Remaining = Value</option>
+                            <option value=">">Time Remaining &gt; Value</option>
+                            <option value="<">Time Remaining &lt; Value</option>
+                            <option value="==">Time Remaining = Value</option>
                             <option value="expired">Timer Expired</option>
                           </select>
                         </div>
@@ -1050,8 +1052,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </label>
                             <input
                               type="number"
-                              value={localBeat.parameters?.val || 0}
-                              onChange={(e) => handleParameterChange('val', parseInt(e.target.value))}
+                              value={localBeat.parameters?.value ?? localBeat.parameters?.val ?? 0}
+                              onChange={(e) => handleParameterChange('value', parseInt(e.target.value))}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             />
                           </div>
@@ -1069,8 +1071,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </label>
                           <input
                             type="text"
-                            value={localBeat.parameters?.variable || ''}
-                            onChange={(e) => handleParameterChange('variable', e.target.value)}
+                            value={localBeat.parameters?.variableName || localBeat.parameters?.variable || localBeat.parameters?.left || ''}
+                            onChange={(e) => handleParameterChange('variableName', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             placeholder="e.g., playerName"
                           />
@@ -1080,12 +1082,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Operator
                           </label>
                           <select
-                            value={localBeat.parameters?.operator || 'eq'}
+                            value={localBeat.parameters?.operator || '=='}
                             onChange={(e) => handleParameterChange('operator', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
-                            <option value="eq">Equals (=)</option>
-                            <option value="neq">Not Equal (≠)</option>
+                            <option value="==">Equals (=)</option>
+                            <option value="!=">Not Equal (≠)</option>
                             <option value="contains">Contains</option>
                             <option value="exists">Exists</option>
                             <option value="notExists">Does Not Exist</option>
@@ -1098,7 +1100,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </label>
                             <input
                               type="text"
-                              value={localBeat.parameters?.value || ''}
+                              value={localBeat.parameters?.value ?? localBeat.parameters?.val ?? ''}
                               onChange={(e) => handleParameterChange('value', e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                               placeholder="Variable value to check"
@@ -1483,6 +1485,77 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </>
                 )}
 
+                {/* HyperText Editor */}
+                {beat.type === 'hyperText' && (
+                  <div className="space-y-3">
+                    <HyperTextEditor
+                      text={localBeat.parameters?.text || ''}
+                      hyperlinks={localBeat.parameters?._rawHyperlinks || []}
+                      onChange={(text, hyperlinks) => {
+                        // Convert hyperlinks format for beat parameters (renderer format)
+                        const links = hyperlinks.map(link => ({
+                          word: text.substring(link.start, link.end),
+                          targetBeatId: link.targetBeatId,
+                          style: {
+                            color: link.style.color,
+                            hoverColor: localBeat.parameters?.hoverColor || '#003366',
+                            underline: link.style.underline,
+                            bold: false
+                          }
+                        }));
+                        handleParameterChange('text', text);
+                        handleParameterChange('links', links);
+                        // Store raw hyperlinks for editor to use (with start/end positions)
+                        handleParameterChange('_rawHyperlinks', hyperlinks);
+                      }}
+                      availableBeats={availableTargets}
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="allowMultiple"
+                        checked={localBeat.parameters?.allowMultiple || false}
+                        onChange={(e) => handleParameterChange('allowMultiple', e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <label htmlFor="allowMultiple" className="text-sm text-gray-700">
+                        Allow Multiple Clicks
+                        <span className="text-xs text-gray-500 block">
+                          Whether user can click multiple links
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Highlight Color
+                        </label>
+                        <input
+                          type="color"
+                          value={localBeat.parameters?.highlightColor || '#0066cc'}
+                          onChange={(e) => handleParameterChange('highlightColor', e.target.value)}
+                          className="w-full h-10 rounded border border-gray-300"
+                        />
+                        <span className="text-xs text-gray-500">Color for hyperlinked text</span>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Hover Color
+                        </label>
+                        <input
+                          type="color"
+                          value={localBeat.parameters?.hoverColor || '#003366'}
+                          onChange={(e) => handleParameterChange('hoverColor', e.target.value)}
+                          className="w-full h-10 rounded border border-gray-300"
+                        />
+                        <span className="text-xs text-gray-500">Color when hovering</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Dialog Tree Editor */}
                 {beat.type === 'dialogTree' && (
                   <div className="space-y-3">
@@ -1793,30 +1866,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             )}
                           </div>
                           
-                          {showAdvanced && (
-                            <div className="p-2 bg-green-50 rounded space-y-2">
-                              <div className="text-xs font-medium text-green-700">Additional Effects (Optional)</div>
-                              
-                              {/* Inventory Effect */}
-                              <div>
-                                <select
-                                  value={prop.effect?.type || 'inventory'}
-                                  onChange={(e) => handleUpdateProp(index, 'effect.type', e.target.value)}
-                                  className="w-full px-2 py-1 text-xs border rounded"
-                                >
-                                  <option value="inventory">Add to Inventory</option>
-                                  <option value="variable">Set Variable</option>
-                                </select>
-                                <input
-                                  type="text"
-                                  value={prop.effect?.name || prop.name}
-                                  onChange={(e) => handleUpdateProp(index, 'effect.name', e.target.value)}
-                                  placeholder="Item/Variable name"
-                                  className="w-full px-2 py-1 text-xs border rounded mt-1"
-                                />
-                              </div>
-                            </div>
-                          )}
+                          {/* Note: Picking a prop automatically adds it to inventory */}
                         </div>
                       ))}
                     </div>
@@ -1903,7 +1953,7 @@ export const Inspector: React.FC<InspectorProps> = ({
 
                         <div>
                           <label className="block text-xs text-gray-600 mb-1">
-                            False Target' + (localBeat.parameters?.conditionType === 'timer' ? ' <span className="text-red-500">*</span>' : ' (Optional)')
+                            False Target{localBeat.parameters?.conditionType === 'timer' ? <span className="text-red-500"> *</span> : ' (Optional)'}
                           </label>
                           <select
                             value={localBeat.connections?.find((c: any) => c.label === 'false')?.targetId || ''}

@@ -55,6 +55,10 @@ export interface Connection {
 export interface Condition {
   type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat';
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
+  // New canonical field names
+  variableName?: string;
+  value?: any;
+  // Legacy field names (kept for backwards compatibility)
   left?: string;
   right?: any;
   // For counterCompare type

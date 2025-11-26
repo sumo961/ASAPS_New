@@ -20,6 +20,82 @@ import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { DebugPanel } from './components/debug/DebugPanel';
 
+// Constants for beat node dimensions (used for overlap detection)
+const BEAT_NODE_WIDTH = 250;
+const BEAT_NODE_HEIGHT = 80;
+const BEAT_PADDING = 30; // Minimum spacing between beats
+
+/**
+ * Resolve overlapping beat positions by pushing them apart
+ */
+function resolveOverlappingPositions(
+  beats: Array<{ id: string; position?: { x: number; y: number } }>
+): Map<string, { x: number; y: number }> {
+  const adjustedPositions = new Map<string, { x: number; y: number }>();
+
+  // Initialize with original positions
+  beats.forEach(beat => {
+    const pos = beat.position || { x: 200, y: 200 };
+    adjustedPositions.set(beat.id, { x: pos.x, y: pos.y });
+  });
+
+  // Check for overlaps and resolve them
+  const maxIterations = 50; // Prevent infinite loops
+  let hasOverlaps = true;
+  let iteration = 0;
+
+  while (hasOverlaps && iteration < maxIterations) {
+    hasOverlaps = false;
+    iteration++;
+
+    const beatIds = Array.from(adjustedPositions.keys());
+
+    for (let i = 0; i < beatIds.length; i++) {
+      for (let j = i + 1; j < beatIds.length; j++) {
+        const pos1 = adjustedPositions.get(beatIds[i])!;
+        const pos2 = adjustedPositions.get(beatIds[j])!;
+
+        // Check if beats overlap (considering node dimensions)
+        const dx = Math.abs(pos1.x - pos2.x);
+        const dy = Math.abs(pos1.y - pos2.y);
+        const minDx = BEAT_NODE_WIDTH + BEAT_PADDING;
+        const minDy = BEAT_NODE_HEIGHT + BEAT_PADDING;
+
+        if (dx < minDx && dy < minDy) {
+          hasOverlaps = true;
+
+          // Push beats apart - move the second beat
+          if (dx <= dy) {
+            // Push horizontally
+            const pushX = (minDx - dx) / 2 + 10;
+            if (pos1.x <= pos2.x) {
+              pos2.x += pushX;
+            } else {
+              pos2.x -= pushX;
+            }
+          } else {
+            // Push vertically
+            const pushY = (minDy - dy) / 2 + 10;
+            if (pos1.y <= pos2.y) {
+              pos2.y += pushY;
+            } else {
+              pos2.y -= pushY;
+            }
+          }
+
+          adjustedPositions.set(beatIds[j], pos2);
+        }
+      }
+    }
+  }
+
+  if (iteration >= maxIterations) {
+    console.warn('[App] Overlap resolution reached max iterations');
+  }
+
+  return adjustedPositions;
+}
+
 function App() {
   const { state, actions, initializeStory } = useStoryBuilder();
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
@@ -161,10 +237,21 @@ function App() {
       author: state.author
     });
 
+    // CRITICAL: Serialize beats with toJSON() before storing
+    // Beat instances have methods that can't be structured-cloned by IndexedDB
+    // This ensures derived connections (from choices/props) are properly captured
+    const serializedBeats = state.beats.map(beat => {
+      if (typeof beat.toJSON === 'function') {
+        return beat.toJSON();
+      }
+      // Fallback if already a plain object
+      return beat;
+    });
+
     const storyData = {
       title: state.title,
       author: state.author,
-      beats: state.beats,
+      beats: serializedBeats,
       characters: characters,
       connections: state.connections,
     };
@@ -620,10 +707,19 @@ function App() {
   }, [isUntitledProject, hasUnsavedChanges]);
 
   const handleSaveUnsavedWork = useCallback(async () => {
-    // Create a new project with current work
+    // Save current work as a named project
     try {
-      await createProject('Untitled Project');
-      // Project is automatically loaded by createProject
+      // Generate a name with timestamp
+      const timestamp = new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      const projectName = `Saved Project (${timestamp})`;
+
+      await saveCurrent(projectName, 'Auto-saved from unsaved changes dialog');
+      // Project is now saved as named project
       // Clear the dialog and pending action
       setShowSaveDialog(false);
       setPendingAction('');
@@ -631,7 +727,7 @@ function App() {
       console.error('Failed to save project:', error);
       alert('Failed to save project. Please try again.');
     }
-  }, [createProject]);
+  }, [saveCurrent]);
 
   const handleDiscardUnsavedWork = useCallback(() => {
     // Clear the dialog and pending action
@@ -689,31 +785,133 @@ function App() {
       actions.setTitle(story.metadata.title || 'Generated Story');
     }
 
-    // Add all generated beats
+    // Resolve overlapping positions before adding beats
+    const adjustedPositions = story.beats && Array.isArray(story.beats)
+      ? resolveOverlappingPositions(story.beats)
+      : new Map();
+
+    // Add all generated beats, preserving AI-generated IDs with adjusted positions
     if (story.beats && Array.isArray(story.beats)) {
       story.beats.forEach((beatData: any) => {
-        const beat = actions.addBeat(beatData.type || 'introText', beatData.position);
+        // Use adjusted position if available, otherwise fall back to original
+        const position = adjustedPositions.get(beatData.id) || beatData.position;
+
+        // Pass the AI-generated ID and name directly to addBeat
+        const beat = actions.addBeat(
+          beatData.type || 'introText',
+          position,
+          { id: beatData.id, name: beatData.label || beatData.name }
+        );
+
         // Update beat with generated parameters
         if (beatData.parameters) {
-          actions.updateBeat(beat.id, { ...beatData.parameters });
-        }
-        // Update name if provided
-        if (beatData.label || beatData.name) {
-          actions.updateBeat(beat.id, { name: beatData.label || beatData.name });
+          let params = { ...beatData.parameters };
+
+          // Transform conditionBeat nested format to flat format
+          if (beatData.type === 'conditionBeat') {
+            // Flatten nested condition object
+            if (params.condition) {
+              const cond = params.condition;
+              params.conditionType = cond.type || params.conditionType;
+              params.variableName = cond.variableName || cond.left || params.variableName;
+              params.operator = cond.operator || params.operator;
+              params.value = cond.value ?? cond.right ?? params.value;
+              params.counter1 = cond.counter1 || params.counter1;
+              params.counter2 = cond.counter2 || params.counter2;
+              params.timer = cond.timer || params.timer;
+              params.item = cond.item || params.item;
+              params.character = cond.character || params.character;
+              params.checkType = cond.checkType || params.checkType;
+              params.beatId = cond.beatId || params.beatId;
+              delete params.condition;
+            }
+            // Extract targets from connection objects
+            if (params.trueConnection?.target) {
+              params.trueTarget = params.trueConnection.target;
+              delete params.trueConnection;
+            }
+            if (params.falseConnection?.target) {
+              params.falseTarget = params.falseConnection.target;
+              delete params.falseConnection;
+            }
+          }
+
+          actions.updateBeat(beat.id, params);
         }
       });
     }
 
     // Add connections after all beats are created
+    // Collect connections from beat parameters (AI-generated format)
+    const connectionsToCreate: Array<{ source: string; target: string; label?: string }> = [];
+
+    if (story.beats && Array.isArray(story.beats)) {
+      story.beats.forEach((beatData: any) => {
+        // Check for connection in parameters (single-connection beats)
+        if (beatData.parameters?.connection?.target) {
+          connectionsToCreate.push({
+            source: beatData.id,
+            target: beatData.parameters.connection.target,
+          });
+        }
+        // Handle conditionBeat trueConnection/falseConnection
+        if (beatData.type === 'conditionBeat') {
+          if (beatData.parameters?.trueConnection?.target) {
+            connectionsToCreate.push({
+              source: beatData.id,
+              target: beatData.parameters.trueConnection.target,
+              label: 'true',
+            });
+          }
+          if (beatData.parameters?.falseConnection?.target) {
+            connectionsToCreate.push({
+              source: beatData.id,
+              target: beatData.parameters.falseConnection.target,
+              label: 'false',
+            });
+          }
+        }
+        // Also check top-level connections array on the beat (fallback format)
+        if (beatData.connections && Array.isArray(beatData.connections)) {
+          beatData.connections.forEach((conn: any) => {
+            connectionsToCreate.push({
+              source: beatData.id,
+              target: conn.targetId || conn.target,
+              label: conn.label,
+            });
+          });
+        }
+      });
+    }
+
+    // Also support top-level connections array (legacy format)
     if (story.connections && Array.isArray(story.connections)) {
+      story.connections.forEach((conn: any) => {
+        connectionsToCreate.push({
+          source: conn.sourceId || conn.from,
+          target: conn.targetId || conn.to,
+        });
+      });
+    }
+
+    // Create all connections with a delay to ensure state has updated
+    if (connectionsToCreate.length > 0) {
+      console.log('[App] Creating', connectionsToCreate.length, 'connections');
       setTimeout(() => {
-        story.connections.forEach((conn: any) => {
+        let successCount = 0;
+        let failCount = 0;
+        connectionsToCreate.forEach((conn) => {
           try {
-            actions.connectBeats(conn.sourceId || conn.from, conn.targetId || conn.to);
+            if (conn.source && conn.target) {
+              actions.connectBeats(conn.source, conn.target, conn.label);
+              successCount++;
+            }
           } catch (error) {
+            failCount++;
             console.warn('[App] Failed to create connection:', conn, error);
           }
         });
+        console.log(`[App] Connections created: ${successCount} success, ${failCount} failed`);
       }, 100);
     }
 

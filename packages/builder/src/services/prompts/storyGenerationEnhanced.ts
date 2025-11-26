@@ -89,10 +89,13 @@ const BEAT_TYPE_GUIDE = `
 
 **conditionBeat** - State-based branching
 - Use: Check variables, create reconvergent paths, conditional content
-- Parameters: condition (variable, inventory, counter, timer, visitedBeat), targets (true/false)
+- Parameters structure:
+  - condition: { type: "variable"|"counter"|"inventory"|"timer", variableName: "name", operator: "=="|"!="|">"|"<"|">="|"<=", value: any }
+  - trueConnection: { target: "beat_id", label: "description" }
+  - falseConnection: { target: "beat_id", label: "description" }
 - Connections: Two → one if true, one if false
 - Pattern: Reconvergence - multiple paths lead here, then branch based on accumulated state
-- Example: Check if cluesFound >= 2 → [true: unlock secret] [false: normal path]
+- Example: condition: { type: "variable", variableName: "hasKey", operator: "==", value: true }
 
 **addRemoveInventory** - Inventory manipulation
 - Use: Pick up items, lose items, check what player has
@@ -482,9 +485,11 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           type: "setVariable",
           position: { x: 1300, y: 100 },
           parameters: {
-            variableName: "cluesFound",
+            type: "counter",
+            name: "cluesFound",
             value: 1,
-            operation: "add"
+            operation: "change",
+            connection: { target: "beat_5" }
           },
           connections: [{ targetId: "beat_5" }]
         },
@@ -522,9 +527,11 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           type: "setVariable",
           position: { x: 1300, y: 250 },
           parameters: {
-            variableName: "cluesFound",
+            type: "counter",
+            name: "cluesFound",
             value: 1,
-            operation: "add"
+            operation: "change",
+            connection: { target: "beat_8" }
           },
           connections: [{ targetId: "beat_8" }]
         },
@@ -575,9 +582,11 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           type: "setVariable",
           position: { x: 1300, y: 400 },
           parameters: {
-            variableName: "cluesFound",
+            type: "counter",
+            name: "cluesFound",
             value: 1,
-            operation: "add"
+            operation: "change",
+            connection: { target: "beat_11" }
           },
           connections: [{ targetId: "beat_11" }]
         },
@@ -600,10 +609,12 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             condition: {
               type: "counter",
-              variable: "cluesFound",
+              variableName: "cluesFound",
               operator: ">=",
               value: 2
-            }
+            },
+            trueConnection: { target: "beat_13", label: "Enough Clues (≥2)" },
+            falseConnection: { target: "beat_2", label: "Need More Clues (<2)" }
           },
           connections: [
             { targetId: "beat_13", label: "Enough Clues (≥2)" },
@@ -661,10 +672,12 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             condition: {
               type: "counter",
-              variable: "cluesFound",
+              variableName: "cluesFound",
               operator: "==",
               value: 3
-            }
+            },
+            trueConnection: { target: "beat_18", label: "All Clues Found" },
+            falseConnection: { target: "beat_19", label: "Missing Clues" }
           },
           connections: [
             { targetId: "beat_18", label: "All Clues Found" },

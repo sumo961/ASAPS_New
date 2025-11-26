@@ -218,7 +218,7 @@ export class StoryContext extends EventEmitter {
 
     // Handle visitedBeat conditions
     if (condition.type === 'visitedBeat') {
-      const beatId = condition.beatId || condition.left;
+      const beatId = condition.beatId || condition.variableName || condition.left;
       if (!beatId) {
         console.warn('visitedBeat condition missing beatId');
         return false;
@@ -233,46 +233,50 @@ export class StoryContext extends EventEmitter {
       return hasVisited;
     }
 
-    // Handle other condition types that use left/right pattern
-    if (!condition.left) {
-      console.warn(`Condition of type ${condition.type} missing required left value`);
+    // Get variable name - support both new (variableName) and old (left) field names
+    const varName = condition.variableName || condition.left;
+
+    // Handle other condition types that use variableName/value pattern
+    if (!varName) {
+      console.warn(`Condition of type ${condition.type} missing required variableName`);
       return false;
     }
 
-    let left: any;
-    const right = condition.right;
+    let leftValue: any;
+    // Support both new (value) and old (right) field names
+    const rightValue = condition.value !== undefined ? condition.value : condition.right;
 
     // Resolve left value based on condition type
     switch (condition.type) {
       case 'counter':
-        left = this.state.counters[condition.left] || 0;
+        leftValue = this.state.counters[varName] || 0;
         break;
       case 'variable':
-        left = this.state.variables[condition.left];
+        leftValue = this.state.variables[varName];
         break;
       case 'inventory':
-        // For inventory conditions, left is the character name, check their inventory
+        // For inventory conditions, varName is the character name, check their inventory
         // For now, we'll check the main inventory - could be extended for character-specific inventories
-        left = this.state.inventory;
+        leftValue = this.state.inventory;
         break;
       case 'timer':
-        left = this.state.timers[condition.left]?.value || 0;
+        leftValue = this.state.timers[varName]?.value || 0;
         break;
       default:
         // Fallback to the old resolveValue method for backward compatibility
-        left = this.resolveValue(condition.left);
+        leftValue = this.resolveValue(varName);
         break;
     }
 
     switch (condition.operator) {
-      case '==': return left === right;
-      case '!=': return left !== right;
-      case '>': return left > right;
-      case '<': return left < right;
-      case '>=': return left >= right;
-      case '<=': return left <= right;
+      case '==': return leftValue === rightValue;
+      case '!=': return leftValue !== rightValue;
+      case '>': return leftValue > rightValue;
+      case '<': return leftValue < rightValue;
+      case '>=': return leftValue >= rightValue;
+      case '<=': return leftValue <= rightValue;
       case 'contains':
-        return Array.isArray(left) ? left.includes(right) : false;
+        return Array.isArray(leftValue) ? leftValue.includes(rightValue) : false;
       default: return false;
     }
   }

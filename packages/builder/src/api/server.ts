@@ -372,8 +372,18 @@ export class APIServer {
           });
         }
 
+        // Determine the full endpoint URL
+        // If baseUrl already contains '/messages', use it as-is
+        // Otherwise, append '/v1/messages' (standard Anthropic path)
+        let endpoint = baseUrl;
+        if (!baseUrl.includes('/messages')) {
+          endpoint = `${baseUrl.replace(/\/$/, '')}/v1/messages`;
+        }
+
+        console.log(`[AI Proxy] Claude request to: ${endpoint}`);
+
         // Make the actual request to the third-party API
-        const response = await fetch(`${baseUrl}/v1/messages`, {
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -410,8 +420,18 @@ export class APIServer {
           });
         }
 
+        // Determine the full endpoint URL
+        // If baseUrl already contains '/completions', use it as-is
+        // Otherwise, append '/chat/completions' (standard OpenAI path)
+        let endpoint = baseUrl;
+        if (!baseUrl.includes('/completions')) {
+          endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+        }
+
+        console.log(`[AI Proxy] OpenAI request to: ${endpoint}`);
+
         // Make the actual request to the third-party API
-        const response = await fetch(`${baseUrl}/chat/completions`, {
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

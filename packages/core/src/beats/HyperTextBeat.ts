@@ -80,11 +80,42 @@ export class HyperTextBeat extends Beat {
     if (params.allowMultipleClicks !== undefined) this.allowMultipleClicks = params.allowMultipleClicks;
     if (params.highlightColor !== undefined) this.highlightColor = params.highlightColor;
     if (params.hoverColor !== undefined) this.hoverColor = params.hoverColor;
-    
+
     // Update visual data
     if (params.node !== undefined) this.node = params.node;
     if (params.locs !== undefined) this.locs = params.locs;
     if (params.backgroundSound !== undefined) this.backgroundSound = params.backgroundSound;
+  }
+
+  /**
+   * Override getConnections to extract all connections from hyperlinks
+   * This ensures connections are dynamically generated from hyperlinks array
+   */
+  getConnections(): Array<{ targetId: string; label?: string; condition?: any }> {
+    const connections: Array<{ targetId: string; label?: string; condition?: any }> = [];
+
+    // Extract connections from each hyperlink
+    if (this.hyperlinks && Array.isArray(this.hyperlinks)) {
+      for (const link of this.hyperlinks) {
+        if (link.targetBeatId) {
+          connections.push({
+            targetId: link.targetBeatId,
+            label: link.word
+          });
+        }
+      }
+    }
+
+    // Also include regular connections from base class (if any)
+    const baseConnections = super.getConnections();
+    for (const conn of baseConnections) {
+      // Avoid duplicates
+      if (!connections.some(c => c.targetId === conn.targetId && c.label === conn.label)) {
+        connections.push(conn);
+      }
+    }
+
+    return connections;
   }
 
   /**
@@ -143,25 +174,6 @@ export class HyperTextBeat extends Beat {
     return this.getNextBeat(context);
   }
 
-  /**
-   * Override toJSON to ensure hyperlink connections are included
-   */
-  toJSON(): any {
-    const json = super.toJSON();
-    
-    // Ensure all hyperlink targets are in connections
-    this.hyperlinks.forEach(link => {
-      if (!this.hasConnection(link.targetBeatId)) {
-        this.addConnection({
-          targetId: link.targetBeatId,
-          label: link.word
-        });
-      }
-    });
-    
-    return {
-      ...json,
-      connections: this.getConnections()
-    };
-  }
+  // toJSON() is inherited from Beat base class
+  // It correctly uses getConnections() which now includes hyperlink-derived connections
 }

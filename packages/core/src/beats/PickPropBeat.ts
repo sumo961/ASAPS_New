@@ -34,6 +34,38 @@ export class PickPropBeat extends Beat {
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
   }
 
+  /**
+   * Override getConnections to extract all connections from prop options
+   * This ensures connections are dynamically generated from props array
+   */
+  getConnections(): Array<{ targetId: string; label?: string; condition?: any }> {
+    const connections: Array<{ targetId: string; label?: string; condition?: any }> = [];
+
+    // Extract connections from each prop
+    if (this.props && Array.isArray(this.props)) {
+      for (const prop of this.props) {
+        if (prop.target) {
+          connections.push({
+            targetId: prop.target,
+            label: prop.name || prop.id,
+            condition: prop.conditions
+          });
+        }
+      }
+    }
+
+    // Also include regular connections from base class (if any)
+    const baseConnections = super.getConnections();
+    for (const conn of baseConnections) {
+      // Avoid duplicates
+      if (!connections.some(c => c.targetId === conn.targetId && c.label === conn.label)) {
+        connections.push(conn);
+      }
+    }
+
+    return connections;
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer

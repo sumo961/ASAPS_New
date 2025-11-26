@@ -101,6 +101,44 @@ export class AIService {
   }
 
   /**
+   * Transform AI-generated beat format to match schema expectations
+   * Converts top-level `connections` array to `parameters.connection`
+   */
+  private transformBeatFormat(beat: any): any {
+    const transformed = { ...beat };
+
+    // If beat has connections array at top level, convert to parameters.connection
+    if (beat.connections && Array.isArray(beat.connections) && beat.connections.length > 0) {
+      // For single-connection beats (titleScreen, introText, etc.)
+      // Take the first connection and put it in parameters.connection
+      const firstConnection = beat.connections[0];
+      if (!transformed.parameters) {
+        transformed.parameters = {};
+      }
+
+      // Convert from { targetId: "..." } to { target: "..." }
+      transformed.parameters.connection = {
+        target: firstConnection.targetId || firstConnection.target,
+        ...(firstConnection.label && { label: firstConnection.label }),
+        ...(firstConnection.condition && { condition: firstConnection.condition }),
+        ...(firstConnection.effects && { effects: firstConnection.effects }),
+      };
+    }
+
+    return transformed;
+  }
+
+  /**
+   * Transform all beats in a story response
+   */
+  private transformStoryResponse(response: StoryGenerationResponse): StoryGenerationResponse {
+    return {
+      ...response,
+      beats: response.beats.map(beat => this.transformBeatFormat(beat)),
+    };
+  }
+
+  /**
    * Generate complete story
    */
   async generateStory(request: StoryGenerationRequest): Promise<StoryGenerationResponse> {
@@ -110,7 +148,11 @@ export class AIService {
 
     try {
       // Generate with current provider
-      const response = await this.currentProvider!.generateStory(request);
+      let response = await this.currentProvider!.generateStory(request);
+
+      // Transform beat format to match schema
+      response = this.transformStoryResponse(response);
+      console.log('[AIService] Transformed beat format for schema compatibility');
 
       // Validate if enabled
       if (this.options.validateSchema) {
