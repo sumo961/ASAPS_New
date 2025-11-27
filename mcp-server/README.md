@@ -1,6 +1,8 @@
-# ASAPS MCP Server
+# ASAPS MCP Server (AI-Powered)
 
 MCP (Model Context Protocol) server for AI-assisted interactive story creation in ASAPS Modern.
+
+> **Looking for Claude Desktop integration?** See [`mcp-server-desktop/`](../mcp-server-desktop/) for a simpler MCP server that requires NO API keys. Claude Desktop does the thinking, the MCP server just injects stories into the Builder.
 
 ✅ **Week 4 Complete** - Full HTTP API integration implemented and tested!
 ✅ **AI Tools Complete** - All 4 AI-powered tools implemented with Claude Sonnet 4 integration!

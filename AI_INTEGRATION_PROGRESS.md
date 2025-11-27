@@ -472,6 +472,88 @@ Once Claude/OpenAI providers are implemented in Phase 4, all placeholder impleme
 
 ---
 
-*Last Updated: November 18, 2025*
-*Status: Phases 1-5 Complete (100%)*
+## UPDATE: Claude Desktop MCP Server
+
+### November 27, 2025
+
+Added a new MCP server specifically for **Claude Desktop** integration that requires **NO API keys**.
+
+#### Architecture
+
+```
+Claude Desktop <--> MCP Server <--> ASAPS Builder (localhost:3001)
+```
+
+**Key Difference:**
+- **mcp-server/** (AI-Powered): Calls AI APIs (Claude/OpenAI) to generate stories - requires API keys
+- **mcp-server-desktop/** (Direct): Just passes data to ASAPS Builder - Claude Desktop does the thinking
+
+#### Files Created
+
+1. **Package Configuration**
+   - `mcp-server-desktop/package.json`
+   - `mcp-server-desktop/tsconfig.json`
+   - `mcp-server-desktop/README.md` (comprehensive documentation)
+
+2. **MCP Server** (`mcp-server-desktop/src/index.ts` - 350 lines)
+   - `asaps_check_connection` - Verify Builder is running
+   - `asaps_get_beat_schema` - Get beat type documentation
+   - `asaps_get_example_story` - Get example story structure
+   - `asaps_inject_story` - Send story directly to Builder
+
+3. **API Server Endpoints** (`packages/builder/src/api/server.ts`)
+   - `POST /api/stories/inject` - Story injection endpoint
+   - `GET /api/schema/beats` - Beat schema documentation
+   - `GET /api/schema/example` - Example story structure
+
+4. **WebSocket Integration** (`packages/builder/src/App.tsx`)
+   - Real-time story injection via WebSocket
+   - Auto-reconnect on disconnect
+   - Handles beat creation and connections
+
+#### Usage
+
+```bash
+# 1. Build MCP server
+cd mcp-server-desktop
+npm install && npm run build
+
+# 2. Configure Claude Desktop
+# macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
+# Windows: %APPDATA%\Claude\claude_desktop_config.json
+{
+  "mcpServers": {
+    "asaps-desktop": {
+      "command": "node",
+      "args": ["/path/to/mcp-server-desktop/dist/index.js"]
+    }
+  }
+}
+# Note: Paths with spaces work correctly (no escaping needed)
+
+# 3. Start ASAPS Builder
+npm run dev:all
+
+# 4. In Claude Desktop, say:
+# "Create an interactive story about a detective investigating a haunted house"
+```
+
+Claude Desktop will:
+1. Call `asaps_get_beat_schema` to understand beat types
+2. Generate story structure using its reasoning
+3. Call `asaps_inject_story` to send it to Builder
+
+The story immediately appears in the ASAPS Builder window!
+
+#### Total Update
+
+- **New Package:** `mcp-server-desktop/` (~400 lines)
+- **API Extensions:** ~200 lines
+- **WebSocket Handler:** ~150 lines
+- **Total:** ~750 lines
+
+---
+
+*Last Updated: November 27, 2025*
+*Status: Phases 1-5 Complete (100%) + Claude Desktop MCP Server*
 *All Core Features Implemented and Tested*

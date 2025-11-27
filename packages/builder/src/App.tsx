@@ -110,6 +110,7 @@ function App() {
   const [pendingAction, setPendingAction] = useState<string>('');
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
+  const wsRef = useRef<WebSocket | null>(null);
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -301,6 +302,205 @@ function App() {
       unregisterSyncCallback();
     };
   }, [syncProjectData, registerSyncCallback, unregisterSyncCallback]);
+
+  /**
+   * WebSocket connection to API server for external story injection
+   * This enables Claude Desktop MCP and other external tools to push stories directly
+   */
+  const handleStoryGeneratedRef = useRef<((story: any) => void) | null>(null);
+
+  useEffect(() => {
+    // Store the latest handleStoryGenerated callback in a ref to avoid stale closures
+    handleStoryGeneratedRef.current = (story: any) => {
+      console.log('[App] Received story via WebSocket:', story.metadata?.title || 'Untitled');
+
+      // Clear existing beats and connections
+      actions.clearStory();
+
+      // Add metadata
+      if (story.metadata) {
+        actions.setTitle(story.metadata.title || 'Injected Story');
+        if (story.metadata.author) {
+          // Note: author setting if available
+        }
+      }
+
+      // Resolve overlapping positions before adding beats
+      const adjustedPositions = story.beats && Array.isArray(story.beats)
+        ? resolveOverlappingPositions(story.beats)
+        : new Map();
+
+      // Add all beats with adjusted positions
+      if (story.beats && Array.isArray(story.beats)) {
+        story.beats.forEach((beatData: any) => {
+          const position = adjustedPositions.get(beatData.id) ||
+            beatData.position ||
+            { x: beatData.x || 200, y: beatData.y || 200 };
+
+          const beat = actions.addBeat(
+            beatData.type || 'introText',
+            position,
+            { id: beatData.id, name: beatData.name || beatData.label }
+          );
+
+          if (beatData.parameters) {
+            let params = { ...beatData.parameters };
+
+            // Transform conditionBeat nested format to flat format
+            if (beatData.type === 'conditionBeat') {
+              if (params.condition) {
+                const cond = params.condition;
+                params.conditionType = cond.type || params.conditionType;
+                params.variableName = cond.variableName || cond.left || params.variableName;
+                params.operator = cond.operator || params.operator;
+                params.value = cond.value ?? cond.right ?? params.value;
+                delete params.condition;
+              }
+              if (params.trueConnection?.target) {
+                params.trueTarget = params.trueConnection.target;
+                delete params.trueConnection;
+              }
+              if (params.falseConnection?.target) {
+                params.falseTarget = params.falseConnection.target;
+                delete params.falseConnection;
+              }
+            }
+
+            actions.updateBeat(beat.id, params);
+          }
+        });
+      }
+
+      // Process connections
+      const connectionsToCreate: Array<{ source: string; target: string; label?: string }> = [];
+
+      // Extract connections from beat parameters
+      if (story.beats && Array.isArray(story.beats)) {
+        story.beats.forEach((beatData: any) => {
+          if (beatData.parameters?.connection?.target) {
+            connectionsToCreate.push({
+              source: beatData.id,
+              target: beatData.parameters.connection.target,
+            });
+          }
+          if (beatData.type === 'conditionBeat') {
+            if (beatData.parameters?.trueConnection?.target) {
+              connectionsToCreate.push({
+                source: beatData.id,
+                target: beatData.parameters.trueConnection.target,
+                label: 'true',
+              });
+            }
+            if (beatData.parameters?.falseConnection?.target) {
+              connectionsToCreate.push({
+                source: beatData.id,
+                target: beatData.parameters.falseConnection.target,
+                label: 'false',
+              });
+            }
+          }
+        });
+      }
+
+      // Also use top-level connections array
+      if (story.connections && Array.isArray(story.connections)) {
+        story.connections.forEach((conn: any) => {
+          connectionsToCreate.push({
+            source: conn.source || conn.sourceId || conn.from,
+            target: conn.target || conn.targetId || conn.to,
+            label: conn.label,
+          });
+        });
+      }
+
+      // Create connections after a short delay
+      if (connectionsToCreate.length > 0) {
+        setTimeout(() => {
+          connectionsToCreate.forEach((conn) => {
+            if (conn.source && conn.target) {
+              try {
+                actions.connectBeats(conn.source, conn.target, conn.label);
+              } catch (error) {
+                console.warn('[App] Failed to create connection:', conn, error);
+              }
+            }
+          });
+        }, 100);
+      }
+
+      // Handle characters if provided
+      if (story.characters && Array.isArray(story.characters)) {
+        setCharacters(story.characters);
+      }
+
+      markChanged();
+      console.log('[App] Story injection complete:', {
+        beats: story.beats?.length || 0,
+        connections: connectionsToCreate.length,
+        characters: story.characters?.length || 0,
+      });
+    };
+  }, [actions, markChanged]);
+
+  useEffect(() => {
+    // Connect to WebSocket server
+    const connectWebSocket = () => {
+      const wsUrl = 'ws://localhost:3001';
+      console.log('[App] Connecting to WebSocket server:', wsUrl);
+
+      try {
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('[App] WebSocket connected to API server');
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            console.log('[App] WebSocket message received:', message.event);
+
+            if (message.event === 'story:inject' && message.data) {
+              // Use the ref to call the latest callback
+              if (handleStoryGeneratedRef.current) {
+                handleStoryGeneratedRef.current(message.data);
+              }
+            } else if (message.event === 'story:request-state') {
+              // Server is requesting current state - could implement state reporting
+              console.log('[App] State request received (not implemented)');
+            }
+          } catch (error) {
+            console.error('[App] Failed to parse WebSocket message:', error);
+          }
+        };
+
+        ws.onclose = () => {
+          console.log('[App] WebSocket disconnected, will reconnect...');
+          wsRef.current = null;
+          // Reconnect after a delay
+          setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = (error) => {
+          console.error('[App] WebSocket error:', error);
+        };
+      } catch (error) {
+        console.error('[App] Failed to create WebSocket connection:', error);
+        // Retry after a delay
+        setTimeout(connectWebSocket, 3000);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, []); // Only run once on mount
 
   // Track loaded project to avoid re-loading the same project
   const loadedProjectIdRef = useRef<string | null>(null);

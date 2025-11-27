@@ -1,0 +1,25 @@
+{
+  "name": "@asaps/mcp-server-desktop",
+  "version": "1.0.0",
+  "description": "MCP server for Claude Desktop to directly interact with ASAPS Builder",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "asaps-mcp-desktop": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "keywords": ["mcp", "asaps", "claude-desktop", "story", "interactive-fiction"],
+  "author": "ASAPS Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
