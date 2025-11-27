@@ -8,7 +8,7 @@
  * - Project management
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { getStorageManager, type Project, type StorageManager } from '../storage';
 import { CommandManager, type Command } from '../commands';
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave';
@@ -96,6 +96,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 }) => {
   // State
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  // CRITICAL: Ref to store the most recent project for immediate access
+  // This solves the async state update timing issue where getProjectData
+  // would return stale data before React state update propagated
+  const currentProjectRef = useRef<Project | null>(null);
   const [syncCallback, setSyncCallback] = useState<(() => void) | null>(null);
   const [projectId, setProjectId] = useState<string | null>(initialProjectId || null);
   const [initialized, setInitialized] = useState(false);
@@ -120,14 +124,18 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    * Get current project data for auto-save
    */
   const getProjectData = useCallback(() => {
-    if (!currentProject) {
+    // CRITICAL FIX: Use ref for immediate access to most recent project
+    // This solves the async state update timing issue
+    const projectToUse = currentProjectRef.current || currentProject;
+
+    if (!projectToUse) {
       throw new Error('No current project');
     }
 
     // CRITICAL FIX: For untitled projects, throw error to prevent auto-save
     // This forces the user to manually save (which opens Save Project dialog)
     if (isUntitledProject) {
-      console.log('[PersistenceContext] getProjectData - BLOCKING auto-save for untitled project:', currentProject.name);
+      console.log('[PersistenceContext] getProjectData - BLOCKING auto-save for untitled project:', projectToUse.name);
       throw new Error('Cannot auto-save untitled project');
     }
 
@@ -138,21 +146,24 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     }
     syncCallback?.();
 
-    const story = (currentProject as any).story;
+    // After sync, get the most recent project from ref (sync updates the ref)
+    const finalProject = currentProjectRef.current || projectToUse;
+
+    const story = (finalProject as any).story;
     const beats = story?.beats;
     const beatsCount = beats ? (Array.isArray(beats) ? beats.length : beats.size || 0) : 0;
 
     if (debug) {
       console.log('[PersistenceContext] getProjectData - AFTER SYNC:', {
-        projectId: currentProject.id,
-        projectName: currentProject.name,
+        projectId: finalProject.id,
+        projectName: finalProject.name,
         beatsCount: beatsCount,
         hasStory: !!story,
         storyKeys: story ? Object.keys(story) : 'no story'
       });
     }
 
-    return currentProject;
+    return finalProject;
   }, [currentProject, syncCallback, debug, isUntitledProject]);
 
   /**
@@ -181,6 +192,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         if (initialProjectId) {
           const result = await storage.getProject(initialProjectId);
           if (result.success && result.data) {
+            currentProjectRef.current = result.data;
             setCurrentProject(result.data);
             commandManager.setProjectId(initialProjectId);
             await commandManager.loadFromStorage();
@@ -245,6 +257,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         return false;
       }
 
+      currentProjectRef.current = result.data;
       setCurrentProject(result.data);
       setProjectId(projectId);
 
@@ -298,6 +311,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         throw result.error || new Error('Failed to create project');
       }
 
+      currentProjectRef.current = newProject;
       setCurrentProject(newProject);
       setProjectId(newProjectId);
       commandManager.setProjectId(newProjectId);
@@ -323,6 +337,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
       // If deleting current project, clear state
       if (projectId === currentProject?.id) {
+        currentProjectRef.current = null;
         setCurrentProject(null);
         setProjectId(null);
         commandManager.clear();
@@ -351,6 +366,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       modifiedAt: new Date(),
     };
 
+    currentProjectRef.current = updatedProject;
     setCurrentProject(updatedProject);
     markChanged();
   }, [currentProject, markChanged]);
@@ -430,6 +446,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       beatsArrayLength: Array.isArray((updatedProject.story as any)?.beats) ? (updatedProject.story as any).beats.length : (updatedProject.story as any)?.beats?.size || 0
     });
 
+    // CRITICAL: Update ref FIRST for immediate access (before async state update)
+    currentProjectRef.current = updatedProject;
     setCurrentProject(updatedProject);
     // Note: Don't call markChanged() here - let the caller decide when to trigger auto-save
   }, [currentProject]);
@@ -465,6 +483,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       }
 
       // Update state to reflect new named project
+      currentProjectRef.current = namedProject;
       setCurrentProject(namedProject);
       setProjectId(newProjectId);
       setIsUntitledProject(false);

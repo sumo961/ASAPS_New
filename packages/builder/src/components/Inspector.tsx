@@ -644,6 +644,9 @@ export const Inspector: React.FC<InspectorProps> = ({
       ...beat,
       connections: updatedConnections
     });
+
+    // Reset hasChanges since we just saved
+    setHasChanges(false);
   };
 
   const handleSave = () => {

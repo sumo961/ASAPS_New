@@ -374,8 +374,19 @@ export function useStoryBuilder() {
         clusters: [], // Initialize empty clusters for imported story
       });
 
-      // Reset beat counter
-      beatCounter.current = beats.length;
+      // Reset beat counter - parse actual beat IDs to find the highest number
+      let maxBeatNumber = 0;
+      for (const beat of beats) {
+        const match = beat.id?.match(/^beat_(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxBeatNumber) {
+            maxBeatNumber = num;
+          }
+        }
+      }
+      beatCounter.current = Math.max(maxBeatNumber + 1, beats.length);
+      console.log('[importStory] Beat counter set to:', beatCounter.current);
 
       // Log any warnings
       if (result.warnings.length > 0) {
@@ -436,7 +447,21 @@ export function useStoryBuilder() {
     });
 
     // Update beat counter to ensure new beats get unique IDs
-    beatCounter.current = Math.max(beats.length, beatCounter.current);
+    // CRITICAL FIX: Parse actual beat IDs to find the highest number
+    // This prevents duplicate IDs when beats have been added/deleted
+    let maxBeatNumber = 0;
+    for (const beat of beats) {
+      const match = beat.id?.match(/^beat_(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxBeatNumber) {
+          maxBeatNumber = num;
+        }
+      }
+    }
+    // Set counter to one higher than the max found ID
+    beatCounter.current = Math.max(maxBeatNumber + 1, beats.length, beatCounter.current);
+    console.log('[useStoryBuilder] Beat counter set to:', beatCounter.current, '(max beat ID found:', maxBeatNumber, ')');
 
     console.log('[useStoryBuilder] Story data loaded:', {
       title: storyData.title,

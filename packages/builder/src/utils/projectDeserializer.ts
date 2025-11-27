@@ -160,12 +160,52 @@ export function loadProjectData(project: Project): {
     clusters = story.clusters;
   }
 
-  // CRITICAL FIX: Extract connections (these were being lost!)
+  // CRITICAL FIX: Extract connections from multiple sources
+  // Priority: story.connections (flowchart format) > extract from beats
   let connections: any[] = [];
+
+  // First, try to get story-level connections (flowchart format: { source, target })
   if (story.getConnections && typeof story.getConnections === 'function') {
     connections = story.getConnections();
-  } else if (story.connections) {
+  } else if (story.connections && Array.isArray(story.connections)) {
     connections = story.connections;
+  }
+
+  console.log('[loadProjectData] Story-level connections found:', connections.length);
+
+  // If no story-level connections, extract from beat data
+  // This handles cases where connections were only stored in beats
+  if (connections.length === 0 && beatsData.length > 0) {
+    console.log('[loadProjectData] No story-level connections, extracting from beats...');
+
+    for (const beatData of beatsData) {
+      const beatId = beatData.id;
+
+      // Get connections from beat - either from instance method or serialized data
+      let beatConnections: any[] = [];
+
+      if (beatData.getConnections && typeof beatData.getConnections === 'function') {
+        // Beat instance with getConnections method
+        beatConnections = beatData.getConnections();
+      } else if (beatData.connections && Array.isArray(beatData.connections)) {
+        // Serialized beat data
+        beatConnections = beatData.connections;
+      }
+
+      // Convert beat connections (targetId format) to flowchart connections (source/target format)
+      for (const conn of beatConnections) {
+        const targetId = conn.targetId || conn.target;
+        if (targetId) {
+          connections.push({
+            source: beatId,
+            target: targetId,
+            label: conn.label
+          });
+        }
+      }
+    }
+
+    console.log('[loadProjectData] Extracted', connections.length, 'connections from beats');
   }
 
   console.log('[loadProjectData] Final loaded data:', {
