@@ -25,6 +25,9 @@ const BEAT_NODE_WIDTH = 250;
 const BEAT_NODE_HEIGHT = 80;
 const BEAT_PADDING = 30; // Minimum spacing between beats
 
+// Refs to hold current state for sync operations (avoids stale closures)
+// These are updated on every render and provide immediate access to current values
+
 /**
  * Resolve overlapping beat positions by pushing them apart
  */
@@ -116,6 +119,26 @@ function App() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
 
+  // CRITICAL: Refs to hold current state values for sync operations
+  // These avoid stale closures when syncProjectData is called inside setTimeout
+  const beatsRef = useRef<Beat[]>(state.beats);
+  const connectionsRef = useRef(state.connections);
+  const titleRef = useRef(state.title);
+  const authorRef = useRef(state.author);
+  const charactersRef = useRef<Character[]>(characters);
+
+  // Update refs on every render to ensure they always have current values
+  useEffect(() => {
+    beatsRef.current = state.beats;
+    connectionsRef.current = state.connections;
+    titleRef.current = state.title;
+    authorRef.current = state.author;
+  }, [state.beats, state.connections, state.title, state.author]);
+
+  useEffect(() => {
+    charactersRef.current = characters;
+  }, [characters]);
+
   // Project and global settings
   const [projectSettings, setProjectSettings] = useState({
     width: 1024,
@@ -201,6 +224,10 @@ function App() {
   /**
    * Sync current story state to project before saving
    * This ensures beats, characters, etc. are persisted to the project story
+   *
+   * CRITICAL: Uses refs (beatsRef, etc.) instead of state values to avoid stale closures.
+   * When called inside setTimeout, state values from useCallback closure are stale,
+   * but refs always have the current value.
    */
   const syncProjectData = useCallback(() => {
     if (!currentProject) {
@@ -208,18 +235,20 @@ function App() {
       return;
     }
 
-    if (state.beats.length === 0) {
-      console.log('[App] syncProjectData - No beats in state, skipping');
+    // CRITICAL: Read from refs to get current values, not stale closure values
+    const currentBeats = beatsRef.current;
+    const currentConnections = connectionsRef.current;
+    const currentTitle = titleRef.current;
+    const currentAuthor = authorRef.current;
+    const currentCharacters = charactersRef.current;
+
+    if (currentBeats.length === 0) {
+      console.log('[App] syncProjectData - No beats in beatsRef, skipping');
       return;
     }
 
-    // CRITICAL DEBUG: Check if beats array reference changes
-    // Store reference to verify it's the same array throughout
-    const beatsBefore = state.beats;
-    const beatsCountBefore = state.beats.length;
-
-    // Log detailed beat information with ACTUAL array check
-    const beatDetails = state.beats.map(b => ({
+    // Log detailed beat information
+    const beatDetails = currentBeats.map(b => ({
       id: b.id,
       name: b.name || 'unnamed',
       type: b.type,
@@ -227,72 +256,44 @@ function App() {
       y: (b as any).y
     }));
 
-    console.log('[App] syncProjectData - BEFORE updateStory call:', {
-      totalBeats: beatsCountBefore,
+    console.log('[App] syncProjectData - Using REFS (not stale closure):', {
+      totalBeats: currentBeats.length,
       beats: beatDetails,
-      beatsArrayLength: state.beats.length,
-      beatsReference: beatsBefore,
-      connections: state.connections.length,
-      characters: characters.length,
-      title: state.title,
-      author: state.author
+      connections: currentConnections.length,
+      characters: currentCharacters.length,
+      title: currentTitle,
+      author: currentAuthor
     });
 
     // CRITICAL: Serialize beats with toJSON() before storing
     // Beat instances have methods that can't be structured-cloned by IndexedDB
-    // This ensures derived connections (from choices/props) are properly captured
-    const serializedBeats = state.beats.map(beat => {
+    const serializedBeats = currentBeats.map(beat => {
       if (typeof beat.toJSON === 'function') {
         return beat.toJSON();
       }
-      // Fallback if already a plain object
       return beat;
     });
 
     const storyData = {
-      title: state.title,
-      author: state.author,
-      // Also set metadata for compatibility with loadProjectData which checks story.metadata
+      title: currentTitle,
+      author: currentAuthor,
       metadata: {
-        title: state.title,
-        author: state.author,
+        title: currentTitle,
+        author: currentAuthor,
       },
       beats: serializedBeats,
-      characters: characters,
-      connections: state.connections,
+      characters: currentCharacters,
+      connections: currentConnections,
     };
 
-    // DEBUG: Verify storyData has all beats
     console.log('[App] storyData being passed to updateStory:', {
       beatsCount: storyData.beats.length,
       beatIds: storyData.beats.map((b: any) => b.id)
     });
 
     updateStory(storyData);
-    console.log('[App] syncProjectData - updateStory called, checking if beats reference changed...');
-
-    // DEBUG: Check if state.beats is still the same
-    if (state.beats !== beatsBefore) {
-      console.warn('[App] ⚠️ BEATS ARRAY REFERENCE CHANGED! This could cause data loss!');
-      console.warn('[App] Before:', beatsBefore.length, 'beats');
-      console.warn('[App] After:', state.beats.length, 'beats');
-    } else {
-      console.log('[App] Beats array reference unchanged (good)');
-    }
-
-    // DEBUG: Check the project story after update
-    setTimeout(() => {
-      const story = (currentProject as any).story;
-      const beats = story?.beats;
-      const beatsCount = beats ? (Array.isArray(beats) ? beats.length : beats.size || 0) : 0;
-      console.log('[App] syncProjectData - VERIFICATION after update (setTimeout):', {
-        beatsCount,
-        hasStory: !!story,
-        beatIds: Array.isArray(beats) ? beats.map((b: any) => b.id) : 'not array',
-        storyKeys: story ? Object.keys(story) : 'no story'
-      });
-    }, 100);
-  }, [currentProject, state.beats, state.connections, state.title, state.author, characters, updateStory]);
+    console.log('[App] syncProjectData - updateStory called successfully');
+  }, [currentProject, updateStory]);
 
   /**
    * Register sync callback with PersistenceContext
