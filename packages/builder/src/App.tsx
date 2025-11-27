@@ -463,7 +463,8 @@ function App() {
         setCharacters(story.characters);
       }
 
-      markChanged();
+      // NOTE: Don't call markChanged() here - we'll save the project immediately
+      // and it should not appear as "unsaved" after the save completes
       console.log('[App] Story injection complete:', {
         beats: story.beats?.length || 0,
         connections: connectionsToCreate.length,
@@ -584,10 +585,18 @@ function App() {
 
   // Track loaded project to avoid re-loading the same project
   const loadedProjectIdRef = useRef<string | null>(null);
+  // Track if we've already initialized to prevent React Strict Mode double-init
+  const hasInitializedRef = useRef<boolean>(false);
 
   // Initialize with a basic story and create untitled project on mount
   useEffect(() => {
     const initializeApp = async () => {
+      // CRITICAL: Prevent double initialization from React Strict Mode
+      if (hasInitializedRef.current) {
+        console.log('[App] Skipping init - already initialized');
+        return;
+      }
+
       console.log('[App] Initializing app - currentProject:', currentProject, 'beats.length:', state.beats.length);
 
       // CRITICAL FIX: Reset loadedProjectIdRef on fresh start
@@ -603,14 +612,17 @@ function App() {
       if (!hasAnyProjects && state.beats.length === 0) {
         console.log('[App] No projects exist and no beats - initializing from scratch');
 
+        // Mark as initialized BEFORE async operations to prevent race conditions
+        hasInitializedRef.current = true;
+
         // Initialize the story first (creates the 3-beat base story)
         // This is async - beats will appear in state shortly
         initializeStory();
         console.log('[App] AFTER initializeStory called - beats will appear soon via React state update');
 
-        // CRITICAL: Mark as changed so hasUnsavedChanges becomes true
-        console.log('[App] Marking as changed to trigger save button');
-        markChanged();
+        // NOTE: Do NOT mark as changed here - the default story is not "unsaved work"
+        // Only mark as changed when user actually makes changes
+        // This prevents showing "unsaved" indicator for a fresh default story
 
         // Create untitled project - the loading effect will handle saving beats when they appear
         try {

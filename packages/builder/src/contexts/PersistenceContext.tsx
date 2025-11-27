@@ -493,11 +493,24 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         throw result.error || new Error('Failed to save project');
       }
 
+      // Delete the old untitled project if it was "Untitled Project"
+      // This prevents accumulation of ghost untitled projects
+      if (projectToSave.name === 'Untitled Project') {
+        console.log('[PersistenceContext] Deleting old untitled project:', projectToSave.id);
+        try {
+          await storage.deleteProject(projectToSave.id);
+        } catch (deleteError) {
+          console.warn('[PersistenceContext] Failed to delete old untitled project:', deleteError);
+          // Non-fatal - continue with saving the new project
+        }
+      }
+
       // Update state to reflect new named project
       currentProjectRef.current = namedProject;
       setCurrentProject(namedProject);
       setProjectId(newProjectId);
       setIsUntitledProject(false);
+      // Note: hasUnsavedChanges will be cleared by saveNow() which sets status to 'saved'
       commandManager.setProjectId(newProjectId);
       commandManager.clear();
 
