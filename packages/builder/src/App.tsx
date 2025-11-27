@@ -252,6 +252,11 @@ function App() {
     const storyData = {
       title: state.title,
       author: state.author,
+      // Also set metadata for compatibility with loadProjectData which checks story.metadata
+      metadata: {
+        title: state.title,
+        author: state.author,
+      },
       beats: serializedBeats,
       characters: characters,
       connections: state.connections,
@@ -442,10 +447,18 @@ function App() {
       });
 
       // Auto-save: Create a new project and save the injected story
-      // Wait for React state to update before saving
+      // Flow: 1) Wait for state 2) Sync to project 3) Wait 4) Save as new project
       setTimeout(async () => {
         try {
           const description = story.metadata?.description || 'Story created via Claude Desktop MCP';
+          console.log('[App] Syncing injected story data to project...');
+
+          // Explicitly sync current beats to project before saving
+          syncProjectData();
+
+          // Wait for React state update
+          await new Promise(resolve => setTimeout(resolve, 200));
+
           console.log('[App] Auto-saving injected story as new project:', storyTitle);
           await saveCurrent(storyTitle, description);
           console.log('[App] Injected story saved successfully');
@@ -454,7 +467,7 @@ function App() {
         }
       }, 300);
     };
-  }, [actions, markChanged, saveCurrent]);
+  }, [actions, markChanged, saveCurrent, syncProjectData]);
 
   useEffect(() => {
     // Connect to WebSocket server
@@ -1133,10 +1146,18 @@ function App() {
     markChanged();
 
     // Auto-save: Create a new project and save the generated story
-    // Wait for React state to update before saving
+    // Flow: 1) Wait for state 2) Sync to project 3) Wait 4) Save as new project
     setTimeout(async () => {
       try {
         const description = story.metadata?.description || 'AI-generated interactive story';
+        console.log('[App] Syncing generated story data to project...');
+
+        // Explicitly sync current beats to project before saving
+        syncProjectData();
+
+        // Wait for React state update
+        await new Promise(resolve => setTimeout(resolve, 200));
+
         console.log('[App] Auto-saving generated story as new project:', storyTitle);
         await saveCurrent(storyTitle, description);
         console.log('[App] Generated story saved successfully');
@@ -1144,7 +1165,7 @@ function App() {
         console.error('[App] Failed to auto-save generated story:', error);
       }
     }, 300);
-  }, [actions, markChanged, saveCurrent]);
+  }, [actions, markChanged, saveCurrent, syncProjectData]);
 
   /**
    * Handle AI-generated beat from natural language description
