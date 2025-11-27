@@ -315,19 +315,34 @@ function App() {
    */
   const handleStoryGeneratedRef = useRef<((story: any) => void) | null>(null);
   const injectionSaveInProgressRef = useRef<boolean>(false);
+  const currentInjectionIdRef = useRef<string | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Store the latest handleStoryGenerated callback in a ref to avoid stale closures
     handleStoryGeneratedRef.current = async (story: any) => {
-      // Prevent duplicate saves from React re-renders
-      if (injectionSaveInProgressRef.current) {
-        console.log('[App] Story injection already in progress, skipping duplicate');
+      // Generate unique injection ID for this story
+      const injectionId = `injection_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Cancel any previous pending save operations
+      if (saveTimeoutRef.current) {
+        console.log('[App] Cancelling previous save timeout');
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+
+      // Prevent duplicate calls - but allow if this is a new injection
+      if (injectionSaveInProgressRef.current && currentInjectionIdRef.current === injectionId) {
+        console.log('[App] Story injection already in progress for same ID, skipping duplicate');
         return;
       }
+
+      // Set current injection as active
       injectionSaveInProgressRef.current = true;
+      currentInjectionIdRef.current = injectionId;
 
       const storyTitle = story.metadata?.title || 'Injected Story';
-      console.log('[App] Received story via WebSocket:', storyTitle);
+      console.log('[App] Received story via WebSocket:', storyTitle, 'injectionId:', injectionId);
 
       // Clear existing beats and connections
       actions.clearStory();
@@ -453,14 +468,22 @@ function App() {
         beats: story.beats?.length || 0,
         connections: connectionsToCreate.length,
         characters: story.characters?.length || 0,
+        injectionId,
       });
 
       // Auto-save: Create a new project and save the injected story
       // Flow: 1) Wait for state 2) Sync to project 3) Wait 4) Save as new project
-      setTimeout(async () => {
+      // Store timeout ref so it can be cancelled if a new injection comes in
+      saveTimeoutRef.current = setTimeout(async () => {
+        // Check if this injection is still the active one
+        if (currentInjectionIdRef.current !== injectionId) {
+          console.log('[App] Injection ID mismatch, skipping save. Expected:', injectionId, 'Current:', currentInjectionIdRef.current);
+          return;
+        }
+
         try {
           const description = story.metadata?.description || 'Story created via Claude Desktop MCP';
-          console.log('[App] Syncing injected story data to project...');
+          console.log('[App] Syncing injected story data to project...', 'injectionId:', injectionId);
 
           // Explicitly sync current beats to project before saving
           syncProjectData();
@@ -468,16 +491,34 @@ function App() {
           // Wait for React state update
           await new Promise(resolve => setTimeout(resolve, 200));
 
+          // Double-check we're still the active injection
+          if (currentInjectionIdRef.current !== injectionId) {
+            console.log('[App] Injection ID changed during wait, aborting save');
+            return;
+          }
+
           console.log('[App] Auto-saving injected story as new project:', storyTitle);
           await saveCurrent(storyTitle, description);
           console.log('[App] Injected story saved successfully');
         } catch (error) {
           console.error('[App] Failed to auto-save injected story:', error);
         } finally {
-          // Reset flag to allow future injections
-          injectionSaveInProgressRef.current = false;
+          // Reset flags only if this is still the active injection
+          if (currentInjectionIdRef.current === injectionId) {
+            injectionSaveInProgressRef.current = false;
+            saveTimeoutRef.current = null;
+          }
         }
       }, 300);
+    };
+
+    // Cleanup on effect re-run (HMR) - cancel any pending saves
+    return () => {
+      if (saveTimeoutRef.current) {
+        console.log('[App] Cleanup: cancelling pending save timeout');
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
     };
   }, [actions, markChanged, saveCurrent, syncProjectData]);
 
