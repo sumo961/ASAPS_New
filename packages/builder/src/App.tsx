@@ -311,15 +311,16 @@ function App() {
 
   useEffect(() => {
     // Store the latest handleStoryGenerated callback in a ref to avoid stale closures
-    handleStoryGeneratedRef.current = (story: any) => {
-      console.log('[App] Received story via WebSocket:', story.metadata?.title || 'Untitled');
+    handleStoryGeneratedRef.current = async (story: any) => {
+      const storyTitle = story.metadata?.title || 'Injected Story';
+      console.log('[App] Received story via WebSocket:', storyTitle);
 
       // Clear existing beats and connections
       actions.clearStory();
 
       // Add metadata
       if (story.metadata) {
-        actions.setTitle(story.metadata.title || 'Injected Story');
+        actions.setTitle(storyTitle);
         if (story.metadata.author) {
           // Note: author setting if available
         }
@@ -439,8 +440,21 @@ function App() {
         connections: connectionsToCreate.length,
         characters: story.characters?.length || 0,
       });
+
+      // Auto-save: Create a new project and save the injected story
+      // Wait for React state to update before saving
+      setTimeout(async () => {
+        try {
+          const description = story.metadata?.description || 'Story created via Claude Desktop MCP';
+          console.log('[App] Auto-saving injected story as new project:', storyTitle);
+          await saveCurrent(storyTitle, description);
+          console.log('[App] Injected story saved successfully');
+        } catch (error) {
+          console.error('[App] Failed to auto-save injected story:', error);
+        }
+      }, 300);
     };
-  }, [actions, markChanged]);
+  }, [actions, markChanged, saveCurrent]);
 
   useEffect(() => {
     // Connect to WebSocket server
@@ -974,15 +988,16 @@ function App() {
   /**
    * Handle AI-generated story
    */
-  const handleStoryGenerated = useCallback((story: any) => {
-    console.log('[App] Story generated:', story);
+  const handleStoryGenerated = useCallback(async (story: any) => {
+    const storyTitle = story.metadata?.title || 'Generated Story';
+    console.log('[App] Story generated:', storyTitle);
 
     // Clear existing beats and connections
     actions.clearStory();
 
     // Add metadata
     if (story.metadata) {
-      actions.setTitle(story.metadata.title || 'Generated Story');
+      actions.setTitle(storyTitle);
     }
 
     // Resolve overlapping positions before adding beats
@@ -1116,7 +1131,20 @@ function App() {
     }
 
     markChanged();
-  }, [actions, markChanged]);
+
+    // Auto-save: Create a new project and save the generated story
+    // Wait for React state to update before saving
+    setTimeout(async () => {
+      try {
+        const description = story.metadata?.description || 'AI-generated interactive story';
+        console.log('[App] Auto-saving generated story as new project:', storyTitle);
+        await saveCurrent(storyTitle, description);
+        console.log('[App] Generated story saved successfully');
+      } catch (error) {
+        console.error('[App] Failed to auto-save generated story:', error);
+      }
+    }, 300);
+  }, [actions, markChanged, saveCurrent]);
 
   /**
    * Handle AI-generated beat from natural language description
