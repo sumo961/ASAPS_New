@@ -459,7 +459,12 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     name: string,
     description?: string
   ): Promise<string> => {
-    if (!currentProject) {
+    // CRITICAL: Use currentProjectRef.current instead of currentProject state
+    // The ref has the immediately updated value from syncProjectData,
+    // whereas currentProject state may be stale due to React's async updates
+    const projectToSave = currentProjectRef.current || currentProject;
+
+    if (!projectToSave) {
       throw new Error('No current project to save');
     }
 
@@ -467,9 +472,15 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       const { v4: uuidv4 } = await import('uuid');
       const newProjectId = uuidv4();
 
+      console.log('[PersistenceContext] saveCurrentProject - Creating new project:', {
+        name,
+        sourceProjectId: projectToSave.id,
+        storyBeatsCount: (projectToSave.story as any)?.beats?.length || 0,
+      });
+
       // Create new named project with current project data
       const namedProject: Project = {
-        ...currentProject,
+        ...projectToSave,
         id: newProjectId,
         name,
         description,

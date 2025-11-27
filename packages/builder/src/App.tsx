@@ -313,10 +313,18 @@ function App() {
    * This enables Claude Desktop MCP and other external tools to push stories directly
    */
   const handleStoryGeneratedRef = useRef<((story: any) => void) | null>(null);
+  const injectionSaveInProgressRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Store the latest handleStoryGenerated callback in a ref to avoid stale closures
     handleStoryGeneratedRef.current = async (story: any) => {
+      // Prevent duplicate saves from React re-renders
+      if (injectionSaveInProgressRef.current) {
+        console.log('[App] Story injection already in progress, skipping duplicate');
+        return;
+      }
+      injectionSaveInProgressRef.current = true;
+
       const storyTitle = story.metadata?.title || 'Injected Story';
       console.log('[App] Received story via WebSocket:', storyTitle);
 
@@ -464,6 +472,9 @@ function App() {
           console.log('[App] Injected story saved successfully');
         } catch (error) {
           console.error('[App] Failed to auto-save injected story:', error);
+        } finally {
+          // Reset flag to allow future injections
+          injectionSaveInProgressRef.current = false;
         }
       }, 300);
     };
