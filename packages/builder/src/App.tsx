@@ -316,63 +316,68 @@ function App() {
   const handleStoryGeneratedRef = useRef<((story: any) => void) | null>(null);
   const injectionSaveInProgressRef = useRef<boolean>(false);
   const currentInjectionIdRef = useRef<string | null>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track processed injections by server timestamp to prevent duplicates
+  const processedInjectionsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     // Store the latest handleStoryGenerated callback in a ref to avoid stale closures
     handleStoryGeneratedRef.current = async (story: any) => {
-      // Generate unique injection ID for this story
-      const injectionId = `injection_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Use server's injectedAt timestamp as deduplication key
+      // This ensures the same story isn't processed twice even if received by multiple clients
+      const serverInjectionId = story.injectedAt || `fallback_${Date.now()}`;
 
-      // Cancel any previous pending save operations
-      if (saveTimeoutRef.current) {
-        console.log('[App] Cancelling previous save timeout');
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
-
-      // Prevent duplicate calls - but allow if this is a new injection
-      if (injectionSaveInProgressRef.current && currentInjectionIdRef.current === injectionId) {
-        console.log('[App] Story injection already in progress for same ID, skipping duplicate');
+      // Check if we've already processed this injection
+      if (processedInjectionsRef.current.has(serverInjectionId)) {
+        console.log('[App] Story already processed (duplicate WebSocket message), skipping. injectedAt:', serverInjectionId);
         return;
       }
 
-      // Set current injection as active
+      // Mark as processed
+      processedInjectionsRef.current.add(serverInjectionId);
+
+      // Clean up old entries after 10 seconds to prevent memory leak
+      setTimeout(() => {
+        processedInjectionsRef.current.delete(serverInjectionId);
+      }, 10000);
+
+      // Generate unique injection ID for tracking within this session
+      const injectionId = `injection_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Set current injection as active (cancels any previous in-flight saves via ID check)
       injectionSaveInProgressRef.current = true;
       currentInjectionIdRef.current = injectionId;
 
       const storyTitle = story.metadata?.title || 'Injected Story';
       console.log('[App] Received story via WebSocket:', storyTitle, 'injectionId:', injectionId);
 
-      // Clear existing beats and connections
-      actions.clearStory();
+      // NOTE: We use loadStoryData for a single batch update instead of:
+      // - actions.clearStory() - would trigger a state update
+      // - actions.setTitle() - would trigger another state update
+      // - actions.addBeat() x 42 - would trigger 42 state updates!
+      // This reduces re-renders from 44+ to just 1
 
-      // Add metadata
-      if (story.metadata) {
-        actions.setTitle(storyTitle);
-        if (story.metadata.author) {
-          // Note: author setting if available
-        }
-      }
-
-      // Resolve overlapping positions before adding beats
+      // BATCH UPDATE: Create all beats first, then load them in a single state update
+      // This prevents the GraphEditor from re-rendering 42+ times
       const adjustedPositions = story.beats && Array.isArray(story.beats)
         ? resolveOverlappingPositions(story.beats)
         : new Map();
 
-      // Add all beats with adjusted positions
+      // Create all beats without adding to state (batch preparation)
+      const createdBeats: Beat[] = [];
       if (story.beats && Array.isArray(story.beats)) {
         story.beats.forEach((beatData: any) => {
           const position = adjustedPositions.get(beatData.id) ||
             beatData.position ||
             { x: beatData.x || 200, y: beatData.y || 200 };
 
-          const beat = actions.addBeat(
+          // Use createBeat (not addBeat) to avoid state updates
+          const beat = actions.createBeat(
             beatData.type || 'introText',
             position,
             { id: beatData.id, name: beatData.name || beatData.label }
           );
 
+          // Apply parameters directly to the beat instance
           if (beatData.parameters) {
             let params = { ...beatData.parameters };
 
@@ -396,12 +401,15 @@ function App() {
               }
             }
 
-            actions.updateBeat(beat.id, params);
+            // Update parameters on the beat instance directly
+            beat.updateParameters(params);
           }
+
+          createdBeats.push(beat);
         });
       }
 
-      // Process connections
+      // Process connections (build connection list without state updates)
       const connectionsToCreate: Array<{ source: string; target: string; label?: string }> = [];
 
       // Extract connections from beat parameters
@@ -443,22 +451,52 @@ function App() {
         });
       }
 
-      // Create connections after a short delay
-      if (connectionsToCreate.length > 0) {
-        setTimeout(() => {
-          connectionsToCreate.forEach((conn) => {
-            if (conn.source && conn.target) {
-              try {
-                actions.connectBeats(conn.source, conn.target, conn.label);
-              } catch (error) {
-                console.warn('[App] Failed to create connection:', conn, error);
-              }
-            }
-          });
-        }, 100);
-      }
-
       // Handle characters if provided
+      const storyCharacters = story.characters && Array.isArray(story.characters)
+        ? story.characters
+        : characters; // Keep existing characters if none provided
+
+      // CRITICAL: Add connections to beat instances BEFORE loading story data
+      // The GraphEditor reads connections from beat.getConnections(), not state.connections
+      // Build a map of beats by ID for fast lookup
+      const beatMap = new Map<string, Beat>();
+      createdBeats.forEach(beat => beatMap.set(beat.id, beat));
+
+      // Add connections to source beats
+      connectionsToCreate.forEach(conn => {
+        const sourceBeat = beatMap.get(conn.source);
+        const targetBeat = beatMap.get(conn.target);
+        if (sourceBeat && targetBeat) {
+          sourceBeat.addConnection({
+            targetId: conn.target,
+            label: conn.label || `To ${targetBeat.name}`,
+          });
+        }
+      });
+
+      // CRITICAL: Set pendingNewProjectIdRef BEFORE loadStoryData
+      // The loadStoryData call will trigger the load effect via state.beats dependency.
+      // We need to mark that we're in a save transition BEFORE that happens.
+      pendingNewProjectIdRef.current = 'pending';
+      console.log('[App] Set pendingNewProjectIdRef to "pending" before loadStoryData');
+
+      // SINGLE BATCH UPDATE: Load all story data at once
+      // This triggers only ONE re-render instead of 42+
+      console.log('[App] Batch loading story data:', {
+        beats: createdBeats.length,
+        connections: connectionsToCreate.length,
+        characters: storyCharacters.length,
+      });
+
+      actions.loadStoryData({
+        title: storyTitle,
+        author: story.metadata?.author || state.author,
+        beats: createdBeats,
+        connections: connectionsToCreate,
+        characters: storyCharacters,
+      });
+
+      // Update characters state separately (for App-level character management)
       if (story.characters && Array.isArray(story.characters)) {
         setCharacters(story.characters);
       }
@@ -473,12 +511,15 @@ function App() {
       });
 
       // Auto-save: Create a new project and save the injected story
-      // Flow: 1) Wait for state 2) Sync to project 3) Wait 4) Save as new project
-      // Store timeout ref so it can be cancelled if a new injection comes in
-      saveTimeoutRef.current = setTimeout(async () => {
+      // Use an async IIFE that runs immediately - don't use setTimeout that can be cancelled by HMR
+      // The injectionId check protects against duplicate processing
+      (async () => {
+        // Wait for React state to settle
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         // Check if this injection is still the active one
         if (currentInjectionIdRef.current !== injectionId) {
-          console.log('[App] Injection ID mismatch, skipping save. Expected:', injectionId, 'Current:', currentInjectionIdRef.current);
+          console.log('[App] Injection ID mismatch after wait, skipping save. Expected:', injectionId, 'Current:', currentInjectionIdRef.current);
           return;
         }
 
@@ -489,7 +530,7 @@ function App() {
           // Explicitly sync current beats to project before saving
           syncProjectData();
 
-          // Wait for React state update
+          // Wait for sync to complete
           await new Promise(resolve => setTimeout(resolve, 200));
 
           // Double-check we're still the active injection
@@ -499,28 +540,32 @@ function App() {
           }
 
           console.log('[App] Auto-saving injected story as new project:', storyTitle);
-          await saveCurrent(storyTitle, description);
-          console.log('[App] Injected story saved successfully');
+
+          // NOTE: pendingNewProjectIdRef was already set to 'pending' before loadStoryData
+          // to block the load effect from reloading the old project
+
+          const newProjectId = await saveCurrent(storyTitle, description);
+          console.log('[App] Injected story saved successfully, new project ID:', newProjectId);
+
+          // CRITICAL: Update both refs atomically
+          // pendingNewProjectIdRef stores the new ID so the load effect knows to skip
+          // until currentProject catches up
+          pendingNewProjectIdRef.current = newProjectId;
+          loadedProjectIdRef.current = newProjectId;
         } catch (error) {
           console.error('[App] Failed to auto-save injected story:', error);
+          // Clear pending flag on error to allow normal operation to resume
+          pendingNewProjectIdRef.current = null;
         } finally {
           // Reset flags only if this is still the active injection
           if (currentInjectionIdRef.current === injectionId) {
             injectionSaveInProgressRef.current = false;
-            saveTimeoutRef.current = null;
           }
         }
-      }, 300);
+      })();
     };
 
-    // Cleanup on effect re-run (HMR) - cancel any pending saves
-    return () => {
-      if (saveTimeoutRef.current) {
-        console.log('[App] Cleanup: cancelling pending save timeout');
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
-    };
+    // No cleanup needed - the async IIFE will check injectionId to prevent duplicate saves
   }, [actions, markChanged, saveCurrent, syncProjectData]);
 
   useEffect(() => {
@@ -587,6 +632,11 @@ function App() {
   const loadedProjectIdRef = useRef<string | null>(null);
   // Track if we've already initialized to prevent React Strict Mode double-init
   const hasInitializedRef = useRef<boolean>(false);
+  // CRITICAL: Track when we're transitioning to a new project after save
+  // This prevents the load effect from trying to reload the old project
+  // during the async window between saveCurrentProject completing and
+  // React propagating the new currentProject value
+  const pendingNewProjectIdRef = useRef<string | null>(null);
 
   // Initialize with a basic story and create untitled project on mount
   useEffect(() => {
@@ -646,6 +696,7 @@ function App() {
     console.log('[App] Project LOAD EFFECT started');
     console.log('[App] currentProject.id:', currentProject?.id);
     console.log('[App] loadedProjectIdRef:', loadedProjectIdRef.current);
+    console.log('[App] pendingNewProjectIdRef:', pendingNewProjectIdRef.current);
     console.log('[App] state.beats.length:', state.beats.length);
     console.log('[App] currentProject.name:', currentProject?.name);
 
@@ -654,6 +705,34 @@ function App() {
       console.log('[App] >>> SKIPPED loading - no project or already loaded');
       console.log('[App] ==========================================');
       return;
+    }
+
+    // CRITICAL FIX: Check if we're in the middle of a save-to-new-project transition
+    // This happens when saveCurrentProject creates a new project but React hasn't
+    // propagated the new currentProject value yet. During this window, we should
+    // NOT try to reload the old project.
+    if (pendingNewProjectIdRef.current) {
+      // 'pending' means we're waiting for saveCurrent to complete
+      if (pendingNewProjectIdRef.current === 'pending') {
+        console.log('[App] >>> SKIPPED loading - save in progress, waiting for new project ID');
+        console.log('[App] ==========================================');
+        return;
+      }
+
+      // Check if currentProject has caught up to the new project ID
+      if (currentProject.id === pendingNewProjectIdRef.current) {
+        // Transition complete! Clear the pending flag and mark as loaded
+        console.log('[App] >>> Transition complete! currentProject caught up to new project:', currentProject.id);
+        pendingNewProjectIdRef.current = null;
+        loadedProjectIdRef.current = currentProject.id;
+        console.log('[App] ==========================================');
+        return;
+      } else {
+        // Still in transition - currentProject has old ID, skip reload
+        console.log('[App] >>> SKIPPED loading - in transition to new project. currentProject:', currentProject.id, 'pending:', pendingNewProjectIdRef.current);
+        console.log('[App] ==========================================');
+        return;
+      }
     }
 
     console.log('[App] >>> WILL LOAD project:', currentProject.id);

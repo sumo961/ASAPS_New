@@ -105,6 +105,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   const [initialized, setInitialized] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
   const [isUntitledProject, setIsUntitledProject] = useState(false);
+  // CRITICAL: Ref for immediate synchronous access to isUntitledProject
+  // This solves the async state update timing issue where getProjectData
+  // would check stale state before React state update propagated
+  const isUntitledProjectRef = useRef(false);
   const [pendingNavigationAction, setPendingNavigationAction] = useState<string | null>(null);
 
   // Managers (created once)
@@ -134,7 +138,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
     // CRITICAL FIX: For untitled projects, throw error to prevent auto-save
     // This forces the user to manually save (which opens Save Project dialog)
-    if (isUntitledProject) {
+    // CRITICAL: Use ref instead of state for immediate synchronous access
+    // This allows saveCurrentProject to set isUntitledProjectRef.current = false
+    // and have getProjectData see it immediately, before React state updates
+    if (isUntitledProjectRef.current) {
       console.log('[PersistenceContext] getProjectData - BLOCKING auto-save for untitled project:', projectToUse.name);
       throw new Error('Cannot auto-save untitled project');
     }
@@ -164,7 +171,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     }
 
     return finalProject;
-  }, [currentProject, syncCallback, debug, isUntitledProject]);
+  }, [currentProject, syncCallback, debug]);
 
   /**
    * Auto-save hook
@@ -376,29 +383,35 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    * CRITICAL FIX: Handle Story class instances properly
    */
   const updateProjectStory = useCallback((storyData: Partial<any>) => {
-    if (!currentProject) {
+    // CRITICAL: Use ref instead of state to get the most recent project
+    // This is essential because saveCurrentProject updates the ref before calling saveNow(),
+    // but the state hasn't propagated yet. Using the ref ensures we update the NEW project,
+    // not overwrite it with the old one.
+    const projectToUpdate = currentProjectRef.current || currentProject;
+
+    if (!projectToUpdate) {
       console.warn('[PersistenceContext] No current project to update story');
       return;
     }
 
     // DEBUG: Log what's being updated
     console.log('[PersistenceContext] updateProjectStory - BEFORE:', {
-      projectId: currentProject.id,
-      projectName: currentProject.name,
-      storyKeys: Object.keys(currentProject.story || {}),
-      storyBeatsCount: (currentProject.story as any)?.beats ? (Array.isArray((currentProject.story as any).beats) ? (currentProject.story as any).beats.length : 'not array') : 0,
-      storyConstructor: currentProject.story?.constructor?.name
+      projectId: projectToUpdate.id,
+      projectName: projectToUpdate.name,
+      storyKeys: Object.keys(projectToUpdate.story || {}),
+      storyBeatsCount: (projectToUpdate.story as any)?.beats ? (Array.isArray((projectToUpdate.story as any).beats) ? (projectToUpdate.story as any).beats.length : 'not array') : 0,
+      storyConstructor: projectToUpdate.story?.constructor?.name
     });
 
     // CRITICAL FIX: Check if story is a Story class instance
     // If so, we need to convert it to a plain object before merging
-    const isStoryClass = currentProject.story?.constructor?.name === 'Story';
+    const isStoryClass = projectToUpdate.story?.constructor?.name === 'Story';
     let newStory: any;
 
     if (isStoryClass) {
       console.log('[PersistenceContext] Story is a Story class instance, converting to plain object');
       // Convert Story instance to plain object by extracting its data
-      const story = currentProject.story as any;
+      const story = projectToUpdate.story as any;
 
       // CRITICAL: Serialize beats with toJSON() to capture derived connections
       // from choices/props arrays (MovementChoice, PickProp, HyperText, etc.)
@@ -427,13 +440,13 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     } else {
       // Story is already a plain object, use spread operator
       newStory = {
-        ...currentProject.story,
+        ...projectToUpdate.story,
         ...storyData,
       };
     }
 
     const updatedProject = {
-      ...currentProject,
+      ...projectToUpdate,
       story: newStory as any,
       modifiedAt: new Date(),
     };
@@ -459,6 +472,13 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     name: string,
     description?: string
   ): Promise<string> => {
+    // CRITICAL FIX: Sync current React state (beats, connections, etc.) to project
+    // BEFORE reading from the ref. This ensures injected beats are captured.
+    if (syncCallback) {
+      console.log('[PersistenceContext] saveCurrentProject - Syncing project data before save...');
+      syncCallback();
+    }
+
     // CRITICAL: Use currentProjectRef.current instead of currentProject state
     // The ref has the immediately updated value from syncProjectData,
     // whereas currentProject state may be stale due to React's async updates
@@ -509,12 +529,17 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       currentProjectRef.current = namedProject;
       setCurrentProject(namedProject);
       setProjectId(newProjectId);
+      // CRITICAL: Update ref FIRST for immediate synchronous access
+      // This ensures getProjectData (called by saveNow) sees the updated value
+      // before React's async state update propagates
+      isUntitledProjectRef.current = false;
       setIsUntitledProject(false);
       // Note: hasUnsavedChanges will be cleared by saveNow() which sets status to 'saved'
       commandManager.setProjectId(newProjectId);
       commandManager.clear();
 
       // Trigger a save to ensure everything is persisted
+      // Now getProjectData will see isUntitledProjectRef.current = false
       await saveNow();
 
       return newProjectId;
@@ -522,14 +547,24 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceContext] Failed to save current project:', error);
       throw error;
     }
-  }, [currentProject, storage, commandManager, saveNow]);
+  }, [currentProject, storage, commandManager, saveNow, syncCallback]);
 
   /**
    * Clear untitled project state (mark as not untitled)
    */
   const clearUntitledState = useCallback(() => {
+    isUntitledProjectRef.current = false;
     setIsUntitledProject(false);
     setPendingNavigationAction(null);
+  }, []);
+
+  /**
+   * Wrapped setter that updates both ref and state
+   * This ensures the ref is always in sync with the state
+   */
+  const setIsUntitledProjectWithRef = useCallback((isUntitled: boolean) => {
+    isUntitledProjectRef.current = isUntitled;
+    setIsUntitledProject(isUntitled);
   }, []);
 
   /**
@@ -576,7 +611,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     updateProjectMetadata,
     updateProjectStory,
     saveCurrentProject,
-    setIsUntitledProject,
+    setIsUntitledProject: setIsUntitledProjectWithRef,
     clearUntitledState,
     registerSyncCallback,
     unregisterSyncCallback,
