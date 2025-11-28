@@ -569,28 +569,52 @@ function App() {
   }, [actions, markChanged, saveCurrent, syncProjectData]);
 
   useEffect(() => {
+    // Unique ID for this WebSocket connection instance (for debugging duplicates)
+    const wsInstanceId = `ws_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    // Flag to prevent reconnection after cleanup (important for HMR)
+    let isCleanedUp = false;
+
     // Connect to WebSocket server
     const connectWebSocket = () => {
+      // Don't reconnect if we've been cleaned up (HMR or unmount)
+      if (isCleanedUp) {
+        console.log(`[App] Skipping WebSocket reconnect - instance ${wsInstanceId} was cleaned up`);
+        return;
+      }
+
       const wsUrl = 'ws://localhost:3001';
-      console.log('[App] Connecting to WebSocket server:', wsUrl);
+      console.log(`[App] Connecting to WebSocket server: ${wsUrl} (instance: ${wsInstanceId})`);
 
       try {
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
-          console.log('[App] WebSocket connected to API server');
+          console.log(`[App] WebSocket connected to API server (instance: ${wsInstanceId})`);
         };
 
         ws.onmessage = (event) => {
+          // Ignore messages if we've been cleaned up
+          if (isCleanedUp) return;
+
           try {
             const message = JSON.parse(event.data);
-            console.log('[App] WebSocket message received:', message.event);
+            const messageTime = new Date().toISOString();
+            console.log(`[App] WebSocket message received at ${messageTime}:`, message.event);
+            if (message.data?.injectedAt) {
+              console.log('[App] Message injectedAt:', message.data.injectedAt);
+            }
+            if (message.timestamp) {
+              console.log('[App] Message server timestamp:', message.timestamp);
+            }
 
             if (message.event === 'story:inject' && message.data) {
+              console.log(`[App] Processing story:inject event on instance ${wsInstanceId}...`);
               // Use the ref to call the latest callback
               if (handleStoryGeneratedRef.current) {
                 handleStoryGeneratedRef.current(message.data);
+              } else {
+                console.warn('[App] handleStoryGeneratedRef.current is null, cannot process story');
               }
             } else if (message.event === 'story:request-state') {
               // Server is requesting current state - could implement state reporting
@@ -602,10 +626,12 @@ function App() {
         };
 
         ws.onclose = () => {
-          console.log('[App] WebSocket disconnected, will reconnect...');
+          console.log(`[App] WebSocket disconnected (instance: ${wsInstanceId}), isCleanedUp: ${isCleanedUp}`);
           wsRef.current = null;
-          // Reconnect after a delay
-          setTimeout(connectWebSocket, 3000);
+          // Only reconnect if we haven't been cleaned up
+          if (!isCleanedUp) {
+            setTimeout(connectWebSocket, 3000);
+          }
         };
 
         ws.onerror = (error) => {
@@ -613,14 +639,18 @@ function App() {
         };
       } catch (error) {
         console.error('[App] Failed to create WebSocket connection:', error);
-        // Retry after a delay
-        setTimeout(connectWebSocket, 3000);
+        // Only retry if we haven't been cleaned up
+        if (!isCleanedUp) {
+          setTimeout(connectWebSocket, 3000);
+        }
       }
     };
 
     connectWebSocket();
 
     return () => {
+      console.log(`[App] Cleaning up WebSocket instance ${wsInstanceId}`);
+      isCleanedUp = true;
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;

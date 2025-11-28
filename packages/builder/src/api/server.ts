@@ -377,7 +377,9 @@ export class APIServer {
           });
         }
 
-        console.log(`[API] Injecting story: "${metadata?.title || 'Untitled'}" with ${beats.length} beats`);
+        const injectionId = `inject_${Date.now()}`;
+        console.log(`[API] Injecting story: "${metadata?.title || 'Untitled'}" with ${beats.length} beats (id: ${injectionId})`);
+        console.log(`[API] WebSocket clients connected: ${this.wss?.clients?.size || 0}`);
 
         // Broadcast the story to all connected WebSocket clients
         // The ASAPS Builder will receive this and update its state
@@ -989,11 +991,15 @@ export class APIServer {
 
     const message = JSON.stringify({ event, data, timestamp: new Date().toISOString() });
 
+    let clientCount = 0;
     this.wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(message);
+        clientCount++;
       }
     });
+
+    console.log(`[API] Broadcast '${event}' to ${clientCount} client(s)`);
   }
 
   /**

@@ -259,6 +259,11 @@ async function handleGetExampleStory(): Promise<any> {
 async function handleInjectStory(args: any): Promise<any> {
   const { metadata, beats, connections, characters } = args;
 
+  // Log injection attempt with timestamp for debugging duplicates
+  const injectionTimestamp = new Date().toISOString();
+  console.error(`[ASAPS MCP Desktop] handleInjectStory called at ${injectionTimestamp}`);
+  console.error(`[ASAPS MCP Desktop] Story title: "${metadata?.title}", beats: ${beats?.length || 0}`);
+
   // Validate required fields
   if (!metadata?.title) {
     return {
@@ -296,6 +301,7 @@ async function handleInjectStory(args: any): Promise<any> {
   }
 
   try {
+    console.error(`[ASAPS MCP Desktop] Sending POST to /api/stories/inject...`);
     const result = await fetchAPI('/api/stories/inject', {
       method: 'POST',
       body: JSON.stringify({
@@ -305,6 +311,8 @@ async function handleInjectStory(args: any): Promise<any> {
         characters: characters || [],
       }),
     });
+
+    console.error(`[ASAPS MCP Desktop] Injection API response:`, JSON.stringify(result));
 
     return {
       success: true,
