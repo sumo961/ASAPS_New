@@ -23,36 +23,112 @@ export class DialogTreeBeat extends Beat {
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
 
     if (dialogTreeParam) {
-      this.dialogTree = dialogTreeParam;
+      // Migrate old format to new format if needed
+      this.dialogTree = this.migrateDialogTree(dialogTreeParam);
       // Use values from dialogTree for basic properties, but allow parameter overrides
-      this.speaker = config.parameters?.speaker || dialogTreeParam.speaker;
-      this.text = config.parameters?.text || dialogTreeParam.text;
-      this.emotion = config.parameters?.emotion || dialogTreeParam.emotion;
+      this.speaker = config.parameters?.speaker || this.dialogTree.speaker;
+      this.text = config.parameters?.text || this.dialogTree.text;
+      this.emotion = config.parameters?.emotion || this.dialogTree.emotion;
     } else {
       // Initialize basic properties from parameters or defaults
       this.speaker = config.parameters?.speaker || 'Character';
       this.text = config.parameters?.text || 'Hello!';
       this.emotion = config.parameters?.emotion || 'neutral';
 
-      // Create safe default dialogTree
+      // Create safe default dialogTree with required choices array
       this.dialogTree = {
         id: 'root',
         speaker: this.speaker,
         text: this.text,
-        emotion: this.emotion
+        emotion: this.emotion,
+        choices: []
       };
     }
   }
 
   /**
+   * Migrate old dialogTree format to new simplified format
+   * Old: choice.target could be DialogNode, node.next could exist
+   * New: choice.dialogNode for nested nodes, choice.target only for beat IDs
+   */
+  private migrateDialogTree(node: any): DialogNode {
+    if (!node) return { id: 'root', speaker: '', text: '', choices: [] };
+
+    const migrated: DialogNode = {
+      id: node.id || 'root',
+      speaker: node.speaker || '',
+      text: node.text || '',
+      emotion: node.emotion,
+      conditions: node.conditions,
+      effects: node.effects,
+      choices: []
+    };
+
+    // Migrate choices
+    if (node.choices && Array.isArray(node.choices)) {
+      migrated.choices = node.choices.map((choice: any) => {
+        const migratedChoice: DialogChoice = {
+          id: choice.id,
+          text: choice.text,
+          conditions: choice.conditions,
+          effects: choice.effects,
+          visible: choice.visible
+        };
+
+        // Preserve counter effects (used in editor)
+        if (choice.counter) (migratedChoice as any).counter = choice.counter;
+        if (choice.counterOperation) (migratedChoice as any).counterOperation = choice.counterOperation;
+        if (choice.counterValue !== undefined) (migratedChoice as any).counterValue = choice.counterValue;
+
+        // Old format: target was either string (beat ID) or object (nested DialogNode)
+        // New format: target is string only, dialogNode is nested node
+        if (typeof choice.target === 'string') {
+          migratedChoice.target = choice.target;
+        } else if (typeof choice.target === 'object' && choice.target) {
+          migratedChoice.dialogNode = this.migrateDialogTree(choice.target);
+        }
+
+        // Also check for new format dialogNode
+        if (choice.dialogNode) {
+          migratedChoice.dialogNode = this.migrateDialogTree(choice.dialogNode);
+        }
+
+        return migratedChoice;
+      });
+    }
+
+    // Handle old 'next' property by creating a continue choice
+    // (This maintains backward compatibility with old format)
+    if (node.next) {
+      if (typeof node.next === 'string') {
+        // next was a beat ID - add a continue choice
+        migrated.choices.push({
+          id: 'auto_continue',
+          text: '[Continue]',
+          target: node.next
+        });
+      } else if (typeof node.next === 'object') {
+        // next was a nested DialogNode - add a continue choice
+        migrated.choices.push({
+          id: 'auto_continue',
+          text: '[Continue]',
+          dialogNode: this.migrateDialogTree(node.next)
+        });
+      }
+    }
+
+    return migrated;
+  }
+
+  /**
    * Override getConnections to extract all connections from the dialog tree
-   * CRITICAL FIX: Added null checks and safety guards
+   * New format: choice.target is beat ID (string), choice.dialogNode is nested node
    */
   getConnections(): Array<{ targetId: string; label?: string; condition?: any }> {
     const connections: Array<{ targetId: string; label?: string; condition?: any }> = [];
     const seenConnections = new Set<string>();
 
-    // CRITICAL FIX: Guard against undefined dialogTree
+    // Guard against undefined dialogTree
     if (!this.dialogTree) {
       console.warn('[DialogTreeBeat] dialogTree is undefined for beat', this.id);
       return super.getConnections();
@@ -60,7 +136,7 @@ export class DialogTreeBeat extends Beat {
 
     // Extract connections from a dialog node recursively
     const extractFromNode = (node: DialogNode | undefined | null, depth: number = 0): void => {
-      // CRITICAL FIX: Safety check - prevent infinite recursion
+      // Safety check - prevent infinite recursion
       if (!node || depth > 20) {
         if (depth > 20) {
           console.warn('[DialogTreeBeat] Max recursion depth reached for beat', this.id);
@@ -72,9 +148,10 @@ export class DialogTreeBeat extends Beat {
         // Check choices for targets
         if (node.choices && Array.isArray(node.choices)) {
           node.choices.forEach((choice) => {
-            if (!choice) return; // CRITICAL FIX: Skip null/undefined choices
-            
-            if (typeof choice.target === 'string' && choice.target) {
+            if (!choice) return; // Skip null/undefined choices
+
+            // New format: target is always a string (beat ID) to exit
+            if (choice.target && typeof choice.target === 'string') {
               const connectionKey = `${choice.target}-${choice.text || ''}`;
               if (!seenConnections.has(connectionKey)) {
                 seenConnections.add(connectionKey);
@@ -83,25 +160,13 @@ export class DialogTreeBeat extends Beat {
                   label: choice.text || 'Choice'
                 });
               }
-            } else if (typeof choice.target === 'object' && choice.target) {
-              // Recursively extract from nested dialog nodes
-              extractFromNode(choice.target, depth + 1);
+            }
+
+            // New format: dialogNode contains nested dialog
+            if (choice.dialogNode) {
+              extractFromNode(choice.dialogNode, depth + 1);
             }
           });
-        }
-
-        // Check next for targets
-        if (typeof node.next === 'string' && node.next) {
-          const connectionKey = `${node.next}-Continue`;
-          if (!seenConnections.has(connectionKey)) {
-            seenConnections.add(connectionKey);
-            connections.push({
-              targetId: node.next,
-              label: 'Continue'
-            });
-          }
-        } else if (typeof node.next === 'object' && node.next) {
-          extractFromNode(node.next, depth + 1);
         }
       } catch (error) {
         console.error('[DialogTreeBeat] Error extracting connections:', error);
@@ -145,8 +210,9 @@ export class DialogTreeBeat extends Beat {
 
   updateParameters(params: Record<string, any>): void {
     // CRITICAL FIX: Update dialogTree first and extract properties FROM it
+    // Always run migration to ensure nested dialogNodes have choices arrays
     if (params.dialogTree !== undefined) {
-      this.dialogTree = params.dialogTree;
+      this.dialogTree = this.migrateDialogTree(params.dialogTree);
       // Extract speaker/text/emotion from the new dialogTree
       if (this.dialogTree.speaker !== undefined) this.speaker = this.dialogTree.speaker;
       if (this.dialogTree.text !== undefined) this.text = this.dialogTree.text;
@@ -199,17 +265,22 @@ export class DialogTreeBeat extends Beat {
     // Get locations array for positioned rendering
     const locations = Array.from(this.locations.values());
 
+    // Track the exit target when user selects a choice with a beat ID target
+    let exitTargetBeatId: string | null = null;
+
     while (this.currentNode) {
+      // Check conditions on the node
       if (this.currentNode.conditions) {
         const allConditionsMet = this.currentNode.conditions.every(
           cond => context.checkCondition(cond)
         );
         if (!allConditionsMet) {
-          this.currentNode = this.findNextNode(this.currentNode);
-          continue;
+          // No conditions met and no choices available - exit dialog
+          break;
         }
       }
 
+      // Apply effects from the node
       if (this.currentNode.effects) {
         this.currentNode.effects.forEach(effect => context.applyEffect(effect));
       }
@@ -218,6 +289,7 @@ export class DialogTreeBeat extends Beat {
       const processedSpeaker = this.processText(this.currentNode.speaker, context);
       const processedText = this.processText(this.currentNode.text, context);
 
+      // Render the NPC/system dialog
       await renderer.renderDialog(
         processedSpeaker,
         processedText,
@@ -225,6 +297,8 @@ export class DialogTreeBeat extends Beat {
         locations
       );
 
+      // Every node must have choices (new simplified format)
+      // Player must click a choice to continue or exit
       if (this.currentNode.choices && this.currentNode.choices.length > 0) {
         const visibleChoices = this.filterVisibleChoices(
           this.currentNode.choices,
@@ -232,38 +306,55 @@ export class DialogTreeBeat extends Beat {
         );
 
         if (visibleChoices.length === 0) {
-          this.currentNode = this.findNextNode(this.currentNode);
-        } else {
-          // Apply delay if configured (before showing choices)
-          if (this.choiceDelay && this.choiceDelay > 0) {
-            await new Promise(resolve => setTimeout(resolve, this.choiceDelay! * 1000));
+          // No visible choices - dialog ends here
+          break;
+        }
+
+        // Apply delay if configured (before showing choices)
+        if (this.choiceDelay && this.choiceDelay > 0) {
+          await new Promise(resolve => setTimeout(resolve, this.choiceDelay! * 1000));
+        }
+
+        // Process choice text with variable interpolation and render choices
+        const choiceId = await renderer.renderChoices(
+          visibleChoices.map(c => ({ id: c.id, text: this.processText(c.text, context) })),
+          locations
+        );
+
+        const selectedChoice = visibleChoices.find(c => c.id === choiceId);
+        if (selectedChoice) {
+          // Apply effects from the selected choice
+          if (selectedChoice.effects) {
+            selectedChoice.effects.forEach(effect => context.applyEffect(effect));
           }
 
-          // Process choice text with variable interpolation
-          const choiceId = await renderer.renderChoices(
-            visibleChoices.map(c => ({ id: c.id, text: this.processText(c.text, context) })),
-            locations
-          );
-
-          const selectedChoice = visibleChoices.find(c => c.id === choiceId);
-          if (selectedChoice) {
-            if (selectedChoice.effects) {
-              selectedChoice.effects.forEach(effect => context.applyEffect(effect));
-            }
-            this.currentNode = this.resolveTarget(selectedChoice.target);
+          // New format: target is beat ID to exit, dialogNode continues conversation
+          if (selectedChoice.target) {
+            // Exit to another beat
+            exitTargetBeatId = selectedChoice.target;
+            this.currentNode = null; // Exit the while loop
+          } else if (selectedChoice.dialogNode) {
+            // Continue with nested dialog node
+            this.currentNode = selectedChoice.dialogNode;
           } else {
+            // No target or dialogNode - dialog ends
             break;
           }
+        } else {
+          // No choice selected - should not happen, but break to be safe
+          break;
         }
-      } else if (this.currentNode.next) {
-        await renderer.waitForUserInput();
-        this.currentNode = this.resolveTarget(this.currentNode.next);
       } else {
-        await renderer.waitForUserInput();
+        // No choices on this node - dialog ends (shouldn't happen in new format)
         break;
       }
     }
-    
+
+    // Return exit target if captured, otherwise fall back to getNextBeat()
+    if (exitTargetBeatId) {
+      return exitTargetBeatId;
+    }
+
     return this.getNextBeat(context);
   }
 
@@ -278,25 +369,5 @@ export class DialogTreeBeat extends Beat {
       }
       return true;
     });
-  }
-
-  private resolveTarget(target?: string | DialogNode): DialogNode | null {
-    if (!target) return null;
-    if (typeof target === 'string') {
-      return this.findNodeById(target);
-    }
-    return target;
-  }
-
-  private findNodeById(id: string): DialogNode | null {
-    // Simplified - in real implementation would traverse tree
-    return null;
-  }
-
-  private findNextNode(current: DialogNode): DialogNode | null {
-    if (current.next) {
-      return this.resolveTarget(current.next);
-    }
-    return null;
   }
 }

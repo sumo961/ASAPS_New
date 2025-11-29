@@ -1055,7 +1055,10 @@ export class ASMLParser {
   }
 
   /**
-   * Parse dialog tree structure - FIXED to handle nested dialogs
+   * Parse dialog tree structure
+   * Supports both new simplified format and old format for backward compatibility:
+   * - New format: <choice><dialogTree>...</dialogTree></choice>
+   * - Old format: <choice><target><dialogTree>...</dialogTree></target></choice>
    */
   private parseDialogTree(dialogTreeEl: Element, config?: any): any {
     const dialogNode: any = {
@@ -1072,13 +1075,18 @@ export class ASMLParser {
       const choice: any = {
         id: choiceEl.getAttribute('id'),
         text: choiceEl.getAttribute('text'),
-        target: choiceEl.getAttribute('target'),
         // Parse counter effects
         counter: choiceEl.getAttribute('counter'),
         counterOperation: choiceEl.getAttribute('operation'),
         counterValue: choiceEl.getAttribute('val') ?
           parseInt(choiceEl.getAttribute('val')!) : undefined
       };
+
+      // target attribute is always a beat ID string (new format)
+      const targetAttr = choiceEl.getAttribute('target');
+      if (targetAttr) {
+        choice.target = targetAttr;
+      }
 
       // Import buttonsound attribute → add/update location with sound
       const buttonsound = choiceEl.getAttribute('buttonsound');
@@ -1101,33 +1109,46 @@ export class ASMLParser {
         }
       }
 
-      // Check for nested target element containing dialog tree
+      // NEW FORMAT: Direct <dialogTree> inside choice (no <target> wrapper)
+      const directDialogEl = choiceEl.querySelector(':scope > dialogTree');
+      if (directDialogEl) {
+        choice.dialogNode = this.parseDialogTree(directDialogEl, config);
+      }
+
+      // OLD FORMAT: <target><dialogTree>...</dialogTree></target>
+      // (backward compatibility - convert to new format)
       const targetEl = choiceEl.querySelector(':scope > target');
       if (targetEl) {
         const nestedDialogEl = targetEl.querySelector(':scope > dialogTree');
         if (nestedDialogEl) {
-          // RECURSIVE PARSE - this is the critical fix
-          choice.target = this.parseDialogTree(nestedDialogEl, config);
+          choice.dialogNode = this.parseDialogTree(nestedDialogEl, config);
         }
       }
 
       // Parse condition if present
-      const conditionEl = choiceEl.querySelector('condition');
+      const conditionEl = choiceEl.querySelector(':scope > condition');
       if (conditionEl) {
-        choice.condition = this.parseCondition(conditionEl);
+        choice.conditions = [this.parseCondition(conditionEl)];
       }
 
-      // Parse next if present (can be nested dialog too)
-      const nextEl = choiceEl.querySelector('next');
+      // Parse effects if present
+      const effectElements = choiceEl.querySelectorAll(':scope > effect');
+      if (effectElements.length > 0) {
+        choice.effects = Array.from(effectElements).map(el => this.parseEffect(el));
+      }
+
+      // OLD FORMAT: <next> element (backward compatibility - convert to dialogNode)
+      const nextEl = choiceEl.querySelector(':scope > next');
       if (nextEl) {
         const nextTarget = nextEl.getAttribute('target');
-        if (nextTarget) {
-          choice.next = nextTarget;
+        if (nextTarget && !choice.target) {
+          // next with target becomes the choice's target
+          choice.target = nextTarget;
         } else {
-          // Check for nested dialog in next
+          // Nested dialog in next becomes dialogNode
           const nextDialogEl = nextEl.querySelector(':scope > dialogTree');
-          if (nextDialogEl) {
-            choice.next = this.parseDialogTree(nextDialogEl);
+          if (nextDialogEl && !choice.dialogNode) {
+            choice.dialogNode = this.parseDialogTree(nextDialogEl, config);
           }
         }
       }
@@ -1135,42 +1156,57 @@ export class ASMLParser {
       dialogNode.choices.push(choice);
     });
 
-    // Parse direct next element (for linear dialog progression)
+    // OLD FORMAT: Direct <next> element on dialogTree (backward compatibility)
+    // Convert to a [Continue] choice
     const directNextEl = dialogTreeEl.querySelector(':scope > next');
+    console.log(`[ASMLParser.parseDialogTree] id=${dialogNode.id}, found <next>:`, !!directNextEl);
     if (directNextEl) {
       const nextTarget = directNextEl.getAttribute('target');
+      console.log(`[ASMLParser.parseDialogTree] <next> target attr:`, nextTarget);
       if (nextTarget) {
-        dialogNode.next = nextTarget;
+        dialogNode.choices.push({
+          id: 'auto_continue',
+          text: '[Continue]',
+          target: nextTarget
+        });
+        console.log(`[ASMLParser.parseDialogTree] Added [Continue] choice with target:`, nextTarget);
       } else {
         const nextDialogEl = directNextEl.querySelector(':scope > dialogTree');
+        console.log(`[ASMLParser.parseDialogTree] <next> has nested <dialogTree>:`, !!nextDialogEl);
         if (nextDialogEl) {
-          dialogNode.next = this.parseDialogTree(nextDialogEl);
+          const nestedNode = this.parseDialogTree(nextDialogEl, config);
+          dialogNode.choices.push({
+            id: 'auto_continue',
+            text: '[Continue]',
+            dialogNode: nestedNode
+          });
+          console.log(`[ASMLParser.parseDialogTree] Added [Continue] choice with nested dialogNode:`, nestedNode.id);
         }
       }
     }
 
+    console.log(`[ASMLParser.parseDialogTree] Final dialogNode id=${dialogNode.id} has ${dialogNode.choices.length} choices`);
     return dialogNode;
   }
 
   /**
-   * Extract connections from dialog tree
+   * Extract connections from dialog tree (new format uses dialogNode, old used target as object)
    */
   private extractDialogConnections(dialogNode: any, connections: Connection[]): void {
     if (!dialogNode) return;
 
     if (dialogNode.choices) {
       dialogNode.choices.forEach((choice: any) => {
-        if (choice.target) {
+        // New format: target is string (beat ID)
+        if (typeof choice.target === 'string' && choice.target) {
           connections.push({
             targetId: choice.target,
             label: choice.text || undefined
           });
         }
-        if (choice.next) {
-          connections.push({
-            targetId: choice.next,
-            label: choice.text || undefined
-          });
+        // Recurse into nested dialogNode
+        if (choice.dialogNode) {
+          this.extractDialogConnections(choice.dialogNode, connections);
         }
       });
     }
@@ -1252,6 +1288,21 @@ export class ASMLParser {
     return {
       targetId: connectionElement.getAttribute('target') || '',
       label: connectionElement.getAttribute('label') || undefined
+    };
+  }
+
+  /**
+   * Parse effect element
+   */
+  private parseEffect(effectElement: Element): Effect {
+    const effectType = effectElement.getAttribute('type') || 'setVariable';
+    const target = effectElement.getAttribute('target') || '';
+    const value = this.parseConditionValue(effectElement.getAttribute('value'));
+
+    return {
+      type: effectType as Effect['type'],
+      target,
+      value
     };
   }
 

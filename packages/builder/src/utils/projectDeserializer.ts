@@ -10,6 +10,67 @@ import type { Beat } from '@asaps/core';
 import type { Project } from '../storage/types';
 
 /**
+ * Migrate dialogTree beats that use deprecated defaultConnection
+ * Converts defaultConnection to explicit choice targets
+ */
+function migrateDialogTreeDefaultConnection(beatData: any): void {
+  if (beatData.type !== 'dialogTree') return;
+
+  const params = beatData.parameters || {};
+  const defaultConn = params.defaultConnection || beatData.defaultConnection;
+
+  if (!defaultConn) return;
+
+  const defaultTarget = typeof defaultConn === 'string' ? defaultConn : defaultConn.target;
+  if (!defaultTarget) return;
+
+  console.log('[migrateDialogTree] Migrating defaultConnection for beat:', beatData.id, '-> target:', defaultTarget);
+
+  // Find all leaf choices (choices without targets) and add the default target
+  const addTargetToLeafChoices = (node: any): boolean => {
+    if (!node) return false;
+
+    let modified = false;
+
+    if (node.choices && Array.isArray(node.choices)) {
+      for (const choice of node.choices) {
+        if (!choice.target) {
+          // This is a leaf choice - add the default target
+          choice.target = defaultTarget;
+          modified = true;
+          console.log('[migrateDialogTree] Added target to choice:', choice.text || choice.id);
+        } else if (typeof choice.target === 'object') {
+          // Nested dialog node - recurse
+          if (addTargetToLeafChoices(choice.target)) {
+            modified = true;
+          }
+        }
+      }
+    }
+
+    // Also check 'next' for linear continuation
+    if (typeof node.next === 'object' && node.next) {
+      if (addTargetToLeafChoices(node.next)) {
+        modified = true;
+      }
+    }
+
+    return modified;
+  };
+
+  // Apply migration to dialogTree
+  if (params.dialogTree) {
+    addTargetToLeafChoices(params.dialogTree);
+  }
+
+  // Remove the deprecated defaultConnection
+  delete params.defaultConnection;
+  delete beatData.defaultConnection;
+
+  console.log('[migrateDialogTree] Migration complete for beat:', beatData.id);
+}
+
+/**
  * Deserialize beats from stored project data
  * Converts plain objects back into Beat class instances
  */
@@ -32,6 +93,9 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         name: beatData.name || 'unnamed',
         type: beatData.type
       });
+
+      // Apply migrations for deprecated features
+      migrateDialogTreeDefaultConnection(beatData);
 
       // Create beat config from stored data
       const config = {

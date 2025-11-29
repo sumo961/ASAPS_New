@@ -15,28 +15,30 @@
 
   "customTypes": {
     "dialogNode": {
-      "description": "A node in a dialog tree",
+      "description": "A node in a dialog tree representing NPC/system output. Always followed by player choices.",
       "schema": {
         "id": "string",
-        "speaker": "string", 
+        "speaker": "string",
         "text": "string",
         "emotion": "string?",
         "conditions": "condition[]?",
-        "choices": "dialogChoice[]?",
-        "next": "string | dialogNode?",
+        "choices": "dialogChoice[]",
         "effects": "effect[]?"
-      }
+      },
+      "notes": "dialogNode displays text and waits for player to click a choice. No auto-advance."
     },
     "dialogChoice": {
-      "description": "A choice option in dialog",
+      "description": "A player choice in dialog. Can exit to a beat or continue with nested dialog.",
       "schema": {
         "id": "string",
         "text": "string",
-        "target": "string | dialogNode?",
+        "target": "string?",
+        "dialogNode": "dialogNode?",
         "conditions": "condition[]?",
         "effects": "effect[]?",
         "visible": "boolean?"
-      }
+      },
+      "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both."
     },
     "movementOption": {
       "description": "A movement choice",
@@ -189,7 +191,7 @@
 
     "dialogTree": {
       "category": "visible",
-      "displayName": "Dialog Tree", 
+      "displayName": "Dialog Tree",
       "icon": "🌳",
       "description": "Complex branching conversation system",
       "connectionType": "multiple",
@@ -198,11 +200,6 @@
           "type": "dialogNode",
           "required": true,
           "description": "Root dialog node with full conversation tree"
-        },
-        "defaultConnection": {
-          "type": "connection",
-          "required": false,
-          "description": "Default target after dialog completes"
         },
         "choiceDelay": {
           "type": "number",
@@ -223,7 +220,15 @@
       },
       "transitions": true,
       "sound": true,
-      "renderer": "dialogTree"
+      "renderer": "dialogTree",
+      "aiNotes": {
+        "structure": "dialogTree alternates: dialogNode (NPC speaks) → choices (player clicks - text IS player's dialogue) → dialogNode (NPC responds) → choices...",
+        "pattern": "Each dialogNode has speaker, text, and choices array. Player must click a choice to continue.",
+        "choiceNavigation": "Each choice has text (player's line) and EITHER 'target' (beat ID to exit) OR 'dialogNode' (NPC responds), never both",
+        "critical": "Choice text IS the player's dialogue. NEVER use '[Continue]' or placeholder text. Every choice should be meaningful player dialogue.",
+        "effects": "Use effects on choices to modify counters or variables when player selects that choice",
+        "example": "{ id: 'root', speaker: 'NPC', text: 'Hello!', choices: [{ id: 'c1', text: 'Hi there!', dialogNode: { id: 'n1', speaker: 'NPC', text: 'Nice day!', choices: [{ id: 'c2', text: 'Indeed it is. Goodbye!', target: 'next_beat' }] } }] }"
+      }
     },
 
     "movementChoice": {

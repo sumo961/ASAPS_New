@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2025-11-26T03:24:06.639Z
+ * Generated: 2025-11-29T13:05:14.591Z
  */
 
 // ============================================
@@ -13,7 +13,7 @@
 import type { Connection, Condition, Effect } from '../types';
 
 /**
- * A node in a dialog tree
+ * A node in a dialog tree representing NPC/system output. Always followed by player choices.
  */
 export interface DialogNode {
   id: string;
@@ -21,18 +21,18 @@ export interface DialogNode {
   text: string;
   emotion?: string;
   conditions?: Condition[];
-  choices?: DialogChoice[];
-  next?: 'string' | 'dialogNode';
+  choices: DialogChoice[];
   effects?: Effect[];
 }
 
 /**
- * A choice option in dialog
+ * A player choice in dialog. Can exit to a beat or continue with nested dialog.
  */
 export interface DialogChoice {
   id: string;
   text: string;
-  target?: 'string' | 'dialogNode';
+  target?: string;
+  dialogNode?: DialogNode;
   conditions?: Condition[];
   effects?: Effect[];
   visible?: boolean;
@@ -104,8 +104,6 @@ export interface IntroTextParameters {
 export interface DialogTreeParameters {
   /** Root dialog node with full conversation tree */
   dialogTree: DialogNode;
-  /** Default target after dialog completes */
-  defaultConnection?: Connection | undefined;
   /** Delay in seconds before showing choices with fade-in */
   choiceDelay?: number | undefined;
 }

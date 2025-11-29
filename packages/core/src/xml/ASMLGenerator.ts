@@ -475,7 +475,7 @@ export class ASMLGenerator {
         break;
         
       case 'dialogTree':
-        // Root dialog attributes
+        // Root dialog attributes (no emotion per ASML spec)
         if (params.dialogTree) {
           if (params.dialogTree.speaker) attrs.push(`speaker="${this.escapeXml(params.dialogTree.speaker)}"`);
           if (params.dialogTree.text) attrs.push(`text="${this.escapeXml(params.dialogTree.text)}"`);
@@ -666,12 +666,7 @@ export class ASMLGenerator {
               this.generateDialogChoice(enrichedChoice, lines, indent + this.indent);
             }
           }
-
-          // Add default connection if exists
-          const defaultConn = connections.find(c => !c.label || c.label === 'Continue');
-          if (defaultConn) {
-            lines.push(`${indent}${this.indent}<connection target="${defaultConn.targetId}" />`);
-          }
+          // NOTE: No separate <connection> tag needed - dialog exits via choice targets
         } else if (beat.type === 'randomTarget' && params.choices) {
           // Generate choices for random target
           for (let i = 0; i < params.choices.length; i++) {
@@ -779,21 +774,27 @@ export class ASMLGenerator {
   }
   
   /**
-   * Generate dialog choice element - FIXED to handle nested dialogs properly
+   * Generate dialog choice element
+   * New simplified format:
+   * - target attribute is beat ID string (to exit dialog)
+   * - dialogNode is nested inside choice (to continue conversation)
+   * - No <target> wrapper needed
    */
   private generateDialogChoice(choice: any, lines: string[], indent: string): void {
     const attrs: string[] = [];
     if (choice.id) attrs.push(`id="${choice.id}"`);
     if (choice.text) attrs.push(`text="${this.escapeXml(choice.text)}"`);
 
-    // Check if target is a string (beat ID) or object (nested dialog)
-    const hasNestedDialog = typeof choice.target === 'object' && choice.target;
+    // New format: target is always a string (beat ID) to exit
     const hasStringTarget = typeof choice.target === 'string' && choice.target;
-
-    // Only add target attribute if it's a string (beat ID)
     if (hasStringTarget) {
       attrs.push(`target="${choice.target}"`);
     }
+
+    // New format: dialogNode contains nested dialog
+    // Also support old format where target was an object
+    const hasNestedDialog = choice.dialogNode || (typeof choice.target === 'object' && choice.target);
+    const nestedDialogNode = choice.dialogNode || (typeof choice.target === 'object' ? choice.target : null);
 
     // Add sound effect (from location)
     if (choice.sound) attrs.push(`buttonsound="${this.escapeXml(choice.sound)}"`);
@@ -811,89 +812,145 @@ export class ASMLGenerator {
         attrs.push(`val="${choice.counterValue}"`);
       }
     }
-    
+
     const hasChildren = hasNestedDialog || choice.conditions || choice.effects;
-    
+
     if (hasChildren) {
       lines.push(`${indent}<choice ${attrs.join(' ')}>`);
-      
+
       // Conditions
       if (choice.conditions) {
         for (const condition of choice.conditions) {
           this.generateCondition(condition, lines, indent + this.indent);
         }
       }
-      
-      // Nested dialog as target element
-      if (hasNestedDialog) {
-        lines.push(`${indent}${this.indent}<target>`);
-        this.generateNestedDialogTree(choice.target, lines, indent + this.indent + this.indent);
-        lines.push(`${indent}${this.indent}</target>`);
+
+      // Nested dialog - directly inside choice (no <target> wrapper)
+      if (nestedDialogNode) {
+        this.generateNestedDialogTree(nestedDialogNode, lines, indent + this.indent);
       }
-      
+
       // Effects
       if (choice.effects) {
         for (const effect of choice.effects) {
           this.generateEffect(effect, lines, indent + this.indent);
         }
       }
-      
+
       lines.push(`${indent}</choice>`);
     } else {
       lines.push(`${indent}<choice ${attrs.join(' ')} />`);
     }
   }
-  
+
   /**
    * Generate nested dialog tree structure
+   * Optimizes output by collapsing linear [Continue] sequences:
+   * - If a dialogTree has a single [Continue] choice leading to another dialogTree
+   *   that exits to a beat, collapse it into a single choice with the final text
    */
   private generateNestedDialogTree(node: any, lines: string[], indent: string): void {
     const attrs: string[] = [];
     if (node.id) attrs.push(`id="${node.id}"`);
     if (node.speaker) attrs.push(`speaker="${this.escapeXml(node.speaker)}"`);
     if (node.text) attrs.push(`text="${this.escapeXml(node.text)}"`);
-    
-    const hasChildren = node.choices || node.next || node.conditions || node.effects;
-    
+    // Note: emotion is intentionally NOT exported per user requirement
+
+    // Optimize: collapse linear [Continue] chains
+    const optimizedChoices = this.optimizeDialogChoices(node.choices);
+
+    const hasChoices = optimizedChoices && optimizedChoices.length > 0;
+    const hasChildren = hasChoices || node.conditions || node.effects;
+
     if (hasChildren) {
       lines.push(`${indent}<dialogTree ${attrs.join(' ')}>`);
-      
+
       // Conditions
       if (node.conditions) {
         for (const condition of node.conditions) {
           this.generateCondition(condition, lines, indent + this.indent);
         }
       }
-      
-      // Choices - recursive handling
-      if (node.choices) {
-        for (const choice of node.choices) {
+
+      // Choices - recursive handling with optimized choices
+      if (optimizedChoices) {
+        for (const choice of optimizedChoices) {
           this.generateDialogChoice(choice, lines, indent + this.indent);
         }
       }
-      
-      // Next node
-      if (node.next) {
-        if (typeof node.next === 'string') {
-          lines.push(`${indent}${this.indent}<next target="${node.next}" />`);
-        } else {
-          lines.push(`${indent}${this.indent}<next>`);
-          this.generateNestedDialogTree(node.next, lines, indent + this.indent + this.indent);
-          lines.push(`${indent}${this.indent}</next>`);
-        }
-      }
-      
+
       // Effects
       if (node.effects) {
         for (const effect of node.effects) {
           this.generateEffect(effect, lines, indent + this.indent);
         }
       }
-      
+
       lines.push(`${indent}</dialogTree>`);
     } else {
       lines.push(`${indent}<dialogTree ${attrs.join(' ')} />`);
     }
+  }
+
+  /**
+   * Optimize dialog choices by collapsing linear [Continue] sequences
+   * Pattern: dialogNode has single [Continue] choice that leads to another dialogNode
+   * Result: Replace [Continue] with the final choice (text from inner node, target preserved)
+   */
+  private optimizeDialogChoices(choices: any[] | undefined): any[] | undefined {
+    if (!choices || choices.length === 0) return choices;
+
+    return choices.map(choice => {
+      // First, recursively optimize any nested dialogNode's choices
+      if (choice.dialogNode) {
+        choice = {
+          ...choice,
+          dialogNode: {
+            ...choice.dialogNode,
+            choices: this.optimizeDialogChoices(choice.dialogNode.choices)
+          }
+        };
+      }
+
+      // Now check if THIS choice is a [Continue] that can be collapsed
+      const isContinueChoice = choice.id === 'auto_continue' ||
+                               choice.text === '[Continue]' ||
+                               (choice.text && choice.text.startsWith('['));
+
+      if (!isContinueChoice) {
+        return choice;
+      }
+
+      // This IS a [Continue] choice - try to collapse it
+      if (choice.dialogNode) {
+        // [Continue] leads to a dialogNode - use the dialogNode's info
+        const innerNode = choice.dialogNode;
+
+        // Check if inner node has exactly one choice that exits
+        if (innerNode.choices && innerNode.choices.length === 1) {
+          const innerChoice = innerNode.choices[0];
+
+          if (innerChoice.target && typeof innerChoice.target === 'string' && !innerChoice.dialogNode) {
+            // Inner choice exits to a beat - fully collapse!
+            // Replace [Continue] -> dialogNode -> choice pattern with just the final choice
+            return {
+              id: innerNode.id || innerChoice.id || choice.id,
+              text: innerNode.text || innerChoice.text,
+              target: innerChoice.target,
+              // Preserve any counter effects
+              counter: innerChoice.counter || choice.counter,
+              counterOperation: innerChoice.counterOperation || choice.counterOperation,
+              counterValue: innerChoice.counterValue !== undefined ? innerChoice.counterValue : choice.counterValue,
+              conditions: innerChoice.conditions || choice.conditions,
+              effects: innerChoice.effects || choice.effects
+            };
+          }
+        }
+      }
+
+      // Can't collapse further - return as-is
+      return choice;
+    });
   }
   
   /**

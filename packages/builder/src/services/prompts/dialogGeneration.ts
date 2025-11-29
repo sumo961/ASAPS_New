@@ -20,35 +20,51 @@ Generate dialog trees for interactive conversations with:
 4. Proper branching structure
 5. Clear consequences for choices
 
+## Dialog Flow Pattern
+Dialog trees use a compact, alternating structure:
+- dialogNode: Contains speaker, text, and choices array
+- choice: What the player clicks - the text IS what the player says
+- Nested dialogNode inside choice: The NPC's response to that choice
+
+The key insight: The choice text IS the player's line. When you want an NPC to respond to a player choice and then exit, put the NPC's response text directly IN THE CHOICE that exits.
+
 ## Output Format
 Respond with JSON in this exact structure:
 {
   "dialogTree": {
     "id": "root",
-    "speaker": "Character Name",
-    "text": "What they say",
-    "emotion": "neutral|happy|angry|sad|surprised|fearful",
+    "speaker": "NPC Name",
+    "text": "NPC opening line",
     "choices": [
       {
         "id": "choice_1",
-        "text": "Player response option",
-        "target": "node_id" or { nested dialog node },
-        "conditions": [],
-        "effects": []
+        "text": "Player response text",
+        "dialogNode": {              // NPC responds to this choice
+          "id": "node_1",
+          "speaker": "NPC Name",
+          "text": "NPC response",
+          "choices": [
+            { "id": "c1", "text": "Player's next line that exits", "target": "next_beat" }
+          ]
+        }
+      },
+      {
+        "id": "choice_2",
+        "text": "Alternative player response that exits directly",
+        "target": "next_beat"
       }
-    ],
-    "next": "node_id" or { nested dialog node } // for linear continuation
+    ]
   },
-  "reasoning": "Brief explanation of dialog structure"
+  "reasoning": "Brief explanation"
 }
 
-## Dialog Node Structure Rules
-1. Every node must have: id, text
-2. Speaker is optional (defaults to same as previous)
-3. Emotion affects how dialog is presented
-4. Choices are for player responses
-5. Next is for NPC continuing to speak
-6. Target can be another beat ID (string) or nested dialog node (object)
+## CRITICAL Structure Rules
+1. Every dialogNode has: id, speaker, text, and choices array
+2. Each choice has text (player's line) and EITHER 'target' (beat ID) OR 'dialogNode' (NPC responds)
+3. The choice TEXT is what the player says/clicks - make it their actual dialogue
+4. NEVER use "[Continue]" or placeholder text - choices should contain meaningful player dialogue
+5. When conversation ends, the FINAL choice text is the player's last line + target to exit
+6. DO NOT create extra nesting just for continuation - keep trees as flat as possible
 
 ## Writing Guidelines
 1. Keep dialog natural and conversational
@@ -121,44 +137,46 @@ export function getDialogGenerationExample(): { user: string; assistant: string 
         id: "root",
         speaker: "You",
         text: "Mr. Jenkins, where were you when Lord Blackwood was murdered?",
-        emotion: "neutral",
         choices: [
           {
             id: "sympathetic",
             text: "I understand this must be difficult for you.",
-            target: {
+            dialogNode: {
               id: "jenkins_relaxed",
               speaker: "Mr. Jenkins",
               text: "Thank you for understanding, Detective. I was in the kitchen preparing dinner.",
-              emotion: "sad",
-              next: "continue_investigation"
+              choices: [
+                { id: "response_1", text: "I see. I'll need to verify that with the staff.", target: "continue_investigation" }
+              ]
             }
           },
           {
             id: "aggressive",
             text: "Don't lie to me! I know you were near the study!",
-            target: {
+            dialogNode: {
               id: "jenkins_defensive",
               speaker: "Mr. Jenkins",
               text: "How dare you! I served this family for 30 years! I would never...",
-              emotion: "angry",
-              next: "continue_investigation"
+              choices: [
+                { id: "response_2", text: "Calm down. We'll continue this later.", target: "continue_investigation" }
+              ]
             }
           },
           {
             id: "factual",
             text: "Please just state the facts, Mr. Jenkins.",
-            target: {
+            dialogNode: {
               id: "jenkins_formal",
               speaker: "Mr. Jenkins",
               text: "I was in the kitchen from 7 to 8 PM. The maid can verify this.",
-              emotion: "neutral",
-              next: "continue_investigation"
+              choices: [
+                { id: "response_3", text: "Thank you. That will be all for now.", target: "continue_investigation" }
+              ]
             }
           }
         ]
       },
-      reasoning: "Dialog provides three distinct approaches (sympathetic, aggressive, factual) that reveal different aspects of the butler's personality and potentially different information. Each choice leads to a unique emotional response."
+      reasoning: "Dialog provides three distinct approaches (sympathetic, aggressive, factual) that reveal different aspects of the butler's personality. Each player choice is meaningful dialogue, and the final choice in each branch is the player's closing line that exits to the next beat. No [Continue] placeholders - every choice contains actual player dialogue."
     }, null, 2)
   };
 }

@@ -34,10 +34,15 @@ const BEAT_TYPE_GUIDE = `
 
 **dialogTree** - Branching conversations
 - Use: Character interactions, interrogations, negotiations
-- Parameters: dialogTree (nested nodes with speaker, text, choices)
-- Connections: Multiple → based on dialog choices
-- Pattern: Can nest deeply or exit to different beats
-- Example: Talk to butler → [Sympathetic | Aggressive | Neutral] → different outcomes
+- Parameters: dialogTree with nested dialogNode structure
+  - dialogNode: { id, speaker, text, choices: [] } - NPC/system speaks, then waits for player choice
+  - choice: { id, text, target? | dialogNode? } - What player clicks (text IS the player's line)
+  - target (string): Beat ID to exit dialog - the choice text is player's last line
+  - dialogNode (nested): NPC responds to this choice, conversation continues
+- Connections: Multiple → based on dialog choices leading to beat targets
+- Pattern: dialogNode (NPC speaks) → player choice (text=player's line) → dialogNode (NPC responds) → player choice...
+- IMPORTANT: Choice text IS what the player says. Never use "[Continue]" - use actual dialogue.
+- Example: NPC asks question → [Player response A | Player response B] → NPC responds differently → [Player's closing line exits to beat]
 
 **movementChoice** - Location/direction selection
 - Use: Exploration, navigation, choosing paths

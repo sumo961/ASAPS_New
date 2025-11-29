@@ -172,14 +172,18 @@ Suggest 3 logical next beats.`,
           name: "Interview Suspect in Library",
           reasoning: "After choosing a location, encountering and questioning a suspect creates tension and provides clues. DialogTree allows branching conversation with multiple questioning approaches.",
           parameters: {
-            speaker: "Mr. Jenkins (Butler)",
-            rootDialog: {
+            dialogTree: {
               id: "root",
+              speaker: "Mr. Jenkins (Butler)",
               text: "Oh, Detective! I was just... organizing the books.",
-              emotion: "fearful"
+              emotion: "fearful",
+              choices: [
+                { id: "accuse", text: "That seems suspicious...", target: "beat_accuse" },
+                { id: "sympathize", text: "I understand. Where were you last night?", target: "beat_alibi" }
+              ]
             }
           },
-          connections: [{ targetId: "beat_next" }],
+          connections: [{ targetId: "beat_accuse" }, { targetId: "beat_alibi" }],
           confidence: 0.9,
           position: { x: 1000, y: 50 }
         },
