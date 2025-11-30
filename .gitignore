@@ -62,3 +62,13 @@ visual-patches/
 /*.tsx
 /*.js
 !eslint.config.js
+
+# Root-level temp/test files
+/*.png
+/*.xml
+/*.json
+/*.patch
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.base.json
