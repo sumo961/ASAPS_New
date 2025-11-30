@@ -228,7 +228,7 @@ This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENS
 ## 🙏 Acknowledgments
 
 - Advanced Stories Group at Georgia Tech
-- Dr. Janet Murray for supervision and guidance
+- Dr. Janet Murray for supervision and guidance of the initial project
 - The [COST Action 18230](https://indcor.eu) and the [ARDIN](https://ardin.online) community for continued inspiration
 
 ## 📞 Support
