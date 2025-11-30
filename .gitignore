@@ -46,3 +46,19 @@ dev_docs/
 # Claude Code instructions (local only)
 CLAUDE.md
 .claude/
+
+# Scripts and temporary files (local only)
+*.sh
+*.bat
+*.txt
+backup/
+backups/
+Old_docs/
+scripts/
+visual-patches/
+
+# Root-level test/debug files (keep eslint.config.js)
+/*.ts
+/*.tsx
+/*.js
+!eslint.config.js
