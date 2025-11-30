@@ -43,6 +43,9 @@ lerna-debug.log*
 # Development documentation (local only)
 dev_docs/
 
+# Examples directory (will be repopulated)
+examples/
+
 # Claude Code instructions (local only)
 CLAUDE.md
 .claude/
