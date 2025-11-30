@@ -71,7 +71,15 @@ visual-patches/
 /*.xml
 /*.json
 /*.patch
+/*.asml
 !package.json
 !package-lock.json
 !tsconfig.json
 !tsconfig.base.json
+
+# Backup files
+*.backup
+*.backup.*
+package-lock*.json
+!package-lock.json
+package.json.backup*
