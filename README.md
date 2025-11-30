@@ -45,6 +45,7 @@ asaps-modern/
 │   ├── builder/       # React-based visual story builder
 │   └── renderer/      # Rendering engines (Canvas & React)
 ├── mcp-server/        # MCP server for AI assistant integration
+├── mcp-server-desktop/ # MCP server for desktop AI assistants
 └── beat-definitions/  # JSON beat type definitions
 ```
 
