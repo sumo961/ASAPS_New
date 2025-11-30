@@ -2,6 +2,19 @@
 
 A modern TypeScript implementation of the Advanced Stories Authoring and Presentation System (ASPAS) by Hartmut Koenitz, based on his original ActionScript version (2005-2017) started at Georgia Tech. This modernization brings the powerful ASML (Advanced Stories Markup Language, also created by Hartmut Koenitz) XML-based narrative system to the web with enhanced features, a visual story builder, and AI-assisted content generation.
 
+## ⚠️ Development Status (v0.8.0)
+
+This is a **beta release**. Core functionality works, but some features are incomplete or untested:
+
+| Feature | Status |
+|---------|--------|
+| Assets (graphics, sounds, sprite animations) | Mostly implemented, not fully tested |
+| Visual dialog editor | Only supports initial phase of dialog trees |
+| Project switching | Occasional issues; reload interface to resolve |
+| Animation system | Implemented but untested |
+| Cluster system (collapsible beat groups) | Initial work done, not fully implemented |
+| Legacy ASML import | Conversion from earlier ASML files may not work |
+
 ## 🎯 Features
 
 - **Visual Story Builder**: Drag-and-drop interface for creating interactive narratives
