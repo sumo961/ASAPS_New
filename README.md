@@ -22,8 +22,8 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ```bash
 # Clone the repository
-git clone [repository-url]
-cd asaps-modern
+git clone https://github.com/sumo961/ASAPS_New.git
+cd ASAPS_New
 
 # Install dependencies
 npm install
@@ -43,8 +43,7 @@ asaps-modern/
 │   ├── builder/       # React-based visual story builder
 │   └── renderer/      # Rendering engines (Canvas & React)
 ├── beat-definitions/  # JSON beat type definitions
-├── examples/          # Example story files
-└── docs/             # Documentation
+└── examples/          # Example story files
 ```
 
 ## 🎮 Usage
@@ -61,17 +60,23 @@ asaps-modern/
 ### Beat Types
 
 #### Visible Beats
-- **Title Screen** (🎬): Opening screen with title and author
-- **Intro Text** (📝): Display text with continue button
-- **Dialog Tree** (🌳): Complex branching conversations
-- **Movement Choice** (🚶): Location-based navigation
-- **Pick Prop** (🎒): Interactive object selection
-- **Video Beat** (🎥): Video playback
-- **End Screen** (🏁): Story conclusion
+- **Title Screen**: Opening screen with title and author
+- **Intro Text**: Display text with continue button
+- **Dialog Tree**: Complex branching conversations
+- **Movement Choice**: Location-based navigation
+- **Pick Prop**: Interactive object selection
+- **Video Beat**: Video playback with optional controls
+- **Duration Screen**: Timed display screen
+- **Hyper Text**: Clickable hyperlinked text with multiple targets
+- **Input Text**: User text input with validation
+- **End Screen**: Story conclusion with restart option
 
-#### Logic Beats
-- **Set Variable** (🔧): Modify story variables
-- **Condition Beat** (❓): Conditional branching
+#### Logic Beats (Invisible)
+- **Set Variable**: Modify story variables and counters
+- **Condition Beat**: Conditional branching logic
+- **Random Target**: Randomly select next beat
+- **Set Timer**: Named timers with timeout targets
+- **Add/Remove Inventory**: Manage character inventories
 
 ## 🔄 Importing Legacy Stories
 
@@ -204,9 +209,8 @@ Contributions are welcome! Please follow these guidelines:
 ## 📞 Support
 
 For questions and support:
-- Check the documentation in the `docs/` folder
 - Review example stories in `examples/`
-- [Open an issue](link-to-issues) for bug reports
+- [Open an issue](https://github.com/sumo961/ASAPS_New/issues) for bug reports
 
 ---
 

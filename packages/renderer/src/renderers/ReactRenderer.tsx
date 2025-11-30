@@ -73,8 +73,8 @@ const DialogDisplay: React.FC<{ speaker: string; text: string; emotion?: string 
     );
   };
 
-// Choice Component
-const ChoiceDisplay: React.FC<{ choices: Array<{ id: string; text: string }> } & ScreenProps> = 
+// Choice Component (standalone - used when no dialog context)
+const ChoiceDisplay: React.FC<{ choices: Array<{ id: string; text: string }> } & ScreenProps> =
   ({ choices, onAction }) => (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-100 p-8">
       <div className="max-w-2xl w-full space-y-4">
@@ -90,6 +90,110 @@ const ChoiceDisplay: React.FC<{ choices: Array<{ id: string; text: string }> } &
       </div>
     </div>
   );
+
+// Combined Dialog + Choices Component (fallback when no positioned locations)
+// Styled version that respects background and theme settings
+const DialogWithChoicesDisplay: React.FC<{
+  text: string;
+  choices: Array<{ id: string; text: string }>;
+  backgroundUrl?: string | null;
+  theme?: RenderThemeSettings;
+} & ScreenProps> = ({ text, choices, onAction, backgroundUrl, theme }) => {
+  // Use theme settings or defaults
+  const textBox = theme?.textBox || {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#CCCCCC',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    opacity: 95,
+  };
+  const button = theme?.button || {
+    backgroundColor: '#3B82F6',
+    hoverBackgroundColor: '#2563EB',
+    textColor: '#FFFFFF',
+    borderColor: '#2563EB',
+    borderWidth: 2,
+    borderRadius: 8,
+  };
+  const colors = theme?.colors || {
+    textColor: '#1F2937',
+    textAlpha: 100,
+  };
+  const fonts = theme?.fonts || {
+    textFont: 'inherit',
+    buttonFont: 'inherit',
+  };
+
+  // Convert opacity (0-100) to CSS value
+  const bgOpacity = textBox.opacity / 100;
+
+  // Parse background color and apply opacity
+  const textBoxBg = textBox.backgroundColor.startsWith('#')
+    ? `rgba(${parseInt(textBox.backgroundColor.slice(1,3), 16)}, ${parseInt(textBox.backgroundColor.slice(3,5), 16)}, ${parseInt(textBox.backgroundColor.slice(5,7), 16)}, ${bgOpacity})`
+    : textBox.backgroundColor;
+
+  return (
+    <div
+      className="flex flex-col items-center justify-center h-screen p-8"
+      style={{
+        backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : 'linear-gradient(to bottom, #1e3a8a, #1e40af)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      <div className="max-w-2xl w-full">
+        {/* Dialog text box */}
+        <div
+          className="shadow-lg mb-4"
+          style={{
+            backgroundColor: textBoxBg,
+            border: `${textBox.borderWidth}px solid ${textBox.borderColor}`,
+            borderRadius: `${textBox.borderRadius}px`,
+            padding: `${textBox.padding}px`,
+          }}
+        >
+          <p
+            className="text-lg text-center"
+            style={{
+              color: colors.textColor,
+              opacity: colors.textAlpha / 100,
+              fontFamily: fonts.textFont,
+            }}
+          >
+            {text}
+          </p>
+        </div>
+
+        {/* Player Choices */}
+        <div className="space-y-2">
+          {choices.map(choice => (
+            <button
+              key={choice.id}
+              onClick={() => onAction?.(choice.id)}
+              className="w-full p-3 text-center transition-all"
+              style={{
+                backgroundColor: button.backgroundColor,
+                color: button.textColor,
+                border: `${button.borderWidth}px solid ${button.borderColor}`,
+                borderRadius: `${button.borderRadius}px`,
+                fontFamily: fonts.buttonFont,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = button.hoverBackgroundColor;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = button.backgroundColor;
+              }}
+            >
+              {choice.text}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Movement Choice Component
 const MovementDisplay: React.FC<{
@@ -542,6 +646,7 @@ export class ReactRenderer extends BaseRenderer {
             hideTextBoxes={this.hideTextBoxes}
             hideButtonBoxes={this.hideButtonBoxes}
             theme={this.theme}
+            previewMode={true}
           />
         </div>
       );
@@ -596,16 +701,11 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
-    if (locations && locations.length > 0) {
-      await this.renderPositionedBeat('dialogTree', {
-        speaker,
-        text,
-        emotion
-      }, locations);
-      return;
-    }
-
-    this.renderComponent(<DialogDisplay speaker={speaker} text={text} emotion={emotion} onAction={this.handleAction} />);
+    // Store dialog context for renderChoices to use
+    // NOTE: We don't render anything here - renderChoices will handle all rendering
+    // for dialog trees using the DialogWithChoicesDisplay component.
+    // This prevents the flicker between renderDialog and renderChoices views.
+    this.setState('dialogContext', { speaker, text, emotion });
   }
 
   async renderChoices(choices: { id: string; text: string }[], locations?: Location[]): Promise<string> {
@@ -613,15 +713,101 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
+    // Get dialog context from prior renderDialog call
+    const dialogContext = this.getState('dialogContext') || {};
+
+    // Use positioned rendering if locations are available
     if (locations && locations.length > 0) {
-      return this.renderPositionedBeat('dialogTree', {
+      // Check if current choices match the location names (for buttons)
+      const buttonLocations = locations.filter(loc => loc.kind === 'button');
+      const choicesMatchLocations = choices.every(choice =>
+        buttonLocations.some(loc => loc.name === choice.text)
+      );
+
+      if (choicesMatchLocations || buttonLocations.length === 0) {
+        // Root level dialog or no button locations - use positioned rendering as-is
+        const content: Record<string, any> = {
+          text: dialogContext.text || '',
+          choices
+        };
+        return this.renderPositionedBeat('dialogTree', content, locations, true);
+      }
+
+      // Nested dialog: reuse root layout positions but with new content
+      // Create modified locations that map nested content to root positions by index
+      // Note: Dialog text elements can have kind 'text' or 'dialog'
+      const textLocations = locations.filter(loc => loc.kind === 'text' || loc.kind === 'dialog');
+      const characterLocations = locations.filter(loc => loc.kind === 'character');
+
+      console.log('[renderChoices] Nested dialog detected');
+      console.log('[renderChoices] textLocations:', textLocations.length, textLocations.map(l => ({ name: l.name, kind: l.kind })));
+      console.log('[renderChoices] buttonLocations:', buttonLocations.length, buttonLocations.map(l => ({ name: l.name, kind: l.kind })));
+      console.log('[renderChoices] dialogContext.text:', dialogContext.text?.substring(0, 50));
+      console.log('[renderChoices] choices:', choices.map(c => c.text));
+
+      // Build new locations array: remap text element name to "text" for content mapping
+      // Calculate expanded dimensions for nested content
+      const textHeight = 300; // Minimum height for nested text
+      const textWidth = 500;  // Minimum width for nested text
+      const buttonWidth = 450; // Minimum width for buttons
+      const buttonHeight = 60; // Minimum height for buttons
+      const textLoc = textLocations[0];
+      const heightDiff = textLoc ? Math.max(0, textHeight - textLoc.height) : 0;
+
+      const nestedLocations: Location[] = [
+        // Update text location name to "text" so getContentForLocation can map it
+        // Use larger dimensions to accommodate longer nested content
+        ...textLocations.map(loc => ({
+          ...loc,
+          name: 'text',
+          height: Math.max(loc.height, textHeight),
+          width: Math.max(loc.width, textWidth),
+        })),
+        ...characterLocations,
+      ];
+
+      // Map nested choices to button positions by index
+      // Offset buttons down if text box was expanded, and ensure adequate button size
+      choices.forEach((choice, index) => {
+        if (index < buttonLocations.length) {
+          const btnLoc = buttonLocations[index];
+          nestedLocations.push({
+            ...btnLoc,
+            name: choice.text,
+            y: btnLoc.y + heightDiff,
+            width: Math.max(btnLoc.width, buttonWidth),
+            height: Math.max(btnLoc.height, buttonHeight),
+          });
+        }
+      });
+
+      console.log('[renderChoices] nestedLocations:', nestedLocations.map(l => ({ name: l.name, kind: l.kind })));
+
+      const content: Record<string, any> = {
+        text: dialogContext.text || '',
         choices
-      }, locations, true);
+      };
+      console.log('[renderChoices] content.text:', content.text?.substring(0, 50));
+      return this.renderPositionedBeat('dialogTree', content, nestedLocations, true);
     }
 
+    // Fallback: styled component when no locations defined at all
     return new Promise(resolve => {
       this.resolveAction = resolve;
-      this.renderComponent(<ChoiceDisplay choices={choices} onAction={this.handleAction} />);
+      if (dialogContext.text) {
+        this.renderComponent(
+          <DialogWithChoicesDisplay
+            text={dialogContext.text}
+            choices={choices}
+            backgroundUrl={this.backgroundImageUrl}
+            theme={this.theme}
+            onAction={this.handleAction}
+          />
+        );
+      } else {
+        // Fallback to choices-only display
+        this.renderComponent(<ChoiceDisplay choices={choices} onAction={this.handleAction} />);
+      }
     });
   }
 

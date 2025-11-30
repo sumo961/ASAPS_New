@@ -188,7 +188,9 @@ Generate a complete, engaging interactive story structure.`;
 
   const generated = JSON.parse(jsonStr);
 
-  // Add positions to beats if not present
+  // Add placeholder positions to beats if not present
+  // Note: The builder's TreeLayoutAlgorithm will recalculate proper tree positions
+  // based on connections when the story is injected
   const beatsWithPositions = generated.beats.map((beat: any, index: number) => ({
     ...beat,
     position: beat.position || {

@@ -85,6 +85,8 @@ export interface PositionedBeatViewProps {
   hideButtonBoxes?: boolean;
   /** Theme settings for styling elements */
   theme?: RenderThemeSettings;
+  /** Enable preview mode - auto-sizes text boxes to fit content */
+  previewMode?: boolean;
 }
 
 // Default theme to use if none provided
@@ -129,6 +131,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   hideTextBoxes = false,
   hideButtonBoxes = false,
   theme = DEFAULT_THEME,
+  previewMode = false,
 }) => {
   // FIX #3: Add debugging logs
   console.log('[PositionedBeatView] ============================================');
@@ -192,6 +195,95 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
     console.log('[PositionedBeatView] background set to:', containerStyle.background);
   }
 
+  // In preview mode, use a flex layout for text and buttons to auto-flow
+  if (previewMode) {
+    // Separate elements by type
+    const textElements = elements.filter(el =>
+      el.location.kind === 'text' || el.location.kind === 'dialog'
+    );
+    const buttonElements = elements.filter(el =>
+      el.location.kind === 'button'
+    );
+    const otherElements = elements.filter(el =>
+      el.location.kind !== 'text' && el.location.kind !== 'dialog' && el.location.kind !== 'button'
+    );
+
+    return (
+      <div style={containerStyle}>
+        {/* Render other elements (characters, props) with absolute positioning */}
+        {otherElements.map((element, index) => (
+          <PositionedElement
+            key={`other-${index}-${element.location.name}`}
+            element={element}
+            index={index}
+            onAction={handleAction}
+            interactive={interactive}
+            inputValue={inputValue}
+            setInputValue={setInputValue}
+            hideTextBoxes={hideTextBoxes}
+            hideButtonBoxes={hideButtonBoxes}
+            theme={theme}
+            previewMode={false} // Keep absolute for assets
+          />
+        ))}
+
+        {/* Flex container for text and buttons */}
+        <div style={{
+          position: 'absolute',
+          top: textElements[0]?.location.y || 50,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '20px',
+          padding: '0 20px',
+        }}>
+          {/* Text elements */}
+          {textElements.map((element, index) => (
+            <div
+              key={`text-${index}-${element.location.name}`}
+              style={{
+                width: `${element.location.width}px`,
+                maxWidth: '90%',
+              }}
+            >
+              <FlexTextElement
+                element={element}
+                hideTextBox={hideTextBoxes}
+                theme={theme}
+              />
+            </div>
+          ))}
+
+          {/* Buttons in a row */}
+          {buttonElements.length > 0 && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: '16px',
+              justifyContent: 'center',
+              width: '100%',
+            }}>
+              {buttonElements.map((element, index) => (
+                <FlexButtonElement
+                  key={`btn-${index}-${element.location.name}`}
+                  element={element}
+                  onAction={handleAction}
+                  interactive={interactive}
+                  hideButtonBox={hideButtonBoxes}
+                  theme={theme}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Non-preview mode: use absolute positioning for all elements
   return (
     <div style={containerStyle}>
       {elements.map((element, index) => (
@@ -206,6 +298,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           hideTextBoxes={hideTextBoxes}
           hideButtonBoxes={hideButtonBoxes}
           theme={theme}
+          previewMode={previewMode}
         />
       ))}
     </div>
@@ -225,6 +318,7 @@ interface PositionedElementProps {
   hideTextBoxes?: boolean;
   hideButtonBoxes?: boolean;
   theme: RenderThemeSettings;
+  previewMode?: boolean;
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -237,6 +331,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   hideTextBoxes = false,
   hideButtonBoxes = false,
   theme,
+  previewMode = false,
 }) => {
   const { location, content, assetUrl } = element;
 
@@ -293,6 +388,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           location={location}
           hideTextBox={hideTextBoxes}
           theme={theme}
+          previewMode={previewMode}
         />
       );
 
@@ -347,6 +443,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           location={location}
           hideTextBox={hideTextBoxes}
           theme={theme}
+          previewMode={previewMode}
         />
       );
 
@@ -376,7 +473,8 @@ const TextElement: React.FC<{
   location: Location;
   hideTextBox?: boolean;
   theme: RenderThemeSettings;
-}> = ({ style, content, location, hideTextBox = false, theme }) => {
+  previewMode?: boolean;
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
 
@@ -461,6 +559,11 @@ const TextElement: React.FC<{
     ? { animation: `fadeIn ${fadeInDuration}ms ease-in` }
     : {};
 
+  // In preview mode, use auto height with min/max constraints
+  const heightStyle = previewMode
+    ? { height: 'auto', minHeight: '60px', maxHeight: `${location.height}px` }
+    : { height: style.height };
+
   return (
     <>
       <style>
@@ -475,6 +578,7 @@ const TextElement: React.FC<{
         style={{
           ...style,
           ...animationStyle,
+          ...heightStyle,
           backgroundColor: bgWithOpacity,
           padding: hideTextBox ? '0' : `${padding}px`,
           border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
@@ -685,7 +789,8 @@ const DialogElement: React.FC<{
   location: Location;
   hideTextBox?: boolean;
   theme: RenderThemeSettings;
-}> = ({ style, content, location, hideTextBox = false, theme }) => {
+  previewMode?: boolean;
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false }) => {
   // Calculate font size
   let computedFontSize: number;
   if (location.fontSize !== undefined) {
@@ -703,10 +808,16 @@ const DialogElement: React.FC<{
   const paddingHorizontal = Math.max(Math.floor(location.width * 0.04), 12);
   const paddingVertical = Math.max(Math.floor(location.height * 0.1), 12);
 
+  // In preview mode, use auto height with min/max constraints
+  const heightStyle = previewMode
+    ? { height: 'auto', minHeight: '60px', maxHeight: `${location.height}px` }
+    : { height: style.height };
+
   return (
     <div
       style={{
         ...style,
+        ...heightStyle,
         backgroundColor: hideTextBox ? 'transparent' : 'rgba(255, 255, 255, 0.95)',
         borderRadius: hideTextBox ? '0' : '12px',
         padding: hideTextBox ? '0' : `${paddingVertical}px ${paddingHorizontal}px`,
@@ -838,12 +949,29 @@ export function createPositionedElementData(
     // Extract actionId for beats that have choice/option mappings
     let actionId: string | undefined;
 
-    // For movementChoice: match location.name to choice.location to get choice.id
+    // For movementChoice: match location.name to choice.text (or choice.location as fallback)
     if (beatType === 'movementChoice' && content.choices && Array.isArray(content.choices)) {
-      const choice = content.choices.find((c: any) => c.location === location.name);
+      // Try matching by text first (since SchemaLocationInitializer uses choice.text for location.name)
+      let choice = content.choices.find((c: any) => c.text === location.name);
+      // Fallback to location match
+      if (!choice) {
+        choice = content.choices.find((c: any) => c.location === location.name);
+      }
       if (choice) {
         actionId = choice.id;
         console.log(`[createPositionedElementData] MovementChoice: location "${location.name}" → choice ID "${actionId}"`);
+      } else {
+        console.log(`[createPositionedElementData] MovementChoice: NO MATCH for location "${location.name}"`);
+        console.log(`[createPositionedElementData] Available choices:`, content.choices.map((c: any) => ({ id: c.id, text: c.text, location: c.location })));
+      }
+    }
+
+    // For dialogTree: match location.name to choice.text to get choice.id
+    if (beatType === 'dialogTree' && content.choices && Array.isArray(content.choices)) {
+      const choice = content.choices.find((c: any) => c.text === location.name);
+      if (choice) {
+        actionId = choice.id;
+        console.log(`[createPositionedElementData] DialogTree: location "${location.name}" → choice ID "${actionId}"`);
       }
     }
 
@@ -922,6 +1050,21 @@ function getContentForLocation(
     }
     if (nameLower.includes('button') || nameLower.includes('continue')) {
       return content.buttonText || 'Continue';
+    }
+  }
+
+  // Dialog Tree specific elements
+  if (beatType === 'dialogTree') {
+    // Text element for dialog content
+    if (loc.kind === 'text' || nameLower.includes('text') || nameLower.includes('dialog')) {
+      return content.text || '';
+    }
+    // Button elements - match by choice text
+    if (loc.kind === 'button' && content.choices) {
+      const choice = content.choices.find((c: any) => c.text === loc.name);
+      if (choice) {
+        return choice.text;
+      }
     }
   }
 
@@ -1060,3 +1203,136 @@ function getContentForLocation(
   // Ultimate fallback
   return content.text || content.message || content.prompt || content.question || loc.name || '';
 }
+
+// ============================================
+// FLEX LAYOUT COMPONENTS (for preview mode)
+// These render without absolute positioning
+// ============================================
+
+/**
+ * Text element for flex layout (no absolute positioning)
+ */
+const FlexTextElement: React.FC<{
+  element: PositionedElementData;
+  hideTextBox?: boolean;
+  theme: RenderThemeSettings;
+}> = ({ element, hideTextBox = false, theme }) => {
+  const { location, content } = element;
+
+  // Calculate font size
+  let computedFontSize: number;
+  if (location.fontSize !== undefined) {
+    computedFontSize = location.fontSize;
+  } else {
+    // Default size for flex layout
+    computedFontSize = 20;
+  }
+
+  const computedTextAlign = location.textAlign || 'center';
+  const computedFont = location.font || theme.fonts.textFont;
+  const padding = theme.textBox.padding;
+
+  // Convert opacity from 0-100 to 0-1
+  const opacityValue = theme.textBox.opacity / 100;
+  const bgColor = hideTextBox ? 'transparent' : theme.textBox.backgroundColor;
+  const bgWithOpacity = hideTextBox ? 'transparent' :
+    (bgColor.startsWith('#') ? `${bgColor}${Math.round(opacityValue * 255).toString(16).padStart(2, '0')}` : bgColor);
+
+  const textColor = theme.colors.textColor;
+  const textAlpha = theme.colors.textAlpha / 100;
+
+  return (
+    <div
+      style={{
+        backgroundColor: bgWithOpacity,
+        padding: hideTextBox ? '0' : `${padding}px`,
+        border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
+        borderRadius: hideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
+        fontSize: `${computedFontSize}px`,
+        fontFamily: computedFont,
+        fontWeight: '500',
+        color: textColor,
+        opacity: textAlpha,
+        boxShadow: hideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
+        textAlign: computedTextAlign,
+        wordWrap: 'break-word',
+        overflowWrap: 'break-word',
+        lineHeight: '1.4',
+        boxSizing: 'border-box',
+      }}
+    >
+      {content}
+    </div>
+  );
+};
+
+/**
+ * Button element for flex layout (no absolute positioning)
+ */
+const FlexButtonElement: React.FC<{
+  element: PositionedElementData;
+  onAction?: (actionId: string) => void;
+  interactive: boolean;
+  hideButtonBox?: boolean;
+  theme: RenderThemeSettings;
+}> = ({ element, onAction, interactive, hideButtonBox = false, theme }) => {
+  const { location, content, actionId } = element;
+  const [isHovered, setIsHovered] = React.useState(false);
+
+  // Calculate font size
+  let computedFontSize: number;
+  if (location.fontSize !== undefined) {
+    computedFontSize = location.fontSize;
+  } else {
+    computedFontSize = 18;
+  }
+
+  const computedTextAlign = location.textAlign || 'center';
+  const computedFont = location.font || theme.fonts.buttonFont;
+
+  // Determine background color
+  let backgroundColor: string;
+  if (hideButtonBox) {
+    backgroundColor = 'transparent';
+  } else {
+    backgroundColor = isHovered ? theme.button.hoverBackgroundColor : theme.button.backgroundColor;
+  }
+
+  const handleClick = async () => {
+    if (interactive && onAction) {
+      const actionIdToPass = actionId || location.name || 'continue';
+      onAction(actionIdToPass);
+    }
+  };
+
+  return (
+    <button
+      style={{
+        minWidth: `${Math.min(location.width, 200)}px`,
+        padding: hideButtonBox ? '0' : '12px 24px',
+        backgroundColor,
+        color: hideButtonBox ? theme.colors.textColor : theme.button.textColor,
+        border: hideButtonBox ? 'none' : `${theme.button.borderWidth}px solid ${theme.button.borderColor}`,
+        borderRadius: hideButtonBox ? '4px' : `${theme.button.borderRadius}px`,
+        fontSize: `${computedFontSize}px`,
+        fontFamily: computedFont,
+        fontWeight: '600',
+        textAlign: computedTextAlign,
+        transition: 'all 0.2s',
+        boxShadow: hideButtonBox ? 'none' : (isHovered ? '0 6px 12px rgba(0,0,0,0.15)' : '0 4px 6px rgba(0,0,0,0.1)'),
+        transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+        cursor: interactive ? 'pointer' : 'default',
+        wordWrap: 'break-word',
+        overflowWrap: 'break-word',
+        boxSizing: 'border-box',
+        lineHeight: '1.4',
+      }}
+      onClick={handleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      disabled={!interactive}
+    >
+      {content}
+    </button>
+  );
+};

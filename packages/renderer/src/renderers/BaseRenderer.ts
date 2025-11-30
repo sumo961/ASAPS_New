@@ -6,6 +6,7 @@ export abstract class BaseRenderer implements IRenderer {
   protected assetCache: AssetCache;
   protected options: RenderOptions;
   protected state: Map<string, any> = new Map();
+  private stateListeners: Map<string, Set<(value: any) => void>> = new Map();
 
   constructor(context: RenderContext, options: RenderOptions = {}) {
     this.context = context;
@@ -221,10 +222,37 @@ export abstract class BaseRenderer implements IRenderer {
   // State management
   setState(key: string, value: any): void {
     this.state.set(key, value);
+    // Notify listeners for this state key
+    const listeners = this.stateListeners.get(key);
+    if (listeners) {
+      listeners.forEach(listener => listener(value));
+    }
   }
 
   getState(key: string): any {
     return this.state.get(key);
+  }
+
+  /**
+   * Register a listener for state changes on a specific key
+   * Returns an unsubscribe function
+   */
+  onStateChange(key: string, listener: (value: any) => void): () => void {
+    if (!this.stateListeners.has(key)) {
+      this.stateListeners.set(key, new Set());
+    }
+    this.stateListeners.get(key)!.add(listener);
+
+    // Return unsubscribe function
+    return () => {
+      const listeners = this.stateListeners.get(key);
+      if (listeners) {
+        listeners.delete(listener);
+        if (listeners.size === 0) {
+          this.stateListeners.delete(key);
+        }
+      }
+    };
   }
 
   clear(): void {

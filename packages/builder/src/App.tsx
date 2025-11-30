@@ -19,85 +19,10 @@ import { downloadProjectAsZip, importProjectFromZip } from './utils/projectZipMa
 import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { DebugPanel } from './components/debug/DebugPanel';
-
-// Constants for beat node dimensions (used for overlap detection)
-const BEAT_NODE_WIDTH = 250;
-const BEAT_NODE_HEIGHT = 80;
-const BEAT_PADDING = 30; // Minimum spacing between beats
+import { applyTreeLayoutToBeats } from './utils/TreeLayoutAlgorithm';
 
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
-
-/**
- * Resolve overlapping beat positions by pushing them apart
- */
-function resolveOverlappingPositions(
-  beats: Array<{ id: string; position?: { x: number; y: number } }>
-): Map<string, { x: number; y: number }> {
-  const adjustedPositions = new Map<string, { x: number; y: number }>();
-
-  // Initialize with original positions
-  beats.forEach(beat => {
-    const pos = beat.position || { x: 200, y: 200 };
-    adjustedPositions.set(beat.id, { x: pos.x, y: pos.y });
-  });
-
-  // Check for overlaps and resolve them
-  const maxIterations = 50; // Prevent infinite loops
-  let hasOverlaps = true;
-  let iteration = 0;
-
-  while (hasOverlaps && iteration < maxIterations) {
-    hasOverlaps = false;
-    iteration++;
-
-    const beatIds = Array.from(adjustedPositions.keys());
-
-    for (let i = 0; i < beatIds.length; i++) {
-      for (let j = i + 1; j < beatIds.length; j++) {
-        const pos1 = adjustedPositions.get(beatIds[i])!;
-        const pos2 = adjustedPositions.get(beatIds[j])!;
-
-        // Check if beats overlap (considering node dimensions)
-        const dx = Math.abs(pos1.x - pos2.x);
-        const dy = Math.abs(pos1.y - pos2.y);
-        const minDx = BEAT_NODE_WIDTH + BEAT_PADDING;
-        const minDy = BEAT_NODE_HEIGHT + BEAT_PADDING;
-
-        if (dx < minDx && dy < minDy) {
-          hasOverlaps = true;
-
-          // Push beats apart - move the second beat
-          if (dx <= dy) {
-            // Push horizontally
-            const pushX = (minDx - dx) / 2 + 10;
-            if (pos1.x <= pos2.x) {
-              pos2.x += pushX;
-            } else {
-              pos2.x -= pushX;
-            }
-          } else {
-            // Push vertically
-            const pushY = (minDy - dy) / 2 + 10;
-            if (pos1.y <= pos2.y) {
-              pos2.y += pushY;
-            } else {
-              pos2.y -= pushY;
-            }
-          }
-
-          adjustedPositions.set(beatIds[j], pos2);
-        }
-      }
-    }
-  }
-
-  if (iteration >= maxIterations) {
-    console.warn('[App] Overlap resolution reached max iterations');
-  }
-
-  return adjustedPositions;
-}
 
 function App() {
   const { state, actions, initializeStory } = useStoryBuilder();
@@ -358,8 +283,9 @@ function App() {
 
       // BATCH UPDATE: Create all beats first, then load them in a single state update
       // This prevents the GraphEditor from re-rendering 42+ times
+      // Use tree layout algorithm to position beats based on their connections
       const adjustedPositions = story.beats && Array.isArray(story.beats)
-        ? resolveOverlappingPositions(story.beats)
+        ? applyTreeLayoutToBeats(story.beats)
         : new Map();
 
       // Create all beats without adding to state (batch preparation)
@@ -412,15 +338,46 @@ function App() {
       // Process connections (build connection list without state updates)
       const connectionsToCreate: Array<{ source: string; target: string; label?: string }> = [];
 
+      // Helper to recursively extract targets from dialogTree
+      // Supports both new format (dialogNode) and old format (target as object)
+      const extractDialogTreeTargets = (node: any, beatId: string): void => {
+        if (!node) return;
+
+        // Check choices for targets
+        if (node.choices && Array.isArray(node.choices)) {
+          node.choices.forEach((choice: any) => {
+            // New format: target is string (beat ID)
+            if (typeof choice.target === 'string' && choice.target) {
+              connectionsToCreate.push({
+                source: beatId,
+                target: choice.target,
+                label: choice.text || 'Choice',
+              });
+            }
+            // New format: dialogNode for nested dialog
+            if (choice.dialogNode) {
+              extractDialogTreeTargets(choice.dialogNode, beatId);
+            }
+            // Old format: target as object (backward compatibility)
+            if (typeof choice.target === 'object' && choice.target) {
+              extractDialogTreeTargets(choice.target, beatId);
+            }
+          });
+        }
+      };
+
       // Extract connections from beat parameters
       if (story.beats && Array.isArray(story.beats)) {
         story.beats.forEach((beatData: any) => {
+          // Single connection (introText, titleScreen, etc.)
           if (beatData.parameters?.connection?.target) {
             connectionsToCreate.push({
               source: beatData.id,
               target: beatData.parameters.connection.target,
             });
           }
+
+          // conditionBeat true/false connections
           if (beatData.type === 'conditionBeat') {
             if (beatData.parameters?.trueConnection?.target) {
               connectionsToCreate.push({
@@ -436,6 +393,64 @@ function App() {
                 label: 'false',
               });
             }
+          }
+
+          // dialogTree - extract targets from nested dialog structure
+          if (beatData.type === 'dialogTree' && beatData.parameters?.dialogTree) {
+            extractDialogTreeTargets(beatData.parameters.dialogTree, beatData.id);
+          }
+
+          // movementChoice - extract targets from choices array
+          if (beatData.type === 'movementChoice' && beatData.parameters?.choices) {
+            beatData.parameters.choices.forEach((choice: any) => {
+              if (choice.target) {
+                connectionsToCreate.push({
+                  source: beatData.id,
+                  target: choice.target,
+                  label: choice.text || choice.location || 'Choice',
+                });
+              }
+            });
+          }
+
+          // pickProp - extract targets from props array
+          if (beatData.type === 'pickProp' && beatData.parameters?.props) {
+            beatData.parameters.props.forEach((prop: any) => {
+              if (prop.target) {
+                connectionsToCreate.push({
+                  source: beatData.id,
+                  target: prop.target,
+                  label: prop.name || 'Prop',
+                });
+              }
+            });
+          }
+
+          // hyperText - extract targets from hyperlinks array
+          if (beatData.type === 'hyperText' && beatData.parameters?.hyperlinks) {
+            beatData.parameters.hyperlinks.forEach((link: any) => {
+              if (link.targetBeatId) {
+                connectionsToCreate.push({
+                  source: beatData.id,
+                  target: link.targetBeatId,
+                  label: link.word || 'Link',
+                });
+              }
+            });
+          }
+
+          // randomTarget - extract targets from choices array
+          if (beatData.type === 'randomTarget' && beatData.parameters?.choices) {
+            beatData.parameters.choices.forEach((choice: any, index: number) => {
+              const target = typeof choice === 'string' ? choice : choice.target;
+              if (target) {
+                connectionsToCreate.push({
+                  source: beatData.id,
+                  target: target,
+                  label: `Random ${index + 1}`,
+                });
+              }
+            });
           }
         });
       }
@@ -1187,9 +1202,9 @@ function App() {
       actions.setTitle(storyTitle);
     }
 
-    // Resolve overlapping positions before adding beats
+    // Apply tree layout to position beats based on their connections
     const adjustedPositions = story.beats && Array.isArray(story.beats)
-      ? resolveOverlappingPositions(story.beats)
+      ? applyTreeLayoutToBeats(story.beats)
       : new Map();
 
     // Add all generated beats, preserving AI-generated IDs with adjusted positions

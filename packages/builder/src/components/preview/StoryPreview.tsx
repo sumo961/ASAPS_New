@@ -8,6 +8,7 @@ import type { Asset } from '../assets/AssetManager';
 import type { Character } from '../../types/character';
 import { StatePresetManager } from '../debug/StatePresetManager';
 import { StatePresetEditor } from '../debug/StatePresetEditor';
+import { initializeBeatLocations } from '../../utils/SchemaLocationInitializer';
 
 interface StoryPreviewProps {
   story: Story;
@@ -196,6 +197,12 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
     try {
       setIsRunning(true);
 
+      // CRITICAL: Initialize beat locations from schema for beats that don't have them
+      // This ensures proper positioned rendering instead of fallback centered components
+      const allBeats = story.getAllBeats();
+      console.log('[StoryPreview] Initializing locations for', allBeats.length, 'beats');
+      initializeBeatLocations(allBeats, 1024, 768);
+
       // Set up asset resolver for backgrounds
       if (rendererRef.current && 'setAssetResolver' in rendererRef.current) {
         const environment = story.getEnvironment();
@@ -252,18 +259,37 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         }
       }
       
+      // Listen to renderer state changes to track current beat
+      // This is called at the START of beat execution (unlike markBeatVisited which is at the END)
+      if (rendererRef.current && 'onStateChange' in rendererRef.current) {
+        (rendererRef.current as any).onStateChange('currentBeatInfo', (beatInfo: { id: string; name: string; type: string } | null) => {
+          if (beatInfo) {
+            const beat = story.getBeat(beatInfo.id);
+            setCurrentBeat(beat || null);
+            // Update debug info with current state
+            setDebugInfo({
+              currentBeatId: beatInfo.id,
+              visitedBeats: context.getVisitedBeats(),
+              variables: context.getVariables(),
+              counters: context.getCounters(),
+              inventory: context.getInventory(),
+            });
+          }
+        });
+      }
+
+      // Also update debug info when beats are visited (for the visited beats list)
       const originalMarkVisited = context.markBeatVisited.bind(context);
       context.markBeatVisited = (beatId: string) => {
         originalMarkVisited(beatId);
-        const beat = story.getBeat(beatId);
-        setCurrentBeat(beat || null);
-        setDebugInfo({
-          currentBeatId: beatId,
+        // Update only the visited beats list, currentBeat is handled by onStateChange
+        setDebugInfo((prev: any) => ({
+          ...prev,
           visitedBeats: context.getVisitedBeats(),
           variables: context.getVariables(),
           counters: context.getCounters(),
           inventory: context.getInventory(),
-        });
+        }));
       };
       
       const timerManager = context.getTimerManager();

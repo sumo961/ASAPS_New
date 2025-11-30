@@ -201,10 +201,12 @@ export function initializeLocationsFromSchema(
       }
     }
 
-    // Skip 'choices' location for beats that handle choices dynamically
-    // These beats create individual choice/location buttons programmatically
-    if ((beat.type === 'movementChoice' || beat.type === 'dialogTree' || beat.type === 'pickProp')
-        && locationName === 'choices') {
+    // Skip 'choices' and 'props' locations for beats that handle them dynamically
+    // These beats create individual choice/prop buttons programmatically from their parameters
+    if ((beat.type === 'movementChoice' || beat.type === 'dialogTree') && locationName === 'choices') {
+      return; // Skip - will be created dynamically below
+    }
+    if (beat.type === 'pickProp' && locationName === 'props') {
       return; // Skip - will be created dynamically below
     }
 
@@ -282,52 +284,84 @@ export function initializeLocationsFromSchema(
   });
 
   // Handle dynamic elements (choices, props, etc.)
-  if (beat.type === 'dialogTree' && params.dialogTree?.choices) {
-    const choices = params.dialogTree.choices;
-    choices.forEach((choice: any, index: number) => {
-      const width = 240;
-      const height = 50;
-      const x = centerX - width / 2;
-      const y = currentY + (index * (height + 15));
+  // DialogTree - get choices from dialogTree.choices
+  if (beat.type === 'dialogTree') {
+    let choices: any[] = [];
 
-      elements.push({
-        id: `choice_${index}_${Date.now()}`,
-        type: 'button',
-        name: `Choice ${index + 1}`,
-        text: choice.text || `Choice ${index + 1}`,
-        x,
-        y,
-        z: 10 + index,
-        width,
-        height,
-        rotation: 0,
-        scale: 1,
-        visible: true,
-        locked: false,
-        font: 'Arial',
-        fontSize: 16,
-        textAlign: 'center',
+    if (params.dialogTree?.choices) {
+      choices = params.dialogTree.choices;
+      console.log('[SchemaLocationInitializer] DialogTree choices:', choices);
+    }
+
+    if (choices.length > 0) {
+      // First pass: calculate sizes for all choices to find the max width
+      const choiceSizes = choices.map((choice: any, index: number) => {
+        const choiceText = choice.text || `Choice ${index + 1}`;
+        // Auto-size based on text content - use wider min/max for buttons with longer text
+        const sized = autoSizeText(choiceText, 16, 200, 600, true);
+        return { choiceText, ...sized };
       });
-    });
+
+      // Use the maximum width for all buttons (for visual consistency)
+      const maxWidth = Math.max(...choiceSizes.map((s: { choiceText: string; width: number; height: number }) => s.width));
+      const buttonHeight = 50; // Fixed height for consistency
+
+      let buttonY = currentY;
+      choiceSizes.forEach((sizeInfo: any, index: number) => {
+        const x = centerX - maxWidth / 2;
+
+        elements.push({
+          id: `choice_${index}_${Date.now()}`,
+          type: 'button',
+          name: sizeInfo.choiceText, // Use actual text as name for visual editor display
+          text: sizeInfo.choiceText,
+          x,
+          y: buttonY,
+          z: 10 + index,
+          width: maxWidth,
+          height: buttonHeight,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          font: 'Arial',
+          fontSize: 16,
+          textAlign: 'center',
+        });
+        buttonY += buttonHeight + 15;
+      });
+    }
   }
 
   if (beat.type === 'movementChoice' && params.choices) {
-    params.choices.forEach((choice: any, index: number) => {
-      const width = 240;
-      const height = 50;
-      const x = centerX - width / 2;
-      const y = currentY + (index * (height + 15));
+    console.log('[SchemaLocationInitializer] MovementChoice choices:', params.choices);
+
+    // First pass: calculate sizes for all choices to find the max width
+    const choiceSizes = params.choices.map((choice: any, index: number) => {
+      const choiceText = choice.text || choice.location || `Location ${index + 1}`;
+      // Auto-size based on text content
+      const sized = autoSizeText(choiceText, 16, 200, 600, true);
+      return { choiceText, ...sized };
+    });
+
+    // Use the maximum width for all buttons (for visual consistency)
+    const maxWidth = Math.max(...choiceSizes.map((s: any) => s.width));
+    const buttonHeight = 50;
+
+    let buttonY = currentY;
+    choiceSizes.forEach((sizeInfo: any, index: number) => {
+      const x = centerX - maxWidth / 2;
 
       elements.push({
         id: `location_${index}_${Date.now()}`,
         type: 'hotspot', // Use hotspot type for location choices
-        name: choice.text || choice.location || `Location ${index + 1}`,
-        text: choice.text || choice.location,
+        name: sizeInfo.choiceText, // Use actual text as name for visual editor display
+        text: sizeInfo.choiceText,
         x,
-        y,
+        y: buttonY,
         z: 10 + index,
-        width,
-        height,
+        width: maxWidth,
+        height: buttonHeight,
         rotation: 0,
         scale: 1,
         visible: true,
@@ -336,16 +370,19 @@ export function initializeLocationsFromSchema(
         fontSize: 16,
         textAlign: 'center',
       });
+      buttonY += buttonHeight + 15;
     });
   }
 
   if (beat.type === 'pickProp' && params.props) {
+    console.log('[SchemaLocationInitializer] PickProp props:', params.props);
     const propsPerRow = 3;
     const propWidth = 200;
     const propHeight = 50;
     const spacing = 20;
 
     params.props.forEach((prop: any, index: number) => {
+      const propName = prop.name || `Prop ${index + 1}`;
       const row = Math.floor(index / propsPerRow);
       const col = index % propsPerRow;
       const totalWidth = (propWidth * propsPerRow) + (spacing * (propsPerRow - 1));
@@ -357,8 +394,8 @@ export function initializeLocationsFromSchema(
       elements.push({
         id: `prop_${index}_${Date.now()}`,
         type: 'button',
-        name: prop.name || `Prop ${index + 1}`,
-        text: prop.name,
+        name: propName, // Use actual name for visual editor display
+        text: propName,
         x,
         y,
         z: 10 + index,
@@ -492,22 +529,30 @@ export function regenerateChoiceElements(
 
   // movementChoice beats - use hotspot type for location choices
   if (beatType === 'movementChoice' && params.choices) {
-    params.choices.forEach((choice: any, index: number) => {
-      const width = 240;
-      const height = 50;
-      const x = centerX - width / 2;
-      const y = currentY + (index * (height + 15));
+    // First pass: calculate sizes for all choices to find the max width
+    const choiceSizes = params.choices.map((choice: any, index: number) => {
+      const choiceText = choice.text || choice.location || `Location ${index + 1}`;
+      const sized = autoSizeText(choiceText, 16, 200, 600, true);
+      return { choiceText, ...sized };
+    });
+
+    const maxWidth = Math.max(...choiceSizes.map((s: any) => s.width));
+    const buttonHeight = 50;
+
+    let buttonY = currentY;
+    choiceSizes.forEach((sizeInfo: any, index: number) => {
+      const x = centerX - maxWidth / 2;
 
       elements.push({
         id: `location_${index}_${Date.now()}`,
         type: 'hotspot', // Use hotspot type for location choices
-        name: choice.text || choice.location || `Location ${index + 1}`,
-        text: choice.text || choice.location,
+        name: sizeInfo.choiceText, // Use actual text for visual editor
+        text: sizeInfo.choiceText,
         x,
-        y,
+        y: buttonY,
         z: 10 + index,
-        width,
-        height,
+        width: maxWidth,
+        height: buttonHeight,
         rotation: 0,
         scale: 1,
         visible: true,
@@ -516,37 +561,12 @@ export function regenerateChoiceElements(
         fontSize: 16,
         textAlign: 'center',
       });
+      buttonY += buttonHeight + 15;
     });
   }
 
-  // dialogTree beats
-  if (beatType === 'dialogTree' && params.dialogTree?.choices) {
-    params.dialogTree.choices.forEach((choice: any, index: number) => {
-      const width = 240;
-      const height = 50;
-      const x = centerX - width / 2;
-      const y = currentY + (index * (height + 15));
-
-      elements.push({
-        id: `choice_${index}_${Date.now()}`,
-        type: 'button',
-        name: `Choice ${index + 1}`,
-        text: choice.text || `Choice ${index + 1}`,
-        x,
-        y,
-        z: 10 + index,
-        width,
-        height,
-        rotation: 0,
-        scale: 1,
-        visible: true,
-        locked: false,
-        font: 'Arial',
-        fontSize: 16,
-        textAlign: 'center',
-      });
-    });
-  }
+  // NOTE: dialogTree choice buttons are created in the createElements function above
+  // Do NOT duplicate them here - they're already handled at line ~288
 
   // pickProp beats
   if (beatType === 'pickProp' && params.props) {
@@ -556,6 +576,7 @@ export function regenerateChoiceElements(
     const spacing = 20;
 
     params.props.forEach((prop: any, index: number) => {
+      const propName = prop.name || `Prop ${index + 1}`;
       const row = Math.floor(index / propsPerRow);
       const col = index % propsPerRow;
       const totalWidth = (propWidth * propsPerRow) + (spacing * (propsPerRow - 1));
@@ -567,8 +588,8 @@ export function regenerateChoiceElements(
       elements.push({
         id: `prop_${index}_${Date.now()}`,
         type: 'button',
-        name: prop.name || `Prop ${index + 1}`,
-        text: prop.name,
+        name: propName, // Use actual name for visual editor
+        text: propName,
         x,
         y,
         z: 10 + index,

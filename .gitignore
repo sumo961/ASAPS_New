@@ -39,3 +39,10 @@ lerna-debug.log*
 .temp/
 .tmp/
 *.bak
+
+# Development documentation (local only)
+dev_docs/
+
+# Claude Code instructions (local only)
+CLAUDE.md
+.claude/

@@ -56,6 +56,13 @@ export abstract class Beat {
 
   async execute(context: StoryContext, renderer: IRenderer): Promise<string | null> {
     try {
+      // Notify renderer of current beat info at the START of execution
+      renderer.setState('currentBeatInfo', {
+        id: this.id,
+        name: this.name,
+        type: this.type,
+      });
+
       await this.onEnter(context, renderer);
       
       if (this.transition) {

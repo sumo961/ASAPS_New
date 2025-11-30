@@ -1593,33 +1593,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                       </div>
                     )}
 
-                    <div className="border-t pt-3">
-                      <h3 className="text-sm font-medium text-gray-700 mb-2">
-                        After Dialog Ends
-                      </h3>
-                      <select
-                        value={localBeat.connections?.[0]?.targetId || ''}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddConnection(e.target.value, 'Continue');
-                          } else {
-                            setLocalBeat((prev: any) => ({
-                              ...prev,
-                              connections: []
-                            }));
-                            setHasChanges(true);
-                          }
-                        }}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                      >
-                        <option value="">End story here</option>
-                        {availableTargets.map(target => (
-                          <option key={target.id} value={target.id}>
-                            {target.name} ({target.id})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                   </div>
                 )}
 

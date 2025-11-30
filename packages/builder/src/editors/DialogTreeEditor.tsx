@@ -29,16 +29,17 @@ interface DialogNode {
   id: string;
   speaker: string;
   text: string;
+  emotion?: string;
   conditions?: Condition[];
-  choices?: DialogChoice[];
-  next?: string | DialogNode;
+  choices: DialogChoice[];  // Required - always followed by player choices
   effects?: Effect[];
 }
 
 interface DialogChoice {
   id: string;
   text: string;
-  target?: string | DialogNode;
+  target?: string;  // Beat ID to exit dialog
+  dialogNode?: DialogNode;  // Nested dialog (NPC responds)
   conditions?: Condition[];
   effects?: Effect[];
   visible?: boolean;
@@ -110,15 +111,16 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   // Navigate to node at path
   const getNodeAtPath = (tree: DialogNode, path: string[]): DialogNode | null => {
     let current: any = tree;
-    
+
     for (let i = 1; i < path.length; i++) { // Skip 'root'
       const key = path[i];
       if (key.startsWith('choice_')) {
         const choiceIndex = parseInt(key.split('_')[1]);
         if (current.choices && current.choices[choiceIndex]) {
-          const target = current.choices[choiceIndex].target;
-          if (typeof target === 'object' && target !== null) {
-            current = target;
+          // Use dialogNode for nested dialog (new format)
+          const nestedNode = current.choices[choiceIndex].dialogNode;
+          if (nestedNode) {
+            current = nestedNode;
           } else {
             return null;
           }
@@ -127,20 +129,20 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         }
       }
     }
-    
+
     return current;
   };
 
   // Update node at path
   const updateNodeAtPath = (tree: DialogNode, path: string[], updates: Partial<DialogNode>): DialogNode => {
     const newTree = cloneNode(tree);
-    
+
     if (path.length === 1 && path[0] === 'root') {
       // Updating root node
       Object.assign(newTree, updates);
       return newTree;
     }
-    
+
     // Navigate to the target node
     let current: any = newTree;
     for (let i = 1; i < path.length; i++) { // Skip 'root'
@@ -148,19 +150,20 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
       if (key.startsWith('choice_')) {
         const choiceIndex = parseInt(key.split('_')[1]);
         if (current.choices && current.choices[choiceIndex]) {
-          const target = current.choices[choiceIndex].target;
-          if (typeof target === 'object' && target !== null) {
+          // Use dialogNode for nested dialog (new format)
+          const nestedNode = current.choices[choiceIndex].dialogNode;
+          if (nestedNode) {
             if (i === path.length - 1) {
               // This is the target to update
-              Object.assign(current.choices[choiceIndex].target, updates);
+              Object.assign(current.choices[choiceIndex].dialogNode, updates);
             } else {
-              current = current.choices[choiceIndex].target;
+              current = current.choices[choiceIndex].dialogNode;
             }
           }
         }
       }
     }
-    
+
     return newTree;
   };
 
@@ -207,11 +210,13 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     const newNode: DialogNode = {
       id: `node_${Date.now()}`,
       speaker: characters[0],
-      text: 'NPC response...'
+      text: 'NPC response...',
+      choices: []  // Start with empty choices array
     };
-    
-    updateChoiceAtPath(path, choiceIndex, { target: newNode });
-    
+
+    // Use dialogNode for nested dialog (new format)
+    updateChoiceAtPath(path, choiceIndex, { dialogNode: newNode, target: undefined });
+
     // Auto-expand the choice to show the new nested dialog
     const choiceId = `${path.join('.')}.choice_${choiceIndex}`;
     setExpandedChoices(new Set([...expandedChoices, choiceId]));
@@ -267,9 +272,10 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         if (node.choices) {
           node.choices.forEach((choice, index) => {
             const choiceId = `${nodeId}.choice_${index}`;
-            if (typeof choice.target === 'object' && choice.target) {
+            // Use dialogNode for nested dialog (new format)
+            if (choice.dialogNode) {
               allChoiceIds.add(choiceId);
-              traverse(choice.target, [...path, `choice_${index}`]);
+              traverse(choice.dialogNode, [...path, `choice_${index}`]);
             }
           });
         }
@@ -319,7 +325,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     const isNPC = depth % 2 === 0; // Even depths are NPC, odd are player
     const hasChoices = node.choices && node.choices.length > 0;
     // For root node or nodes without choices, always show as expanded to display "Add Player Response"
-    const shouldShowContent = isExpanded || (!hasChoices && isNPC);
+    // For nested nodes (depth > 0), always show content since parent choice was already expanded to get here
+    const shouldShowContent = isExpanded || depth > 0 || (!hasChoices && isNPC);
     
     return (
       <div key={nodeId} className={`${depth > 0 ? 'ml-4' : ''}`}>
@@ -327,15 +334,15 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         <div className={`flex items-start gap-2 p-2 rounded-lg mb-1 ${
           isNPC ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
         }`}>
-          {/* Expand/Collapse for nodes with choices */}
-          {hasChoices ? (
+          {/* Expand/Collapse for nodes with choices - only for root level (depth 0) */}
+          {hasChoices && depth === 0 ? (
             <button
               onClick={() => toggleNodeExpansion(nodeId)}
               className="p-0.5 hover:bg-gray-200 rounded mt-0.5"
               title={isExpanded ? "Collapse choices" : "Expand choices"}
             >
-              {isExpanded ? 
-                <ChevronDown className="w-4 h-4" /> : 
+              {isExpanded ?
+                <ChevronDown className="w-4 h-4" /> :
                 <ChevronRight className="w-4 h-4" />
               }
             </button>
@@ -348,7 +355,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             <div className="flex items-center gap-2 mb-1">
               {isNPC ? <Users className="w-4 h-4 text-blue-600" /> : <User className="w-4 h-4 text-orange-600" />}
               <span className="font-medium text-sm">{node.speaker}</span>
-              {hasChoices && (
+              {/* Only show choice count for root node where collapse/expand is available */}
+              {hasChoices && depth === 0 && (
                 <span className="text-xs text-gray-500">
                   ({node.choices?.length} choice{node.choices?.length !== 1 ? 's' : ''})
                 </span>
@@ -381,50 +389,117 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             {node.choices && node.choices.map((choice, index) => {
               const choiceId = `${nodeId}.choice_${index}`;
               const isChoiceExpanded = expandedChoices.has(choiceId);
-              const hasNestedDialog = typeof choice.target === 'object' && choice.target;
-              
+              // Use dialogNode for nested dialog (new format)
+              const hasNestedDialog = !!choice.dialogNode;
+
+              // Check if text is a placeholder that should be collapsed
+              const isPlaceholderText = (text: string | undefined): boolean => {
+                if (!text) return false;
+                return text === '[Continue]' || text === 'auto_continue' || (text.startsWith('[') && text.endsWith(']'));
+              };
+
+              // Detect collapsible pattern: [Continue] → dialogNode → single choice with target
+              // This pattern should be displayed as the final choice, not the [Continue]
+              const isCollapsible = isPlaceholderText(choice.text) &&
+                choice.dialogNode &&
+                choice.dialogNode.choices?.length === 1 &&
+                choice.dialogNode.choices[0].target;
+
+              // For collapsible patterns, use the nested choice's text and target
+              const finalChoice = isCollapsible ? choice.dialogNode!.choices[0] : choice;
+              const displayText = finalChoice.text;
+              const displayTarget = finalChoice.target;
+              const needsTextReplacement = isPlaceholderText(displayText);
+
+              // For collapsible patterns, show the NPC response as expandable
+              // For regular nested dialogs, show as expandable
+              const hasExpandableContent = hasNestedDialog;
+
               return (
                 <div key={choice.id} className="mb-2">
+                  {/* For collapsible patterns, show the NPC response above the player's exit choice */}
+                  {isCollapsible && choice.dialogNode && (
+                    <div className="mb-1 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Users className="w-3 h-3 text-blue-600" />
+                        <span className="text-xs font-medium text-blue-700">
+                          {choice.dialogNode.speaker || 'NPC'} responds:
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700">{choice.dialogNode.text}</p>
+                    </div>
+                  )}
                   <div className="flex items-start gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
-                    {/* Expand/collapse for choice with nested dialog */}
-                    {hasNestedDialog && (
+                    {/* Expand/collapse for choice with nested dialog - but NOT for collapsible patterns */}
+                    {hasNestedDialog && !isCollapsible && (
                       <button
                         onClick={() => toggleChoiceExpansion(choiceId)}
                         className="p-0.5 hover:bg-orange-100 rounded mt-0.5"
                         title={isChoiceExpanded ? "Collapse thread" : "Expand thread"}
                       >
-                        {isChoiceExpanded ? 
-                          <ChevronDown className="w-3 h-3" /> : 
+                        {isChoiceExpanded ?
+                          <ChevronDown className="w-3 h-3" /> :
                           <ChevronRight className="w-3 h-3" />
                         }
                       </button>
                     )}
-                    {!hasNestedDialog && <div className="w-4" />}
-                    
+                    {(!hasNestedDialog || isCollapsible) && <div className="w-4" />}
+
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <User className="w-3 h-3 text-orange-600" />
                         <span className="text-xs font-medium text-orange-700">Player says:</span>
-                        {hasNestedDialog && !isChoiceExpanded && (
-                          <span className="text-xs text-orange-600 bg-orange-100 px-1 rounded">
+                        {/* Show target badge for direct targets or collapsible patterns */}
+                        {displayTarget && (
+                          <span className="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <ArrowRight className="w-3 h-3" />
+                            {displayTarget}
+                          </span>
+                        )}
+                        {/* Show "Has response" for complex nested dialog when collapsed - NOT for collapsible patterns */}
+                        {hasNestedDialog && !isCollapsible && !isChoiceExpanded && (
+                          <span className="text-xs text-blue-600 bg-blue-100 px-1 rounded">
                             Has response →
                           </span>
                         )}
                       </div>
                       <input
                         type="text"
-                        value={choice.text}
-                        onChange={(e) => updateChoiceAtPath(path, index, { text: e.target.value })}
-                        className="w-full px-2 py-1 text-sm border rounded bg-white"
-                        placeholder="Player response..."
+                        value={displayText}
+                        onChange={(e) => {
+                          if (isCollapsible) {
+                            // Update the nested choice's text
+                            const updatedDialogNode = {
+                              ...choice.dialogNode!,
+                              choices: [{
+                                ...choice.dialogNode!.choices[0],
+                                text: e.target.value
+                              }]
+                            };
+                            updateChoiceAtPath(path, index, { dialogNode: updatedDialogNode });
+                          } else {
+                            updateChoiceAtPath(path, index, { text: e.target.value });
+                          }
+                        }}
+                        className={`w-full px-2 py-1 text-sm border rounded ${
+                          needsTextReplacement
+                            ? 'bg-yellow-50 border-yellow-400'
+                            : 'bg-white'
+                        }`}
+                        placeholder="What does the player say?"
                       />
-                      
+                      {needsTextReplacement && (
+                        <p className="text-xs text-yellow-600 mt-1">
+                          ⚠️ Replace with actual player dialogue
+                        </p>
+                      )}
+
                       {/* Counter effect controls */}
                       <div className="mt-2 flex gap-2 items-center">
                         <span className="text-xs text-gray-600">Counter:</span>
                         <select
                           value={choice.counter || ''}
-                          onChange={(e) => updateChoiceAtPath(path, index, { 
+                          onChange={(e) => updateChoiceAtPath(path, index, {
                             counter: e.target.value || undefined,
                             counterOperation: e.target.value ? 'change' : undefined,
                             counterValue: e.target.value ? 0 : undefined
@@ -440,8 +515,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                           <>
                             <select
                               value={choice.counterOperation || 'change'}
-                              onChange={(e) => updateChoiceAtPath(path, index, { 
-                                counterOperation: e.target.value as 'change' | 'set' 
+                              onChange={(e) => updateChoiceAtPath(path, index, {
+                                counterOperation: e.target.value as 'change' | 'set'
                               })}
                               className="px-2 py-1 text-xs border rounded"
                             >
@@ -451,8 +526,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                             <input
                               type="number"
                               value={choice.counterValue || 0}
-                              onChange={(e) => updateChoiceAtPath(path, index, { 
-                                counterValue: parseInt(e.target.value) || 0 
+                              onChange={(e) => updateChoiceAtPath(path, index, {
+                                counterValue: parseInt(e.target.value) || 0
                               })}
                               className="w-20 px-2 py-1 text-xs border rounded"
                               placeholder="0"
@@ -460,24 +535,36 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                           </>
                         )}
                       </div>
-                      
-                      {/* Target selection or nested dialog */}
-                      {!hasNestedDialog && (
+
+                      {/* Target selection - show for choices without nested dialog OR collapsible patterns */}
+                      {(!hasNestedDialog || isCollapsible) && (
                         <div className="mt-2 flex gap-2 items-center">
                           <span className="text-xs text-gray-600">→</span>
                           <select
-                            value={typeof choice.target === 'string' ? choice.target : ''}
+                            value={displayTarget || ''}
                             onChange={(e) => {
                               if (e.target.value === '__nested__') {
                                 createNestedDialog(path, index);
+                              } else if (isCollapsible) {
+                                // Update the nested choice's target
+                                const updatedDialogNode = {
+                                  ...choice.dialogNode!,
+                                  choices: [{
+                                    ...choice.dialogNode!.choices[0],
+                                    target: e.target.value || undefined
+                                  }]
+                                };
+                                updateChoiceAtPath(path, index, { dialogNode: updatedDialogNode });
                               } else {
-                                updateChoiceAtPath(path, index, { target: e.target.value });
+                                updateChoiceAtPath(path, index, { target: e.target.value || undefined });
                               }
                             }}
                             className="flex-1 px-2 py-1 text-xs border rounded"
                           >
                             <option value="">Select action...</option>
-                            <option value="__nested__">➕ Add NPC response...</option>
+                            {!isCollapsible && (
+                              <option value="__nested__">➕ Add NPC response...</option>
+                            )}
                             <optgroup label="Connect to beat">
                               {allBeats?.map(beat => (
                                 <option key={beat.id} value={beat.id}>
@@ -489,7 +576,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                         </div>
                       )}
                     </div>
-                    
+
                     <button
                       onClick={() => removeChoiceAtPath(path, index)}
                       className="p-1 text-red-500 hover:bg-red-50 rounded"
@@ -498,12 +585,12 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                       <X className="w-3 h-3" />
                     </button>
                   </div>
-                  
+
                   {/* Nested dialog (rendered recursively) */}
-                  {isChoiceExpanded && hasNestedDialog && (
+                  {isChoiceExpanded && hasNestedDialog && choice.dialogNode && (
                     <div className="mt-1">
                       {/* Increment depth by 2 to account for player choice layer */}
-                      {renderDialogNode(choice.target as DialogNode, [...path, `choice_${index}`], depth + 2)}
+                      {renderDialogNode(choice.dialogNode, [...path, `choice_${index}`], depth + 2)}
                     </div>
                   )}
                 </div>
