@@ -42,8 +42,7 @@ asaps-modern/
 │   ├── core/          # Core story engine and beat system
 │   ├── builder/       # React-based visual story builder
 │   └── renderer/      # Rendering engines (Canvas & React)
-├── beat-definitions/  # JSON beat type definitions
-└── examples/          # Example story files
+└── beat-definitions/  # JSON beat type definitions
 ```
 
 ## 🎮 Usage
@@ -209,7 +208,6 @@ Contributions are welcome! Please follow these guidelines:
 ## 📞 Support
 
 For questions and support:
-- Review example stories in `examples/`
 - [Open an issue](https://github.com/sumo961/ASAPS_New/issues) for bug reports
 
 ---
