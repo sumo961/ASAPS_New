@@ -193,12 +193,14 @@ The system uses a modular architecture with three main packages:
 ASPAS Modern includes AI-powered features to assist with story creation:
 
 ### AI-Assisted Content Generation
+- **Complete Story Generation**: Create entire interactive stories from prompts, both within the ASAPS builder UI and via MCP server
 - **Dialog Tree Generation**: Automatically generate branching conversations based on scene descriptions and character contexts
 - **Story Content Suggestions**: Get AI-powered suggestions for story progression
 - **Multiple AI Provider Support**: Works with OpenAI, Anthropic Claude, and other LLM providers
 
 ### MCP Server
 The project includes an MCP (Model Context Protocol) server that enables AI assistants to:
+- Create complete stories from scratch with full beat structures
 - Read and analyze story structures
 - Generate and modify beats
 - Create dialog trees with proper branching logic
