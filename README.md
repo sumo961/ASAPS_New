@@ -44,6 +44,7 @@ asaps-modern/
 │   ├── core/          # Core story engine and beat system
 │   ├── builder/       # React-based visual story builder
 │   └── renderer/      # Rendering engines (Canvas & React)
+├── mcp-server/        # MCP server for AI assistant integration
 └── beat-definitions/  # JSON beat type definitions
 ```
 
