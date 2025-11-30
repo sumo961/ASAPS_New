@@ -219,7 +219,11 @@ Contributions are welcome! Please follow these guidelines:
 
 ## 📄 License
 
-[License information]
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+**Free for non-commercial use** - personal projects, research, education, and non-profit organizations.
+
+**Commercial use requires a separate license** - contact for commercial licensing inquiries.
 
 ## 🙏 Acknowledgments
 
