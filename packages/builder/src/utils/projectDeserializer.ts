@@ -10,6 +10,147 @@ import type { Beat } from '@asaps/core';
 import type { Project } from '../storage/types';
 
 /**
+ * Extract target ID from various formats
+ * Handles: string, { next: "id" }, { target: "id" }
+ */
+function extractTargetId(target: any): string | null {
+  if (!target) return null;
+  if (typeof target === 'string') return target;
+  if (typeof target === 'object') {
+    if (target.next) return target.next;
+    if (typeof target.target === 'string') return target.target;
+  }
+  return null;
+}
+
+/**
+ * Extract connections from beat parameters (multi-connection beats)
+ * This normalizes beats that store targets in parameters rather than connections array
+ */
+function extractConnectionsFromBeatParameters(beatData: any): Array<{ source: string; target: string; label?: string }> {
+  const connections: Array<{ source: string; target: string; label?: string }> = [];
+  const params = beatData.parameters || {};
+  const beatId = beatData.id;
+  const beatType = beatData.type;
+
+  // movementChoice - choices[].target
+  if (beatType === 'movementChoice' && params.choices) {
+    params.choices.forEach((choice: any, index: number) => {
+      const target = extractTargetId(choice.target) || extractTargetId(choice);
+      if (target) {
+        connections.push({
+          source: beatId,
+          target: target,
+          label: choice.text || choice.location || `Choice ${index + 1}`,
+        });
+      }
+    });
+  }
+
+  // dialogTree - choices[].target or entries[].choices[].target
+  if (beatType === 'dialogTree' && params.dialogTree) {
+    const processChoices = (choices: any[], prefix: string) => {
+      if (!Array.isArray(choices)) return;
+      choices.forEach((choice: any, index: number) => {
+        const target = extractTargetId(choice.target);
+        if (target) {
+          connections.push({
+            source: beatId,
+            target: target,
+            label: choice.text || `Choice ${index + 1}`,
+          });
+        }
+      });
+    };
+
+    // Direct choices array
+    if (params.dialogTree.choices) {
+      processChoices(params.dialogTree.choices, 'choice');
+    }
+
+    // Entries array with nested choices
+    if (params.dialogTree.entries) {
+      params.dialogTree.entries.forEach((entry: any, entryIndex: number) => {
+        if (entry.choices) {
+          processChoices(entry.choices, `entry${entryIndex}`);
+        }
+      });
+    }
+  }
+
+  // pickProp - props[].target
+  if (beatType === 'pickProp' && params.props) {
+    params.props.forEach((prop: any, index: number) => {
+      const target = extractTargetId(prop.target);
+      if (target) {
+        connections.push({
+          source: beatId,
+          target: target,
+          label: prop.name || `Prop ${index + 1}`,
+        });
+      }
+    });
+  }
+
+  // hyperText - hyperlinks[].targetBeatId
+  if (beatType === 'hyperText' && params.hyperlinks) {
+    params.hyperlinks.forEach((link: any, index: number) => {
+      if (link.targetBeatId) {
+        connections.push({
+          source: beatId,
+          target: link.targetBeatId,
+          label: link.word || `Link ${index + 1}`,
+        });
+      }
+    });
+  }
+
+  // conditionBeat - trueTarget, falseTarget
+  // IMPORTANT: Labels must be lowercase 'true'/'false' to match Inspector.tsx expectations
+  if (beatType === 'conditionBeat') {
+    if (params.trueTarget) {
+      connections.push({
+        source: beatId,
+        target: params.trueTarget,
+        label: 'true',
+      });
+    }
+    if (params.falseTarget) {
+      connections.push({
+        source: beatId,
+        target: params.falseTarget,
+        label: 'false',
+      });
+    }
+  }
+
+  // randomTarget - choices[].target
+  if (beatType === 'randomTarget' && params.choices) {
+    params.choices.forEach((choice: any, index: number) => {
+      const target = typeof choice === 'string' ? choice : extractTargetId(choice.target) || extractTargetId(choice);
+      if (target) {
+        connections.push({
+          source: beatId,
+          target: target,
+          label: `Random ${index + 1}`,
+        });
+      }
+    });
+  }
+
+  // setTimer - timerTarget
+  if (beatType === 'setTimer' && params.timerTarget) {
+    connections.push({
+      source: beatId,
+      target: params.timerTarget,
+      label: 'Timer Target',
+    });
+  }
+
+  return connections;
+}
+
+/**
  * Migrate dialogTree beats that use deprecated defaultConnection
  * Converts defaultConnection to explicit choice targets
  */
@@ -122,6 +263,22 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
       // Update beat with parameters if they exist
       if (beatData.parameters) {
         beat.updateParameters(beatData.parameters);
+      }
+
+      // CRITICAL FIX: For conditionBeat, ensure trueTarget/falseTarget are set directly
+      // Sometimes these get lost during deserialization even though they're in parameters
+      if (beatData.type === 'conditionBeat' && beatData.parameters) {
+        const conditionBeat = beat as any;
+        if (beatData.parameters.trueTarget && !conditionBeat.trueTarget) {
+          conditionBeat.trueTarget = beatData.parameters.trueTarget;
+          console.log(`[deserializeBeats] Set trueTarget from parameters: ${conditionBeat.trueTarget}`);
+        }
+        if (beatData.parameters.falseTarget && !conditionBeat.falseTarget) {
+          conditionBeat.falseTarget = beatData.parameters.falseTarget;
+          console.log(`[deserializeBeats] Set falseTarget from parameters: ${conditionBeat.falseTarget}`);
+        }
+        // Log the current state
+        console.log(`[deserializeBeats] ConditionBeat ${beat.id}: trueTarget=${conditionBeat.trueTarget}, falseTarget=${conditionBeat.falseTarget}, params.trueTarget=${beatData.parameters.trueTarget}, params.falseTarget=${beatData.parameters.falseTarget}`);
       }
 
       console.log('[deserializeBeats] Successfully created beat:', beat.id, 'type:', beat.type);
@@ -271,6 +428,68 @@ export function loadProjectData(project: Project): {
 
     console.log('[loadProjectData] Extracted', connections.length, 'connections from beats');
   }
+
+  // CRITICAL: Also derive connections from multi-connection beat parameters
+  // This handles beats like dialogTree, movementChoice, pickProp, conditionBeat, etc.
+  // that store targets in parameters rather than connections array
+  const existingConnectionKeys = new Set(
+    connections.map((c: any) => `${c.source || c.sourceId}->${c.target || c.targetId}`)
+  );
+
+  // Create a map of beat ID to Beat instance for easy lookup
+  const beatsById = new Map<string, Beat>();
+  for (const beat of beats) {
+    beatsById.set(beat.id, beat);
+  }
+
+  for (const beatData of beatsData) {
+    const derivedConnections = extractConnectionsFromBeatParameters(beatData);
+    for (const conn of derivedConnections) {
+      const key = `${conn.source}->${conn.target}`;
+
+      // Add to story-level connections array if not already there
+      if (!existingConnectionKeys.has(key)) {
+        existingConnectionKeys.add(key);
+        connections.push(conn);
+      }
+
+      // CRITICAL: ALWAYS add to the Beat instance's connections array
+      // This ensures beat.getConnections() returns the derived connections
+      // even if the connection was already in story.connections
+      const beat = beatsById.get(conn.source);
+      if (beat) {
+        // Convert to Connection format expected by Beat
+        const beatConnection = {
+          targetId: conn.target,
+          label: conn.label,
+        };
+        // Check if this connection already exists in the beat
+        const alreadyExists = beat.connections.some(
+          (c: any) => c.targetId === conn.target || c.target === conn.target
+        );
+        if (!alreadyExists) {
+          beat.connections.push(beatConnection);
+          console.log(`[loadProjectData] Added derived connection to beat ${conn.source}: -> ${conn.target}`);
+        }
+
+        // ALSO update beat-specific target properties for inspector compatibility
+        // ConditionBeat stores trueTarget/falseTarget as class properties
+        // Labels are lowercase 'true'/'false' to match Inspector.tsx expectations
+        if (beat.type === 'conditionBeat') {
+          if (conn.label === 'true' && !(beat as any).trueTarget) {
+            (beat as any).trueTarget = conn.target;
+            console.log(`[loadProjectData] Set trueTarget on conditionBeat ${conn.source}: ${conn.target}`);
+          }
+          if (conn.label === 'false' && !(beat as any).falseTarget) {
+            (beat as any).falseTarget = conn.target;
+            console.log(`[loadProjectData] Set falseTarget on conditionBeat ${conn.source}: ${conn.target}`);
+          }
+        }
+      }
+    }
+  }
+
+  console.log('[loadProjectData] After parameter derivation, total connections:', connections.length);
 
   console.log('[loadProjectData] Final loaded data:', {
     title,

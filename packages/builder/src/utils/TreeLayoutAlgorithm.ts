@@ -245,24 +245,52 @@ export function extractConnectionsFromBeats(
     }
   };
 
+  // Helper to extract target from various formats
+  const extractTargetId = (target: any): string | null => {
+    if (!target) return null;
+    // Direct string target
+    if (typeof target === 'string') return target;
+    // Nested object with .next property (Claude Desktop format)
+    if (typeof target === 'object' && target.next) return target.next;
+    // Nested object with .target property
+    if (typeof target === 'object' && typeof target.target === 'string') return target.target;
+    return null;
+  };
+
   // Helper to extract from dialogTree
-  // Supports both new format (dialogNode) and old format (target as object)
+  // Supports multiple formats: direct targets, nested objects, and entries arrays
   const extractDialogTreeTargets = (node: any, beatId: string): void => {
     if (!node) return;
 
+    // Handle choices array
     if (node.choices && Array.isArray(node.choices)) {
       node.choices.forEach((choice: any) => {
-        // New format: target is string (beat ID)
-        if (typeof choice.target === 'string' && choice.target) {
-          addEdge(beatId, choice.target);
+        // Extract target from various formats
+        const targetId = extractTargetId(choice.target);
+        if (targetId) {
+          addEdge(beatId, targetId);
         }
         // New format: dialogNode for nested dialog
         if (choice.dialogNode) {
           extractDialogTreeTargets(choice.dialogNode, beatId);
         }
-        // Old format: target as object (for backward compatibility)
-        if (typeof choice.target === 'object' && choice.target) {
+        // Recurse into nested target objects that contain more dialog data
+        if (typeof choice.target === 'object' && choice.target && !choice.target.next) {
           extractDialogTreeTargets(choice.target, beatId);
+        }
+      });
+    }
+
+    // Handle entries array (alternative dialog structure)
+    if (node.entries && Array.isArray(node.entries)) {
+      node.entries.forEach((entry: any) => {
+        if (entry.choices && Array.isArray(entry.choices)) {
+          entry.choices.forEach((choice: any) => {
+            const targetId = extractTargetId(choice.target);
+            if (targetId) {
+              addEdge(beatId, targetId);
+            }
+          });
         }
       });
     }
@@ -276,8 +304,16 @@ export function extractConnectionsFromBeats(
       addEdge(beat.id, params.connection.target);
     }
 
-    // conditionBeat
+    // conditionBeat - supports both direct targets and connection objects
     if (beat.type === 'conditionBeat') {
+      // Direct target format (preferred)
+      if (params.trueTarget) {
+        addEdge(beat.id, params.trueTarget);
+      }
+      if (params.falseTarget) {
+        addEdge(beat.id, params.falseTarget);
+      }
+      // Legacy connection object format
       if (params.trueConnection?.target) {
         addEdge(beat.id, params.trueConnection.target);
       }

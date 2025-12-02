@@ -256,16 +256,33 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       }
 
       // Special handling for dialogTree beats - show all dialog choices
-      if (beat.type === 'dialogTree' && params.dialogTree?.choices) {
-        params.dialogTree.choices.forEach((choice: any, index: number) => {
-          if (choice.target) {
-            const choiceEdgeId = `${beat.id}-dialog-${index}-${choice.target}`;
+      // Helper to extract target from various formats
+      const extractTarget = (choice: any): string | null => {
+        if (!choice) return null;
+        // Direct string target
+        if (typeof choice.target === 'string') return choice.target;
+        // Nested object with .next property (Claude Desktop format)
+        if (choice.target && typeof choice.target === 'object' && choice.target.next) {
+          return choice.target.next;
+        }
+        // Nested object with .target property
+        if (choice.target && typeof choice.target === 'object' && choice.target.target) {
+          return choice.target.target;
+        }
+        return null;
+      };
+
+      if (beat.type === 'dialogTree' && params.dialogTree) {
+        const addDialogChoiceEdge = (choice: any, index: number, prefix: string) => {
+          const target = extractTarget(choice);
+          if (target) {
+            const choiceEdgeId = `${beat.id}-dialog-${prefix}-${index}-${target}`;
             if (!edgeIds.has(choiceEdgeId)) {
               edgeIds.add(choiceEdgeId);
               allEdges.push({
                 id: choiceEdgeId,
                 source: beat.id,
-                target: choice.target,
+                target: target,
                 type: 'custom',
                 animated: false,
                 label: choice.text || `Choice ${index + 1}`,
@@ -284,7 +301,25 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
               });
             }
           }
-        });
+        };
+
+        // Handle direct choices array
+        if (params.dialogTree.choices) {
+          params.dialogTree.choices.forEach((choice: any, index: number) => {
+            addDialogChoiceEdge(choice, index, 'choice');
+          });
+        }
+
+        // Handle entries array with nested choices
+        if (params.dialogTree.entries) {
+          params.dialogTree.entries.forEach((entry: any, entryIndex: number) => {
+            if (entry.choices) {
+              entry.choices.forEach((choice: any, choiceIndex: number) => {
+                addDialogChoiceEdge(choice, choiceIndex, `entry${entryIndex}`);
+              });
+            }
+          });
+        }
       }
 
       // Special handling for pickProp beats - show all prop choices
@@ -318,7 +353,97 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           }
         });
       }
-      
+
+      // Special handling for conditionBeat - show true/false branches
+      if (beat.type === 'conditionBeat') {
+        if (params.trueTarget) {
+          const trueEdgeId = `${beat.id}-true-${params.trueTarget}`;
+          if (!edgeIds.has(trueEdgeId)) {
+            edgeIds.add(trueEdgeId);
+            allEdges.push({
+              id: trueEdgeId,
+              source: beat.id,
+              target: params.trueTarget,
+              type: 'custom',
+              animated: false,
+              label: 'True',
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                width: 20,
+                height: 20,
+              },
+              style: {
+                stroke: '#22c55e', // Green for true branch
+                strokeWidth: 2,
+              },
+              data: {
+                isCondition: true,
+                branch: 'true',
+              },
+            });
+          }
+        }
+        if (params.falseTarget) {
+          const falseEdgeId = `${beat.id}-false-${params.falseTarget}`;
+          if (!edgeIds.has(falseEdgeId)) {
+            edgeIds.add(falseEdgeId);
+            allEdges.push({
+              id: falseEdgeId,
+              source: beat.id,
+              target: params.falseTarget,
+              type: 'custom',
+              animated: false,
+              label: 'False',
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                width: 20,
+                height: 20,
+              },
+              style: {
+                stroke: '#ef4444', // Red for false branch
+                strokeWidth: 2,
+              },
+              data: {
+                isCondition: true,
+                branch: 'false',
+              },
+            });
+          }
+        }
+      }
+
+      // Special handling for hyperText beats - show all hyperlink targets
+      if (beat.type === 'hyperText' && params.hyperlinks) {
+        params.hyperlinks.forEach((link: any, index: number) => {
+          if (link.targetBeatId) {
+            const linkEdgeId = `${beat.id}-hyperlink-${index}-${link.targetBeatId}`;
+            if (!edgeIds.has(linkEdgeId)) {
+              edgeIds.add(linkEdgeId);
+              allEdges.push({
+                id: linkEdgeId,
+                source: beat.id,
+                target: link.targetBeatId,
+                type: 'custom',
+                animated: false,
+                label: link.word || `Link ${index + 1}`,
+                markerEnd: {
+                  type: MarkerType.ArrowClosed,
+                  width: 20,
+                  height: 20,
+                },
+                style: {
+                  stroke: '#06b6d4', // Cyan for hypertext links
+                  strokeWidth: 2,
+                },
+                data: {
+                  isHyperlink: true,
+                },
+              });
+            }
+          }
+        });
+      }
+
       // Regular connections
       let connections: any[] = [];
       

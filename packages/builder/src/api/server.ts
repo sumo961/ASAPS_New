@@ -456,6 +456,8 @@ export class APIServer {
                 title: { type: 'string', required: true, description: 'Story title text' },
                 author: { type: 'string', required: false, description: 'Author name' },
                 buttonText: { type: 'string', required: false, default: 'Start', description: 'Start button text' },
+                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance (optional)' },
+                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
               },
               example: {
                 id: 'beat_0',
@@ -468,11 +470,13 @@ export class APIServer {
 
             introText: {
               category: 'visible',
-              description: 'Text display with continue button - use for narration',
+              description: 'Text display with continue button - use for narration. For branching, use movementChoice or dialogTree instead.',
               connectionType: 'single',
               parameters: {
                 text: { type: 'string', required: true, description: 'Text content to display' },
                 buttonText: { type: 'string', required: false, default: 'Continue', description: 'Continue button text' },
+                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance (optional)' },
+                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
               },
               example: {
                 id: 'beat_1',
@@ -485,7 +489,7 @@ export class APIServer {
 
             dialogTree: {
               category: 'visible',
-              description: 'Branching conversation with character dialogue and player choices',
+              description: 'Branching conversation with character dialogue and player choices. Targets are in dialogTree.choices[].target, NOT in connections array.',
               connectionType: 'multiple',
               parameters: {
                 dialogTree: {
@@ -501,6 +505,8 @@ export class APIServer {
                     next: 'string (beatId) or nested dialogNode',
                   },
                 },
+                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no choice made (optional)' },
+                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
               },
               example: {
                 id: 'beat_2',
@@ -523,7 +529,7 @@ export class APIServer {
 
             movementChoice: {
               category: 'visible',
-              description: 'Location-based navigation - player chooses where to go',
+              description: 'Location-based navigation - player chooses where to go. Targets are in choices[].target, NOT in connections array.',
               connectionType: 'multiple',
               parameters: {
                 question: { type: 'string', required: true, description: 'Prompt text' },
@@ -538,6 +544,8 @@ export class APIServer {
                     target: 'string - target beat ID',
                   },
                 },
+                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no choice made (optional)' },
+                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
               },
               example: {
                 id: 'beat_3',
@@ -556,7 +564,7 @@ export class APIServer {
 
             pickProp: {
               category: 'visible',
-              description: 'Interactive object selection - player picks up or interacts with items',
+              description: 'Interactive object selection - player picks up or interacts with items. Targets are in props[].target, NOT in connections array.',
               connectionType: 'multiple',
               parameters: {
                 question: { type: 'string', required: true, description: 'Prompt text' },
@@ -571,12 +579,14 @@ export class APIServer {
                     target: 'string - target beat ID',
                   },
                 },
+                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no choice made (optional)' },
+                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
               },
             },
 
             hyperText: {
               category: 'visible',
-              description: 'Text with clickable hyperlinked words that branch to different beats',
+              description: 'Text with clickable hyperlinked words that branch to different beats. Targets are in hyperlinks[].targetBeatId, NOT in connections array.',
               connectionType: 'multiple',
               parameters: {
                 text: { type: 'string', required: true, description: 'Main text with hyperlinked words' },
@@ -589,12 +599,14 @@ export class APIServer {
                     targetBeatId: 'string - target beat ID',
                   },
                 },
+                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no link clicked (optional)' },
+                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
               },
             },
 
             durScreen: {
               category: 'visible',
-              description: 'Timed display that auto-advances after duration',
+              description: 'Timed display that auto-advances after duration. Does NOT support defaultTarget (already auto-advances by design).',
               connectionType: 'single',
               parameters: {
                 text: { type: 'string', required: true, description: 'Text to display' },
@@ -611,6 +623,8 @@ export class APIServer {
                 saveToType: { type: 'string', required: true, enum: ['variable', 'characterName'] },
                 variable: { type: 'string', required: false, description: 'Variable name to store input' },
                 placeholder: { type: 'string', required: false, description: 'Placeholder text' },
+                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no input provided (optional)' },
+                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
               },
             },
 
@@ -622,6 +636,8 @@ export class APIServer {
                 videoFile: { type: 'string', required: true, description: 'Path to video file' },
                 autoplay: { type: 'boolean', required: false, default: true },
                 controls: { type: 'boolean', required: false, default: false },
+                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance (optional)' },
+                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
               },
             },
 
@@ -633,6 +649,8 @@ export class APIServer {
                 message: { type: 'string', required: false, description: 'Ending message' },
                 showRestart: { type: 'boolean', required: false, default: true },
                 showCredits: { type: 'boolean', required: false, default: false },
+                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance (optional, rare for endings)' },
+                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
               },
               example: {
                 id: 'beat_end',
@@ -713,7 +731,12 @@ export class APIServer {
               target: 'string - target beat ID',
               label: 'string? - optional connection label',
             },
-            note: 'Connections define the flow between beats. For choice-based beats (movementChoice, pickProp, dialogTree), connections are derived from the choices/props arrays.',
+            rules: {
+              single: 'Beats with connectionType="single" (titleScreen, introText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer) can ONLY have ONE connection in the connections array.',
+              multiple: 'Beats with connectionType="multiple" (dialogTree, movementChoice, pickProp, hyperText, randomTarget) define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.',
+              conditional: 'conditionBeat uses trueTarget and falseTarget PARAMETERS, not connections array.',
+            },
+            note: 'IMPORTANT: Do NOT put multiple connections for single-type beats. For branching, use dialogTree or movementChoice instead of multiple connections from introText.',
           },
 
           storyStructure: {
@@ -733,12 +756,14 @@ export class APIServer {
 
           tips: [
             'Start with a titleScreen beat',
-            'Use introText for narration and scene-setting',
+            'Use introText for narration and scene-setting (single connection only!)',
             'Use dialogTree for character conversations with choices',
-            'Use movementChoice for exploration/navigation',
+            'Use movementChoice for exploration/navigation branching',
+            'IMPORTANT: For branching story points, use dialogTree or movementChoice - NEVER multiple connections from introText',
             'End branches with endScreen beats',
             'Position beats using x, y coordinates (grid: ~300px horizontal, ~200px vertical spacing)',
             'Use meaningful beat IDs like "beat_0", "beat_1", etc.',
+            'Most visible beats support optional defaultTarget/defaultTargetTimeout for timed auto-advance (except durScreen which already auto-advances)',
           ],
         };
 

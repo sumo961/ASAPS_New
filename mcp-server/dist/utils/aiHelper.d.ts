@@ -5,23 +5,45 @@
  */
 /**
  * Beat type definitions for generation
+ *
+ * CONNECTION RULES:
+ * - SINGLE CONNECTION beats: Can only connect to ONE target beat via the connections array
+ *   titleScreen, introText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
+ *
+ * - MULTIPLE CONNECTION beats: Support multiple targets via their parameters (NOT the connections array)
+ *   - dialogTree: targets defined in dialogTree.choices[].target
+ *   - movementChoice: targets defined in choices[].target
+ *   - pickProp: targets defined in props[].target
+ *   - hyperText: targets defined in hyperlinks[].targetBeatId
+ *   - conditionBeat: uses trueTarget and falseTarget parameters
+ *   - randomTarget: targets defined in choices[].target
+ *
+ * DEFAULT TARGET (Timed Auto-Advance):
+ * Most visible beats (EXCEPT durScreen) can have an OPTIONAL defaultTarget parameter with a timeout.
+ * This auto-advances to a different beat if the interactor doesn't act within the specified time.
+ * - Set via parameters: defaultTarget (beat ID) and defaultTargetTimeout (milliseconds)
+ * - Example: { defaultTarget: "beat_timeout", defaultTargetTimeout: 30000 } = auto-advance after 30 seconds
+ * - Useful for: creating urgency, handling inactive users, timed puzzles
+ * - NOT available on durScreen (which already auto-advances by design)
+ *
+ * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from introText!
  */
 export declare const BEAT_TYPES: {
-    readonly titleScreen: "Start screen with title and author";
-    readonly introText: "Introductory text or narration";
-    readonly endScreen: "End screen with message";
-    readonly dialogTree: "Branching dialogue with character conversations";
-    readonly movementChoice: "Choice of locations to move to";
-    readonly pickProp: "Interactive prop selection";
-    readonly hyperText: "Text with embedded hyperlinks";
-    readonly inputText: "Player text input";
-    readonly durScreen: "Timed screen that auto-advances";
-    readonly videoBeat: "Video playback";
-    readonly conditionBeat: "Conditional branching based on variables";
-    readonly setVariable: "Set story variables";
-    readonly addRemoveInventory: "Modify player inventory";
-    readonly randomTarget: "Random branching";
-    readonly setTimer: "Set/check timers";
+    readonly titleScreen: "Start screen with title and author. SINGLE CONNECTION: only one target via connections array. Supports optional defaultTarget for timed auto-advance.";
+    readonly introText: "Narrative text with Continue button. SINGLE CONNECTION: only one target via connections array. For branching, use movementChoice or dialogTree instead. Supports optional defaultTarget for timed auto-advance.";
+    readonly endScreen: "End screen with message. SINGLE CONNECTION or no connections (story ends here). Supports optional defaultTarget for timed auto-advance.";
+    readonly dialogTree: "Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports optional defaultTarget for timed auto-advance if no choice is made.";
+    readonly movementChoice: "Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. Supports optional defaultTarget for timed auto-advance if no choice is made.";
+    readonly pickProp: "Interactive prop selection. MULTIPLE TARGETS: define targets in props[].target parameter. Supports optional defaultTarget for timed auto-advance.";
+    readonly hyperText: "Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Supports optional defaultTarget for timed auto-advance.";
+    readonly inputText: "Player text input with validation. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance if no input is provided.";
+    readonly durScreen: "Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target. NO defaultTarget (already auto-advances by design).";
+    readonly videoBeat: "Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.";
+    readonly conditionBeat: "Conditional branching. TWO TARGETS: uses trueTarget and falseTarget parameters, NOT connections array.";
+    readonly setVariable: "Set story variables. SINGLE CONNECTION: executes then continues to one target.";
+    readonly addRemoveInventory: "Modify player inventory. SINGLE CONNECTION: executes then continues to one target.";
+    readonly randomTarget: "Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.";
+    readonly setTimer: "Set/check timers. SINGLE CONNECTION: plus optional timerTarget parameter for timeout.";
 };
 /**
  * Story generation configuration

@@ -742,8 +742,17 @@ function App() {
     console.log('[App] currentProject.id:', currentProject?.id);
     console.log('[App] loadedProjectIdRef:', loadedProjectIdRef.current);
     console.log('[App] pendingNewProjectIdRef:', pendingNewProjectIdRef.current);
+    console.log('[App] injectionSaveInProgressRef:', injectionSaveInProgressRef.current);
     console.log('[App] state.beats.length:', state.beats.length);
     console.log('[App] currentProject.name:', currentProject?.name);
+
+    // CRITICAL FIX: Skip if injection is in progress to prevent bleed from old project
+    // The injection handler manages its own save lifecycle
+    if (injectionSaveInProgressRef.current) {
+      console.log('[App] >>> SKIPPED loading - injection in progress (prevents project bleed)');
+      console.log('[App] ==========================================');
+      return;
+    }
 
     // CRITICAL FIX: Only proceed if currentProject exists and isn't already loaded
     if (!currentProject || currentProject.id === loadedProjectIdRef.current) {

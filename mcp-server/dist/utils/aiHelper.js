@@ -5,27 +5,49 @@
  */
 /**
  * Beat type definitions for generation
+ *
+ * CONNECTION RULES:
+ * - SINGLE CONNECTION beats: Can only connect to ONE target beat via the connections array
+ *   titleScreen, introText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
+ *
+ * - MULTIPLE CONNECTION beats: Support multiple targets via their parameters (NOT the connections array)
+ *   - dialogTree: targets defined in dialogTree.choices[].target
+ *   - movementChoice: targets defined in choices[].target
+ *   - pickProp: targets defined in props[].target
+ *   - hyperText: targets defined in hyperlinks[].targetBeatId
+ *   - conditionBeat: uses trueTarget and falseTarget parameters
+ *   - randomTarget: targets defined in choices[].target
+ *
+ * DEFAULT TARGET (Timed Auto-Advance):
+ * Most visible beats (EXCEPT durScreen) can have an OPTIONAL defaultTarget parameter with a timeout.
+ * This auto-advances to a different beat if the interactor doesn't act within the specified time.
+ * - Set via parameters: defaultTarget (beat ID) and defaultTargetTimeout (milliseconds)
+ * - Example: { defaultTarget: "beat_timeout", defaultTargetTimeout: 30000 } = auto-advance after 30 seconds
+ * - Useful for: creating urgency, handling inactive users, timed puzzles
+ * - NOT available on durScreen (which already auto-advances by design)
+ *
+ * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from introText!
  */
 export const BEAT_TYPES = {
-    // Story structure
-    titleScreen: 'Start screen with title and author',
-    introText: 'Introductory text or narration',
-    endScreen: 'End screen with message',
-    // Interactive content
-    dialogTree: 'Branching dialogue with character conversations',
-    movementChoice: 'Choice of locations to move to',
-    pickProp: 'Interactive prop selection',
-    hyperText: 'Text with embedded hyperlinks',
-    inputText: 'Player text input',
-    // Timed content
-    durScreen: 'Timed screen that auto-advances',
-    videoBeat: 'Video playback',
-    // Logic
-    conditionBeat: 'Conditional branching based on variables',
-    setVariable: 'Set story variables',
-    addRemoveInventory: 'Modify player inventory',
-    randomTarget: 'Random branching',
-    setTimer: 'Set/check timers',
+    // Story structure - SINGLE CONNECTION (one Continue button)
+    titleScreen: 'Start screen with title and author. SINGLE CONNECTION: only one target via connections array. Supports optional defaultTarget for timed auto-advance.',
+    introText: 'Narrative text with Continue button. SINGLE CONNECTION: only one target via connections array. For branching, use movementChoice or dialogTree instead. Supports optional defaultTarget for timed auto-advance.',
+    endScreen: 'End screen with message. SINGLE CONNECTION or no connections (story ends here). Supports optional defaultTarget for timed auto-advance.',
+    // Interactive content - MULTIPLE CONNECTIONS via parameters
+    dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports optional defaultTarget for timed auto-advance if no choice is made.',
+    movementChoice: 'Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. Supports optional defaultTarget for timed auto-advance if no choice is made.',
+    pickProp: 'Interactive prop selection. MULTIPLE TARGETS: define targets in props[].target parameter. Supports optional defaultTarget for timed auto-advance.',
+    hyperText: 'Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Supports optional defaultTarget for timed auto-advance.',
+    inputText: 'Player text input with validation. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance if no input is provided.',
+    // Timed content - SINGLE CONNECTION (NO defaultTarget - already timed by design)
+    durScreen: 'Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target. NO defaultTarget (already auto-advances by design).',
+    videoBeat: 'Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.',
+    // Logic beats (invisible - no defaultTarget needed)
+    conditionBeat: 'Conditional branching. TWO TARGETS: uses trueTarget and falseTarget parameters, NOT connections array.',
+    setVariable: 'Set story variables. SINGLE CONNECTION: executes then continues to one target.',
+    addRemoveInventory: 'Modify player inventory. SINGLE CONNECTION: executes then continues to one target.',
+    randomTarget: 'Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.',
+    setTimer: 'Set/check timers. SINGLE CONNECTION: plus optional timerTarget parameter for timeout.',
 };
 /**
  * Generate a complete story using AI or simulation
@@ -81,14 +103,19 @@ Return a JSON object with this structure:
   "reasoning": "Explanation of story structure"
 }
 
+CRITICAL CONNECTION RULES:
+- SINGLE CONNECTION beats (titleScreen, introText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
+- MULTIPLE CONNECTION beats (dialogTree, movementChoice, pickProp, hyperText, randomTarget): Define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.
+- conditionBeat: Uses trueTarget and falseTarget PARAMETERS, not connections array.
+
 Important:
 - Use descriptive labels for beats
 - Create engaging, coherent narrative flow
 - Use appropriate beat types for each story moment
-- Include proper connections between beats
-- For dialogTree beats, include "dialogue" parameter with conversation text
-- For movementChoice beats, include "choices" array with location options
-- For pickProp beats, include "props" array with interactive objects
+- NEVER put multiple connections from introText - use movementChoice or dialogTree for branching
+- For dialogTree beats, targets go in dialogTree.choices[].target parameter
+- For movementChoice beats, targets go in choices[].target parameter
+- For pickProp beats, targets go in props[].target parameter
 - Ensure all beat IDs are unique and all connections reference valid beat IDs`;
     const userPrompt = `Create an interactive story with these requirements:
 
@@ -125,7 +152,9 @@ Generate a complete, engaging interactive story structure.`;
     const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, content];
     const jsonStr = jsonMatch[1] || content;
     const generated = JSON.parse(jsonStr);
-    // Add positions to beats if not present
+    // Add placeholder positions to beats if not present
+    // Note: The builder's TreeLayoutAlgorithm will recalculate proper tree positions
+    // based on connections when the story is injected
     const beatsWithPositions = generated.beats.map((beat, index) => ({
         ...beat,
         position: beat.position || {

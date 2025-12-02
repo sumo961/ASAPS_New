@@ -1893,6 +1893,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     )}
 
                     {/* Conditional Connection Beats */}
+                    {/* ConditionBeat stores targets in parameters (trueTarget/falseTarget), not in connections array */}
                     {connectionType === 'conditional' && beat.type === 'conditionBeat' && (
                       <div className="space-y-3">
                         <div>
@@ -1900,12 +1901,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             True Target <span className="text-red-500">*</span>
                           </label>
                           <select
-                            value={localBeat.connections?.find((c: any) => c.label === 'true')?.targetId || ''}
+                            value={localBeat.parameters?.trueTarget || localBeat.connections?.find((c: any) => c.label === 'true')?.targetId || ''}
                             onChange={(e) => {
                               const targetId = e.target.value;
+                              // Update both parameters and connections for consistency
                               const otherConns = localBeat.connections?.filter((c: any) => c.label !== 'true') || [];
                               const updatedBeat = {
                                 ...localBeat,
+                                parameters: {
+                                  ...localBeat.parameters,
+                                  trueTarget: targetId || undefined
+                                },
                                 connections: targetId
                                   ? [...otherConns, { targetId, label: 'true' }]
                                   : otherConns
@@ -1932,12 +1938,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             False Target{localBeat.parameters?.conditionType === 'timer' ? <span className="text-red-500"> *</span> : ' (Optional)'}
                           </label>
                           <select
-                            value={localBeat.connections?.find((c: any) => c.label === 'false')?.targetId || ''}
+                            value={localBeat.parameters?.falseTarget || localBeat.connections?.find((c: any) => c.label === 'false')?.targetId || ''}
                             onChange={(e) => {
                               const targetId = e.target.value;
+                              // Update both parameters and connections for consistency
                               const otherConns = localBeat.connections?.filter((c: any) => c.label !== 'false') || [];
                               const updatedBeat = {
                                 ...localBeat,
+                                parameters: {
+                                  ...localBeat.parameters,
+                                  falseTarget: targetId || undefined
+                                },
                                 connections: targetId
                                   ? [...otherConns, { targetId, label: 'false' }]
                                   : otherConns
