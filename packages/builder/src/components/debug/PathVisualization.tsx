@@ -81,8 +81,13 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   }, [allPaths, searchTerm, filterMode, showCycles]);
 
   const handlePathClick = (index: number, path: StoryPath) => {
-    setSelectedPath(selectedPath === index ? null : index);
-    if (selectedPath !== index) {
+    const isDeselecting = selectedPath === index;
+    setSelectedPath(isDeselecting ? null : index);
+
+    // Always call highlight callback - either with path beats or empty array to clear
+    if (isDeselecting) {
+      onHighlightPath?.([]);
+    } else {
       onHighlightPath?.(getPathBeatIds(path));
     }
   };

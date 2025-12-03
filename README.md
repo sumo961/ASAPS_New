@@ -246,7 +246,6 @@ This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENS
 - Dr. Janet Murray for supervision and guidance of the initial project
 - All the students using the original ASAPS 2005-2017
 - The [COST Action 18230](https://indcor.eu) and the [ARDIN](https://ardin.online) community for continued inspiration
-- Created with the help of [Claude Code](https://claude.com/claude-code) and [Kimi K2](https://kimi.ai)
 
 ## 📞 Support
 

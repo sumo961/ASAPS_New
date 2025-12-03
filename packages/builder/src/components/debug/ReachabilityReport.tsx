@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AlertCircle, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronRight, Search, Unlink } from 'lucide-react';
 import { Story, ReachabilityAnalyzer } from '@asaps/core';
 import type { ReachabilityResult } from '@asaps/core';
 
@@ -153,6 +153,16 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
               </div>
             </div>
 
+            {/* Broken connections alert */}
+            {analysis.brokenConnections && analysis.brokenConnections.length > 0 && (
+              <div className="bg-purple-50 border border-purple-200 rounded p-3">
+                <div className="flex items-center gap-2 text-sm text-purple-800">
+                  <Unlink className="w-4 h-4" />
+                  <span className="font-medium">{analysis.brokenConnections.length} broken connection(s) - pointing to non-existent beats</span>
+                </div>
+              </div>
+            )}
+
             {analysis.warnings.length > 0 && (
               <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
                 <div className="flex items-center gap-2 text-sm text-yellow-800">
@@ -213,6 +223,62 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
           </div>
         )}
       </div>
+
+      {/* Broken Connections */}
+      {analysis.brokenConnections && analysis.brokenConnections.length > 0 && (
+        <div className="border-b border-gray-100">
+          <button
+            onClick={() => toggleSection('broken')}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              {expandedSections.has('broken') ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+              <Unlink className="w-4 h-4 text-purple-600" />
+              <span className="font-medium">Broken Connections</span>
+            </div>
+            <span className="text-sm text-gray-600">
+              {analysis.brokenConnections.length}
+            </span>
+          </button>
+
+          {expandedSections.has('broken') && (
+            <div className="px-4 pb-3">
+              <div className="bg-purple-50 border border-purple-200 rounded p-2 mb-3 text-xs text-purple-800">
+                Connections pointing to beats that don't exist. The target beat ID may have been deleted or mistyped.
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {analysis.brokenConnections.map((broken, index) => (
+                  <div
+                    key={`${broken.sourceBeatId}-${broken.targetId}-${index}`}
+                    onClick={() => onHighlightBeat?.(broken.sourceBeatId)}
+                    className="p-3 bg-purple-50 border border-purple-200 rounded cursor-pointer hover:border-purple-300"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900">
+                          From: {broken.sourceBeatName}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {broken.sourceBeatId}
+                        </div>
+                        <div className="text-xs text-purple-700 mt-2">
+                          → Missing target: <span className="font-mono">{broken.targetId}</span>
+                          {broken.label && <span className="ml-2 text-gray-600">(label: {broken.label})</span>}
+                        </div>
+                      </div>
+                      <Unlink className="w-4 h-4 text-purple-600 flex-shrink-0 ml-2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Unreachable Beats */}
       {analysis.unreachableBeats.length > 0 && (

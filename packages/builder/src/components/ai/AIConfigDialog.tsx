@@ -28,6 +28,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
+  const [maxTokens, setMaxTokens] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -43,7 +44,8 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
     setSuccess(false);
 
     try {
-      configure(provider, apiKey, model || undefined, baseUrl || undefined);
+      const maxTokensNum = maxTokens ? parseInt(maxTokens, 10) : undefined;
+      configure(provider, apiKey, model || undefined, baseUrl || undefined, maxTokensNum);
       setSuccess(true);
 
       // Close after short delay
@@ -201,6 +203,28 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
               For alternative API-compatible providers (leave empty for default)
             </p>
           </div>
+
+          {/* Max Tokens (Optional) - shown when using custom baseUrl */}
+          {baseUrl && (
+            <div>
+              <label htmlFor="maxTokens" className="block text-sm font-medium text-gray-700 mb-2">
+                Max Tokens (Optional)
+              </label>
+              <input
+                id="maxTokens"
+                type="number"
+                value={maxTokens}
+                onChange={(e) => setMaxTokens(e.target.value)}
+                placeholder="8000"
+                min="1000"
+                max="128000"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Max output tokens for story generation. Some providers (Kimi, etc.) may have lower limits. Default: 8000 for custom providers.
+              </p>
+            </div>
+          )}
 
           {/* Error */}
           {(error || aiError) && (

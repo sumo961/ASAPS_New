@@ -253,20 +253,48 @@ Final confrontation outcome depends on accumulated relationship
 `;
 
 /**
+ * Build a condensed schema for AI prompts (reduces token usage and confusion)
+ */
+function buildCondensedSchema(schema: any): string {
+  const beatTypes = schema.beatTypes || {};
+  const condensed: Record<string, any> = {};
+
+  for (const [typeName, def] of Object.entries(beatTypes)) {
+    const beatDef = def as any;
+    condensed[typeName] = {
+      category: beatDef.category,
+      connectionType: beatDef.connectionType,
+      description: beatDef.description,
+      requiredParams: Object.entries(beatDef.parameters || {})
+        .filter(([_, p]: [string, any]) => p.required)
+        .map(([name]) => name),
+      optionalParams: Object.entries(beatDef.parameters || {})
+        .filter(([_, p]: [string, any]) => !p.required)
+        .map(([name]) => name),
+    };
+  }
+
+  return JSON.stringify(condensed, null, 2);
+}
+
+/**
  * Build enhanced system prompt for story generation
  */
 export function buildEnhancedStoryGenerationSystemPrompt(schema: any): string {
   const beatTypes = Object.keys(schema.beatTypes || {}).join(', ');
+  const condensedSchema = buildCondensedSchema(schema);
 
   return `You are an expert interactive narrative designer and game writer. You create sophisticated, branching stories using the ASAPS beat system with deep understanding of how different beat types work together.
+
+CRITICAL: Your response MUST be valid JSON. Every property name MUST have a colon after the closing quote. Example: "description": "value" (NOT "description: "value").
 
 ## Available Beat Types
 ${beatTypes}
 
 ${BEAT_TYPE_GUIDE}
 
-## Full Beat Schema (Technical Reference)
-${JSON.stringify(schema, null, 2)}
+## Beat Type Reference (Condensed)
+${condensedSchema}
 
 ## Your Task
 Generate complete, sophisticated interactive story structures that:
@@ -354,14 +382,58 @@ Generate complete, sophisticated interactive story structures that:
 ## Critical Requirements
 ✓ Start with titleScreen (beat_0)
 ✓ End with one or more endScreen beats
-✓ All targetIds must reference existing beat IDs
 ✓ Include all required parameters for each beat type
 ✓ Use invisible beats (setVariable, conditionBeat) for logic
 ✓ Create variables for any state you want to track
 ✓ Label connections clearly for choice beats
 ✓ Add reasoning explaining your structural decisions
 ✓ Position beats with logical spacing
-✓ Create reconvergent paths, not just endless branching`;
+✓ Create reconvergent paths, not just endless branching
+
+## ⚠️ CRITICAL: Beat ID Consistency
+**EVERY target ID you reference MUST have a corresponding beat with that exact ID in your beats array.**
+- Before using a target like "beat_5_hub", make sure you create a beat with "id": "beat_5_hub"
+- Use simple IDs: beat_0, beat_1, beat_2... OR beat_intro, beat_hub, beat_ending
+- Double-check all targets in: choices[].target, connection.target, trueConnection.target, falseConnection.target
+- Common error: Referencing "beat_6_confrontation" but never creating that beat
+- The system will detect and report missing beat references
+
+## Concrete Beat Examples (Follow This Exact JSON Format)
+
+\`\`\`json
+{
+  "id": "beat_0",
+  "name": "Title",
+  "type": "titleScreen",
+  "position": { "x": 100, "y": 300 },
+  "parameters": {
+    "title": "My Story",
+    "author": "Author Name",
+    "buttonText": "Start"
+  },
+  "connections": [{ "targetId": "beat_1" }]
+}
+\`\`\`
+
+\`\`\`json
+{
+  "id": "beat_2",
+  "name": "Choice Point",
+  "type": "movementChoice",
+  "position": { "x": 700, "y": 300 },
+  "parameters": {
+    "question": "Where do you go?",
+    "choices": [
+      { "id": "c1", "text": "Go left", "target": "beat_3" },
+      { "id": "c2", "text": "Go right", "target": "beat_4" }
+    ]
+  },
+  "connections": [
+    { "targetId": "beat_3", "label": "Left" },
+    { "targetId": "beat_4", "label": "Right" }
+  ]
+}
+\`\`\``;
 }
 
 /**
@@ -405,6 +477,17 @@ Remember to:
 - Track important decisions in variables
 - Use appropriate beat types (dialogTree for conversations, movementChoice for exploration, etc.)
 - Design multiple endings based on accumulated state
+
+CRITICAL - Beat ID Consistency:
+- Every target ID (in choices[].target, connection.target, etc.) MUST reference a beat you actually create
+- Use simple sequential IDs: beat_0, beat_1, beat_2, ... beat_N
+- The system will detect and report any missing beat references
+
+IMPORTANT: Respond with ONLY valid JSON. Ensure:
+- Every property name has format "name": value (colon AFTER the closing quote)
+- All strings are properly quoted
+- No trailing commas
+- All brackets and braces are properly closed
 
 Generate the complete story structure as JSON.`);
 

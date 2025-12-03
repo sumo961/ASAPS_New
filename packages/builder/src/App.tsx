@@ -20,6 +20,7 @@ import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { DebugPanel } from './components/debug/DebugPanel';
 import { applyTreeLayoutToBeats } from './utils/TreeLayoutAlgorithm';
+import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
 
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
@@ -1203,6 +1204,23 @@ function App() {
     const storyTitle = story.metadata?.title || 'Generated Story';
     console.log('[App] Story generated:', storyTitle);
 
+    // Validate AI-generated story structure before import
+    const validation = validateAIStory(story);
+    console.log('[App] AI Story Validation:\n' + formatValidationResult(validation));
+
+    if (!validation.valid) {
+      console.warn('[App] AI story has validation errors:');
+      validation.errors.forEach(e => console.warn('  -', e.message));
+      if (validation.missingBeatIds.length > 0) {
+        console.warn('[App] Missing beat IDs:', validation.missingBeatIds.join(', '));
+      }
+      // Continue importing despite errors - user can fix in builder
+    }
+    if (validation.warnings.length > 0) {
+      console.warn('[App] AI story warnings:');
+      validation.warnings.forEach(w => console.warn('  -', w.message));
+    }
+
     // Clear existing beats and connections
     actions.clearStory();
 
@@ -1297,8 +1315,24 @@ function App() {
             });
           }
         }
+        // Handle choice-based beats (movementChoice, pickProp, dialogTree)
+        // Extract connections from parameters.choices[] or parameters.props[]
+        // This is more reliable than depending on AI to duplicate targets in connections array
+        const choicesArray = beatData.parameters?.choices || beatData.parameters?.props || [];
+        if (Array.isArray(choicesArray) && choicesArray.length > 0) {
+          choicesArray.forEach((choice: any, index: number) => {
+            if (choice.target) {
+              connectionsToCreate.push({
+                source: beatData.id,
+                target: choice.target,
+                label: choice.text || choice.name || `Choice ${index + 1}`,
+              });
+            }
+          });
+        }
         // Also check top-level connections array on the beat (fallback format)
-        if (beatData.connections && Array.isArray(beatData.connections)) {
+        // Skip if we already extracted from choices to avoid duplicates
+        if (beatData.connections && Array.isArray(beatData.connections) && choicesArray.length === 0) {
           beatData.connections.forEach((conn: any) => {
             connectionsToCreate.push({
               source: beatData.id,

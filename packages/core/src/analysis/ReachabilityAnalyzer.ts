@@ -46,6 +46,16 @@ export interface ReachabilityWarning {
 }
 
 /**
+ * Information about a broken connection (pointing to non-existent beat)
+ */
+export interface BrokenConnection {
+  sourceBeatId: string;
+  sourceBeatName: string;
+  targetId: string;
+  label?: string;
+}
+
+/**
  * Result of reachability analysis
  */
 export interface ReachabilityResult {
@@ -53,11 +63,13 @@ export interface ReachabilityResult {
   unreachableBeats: UnreachableBeat[];
   warnings: ReachabilityWarning[];
   orphanedBeats: string[];
+  brokenConnections: BrokenConnection[];
   analysis: {
     totalBeats: number;
     reachableCount: number;
     unreachableCount: number;
     orphanedCount: number;
+    brokenConnectionCount: number;
   };
 }
 
@@ -83,6 +95,7 @@ export class ReachabilityAnalyzer {
   private counterModifications: Map<string, { min: number; max: number }>;
   private variableValues: Map<string, Set<any>>;
   private stateAnalyzed: boolean = false;
+  private brokenConnections: BrokenConnection[] = [];
 
   constructor(story: Story, config: ReachabilityConfig = {}) {
     this.story = story;
@@ -109,12 +122,15 @@ export class ReachabilityAnalyzer {
       return this.createEmptyResult();
     }
 
+    // Reset broken connections for new analysis
+    this.brokenConnections = [];
+
     // Step 1: Analyze counter and variable modifications
     if (this.config.analyzeConditions) {
       this.ensureStateAnalyzed();
     }
 
-    // Step 2: Find all reachable beats via BFS
+    // Step 2: Find all reachable beats via BFS (also detects broken connections)
     const reachableBeats = this.findReachableBeats();
 
     // Step 3: Analyze unreachable beats
@@ -128,18 +144,20 @@ export class ReachabilityAnalyzer {
     // Step 5: Generate warnings
     const warnings = this.generateWarnings(reachableBeats);
 
-    console.log(`[ReachabilityAnalyzer] Analysis complete. ${reachableBeats.size}/${totalBeats} beats reachable`);
+    console.log(`[ReachabilityAnalyzer] Analysis complete. ${reachableBeats.size}/${totalBeats} beats reachable, ${this.brokenConnections.length} broken connections`);
 
     return {
       reachableBeats,
       unreachableBeats,
       warnings,
       orphanedBeats,
+      brokenConnections: this.brokenConnections,
       analysis: {
         totalBeats,
         reachableCount: reachableBeats.size,
         unreachableCount: unreachableBeats.length,
-        orphanedCount: orphanedBeats.length
+        orphanedCount: orphanedBeats.length,
+        brokenConnectionCount: this.brokenConnections.length
       }
     };
   }
@@ -170,6 +188,19 @@ export class ReachabilityAnalyzer {
       const connections = beat.getConnections();
 
       for (const connection of connections) {
+        // First, verify the target beat actually exists
+        const targetBeat = this.story.getBeat(connection.targetId);
+        if (!targetBeat) {
+          // Record broken connection (pointing to non-existent beat)
+          this.brokenConnections.push({
+            sourceBeatId: beatId,
+            sourceBeatName: beat.name,
+            targetId: connection.targetId,
+            label: connection.label
+          });
+          continue; // Don't add non-existent beats to reachable set
+        }
+
         // For unconditional connections, mark as reachable
         // When config.analyzeConditions is false, treat all connections as reachable
         const isReachable = !connection.condition ||
@@ -186,8 +217,20 @@ export class ReachabilityAnalyzer {
 
       // Check defaultTarget
       if (beat.defaultTarget && !reachable.has(beat.defaultTarget)) {
-        reachable.add(beat.defaultTarget);
-        queue.push(beat.defaultTarget);
+        // Verify the default target beat actually exists
+        const defaultTargetBeat = this.story.getBeat(beat.defaultTarget);
+        if (!defaultTargetBeat) {
+          // Record broken default target connection
+          this.brokenConnections.push({
+            sourceBeatId: beatId,
+            sourceBeatName: beat.name,
+            targetId: beat.defaultTarget,
+            label: 'default'
+          });
+        } else {
+          reachable.add(beat.defaultTarget);
+          queue.push(beat.defaultTarget);
+        }
       }
     }
 
@@ -707,11 +750,13 @@ export class ReachabilityAnalyzer {
       unreachableBeats: [],
       warnings: [],
       orphanedBeats: [],
+      brokenConnections: [],
       analysis: {
         totalBeats: 0,
         reachableCount: 0,
         unreachableCount: 0,
-        orphanedCount: 0
+        orphanedCount: 0,
+        brokenConnectionCount: 0
       }
     };
   }

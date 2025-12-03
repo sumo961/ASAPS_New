@@ -60,19 +60,43 @@ export class ClaudeProvider extends BaseAIProvider {
   }
 
   /**
-   * Attempt to repair truncated JSON by closing open brackets/braces
+   * Attempt to repair malformed or truncated JSON
+   * Handles:
+   * - Missing quotes in property names (e.g., "description: → "description":)
+   * - Truncated strings and values
+   * - Unclosed brackets and braces
    */
   private repairTruncatedJson(json: string): string {
     let repaired = json.trim();
 
-    // Remove any trailing incomplete string (text after last complete property)
-    // Find the last complete property value
-    const lastCompleteMatch = repaired.match(/^([\s\S]*"[^"]*"\s*:\s*(?:"[^"]*"|true|false|null|\d+|\{[\s\S]*?\}|\[[\s\S]*?\]))\s*,?\s*[^,\]\}]*$/);
-    if (lastCompleteMatch) {
+    // Fix 1: Fix malformed property names (missing closing quote before colon)
+    // Pattern: "propertyName: " → "propertyName": "
+    // This handles cases where Kimi outputs "description: "value" instead of "description": "value"
+    repaired = repaired.replace(/"([^"]+):\s*"/g, '"$1": "');
+
+    // Fix 2: Fix missing quotes around property names entirely
+    // Pattern: propertyName: → "propertyName":
+    repaired = repaired.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+
+    // Fix 3: Remove trailing incomplete property/value
+    // Find and remove incomplete content after last complete value
+    // Look for patterns like: ,"incomplete  or  : "incomplete string without closing
+    const lastCompleteMatch = repaired.match(
+      /^([\s\S]*(?:"[^"]*"\s*:\s*(?:"[^"]*"|true|false|null|-?\d+(?:\.\d+)?|\{[\s\S]*?\}|\[[\s\S]*?\]))\s*,?\s*)(?:"[^"]*"?\s*:?\s*"?[^"}\]]*)?$/
+    );
+    if (lastCompleteMatch && lastCompleteMatch[1]) {
       repaired = lastCompleteMatch[1];
     }
 
-    // Count open brackets and braces
+    // Fix 4: Remove trailing incomplete string value
+    // If we end with an unclosed string, try to close or remove it
+    const unclosedStringMatch = repaired.match(/^([\s\S]*"[^"]*"\s*:\s*)"[^"]*$/);
+    if (unclosedStringMatch) {
+      // Remove the incomplete string value and its property
+      repaired = unclosedStringMatch[1].replace(/,\s*$/, '');
+    }
+
+    // Fix 5: Count and close brackets/braces
     let openBraces = 0;
     let openBrackets = 0;
     let inString = false;
@@ -99,7 +123,6 @@ export class ClaudeProvider extends BaseAIProvider {
       else if (char === ']') openBrackets--;
     }
 
-    // Close any open structures
     // Remove trailing comma if present
     repaired = repaired.replace(/,\s*$/, '');
 
@@ -157,9 +180,15 @@ export class ClaudeProvider extends BaseAIProvider {
     console.log('[ClaudeProvider] Generating story with Claude...');
 
     return this.withRetry(async () => {
+      // Use configured maxTokens if available
+      // For direct Claude API: default to 16000
+      // For alternative providers (Kimi, etc.): default to 8000 to avoid truncation
+      const defaultMaxTokens = this.useProxy ? 8000 : 16000;
+      const maxTokens = this.config?.maxTokens || defaultMaxTokens;
+
       const requestBody = {
         model: this.model,
-        max_tokens: 16000,
+        max_tokens: maxTokens,
         temperature: this.config?.temperature || 0.7,
         system: systemPrompt,
         messages: [

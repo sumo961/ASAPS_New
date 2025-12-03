@@ -896,28 +896,57 @@ export class APIServer {
 
         console.log(`[AI Proxy] Claude request to: ${endpoint}`);
 
-        // Make the actual request to the third-party API
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify(requestBody),
-        });
+        // Use AbortController with generous timeout for AI generation (5 minutes)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
-        const data = await response.json();
+        try {
+          // Make the actual request to the third-party API
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
+          });
 
-        if (!response.ok) {
-          return res.status(response.status).json(data);
+          clearTimeout(timeoutId);
+
+          // Read the response as text first, then parse
+          // This handles large responses better than response.json()
+          const text = await response.text();
+
+          if (!response.ok) {
+            try {
+              const errorData = JSON.parse(text);
+              return res.status(response.status).json(errorData);
+            } catch {
+              return res.status(response.status).json({ error: text });
+            }
+          }
+
+          try {
+            const data = JSON.parse(text);
+            res.json(data);
+          } catch (parseError) {
+            console.error('[AI Proxy] Failed to parse response:', text.substring(0, 500));
+            res.status(500).json({
+              error: 'Failed to parse AI response',
+              message: 'The response could not be parsed as JSON',
+              responsePreview: text.substring(0, 1000),
+            });
+          }
+        } finally {
+          clearTimeout(timeoutId);
         }
-
-        res.json(data);
       } catch (error) {
         console.error('[AI Proxy] Claude error:', error);
-        res.status(500).json({
-          error: 'Proxy request failed',
+        const isTimeout = error instanceof Error && error.name === 'AbortError';
+        res.status(isTimeout ? 504 : 500).json({
+          error: isTimeout ? 'Request timeout' : 'Proxy request failed',
           message: error instanceof Error ? error.message : 'Unknown error'
         });
       }
@@ -944,27 +973,56 @@ export class APIServer {
 
         console.log(`[AI Proxy] OpenAI request to: ${endpoint}`);
 
-        // Make the actual request to the third-party API
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(requestBody),
-        });
+        // Use AbortController with generous timeout for AI generation (5 minutes)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
-        const data = await response.json();
+        try {
+          // Make the actual request to the third-party API
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
+          });
 
-        if (!response.ok) {
-          return res.status(response.status).json(data);
+          clearTimeout(timeoutId);
+
+          // Read the response as text first, then parse
+          // This handles large responses better than response.json()
+          const text = await response.text();
+
+          if (!response.ok) {
+            try {
+              const errorData = JSON.parse(text);
+              return res.status(response.status).json(errorData);
+            } catch {
+              return res.status(response.status).json({ error: text });
+            }
+          }
+
+          try {
+            const data = JSON.parse(text);
+            res.json(data);
+          } catch (parseError) {
+            console.error('[AI Proxy] Failed to parse response:', text.substring(0, 500));
+            res.status(500).json({
+              error: 'Failed to parse AI response',
+              message: 'The response could not be parsed as JSON',
+              responsePreview: text.substring(0, 1000),
+            });
+          }
+        } finally {
+          clearTimeout(timeoutId);
         }
-
-        res.json(data);
       } catch (error) {
         console.error('[AI Proxy] OpenAI error:', error);
-        res.status(500).json({
-          error: 'Proxy request failed',
+        const isTimeout = error instanceof Error && error.name === 'AbortError';
+        res.status(isTimeout ? 504 : 500).json({
+          error: isTimeout ? 'Request timeout' : 'Proxy request failed',
           message: error instanceof Error ? error.message : 'Unknown error'
         });
       }

@@ -8,5 +8,6 @@ export type {
 export type {
   ReachabilityResult,
   UnreachableBeat,
-  ReachabilityWarning
+  ReachabilityWarning,
+  BrokenConnection
 } from './ReachabilityAnalyzer';
