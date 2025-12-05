@@ -1315,7 +1315,36 @@ function App() {
             });
           }
         }
-        // Handle choice-based beats (movementChoice, pickProp, dialogTree)
+        // Handle dialogTree beats - recursively extract targets from nested structure
+        // DialogTree has targets embedded in dialogTree.choices[].target which can be:
+        // - A string beat ID to exit the dialog
+        // - A nested dialogNode object for more conversation
+        if (beatData.type === 'dialogTree' && beatData.parameters?.dialogTree) {
+          const extractDialogTreeTargets = (node: any, targets: Array<{ target: string; label: string }>) => {
+            if (!node || !node.choices) return;
+            node.choices.forEach((choice: any) => {
+              if (choice.target && typeof choice.target === 'string') {
+                // This is a beat ID exit point
+                targets.push({ target: choice.target, label: choice.text || 'Choice' });
+              }
+              // Recurse into nested dialog nodes
+              if (choice.dialogNode) {
+                extractDialogTreeTargets(choice.dialogNode, targets);
+              }
+            });
+          };
+
+          const dialogTargets: Array<{ target: string; label: string }> = [];
+          extractDialogTreeTargets(beatData.parameters.dialogTree, dialogTargets);
+          dialogTargets.forEach(({ target, label }) => {
+            connectionsToCreate.push({
+              source: beatData.id,
+              target,
+              label,
+            });
+          });
+        }
+        // Handle choice-based beats (movementChoice, pickProp)
         // Extract connections from parameters.choices[] or parameters.props[]
         // This is more reliable than depending on AI to duplicate targets in connections array
         const choicesArray = beatData.parameters?.choices || beatData.parameters?.props || [];
