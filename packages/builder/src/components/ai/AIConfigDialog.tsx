@@ -4,9 +4,56 @@
  * Dialog for configuring AI providers
  */
 
-import React, { useState } from 'react';
-import { X, Key, Sparkles, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Key, Sparkles, CheckCircle, AlertCircle, Server } from 'lucide-react';
 import { useAI } from '../../hooks/useAI';
+
+// Provider presets for easy configuration
+type ProviderType = 'claude' | 'openai' | 'local';
+
+interface ProviderPreset {
+  name: string;
+  description: string;
+  defaultBaseUrl: string;
+  defaultModel: string;
+  apiKeyRequired: boolean;
+  apiKeyPlaceholder: string;
+  apiKeyHelp: string;
+  modelHelp: string;
+}
+
+const PROVIDER_PRESETS: Record<ProviderType, ProviderPreset> = {
+  claude: {
+    name: 'Claude',
+    description: 'Anthropic',
+    defaultBaseUrl: '',
+    defaultModel: 'claude-sonnet-4-20250514',
+    apiKeyRequired: true,
+    apiKeyPlaceholder: 'Enter your Anthropic API key',
+    apiKeyHelp: 'Get your API key from console.anthropic.com',
+    modelHelp: 'Leave empty for default model',
+  },
+  openai: {
+    name: 'OpenAI',
+    description: 'GPT-4',
+    defaultBaseUrl: '',
+    defaultModel: 'gpt-4-turbo-preview',
+    apiKeyRequired: true,
+    apiKeyPlaceholder: 'Enter your OpenAI API key',
+    apiKeyHelp: 'Get your API key from platform.openai.com',
+    modelHelp: 'Leave empty for default model',
+  },
+  local: {
+    name: 'Local LLM',
+    description: 'Ollama / Local',
+    defaultBaseUrl: 'http://localhost:11434/v1',
+    defaultModel: 'llama3.2',
+    apiKeyRequired: false,
+    apiKeyPlaceholder: 'ollama (or leave empty)',
+    apiKeyHelp: 'Most local servers ignore this - use any value or leave empty',
+    modelHelp: 'e.g., llama3.2, deepseek-coder:6.7b, mistral:7b',
+  },
+};
 
 export interface AIConfigDialogProps {
   /** Whether dialog is open */
@@ -22,8 +69,8 @@ export interface AIConfigDialogProps {
 export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose }) => {
   const { isConfigured, currentProvider, configure, error: aiError } = useAI();
 
-  const [provider, setProvider] = useState<'claude' | 'openai'>(
-    (currentProvider as 'claude' | 'openai') || 'claude'
+  const [provider, setProvider] = useState<ProviderType>(
+    (currentProvider as ProviderType) || 'claude'
   );
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
@@ -32,10 +79,25 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  const preset = PROVIDER_PRESETS[provider];
+
+  // Update baseUrl when provider changes
+  useEffect(() => {
+    const newPreset = PROVIDER_PRESETS[provider];
+    if (newPreset.defaultBaseUrl) {
+      setBaseUrl(newPreset.defaultBaseUrl);
+    } else {
+      setBaseUrl('');
+    }
+    // Also set default model suggestion
+    setModel('');
+  }, [provider]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!apiKey.trim()) {
+    // Only require API key for providers that need it
+    if (preset.apiKeyRequired && !apiKey.trim()) {
       setError('API key is required');
       return;
     }
@@ -45,7 +107,11 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
 
     try {
       const maxTokensNum = maxTokens ? parseInt(maxTokens, 10) : undefined;
-      configure(provider, apiKey, model || undefined, baseUrl || undefined, maxTokensNum);
+      // Local LLMs use OpenAI-compatible API
+      const actualProvider = provider === 'local' ? 'openai' : provider;
+      // For local, use a dummy API key if none provided (Ollama ignores it)
+      const actualApiKey = provider === 'local' && !apiKey.trim() ? 'ollama' : apiKey;
+      configure(actualProvider, actualApiKey, model || undefined, baseUrl || undefined, maxTokensNum);
       setSuccess(true);
 
       // Close after short delay
@@ -108,7 +174,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Provider
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setProvider('claude')}
@@ -138,13 +204,29 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
                   <p className="text-xs text-gray-500 mt-1">GPT-4</p>
                 </div>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setProvider('local')}
+                className={`p-4 border-2 rounded-lg transition-all ${
+                  provider === 'local'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="text-center">
+                  <Server className="w-5 h-5 mx-auto mb-1 text-gray-600" />
+                  <p className="font-medium text-gray-900">Local</p>
+                  <p className="text-xs text-gray-500 mt-1">Ollama</p>
+                </div>
+              </button>
             </div>
           </div>
 
           {/* API Key */}
           <div>
             <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 mb-2">
-              API Key
+              API Key {!preset.apiKeyRequired && <span className="text-gray-400">(Optional)</span>}
             </label>
             <div className="relative">
               <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -153,54 +235,46 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={`Enter your ${provider === 'claude' ? 'Anthropic' : 'OpenAI'} API key`}
+                placeholder={preset.apiKeyPlaceholder}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
-            <p className="mt-1 text-xs text-gray-500">
-              {provider === 'claude'
-                ? 'Get your API key from console.anthropic.com'
-                : 'Get your API key from platform.openai.com'}
-            </p>
+            <p className="mt-1 text-xs text-gray-500">{preset.apiKeyHelp}</p>
           </div>
 
-          {/* Model (Optional) */}
+          {/* Model */}
           <div>
             <label htmlFor="model" className="block text-sm font-medium text-gray-700 mb-2">
-              Model (Optional)
+              Model {provider !== 'local' && <span className="text-gray-400">(Optional)</span>}
             </label>
             <input
               id="model"
               type="text"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder={
-                provider === 'claude' ? 'claude-sonnet-4-20250514' : 'gpt-4-turbo-preview'
-              }
+              placeholder={preset.defaultModel}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
-            <p className="mt-1 text-xs text-gray-500">Leave empty for default model</p>
+            <p className="mt-1 text-xs text-gray-500">{preset.modelHelp}</p>
           </div>
 
-          {/* Base URL (Optional) */}
+          {/* Base URL */}
           <div>
             <label htmlFor="baseUrl" className="block text-sm font-medium text-gray-700 mb-2">
-              Base URL (Optional)
+              Base URL {provider !== 'local' && <span className="text-gray-400">(Optional)</span>}
             </label>
             <input
               id="baseUrl"
               type="text"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder={
-                provider === 'claude'
-                  ? 'https://api.anthropic.com'
-                  : 'https://api.openai.com/v1'
-              }
+              placeholder={preset.defaultBaseUrl || (provider === 'claude' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1')}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <p className="mt-1 text-xs text-gray-500">
-              For alternative API-compatible providers (leave empty for default)
+              {provider === 'local'
+                ? 'Ollama default: localhost:11434. For remote: http://your-server:11434/v1'
+                : 'For alternative API-compatible providers (leave empty for default)'}
             </p>
           </div>
 
@@ -265,13 +339,27 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
           </div>
         </form>
 
-        {/* Info */}
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-900">
-            <strong>Note:</strong> API keys are stored in memory only and are not persisted. You'll
-            need to re-enter them when you reload the application.
-          </p>
-        </div>
+        {/* Info - context-sensitive */}
+        {provider === 'local' ? (
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-900 font-medium mb-2">Quick Start with Ollama:</p>
+            <ol className="text-sm text-green-800 list-decimal list-inside space-y-1">
+              <li>Install: <code className="bg-green-100 px-1 rounded">curl -fsSL https://ollama.com/install.sh | sh</code></li>
+              <li>Pull a model: <code className="bg-green-100 px-1 rounded">ollama pull llama3.2</code></li>
+              <li>Ollama runs automatically on port 11434</li>
+            </ol>
+            <p className="text-xs text-green-700 mt-2">
+              For Jetson/ARM: Use quantized models (e.g., deepseek-coder:6.7b-q4) to fit in memory.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-900">
+              <strong>Note:</strong> API keys are stored in memory only and are not persisted. You'll
+              need to re-enter them when you reload the application.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
