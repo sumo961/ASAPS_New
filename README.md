@@ -40,7 +40,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 git clone https://github.com/sumo961/ASAPS_New.git
 cd ASAPS_New
 
-# Install dependencies
+# Install dependencies (automatically builds core packages)
 npm install
 
 # Start the development server
@@ -48,6 +48,18 @@ npm run dev
 ```
 
 The builder will open at `http://localhost:5173`
+
+> **Note**: The `npm install` command automatically builds the required `@asaps/core` and `@asaps/renderer` packages. This may take a minute on first install.
+
+### Troubleshooting
+
+If you encounter errors about missing packages (e.g., `Cannot find package '@asaps/core'`), run:
+
+```bash
+npm run build:deps
+```
+
+This manually builds the core dependencies. Then retry `npm run dev`.
 
 ## 📦 Project Structure
 
