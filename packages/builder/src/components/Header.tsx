@@ -74,24 +74,40 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+    <header className="bg-white border-b border-gray-200 px-4 py-2">
+      {/* Row 1: Logo and Story Title */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
-            <FileText className="w-8 h-8 text-blue-600" />
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              ASAPS Builder
+            <FileText className="w-6 h-6 text-blue-600" />
+            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              ASAPS
             </span>
           </div>
 
+          {/* Story Title - More prominent */}
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            className="px-3 py-1.5 text-lg font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+            placeholder="Story Title"
+          />
+        </div>
+      </div>
+
+      {/* Row 2: All action buttons */}
+      <div className="flex items-center justify-between">
+        {/* Left: Project, Undo/Redo, Save, Import/Export */}
+        <div className="flex items-center space-x-2">
           {/* Project Name Display */}
           {projectName ? (
-            <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg font-medium" title={hasUnsavedChanges ? "Unsaved changes" : ""}>
+            <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium" title={hasUnsavedChanges ? "Unsaved changes" : ""}>
               {hasUnsavedChanges && isUntitledProject ? "● " : ""}{projectName}
             </span>
           ) : (
-            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-lg font-medium italic" title={hasUnsavedChanges ? "Unsaved changes" : ""}>
-              {hasUnsavedChanges && isUntitledProject ? "● " : ""}Untitled Project
+            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium italic" title={hasUnsavedChanges ? "Unsaved changes" : ""}>
+              {hasUnsavedChanges && isUntitledProject ? "● " : ""}Untitled
             </span>
           )}
 
@@ -119,24 +135,16 @@ export const Header: React.FC<HeaderProps> = ({
             }}
           />
 
-          {/* Story Title */}
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
-            className="px-4 py-2 text-lg font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Story Title"
-          />
+          <div className="w-px h-6 bg-gray-300 mx-1" />
 
-          {/* Undo/Redo Toolbar */}
           <UndoRedoToolbar
             showDescriptions={false}
             showShortcuts={false}
             orientation="horizontal"
           />
-        </div>
 
-        <div className="flex items-center space-x-2">
+          <div className="w-px h-6 bg-gray-300 mx-1" />
+
           {/* Save Button and Status */}
           <SaveStatus
             status={status}
@@ -150,29 +158,52 @@ export const Header: React.FC<HeaderProps> = ({
             compact={false}
           />
 
+          <div className="w-px h-6 bg-gray-300 mx-1" />
+
+          <button
+            className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+            onClick={onImport}
+            title="Import ASML XML"
+          >
+            <Upload className="w-4 h-4" />
+            Import
+          </button>
+
+          <button
+            className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+            onClick={onExport}
+            title="Export as ASML XML"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+        </div>
+
+        {/* Right: Feature buttons */}
+        <div className="flex items-center space-x-2">
           {onCharacters && (
-            <button 
-              className="px-4 py-2 bg-indigo-500 text-white rounded-lg font-medium hover:bg-indigo-600 transition-colors flex items-center gap-2"
+            <button
+              className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors flex items-center gap-1.5"
               onClick={onCharacters}
             >
               <Users className="w-4 h-4" />
               Characters
             </button>
           )}
-          
+
           {onAssets && (
-            <button 
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center gap-2"
+            <button
+              className="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors flex items-center gap-1.5"
               onClick={onAssets}
             >
               <Image className="w-4 h-4" />
               Assets
             </button>
           )}
-          
+
           {onSettings && (
             <button
-              className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors flex items-center gap-2"
+              className="px-3 py-1.5 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors flex items-center gap-1.5"
               onClick={onSettings}
             >
               <Settings className="w-4 h-4" />
@@ -182,7 +213,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {onDebug && (
             <button
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors flex items-center gap-2"
+              className="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors flex items-center gap-1.5"
               onClick={onDebug}
               title="Debug Tools"
             >
@@ -194,13 +225,13 @@ export const Header: React.FC<HeaderProps> = ({
           {/* AI Menu Button */}
           <div className="relative">
             <button
-              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-2"
+              className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1.5"
               onClick={() => setShowAIMenu(!showAIMenu)}
               title="AI Tools"
             >
               <Sparkles className="w-4 h-4" />
               AI
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-3 h-3" />
             </button>
 
             {/* AI Dropdown Menu */}
@@ -248,33 +279,14 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {onPreview && (
-            <button 
-              className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors flex items-center gap-2"
+            <button
+              className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center gap-1.5"
               onClick={onPreview}
             >
               <Play className="w-4 h-4" />
               Preview
             </button>
           )}
-          
-          <button
-            className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
-            onClick={onExport}
-            title="Export as ASML XML"
-          >
-            <Download className="w-4 h-4" />
-            Export ASML
-          </button>
-
-          <button
-            className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
-            onClick={onImport}
-            title="Import ASML XML"
-          >
-            <Upload className="w-4 h-4" />
-            Import ASML
-          </button>
-
         </div>
       </div>
 

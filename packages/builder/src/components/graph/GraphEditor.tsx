@@ -676,6 +676,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
         attributionPosition="bottom-left"
+        minZoom={0.05}
+        maxZoom={4}
       >
         <Background color="#aaa" gap={16} />
         <Controls />

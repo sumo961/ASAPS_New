@@ -37,8 +37,8 @@ interface LayoutResult {
 }
 
 const DEFAULT_OPTIONS: Required<LayoutOptions> = {
-  nodeSpacingX: 300,
-  nodeSpacingY: 150,
+  nodeSpacingX: 280,
+  nodeSpacingY: 180,
   startX: 100,
   startY: 100,
   direction: 'TB',
@@ -46,6 +46,8 @@ const DEFAULT_OPTIONS: Required<LayoutOptions> = {
 
 /**
  * Calculate tree layout positions for a directed graph of story beats
+ * Uses a proper tree-based algorithm that positions children under their parent
+ * rather than putting all same-depth nodes in a single horizontal row.
  *
  * @param nodes - Array of nodes with id and optional position
  * @param edges - Array of edges with source and target ids
@@ -122,102 +124,150 @@ export function calculateTreeLayout(
   }
 
   // Handle any unvisited nodes (disconnected components)
+  let maxLayer = 0;
+  layers.forEach((layer) => {
+    maxLayer = Math.max(maxLayer, layer);
+  });
+
   nodeSet.forEach((nodeId) => {
     if (!visited.has(nodeId)) {
-      // Find max layer and add below
-      let maxLayer = 0;
-      layers.forEach((layer) => {
-        maxLayer = Math.max(maxLayer, layer);
-      });
       layers.set(nodeId, maxLayer + 1);
       visited.add(nodeId);
     }
   });
 
-  // Group nodes by layer
-  const layerNodes = new Map<number, string[]>();
-  layers.forEach((layer, nodeId) => {
-    if (!layerNodes.has(layer)) {
-      layerNodes.set(layer, []);
+  // For DAGs with multiple parents, pick primary parent (first one encountered)
+  const primaryParent = new Map<string, string>();
+  nodeSet.forEach((nodeId) => {
+    const parents = incoming.get(nodeId) || [];
+    if (parents.length > 0) {
+      // Pick parent at lowest layer (closest to root) as primary
+      let bestParent = parents[0];
+      let bestLayer = layers.get(bestParent) || Infinity;
+      parents.forEach((p) => {
+        const pLayer = layers.get(p) || Infinity;
+        if (pLayer < bestLayer) {
+          bestParent = p;
+          bestLayer = pLayer;
+        }
+      });
+      primaryParent.set(nodeId, bestParent);
     }
-    layerNodes.get(layer)!.push(nodeId);
   });
 
-  // Sort nodes within each layer to minimize edge crossings
-  // Use barycenter heuristic: position node at the average position of its parents
-  const nodePositionInLayer = new Map<string, number>();
-
-  // First pass: assign initial positions based on order in roots
-  roots.forEach((rootId, index) => {
-    nodePositionInLayer.set(rootId, index);
+  // Build tree structure based on primary parent relationships
+  const treeChildren = new Map<string, string[]>();
+  nodeSet.forEach((nodeId) => {
+    treeChildren.set(nodeId, []);
   });
 
-  // Process layers top-down
-  const sortedLayers = Array.from(layerNodes.keys()).sort((a, b) => a - b);
+  nodeSet.forEach((nodeId) => {
+    const parent = primaryParent.get(nodeId);
+    if (parent) {
+      treeChildren.get(parent)?.push(nodeId);
+    }
+  });
 
-  sortedLayers.forEach((layerIndex) => {
-    if (layerIndex === 0) return; // Roots already positioned
+  // Calculate subtree width for each node (number of leaf-level slots needed)
+  const subtreeWidth = new Map<string, number>();
 
-    const nodesInLayer = layerNodes.get(layerIndex) || [];
+  const calculateWidth = (nodeId: string, visitedCalc: Set<string>): number => {
+    if (visitedCalc.has(nodeId)) {
+      return 0; // Avoid infinite loops in cycles
+    }
+    visitedCalc.add(nodeId);
 
-    // Calculate barycenter for each node based on parent positions
-    const barycenters: Array<{ id: string; barycenter: number }> = [];
+    const children = treeChildren.get(nodeId) || [];
+    if (children.length === 0) {
+      subtreeWidth.set(nodeId, 1);
+      return 1;
+    }
 
-    nodesInLayer.forEach((nodeId) => {
-      const parents = incoming.get(nodeId) || [];
-      if (parents.length === 0) {
-        barycenters.push({ id: nodeId, barycenter: Infinity }); // Put at end
-      } else {
-        let sum = 0;
-        let count = 0;
-        parents.forEach((parentId) => {
-          const pos = nodePositionInLayer.get(parentId);
-          if (pos !== undefined) {
-            sum += pos;
-            count++;
-          }
-        });
-        const avg = count > 0 ? sum / count : nodesInLayer.indexOf(nodeId);
-        barycenters.push({ id: nodeId, barycenter: avg });
-      }
+    let totalWidth = 0;
+    children.forEach((childId) => {
+      totalWidth += calculateWidth(childId, visitedCalc);
     });
 
-    // Sort by barycenter
-    barycenters.sort((a, b) => a.barycenter - b.barycenter);
+    // Node needs at least width 1
+    totalWidth = Math.max(totalWidth, 1);
+    subtreeWidth.set(nodeId, totalWidth);
+    return totalWidth;
+  };
 
-    // Assign positions in sorted order
-    barycenters.forEach(({ id }, index) => {
-      nodePositionInLayer.set(id, index);
-    });
-
-    // Update layerNodes with sorted order
-    layerNodes.set(
-      layerIndex,
-      barycenters.map((b) => b.id)
-    );
+  // Calculate widths starting from roots
+  roots.forEach((rootId) => {
+    calculateWidth(rootId, new Set<string>());
   });
 
-  // Calculate actual pixel positions
+  // Handle orphaned nodes
+  nodeSet.forEach((nodeId) => {
+    if (!subtreeWidth.has(nodeId)) {
+      subtreeWidth.set(nodeId, 1);
+    }
+  });
+
+  // Position nodes using the calculated widths
   const positions = new Map<string, { x: number; y: number }>();
 
-  sortedLayers.forEach((layerIndex) => {
-    const nodesInLayer = layerNodes.get(layerIndex) || [];
-    const layerWidth = (nodesInLayer.length - 1) * opts.nodeSpacingX;
-    const layerStartX = opts.startX - layerWidth / 2 + 400; // Center the layer, offset to right
+  const positionNode = (
+    nodeId: string,
+    xOffset: number,
+    availableWidth: number,
+    positionedNodes: Set<string>
+  ): void => {
+    if (positionedNodes.has(nodeId)) {
+      return; // Already positioned
+    }
+    positionedNodes.add(nodeId);
 
-    nodesInLayer.forEach((nodeId, indexInLayer) => {
-      let x: number, y: number;
+    const layer = layers.get(nodeId) || 0;
+    const width = subtreeWidth.get(nodeId) || 1;
 
-      if (opts.direction === 'TB') {
-        x = layerStartX + indexInLayer * opts.nodeSpacingX;
-        y = opts.startY + layerIndex * opts.nodeSpacingY;
-      } else {
-        x = opts.startX + layerIndex * opts.nodeSpacingX;
-        y = opts.startY + indexInLayer * opts.nodeSpacingY;
-      }
+    // Center this node within its available width
+    const nodeX = xOffset + (availableWidth * opts.nodeSpacingX) / 2;
+    const nodeY = opts.startY + layer * opts.nodeSpacingY;
 
-      positions.set(nodeId, { x, y });
-    });
+    positions.set(nodeId, { x: nodeX, y: nodeY });
+
+    // Position children
+    const children = treeChildren.get(nodeId) || [];
+    if (children.length > 0) {
+      let childOffset = xOffset;
+      children.forEach((childId) => {
+        const childWidth = subtreeWidth.get(childId) || 1;
+        positionNode(childId, childOffset, childWidth, positionedNodes);
+        childOffset += childWidth * opts.nodeSpacingX;
+      });
+    }
+  };
+
+  // Calculate total width and position roots
+  let totalWidth = 0;
+  roots.forEach((rootId) => {
+    totalWidth += subtreeWidth.get(rootId) || 1;
+  });
+
+  // Position each root tree
+  let xOffset = opts.startX;
+  const positionedNodes = new Set<string>();
+
+  roots.forEach((rootId) => {
+    const rootWidth = subtreeWidth.get(rootId) || 1;
+    positionNode(rootId, xOffset, rootWidth, positionedNodes);
+    xOffset += rootWidth * opts.nodeSpacingX + opts.nodeSpacingX; // Extra space between root trees
+  });
+
+  // Position any remaining unpositioned nodes (orphans, cycle nodes)
+  let orphanX = xOffset;
+  nodeSet.forEach((nodeId) => {
+    if (!positions.has(nodeId)) {
+      const layer = layers.get(nodeId) || 0;
+      positions.set(nodeId, {
+        x: orphanX,
+        y: opts.startY + layer * opts.nodeSpacingY
+      });
+      orphanX += opts.nodeSpacingX;
+    }
   });
 
   return { positions, layers };

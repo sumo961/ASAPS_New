@@ -9,6 +9,8 @@
     "packages/*"
   ],
   "scripts": {
+    "prepare": "npm run build:deps || echo 'Build skipped (CI or first install)'",
+    "build:deps": "npm run generate:types && npm run build -w @asaps/core && npm run build -w @asaps/renderer",
     "dev": "npm run dev -w @asaps/builder",
     "dev:all": "concurrently \"npm run dev -w @asaps/core\" \"npm run dev -w @asaps/builder\"",
     "build": "npm run generate:types && npm run build -w @asaps/core && npm run build -w @asaps/renderer && npm run build -w @asaps/builder",

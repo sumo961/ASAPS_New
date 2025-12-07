@@ -154,6 +154,17 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
     );
   }
 
+  // Unified save handler - calls onSaveProject for untitled, otherwise onSave
+  const handleSave = () => {
+    if (isUntitledProject && onSaveProject) {
+      onSaveProject();
+    } else if (onSave) {
+      onSave();
+    }
+  };
+
+  const hasSaveHandler = onSave || onSaveProject;
+
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       {/* Status indicator - only show when there's something to report */}
@@ -172,22 +183,10 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
         </div>
       )}
 
-      {/* Save Project button - appears for untitled projects with changes */}
-      {showSaveProjectButton && onSaveProject && (
+      {/* Single unified Save button */}
+      {hasSaveHandler && (
         <button
-          onClick={onSaveProject}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
-          title="Save as a named project"
-        >
-          <Save size={16} />
-          Save Project
-        </button>
-      )}
-
-      {/* Manual save button (styled to match header buttons) */}
-      {onSave && (
-        <button
-          onClick={onSave}
+          onClick={handleSave}
           disabled={status === 'saving'}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
             status === 'saving'
@@ -205,7 +204,7 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
               ? `Saved ${lastSaved ? formatTimeAgo(lastSaved) : 'just now'}`
               : status === 'pending'
               ? 'Save changes'
-              : 'Save project'
+              : 'Save'
           }
         >
           {status === 'saved' ? <Check size={16} /> : status === 'saving' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
