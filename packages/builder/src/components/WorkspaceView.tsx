@@ -38,6 +38,7 @@ interface WorkspaceViewProps {
   };
   globalSettings?: GlobalSettings;
   highlightedBeatIds?: string[];
+  onAutoLayout?: () => void;
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
@@ -66,6 +67,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   projectSettings,
   globalSettings,
   highlightedBeatIds = [],
+  onAutoLayout,
 }) => {
   const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
 
@@ -160,6 +162,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               paletteCollapsed={paletteCollapsed}
               onTogglePalette={onTogglePalette}
               highlightedBeatIds={highlightedBeatIds}
+              onAutoLayout={onAutoLayout}
             />
           </div>
         ) : (

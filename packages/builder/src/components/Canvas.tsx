@@ -20,6 +20,7 @@ interface CanvasProps {
   onTogglePalette?: () => void;
   onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;
   highlightedBeatIds?: string[];
+  onAutoLayout?: () => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -39,6 +40,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onTogglePalette,
   onBeatInContainerMove,
   highlightedBeatIds = [],
+  onAutoLayout,
 }) => {
   const handleBeatMove = (beatId: string, x: number, y: number) => {
     onBeatMove(beatId, { x, y });
@@ -90,6 +92,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onClusterExpandCollapse={handleClusterExpandCollapse}
           onBeatInContainerMove={handleBeatInContainerMove}
           highlightedBeatIds={highlightedBeatIds}
+          onAutoLayout={onAutoLayout}
         />
       </div>
       

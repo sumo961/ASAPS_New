@@ -37,6 +37,7 @@ interface GraphEditorProps {
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove: (beatId: string, clusterId: string, x: number, y: number) => void;
   highlightedBeatIds?: string[];
+  onAutoLayout?: () => void;
 }
 
 const nodeTypes: NodeTypes = {
@@ -77,6 +78,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onClusterMove,
   onBeatInContainerMove,
   highlightedBeatIds = [],
+  onAutoLayout,
 }) => {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
@@ -681,6 +683,53 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       >
         <Background color="#aaa" gap={16} />
         <Controls />
+        {/* Auto-layout button positioned next to Controls */}
+        {onAutoLayout && (
+          <div
+            className="react-flow__panel react-flow__controls"
+            style={{
+              position: 'absolute',
+              left: 10,
+              bottom: 150,
+              zIndex: 5,
+            }}
+          >
+            <button
+              onClick={onAutoLayout}
+              className="react-flow__controls-button"
+              title="Auto-arrange beats"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 26,
+                height: 26,
+                padding: 0,
+                border: 'none',
+                background: '#fff',
+                cursor: 'pointer',
+                borderRadius: 2,
+              }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ width: 14, height: 14 }}
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+                <path d="M10 6h4M6 10v4M18 10v4M10 18h4" />
+              </svg>
+            </button>
+          </div>
+        )}
         <MiniMap
           nodeStrokeColor={(node) => node.data?.color || '#94a3b8'}
           nodeColor={(node) => node.data?.color || '#94a3b8'}

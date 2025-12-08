@@ -285,8 +285,15 @@ function App() {
       // BATCH UPDATE: Create all beats first, then load them in a single state update
       // This prevents the GraphEditor from re-rendering 42+ times
       // Use tree layout algorithm to position beats based on their connections
+      // Pass both beats (for parameter-embedded connections) and the connections array (for external connections)
+      const externalConnections = story.connections && Array.isArray(story.connections)
+        ? story.connections.map((conn: any) => ({
+            source: conn.sourceId || conn.source,
+            target: conn.targetId || conn.target,
+          }))
+        : [];
       const adjustedPositions = story.beats && Array.isArray(story.beats)
-        ? applyTreeLayoutToBeats(story.beats)
+        ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections)
         : new Map();
 
       // Create all beats without adding to state (batch preparation)
@@ -904,6 +911,42 @@ function App() {
     markChanged();
   }, [actions, markChanged]);
 
+  // Auto-layout handler - rearranges all beats using the tree layout algorithm
+  const handleAutoLayout = useCallback(() => {
+    if (state.beats.length === 0) return;
+
+    // Convert beats to the format needed by the layout algorithm
+    const beatsForLayout = state.beats.map(beat => ({
+      id: beat.id,
+      type: beat.type,
+      position: { x: beat.x || 0, y: beat.y || 0 },
+      parameters: typeof beat.getParameters === 'function' ? beat.getParameters() : {},
+    }));
+
+    // Extract connections from beat objects (for simple beats with external connections)
+    const externalEdges: Array<{ source: string; target: string }> = [];
+    state.beats.forEach(beat => {
+      if (typeof beat.getConnections === 'function') {
+        const connections = beat.getConnections();
+        connections.forEach((conn: any) => {
+          if (conn.targetId) {
+            externalEdges.push({ source: beat.id, target: conn.targetId });
+          }
+        });
+      }
+    });
+
+    // Calculate new positions with both parameter edges and external edges
+    const newPositions = applyTreeLayoutToBeats(beatsForLayout, undefined, externalEdges);
+
+    // Apply new positions to all beats
+    newPositions.forEach((pos, beatId) => {
+      actions.moveBeat(beatId, pos);
+    });
+
+    markChanged();
+  }, [state.beats, actions, markChanged]);
+
   const handleExport = useCallback(async () => {
     try {
       const asml = actions.exportStory(assets, characters);
@@ -1262,8 +1305,15 @@ function App() {
     }
 
     // Apply tree layout to position beats based on their connections
+    // Pass both beats (for parameter-embedded connections) and the connections array (for external connections)
+    const externalConnections = story.connections && Array.isArray(story.connections)
+      ? story.connections.map((conn: any) => ({
+          source: conn.sourceId || conn.source,
+          target: conn.targetId || conn.target,
+        }))
+      : [];
     const adjustedPositions = story.beats && Array.isArray(story.beats)
-      ? applyTreeLayoutToBeats(story.beats)
+      ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections)
       : new Map();
 
     // Add all generated beats, preserving AI-generated IDs with adjusted positions
@@ -1585,6 +1635,7 @@ function App() {
             projectSettings={projectSettings}
             globalSettings={globalSettings}
             highlightedBeatIds={highlightedBeatIds}
+            onAutoLayout={handleAutoLayout}
           />
 
           {selectedBeat && (

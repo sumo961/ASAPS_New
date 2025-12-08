@@ -2,10 +2,11 @@
  * Tree/DAG Layout Algorithm for Story Flowcharts
  *
  * Positions beats in a hierarchical tree layout based on their connections.
- * Uses a modified Sugiyama algorithm approach:
+ * Uses a modified Reingold-Tilford algorithm approach:
  * 1. Assign layers (depth) based on topological sort
- * 2. Minimize edge crossings within layers
- * 3. Position nodes to minimize edge lengths
+ * 2. Calculate subtree widths for proper spacing
+ * 3. Position nodes centered above their children
+ * 4. Handle multiple branches with proper spreading
  */
 
 interface NodeData {
@@ -19,7 +20,7 @@ interface EdgeData {
 }
 
 interface LayoutOptions {
-  /** Horizontal spacing between nodes in the same layer */
+  /** Horizontal spacing between sibling nodes */
   nodeSpacingX?: number;
   /** Vertical spacing between layers */
   nodeSpacingY?: number;
@@ -29,6 +30,8 @@ interface LayoutOptions {
   startY?: number;
   /** Layout direction: 'TB' (top-bottom), 'LR' (left-right) */
   direction?: 'TB' | 'LR';
+  /** Minimum width of a node for spacing calculations */
+  nodeWidth?: number;
 }
 
 interface LayoutResult {
@@ -37,17 +40,18 @@ interface LayoutResult {
 }
 
 const DEFAULT_OPTIONS: Required<LayoutOptions> = {
-  nodeSpacingX: 280,
-  nodeSpacingY: 180,
+  nodeSpacingX: 200,
+  nodeSpacingY: 150,
   startX: 100,
-  startY: 100,
+  startY: 50,
   direction: 'TB',
+  nodeWidth: 180,
 };
 
 /**
  * Calculate tree layout positions for a directed graph of story beats
- * Uses a proper tree-based algorithm that positions children under their parent
- * rather than putting all same-depth nodes in a single horizontal row.
+ * Uses a modified Reingold-Tilford algorithm that positions children under their parent
+ * with proper spreading to use vertical and horizontal space effectively.
  *
  * @param nodes - Array of nodes with id and optional position
  * @param edges - Array of edges with source and target ids
@@ -60,6 +64,11 @@ export function calculateTreeLayout(
   options: LayoutOptions = {}
 ): LayoutResult {
   const opts = { ...DEFAULT_OPTIONS, ...options };
+
+  // Empty graph
+  if (nodes.length === 0) {
+    return { positions: new Map(), layers: new Map() };
+  }
 
   // Build adjacency lists
   const outgoing = new Map<string, string[]>(); // node -> children
@@ -74,8 +83,17 @@ export function calculateTreeLayout(
 
   edges.forEach((edge) => {
     if (nodeSet.has(edge.source) && nodeSet.has(edge.target)) {
-      outgoing.get(edge.source)?.push(edge.target);
-      incoming.get(edge.target)?.push(edge.source);
+      // Avoid duplicates
+      const existing = outgoing.get(edge.source) || [];
+      if (!existing.includes(edge.target)) {
+        existing.push(edge.target);
+        outgoing.set(edge.source, existing);
+      }
+      const incomingList = incoming.get(edge.target) || [];
+      if (!incomingList.includes(edge.source)) {
+        incomingList.push(edge.source);
+        incoming.set(edge.target, incomingList);
+      }
     }
   });
 
@@ -92,36 +110,46 @@ export function calculateTreeLayout(
     roots.push(nodes[0].id);
   }
 
-  // Assign layers using BFS from roots
+  // Assign layers using BFS from roots, ensuring proper depth for branching
   const layers = new Map<string, number>();
   const visited = new Set<string>();
-  const queue: Array<{ id: string; layer: number }> = [];
 
-  roots.forEach((rootId) => {
-    queue.push({ id: rootId, layer: 0 });
-  });
+  // Use iterative BFS with proper handling of multiple paths
+  const assignLayers = () => {
+    const queue: Array<{ id: string; layer: number }> = [];
 
-  while (queue.length > 0) {
-    const { id, layer } = queue.shift()!;
-
-    if (visited.has(id)) {
-      // Update layer if this path gives a deeper position
-      const currentLayer = layers.get(id) || 0;
-      if (layer > currentLayer) {
-        layers.set(id, layer);
-      }
-      continue;
-    }
-
-    visited.add(id);
-    layers.set(id, layer);
-
-    // Add children to queue
-    const children = outgoing.get(id) || [];
-    children.forEach((childId) => {
-      queue.push({ id: childId, layer: layer + 1 });
+    roots.forEach((rootId) => {
+      queue.push({ id: rootId, layer: 0 });
+      layers.set(rootId, 0);
     });
-  }
+
+    while (queue.length > 0) {
+      const { id, layer } = queue.shift()!;
+
+      if (visited.has(id)) {
+        continue;
+      }
+      visited.add(id);
+
+      // Process all children
+      const children = outgoing.get(id) || [];
+      children.forEach((childId) => {
+        const currentChildLayer = layers.get(childId);
+        const newLayer = layer + 1;
+
+        // Always use the deepest layer for proper vertical distribution
+        if (currentChildLayer === undefined || newLayer > currentChildLayer) {
+          layers.set(childId, newLayer);
+        }
+
+        if (!visited.has(childId)) {
+          queue.push({ id: childId, layer: newLayer });
+        }
+      });
+    }
+  };
+
+  assignLayers();
 
   // Handle any unvisited nodes (disconnected components)
   let maxLayer = 0;
@@ -130,22 +158,20 @@ export function calculateTreeLayout(
   });
 
   nodeSet.forEach((nodeId) => {
-    if (!visited.has(nodeId)) {
+    if (!layers.has(nodeId)) {
       layers.set(nodeId, maxLayer + 1);
-      visited.add(nodeId);
     }
   });
 
-  // For DAGs with multiple parents, pick primary parent (first one encountered)
+  // For DAGs with multiple parents, pick primary parent (closest to root)
   const primaryParent = new Map<string, string>();
   nodeSet.forEach((nodeId) => {
     const parents = incoming.get(nodeId) || [];
     if (parents.length > 0) {
-      // Pick parent at lowest layer (closest to root) as primary
       let bestParent = parents[0];
-      let bestLayer = layers.get(bestParent) || Infinity;
+      let bestLayer = layers.get(bestParent) ?? Infinity;
       parents.forEach((p) => {
-        const pLayer = layers.get(p) || Infinity;
+        const pLayer = layers.get(p) ?? Infinity;
         if (pLayer < bestLayer) {
           bestParent = p;
           bestLayer = pLayer;
@@ -164,18 +190,33 @@ export function calculateTreeLayout(
   nodeSet.forEach((nodeId) => {
     const parent = primaryParent.get(nodeId);
     if (parent) {
-      treeChildren.get(parent)?.push(nodeId);
+      const children = treeChildren.get(parent) || [];
+      if (!children.includes(nodeId)) {
+        children.push(nodeId);
+        treeChildren.set(parent, children);
+      }
     }
   });
 
-  // Calculate subtree width for each node (number of leaf-level slots needed)
-  const subtreeWidth = new Map<string, number>();
+  // Sort children by their order in the original edges for consistency
+  treeChildren.forEach((children, parentId) => {
+    const parentOutgoing = outgoing.get(parentId) || [];
+    children.sort((a, b) => {
+      const aIndex = parentOutgoing.indexOf(a);
+      const bIndex = parentOutgoing.indexOf(b);
+      return aIndex - bIndex;
+    });
+  });
 
-  const calculateWidth = (nodeId: string, visitedCalc: Set<string>): number => {
-    if (visitedCalc.has(nodeId)) {
-      return 0; // Avoid infinite loops in cycles
+  // Calculate subtree width (number of leaf slots needed)
+  const subtreeWidth = new Map<string, number>();
+  const widthCalculated = new Set<string>();
+
+  const calculateWidth = (nodeId: string): number => {
+    if (widthCalculated.has(nodeId)) {
+      return subtreeWidth.get(nodeId) || 1;
     }
-    visitedCalc.add(nodeId);
+    widthCalculated.add(nodeId);
 
     const children = treeChildren.get(nodeId) || [];
     if (children.length === 0) {
@@ -185,18 +226,16 @@ export function calculateTreeLayout(
 
     let totalWidth = 0;
     children.forEach((childId) => {
-      totalWidth += calculateWidth(childId, visitedCalc);
+      totalWidth += calculateWidth(childId);
     });
 
-    // Node needs at least width 1
-    totalWidth = Math.max(totalWidth, 1);
     subtreeWidth.set(nodeId, totalWidth);
     return totalWidth;
   };
 
   // Calculate widths starting from roots
   roots.forEach((rootId) => {
-    calculateWidth(rootId, new Set<string>());
+    calculateWidth(rootId);
   });
 
   // Handle orphaned nodes
@@ -206,59 +245,74 @@ export function calculateTreeLayout(
     }
   });
 
-  // Position nodes using the calculated widths
+  // Position nodes using a cleaner approach
   const positions = new Map<string, { x: number; y: number }>();
+  const positioned = new Set<string>();
 
-  const positionNode = (
+  const positionSubtree = (
     nodeId: string,
-    xOffset: number,
-    availableWidth: number,
-    positionedNodes: Set<string>
-  ): void => {
-    if (positionedNodes.has(nodeId)) {
-      return; // Already positioned
+    leftBound: number
+  ): number => {
+    if (positioned.has(nodeId)) {
+      return leftBound;
     }
-    positionedNodes.add(nodeId);
+    positioned.add(nodeId);
 
     const layer = layers.get(nodeId) || 0;
+    const children = treeChildren.get(nodeId) || [];
     const width = subtreeWidth.get(nodeId) || 1;
 
-    // Center this node within its available width
-    const nodeX = xOffset + (availableWidth * opts.nodeSpacingX) / 2;
-    const nodeY = opts.startY + layer * opts.nodeSpacingY;
+    // Calculate Y position based on layer
+    const y = opts.startY + layer * opts.nodeSpacingY;
 
-    positions.set(nodeId, { x: nodeX, y: nodeY });
-
-    // Position children
-    const children = treeChildren.get(nodeId) || [];
-    if (children.length > 0) {
-      let childOffset = xOffset;
-      children.forEach((childId) => {
-        const childWidth = subtreeWidth.get(childId) || 1;
-        positionNode(childId, childOffset, childWidth, positionedNodes);
-        childOffset += childWidth * opts.nodeSpacingX;
-      });
+    if (children.length === 0) {
+      // Leaf node: place at leftBound + half node spacing
+      const x = leftBound + opts.nodeSpacingX / 2;
+      positions.set(nodeId, { x, y });
+      return leftBound + opts.nodeSpacingX;
     }
+
+    // Internal node: position children first, then center parent above them
+    let currentLeft = leftBound;
+    const childPositions: number[] = [];
+
+    children.forEach((childId) => {
+      const childWidth = subtreeWidth.get(childId) || 1;
+      const childLeft = currentLeft;
+      const newRight = positionSubtree(childId, childLeft);
+
+      // Get the child's actual X position for centering
+      const childPos = positions.get(childId);
+      if (childPos) {
+        childPositions.push(childPos.x);
+      }
+
+      currentLeft = newRight;
+    });
+
+    // Center this node above its children
+    let x: number;
+    if (childPositions.length > 0) {
+      const minChildX = Math.min(...childPositions);
+      const maxChildX = Math.max(...childPositions);
+      x = (minChildX + maxChildX) / 2;
+    } else {
+      x = leftBound + (width * opts.nodeSpacingX) / 2;
+    }
+
+    positions.set(nodeId, { x, y });
+    return currentLeft;
   };
 
-  // Calculate total width and position roots
-  let totalWidth = 0;
-  roots.forEach((rootId) => {
-    totalWidth += subtreeWidth.get(rootId) || 1;
-  });
-
   // Position each root tree
-  let xOffset = opts.startX;
-  const positionedNodes = new Set<string>();
-
+  let currentLeft = opts.startX;
   roots.forEach((rootId) => {
-    const rootWidth = subtreeWidth.get(rootId) || 1;
-    positionNode(rootId, xOffset, rootWidth, positionedNodes);
-    xOffset += rootWidth * opts.nodeSpacingX + opts.nodeSpacingX; // Extra space between root trees
+    currentLeft = positionSubtree(rootId, currentLeft);
+    currentLeft += opts.nodeSpacingX / 2; // Gap between root trees
   });
 
-  // Position any remaining unpositioned nodes (orphans, cycle nodes)
-  let orphanX = xOffset;
+  // Position any remaining unpositioned nodes (orphans, nodes in cycles)
+  let orphanX = currentLeft + opts.nodeSpacingX;
   nodeSet.forEach((nodeId) => {
     if (!positions.has(nodeId)) {
       const layer = layers.get(nodeId) || 0;
@@ -428,6 +482,7 @@ export function extractConnectionsFromBeats(
  *
  * @param beats - Array of story beats with positions
  * @param options - Layout options
+ * @param externalEdges - Optional external edges to include (from beat.getConnections())
  * @returns Map of beat id to new position
  */
 export function applyTreeLayoutToBeats(
@@ -437,10 +492,26 @@ export function applyTreeLayoutToBeats(
     position?: { x: number; y: number };
     parameters?: Record<string, any>;
   }>,
-  options?: LayoutOptions
+  options?: LayoutOptions,
+  externalEdges?: Array<{ source: string; target: string }>
 ): Map<string, { x: number; y: number }> {
-  const edges = extractConnectionsFromBeats(beats);
+  // Extract edges from beat parameters (for multi-target beats like dialogTree, movementChoice)
+  const parameterEdges = extractConnectionsFromBeats(beats);
+
+  // Combine parameter edges with external edges (from beat.getConnections())
+  const allEdges = [...parameterEdges];
+  if (externalEdges) {
+    const seenEdges = new Set(parameterEdges.map(e => `${e.source}->${e.target}`));
+    externalEdges.forEach(edge => {
+      const key = `${edge.source}->${edge.target}`;
+      if (!seenEdges.has(key)) {
+        allEdges.push(edge);
+        seenEdges.add(key);
+      }
+    });
+  }
+
   const nodes = beats.map((b) => ({ id: b.id, position: b.position }));
-  const { positions } = calculateTreeLayout(nodes, edges, options);
+  const { positions } = calculateTreeLayout(nodes, allEdges, options);
   return positions;
 }
