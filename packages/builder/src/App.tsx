@@ -144,7 +144,7 @@ function App() {
 
   // Persistence hooks
   const { markChanged, saveNow } = useSave();
-  const { updateStory, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata } = useProject();
+  const { updateStory, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled } = useProject();
   const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback } = usePersistence();
 
   /**
@@ -1122,15 +1122,47 @@ function App() {
     return story;
   }, [state]);
 
+  /**
+   * Check if the current project is a "default empty" project
+   * (has only the 3 default beats with default IDs created by initializeStory)
+   */
+  const isDefaultEmptyProject = useCallback(() => {
+    if (!isUntitledProject) return false;
+
+    // Check if we have exactly 3 beats with the default IDs
+    if (state.beats.length !== 3) return false;
+
+    const beatIds = state.beats.map(b => b.id).sort();
+    const defaultBeatIds = ['beat_0', 'beat_1', 'beat_2'];
+
+    // Check if beat IDs match the default ones
+    if (JSON.stringify(beatIds) !== JSON.stringify(defaultBeatIds)) return false;
+
+    // Check if beat types match the default types
+    const beatTypes = state.beats.map(b => b.type).sort();
+    const defaultBeatTypes = ['endScreen', 'introText', 'titleScreen'];
+
+    return JSON.stringify(beatTypes) === JSON.stringify(defaultBeatTypes);
+  }, [isUntitledProject, state.beats]);
+
   // Save unsaved work dialog handlers
   const handleShowSaveDialog = useCallback((action: string) => {
+    // If it's an untitled project with only default content,
+    // discard it automatically without prompting
+    if (isUntitledProject && isDefaultEmptyProject()) {
+      console.log('[App] Discarding empty untitled project automatically');
+      discardUntitled();
+      return false; // Not intercepted, let Header proceed
+    }
+
+    // If it's an untitled project with real changes, show save dialog
     if (isUntitledProject && hasUnsavedChanges) {
       setShowSaveDialog(true);
       setPendingAction(action);
       return true; // Intercepted
     }
     return false; // Not intercepted, let Header proceed
-  }, [isUntitledProject, hasUnsavedChanges]);
+  }, [isUntitledProject, hasUnsavedChanges, isDefaultEmptyProject, discardUntitled]);
 
   const handleSaveUnsavedWork = useCallback(async () => {
     // Save current work as a named project

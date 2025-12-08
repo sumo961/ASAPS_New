@@ -55,6 +55,7 @@ export interface PersistenceContextValue {
   // Untitled project management
   setIsUntitledProject: (isUntitled: boolean) => void;
   clearUntitledState: () => void;
+  discardUntitledProject: () => Promise<void>;
 
   // Data sync callback registration
   registerSyncCallback: (callback: () => void) => void;
@@ -559,6 +560,41 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   }, []);
 
   /**
+   * Discard the current untitled project (delete from storage without saving)
+   * Used when user navigates away from an unmodified untitled project
+   */
+  const discardUntitledProject = useCallback(async () => {
+    const projectToDiscard = currentProjectRef.current || currentProject;
+
+    if (!projectToDiscard) {
+      return;
+    }
+
+    // Only discard if it's an untitled project
+    if (projectToDiscard.name !== 'Untitled Project') {
+      return;
+    }
+
+    console.log('[PersistenceContext] Discarding untitled project:', projectToDiscard.id);
+
+    try {
+      await storage.deleteProject(projectToDiscard.id);
+      console.log('[PersistenceContext] Successfully discarded untitled project');
+    } catch (error) {
+      console.warn('[PersistenceContext] Failed to discard untitled project:', error);
+      // Non-fatal - continue anyway
+    }
+
+    // Clear state
+    currentProjectRef.current = null;
+    setCurrentProject(null);
+    setProjectId(null);
+    isUntitledProjectRef.current = false;
+    setIsUntitledProject(false);
+    commandManager.clear();
+  }, [currentProject, storage, commandManager]);
+
+  /**
    * Wrapped setter that updates both ref and state
    * This ensures the ref is always in sync with the state
    */
@@ -613,6 +649,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     saveCurrentProject,
     setIsUntitledProject: setIsUntitledProjectWithRef,
     clearUntitledState,
+    discardUntitledProject,
     registerSyncCallback,
     unregisterSyncCallback,
     initialized,
@@ -687,6 +724,7 @@ export function useProject() {
     updateProjectMetadata,
     updateProjectStory,
     saveCurrentProject,
+    discardUntitledProject,
   } = usePersistence();
 
   return {
@@ -698,5 +736,6 @@ export function useProject() {
     updateMetadata: updateProjectMetadata,
     updateStory: updateProjectStory,
     saveCurrent: saveCurrentProject,
+    discardUntitled: discardUntitledProject,
   };
 }

@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Folder, Trash2, Clock, Calendar, Search, Grid, List, Archive } from 'lucide-react';
+import { Plus, Folder, Trash2, Clock, Calendar, Search, Grid, List, Archive, CheckSquare, Square } from 'lucide-react';
 import { usePersistence, useProject } from '../contexts/PersistenceContext';
 import type { Project } from '../storage/types';
 
@@ -65,7 +65,10 @@ const ProjectCard: React.FC<{
   onDelete: () => void;
   onRename?: (newName: string) => Promise<void>;
   viewMode: 'grid' | 'list';
-}> = ({ project, onLoad, onDelete, onRename, viewMode }) => {
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+  showCheckbox?: boolean;
+}> = ({ project, onLoad, onDelete, onRename, viewMode, isSelected = false, onToggleSelect, showCheckbox = false }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
@@ -114,9 +117,26 @@ const ProjectCard: React.FC<{
   if (viewMode === 'list') {
     return (
       <div
-        className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group"
+        className={`flex items-center gap-4 p-4 bg-white border rounded-lg hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
+          isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+        }`}
         onClick={onLoad}
       >
+        {showCheckbox && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect?.();
+            }}
+            className="flex-shrink-0 p-1 rounded hover:bg-gray-100"
+          >
+            {isSelected ? (
+              <CheckSquare className="text-blue-600" size={20} />
+            ) : (
+              <Square className="text-gray-400" size={20} />
+            )}
+          </button>
+        )}
         <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
           <Folder className="text-blue-600" size={24} />
         </div>
@@ -212,12 +232,31 @@ const ProjectCard: React.FC<{
 
   return (
     <div
-      className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group"
+      className={`bg-white border rounded-lg p-6 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
+        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+      }`}
       onClick={onLoad}
     >
       <div className="flex items-start justify-between mb-4">
-        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-          <Folder className="text-blue-600" size={24} />
+        <div className="flex items-center gap-2">
+          {showCheckbox && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect?.();
+              }}
+              className="p-1 rounded hover:bg-gray-100"
+            >
+              {isSelected ? (
+                <CheckSquare className="text-blue-600" size={20} />
+              ) : (
+                <Square className="text-gray-400" size={20} />
+              )}
+            </button>
+          )}
+          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+            <Folder className="text-blue-600" size={24} />
+          </div>
         </div>
         <button
           onClick={handleDelete}
@@ -329,6 +368,9 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'modified' | 'created' | 'name'>('modified');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   /**
    * Load projects from storage
@@ -394,6 +436,78 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
     } catch (error) {
       console.error('[ProjectLibrary] Rename failed:', error);
       throw error;
+    }
+  };
+
+  /**
+   * Toggle selection for a project
+   */
+  const handleToggleSelect = (projectId: string) => {
+    setSelectedProjects(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(projectId)) {
+        newSet.delete(projectId);
+      } else {
+        newSet.add(projectId);
+      }
+      return newSet;
+    });
+  };
+
+  /**
+   * Select all visible projects
+   */
+  const handleSelectAll = () => {
+    const allIds = new Set(filteredProjects.map(p => p.id));
+    setSelectedProjects(allIds);
+  };
+
+  /**
+   * Deselect all projects
+   */
+  const handleDeselectAll = () => {
+    setSelectedProjects(new Set());
+  };
+
+  /**
+   * Toggle selection mode
+   */
+  const handleToggleSelectionMode = () => {
+    if (selectionMode) {
+      // Exiting selection mode - clear selections
+      setSelectedProjects(new Set());
+      setShowBulkDeleteConfirm(false);
+    }
+    setSelectionMode(!selectionMode);
+  };
+
+  /**
+   * Handle bulk delete
+   */
+  const handleBulkDelete = async () => {
+    if (selectedProjects.size === 0) return;
+
+    if (!showBulkDeleteConfirm) {
+      setShowBulkDeleteConfirm(true);
+      setTimeout(() => setShowBulkDeleteConfirm(false), 5000);
+      return;
+    }
+
+    try {
+      // Delete all selected projects
+      const deletePromises = Array.from(selectedProjects).map(id =>
+        storage.deleteProject(id)
+      );
+      await Promise.all(deletePromises);
+
+      // Clear selection and reload
+      setSelectedProjects(new Set());
+      setShowBulkDeleteConfirm(false);
+      setSelectionMode(false);
+      await loadProjects();
+    } catch (error) {
+      console.error('[ProjectLibrary] Bulk delete failed:', error);
+      alert('Some projects failed to delete');
     }
   };
 
@@ -504,7 +618,62 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 <List size={20} />
               </button>
             </div>
+
+            {/* Selection mode toggle */}
+            <button
+              onClick={handleToggleSelectionMode}
+              className={`px-3 py-2 rounded-lg border transition ${
+                selectionMode
+                  ? 'bg-blue-100 text-blue-600 border-blue-300'
+                  : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+              }`}
+              title={selectionMode ? 'Exit selection mode' : 'Select multiple projects'}
+            >
+              {selectionMode ? 'Cancel' : 'Select'}
+            </button>
           </div>
+
+          {/* Selection controls bar */}
+          {selectionMode && (
+            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={selectedProjects.size === filteredProjects.length ? handleDeselectAll : handleSelectAll}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition"
+              >
+                {selectedProjects.size === filteredProjects.length ? (
+                  <>
+                    <CheckSquare size={16} />
+                    Deselect All
+                  </>
+                ) : (
+                  <>
+                    <Square size={16} />
+                    Select All ({filteredProjects.length})
+                  </>
+                )}
+              </button>
+
+              <div className="flex-1 text-sm text-gray-500">
+                {selectedProjects.size} selected
+              </div>
+
+              <button
+                onClick={handleBulkDelete}
+                disabled={selectedProjects.size === 0}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                  selectedProjects.size === 0
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : showBulkDeleteConfirm
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-red-500 text-white hover:bg-red-600'
+                }`}
+                title={showBulkDeleteConfirm ? 'Click again to confirm deletion' : 'Delete selected projects'}
+              >
+                <Trash2 size={16} />
+                {showBulkDeleteConfirm ? 'Click to Confirm' : `Delete (${selectedProjects.size})`}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -546,10 +715,19 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 <ProjectCard
                   key={project.id}
                   project={project}
-                  onLoad={() => onLoadProject(project.id)}
+                  onLoad={() => {
+                    if (selectionMode) {
+                      handleToggleSelect(project.id);
+                    } else {
+                      onLoadProject(project.id);
+                    }
+                  }}
                   onDelete={() => handleDeleteProject(project.id)}
                   onRename={onRenameProject ? (newName) => handleRenameProject(project.id, newName) : undefined}
                   viewMode={viewMode}
+                  isSelected={selectedProjects.has(project.id)}
+                  onToggleSelect={() => handleToggleSelect(project.id)}
+                  showCheckbox={selectionMode}
                 />
               ))}
             </div>
