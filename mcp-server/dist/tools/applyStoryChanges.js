@@ -161,7 +161,7 @@ SINGLE CONNECTION beats (only ONE target in connections array):
 - durScreen: Timed auto-advance. Parameters: { text, duration }
 - videoBeat: Video playback. Parameters: { videoUrl }
 - inputText: Text input. Parameters: { prompt, variableName }
-- setVariable: Set variable. Parameters: { variableName, value, operation }
+- setVariable: Set ONE variable per beat. IMPORTANT: Can only modify ONE variable at a time! Chain multiple setVariable beats for multiple changes. Parameters: { variableName, value, operation }
 - addRemoveInventory: Modify inventory. Parameters: { action, itemName }
 - setTimer: Timer control. Parameters: { timerName, action, duration, timerTarget }
 

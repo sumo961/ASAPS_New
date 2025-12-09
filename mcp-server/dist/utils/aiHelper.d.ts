@@ -40,7 +40,7 @@ export declare const BEAT_TYPES: {
     readonly durScreen: "Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target. NO defaultTarget (already auto-advances by design).";
     readonly videoBeat: "Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.";
     readonly conditionBeat: "Conditional branching. TWO TARGETS: uses trueTarget and falseTarget parameters, NOT connections array.";
-    readonly setVariable: "Set story variables. SINGLE CONNECTION: executes then continues to one target.";
+    readonly setVariable: "Set ONE variable/counter per beat. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, use multiple consecutive setVariable beats chained together. SINGLE CONNECTION: executes then continues to one target.";
     readonly addRemoveInventory: "Modify player inventory. SINGLE CONNECTION: executes then continues to one target.";
     readonly randomTarget: "Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.";
     readonly setTimer: "Set/check timers. SINGLE CONNECTION: plus optional timerTarget parameter for timeout.";

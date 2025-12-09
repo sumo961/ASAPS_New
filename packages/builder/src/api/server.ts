@@ -664,13 +664,13 @@ export class APIServer {
             // Logic beats (invisible, for game logic)
             setVariable: {
               category: 'logic',
-              description: 'Set or modify a story variable or counter',
+              description: 'Set or modify ONE story variable or counter per beat. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, use multiple consecutive setVariable beats chained together. Never name a beat with multiple operations (e.g., "Health +1, Score +2") - split into separate beats.',
               connectionType: 'single',
               parameters: {
                 type: { type: 'string', required: true, enum: ['variable', 'counter'] },
                 name: { type: 'string', required: true, description: 'Variable/counter name' },
                 value: { type: 'any', required: true, description: 'New value' },
-                operation: { type: 'string', required: false, enum: ['set', 'change'], default: 'set' },
+                operation: { type: 'string', required: false, enum: ['set', 'change', 'add', 'subtract'], default: 'set' },
               },
             },
 

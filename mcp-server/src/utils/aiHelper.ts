@@ -48,7 +48,7 @@ export const BEAT_TYPES = {
 
   // Logic beats (invisible - no defaultTarget needed)
   conditionBeat: 'Conditional branching. TWO TARGETS: uses trueTarget and falseTarget parameters, NOT connections array.',
-  setVariable: 'Set story variables. SINGLE CONNECTION: executes then continues to one target.',
+  setVariable: 'Set ONE variable/counter per beat. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, use multiple consecutive setVariable beats chained together. SINGLE CONNECTION: executes then continues to one target.',
   addRemoveInventory: 'Modify player inventory. SINGLE CONNECTION: executes then continues to one target.',
   randomTarget: 'Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.',
   setTimer: 'Set/check timers. SINGLE CONNECTION: plus optional timerTarget parameter for timeout.',
@@ -163,6 +163,14 @@ CRITICAL CONNECTION RULES:
 - SINGLE CONNECTION beats (titleScreen, introText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
 - MULTIPLE CONNECTION beats (dialogTree, movementChoice, pickProp, hyperText, randomTarget): Define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.
 - conditionBeat: Uses trueTarget and falseTarget PARAMETERS, not connections array.
+
+CRITICAL setVariable LIMITATION:
+- setVariable beats can ONLY modify ONE variable/counter per beat!
+- If you need to set multiple variables (e.g., "Creative +1, Temper -1"), you MUST create SEPARATE setVariable beats chained together.
+- Example: Instead of one beat named "Creative +1, Temper -1", create TWO beats:
+  1. "Creative +1" (setVariable for creative_energy) → connects to →
+  2. "Temper -1" (setVariable for temper_control) → connects to next story beat
+- NEVER name a setVariable beat with multiple operations - split them into multiple beats!
 
 Important:
 - Use descriptive labels for beats
