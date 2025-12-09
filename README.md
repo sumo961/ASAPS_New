@@ -248,6 +248,7 @@ To use the MCP server, configure it in your AI assistant's MCP settings pointing
 - **Fresh clone fixes**: Fix build issues on fresh clone (generate-beat-types.ts now tracked)
 - **UI improvements**: Various UI fixes and empty project handling
 - **ConditionBeat fix**: Fix counter conditions not exporting/validating correctly (variableName/value fields)
+- **setVariable AI prompts**: Clarify that setVariable beats can only modify one variable per beat (prevents AI misgeneration)
 
 ### v0.8.0 (2025-12-07)
 - Initial beta release
