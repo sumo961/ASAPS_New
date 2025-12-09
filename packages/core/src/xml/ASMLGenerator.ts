@@ -712,8 +712,11 @@ export class ASMLGenerator {
               if (params.timer) condAttrs.push(`timer="${this.escapeXml(params.timer)}"`);
               if (params.val !== undefined) condAttrs.push(`val="${params.val}"`);
             } else if (params.conditionType === 'counter') {
-              if (params.left) condAttrs.push(`counter="${this.escapeXml(params.left)}"`);
-              if (params.val !== undefined) condAttrs.push(`val="${params.val}"`);
+              // Support both new (variableName) and legacy (left) field names
+              const counterName = params.variableName || params.left;
+              const counterVal = params.value ?? params.val;
+              if (counterName) condAttrs.push(`counter="${this.escapeXml(counterName)}"`);
+              if (counterVal !== undefined) condAttrs.push(`val="${counterVal}"`);
             } else if (params.conditionType === 'variable') {
               if (params.variable) condAttrs.push(`variable="${this.escapeXml(params.variable)}"`);
               if (params.value !== undefined) condAttrs.push(`value="${this.escapeXml(String(params.value))}"`);

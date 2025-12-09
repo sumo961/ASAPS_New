@@ -185,13 +185,15 @@ export class ConditionBeat extends Beat {
         isValidCondition = !!(this.item);
         break;
       case 'variable':
-        isValidCondition = !!(this.variable || this.left);
+        isValidCondition = !!(this.variable || this.variableName || this.left);
         break;
       case 'visitedBeat':
         isValidCondition = !!(this.beatId || this.left);
         break;
+      case 'counter':
       default:
-        isValidCondition = !!(this.left);
+        // Support both new (variableName) and legacy (left) field names
+        isValidCondition = !!(this.variableName || this.left);
     }
     
     if (!isValidCondition || this.trueTarget === '') {
