@@ -247,6 +247,7 @@ To use the MCP server, configure it in your AI assistant's MCP settings pointing
 - **AI validation**: Improved AI story validation and debug tools
 - **Fresh clone fixes**: Fix build issues on fresh clone (generate-beat-types.ts now tracked)
 - **UI improvements**: Various UI fixes and empty project handling
+- **ConditionBeat fix**: Fix counter conditions not exporting/validating correctly (variableName/value fields)
 
 ### v0.8.0 (2025-12-07)
 - Initial beta release
