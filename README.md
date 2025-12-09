@@ -2,7 +2,7 @@
 
 A modern TypeScript implementation of the Advanced Stories Authoring and Presentation System (ASPAS) by Hartmut Koenitz, based on his original ActionScript version (2005-2017) started at Georgia Tech. This modernization brings the powerful ASML (Advanced Stories Markup Language, also created by Hartmut Koenitz) XML-based narrative system to the web with enhanced features, a visual story builder, and AI-assisted content generation.
 
-## ⚠️ Development Status (v0.8.0)
+## ⚠️ Development Status (v0.8.5)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -232,6 +232,29 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 - Export stories in ASML format
 
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
+
+## 📋 Version History
+
+### v0.8.5 (2025-12-09)
+- **Auto-layout**: Add auto-layout button for automatic flowchart arrangement
+- **Tree layout algorithm**: Improved Reingold-Tilford layout with external connections support
+- **Test suites**: Comprehensive test coverage for MCP servers and AI functions
+- **Bulk delete**: Add bulk delete for beats in graph editor
+- **Local LLM support**: Add Ollama/Local LLM preset option to AI configuration
+- **MCP connection fixes**: Fix dialogTree connections not being extracted from MCP-injected stories
+- **AI validation**: Improved AI story validation and debug tools
+- **Fresh clone fixes**: Fix build issues on fresh clone (generate-beat-types.ts now tracked)
+- **UI improvements**: Various UI fixes and empty project handling
+
+### v0.8.0 (2025-12-07)
+- Initial beta release
+- Visual story builder with drag-and-drop interface
+- Graph-based story editor with ReactFlow
+- 14+ beat types for interactive narratives
+- AI-assisted content generation (OpenAI, Anthropic)
+- MCP server integration for AI assistants
+- ASML XML import/export
+- Legacy ASML file support with automatic migration
 
 ## 🤝 Contributing
 
