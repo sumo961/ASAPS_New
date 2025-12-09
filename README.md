@@ -241,7 +241,7 @@ To use the MCP server, configure it in your AI assistant's MCP settings pointing
 - **Auto-layout**: Add auto-layout button for automatic flowchart arrangement
 - **Tree layout algorithm**: Improved Reingold-Tilford layout with external connections support
 - **Test suites**: Comprehensive test coverage for MCP servers and AI functions
-- **Bulk delete**: Add bulk delete for beats in graph editor
+- **Bulk delete**: Add bulk delete for projects in project modal
 - **Local LLM support**: Add Ollama/Local LLM preset option to AI configuration
 - **MCP connection fixes**: Fix dialogTree connections not being extracted from MCP-injected stories
 - **AI validation**: Improved AI story validation and debug tools
