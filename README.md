@@ -55,16 +55,26 @@ The builder will open at `http://localhost:5173`
 
 ### Troubleshooting
 
-**Missing packages error** (`Cannot find package '@asaps/core'`):
+**Missing packages error** (`Cannot find package '@asaps/core'` or `Failed to resolve entry for package "@asaps/core"`):
 ```bash
 npm run build:deps
+npm run dev
 ```
-This manually builds the core dependencies. Then retry `npm run dev`.
+This manually builds the core dependencies, then starts the dev server.
 
-**Windows Users**: The project uses cross-platform build scripts. If you encounter any issues:
-1. Ensure you have Node.js 18+ installed
-2. Use PowerShell or Command Prompt (not Git Bash for npm commands)
-3. If builds fail, try: `npm cache clean --force` then `npm install`
+**Windows Users**: The project fully supports Windows. If you encounter build issues after a fresh clone:
+```bash
+npm run build:deps
+npm run dev
+```
+
+For a complete reset:
+```powershell
+# PowerShell
+Remove-Item -Recurse -Force node_modules
+npm install
+npm run dev
+```
 
 ## 📦 Project Structure
 
