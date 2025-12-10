@@ -14,7 +14,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Visual dialog editor | Only supports initial phase of dialog trees |
 | Project switching | Occasional issues; reload interface to resolve |
 | Animation system | Implemented but untested |
-| Cluster system (collapsible beat groups) | Initial work done, not fully implemented |
+| Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Conversion from earlier ASML files may not work |
 
 ## 🎯 Features
@@ -55,13 +55,16 @@ The builder will open at `http://localhost:5173`
 
 ### Troubleshooting
 
-If you encounter errors about missing packages (e.g., `Cannot find package '@asaps/core'`), run:
-
+**Missing packages error** (`Cannot find package '@asaps/core'`):
 ```bash
 npm run build:deps
 ```
-
 This manually builds the core dependencies. Then retry `npm run dev`.
+
+**Windows Users**: The project uses cross-platform build scripts. If you encounter any issues:
+1. Ensure you have Node.js 18+ installed
+2. Use PowerShell or Command Prompt (not Git Bash for npm commands)
+3. If builds fail, try: `npm cache clean --force` then `npm install`
 
 ## 📦 Project Structure
 
