@@ -52,6 +52,7 @@ function App() {
   const titleRef = useRef(state.title);
   const authorRef = useRef(state.author);
   const charactersRef = useRef<Character[]>(characters);
+  const clustersRef = useRef<Cluster[]>(state.clusters || []);
   const globalSettingsRef = useRef<GlobalSettings | null>(null);
 
   // Update refs on every render to ensure they always have current values
@@ -60,7 +61,8 @@ function App() {
     connectionsRef.current = state.connections;
     titleRef.current = state.title;
     authorRef.current = state.author;
-  }, [state.beats, state.connections, state.title, state.author]);
+    clustersRef.current = state.clusters || [];
+  }, [state.beats, state.connections, state.title, state.author, state.clusters]);
 
   useEffect(() => {
     charactersRef.current = characters;
@@ -173,6 +175,7 @@ function App() {
     const currentTitle = titleRef.current;
     const currentAuthor = authorRef.current;
     const currentCharacters = charactersRef.current;
+    const currentClusters = clustersRef.current;
 
     if (currentBeats.length === 0) {
       console.log('[App] syncProjectData - No beats in beatsRef, skipping');
@@ -193,6 +196,7 @@ function App() {
       beats: beatDetails,
       connections: currentConnections.length,
       characters: currentCharacters.length,
+      clusters: currentClusters.length,
       title: currentTitle,
       author: currentAuthor
     });
@@ -216,6 +220,7 @@ function App() {
       beats: serializedBeats,
       characters: currentCharacters,
       connections: currentConnections,
+      clusters: currentClusters,
     };
 
     console.log('[App] storyData being passed to updateStory:', {
@@ -1617,10 +1622,13 @@ function App() {
           onClusterSelect={handleClusterSelect}
           onAddBeat={(type) => actions.addBeat(type)}
           onAddCluster={() => {
+            const clusterName = prompt('Enter cluster name:', `Cluster ${(state.clusters?.length || 0) + 1}`);
+            if (!clusterName) return; // User cancelled
+
             const newCluster = {
               id: `cluster_${Date.now()}`,
-              name: 'New Cluster',
-              type: 'organizational' as const,
+              name: clusterName.trim(),
+              type: 'spatial' as const, // All clusters are spatial by default
               containerPosition: { x: 100, y: 100 },
               containerBounds: { width: 400, height: 300 },
               isExpanded: true,
@@ -1665,6 +1673,12 @@ function App() {
                 markChanged();
               }
             }}
+            onDropBeatToCluster={(beatId: string, clusterId: string) => {
+              if (actions.moveBeatToCluster) {
+                actions.moveBeatToCluster(beatId, clusterId);
+                markChanged();
+              }
+            }}
             paletteCollapsed={paletteCollapsed}
             onTogglePalette={() => setPaletteCollapsed(!paletteCollapsed)}
             assets={assets}
@@ -1677,6 +1691,37 @@ function App() {
             globalSettings={globalSettings}
             highlightedBeatIds={highlightedBeatIds}
             onAutoLayout={handleAutoLayout}
+            onAutoLayoutCluster={(clusterId: string) => {
+              // Auto-layout beats within a cluster using a simple grid
+              const cluster = state.clusters?.find(c => c.id === clusterId);
+              if (!cluster) return;
+
+              const clusterBeats = state.beats.filter(b => b.cluster === clusterId);
+              if (clusterBeats.length === 0) return;
+
+              const nodeWidth = 160;
+              const nodeHeight = 80;
+              const padding = 20;
+              const gap = 40;
+              const maxWidth = (cluster.containerBounds?.width || 500) - padding * 2;
+
+              // Calculate grid layout
+              const beatsPerRow = Math.max(1, Math.floor((maxWidth + gap) / (nodeWidth + gap)));
+
+              clusterBeats.forEach((beat, index) => {
+                const row = Math.floor(index / beatsPerRow);
+                const col = index % beatsPerRow;
+                const x = padding + col * (nodeWidth + gap);
+                const y = padding + row * (nodeHeight + gap);
+
+                if (actions.moveBeatInContainer) {
+                  actions.moveBeatInContainer(beat.id, clusterId, x, y);
+                }
+              });
+
+              markChanged();
+              console.log(`[App] Auto-arranged ${clusterBeats.length} beats in cluster ${cluster.name}`);
+            }}
             onAddToContainer={(clusterId: string) => {
               // For now, show a helpful message - full implementation would show a beat selection dialog
               console.log(`[App] Add beat to cluster ${clusterId} - drag beats from sidebar to add them`);
@@ -1689,6 +1734,12 @@ function App() {
             onRemoveCluster={(clusterId: string) => {
               if (actions.removeCluster) {
                 actions.removeCluster(clusterId);
+                markChanged();
+              }
+            }}
+            onClusterResize={(clusterId: string, width: number, height: number) => {
+              if (actions.resizeCluster) {
+                actions.resizeCluster(clusterId, width, height);
                 markChanged();
               }
             }}

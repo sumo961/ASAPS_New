@@ -37,6 +37,9 @@ interface GraphEditorProps {
   onClusterExpandCollapse: (clusterId: string) => void;
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove: (beatId: string, clusterId: string, x: number, y: number) => void;
+  onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
+  onClusterResize?: (clusterId: string, width: number, height: number) => void;
+  onAutoLayoutCluster?: (clusterId: string) => void;
   highlightedBeatIds?: string[];
   onAutoLayout?: () => void;
   onAddToContainer?: (clusterId: string) => void;
@@ -81,6 +84,9 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onClusterExpandCollapse,
   onClusterMove,
   onBeatInContainerMove,
+  onDropBeatToCluster,
+  onClusterResize,
+  onAutoLayoutCluster,
   highlightedBeatIds = [],
   onAutoLayout,
   onAddToContainer,
@@ -97,7 +103,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
 
   // Convert beats to ReactFlow nodes with viewport-aware debugging
   const nodes = useMemo(() => {
-    const beatNodes = beats.map((beat) => ({
+    // Only show beats that are NOT in a cluster as separate nodes
+    // Beats inside clusters are rendered within the cluster container
+    const unclusteredBeats = beats.filter(beat => !beat.cluster);
+
+    const beatNodes = unclusteredBeats.map((beat) => ({
       id: beat.id,
       type: 'beat',
       position: { x: beat.x || 0, y: beat.y || 0 },
@@ -120,6 +130,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       const containedBeatCount = beatsInThisCluster.length;
 
       // Get actual positions from containerBeatPositions, or generate default positions
+      // Include actual beat objects for rendering connections inside the cluster
       const containerBeats = beatsInThisCluster.map((beat, index) => {
         // Look for existing position
         const existingPosition = containerBeatPositions.find(
@@ -129,6 +140,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         if (existingPosition) {
           return {
             ...existingPosition,
+            beat, // Include the actual beat object
             mapStyle: existingPosition.mapStyle || {
               icon: '📍',
               color: '#3b82f6',
@@ -138,13 +150,15 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           };
         }
 
-        // Default position - simple grid pattern
+        // Default position - 2-column grid with proper spacing to avoid overlap
+        // NODE_WIDTH is 160, NODE_HEIGHT is 80, so use 180x100 spacing
         return {
           beatId: beat.id,
           clusterId: cluster.id,
+          beat, // Include the actual beat object
           position: {
-            x: 50 + (index % 2) * 120,
-            y: 50 + Math.floor(index / 2) * 60,
+            x: 20 + (index % 2) * 200,
+            y: 20 + Math.floor(index / 2) * 110,
             z: index
           },
           mapStyle: {
@@ -171,6 +185,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           onRemoveContainer: onRemoveCluster || (() => {}),
           onExpandCollapse: onClusterExpandCollapse || (() => {}),
           onBeatInContainerMove: onBeatInContainerMove,
+          onDropBeatToCluster: onDropBeatToCluster,
+          onClusterResize: onClusterResize,
+          onAutoLayoutCluster: onAutoLayoutCluster,
+          onBeatSelect: onBeatSelect,
+          allBeats: beats, // Pass all beats for external connection calculation
         },
         style: {
           width: cluster.containerBounds.width,
@@ -182,13 +201,58 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     return [...beatNodes, ...clusterNodes];
 
     // return totalNodes; // Uncomment to go back to normal
-  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, highlightedBeatIds, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove]);
+  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, highlightedBeatIds, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(() => {
     const allEdges: Edge[] = [];
     const edgeIds = new Set<string>(); // Track edge IDs to prevent duplicates
-    
+
+    // Helper to get the cluster ID a beat belongs to (or null if unclustered)
+    const getBeatCluster = (beatId: string): string | null => {
+      const beat = beats.find(b => b.id === beatId);
+      return beat?.cluster || null;
+    };
+
+    // Helper to resolve the actual node ID for an edge endpoint
+    // If beat is in a cluster, return the cluster ID; otherwise return the beat ID
+    const resolveNodeId = (beatId: string): string => {
+      const clusterId = getBeatCluster(beatId);
+      return clusterId || beatId;
+    };
+
+    // Helper to create an edge with proper source/target resolution
+    // Returns null if the edge would be internal to a cluster (both endpoints in same cluster)
+    const createEdge = (
+      sourceId: string,
+      targetId: string,
+      edgeProps: Partial<Edge>
+    ): Edge | null => {
+      const sourceCluster = getBeatCluster(sourceId);
+      const targetCluster = getBeatCluster(targetId);
+
+      // Skip edges that are internal to the same cluster
+      if (sourceCluster && targetCluster && sourceCluster === targetCluster) {
+        return null;
+      }
+
+      // Resolve to cluster nodes if needed
+      const resolvedSource = resolveNodeId(sourceId);
+      const resolvedTarget = resolveNodeId(targetId);
+
+      // Skip self-loops (can happen if both endpoints resolve to same cluster)
+      if (resolvedSource === resolvedTarget) {
+        return null;
+      }
+
+      return {
+        id: `${resolvedSource}-to-${resolvedTarget}-${edgeProps.id || ''}`,
+        source: resolvedSource,
+        target: resolvedTarget,
+        ...edgeProps,
+      } as Edge;
+    };
+
     beats.forEach((beat) => {
       // Get beat parameters for special handling
       const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
@@ -479,7 +543,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
 
       // Regular connections
       let connections: any[] = [];
-      
+
       // Check if beat has getConnections method
       if (typeof beat.getConnections === 'function') {
         connections = beat.getConnections();
@@ -487,22 +551,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         // Fallback to direct property access
         connections = beat.connections;
       }
-      
-      // Add connections with unique IDs
+
+      // Add connections with unique IDs, resolving cluster boundaries
       connections.forEach((connection) => {
-        const edgeId = `${beat.id}-to-${connection.targetId}`;
-        
-        // Skip if we already have this connection to prevent duplicates
-        if (edgeIds.has(edgeId)) {
-          return;
-        }
-        
-        edgeIds.add(edgeId);
-        
-        allEdges.push({
-          id: edgeId,
-          source: beat.id,
-          target: connection.targetId,
+        const edge = createEdge(beat.id, connection.targetId, {
+          id: `conn-${beat.id}-${connection.targetId}`,
           type: 'custom',
           animated: connection.condition !== undefined,
           label: connection.label || (connection.condition ? '?' : ''),
@@ -519,36 +572,40 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
             condition: connection.condition,
           },
         });
+
+        if (edge && !edgeIds.has(edge.id)) {
+          edgeIds.add(edge.id);
+          allEdges.push(edge);
+        }
       });
-      
+
       // Add default target
       if (beat.defaultTarget) {
-        const defaultEdgeId = `${beat.id}-default-${beat.defaultTarget}`;
-        if (!edgeIds.has(defaultEdgeId)) {
-          edgeIds.add(defaultEdgeId);
-          allEdges.push({
-            id: defaultEdgeId,
-            source: beat.id,
-            target: beat.defaultTarget,
-            type: 'custom',
-            animated: true,
-            label: 'default',
-            style: {
-              stroke: '#22c55e',
-              strokeWidth: 2,
-              strokeDasharray: '5 5',
-            },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              width: 20,
-              height: 20,
-              color: '#22c55e',
-            },
-          });
+        const edge = createEdge(beat.id, beat.defaultTarget, {
+          id: `default-${beat.id}`,
+          type: 'custom',
+          animated: true,
+          label: 'default',
+          style: {
+            stroke: '#22c55e',
+            strokeWidth: 2,
+            strokeDasharray: '5 5',
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 20,
+            height: 20,
+            color: '#22c55e',
+          },
+        });
+
+        if (edge && !edgeIds.has(edge.id)) {
+          edgeIds.add(edge.id);
+          allEdges.push(edge);
         }
       }
     });
-    
+
     return allEdges;
   }, [beats]);
 

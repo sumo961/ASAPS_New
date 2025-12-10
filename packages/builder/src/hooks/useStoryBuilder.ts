@@ -41,6 +41,7 @@ interface StoryBuilderActions {
   moveBeatToCluster: (beatId: string, clusterId: string) => void;
   moveBeatInContainer: (beatId: string, clusterId: string, x: number, y: number) => void;
   moveCluster: (clusterId: string, position: { x: number; y: number }) => void;
+  resizeCluster: (clusterId: string, width: number, height: number) => void;
   addCluster: (cluster: Cluster) => void;
   removeCluster: (clusterId: string) => void;
   renameCluster: (clusterId: string, name: string) => void;
@@ -561,13 +562,14 @@ export function useStoryBuilder() {
 
   // Move beat to cluster
   const moveBeatToCluster = useCallback((beatId: string, clusterId: string) => {
+    console.log(`[useStoryBuilder] Moving beat ${beatId} to cluster ${clusterId}`);
     setState(prev => ({
       ...prev,
       beats: prev.beats.map(beat => {
         if (beat.id === beatId) {
-          // Update the clusterId property on the existing Beat instance
-          // @ts-ignore - We're modifying a readonly property for internal tracking
-          beat.clusterId = clusterId;
+          // Update the cluster property on the existing Beat instance
+          beat.cluster = clusterId;
+          console.log(`[useStoryBuilder] Beat ${beat.name} now in cluster ${clusterId}`);
         }
         return beat;
       }),
@@ -613,6 +615,25 @@ export function useStoryBuilder() {
       clusters: prev.clusters.map(cluster =>
         cluster.id === clusterId
           ? { ...cluster, containerPosition: position }
+          : cluster
+      ),
+    }));
+  }, []);
+
+  // Resize cluster container
+  const resizeCluster = useCallback((clusterId: string, width: number, height: number) => {
+    setState(prev => ({
+      ...prev,
+      clusters: prev.clusters.map(cluster =>
+        cluster.id === clusterId
+          ? {
+              ...cluster,
+              containerBounds: {
+                ...cluster.containerBounds,
+                width,
+                height,
+              }
+            }
           : cluster
       ),
     }));
@@ -676,6 +697,7 @@ export function useStoryBuilder() {
     moveBeatToCluster,
     moveBeatInContainer,
     moveCluster,
+    resizeCluster,
     addCluster,
     removeCluster,
     renameCluster,

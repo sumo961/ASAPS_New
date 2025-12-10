@@ -22,6 +22,7 @@ interface WorkspaceViewProps {
   onClusterExpandCollapse: (clusterId: string) => void;
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;
+  onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
   paletteCollapsed: boolean;
   onTogglePalette: () => void;
   assets?: any[];
@@ -40,8 +41,10 @@ interface WorkspaceViewProps {
   globalSettings?: GlobalSettings;
   highlightedBeatIds?: string[];
   onAutoLayout?: () => void;
+  onAutoLayoutCluster?: (clusterId: string) => void;
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
+  onClusterResize?: (clusterId: string, width: number, height: number) => void;
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
@@ -60,6 +63,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onClusterExpandCollapse,
   onClusterMove,
   onBeatInContainerMove,
+  onDropBeatToCluster,
   paletteCollapsed,
   onTogglePalette,
   assets = [],
@@ -72,8 +76,10 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   globalSettings,
   highlightedBeatIds = [],
   onAutoLayout,
+  onAutoLayoutCluster,
   onAddToContainer,
   onRemoveCluster,
+  onClusterResize,
 }) => {
   const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
 
@@ -166,12 +172,15 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onClusterExpandCollapse={onClusterExpandCollapse}
               onClusterMove={onClusterMove}
               onBeatInContainerMove={onBeatInContainerMove}
+              onDropBeatToCluster={onDropBeatToCluster}
               paletteCollapsed={paletteCollapsed}
               onTogglePalette={onTogglePalette}
               highlightedBeatIds={highlightedBeatIds}
               onAutoLayout={onAutoLayout}
+              onAutoLayoutCluster={onAutoLayoutCluster}
               onAddToContainer={onAddToContainer}
               onRemoveCluster={onRemoveCluster}
+              onClusterResize={onClusterResize}
             />
           </div>
         ) : (

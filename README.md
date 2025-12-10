@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.8.5)
+## ⚠️ Development Status (v0.8.6)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -249,6 +249,17 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.8.6 (2025-12-10)
+- **Enhanced cluster system**: Clusters are containers to help organize projects into sections (e.g., "In the House", "In the Forest"). They appear as collapsible mini-flowcharts in the main graph and as folders in the sidebar.
+- **Cluster UI controls**: Mini-flowchart view with zoom controls, fit view, and auto-arrange buttons
+- **Cluster internal connections**: Visual connections between beats inside clusters with proper handle alignment
+- **Cluster external connections**: Visual indicators for connections entering/leaving clusters
+- **Edge routing around clusters**: Returning connections automatically route above or below clusters instead of through them
+- **Cluster drag improvements**: Fix beat drag constraints allowing positioning at cluster top edge
+- **Cluster resize fix**: Fix resize jump issue when starting to drag cluster viewport
+- **Sidebar cluster folders**: Collapsible folder view showing beats organized by cluster
+- **Drag beats to clusters**: Drag beats from sidebar into cluster folders or expanded cluster viewports
 
 ### v0.8.5 (2025-12-09)
 - **Auto-layout**: Add auto-layout button for automatic flowchart arrangement
