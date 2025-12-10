@@ -260,6 +260,7 @@ To use the MCP server, configure it in your AI assistant's MCP settings pointing
 - **Cluster resize fix**: Fix resize jump issue when starting to drag cluster viewport
 - **Sidebar cluster folders**: Collapsible folder view showing beats organized by cluster
 - **Drag beats to clusters**: Drag beats from sidebar into cluster folders or expanded cluster viewports
+- **AI cluster awareness**: AI story generation (both internal and MCP) now understands clusters and can organize stories into sections
 
 ### v0.8.5 (2025-12-09)
 - **Auto-layout**: Add auto-layout button for automatic flowchart arrangement
