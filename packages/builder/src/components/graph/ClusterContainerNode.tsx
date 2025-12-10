@@ -9,6 +9,8 @@ interface ClusterContainerNodeData {
   color: string;
   onAddToContainer: (clusterId: string) => void;
   onRemoveContainer: (clusterId: string) => void;
+  onExpandCollapse: (clusterId: string) => void;
+  onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;
   containedBeats?: ContainerBeatPosition[]; // Beats positioned within this cluster
 }
 
@@ -25,8 +27,10 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
   xPos,
   yPos
 }) => {
-  const { cluster, containedBeatCount, onAddToContainer, onRemoveContainer, containedBeats } = data;
+  const { cluster, containedBeatCount, onAddToContainer, onRemoveContainer, onExpandCollapse, onBeatInContainerMove, containedBeats } = data;
   const [isHovered, setIsHovered] = useState(false);
+  const [draggingBeat, setDraggingBeat] = useState<string | null>(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -38,10 +42,35 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
 
   const handleExpandCollapse = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    // This will be handled by the parent GraphEditor component
-    // Emit a custom event or use ReactFlow's node selection mechanism
     console.log('[ClusterContainerNode] Expand/collapse requested for cluster:', cluster.id);
-  }, [cluster.id]);
+    onExpandCollapse(cluster.id);
+  }, [cluster.id, onExpandCollapse]);
+
+  // Handle beat drag start within container
+  const handleBeatDragStart = useCallback((e: React.MouseEvent, beatId: string, currentX: number, currentY: number) => {
+    e.stopPropagation();
+    setDraggingBeat(beatId);
+    setDragStart({ x: e.clientX - currentX, y: e.clientY - currentY });
+  }, []);
+
+  // Handle beat drag move
+  const handleBeatDragMove = useCallback((e: React.MouseEvent) => {
+    if (!draggingBeat || !onBeatInContainerMove) return;
+    e.stopPropagation();
+
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+
+    // Snap to grid
+    const snapped = alignToGrid({ x: newX, y: newY });
+    onBeatInContainerMove(draggingBeat, cluster.id, snapped.x, snapped.y);
+  }, [draggingBeat, dragStart, cluster.id, onBeatInContainerMove]);
+
+  // Handle beat drag end
+  const handleBeatDragEnd = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraggingBeat(null);
+  }, []);
 
   // Calculate container dimensions based on content
   const containerStyle = {
@@ -165,26 +194,35 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
 
         {/* Beat container zone */}
         {cluster.isExpanded && (
-          <div className="relative p-4 overflow-hidden" style={{ minHeight: '180px' }}>
+          <div
+            className="relative p-4 overflow-hidden"
+            style={{ minHeight: '180px' }}
+            onMouseMove={handleBeatDragMove}
+            onMouseUp={handleBeatDragEnd}
+            onMouseLeave={handleBeatDragEnd}
+          >
             {/* Container beat positions */}
             {containedBeats && containedBeats.length > 0 ? (
               <div className="relative w-full h-full">
                 {containedBeats.map((beatPosition) => (
                   <div
                     key={beatPosition.beatId}
-                    className="absolute p-2 bg-blue-100 border-2 border-blue-300 rounded shadow-lg hover:bg-blue-200 transition-colors cursor-pointer"
+                    className={`absolute p-2 bg-blue-100 border-2 rounded shadow-lg hover:bg-blue-200 transition-colors cursor-grab ${
+                      draggingBeat === beatPosition.beatId ? 'border-blue-500 cursor-grabbing shadow-xl' : 'border-blue-300'
+                    }`}
                     style={{
                       left: `${beatPosition.position.x}px`,
                       top: `${beatPosition.position.y + 20}px`, // Add offset for header
                       minWidth: '100px',
-                      zIndex: beatPosition.position.z
+                      zIndex: draggingBeat === beatPosition.beatId ? 1000 : beatPosition.position.z
                     }}
+                    onMouseDown={(e) => handleBeatDragStart(e, beatPosition.beatId, beatPosition.position.x, beatPosition.position.y)}
                     onClick={(e) => {
                       e.stopPropagation();
                       console.log('Clicked positioned beat:', beatPosition.beatId);
                     }}
                   >
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-sm select-none">
                       <span className="text-lg">{beatPosition.mapStyle?.icon || '📖'}</span>
                       <span className="font-medium text-blue-800 text-xs truncate">
                         {beatPosition.beatId}

@@ -8,6 +8,74 @@
 import type { Beat, BeatConfig, Story } from '@asaps/core';
 
 // ============================================================================
+// Global Settings Types (per-project)
+// ============================================================================
+
+/**
+ * Complete project settings including visual, audio, and presentation options.
+ * Persisted with each project for project-specific customization.
+ */
+export interface GlobalSettings {
+  project: {
+    width: number;              // Project width in pixels
+    height: number;             // Project height in pixels
+    aspectRatio: string;        // Aspect ratio (e.g., "4:3", "16:9")
+    scalingMode: 'none' | 'fit' | 'fill' | 'stretch';  // How to scale content
+  };
+  colors: {
+    pcolor: string;         // Player text color
+    palpha: number;         // Player text alpha
+    nonpcolor: string;      // Non-player text color
+    nonpalpha: number;      // Non-player text alpha
+    bgColor: string;        // Background color
+    textBoxBg: string;      // Text box background
+    textBoxBorder: string;  // Text box border
+  };
+  fonts: {
+    titleFont: string;
+    textFont: string;
+    btnFont: string;
+    fontSize: {
+      title: number;
+      text: number;
+      button: number;
+    };
+  };
+  textbox: {
+    radius: number;         // Corner radius
+    padding: number;        // Internal padding
+    borderWidth: number;    // Border width
+    opacity: number;        // Background opacity
+    position: 'bottom' | 'top' | 'center';
+    boxVisibility: 'all' | 'hideText' | 'hideAll';  // Box visibility mode for editor
+  };
+  textEffects: {
+    animation: 'none' | 'typewriter' | 'fade';
+    typewriterSpeed: number; // Characters per second
+    fadeInDuration: number;   // Milliseconds
+  };
+  hotspots: {
+    visible: boolean;
+    labels: boolean;
+    highlightColor: string;
+  };
+  sound: {
+    backgroundMusic: string;    // Background music file
+    backgroundVolume: number;   // Volume 0-100
+    mute: boolean;             // Global mute
+  };
+  copyright: {
+    notice: string;            // Copyright notice text
+    year: string;              // Copyright year
+    owner: string;             // Copyright owner
+  };
+  debug: {
+    firstbeat: string;
+    showvals: boolean;
+  };
+}
+
+// ============================================================================
 // Project Types
 // ============================================================================
 
@@ -27,8 +95,11 @@ export interface Project {
   /** The story data including beats and connections */
   story: Story;
 
-  /** Visual editor settings */
+  /** Visual editor settings (basic - for backward compatibility) */
   settings: ProjectSettings;
+
+  /** Full global settings (optional, added in v1.1.0) */
+  globalSettings?: GlobalSettings;
 
   /** Asset references used in this project */
   assetIds: string[];

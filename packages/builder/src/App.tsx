@@ -52,6 +52,7 @@ function App() {
   const titleRef = useRef(state.title);
   const authorRef = useRef(state.author);
   const charactersRef = useRef<Character[]>(characters);
+  const globalSettingsRef = useRef<GlobalSettings | null>(null);
 
   // Update refs on every render to ensure they always have current values
   useEffect(() => {
@@ -142,9 +143,14 @@ function App() {
     }
   });
 
+  // Update globalSettingsRef whenever globalSettings changes
+  useEffect(() => {
+    globalSettingsRef.current = globalSettings;
+  }, [globalSettings]);
+
   // Persistence hooks
   const { markChanged, saveNow } = useSave();
-  const { updateStory, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled } = useProject();
+  const { updateStory, updateGlobalSettings, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled } = useProject();
   const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback } = usePersistence();
 
   /**
@@ -219,7 +225,14 @@ function App() {
 
     updateStory(storyData);
     console.log('[App] syncProjectData - updateStory called successfully');
-  }, [currentProject, updateStory]);
+
+    // Also sync global settings to the project
+    const currentGlobalSettings = globalSettingsRef.current;
+    if (currentGlobalSettings) {
+      updateGlobalSettings(currentGlobalSettings);
+      console.log('[App] syncProjectData - updateGlobalSettings called successfully');
+    }
+  }, [currentProject, updateStory, updateGlobalSettings]);
 
   /**
    * Register sync callback with PersistenceContext
@@ -867,6 +880,12 @@ function App() {
         setCharacters(projectData.characters || []);
         if (projectData.settings) {
           actions.updateSettings(projectData.settings);
+        }
+
+        // Restore global settings from project (if saved)
+        if (currentProject.globalSettings) {
+          console.log('[App] >>> Restoring globalSettings from project');
+          setGlobalSettings(currentProject.globalSettings);
         }
 
         setIsUntitledProject(false);
@@ -1597,8 +1616,27 @@ function App() {
           onBeatSelect={handleBeatSelect}
           onClusterSelect={handleClusterSelect}
           onAddBeat={(type) => actions.addBeat(type)}
-          onMoveBeatToCluster={actions.moveBeatToCluster}
+          onAddCluster={() => {
+            const newCluster = {
+              id: `cluster_${Date.now()}`,
+              name: 'New Cluster',
+              type: 'organizational' as const,
+              containerPosition: { x: 100, y: 100 },
+              containerBounds: { width: 400, height: 300 },
+              isExpanded: true,
+            };
+            actions.addCluster(newCluster);
+            markChanged();
+          }}
+          onMoveBeatToCluster={(beatId, clusterId) => {
+            actions.moveBeatToCluster(beatId, clusterId);
+            markChanged();
+          }}
           onToggleCluster={actions.expandCollapseCluster}
+          onRenameCluster={(clusterId, name) => {
+            actions.renameCluster(clusterId, name);
+            markChanged();
+          }}
         />
 
         <div className="flex flex-1 overflow-hidden">
@@ -1606,6 +1644,7 @@ function App() {
             beats={state.beats}
             connections={state.connections}
             clusters={state.clusters || []}
+            containerBeatPositions={state.containerBeatPositions || []}
             selectedBeat={selectedBeat}
             selectedCluster={selectedCluster}
             onBeatSelect={handleBeatSelect}
@@ -1620,9 +1659,11 @@ function App() {
                 actions.moveCluster(clusterId, { x, y });
               }
             }}
-            onBeatInContainerMove={() => {
-              // TODO: implement moveBeatInContainer in useStoryBuilder
-              console.log('moveBeatInContainer not implemented');
+            onBeatInContainerMove={(beatId: string, clusterId: string, x: number, y: number) => {
+              if (actions.moveBeatInContainer) {
+                actions.moveBeatInContainer(beatId, clusterId, x, y);
+                markChanged();
+              }
             }}
             paletteCollapsed={paletteCollapsed}
             onTogglePalette={() => setPaletteCollapsed(!paletteCollapsed)}
@@ -1636,6 +1677,21 @@ function App() {
             globalSettings={globalSettings}
             highlightedBeatIds={highlightedBeatIds}
             onAutoLayout={handleAutoLayout}
+            onAddToContainer={(clusterId: string) => {
+              // For now, show a helpful message - full implementation would show a beat selection dialog
+              console.log(`[App] Add beat to cluster ${clusterId} - drag beats from sidebar to add them`);
+              // Select the cluster to highlight it as a drop target
+              const cluster = state.clusters?.find(c => c.id === clusterId);
+              if (cluster) {
+                handleClusterSelect(cluster);
+              }
+            }}
+            onRemoveCluster={(clusterId: string) => {
+              if (actions.removeCluster) {
+                actions.removeCluster(clusterId);
+                markChanged();
+              }
+            }}
           />
 
           {selectedBeat && (

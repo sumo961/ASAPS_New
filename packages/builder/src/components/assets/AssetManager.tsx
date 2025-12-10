@@ -144,7 +144,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
       const response = await fetch(urlInput);
       const blob = await response.blob();
       const fileType = getFileTypeFromMime(blob.type);
-      
+
       if (!fileType) {
         alert('Unsupported file type from URL');
         return;
@@ -159,6 +159,28 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
         size: blob.size,
         uploadedAt: new Date(),
       };
+
+      // Set subType based on file type - fix for URL imports not having subType
+      if (fileType === 'image') {
+        asset.subType = guessImageSubType(fileName);
+        // Get dimensions for images from URL
+        try {
+          const img = new window.Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => {
+              asset.dimensions = { width: img.width, height: img.height };
+              resolve();
+            };
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = urlInput;
+          });
+        } catch (dimError) {
+          console.warn('Could not get image dimensions:', dimError);
+        }
+      } else if (fileType === 'audio') {
+        asset.subType = guessAudioSubType(fileName);
+      }
 
       onAssetAdd(asset);
       setUrlInput('');

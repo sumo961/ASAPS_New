@@ -1,5 +1,5 @@
 import React from 'react';
-import { Beat, Cluster } from '@asaps/core';
+import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { GraphEditor } from './graph/GraphEditor';
 import { BeatPalette } from './graph/BeatPalette';
 
@@ -7,6 +7,7 @@ interface CanvasProps {
   beats: Beat[];
   connections: any[];
   clusters: Cluster[];
+  containerBeatPositions?: ContainerBeatPosition[];
   selectedBeat: Beat | null;
   selectedCluster: Cluster | null;
   onBeatSelect: (beat: Beat) => void;
@@ -21,12 +22,15 @@ interface CanvasProps {
   onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;
   highlightedBeatIds?: string[];
   onAutoLayout?: () => void;
+  onAddToContainer?: (clusterId: string) => void;
+  onRemoveCluster?: (clusterId: string) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
   beats,
   connections,
   clusters,
+  containerBeatPositions = [],
   selectedBeat,
   selectedCluster,
   onBeatSelect,
@@ -41,6 +45,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   onBeatInContainerMove,
   highlightedBeatIds = [],
   onAutoLayout,
+  onAddToContainer,
+  onRemoveCluster,
 }) => {
   const handleBeatMove = (beatId: string, x: number, y: number) => {
     onBeatMove(beatId, { x, y });
@@ -81,6 +87,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         <GraphEditor
           beats={beats}
           clusters={clusters}
+          containerBeatPositions={containerBeatPositions}
           selectedBeat={selectedBeat}
           selectedCluster={selectedCluster}
           onBeatSelect={onBeatSelect}
@@ -93,6 +100,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           onBeatInContainerMove={handleBeatInContainerMove}
           highlightedBeatIds={highlightedBeatIds}
           onAutoLayout={onAutoLayout}
+          onAddToContainer={onAddToContainer}
+          onRemoveCluster={onRemoveCluster}
         />
       </div>
       

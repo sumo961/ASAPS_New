@@ -1069,6 +1069,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 assets={assets}
                 stageWidth={projectSettings?.width || 1024}
                 stageHeight={projectSettings?.height || 768}
+                beatType={beat.type}
+                beatName={beat.name}
               />
             )}
 

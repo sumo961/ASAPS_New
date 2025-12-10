@@ -77,20 +77,25 @@ export class ASMLParser {
         story.setCharacters(this.parseCharacters(charactersElement));
       }
 
-      // Parse plot (beats)
+      // Parse plot (beats and clusters)
       const plotElement = storyElement.querySelector('plot');
       if (plotElement) {
         const { clusters, beats } = this.parsePlot(plotElement);
-        
+
         // Apply layout to beats before adding to story
         this.applyLayout(beats);
-        
+
         // Add all beats to the story
         beats.forEach(beat => {
           if (beat) {
             story.addBeat(beat);
           }
         });
+
+        // Add clusters to the story
+        if (clusters && clusters.length > 0) {
+          story.setClusters(clusters);
+        }
       }
 
       return {
@@ -521,14 +526,49 @@ export class ASMLParser {
     // Parse clusters - support both old and new formats
     const clustersElement = plotElement.querySelector('clusters');
     if (clustersElement) {
-      // New format: <cluster id="..." name="..." />
+      // New format: <cluster id="..." name="..." type="..." />
       const clusterElements = clustersElement.querySelectorAll('cluster');
       if (clusterElements.length > 0) {
         clusterElements.forEach(clusterEl => {
-          clusters.push({
+          const cluster: any = {
             id: clusterEl.getAttribute('id'),
-            name: clusterEl.getAttribute('name')
-          });
+            name: clusterEl.getAttribute('name') || 'Unnamed Cluster',
+            type: clusterEl.getAttribute('type') || 'organizational',
+            isExpanded: clusterEl.getAttribute('expanded') === 'true',
+          };
+
+          // Optional attributes
+          const mapAssetId = clusterEl.getAttribute('mapAssetId');
+          if (mapAssetId) cluster.mapAssetId = mapAssetId;
+
+          const color = clusterEl.getAttribute('color');
+          if (color) cluster.color = color;
+
+          // Parse container position
+          const posEl = clusterEl.querySelector('containerPosition');
+          if (posEl) {
+            cluster.containerPosition = {
+              x: parseFloat(posEl.getAttribute('x') || '0'),
+              y: parseFloat(posEl.getAttribute('y') || '0')
+            };
+          } else {
+            // Default position
+            cluster.containerPosition = { x: 100, y: 100 };
+          }
+
+          // Parse container bounds
+          const boundsEl = clusterEl.querySelector('containerBounds');
+          if (boundsEl) {
+            cluster.containerBounds = {
+              width: parseFloat(boundsEl.getAttribute('width') || '400'),
+              height: parseFloat(boundsEl.getAttribute('height') || '300')
+            };
+          } else {
+            // Default bounds
+            cluster.containerBounds = { width: 400, height: 300 };
+          }
+
+          clusters.push(cluster);
         });
       } else {
         // Legacy format: <clusters cluster1="Mom's House" cluster2="Forest" />
@@ -539,13 +579,14 @@ export class ASMLParser {
             const clusterName = attr.value;
             clusters.push({
               id: clusterId,
-              name: clusterName
+              name: clusterName,
+              type: 'organizational',
+              isExpanded: true,
+              containerPosition: { x: 100 + index * 450, y: 100 },
+              containerBounds: { width: 400, height: 300 }
             });
           }
         });
-
-        // Also check if the beats reference clusters by name (we'll create these)
-        // and we'll handle the cluster name references in the beat cluster attributes later
       }
     }
 

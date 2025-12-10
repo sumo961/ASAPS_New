@@ -346,7 +346,7 @@ export class ASMLGenerator {
     if (clusters && clusters.length > 0) {
       lines.push(`${this.indent}${this.indent}<clusters>`);
       for (const cluster of clusters) {
-        lines.push(`${this.indent}${this.indent}${this.indent}<cluster id="${cluster.id}" name="${this.escapeXml(cluster.name)}" />`);
+        this.generateCluster(cluster, lines);
       }
       lines.push(`${this.indent}${this.indent}</clusters>`);
     } else {
@@ -361,7 +361,47 @@ export class ASMLGenerator {
     
     lines.push(`${this.indent}</plot>`);
   }
-  
+
+  /**
+   * Generate a single cluster element with all properties
+   */
+  private generateCluster(cluster: any, lines: string[]): void {
+    const clusterIndent = `${this.indent}${this.indent}${this.indent}`;
+    const propIndent = `${clusterIndent}${this.indent}`;
+
+    // Build cluster attributes
+    const attrs: string[] = [
+      `id="${cluster.id}"`,
+      `name="${this.escapeXml(cluster.name)}"`,
+      `type="${cluster.type || 'organizational'}"`
+    ];
+
+    // Add optional attributes
+    if (cluster.isExpanded !== undefined) {
+      attrs.push(`expanded="${cluster.isExpanded}"`);
+    }
+    if (cluster.mapAssetId) {
+      attrs.push(`mapAssetId="${cluster.mapAssetId}"`);
+    }
+    if (cluster.color) {
+      attrs.push(`color="${cluster.color}"`);
+    }
+
+    lines.push(`${clusterIndent}<cluster ${attrs.join(' ')}>`);
+
+    // Container position
+    if (cluster.containerPosition) {
+      lines.push(`${propIndent}<containerPosition x="${Math.round(cluster.containerPosition.x)}" y="${Math.round(cluster.containerPosition.y)}" />`);
+    }
+
+    // Container bounds
+    if (cluster.containerBounds) {
+      lines.push(`${propIndent}<containerBounds width="${Math.round(cluster.containerBounds.width)}" height="${Math.round(cluster.containerBounds.height)}" />`);
+    }
+
+    lines.push(`${clusterIndent}</cluster>`);
+  }
+
   /**
    * Generate a single beat element
    */

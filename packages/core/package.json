@@ -33,7 +33,7 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "npm run build:clean && npm run build:types && npm run build:js",
-    "build:clean": "rm -rf dist",
+    "build:clean": "npx rimraf dist",
     "build:types": "tsc --declaration --declarationMap --emitDeclarationOnly --outDir dist || echo 'Type generation had warnings'",
     "build:js": "vite build",
     "test": "vitest",

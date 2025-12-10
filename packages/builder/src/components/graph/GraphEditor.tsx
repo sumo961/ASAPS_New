@@ -26,6 +26,7 @@ import { ContainerConnectionEdge } from './ContainerConnectionEdge';
 interface GraphEditorProps {
   beats: Beat[];
   clusters: Cluster[];
+  containerBeatPositions?: ContainerBeatPosition[];
   selectedBeat: Beat | null;
   selectedCluster: Cluster | null;
   onBeatSelect: (beat: Beat) => void;
@@ -38,6 +39,8 @@ interface GraphEditorProps {
   onBeatInContainerMove: (beatId: string, clusterId: string, x: number, y: number) => void;
   highlightedBeatIds?: string[];
   onAutoLayout?: () => void;
+  onAddToContainer?: (clusterId: string) => void;
+  onRemoveCluster?: (clusterId: string) => void;
 }
 
 const nodeTypes: NodeTypes = {
@@ -67,6 +70,7 @@ const beatTypeColors: Record<string, string> = {
 export const GraphEditor: React.FC<GraphEditorProps> = ({
   beats,
   clusters,
+  containerBeatPositions = [],
   selectedBeat,
   selectedCluster,
   onBeatSelect,
@@ -79,6 +83,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onBeatInContainerMove,
   highlightedBeatIds = [],
   onAutoLayout,
+  onAddToContainer,
+  onRemoveCluster,
 }) => {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
@@ -113,22 +119,42 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       const beatsInThisCluster = beats.filter(beat => beat.cluster === cluster.id);
       const containedBeatCount = beatsInThisCluster.length;
 
-      // Create ContainerBeatPosition data for rendering
-      const containerBeats = beatsInThisCluster.map((beat, index) => ({
-        beatId: beat.id,
-        clusterId: cluster.id,
-        position: {
-          x: 50 + (index % 2) * 120, // Simple grid pattern
-          y: 50 + Math.floor(index / 2) * 60,
-          z: index
-        },
-        mapStyle: {
-          icon: '📍',
-          color: '#3b82f6',
-          size: 'medium' as const,
-          label: beat.name.substring(0, 10)
+      // Get actual positions from containerBeatPositions, or generate default positions
+      const containerBeats = beatsInThisCluster.map((beat, index) => {
+        // Look for existing position
+        const existingPosition = containerBeatPositions.find(
+          pos => pos.beatId === beat.id && pos.clusterId === cluster.id
+        );
+
+        if (existingPosition) {
+          return {
+            ...existingPosition,
+            mapStyle: existingPosition.mapStyle || {
+              icon: '📍',
+              color: '#3b82f6',
+              size: 'medium' as const,
+              label: beat.name.substring(0, 10)
+            }
+          };
         }
-      }));
+
+        // Default position - simple grid pattern
+        return {
+          beatId: beat.id,
+          clusterId: cluster.id,
+          position: {
+            x: 50 + (index % 2) * 120,
+            y: 50 + Math.floor(index / 2) * 60,
+            z: index
+          },
+          mapStyle: {
+            icon: '📍',
+            color: '#3b82f6',
+            size: 'medium' as const,
+            label: beat.name.substring(0, 10)
+          }
+        };
+      });
 
       return {
         id: cluster.id,
@@ -140,6 +166,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           expanded: cluster.isExpanded,
           containedBeatCount: containedBeatCount,
           containedBeats: containerBeats,
+          color: cluster.color || '#6366f1',
+          onAddToContainer: onAddToContainer || (() => {}),
+          onRemoveContainer: onRemoveCluster || (() => {}),
+          onExpandCollapse: onClusterExpandCollapse || (() => {}),
+          onBeatInContainerMove: onBeatInContainerMove,
         },
         style: {
           width: cluster.containerBounds.width,
@@ -151,7 +182,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     return [...beatNodes, ...clusterNodes];
 
     // return totalNodes; // Uncomment to go back to normal
-  }, [beats, clusters, selectedBeat, selectedCluster, highlightedBeatIds]);
+  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, highlightedBeatIds, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(() => {
@@ -680,6 +711,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         attributionPosition="bottom-left"
         minZoom={0.05}
         maxZoom={4}
+        fitView
+        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
       >
         <Background color="#aaa" gap={16} />
         <Controls />

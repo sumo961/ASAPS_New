@@ -9,7 +9,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { getStorageManager, type Project, type StorageManager } from '../storage';
+import { getStorageManager, type Project, type StorageManager, type GlobalSettings } from '../storage';
 import { CommandManager, type Command } from '../commands';
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave';
 
@@ -50,6 +50,7 @@ export interface PersistenceContextValue {
   deleteProject: (projectId: string) => Promise<boolean>;
   updateProjectMetadata: (updates: Partial<Pick<Project, 'name' | 'description'>>) => Promise<void>;
   updateProjectStory: (storyData: Partial<any>) => void;
+  updateProjectGlobalSettings: (settings: GlobalSettings) => void;
   saveCurrentProject: (name: string, description?: string) => Promise<string>;
 
   // Untitled project management
@@ -467,6 +468,29 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   }, [currentProject]);
 
   /**
+   * Update project's global settings (per-project settings persistence)
+   */
+  const updateProjectGlobalSettings = useCallback((settings: GlobalSettings) => {
+    const projectToUpdate = currentProjectRef.current || currentProject;
+
+    if (!projectToUpdate) {
+      console.warn('[PersistenceContext] No current project to update global settings');
+      return;
+    }
+
+    console.log('[PersistenceContext] updateProjectGlobalSettings - Updating global settings');
+
+    const updatedProject = {
+      ...projectToUpdate,
+      globalSettings: settings,
+      modifiedAt: new Date(),
+    };
+
+    currentProjectRef.current = updatedProject;
+    setCurrentProject(updatedProject);
+  }, [currentProject]);
+
+  /**
    * Save current project with a new name (convert from untitled to named)
    */
   const saveCurrentProject = useCallback(async (
@@ -646,6 +670,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     deleteProject,
     updateProjectMetadata,
     updateProjectStory,
+    updateProjectGlobalSettings,
     saveCurrentProject,
     setIsUntitledProject: setIsUntitledProjectWithRef,
     clearUntitledState,
@@ -723,6 +748,7 @@ export function useProject() {
     deleteProject,
     updateProjectMetadata,
     updateProjectStory,
+    updateProjectGlobalSettings,
     saveCurrentProject,
     discardUntitledProject,
   } = usePersistence();
@@ -735,6 +761,7 @@ export function useProject() {
     delete: deleteProject,
     updateMetadata: updateProjectMetadata,
     updateStory: updateProjectStory,
+    updateGlobalSettings: updateProjectGlobalSettings,
     saveCurrent: saveCurrentProject,
     discardUntitled: discardUntitledProject,
   };

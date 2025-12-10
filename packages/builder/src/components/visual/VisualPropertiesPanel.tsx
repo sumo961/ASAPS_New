@@ -38,8 +38,17 @@ interface VisualPropertiesPanelProps {
   stageWidth: number;
   stageHeight: number;
   beatType?: string;  // Beat type to control which elements are available
+  beatName?: string;  // Beat name for display in header
   onOpenCharacterManager?: (callback: (character: any) => void) => void;  // For changing character
 }
+
+// Helper to format beat type for display (camelCase -> Title Case)
+const formatBeatType = (beatType: string): string => {
+  return beatType
+    .replace(/([A-Z])/g, ' $1')  // Add space before capitals
+    .replace(/^./, str => str.toUpperCase())  // Capitalize first letter
+    .trim();
+};
 
 export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   backgroundAssetId,
@@ -56,6 +65,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   stageWidth,
   stageHeight,
   beatType,
+  beatName,
   onOpenCharacterManager,
 }) => {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -119,7 +129,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
       <div className="flex-shrink-0 p-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-800">Visual Properties</h2>
         <div className="text-sm text-gray-500 mt-1">
-          Title Screen (titleScreen)
+          {beatName || (beatType ? formatBeatType(beatType) : 'No beat selected')}
+          {beatType && <span className="text-gray-400 ml-1">({beatType})</span>}
         </div>
       </div>
 

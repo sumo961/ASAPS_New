@@ -8,7 +8,8 @@ import {
   EndScreenBeat,
   ASMLProcessor,
   ASMLGenerator,
-  Cluster
+  Cluster,
+  ContainerBeatPosition
 } from '@asaps/core';
 
 interface StoryBuilderState {
@@ -22,6 +23,7 @@ interface StoryBuilderState {
   environment: any;
   characters: any[];
   clusters: Cluster[];
+  containerBeatPositions: ContainerBeatPosition[];
 }
 
 interface StoryBuilderActions {
@@ -37,6 +39,7 @@ interface StoryBuilderActions {
   disconnectBeats: (sourceBeatId: string, targetBeatId: string) => void;
   expandCollapseCluster: (clusterId: string) => void;
   moveBeatToCluster: (beatId: string, clusterId: string) => void;
+  moveBeatInContainer: (beatId: string, clusterId: string, x: number, y: number) => void;
   moveCluster: (clusterId: string, position: { x: number; y: number }) => void;
   addCluster: (cluster: Cluster) => void;
   removeCluster: (clusterId: string) => void;
@@ -63,6 +66,7 @@ export function useStoryBuilder() {
     environment: { props: [], nodes: [] },
     characters: [],
     clusters: [],
+    containerBeatPositions: [],
   });
 
   // Generate unique beat ID
@@ -372,6 +376,7 @@ export function useStoryBuilder() {
         environment,
         characters,
         clusters: [], // Initialize empty clusters for imported story
+        containerBeatPositions: [], // Initialize empty positions
       });
 
       // Reset beat counter - parse actual beat IDs to find the highest number
@@ -409,6 +414,7 @@ export function useStoryBuilder() {
       environment: { props: [], nodes: [] },
       characters: [],
       clusters: [],
+      containerBeatPositions: [],
     });
     beatCounter.current = 0;
   }, []);
@@ -444,6 +450,7 @@ export function useStoryBuilder() {
       environment: storyData.environment || { props: [], nodes: [] },
       characters: storyData.characters || [],
       clusters: storyData.clusters || [],
+      containerBeatPositions: storyData.containerBeatPositions || [],
     });
 
     // Update beat counter to ensure new beats get unique IDs
@@ -567,6 +574,38 @@ export function useStoryBuilder() {
     }));
   }, []);
 
+  // Move beat position within container (for spatial clusters)
+  const moveBeatInContainer = useCallback((beatId: string, clusterId: string, x: number, y: number) => {
+    setState(prev => {
+      // Check if position already exists for this beat
+      const existingIndex = prev.containerBeatPositions.findIndex(
+        pos => pos.beatId === beatId && pos.clusterId === clusterId
+      );
+
+      const newPosition: ContainerBeatPosition = {
+        beatId,
+        clusterId,
+        position: { x, y, z: 0 }
+      };
+
+      if (existingIndex >= 0) {
+        // Update existing position
+        const newPositions = [...prev.containerBeatPositions];
+        newPositions[existingIndex] = {
+          ...newPositions[existingIndex],
+          position: { ...newPositions[existingIndex].position, x, y }
+        };
+        return { ...prev, containerBeatPositions: newPositions };
+      } else {
+        // Add new position
+        return {
+          ...prev,
+          containerBeatPositions: [...prev.containerBeatPositions, newPosition]
+        };
+      }
+    });
+  }, []);
+
   // Move cluster
   const moveCluster = useCallback((clusterId: string, position: { x: number; y: number }) => {
     setState(prev => ({
@@ -635,6 +674,7 @@ export function useStoryBuilder() {
     loadStoryData,
     expandCollapseCluster,
     moveBeatToCluster,
+    moveBeatInContainer,
     moveCluster,
     addCluster,
     removeCluster,

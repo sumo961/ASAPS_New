@@ -9,6 +9,7 @@
 export type {
   Project,
   ProjectSettings,
+  GlobalSettings,
   StoredAsset,
   AssetType,
   Command,

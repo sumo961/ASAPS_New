@@ -16,7 +16,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && vite build && tsc -p tsconfig.build.json",
+    "build": "npx rimraf dist && vite build && tsc -p tsconfig.build.json",
     "dev": "vite build --watch",
     "test": "vitest",
     "type-check": "tsc --noEmit"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Beat, Cluster } from '@asaps/core';
+import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { Canvas } from './Canvas';
 import { VisualWorkspace } from './visual/VisualWorkspace';
 import { Map, Palette } from 'lucide-react';
@@ -10,6 +10,7 @@ interface WorkspaceViewProps {
   beats: Beat[];
   connections: any[];
   clusters: Cluster[];
+  containerBeatPositions?: ContainerBeatPosition[];
   selectedBeat: Beat | null;
   selectedCluster: Cluster | null;
   onBeatSelect: (beat: Beat) => void;
@@ -39,12 +40,15 @@ interface WorkspaceViewProps {
   globalSettings?: GlobalSettings;
   highlightedBeatIds?: string[];
   onAutoLayout?: () => void;
+  onAddToContainer?: (clusterId: string) => void;
+  onRemoveCluster?: (clusterId: string) => void;
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   beats,
   connections,
   clusters,
+  containerBeatPositions = [],
   selectedBeat,
   selectedCluster,
   onBeatSelect,
@@ -68,6 +72,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   globalSettings,
   highlightedBeatIds = [],
   onAutoLayout,
+  onAddToContainer,
+  onRemoveCluster,
 }) => {
   const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
 
@@ -149,6 +155,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               beats={beats}
               connections={connections}
               clusters={clusters}
+              containerBeatPositions={containerBeatPositions}
               selectedBeat={selectedBeat}
               selectedCluster={selectedCluster}
               onBeatSelect={onBeatSelect}
@@ -163,6 +170,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onTogglePalette={onTogglePalette}
               highlightedBeatIds={highlightedBeatIds}
               onAutoLayout={onAutoLayout}
+              onAddToContainer={onAddToContainer}
+              onRemoveCluster={onRemoveCluster}
             />
           </div>
         ) : (
