@@ -26,6 +26,15 @@
  * - Useful for: creating urgency, handling inactive users, timed puzzles
  * - NOT available on durScreen (which already auto-advances by design)
  *
+ * CLUSTERS (Organizational Containers):
+ * Clusters help organize larger projects into logical sections (e.g., "In the House", "In the Forest").
+ * - Add a "cluster" property to beats with the cluster name (string)
+ * - All beats with the same cluster value will be grouped together
+ * - Clusters appear as collapsible containers in the flowchart and folders in the sidebar
+ * - Example: { cluster: "forest_section" } on multiple beats groups them together
+ * - Use clusters when a story has 15+ beats or distinct geographical/thematic sections
+ * - Beats without a cluster property remain ungrouped at the top level
+ *
  * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from introText!
  */
 export declare const BEAT_TYPES: {
@@ -67,6 +76,7 @@ export interface GeneratedBeat {
         x: number;
         y: number;
     };
+    cluster?: string;
 }
 /**
  * Generated connection structure

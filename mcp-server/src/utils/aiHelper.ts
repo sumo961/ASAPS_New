@@ -27,6 +27,15 @@
  * - Useful for: creating urgency, handling inactive users, timed puzzles
  * - NOT available on durScreen (which already auto-advances by design)
  *
+ * CLUSTERS (Organizational Containers):
+ * Clusters help organize larger projects into logical sections (e.g., "In the House", "In the Forest").
+ * - Add a "cluster" property to beats with the cluster name (string)
+ * - All beats with the same cluster value will be grouped together
+ * - Clusters appear as collapsible containers in the flowchart and folders in the sidebar
+ * - Example: { cluster: "forest_section" } on multiple beats groups them together
+ * - Use clusters when a story has 15+ beats or distinct geographical/thematic sections
+ * - Beats without a cluster property remain ungrouped at the top level
+ *
  * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from introText!
  */
 export const BEAT_TYPES = {
@@ -74,6 +83,7 @@ export interface GeneratedBeat {
   label: string;
   parameters: Record<string, any>;
   position?: { x: number; y: number };
+  cluster?: string; // Optional cluster name to group beats into sections
 }
 
 /**
@@ -171,6 +181,15 @@ CRITICAL setVariable LIMITATION:
   1. "Creative +1" (setVariable for creative_energy) → connects to →
   2. "Temper -1" (setVariable for temper_control) → connects to next story beat
 - NEVER name a setVariable beat with multiple operations - split them into multiple beats!
+
+CLUSTERS (Organizational Containers):
+For larger stories (15+ beats) with distinct sections, use clusters to organize beats:
+- Add a "cluster" property (string) to each beat that belongs to a group
+- All beats with the same cluster value will be grouped together in the UI
+- Example: beats in "In the House" section all have { cluster: "house_section" }
+- Clusters make large flowcharts more navigable and help authors understand story structure
+- Use clusters for: geographical areas, time periods, character arcs, or thematic sections
+- Beats without a cluster property remain at the top level ungrouped
 
 Important:
 - Use descriptive labels for beats

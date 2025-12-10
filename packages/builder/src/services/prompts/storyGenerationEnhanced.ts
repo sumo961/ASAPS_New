@@ -218,7 +218,40 @@ Final confrontation outcome depends on accumulated relationship
 - Linear sequences: Horizontal (x += 300)
 - Branching points: Fan out vertically (y += 150 per branch)
 - Reconvergence: Return to center alignment
-- Clusters: Group related beats (use cluster property)
+- Clusters: Group related beats by location or theme (see Clusters section below)
+
+## Clusters (Organizational Containers)
+
+Clusters are containers that help organize larger projects into logical sections. They're especially useful for location-based stories or stories with distinct chapters/areas.
+
+### What Clusters Are For
+- **Location-based organization**: Group beats by story location (e.g., "In the House", "In the Forest", "The Castle")
+- **Chapter organization**: Separate story into clear sections (e.g., "Act 1", "Act 2", "Finale")
+- **Thematic grouping**: Group related content (e.g., "Combat Sequences", "Romance Path", "Investigation")
+
+### How to Use Clusters
+- Add a \`cluster\` property to beats with the cluster name (string)
+- All beats with the same cluster value will be grouped together
+- Clusters appear as collapsible mini-flowcharts in the main editor
+- Connections between clusters show as external connection indicators
+
+### Example Cluster Usage
+\`\`\`json
+{
+  "id": "beat_forest_1",
+  "name": "Enter the Forest",
+  "type": "introText",
+  "cluster": "The Forest",
+  "parameters": { "text": "You step into the dark woods..." }
+}
+\`\`\`
+
+### Cluster Best Practices
+- Use descriptive cluster names that reflect the location/theme
+- Group 3-10 beats per cluster for optimal organization
+- Create hub beats that connect different clusters
+- Use clusters to reduce visual complexity in large stories
+- Common pattern: Location clusters with movementChoice beats connecting them
 
 ### Connection Best Practices
 - Label important choices clearly
