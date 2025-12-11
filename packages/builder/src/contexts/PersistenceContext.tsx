@@ -434,7 +434,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         characters: story.getCharacters ? story.getCharacters() : story.characters,
         clusters: story.getClusters ? story.getClusters() : story.clusters,
         connections: story.getConnections ? story.getConnections() : story.connections,
-        containerBeatPositions: story.containerBeatPositions || {},
+        containerBeatPositions: story.containerBeatPositions || [],
         assets: story.assets || [],
         // Then apply the updates from storyData
         ...storyData,

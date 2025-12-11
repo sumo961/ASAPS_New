@@ -3,6 +3,13 @@ import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { GraphEditor } from './graph/GraphEditor';
 import { BeatPalette } from './graph/BeatPalette';
 
+// Asset type for cluster backgrounds
+interface Asset {
+  id: string;
+  url: string;
+  type: string;
+}
+
 interface CanvasProps {
   beats: Beat[];
   connections: any[];
@@ -27,6 +34,9 @@ interface CanvasProps {
   onAutoLayout?: () => void;
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
+  // Cluster background images
+  assets?: Asset[];
+  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -53,6 +63,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   onAutoLayout,
   onAddToContainer,
   onRemoveCluster,
+  assets = [],
+  onSetClusterMap,
 }) => {
   const handleBeatMove = (beatId: string, x: number, y: number) => {
     onBeatMove(beatId, { x, y });
@@ -111,6 +123,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           onAutoLayout={onAutoLayout}
           onAddToContainer={onAddToContainer}
           onRemoveCluster={onRemoveCluster}
+          assets={assets}
+          onSetClusterMap={onSetClusterMap}
         />
       </div>
       

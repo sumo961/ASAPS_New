@@ -473,7 +473,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setHasChanges(true);
 
     // For fields that affect graph visualization, update immediately
-    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer') {
+    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name') {
       if (onUpdate && beat) {
         onUpdate(beat.id, { [field]: value });
       }

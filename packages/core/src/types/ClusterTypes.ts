@@ -24,8 +24,10 @@ export interface Cluster {
   // Expand/collapse state
   isExpanded: boolean;
 
-  // Map reference for spatial clusters
+  // Map/background image for spatial clusters
   mapAssetId?: string;
+  mapScale?: number;    // Independent scale for background image (0.1-3.0, default 1.0)
+  mapOpacity?: number;  // Background image opacity (0-1, default 0.5)
 
   // Visual theming
   color?: string;

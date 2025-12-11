@@ -45,6 +45,7 @@ interface StoryBuilderActions {
   addCluster: (cluster: Cluster) => void;
   removeCluster: (clusterId: string) => void;
   renameCluster: (clusterId: string, name: string) => void;
+  setClusterMap: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   exportStory: (assets?: any[], characters?: any[]) => string;
   importStory: (xmlContent: string) => Promise<void>;
   clearStory: () => void;
@@ -677,6 +678,24 @@ export function useStoryBuilder() {
     }));
   }, []);
 
+  // Set cluster background map
+  const setClusterMap = useCallback((clusterId: string, assetId: string | null, scale?: number, opacity?: number) => {
+    console.log('[useStoryBuilder] Setting cluster map', clusterId, assetId, scale, opacity);
+    setState(prev => ({
+      ...prev,
+      clusters: prev.clusters.map(cluster =>
+        cluster.id === clusterId
+          ? {
+              ...cluster,
+              mapAssetId: assetId || undefined,
+              mapScale: scale,
+              mapOpacity: opacity,
+            }
+          : cluster
+      ),
+    }));
+  }, []);
+
   const actions: StoryBuilderActions = {
     setTitle,
     setAuthor,
@@ -701,6 +720,7 @@ export function useStoryBuilder() {
     addCluster,
     removeCluster,
     renameCluster,
+    setClusterMap,
   };
 
   return {

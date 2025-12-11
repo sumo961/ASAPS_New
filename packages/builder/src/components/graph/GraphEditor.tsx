@@ -23,6 +23,13 @@ import { CustomEdge } from './CustomEdge';
 import { ClusterContainerNode } from './ClusterContainerNode';
 import { ContainerConnectionEdge } from './ContainerConnectionEdge';
 
+// Asset type for looking up URLs
+interface Asset {
+  id: string;
+  url: string;
+  type: string;
+}
+
 interface GraphEditorProps {
   beats: Beat[];
   clusters: Cluster[];
@@ -44,6 +51,9 @@ interface GraphEditorProps {
   onAutoLayout?: () => void;
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
+  // Asset lookup for cluster backgrounds
+  assets?: Asset[];
+  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
 }
 
 const nodeTypes: NodeTypes = {
@@ -91,8 +101,15 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onAutoLayout,
   onAddToContainer,
   onRemoveCluster,
+  assets = [],
+  onSetClusterMap,
 }) => {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+
+  // Use ref for assets to avoid triggering unnecessary useMemo recalculations
+  // The cluster nodes will access assets via ref for the popover, which updates on render
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
 
   // DEBUG: Track initial mounting
   const mountRef = useRef(false);
@@ -190,6 +207,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           onAutoLayoutCluster: onAutoLayoutCluster,
           onBeatSelect: onBeatSelect,
           allBeats: beats, // Pass all beats for external connection calculation
+          // Map background - use ref to get current assets without triggering re-render
+          mapAssetUrl: cluster.mapAssetId ? assetsRef.current.find(a => a.id === cluster.mapAssetId)?.url : undefined,
+          onSetClusterMap: onSetClusterMap,
+          // Pass a getter function for assets to avoid embedding the whole array in node data
+          getAssets: () => assetsRef.current,
         },
         style: {
           width: cluster.containerBounds.width,
@@ -201,7 +223,9 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     return [...beatNodes, ...clusterNodes];
 
     // return totalNodes; // Uncomment to go back to normal
-  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, highlightedBeatIds, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect]);
+  // Note: assets is intentionally NOT in dependency array - we use assetsRef to access current assets
+  // This prevents unnecessary node recalculation when assets change, which was causing the flowchart to empty
+  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, highlightedBeatIds, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(() => {
@@ -615,20 +639,15 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Update nodes when beats change
   useEffect(() => {
     console.log('[GraphEditor] useEffect - setting nodes TRIGGERED. Nodes length:', nodes.length, 'NodesState length:', nodesState.length, 'TIMESTAMP:', Date.now());
+
     if (nodes.length > 0) {
       console.log('[GraphEditor] Creating nodes from beats:', nodes.length, 'beats');
-      console.log('[GraphEditor] Beats data:', nodes.map(n => ({id: n.id, name: n.data?.label, x: n.data?.beat?.x, y: n.data?.beat?.y})));
-      console.log('[GraphEditor] Beat nodes positions from beats:');
-      nodes.forEach((node, i) => {
-        console.log(`  [Beat ${i}] ${node.id}: position=(${node.position.x}, ${node.position.y}), data.x=${node.data?.beat?.x}, data.y=${node.data?.beat?.y}, dataType=${node.data?.type}`);
-      });
-      console.log('[GraphEditor] Node types available:', Object.keys(nodeTypes));
+    } else {
+      console.log('[GraphEditor] nodes array is empty - beats length:', beats.length, 'clusters length:', clusters.length);
     }
 
-    console.log('[GraphEditor] BEFORE setNodes: nodesState.length =', nodesState.length, 'new nodes.length =', nodes.length);
     setNodes(nodes);
-    console.log('[GraphEditor] AFTER setNodes: nodesState.length =', nodesState.length);
-  }, [nodes, setNodes]);
+  }, [nodes, setNodes, beats.length, clusters.length]);
 
   // Update edges when beats change
   useEffect(() => {

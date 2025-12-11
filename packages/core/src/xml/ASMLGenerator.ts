@@ -383,6 +383,12 @@ export class ASMLGenerator {
     if (cluster.mapAssetId) {
       attrs.push(`mapAssetId="${cluster.mapAssetId}"`);
     }
+    if (cluster.mapScale !== undefined) {
+      attrs.push(`mapScale="${cluster.mapScale}"`);
+    }
+    if (cluster.mapOpacity !== undefined) {
+      attrs.push(`mapOpacity="${cluster.mapOpacity}"`);
+    }
     if (cluster.color) {
       attrs.push(`color="${cluster.color}"`);
     }

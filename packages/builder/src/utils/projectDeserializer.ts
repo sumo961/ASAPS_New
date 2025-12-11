@@ -305,6 +305,7 @@ export function loadProjectData(project: Project): {
   characters: any[];
   clusters: any[];
   connections: any[];
+  containerBeatPositions: any[];
 } {
   console.log('[loadProjectData] Loading project:', project.id);
 
@@ -380,6 +381,19 @@ export function loadProjectData(project: Project): {
   } else if (story.clusters) {
     clusters = story.clusters;
   }
+
+  // Extract container beat positions
+  let containerBeatPositions: any[] = [];
+  if (story.containerBeatPositions) {
+    // Handle both array and object formats
+    if (Array.isArray(story.containerBeatPositions)) {
+      containerBeatPositions = story.containerBeatPositions;
+    } else if (typeof story.containerBeatPositions === 'object') {
+      // Convert object format to array if needed
+      containerBeatPositions = Object.values(story.containerBeatPositions);
+    }
+  }
+  console.log('[loadProjectData] Container beat positions found:', containerBeatPositions.length);
 
   // CRITICAL FIX: Extract connections from multiple sources
   // Priority: story.connections (flowchart format) > extract from beats
@@ -496,7 +510,8 @@ export function loadProjectData(project: Project): {
     beats: beats.length,
     connections: connections.length,
     characters: characters.length,
-    clusters: clusters.length
+    clusters: clusters.length,
+    containerBeatPositions: containerBeatPositions.length
   });
 
   return {
@@ -507,6 +522,7 @@ export function loadProjectData(project: Project): {
     environment,
     characters,
     clusters,
-    connections
+    connections,
+    containerBeatPositions
   };
 }

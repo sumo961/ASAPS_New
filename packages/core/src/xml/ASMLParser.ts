@@ -541,6 +541,12 @@ export class ASMLParser {
           const mapAssetId = clusterEl.getAttribute('mapAssetId');
           if (mapAssetId) cluster.mapAssetId = mapAssetId;
 
+          const mapScale = clusterEl.getAttribute('mapScale');
+          if (mapScale) cluster.mapScale = parseFloat(mapScale);
+
+          const mapOpacity = clusterEl.getAttribute('mapOpacity');
+          if (mapOpacity) cluster.mapOpacity = parseFloat(mapOpacity);
+
           const color = clusterEl.getAttribute('color');
           if (color) cluster.color = color;
 

@@ -9,7 +9,7 @@ import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
 import { AssetManager } from './components/assets/AssetManager';
 import { Story } from '@asaps/core';
-import type { Beat, Cluster } from '@asaps/core';
+import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
@@ -53,6 +53,7 @@ function App() {
   const authorRef = useRef(state.author);
   const charactersRef = useRef<Character[]>(characters);
   const clustersRef = useRef<Cluster[]>(state.clusters || []);
+  const containerBeatPositionsRef = useRef<ContainerBeatPosition[]>(state.containerBeatPositions || []);
   const globalSettingsRef = useRef<GlobalSettings | null>(null);
 
   // Update refs on every render to ensure they always have current values
@@ -62,7 +63,8 @@ function App() {
     titleRef.current = state.title;
     authorRef.current = state.author;
     clustersRef.current = state.clusters || [];
-  }, [state.beats, state.connections, state.title, state.author, state.clusters]);
+    containerBeatPositionsRef.current = state.containerBeatPositions || [];
+  }, [state.beats, state.connections, state.title, state.author, state.clusters, state.containerBeatPositions]);
 
   useEffect(() => {
     charactersRef.current = characters;
@@ -176,6 +178,7 @@ function App() {
     const currentAuthor = authorRef.current;
     const currentCharacters = charactersRef.current;
     const currentClusters = clustersRef.current;
+    const currentContainerBeatPositions = containerBeatPositionsRef.current;
 
     if (currentBeats.length === 0) {
       console.log('[App] syncProjectData - No beats in beatsRef, skipping');
@@ -221,6 +224,7 @@ function App() {
       characters: currentCharacters,
       connections: currentConnections,
       clusters: currentClusters,
+      containerBeatPositions: currentContainerBeatPositions,
     };
 
     console.log('[App] storyData being passed to updateStory:', {
@@ -867,7 +871,8 @@ function App() {
           beats: projectData.beats.length,
           connections: projectData.connections?.length || 0,
           characters: projectData.characters?.length || 0,
-          clusters: projectData.clusters?.length || 0
+          clusters: projectData.clusters?.length || 0,
+          containerBeatPositions: projectData.containerBeatPositions?.length || 0
         });
 
         actions.loadStoryData({
@@ -879,7 +884,8 @@ function App() {
           settings: projectData.settings,
           environment: projectData.environment,
           characters: projectData.characters,
-          clusters: projectData.clusters
+          clusters: projectData.clusters,
+          containerBeatPositions: projectData.containerBeatPositions || []
         });
 
         setCharacters(projectData.characters || []);
@@ -1740,6 +1746,12 @@ function App() {
             onClusterResize={(clusterId: string, width: number, height: number) => {
               if (actions.resizeCluster) {
                 actions.resizeCluster(clusterId, width, height);
+                markChanged();
+              }
+            }}
+            onSetClusterMap={(clusterId: string, assetId: string | null, scale?: number, opacity?: number) => {
+              if (actions.setClusterMap) {
+                actions.setClusterMap(clusterId, assetId, scale, opacity);
                 markChanged();
               }
             }}

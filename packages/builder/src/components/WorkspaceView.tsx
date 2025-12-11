@@ -45,6 +45,7 @@ interface WorkspaceViewProps {
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
+  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
@@ -80,6 +81,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onAddToContainer,
   onRemoveCluster,
   onClusterResize,
+  onSetClusterMap,
 }) => {
   const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
 
@@ -181,6 +183,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onAddToContainer={onAddToContainer}
               onRemoveCluster={onRemoveCluster}
               onClusterResize={onClusterResize}
+              assets={assets}
+              onSetClusterMap={onSetClusterMap}
             />
           </div>
         ) : (

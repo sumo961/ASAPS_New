@@ -22,6 +22,11 @@ interface ClusterContainerNodeData {
   containedBeats?: ClusterBeatInfo[];
   onBeatSelect?: (beat: Beat) => void;
   allBeats?: Beat[];
+  // Map/background image
+  mapAssetUrl?: string;
+  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  // Getter function for assets to avoid embedding array in node data (prevents render issues)
+  getAssets?: () => Array<{ id: string; url: string; type: string; name?: string }>;
 }
 
 // Beat type colors (same as main flowchart)
@@ -87,8 +92,14 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     onAutoLayoutCluster,
     containedBeats,
     onBeatSelect,
-    allBeats
+    allBeats,
+    mapAssetUrl,
+    onSetClusterMap,
+    getAssets
   } = data;
+
+  // Get assets via getter function to avoid embedding array in node data
+  const assets = getAssets ? getAssets() : [];
 
   // Calculate internal connections between beats in this cluster
   const internalConnections = useMemo(() => {
@@ -237,7 +248,9 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [showMapSettings, setShowMapSettings] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapSettingsRef = useRef<HTMLDivElement>(null);
 
   // Use cluster bounds or defaults
   const containerWidth = Math.max(cluster.containerBounds?.width || MIN_CONTAINER_WIDTH, MIN_CONTAINER_WIDTH);
@@ -543,6 +556,128 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
               </button>
             )}
 
+            {/* Map settings button */}
+            {onSetClusterMap && (
+              <div className="relative" ref={mapSettingsRef}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMapSettings(!showMapSettings);
+                  }}
+                  className={`w-6 h-6 rounded shadow-sm transition-colors flex items-center justify-center text-xs ${
+                    mapAssetUrl ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                  title="Map settings"
+                >
+                  🗺️
+                </button>
+
+                {/* Map settings popover */}
+                {showMapSettings && (
+                  <div
+                    className="absolute top-8 right-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 min-w-[200px]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="text-sm font-medium text-gray-700 mb-2">Background Image</div>
+
+                    {mapAssetUrl ? (
+                      <>
+                        <div className="mb-3">
+                          <img src={mapAssetUrl} alt="" className="w-full h-20 object-cover rounded border" />
+                        </div>
+
+                        <div className="mb-3">
+                          <label className="text-xs text-gray-600 block mb-1">
+                            Scale: {Math.round((cluster.mapScale || 1) * 100)}%
+                          </label>
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="3"
+                            step="0.1"
+                            value={cluster.mapScale || 1}
+                            onChange={(e) => {
+                              onSetClusterMap(cluster.id, cluster.mapAssetId || null, parseFloat(e.target.value), cluster.mapOpacity);
+                            }}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="mb-3">
+                          <label className="text-xs text-gray-600 block mb-1">
+                            Opacity: {Math.round((cluster.mapOpacity ?? 0.5) * 100)}%
+                          </label>
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="1"
+                            step="0.1"
+                            value={cluster.mapOpacity ?? 0.5}
+                            onChange={(e) => {
+                              onSetClusterMap(cluster.id, cluster.mapAssetId || null, cluster.mapScale, parseFloat(e.target.value));
+                            }}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            onSetClusterMap(cluster.id, null);
+                            setShowMapSettings(false);
+                          }}
+                          className="w-full px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                        >
+                          Remove Background
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        {/* Filter to only image assets */}
+                        {(() => {
+                          const imageAssets = assets.filter(a => a.type === 'image');
+                          if (imageAssets.length === 0) {
+                            return (
+                              <div className="py-4 text-center">
+                                <div className="mb-2">No images available</div>
+                                <div className="text-gray-400">
+                                  Add images in the Asset Manager first
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div>
+                              <div className="mb-2 text-gray-600">Select an image:</div>
+                              <div className="grid grid-cols-3 gap-1 max-h-[150px] overflow-y-auto">
+                                {imageAssets.map(asset => (
+                                  <button
+                                    key={asset.id}
+                                    onClick={() => {
+                                      if (onSetClusterMap) {
+                                        onSetClusterMap(cluster.id, asset.id, 1, 0.5);
+                                      }
+                                    }}
+                                    className="w-12 h-12 rounded border border-gray-200 overflow-hidden hover:border-blue-500 hover:ring-2 hover:ring-blue-200 transition-all"
+                                    title={asset.name || asset.id}
+                                  >
+                                    <img
+                                      src={asset.url}
+                                      alt={asset.name || 'Asset'}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="w-px h-4 bg-gray-300 mx-1" />
 
             <button
@@ -568,11 +703,41 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
           className={`nodrag relative overflow-hidden ${isDragOver ? 'bg-green-50' : 'bg-gray-50'}`}
           style={{
             height: contentHeight,
-            backgroundImage: 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
+            backgroundImage: mapAssetUrl ? 'none' : 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
             backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
             cursor: draggingBeat || isResizing ? 'grabbing' : 'default',
           }}
         >
+          {/* Background map image */}
+          {mapAssetUrl && (
+            <img
+              src={mapAssetUrl}
+              alt=""
+              className="absolute pointer-events-none select-none"
+              draggable={false}
+              style={{
+                top: 0,
+                left: 0,
+                transformOrigin: '0 0',
+                transform: `scale(${cluster.mapScale || 1})`,
+                opacity: cluster.mapOpacity ?? 0.5,
+                zIndex: 0,
+              }}
+            />
+          )}
+
+          {/* Grid overlay when map is present */}
+          {mapAssetUrl && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.15) 1px, transparent 1px)',
+                backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+                zIndex: 1,
+              }}
+            />
+          )}
+
           {/* External connections SVG - OUTSIDE transform wrapper, uses transformed coordinates */}
           <svg
             className="absolute inset-0 pointer-events-none"
