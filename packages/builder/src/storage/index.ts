@@ -43,3 +43,10 @@ export {
   getStorageManager,
   resetStorageManager,
 } from './StorageManager';
+
+// Hybrid Storage Adapter (for asset operations with size-based routing)
+export {
+  HybridStorageAdapter,
+  getStorageAdapter,
+  resetStorageAdapter,
+} from './HybridStorageAdapter';

@@ -18,6 +18,8 @@ import { loadProjectData } from './utils/projectDeserializer';
 import { downloadProjectAsZip, importProjectFromZip } from './utils/projectZipManager';
 import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
+import { getStorageAdapter } from './storage/HybridStorageAdapter';
+import { assetToStored, extractBlobFromAsset } from './storage/AssetStorageAdapter';
 import { DebugPanel } from './components/debug/DebugPanel';
 import { applyTreeLayoutToBeats } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
@@ -54,6 +56,7 @@ function App() {
   const charactersRef = useRef<Character[]>(characters);
   const clustersRef = useRef<Cluster[]>(state.clusters || []);
   const containerBeatPositionsRef = useRef<ContainerBeatPosition[]>(state.containerBeatPositions || []);
+  const assetsRef = useRef<Asset[]>(assets);
   const globalSettingsRef = useRef<GlobalSettings | null>(null);
 
   // Update refs on every render to ensure they always have current values
@@ -69,6 +72,10 @@ function App() {
   useEffect(() => {
     charactersRef.current = characters;
   }, [characters]);
+
+  useEffect(() => {
+    assetsRef.current = assets;
+  }, [assets]);
 
   // Project and global settings
   const [projectSettings, setProjectSettings] = useState({
@@ -893,6 +900,49 @@ function App() {
           actions.updateSettings(projectData.settings);
         }
 
+        // Load assets from storage using HybridStorageAdapter
+        const loadAssets = async () => {
+          try {
+            console.log('[App] >>> Loading assets for project:', currentProject.id);
+            const storage = getStorageAdapter();
+            await storage.initialize();
+            console.log('[App] >>> HybridStorageAdapter initialized');
+
+            // listAssets returns metadata only, we need to load blobs separately
+            const assetInfoList = await storage.listAssets(currentProject.id);
+            console.log('[App] >>> Found', assetInfoList.length, 'assets in storage');
+
+            const uiAssets: Asset[] = [];
+            for (const assetInfo of assetInfoList) {
+              // Load the actual blob from storage (respects hybrid storage routing)
+              const blob = await storage.loadAsset(assetInfo.id);
+              if (blob) {
+                const url = URL.createObjectURL(blob);
+                uiAssets.push({
+                  id: assetInfo.id,
+                  name: assetInfo.filename,
+                  type: assetInfo.mimeType.startsWith('image/') ? 'image' :
+                        assetInfo.mimeType.startsWith('audio/') ? 'audio' :
+                        assetInfo.mimeType.startsWith('video/') ? 'video' :
+                        assetInfo.mimeType.includes('font') ? 'font' : 'image',
+                  url,
+                  size: assetInfo.size,
+                  uploadedAt: new Date(assetInfo.uploadedAt),
+                });
+                console.log('[App] >>> Asset loaded:', assetInfo.filename, '(location:', assetInfo.location, ')');
+              } else {
+                console.warn('[App] >>> Could not load blob for asset:', assetInfo.filename);
+              }
+            }
+
+            setAssets(uiAssets);
+            console.log('[App] >>> Total assets loaded:', uiAssets.length);
+          } catch (err) {
+            console.error('[App] >>> Error loading assets:', err);
+          }
+        };
+        loadAssets();
+
         // Restore global settings from project (if saved)
         if (currentProject.globalSettings) {
           console.log('[App] >>> Restoring globalSettings from project');
@@ -1088,12 +1138,58 @@ function App() {
   }, []);
 
   const handleAssetAdd = useCallback(async (asset: Asset) => {
-    setAssets(prev => [...prev, asset]);
-    markChanged();
-    return true;
-  }, [markChanged]);
+    console.log('[App] handleAssetAdd CALLED with asset:', asset.name, asset.id);
 
-  const handleAssetRemove = useCallback((assetId: string) => {
+    if (!currentProject) {
+      console.warn('[App] handleAssetAdd - No current project, skipping storage');
+      setAssets(prev => [...prev, asset]);
+      markChanged();
+      return true;
+    }
+
+    console.log('[App] handleAssetAdd - Current project:', currentProject.id);
+
+    try {
+      // Extract blob from asset and convert to stored format
+      console.log('[App] handleAssetAdd - Extracting blob...');
+      const blob = await extractBlobFromAsset(asset);
+      console.log('[App] handleAssetAdd - Blob extracted, size:', blob.size);
+
+      const storedAsset = await assetToStored(asset, currentProject.id, blob);
+      console.log('[App] handleAssetAdd - Converted to stored format');
+
+      // Save to storage using HybridStorageAdapter (v2 schema with asset-metadata)
+      const storage = getStorageAdapter();
+      console.log('[App] handleAssetAdd - Got HybridStorageAdapter');
+      await storage.initialize();
+      console.log('[App] handleAssetAdd - Storage initialized, saving asset...');
+      await storage.saveAsset(storedAsset);
+
+      setAssets(prev => [...prev, asset]);
+      markChanged();
+      console.log('[App] handleAssetAdd - Asset saved to storage:', asset.name);
+      return true;
+    } catch (err) {
+      console.error('[App] handleAssetAdd - Error saving asset:', err);
+      // Still add to local state as fallback
+      setAssets(prev => [...prev, asset]);
+      markChanged();
+      return true;
+    }
+  }, [currentProject, markChanged]);
+
+  const handleAssetRemove = useCallback(async (assetId: string) => {
+    try {
+      // Delete from storage using HybridStorageAdapter
+      const storage = getStorageAdapter();
+      await storage.initialize();
+      await storage.deleteAsset(assetId);
+      console.log('[App] handleAssetRemove - Asset deleted from storage:', assetId);
+    } catch (err) {
+      console.error('[App] handleAssetRemove - Error deleting asset:', err);
+    }
+
+    // Always update local state
     setAssets(prev => prev.filter(a => a.id !== assetId));
     markChanged();
   }, [markChanged]);

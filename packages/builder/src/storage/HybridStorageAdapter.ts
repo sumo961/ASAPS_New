@@ -6,6 +6,8 @@
  * - Large assets (>=5MB): Filesystem or Cache API for storage efficiency
  *
  * Supports both browser (Cache API) and Electron (Node.js fs) environments
+ *
+ * Uses the shared schema from schema.ts for database consistency.
  */
 
 import type {
@@ -16,23 +18,26 @@ import type {
 } from './IStorageAdapter';
 import { StorageError } from './IStorageAdapter';
 import type { Project, StoredAsset } from './types';
-import { openDB, type IDBPDatabase } from 'idb';
+import type { IDBPDatabase } from 'idb';
+import { initDatabase, type AsapsDBSchema } from './schema';
 
-const DB_NAME = 'asaps-storage';
-const DB_VERSION = 2;
+/**
+ * Store names matching the schema definitions
+ * These type-safe constants ensure we use the correct store names
+ */
 const STORES = {
-  projects: 'projects',
-  assets: 'assets',
-  assetMetadata: 'asset-metadata',
-  history: 'history',
-  drafts: 'drafts',
-} as const;
+  projects: 'projects' as const,
+  assets: 'assets' as const,
+  assetMetadata: 'asset-metadata' as const,
+  history: 'history' as const,
+  drafts: 'drafts' as const,
+};
 
 /**
  * Hybrid Storage Adapter Implementation
  */
 export class HybridStorageAdapter implements IStorageAdapter {
-  private db: IDBPDatabase | null = null;
+  private db: IDBPDatabase<AsapsDBSchema> | null = null;
   private config: Required<StorageAdapterConfig>;
   private isElectron: boolean = false;
   private cache: Cache | null = null;
@@ -67,60 +72,19 @@ export class HybridStorageAdapter implements IStorageAdapter {
         return;
       }
 
-      // Initialize IndexedDB (browser/Electron only)
-      this.db = await openDB(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, transaction) {
-          // Projects store
-          if (!db.objectStoreNames.contains(STORES.projects)) {
-            const projectStore = db.createObjectStore(STORES.projects, {
-              keyPath: 'id',
-            });
-            projectStore.createIndex('modifiedAt', 'modifiedAt');
-            projectStore.createIndex('createdAt', 'createdAt');
-          }
-
-          // Assets store (for small assets - blobs)
-          if (!db.objectStoreNames.contains(STORES.assets)) {
-            const assetStore = db.createObjectStore(STORES.assets, {
-              keyPath: 'id',
-            });
-            assetStore.createIndex('projectId', 'projectId');
-          }
-
-          // Asset metadata store (for all assets)
-          if (!db.objectStoreNames.contains(STORES.assetMetadata)) {
-            const metaStore = db.createObjectStore(STORES.assetMetadata, {
-              keyPath: 'id',
-            });
-            metaStore.createIndex('projectId', 'projectId');
-            metaStore.createIndex('location', 'location');
-          }
-
-          // History store
-          if (!db.objectStoreNames.contains(STORES.history)) {
-            const historyStore = db.createObjectStore(STORES.history, {
-              keyPath: 'projectId',
-            });
-          }
-
-          // Drafts store
-          if (!db.objectStoreNames.contains(STORES.drafts)) {
-            const draftStore = db.createObjectStore(STORES.drafts, {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            draftStore.createIndex('projectId', 'projectId');
-            draftStore.createIndex('timestamp', 'timestamp');
-          }
-        },
-      });
+      // Use the shared schema initialization from schema.ts
+      // This ensures both HybridStorageAdapter and StorageManager use the same database
+      console.log('[HybridStorageAdapter] Initializing with shared schema...');
+      this.db = await initDatabase();
+      console.log('[HybridStorageAdapter] Database initialized successfully');
 
       // Initialize Cache API (browser only)
       if (this.config.enableCache && typeof caches !== 'undefined') {
         try {
           this.cache = await caches.open('asaps-assets-cache');
+          console.log('[HybridStorageAdapter] Cache API initialized');
         } catch (err) {
-          console.warn('Cache API not available, using IndexedDB fallback');
+          console.warn('[HybridStorageAdapter] Cache API not available, using IndexedDB fallback');
         }
       }
 
@@ -129,6 +93,7 @@ export class HybridStorageAdapter implements IStorageAdapter {
         await this.initializeFilesystem();
       }
     } catch (err) {
+      console.error('[HybridStorageAdapter] Initialization failed:', err);
       throw new StorageError(
         'Failed to initialize storage',
         'STORAGE_UNAVAILABLE',
@@ -187,7 +152,7 @@ export class HybridStorageAdapter implements IStorageAdapter {
     try {
       await this.db!.put(STORES.projects, {
         ...project,
-        modifiedAt: new Date().toISOString(),
+        modifiedAt: new Date(),
       });
     } catch (err) {
       throw new StorageError(
@@ -251,7 +216,7 @@ export class HybridStorageAdapter implements IStorageAdapter {
 
       // Delete drafts
       const tx = this.db!.transaction(STORES.drafts, 'readwrite');
-      const index = tx.store.index('projectId');
+      const index = tx.store.index('by-project');
       const drafts = await index.getAll(projectId);
 
       for (const draft of drafts) {
@@ -376,7 +341,7 @@ export class HybridStorageAdapter implements IStorageAdapter {
 
     try {
       const tx = this.db!.transaction(STORES.assetMetadata, 'readonly');
-      const index = tx.store.index('projectId');
+      const index = tx.store.index('by-project');
       const assets = await index.getAll(projectId);
       return assets;
     } catch (err) {
@@ -494,9 +459,13 @@ export class HybridStorageAdapter implements IStorageAdapter {
     await this.db!.put(STORES.assets, {
       id: asset.id,
       projectId: asset.projectId,
-      blob: asset.blob,
-      mimeType: asset.mimeType,
+      type: asset.type,
       filename: asset.filename,
+      mimeType: asset.mimeType,
+      size: asset.size,
+      blob: asset.blob,
+      uploadedAt: asset.uploadedAt,
+      thumbnail: asset.thumbnail,
     });
   }
 
@@ -706,10 +675,12 @@ export class HybridStorageAdapter implements IStorageAdapter {
   async saveHistory(projectId: string, history: any): Promise<void> {
     this.ensureReady();
 
+    // history is expected to contain commands and currentIndex
     await this.db!.put(STORES.history, {
       projectId,
-      history,
-      timestamp: new Date().toISOString(),
+      commands: history.commands || [],
+      currentIndex: history.currentIndex || 0,
+      lastUpdated: new Date(),
     });
   }
 
@@ -717,16 +688,20 @@ export class HybridStorageAdapter implements IStorageAdapter {
     this.ensureReady();
 
     const record = await this.db!.get(STORES.history, projectId);
-    return record?.history || null;
+    if (!record) return null;
+    return { commands: record.commands, currentIndex: record.currentIndex };
   }
 
   async saveDraft(projectId: string, draft: any): Promise<void> {
     this.ensureReady();
 
+    const id = `${projectId}_${Date.now()}`;
     await this.db!.add(STORES.drafts, {
+      id,
       projectId,
-      draft,
-      timestamp: new Date().toISOString(),
+      projectSnapshot: draft,
+      createdAt: new Date(),
+      isManual: draft.isManual || false,
     });
   }
 
@@ -734,10 +709,10 @@ export class HybridStorageAdapter implements IStorageAdapter {
     this.ensureReady();
 
     const tx = this.db!.transaction(STORES.drafts, 'readonly');
-    const index = tx.store.index('projectId');
+    const index = tx.store.index('by-project');
     const drafts = await index.getAll(projectId);
 
-    return drafts.map((d) => d.draft);
+    return drafts.map((d) => d.projectSnapshot);
   }
 
   async deleteDraft(draftId: string): Promise<void> {
