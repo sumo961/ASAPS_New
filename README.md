@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.8.6)
+## ⚠️ Development Status (v0.8.7)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -249,6 +249,15 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.8.7 (2025-12-11)
+- **Cluster background images**: Add optional floorplan/map images to clusters with independent scale and opacity
+- **Cluster map UI**: Popover controls for selecting, scaling, and adjusting opacity of cluster background images
+- **ASML cluster map support**: Serialize mapScale and mapOpacity attributes for cluster background images
+- **Beat positions persistence**: Fix beat positions within clusters not saving after project reload
+- **Beat renaming fix**: Fix beat name changes not persisting (name field now triggers immediate update)
+- **Flowchart stability**: Fix flowchart becoming empty after closing Asset Manager (ref pattern fix)
+- **Type consistency**: Fix containerBeatPositions fallback from object to array format
 
 ### v0.8.6 (2025-12-10)
 - **Enhanced cluster system**: Clusters are containers to help organize projects into sections (e.g., "In the House", "In the Forest"). They appear as collapsible mini-flowcharts in the main graph and as folders in the sidebar.
