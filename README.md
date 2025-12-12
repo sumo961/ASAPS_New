@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.8.7)
+## ⚠️ Development Status (v0.8.8)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -249,6 +249,14 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.8.8 (2025-12-12)
+- **Preview zoom controls**: Add zoom in/out buttons, percentage indicator, and "Fit" button for auto-scale to window
+- **Preview scaling**: Stage automatically scales to fit dialog window while maintaining aspect ratio
+- **Default theme change**: New projects now use a light blue background (#87CEEB) with white text boxes and black text instead of dark theme
+- **Theme settings applied before preview**: Global settings (colors, backgrounds) are now applied before preview starts
+- **Self-contained stories**: Environment.nodes populated from builder assets for standalone story support
+- **ReactRenderer refactoring**: Simplified and cleaned up rendering code
 
 ### v0.8.7 (2025-12-11)
 - **Cluster background images**: Add optional floorplan/map images to clusters with independent scale and opacity
