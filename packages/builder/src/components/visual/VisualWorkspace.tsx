@@ -787,8 +787,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     handleAssetSelection('background', (asset) => {
       setBackgroundAssetId(asset.id);
       setHasChanges(true);
+
+      // CRITICAL FIX: Immediately persist background to beat parameters
+      // This ensures the background is saved even without switching beats
+      if (beat && beat.updateParameters) {
+        const params = beat.getParameters ? beat.getParameters() : {};
+        beat.updateParameters({
+          ...params,
+          backgroundAssetId: asset.id,
+          node: asset.id // Also set 'node' for compatibility with Beat.execute()
+        });
+        console.log(`[VisualWorkspace] Background immediately persisted to beat: ${asset.id}`);
+      }
     });
-  }, [handleAssetSelection]);
+  }, [handleAssetSelection, beat]);
 
   // Save visual changes
   const handleSave = () => {
@@ -1071,6 +1083,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 stageHeight={projectSettings?.height || 768}
                 beatType={beat.type}
                 beatName={beat.name}
+                onSelectAsset={onAssetSelect}
               />
             )}
 
@@ -1112,6 +1125,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           selectedElement={selectedElementId}
           onSelectElement={setSelectedElementId}
           projectSettings={projectSettings}
+          globalSettings={globalSettings}
         />
       </div>
 

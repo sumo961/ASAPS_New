@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { Story, StoryEngine, Beat } from '@asaps/core';
 import type { StatePreset } from '@asaps/core';
 import { ReactRenderer } from '@asaps/renderer';
@@ -9,6 +9,10 @@ import type { Character } from '../../types/character';
 import { StatePresetManager } from '../debug/StatePresetManager';
 import { StatePresetEditor } from '../debug/StatePresetEditor';
 import { initializeBeatLocations } from '../../utils/SchemaLocationInitializer';
+
+// Stage dimensions
+const STAGE_WIDTH = 1024;
+const STAGE_HEIGHT = 768;
 
 interface StoryPreviewProps {
   story: Story;
@@ -26,6 +30,10 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   const [debugStartBeat, setDebugStartBeat] = useState<string | null>(null);
   const boxVisibility = settings?.textbox?.boxVisibility || 'all';
   const containerRef = useRef<HTMLDivElement>(null);
+  const previewAreaRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [fitScale, setFitScale] = useState(1); // Auto-calculated fit scale
+  const [isAutoFit, setIsAutoFit] = useState(true); // Whether to use auto-fit or manual scale
 
   // Store as ReactRenderer, cast to any when passing to StoryEngine to bypass type checking
   const rendererRef = useRef<ReactRenderer | null>(null);
@@ -112,6 +120,56 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
     // We'll apply the preset when starting the preview
   }, []);
 
+  // Calculate fit scale factor based on available preview area
+  useLayoutEffect(() => {
+    const calculateFitScale = () => {
+      if (!previewAreaRef.current) return;
+
+      const padding = 20; // Padding around the stage
+      const availableWidth = previewAreaRef.current.clientWidth - (padding * 2);
+      const availableHeight = previewAreaRef.current.clientHeight - (padding * 2);
+
+      // Calculate scale to fit while maintaining aspect ratio
+      const scaleX = availableWidth / STAGE_WIDTH;
+      const scaleY = availableHeight / STAGE_HEIGHT;
+      const newFitScale = Math.min(scaleX, scaleY, 1); // Don't scale up past 100%
+
+      setFitScale(newFitScale);
+
+      // If in auto-fit mode, update the active scale
+      if (isAutoFit) {
+        setScale(newFitScale);
+      }
+    };
+
+    // Initial calculation
+    calculateFitScale();
+
+    // Recalculate on window resize
+    const resizeObserver = new ResizeObserver(calculateFitScale);
+    if (previewAreaRef.current) {
+      resizeObserver.observe(previewAreaRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, [activeTab, isAutoFit]); // Recalculate when switching tabs or auto-fit mode changes
+
+  // Zoom control functions
+  const handleZoomIn = useCallback(() => {
+    setIsAutoFit(false);
+    setScale(prev => Math.min(prev + 0.1, 2)); // Max 200%
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setIsAutoFit(false);
+    setScale(prev => Math.max(prev - 0.1, 0.25)); // Min 25%
+  }, []);
+
+  const handleFitToWindow = useCallback(() => {
+    setIsAutoFit(true);
+    setScale(fitScale);
+  }, [fitScale]);
+
   useEffect(() => {
     // Only initialize once when container is ready
     if (!containerRef.current) return;
@@ -124,8 +182,8 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
       // Create renderer with the preview container
       const reactRenderer = new ReactRenderer({
         container: containerRef.current,
-        width: 1024,
-        height: 768,
+        width: STAGE_WIDTH,
+        height: STAGE_HEIGHT,
       });
 
       // Set up asset resolver to provide URLs for assetIds
@@ -197,22 +255,49 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
     try {
       setIsRunning(true);
 
+      // Set theme BEFORE starting preview to ensure settings are applied
+      if (settings) {
+        const theme = convertGlobalSettingsToTheme(settings);
+        if ('setTheme' in rendererRef.current) {
+          (rendererRef.current as any).setTheme(theme);
+        }
+      }
+
       // CRITICAL: Initialize beat locations from schema for beats that don't have them
       // This ensures proper positioned rendering instead of fallback centered components
       const allBeats = story.getAllBeats();
       console.log('[StoryPreview] Initializing locations for', allBeats.length, 'beats');
-      initializeBeatLocations(allBeats, 1024, 768);
+      initializeBeatLocations(allBeats, STAGE_WIDTH, STAGE_HEIGHT);
 
-      // Set up asset resolver for backgrounds
+      // CRITICAL: Populate environment.nodes from builder assets for self-contained story
+      // This makes the Story object self-contained with all asset URLs, enabling:
+      // 1. Beat.execute() to find background URLs via environment.nodes lookup
+      // 2. Future standalone engine export where Story is the single source of truth
+      if (assets && assets.length > 0) {
+        const existingEnvironment = story.getEnvironment() || {};
+        const environmentNodes = assets.map(asset => ({
+          id: asset.id,
+          url: asset.url,
+          type: asset.type,
+          name: asset.name
+        }));
+        story.setEnvironment({
+          ...existingEnvironment,
+          nodes: environmentNodes
+        });
+        console.log('[StoryPreview] Populated environment.nodes with', assets.length, 'assets');
+      }
+
+      // Set up asset resolver for backgrounds (uses the populated environment.nodes)
       if (rendererRef.current && 'setAssetResolver' in rendererRef.current) {
         const environment = story.getEnvironment();
         (rendererRef.current as any).setAssetResolver((assetId: string) => {
-          // Look up asset in environment.nodes
+          // Look up asset in environment.nodes (now populated from builder assets)
           const node = environment?.nodes?.find((n: any) => n.id === assetId);
           if (node) {
             return node.url || node.path || node.src;
           }
-          // Also check story assets
+          // Also check story assets (legacy support)
           const asset = story.getAssets()?.find((a: any) => a.id === assetId);
           if (asset) {
             return asset.url || asset.path || asset.src;
@@ -470,25 +555,87 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         <div className="flex-1 flex overflow-hidden">
           {activeTab === 'preview' ? (
             <>
-              {/* Preview Area */}
-              <div className="flex-1 bg-gray-50">
+              {/* Preview Area with Zoom Controls */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Stage Container */}
                 <div
-                  ref={containerRef}
-                  className="h-full w-full bg-white overflow-auto"
+                  ref={previewAreaRef}
+                  className="flex-1 bg-gray-100 flex items-center justify-center overflow-auto relative"
                 >
+                  {/* Placeholder shown before preview starts */}
                   {!currentBeat && !isRunning && (
-                    <div className="h-full flex items-center justify-center text-gray-400">
-                      <div className="text-center">
-                        <Play className="w-16 h-16 mx-auto mb-4" />
-                        <p>Click "Start Preview" to test your story</p>
-                        {selectedPreset && (
-                          <p className="text-sm mt-2 text-blue-600">
-                            Preset "{selectedPreset.name}" will be loaded
-                          </p>
-                        )}
-                      </div>
+                    <div className="text-gray-400 text-center absolute">
+                      <Play className="w-16 h-16 mx-auto mb-4" />
+                      <p>Click "Start Preview" to test your story</p>
+                      {selectedPreset && (
+                        <p className="text-sm mt-2 text-blue-600">
+                          Preset "{selectedPreset.name}" will be loaded
+                        </p>
+                      )}
                     </div>
                   )}
+                  {/* Stage wrapper - sized to match scaled dimensions for proper centering */}
+                  <div
+                    style={{
+                      width: STAGE_WIDTH * scale,
+                      height: STAGE_HEIGHT * scale,
+                      visibility: (currentBeat || isRunning) ? 'visible' : 'hidden',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {/* Stage container - scaled from top-left corner */}
+                    <div
+                      className="relative bg-white shadow-lg"
+                      style={{
+                        width: STAGE_WIDTH,
+                        height: STAGE_HEIGHT,
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'top left',
+                      }}
+                    >
+                      <div
+                        ref={containerRef}
+                        className="absolute inset-0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Zoom Controls Bar */}
+                <div className="bg-gray-200 border-t px-4 py-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleZoomOut}
+                      className="p-1.5 hover:bg-gray-300 rounded transition-colors"
+                      title="Zoom Out"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span className="text-sm font-medium w-14 text-center">
+                      {Math.round(scale * 100)}%
+                    </span>
+                    <button
+                      onClick={handleZoomIn}
+                      className="p-1.5 hover:bg-gray-300 rounded transition-colors"
+                      title="Zoom In"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-5 bg-gray-400 mx-2" />
+                    <button
+                      onClick={handleFitToWindow}
+                      className={`p-1.5 rounded transition-colors flex items-center gap-1 text-sm ${
+                        isAutoFit ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-300'
+                      }`}
+                      title="Fit to Window"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Fit</span>
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Stage: {STAGE_WIDTH} x {STAGE_HEIGHT}
+                  </div>
                 </div>
               </div>
 

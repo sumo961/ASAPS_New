@@ -17,7 +17,7 @@ import type {
   StorageLocation,
 } from './IStorageAdapter';
 import { StorageError } from './IStorageAdapter';
-import type { Project, StoredAsset } from './types';
+import type { Project, StoredAsset, StorageResult } from './types';
 import type { IDBPDatabase } from 'idb';
 import { initDatabase, type AsapsDBSchema } from './schema';
 
@@ -351,6 +351,58 @@ export class HybridStorageAdapter implements IStorageAdapter {
         err as Error
       );
     }
+  }
+
+  /**
+   * Get all assets for a project with blob data (compatible with StorageManager API)
+   * This method combines metadata from asset-metadata store with blob data
+   */
+  async getProjectAssets(projectId: string): Promise<StorageResult<StoredAsset[]>> {
+    this.ensureReady();
+
+    try {
+      const metadataList = await this.listAssets(projectId);
+      const storedAssets: StoredAsset[] = [];
+
+      for (const metadata of metadataList) {
+        const blob = await this.loadAsset(metadata.id);
+        if (blob) {
+          // Convert AssetStorageInfo + blob to StoredAsset format
+          const storedAsset: StoredAsset = {
+            id: metadata.id,
+            projectId: metadata.projectId,
+            type: this.inferAssetType(metadata.mimeType),
+            filename: metadata.filename,
+            mimeType: metadata.mimeType,
+            size: metadata.size,
+            blob,
+            uploadedAt: new Date(metadata.uploadedAt),
+            lastUsedAt: new Date(),
+            metadata: {
+              // Include subType and other metadata from the stored info
+              ...(metadata as any).metadata,
+            },
+          };
+          storedAssets.push(storedAsset);
+        }
+      }
+
+      return { success: true, data: storedAssets };
+    } catch (err) {
+      console.error('[HybridStorageAdapter] Failed to get project assets:', err);
+      return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
+    }
+  }
+
+  /**
+   * Infer asset type from MIME type
+   */
+  private inferAssetType(mimeType: string): 'image' | 'audio' | 'video' | 'font' | 'other' {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.includes('font') || mimeType === 'application/x-font-ttf' || mimeType === 'application/x-font-opentype') return 'font';
+    return 'other';
   }
 
   async deleteAsset(assetId: string): Promise<void> {

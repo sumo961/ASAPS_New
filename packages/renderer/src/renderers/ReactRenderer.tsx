@@ -4,6 +4,7 @@ import { BaseRenderer } from './BaseRenderer';
 import type { Location } from '@asaps/core';
 import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
+import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 
 // ============= REACT COMPONENTS (Centered Layouts) =============
 // These are fallback components when no positioning data is available
@@ -627,12 +628,17 @@ export class ReactRenderer extends BaseRenderer {
         beatType,
         this.assetResolver || undefined
       );
-      
+
       // Determine background - consistent for all beat types
-      // Use the beat's background image if available, otherwise use default gradient
-      const backgroundColor = this.backgroundImageUrl ? 'transparent' : 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+      // Use the beat's background image if available, otherwise use theme background color or default gradient
+      const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+      const backgroundColor = this.backgroundImageUrl
+        ? 'transparent'
+        : (this.theme?.backgroundColor || defaultGradient);
       
       // Render using the shared PositionedBeatView component
+      // NOTE: previewMode=false to use absolute positioning from Visual Editor
+      // previewMode=true uses a flex layout that ignores element positions
       this.renderComponent(
         <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <PositionedBeatView
@@ -646,7 +652,7 @@ export class ReactRenderer extends BaseRenderer {
             hideTextBoxes={this.hideTextBoxes}
             hideButtonBoxes={this.hideButtonBoxes}
             theme={this.theme}
-            previewMode={true}
+            previewMode={false}
           />
         </div>
       );
@@ -659,41 +665,30 @@ export class ReactRenderer extends BaseRenderer {
     console.log(`[ReactRenderer ${this.instanceId}] renderTitleScreen called`);
     console.log(`[ReactRenderer ${this.instanceId}]   - title: "${title}"`);
     console.log(`[ReactRenderer ${this.instanceId}]   - locations:`, locations?.length || 0);
-    if (locations && locations.length > 0) {
-      console.log(`[ReactRenderer ${this.instanceId}]   - locations detail:`, JSON.stringify(locations, null, 2));
-    }
-    
+
     // Get background - try state first (asset URL), then try to resolve from state (asset ID)
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
     console.log(`[ReactRenderer ${this.instanceId}]   - backgroundAssetId:`, backgroundAssetId);
     console.log(`[ReactRenderer ${this.instanceId}]   - backgroundImageUrl:`, this.backgroundImageUrl);
-    
-    if (locations && locations.length > 0) {
-      console.log(`[ReactRenderer ${this.instanceId}] ✅ Using POSITIONED rendering`);
-      await this.renderPositionedBeat('titleScreen', { title, author, buttonText }, locations);
-      return;
-    }
-    
-    console.log(`[ReactRenderer ${this.instanceId}] ⚠️ Using CENTERED fallback rendering (no locations)`);
-    return new Promise(resolve => {
-      this.resolveAction = () => { this.resolveAction = null; resolve(); };
-      this.renderComponent(<TitleScreen title={title} author={author} buttonText={buttonText} onAction={this.handleAction} />);
-    });
+
+    // Use provided locations or generate default locations from schema
+    const content = { title, author, buttonText };
+    let effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('titleScreen', content);
+
+    console.log(`[ReactRenderer ${this.instanceId}] ✅ Using POSITIONED rendering with ${effectiveLocations.length} locations`);
+    await this.renderPositionedBeat('titleScreen', content, effectiveLocations);
   }
 
   async renderText(text: string, buttonText: string, locations?: Location[]): Promise<void> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
-    
-    if (locations && locations.length > 0) {
-      await this.renderPositionedBeat('introText', { text, buttonText }, locations);
-      return;
-    }
-    return new Promise(resolve => {
-      this.resolveAction = () => { this.resolveAction = null; resolve(); };
-      this.renderComponent(<TextDisplay text={text} buttonText={buttonText} onAction={this.handleAction} />);
-    });
+
+    // Use provided locations or generate default locations from schema
+    const content = { text, buttonText };
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('introText', content);
+
+    await this.renderPositionedBeat('introText', content, effectiveLocations);
   }
 
   async renderDialog(speaker: string, text: string, emotion?: string, locations?: Location[]): Promise<void> {
@@ -791,51 +786,25 @@ export class ReactRenderer extends BaseRenderer {
       return this.renderPositionedBeat('dialogTree', content, nestedLocations, true);
     }
 
-    // Fallback: styled component when no locations defined at all
-    return new Promise(resolve => {
-      this.resolveAction = resolve;
-      if (dialogContext.text) {
-        this.renderComponent(
-          <DialogWithChoicesDisplay
-            text={dialogContext.text}
-            choices={choices}
-            backgroundUrl={this.backgroundImageUrl}
-            theme={this.theme}
-            onAction={this.handleAction}
-          />
-        );
-      } else {
-        // Fallback to choices-only display
-        this.renderComponent(<ChoiceDisplay choices={choices} onAction={this.handleAction} />);
-      }
-    });
+    // No locations provided - generate default locations from schema
+    const content: Record<string, any> = {
+      text: dialogContext.text || '',
+      choices
+    };
+    const defaultLocations = generateDefaultLocations('dialogTree', content);
+    return this.renderPositionedBeat('dialogTree', content, defaultLocations, true);
   }
 
   async renderMovement(question: string, choices: { id: string; text: string; location: string }[], locations?: Location[]): Promise<string> {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
-    console.log('[ReactRenderer.renderMovement] Getting background:');
-    console.log('[ReactRenderer.renderMovement]   - backgroundAssetId from state:', backgroundAssetId);
-    console.log('[ReactRenderer.renderMovement]   - backgroundAssetUrl from state:', this.getState('backgroundAssetUrl'));
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
-    console.log('[ReactRenderer.renderMovement]   - resolved backgroundImageUrl:', this.backgroundImageUrl?.substring(0, 50));
 
-    if (locations && locations.length > 0) {
-      console.log('[ReactRenderer.renderMovement] Using positioned rendering with', locations.length, 'locations');
-      console.log('[ReactRenderer.renderMovement] backgroundImageUrl before positioned render:', this.backgroundImageUrl?.substring(0, 50));
-      return this.renderPositionedBeat('movementChoice', {
-        question,
-        choices
-      }, locations, true);
-    }
+    // Use provided locations or generate default locations from schema
+    const content = { question, choices };
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('movementChoice', content);
 
-    console.log('[ReactRenderer.renderMovement] Using fallback component rendering');
-    console.log('[ReactRenderer.renderMovement] backgroundImageUrl for fallback:', this.backgroundImageUrl?.substring(0, 50));
-
-    return new Promise(resolve => {
-      this.resolveAction = resolve;
-      this.renderComponent(<MovementDisplay question={question} choices={choices} backgroundUrl={this.backgroundImageUrl} onAction={this.handleAction} />);
-    });
+    return this.renderPositionedBeat('movementChoice', content, effectiveLocations, true);
   }
 
   async renderPropSelection(question: string, props: { id: string; name: string; description: string }[], locations?: Location[]): Promise<string> {
@@ -843,17 +812,11 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
-    if (locations && locations.length > 0) {
-      return this.renderPositionedBeat('pickProp', {
-        question,
-        props
-      }, locations, true);
-    }
+    // Use provided locations or generate default locations from schema
+    const content = { question, props };
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('pickProp', content);
 
-    return new Promise(resolve => {
-      this.resolveAction = resolve;
-      this.renderComponent(<PropDisplay question={question} props={props} onAction={this.handleAction} />);
-    });
+    return this.renderPositionedBeat('pickProp', content, effectiveLocations, true);
   }
 
   async renderVideo(videoFile: string, autoplay: boolean, controls: boolean): Promise<void> {
@@ -885,44 +848,26 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
-    if (locations && locations.length > 0) {
-      // Get button text from renderer state (set by beat)
-      const restartText = this.getState('restartText') || 'Play Again';
-      const creditsText = this.getState('creditsText') || 'Credits';
+    // Get button text from renderer state (set by beat)
+    const restartText = this.getState('restartText') || 'Play Again';
+    const creditsText = this.getState('creditsText') || 'Credits';
 
-      // Pass through all necessary content for schema mapping
-      await this.renderPositionedBeat('endScreen', {
-        message,
-        showRestart,
-        showCredits,
-        restartText,
-        creditsText
-      }, locations);
-      return;
-    }
-    return new Promise(resolve => {
-      this.resolveAction = () => { this.resolveAction = null; resolve(); };
-      this.renderComponent(<EndScreen message={message} showRestart={showRestart} showCredits={showCredits} onAction={this.handleAction} />);
-    });
+    // Use provided locations or generate default locations from schema
+    const content = { message, showRestart, showCredits, restartText, creditsText };
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('endScreen', content);
+
+    await this.renderPositionedBeat('endScreen', content, effectiveLocations);
   }
 
   async renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
-    
-    if (locations && locations.length > 0) {
-      await this.renderPositionedBeat('durScreen', { text }, locations, false);
-      await new Promise(resolve => setTimeout(resolve, duration));
-      return;
-    }
-    const DurScreen: React.FC = () => (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-100 p-8">
-        <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-6">
-          <p className="text-lg text-gray-800 whitespace-pre-wrap">{text}</p>
-        </div>
-      </div>
-    );
-    this.renderComponent(<DurScreen />);
+
+    // Use provided locations or generate default locations from schema
+    const content = { text };
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('durScreen', content);
+
+    await this.renderPositionedBeat('durScreen', content, effectiveLocations, false);
     await new Promise(resolve => setTimeout(resolve, duration));
   }
 
@@ -941,38 +886,31 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
-    // If locations are provided, use positioned rendering (WYSIWYG)
-    if (locations && locations.length > 0) {
-      // renderPositionedBeat returns a Promise<void>, but we need Promise<string>
-      // So we wrap it and return the input value from resolveAction
-      return new Promise<string>(resolve => {
-        // Store the original resolveAction so we can call it with the input value
-        const originalHandleAction = this.handleAction;
-        this.handleAction = (value: string) => {
-          // Restore original handler
-          this.handleAction = originalHandleAction;
-          // Resolve with the input value
-          resolve(value);
-        };
+    // Use provided locations or generate default locations from schema
+    const content = {
+      prompt,
+      placeholder,
+      buttonText: buttonText || 'Continue',
+      validation: options?.validation,
+      minLength: options?.minLength,
+      maxLength: options?.maxLength,
+      required: options?.required
+    };
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('inputText', content);
 
-        this.renderPositionedBeat('inputText', {
-          prompt,
-          placeholder,
-          buttonText: buttonText || 'Continue',
-          validation: options?.validation,
-          minLength: options?.minLength,
-          maxLength: options?.maxLength,
-          required: options?.required
-        }, locations, true);
-      });
-    }
+    // renderPositionedBeat returns a Promise<void>, but we need Promise<string>
+    // So we wrap it and return the input value from resolveAction
+    return new Promise<string>(resolve => {
+      // Store the original resolveAction so we can call it with the input value
+      const originalHandleAction = this.handleAction;
+      this.handleAction = (value: string) => {
+        // Restore original handler
+        this.handleAction = originalHandleAction;
+        // Resolve with the input value
+        resolve(value);
+      };
 
-    // Fall back to functional component rendering
-    return new Promise(resolve => {
-      this.resolveAction = resolve;
-      this.renderComponent(
-        <InputText prompt={prompt} placeholder={placeholder} buttonText={buttonText} options={options} onAction={this.handleAction} />
-      );
+      this.renderPositionedBeat('inputText', content, effectiveLocations, true);
     });
   }
 
@@ -994,14 +932,10 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
-    if (locations && locations.length > 0) {
-      return this.renderPositionedBeat('hyperText', data, locations, true);
-    }
+    // Use provided locations or generate default locations from schema
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('hyperText', data);
 
-    return new Promise(resolve => {
-      this.resolveAction = resolve;
-      this.renderComponent(<HyperText data={data} onAction={this.handleAction} />);
-    });
+    return this.renderPositionedBeat('hyperText', data, effectiveLocations, true);
   }
 
   // Show choices with fade-in animation

@@ -50,27 +50,28 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
     if (assetType && asset.type !== assetType) return false;
     
     // FIXED: More permissive subtype filtering with fallbacks
+    // Note: Use asset.name for extension checks since blob URLs don't have extensions
     if (assetSubType) {
       if (assetSubType === 'background') {
         // Backgrounds: JPG/JPEG images OR explicitly marked as background
-        const isBackground = asset.type === 'image' && 
-          (asset.url.toLowerCase().match(/\.(jpg|jpeg)$/i) || 
+        const isBackground = asset.type === 'image' &&
+          (asset.name.toLowerCase().match(/\.(jpg|jpeg)$/i) ||
            asset.subType === 'background' ||
            asset.name.toLowerCase().includes('bg') ||
            asset.name.toLowerCase().includes('background'));
         if (!isBackground) return false;
       } else if (assetSubType === 'character') {
-        // Characters: PNG images OR explicitly marked as character  
-        const isCharacter = asset.type === 'image' && 
-          (asset.url.toLowerCase().endsWith('.png') ||
+        // Characters: PNG images OR explicitly marked as character
+        const isCharacter = asset.type === 'image' &&
+          (asset.name.toLowerCase().endsWith('.png') ||
            asset.subType === 'character' ||
            asset.name.toLowerCase().includes('char') ||
            asset.name.toLowerCase().includes('character'));
         if (!isCharacter) return false;
       } else if (assetSubType === 'prop') {
         // Props: PNG images OR explicitly marked as prop
-        const isProp = asset.type === 'image' && 
-          (asset.url.toLowerCase().endsWith('.png') ||
+        const isProp = asset.type === 'image' &&
+          (asset.name.toLowerCase().endsWith('.png') ||
            asset.subType === 'prop' ||
            asset.name.toLowerCase().includes('prop') ||
            asset.name.toLowerCase().includes('item'));

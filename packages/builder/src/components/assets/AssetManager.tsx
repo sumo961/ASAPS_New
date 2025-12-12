@@ -87,15 +87,21 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, forcedSubType?: Asset['subType']) => {
+    console.log('[AssetManager] handleFileUpload called');
     const files = event.target.files;
-    if (!files) return;
+    if (!files) {
+      console.log('[AssetManager] No files selected');
+      return;
+    }
+    console.log('[AssetManager] Files to upload:', files.length);
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      console.log('[AssetManager] Processing file:', file.name, 'type:', file.type, 'size:', file.size);
       const fileType = getFileType(file);
 
       if (!fileType) {
-        console.warn(`Unsupported file type: ${file.type}`);
+        console.warn(`[AssetManager] Unsupported file type: ${file.type}`);
         continue;
       }
 
@@ -108,6 +114,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
         size: file.size,
         uploadedAt: new Date(),
       };
+      console.log('[AssetManager] Created asset object:', asset.id, asset.name);
 
       // Get dimensions for images and videos
       if (fileType === 'image') {
@@ -115,6 +122,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
         asset.dimensions = dimensions;
         // Use forced subType if provided, otherwise guess
         asset.subType = forcedSubType || guessImageSubType(file.name);
+        console.log('[AssetManager] Image dimensions:', dimensions);
       } else if (fileType === 'video') {
         const { dimensions, duration } = await getVideoDimensions(file);
         asset.dimensions = dimensions;
@@ -124,7 +132,9 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
         asset.subType = forcedSubType || guessAudioSubType(file.name);
       }
 
+      console.log('[AssetManager] Calling onAssetAdd for:', asset.name);
       onAssetAdd(asset);
+      console.log('[AssetManager] onAssetAdd returned for:', asset.name);
     }
 
     // Reset all input refs

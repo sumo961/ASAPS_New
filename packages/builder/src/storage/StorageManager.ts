@@ -339,9 +339,76 @@ export class StorageManager {
 
   /**
    * Get assets for a specific project
+   * Falls back to v2 asset-metadata store if v1 assets store is empty
    */
   async getProjectAssets(projectId: string): Promise<StorageResult<StoredAsset[]>> {
-    return this.listAssets({ projectId });
+    // First try v1 assets store
+    const v1Result = await this.listAssets({ projectId });
+
+    // If v1 store has assets, return them
+    if (v1Result.success && v1Result.data && v1Result.data.length > 0) {
+      return v1Result;
+    }
+
+    // Fall back to v2 asset-metadata store (used by HybridStorageAdapter)
+    try {
+      const db = await this.getDb();
+
+      // Check if asset-metadata store exists
+      if (!db.objectStoreNames.contains('asset-metadata')) {
+        return v1Result; // Return v1 result (empty) if v2 store doesn't exist
+      }
+
+      const tx = db.transaction(['asset-metadata', 'assets'], 'readonly');
+      const metadataIndex = tx.objectStore('asset-metadata').index('by-project');
+      const metadataList = await metadataIndex.getAll(projectId);
+
+      if (metadataList.length === 0) {
+        return v1Result; // Return v1 result if no v2 assets either
+      }
+
+      // Load assets from v2 storage
+      const storedAssets: StoredAsset[] = [];
+      const assetsStore = tx.objectStore('assets');
+
+      for (const metadata of metadataList) {
+        // Load blob from assets store (v2 uses same store for small assets)
+        const assetData = await assetsStore.get(metadata.id);
+        if (assetData?.blob) {
+          // Convert v2 metadata + blob to StoredAsset format
+          const storedAsset: StoredAsset = {
+            id: metadata.id,
+            projectId: metadata.projectId,
+            type: this.inferAssetType(metadata.mimeType),
+            filename: metadata.filename,
+            mimeType: metadata.mimeType,
+            size: metadata.size,
+            blob: assetData.blob,
+            uploadedAt: new Date(metadata.uploadedAt),
+            lastUsedAt: new Date(),
+            metadata: (metadata as any).metadata || {},
+          };
+          storedAssets.push(storedAsset);
+        }
+      }
+
+      this.log('Assets loaded from v2 store:', storedAssets.length);
+      return { success: true, data: storedAssets };
+    } catch (error) {
+      this.logError('Failed to load assets from v2 store', error);
+      return v1Result; // Return v1 result on error
+    }
+  }
+
+  /**
+   * Infer asset type from MIME type
+   */
+  private inferAssetType(mimeType: string): AssetType {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.includes('font')) return 'font';
+    return 'other';
   }
 
   /**

@@ -248,10 +248,6 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
   return (
     <div className="h-full bg-gray-100 flex flex-col overflow-hidden">
-      {/* DEBUG BANNER */}
-      <div className="bg-red-500 text-white text-center py-2 font-bold">
-        🔧 DEBUG MODE - VisualBeatEditor LOADED - Updated Code Active 🔧
-      </div>
       {/* Toolbar - Fixed at top */}
       <div className="flex-shrink-0 bg-white border-b border-gray-300 p-2 flex gap-2 items-center shadow-sm">
         <button
@@ -294,23 +290,16 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         </button>
         <button
           onClick={() => {
-            alert('Props button clicked! Check console.');
             // Open asset manager filtered to props
             if (onSelectAsset) {
-              console.log('[VisualBeatEditor] Opening asset selection for props');
               onSelectAsset('prop', (selectedAsset) => {
-                console.log('[VisualBeatEditor] Prop selected:', selectedAsset);
                 if (selectedAsset && selectedAsset.id) {
                   // Add prop element in the center of the canvas
                   const x = (stageWidth / 2) - 75;
                   const y = (stageHeight / 2) - 75;
                   addElement('prop', x, y, selectedAsset.id);
-                } else {
-                  console.warn('[VisualBeatEditor] No asset selected or asset has no ID');
                 }
               });
-            } else {
-              console.error('[VisualBeatEditor] onSelectAsset callback not provided');
             }
           }}
           className={`p-2 rounded hover:bg-gray-100`}

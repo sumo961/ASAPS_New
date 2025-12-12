@@ -102,13 +102,13 @@ function App() {
       scalingMode: 'fit'
     },
     colors: {
-      pcolor: '#ffffff',
-      palpha: 1,
-      nonpcolor: '#ffffff',
-      nonpalpha: 1,
-      bgColor: '#000000',
-      textBoxBg: '#000000',
-      textBoxBorder: '#ffffff'
+      pcolor: '#000000',
+      palpha: 100,  // Text opacity percentage (0-100)
+      nonpcolor: '#000000',
+      nonpalpha: 100,  // Text opacity percentage (0-100)
+      bgColor: '#87CEEB',
+      textBoxBg: '#ffffff',
+      textBoxBorder: '#333333'
     },
     fonts: {
       titleFont: 'Arial',
@@ -124,7 +124,7 @@ function App() {
       radius: 8,
       padding: 16,
       borderWidth: 2,
-      opacity: 0.8,
+      opacity: 80,  // Text box background opacity percentage (0-100)
       position: 'bottom',
       boxVisibility: 'all'
     },
@@ -925,6 +925,7 @@ function App() {
                         assetInfo.mimeType.startsWith('audio/') ? 'audio' :
                         assetInfo.mimeType.startsWith('video/') ? 'video' :
                         assetInfo.mimeType.includes('font') ? 'font' : 'image',
+                  subType: (assetInfo as { subType?: Asset['subType'] }).subType,
                   url,
                   size: assetInfo.size,
                   uploadedAt: new Date(assetInfo.uploadedAt),
@@ -1862,6 +1863,7 @@ function App() {
               onConnect={actions.connectBeats}
               onDisconnect={actions.disconnectBeats}
               onBeatAdd={actions.addBeat}
+              assets={assets}
               onAssetSelect={handleAssetSelect}
               onOpenCharacterManager={handleOpenCharacterManager}
             />
@@ -1875,6 +1877,7 @@ function App() {
           story={getStoryForPreview()}
           assets={assets}
           characters={characters}
+          settings={globalSettings}
           onClose={handleClosePreview}
         />
       )}

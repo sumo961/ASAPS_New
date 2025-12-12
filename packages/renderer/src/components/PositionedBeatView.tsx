@@ -28,6 +28,8 @@ export interface PositionedElementData {
  * Maps directly to GlobalSettings from the builder
  */
 export interface RenderThemeSettings {
+  /** Stage/canvas background color (used when no background image is set) */
+  backgroundColor?: string;
   /** Text box styling */
   textBox: {
     backgroundColor: string;
@@ -136,12 +138,14 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // FIX #3: Add debugging logs
   console.log('[PositionedBeatView] ============================================');
   console.log('[PositionedBeatView] Rendering');
+  console.log('[PositionedBeatView]   - previewMode:', previewMode, '(type:', typeof previewMode, ')');
   console.log('[PositionedBeatView]   - backgroundUrl:', backgroundUrl);
   console.log('[PositionedBeatView]   - backgroundColor prop:', backgroundColor);
   console.log('[PositionedBeatView]   - elements count:', elements.length);
   console.log('[PositionedBeatView]   - stageSize:', { width: stageWidth, height: stageHeight });
   console.log('[PositionedBeatView]   - willUseImage:', !!backgroundUrl);
   console.log('[PositionedBeatView]   - willUseColor:', !backgroundUrl);
+  console.log('[PositionedBeatView]   - BRANCH:', previewMode ? 'FLEX LAYOUT (previewMode=true)' : 'ABSOLUTE POSITIONING (previewMode=false)');
   console.log('[PositionedBeatView] ============================================');
 
   // State to manage input text value (for InputText beats)
