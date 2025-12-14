@@ -1,15 +1,417 @@
 import { Story } from '../engine/Story';
 import { Beat } from '../beats/Beat';
 import { BeatTypeRegistry } from '../beats/BeatRegistry';
-import type { 
-  BeatConfig, 
-  Transition, 
-  Sound, 
-  Location, 
+import type {
+  BeatConfig,
+  Transition,
+  Sound,
+  Location,
   Connection,
   Condition,
-  Effect 
+  Effect
 } from '../types';
+
+/**
+ * Maps legacy ASML beat type names to modern equivalents.
+ * This ensures old story files are properly converted on import.
+ */
+const LEGACY_TYPE_MAP: Record<string, string> = {
+  'conversationChoice': 'dialogTree',
+  'conditionCheck': 'conditionBeat',
+  'setGlobal': 'setVariable',
+};
+
+// ============================================
+// Import-time auto-sizing utilities
+// ============================================
+
+const DEFAULT_FONT_SIZE = 16;
+const MIN_FONT_SIZE = 12;
+const MAX_BUTTON_WIDTH_RATIO = 0.4;  // 40% of canvas
+const MAX_TEXT_WIDTH_RATIO = 0.9;    // 90% of canvas
+const CANVAS_WIDTH = 1024;
+const CANVAS_HEIGHT = 768;
+
+/**
+ * Calculate ideal text box dimensions at a given font size
+ * Uses tight padding to avoid oversized boxes
+ */
+function calculateIdealDimensions(
+  content: string,
+  fontSize: number,
+  maxWidth: number,
+  elementType: 'button' | 'text'
+): { width: number; height: number; lines: number } {
+  if (!content || content.length === 0) {
+    return { width: 100, height: fontSize * 1.4 + 20, lines: 1 };
+  }
+
+  const charWidth = fontSize * 0.55; // Average character width ratio
+  const lineHeight = fontSize * 1.4;
+
+  // Padding: more generous for buttons to avoid cramped look
+  // paddingX is horizontal (left + right), paddingY is vertical (top + bottom)
+  const paddingX = elementType === 'button' ? 24 : 24;
+  const paddingY = elementType === 'button' ? 20 : 16; // Increased button vertical padding
+
+  const textWidth = content.length * charWidth;
+
+  // Check if single line fits within max width
+  if (textWidth + paddingX <= maxWidth) {
+    // Single line
+    return {
+      width: textWidth + paddingX,
+      height: lineHeight + paddingY,
+      lines: 1
+    };
+  }
+
+  // Multi-line: calculate how many lines at max width
+  const availableWidth = maxWidth - paddingX;
+  const charsPerLine = Math.max(Math.floor(availableWidth / charWidth), 10);
+  const numLines = Math.ceil(content.length / charsPerLine);
+
+  // For multiline buttons, add extra vertical padding per line for breathing room
+  const extraPaddingPerLine = elementType === 'button' ? 4 : 0;
+  const totalHeight = (numLines * lineHeight) + paddingY + (numLines > 1 ? extraPaddingPerLine * numLines : 0);
+
+  return {
+    width: maxWidth,
+    height: totalHeight,
+    lines: numLines
+  };
+}
+
+/**
+ * Fit text content to a box, prioritizing 16px font size
+ * Returns ideal dimensions and fontSize
+ *
+ * Strategy:
+ * 1. Try 16px font - calculate ideal box size
+ * 2. If ideal width exceeds max, reduce font size
+ * 3. Use the IDEAL dimensions (not legacy scaled dimensions)
+ */
+function fitTextToBox(
+  content: string,
+  scaledWidth: number,
+  scaledHeight: number,
+  elementType: 'button' | 'text'
+): { fontSize: number; width: number; height: number } {
+  if (!content || content.length === 0) {
+    // Empty content: use minimal default size
+    const minWidth = elementType === 'button' ? 100 : 150;
+    const minHeight = elementType === 'button' ? 40 : 50;
+    return { fontSize: DEFAULT_FONT_SIZE, width: minWidth, height: minHeight };
+  }
+
+  const maxWidth = elementType === 'button'
+    ? CANVAS_WIDTH * MAX_BUTTON_WIDTH_RATIO  // 410px
+    : CANVAS_WIDTH * MAX_TEXT_WIDTH_RATIO;   // 922px
+
+  // Start with default 16px and calculate ideal dimensions
+  let fontSize = DEFAULT_FONT_SIZE;
+  let dims = calculateIdealDimensions(content, fontSize, maxWidth, elementType);
+
+  // Only reduce font size if we're hitting the width limit AND text is very long
+  // This prevents unnecessary font reduction
+  while (dims.lines > 4 && fontSize > MIN_FONT_SIZE) {
+    fontSize--;
+    dims = calculateIdealDimensions(content, fontSize, maxWidth, elementType);
+  }
+
+  // Return ideal dimensions (ignore legacy scaled dimensions)
+  return {
+    fontSize,
+    width: Math.round(dims.width),
+    height: Math.round(dims.height)
+  };
+}
+
+/**
+ * Get text content for a location based on beat type and parameters
+ */
+function getContentForLocation(
+  location: Location,
+  beatType: string,
+  parameters: any,
+  allLocations?: Location[]
+): string {
+  const kind = location.kind;
+  const name = location.name || '';
+
+  // Text boxes: get from beat's text/question/message/prompt field
+  if (kind === 'text') {
+    // Try various text fields
+    return parameters.text ||
+           parameters.question ||
+           parameters.message ||
+           parameters.prompt ||
+           parameters.title ||
+           parameters.dialogTree?.text ||
+           '';
+  }
+
+  // Buttons: look up choice text by name or index
+  if (kind === 'button') {
+    // For introText/titleScreen - single button beats
+    if (beatType === 'introText' || beatType === 'titleScreen') {
+      return parameters.buttonText || 'Continue';
+    }
+
+    // For endScreen
+    if (beatType === 'endScreen') {
+      if (name.toLowerCase().includes('restart') || name.toLowerCase().includes('play')) {
+        return parameters.restartText || 'Play Again';
+      }
+      if (name.toLowerCase().includes('credit')) {
+        return parameters.creditsText || 'Credits';
+      }
+      // Default for endScreen buttons
+      return parameters.restartText || 'Play Again';
+    }
+
+    // For dialogTree/conversationChoice
+    if (parameters.dialogTree?.choices && parameters.dialogTree.choices.length > 0) {
+      const choices = parameters.dialogTree.choices;
+
+      // Try matching by choice text or ID
+      const choice = choices.find(
+        (c: any) => c.text === name || c.id === name
+      );
+      if (choice) return choice.text || '';
+
+      // Try index-based matching (button1 -> choices[0])
+      const indexMatch = name.match(/button(\d+)/i);
+      if (indexMatch) {
+        const index = parseInt(indexMatch[1]) - 1;
+        if (choices[index]) {
+          return choices[index].text || '';
+        }
+      }
+
+      // Fallback: match by button position in locations array
+      if (allLocations) {
+        const buttonLocations = allLocations.filter(l => l.kind === 'button');
+        const buttonIndex = buttonLocations.indexOf(location);
+        if (buttonIndex >= 0 && choices[buttonIndex]) {
+          return choices[buttonIndex].text || '';
+        }
+      }
+
+      // Last resort: return first choice
+      if (choices[0]) {
+        return choices[0].text || '';
+      }
+    }
+
+    // For movementChoice
+    if (parameters.choices && parameters.choices.length > 0) {
+      const choices = parameters.choices;
+      const choice = choices.find(
+        (c: any) => c.text === name || c.id === name || c.location === name
+      );
+      if (choice) return choice.text || '';
+
+      // Fallback: match by button position
+      if (allLocations) {
+        const buttonLocations = allLocations.filter(l => l.kind === 'button');
+        const buttonIndex = buttonLocations.indexOf(location);
+        if (buttonIndex >= 0 && choices[buttonIndex]) {
+          return choices[buttonIndex].text || '';
+        }
+      }
+    }
+
+    // Default: use location name if nothing else matches
+    return name || 'Button';
+  }
+
+  return '';
+}
+
+/**
+ * Check if two rectangles overlap
+ */
+function rectanglesOverlap(
+  r1: { x: number; y: number; width: number; height: number },
+  r2: { x: number; y: number; width: number; height: number },
+  margin: number = 5
+): boolean {
+  return !(
+    r1.x + r1.width + margin <= r2.x ||
+    r2.x + r2.width + margin <= r1.x ||
+    r1.y + r1.height + margin <= r2.y ||
+    r2.y + r2.height + margin <= r1.y
+  );
+}
+
+/**
+ * Prevent overlaps between text boxes, buttons, and character placeholders
+ * Repositions moveable elements (buttons) to avoid collisions with fixed elements (text, characters)
+ */
+function preventOverlaps(locations: Location[]): void {
+  // Separate element types
+  // Text boxes and character placeholders are "fixed" - buttons move around them
+  const fixedElements = locations.filter(l => l.kind === 'text' || l.kind === 'character');
+  const buttons = locations.filter(l => l.kind === 'button');
+
+  // Minimum gap between elements
+  const GAP = 10;
+
+  // Move buttons away from fixed elements (text boxes and character placeholders)
+  for (const button of buttons) {
+    for (const fixed of fixedElements) {
+      if (!rectanglesOverlap(button, fixed, GAP)) continue;
+
+      // Calculate overlap amounts
+      const buttonRight = button.x + button.width;
+      const buttonBottom = button.y + button.height;
+      const fixedRight = fixed.x + fixed.width;
+      const fixedBottom = fixed.y + fixed.height;
+
+      // Calculate how much we'd need to move in each direction
+      const moveLeft = buttonRight - fixed.x + GAP;
+      const moveRight = fixedRight - button.x + GAP;
+      const moveUp = buttonBottom - fixed.y + GAP;
+      const moveDown = fixedBottom - button.y + GAP;
+
+      // Choose the smallest movement that resolves the overlap
+      const moves = [
+        { dir: 'down', amount: moveDown, newX: button.x, newY: fixedBottom + GAP },
+        { dir: 'up', amount: moveUp, newX: button.x, newY: fixed.y - button.height - GAP },
+        { dir: 'right', amount: moveRight, newX: fixedRight + GAP, newY: button.y },
+        { dir: 'left', amount: moveLeft, newX: fixed.x - button.width - GAP, newY: button.y }
+      ];
+
+      // Filter out moves that would put button off-screen
+      const validMoves = moves.filter(m =>
+        m.newX >= 10 &&
+        m.newX + button.width <= CANVAS_WIDTH - 10 &&
+        m.newY >= 10 &&
+        m.newY + button.height <= CANVAS_HEIGHT - 10
+      );
+
+      // Prefer moving down (natural flow), then right, then up, then left
+      // But only if the move amount is reasonable
+      const preferredOrder = ['down', 'right', 'up', 'left'];
+      let bestMove = null;
+
+      for (const preferred of preferredOrder) {
+        const move = validMoves.find(m => m.dir === preferred);
+        if (move) {
+          bestMove = move;
+          break;
+        }
+      }
+
+      // If no preferred move works, take the smallest valid move
+      if (!bestMove && validMoves.length > 0) {
+        validMoves.sort((a, b) => a.amount - b.amount);
+        bestMove = validMoves[0];
+      }
+
+      if (bestMove) {
+        button.x = bestMove.newX;
+        button.y = bestMove.newY;
+      }
+    }
+  }
+
+  // Stack buttons vertically if they overlap each other
+  // Sort by Y position first, then X position for same row
+  buttons.sort((a, b) => {
+    const yDiff = a.y - b.y;
+    if (Math.abs(yDiff) < 20) return a.x - b.x; // Same row, sort by X
+    return yDiff;
+  });
+
+  for (let i = 1; i < buttons.length; i++) {
+    const prevButton = buttons[i - 1];
+    const currButton = buttons[i];
+
+    if (!rectanglesOverlap(currButton, prevButton, GAP)) continue;
+
+    const prevBottom = prevButton.y + prevButton.height;
+    const prevRight = prevButton.x + prevButton.width;
+
+    // Check if they're roughly on the same row
+    const sameRow = Math.abs(prevButton.y - currButton.y) < 20;
+
+    if (sameRow) {
+      // Side-by-side buttons - move current button to the right
+      currButton.x = prevRight + GAP;
+    } else {
+      // Stacked buttons - move current button below
+      currButton.y = prevBottom + GAP;
+    }
+  }
+
+  // Final pass: check buttons against fixed elements again after button stacking
+  // This handles cases where button stacking pushed a button into a fixed element
+  for (const button of buttons) {
+    for (const fixed of fixedElements) {
+      if (!rectanglesOverlap(button, fixed, GAP)) continue;
+
+      // Simply move button below the fixed element
+      button.y = fixed.y + fixed.height + GAP;
+    }
+  }
+}
+
+/**
+ * Clamp element positions to ensure they stay within the canvas bounds
+ * Prevents buttons and text boxes from overrunning the edges
+ */
+function clampToCanvas(locations: Location[]): void {
+  const MARGIN = 10; // Minimum margin from canvas edges
+  const MAX_X = CANVAS_WIDTH - MARGIN;
+  const MAX_Y = CANVAS_HEIGHT - MARGIN;
+
+  for (const loc of locations) {
+    // Skip non-visual elements
+    if (loc.kind !== 'text' && loc.kind !== 'button') continue;
+
+    // Clamp right edge: if x + width exceeds canvas, move element left
+    const rightEdge = loc.x + loc.width;
+    if (rightEdge > MAX_X) {
+      // First try to move the element left
+      const newX = MAX_X - loc.width;
+      if (newX >= MARGIN) {
+        loc.x = newX;
+      } else {
+        // Element is too wide - clamp to margin and potentially shrink width
+        loc.x = MARGIN;
+        if (loc.width > CANVAS_WIDTH - 2 * MARGIN) {
+          loc.width = CANVAS_WIDTH - 2 * MARGIN;
+        }
+      }
+    }
+
+    // Clamp left edge
+    if (loc.x < MARGIN) {
+      loc.x = MARGIN;
+    }
+
+    // Clamp bottom edge: if y + height exceeds canvas, move element up
+    const bottomEdge = loc.y + loc.height;
+    if (bottomEdge > MAX_Y) {
+      const newY = MAX_Y - loc.height;
+      if (newY >= MARGIN) {
+        loc.y = newY;
+      } else {
+        loc.y = MARGIN;
+        if (loc.height > CANVAS_HEIGHT - 2 * MARGIN) {
+          loc.height = CANVAS_HEIGHT - 2 * MARGIN;
+        }
+      }
+    }
+
+    // Clamp top edge
+    if (loc.y < MARGIN) {
+      loc.y = MARGIN;
+    }
+  }
+}
 
 export class ASMLParser {
   private beatTypeRegistry: BeatTypeRegistry;
@@ -322,6 +724,16 @@ export class ASMLParser {
       };
     }
 
+    // Background sound/music
+    const bgSoundElement = settingsElement.querySelector('backgroundsound');
+    if (bgSoundElement) {
+      settings.sound = {
+        backgroundMusic: bgSoundElement.getAttribute('name') || '',
+        backgroundVolume: parseInt(bgSoundElement.getAttribute('volume') || '70'),
+        mute: bgSoundElement.getAttribute('mute') === 'true'
+      };
+    }
+
     return settings;
   }
 
@@ -578,13 +990,13 @@ export class ASMLParser {
         });
       } else {
         // Legacy format: <clusters cluster1="Mom's House" cluster2="Forest" />
+        // IMPORTANT: Use cluster name as ID since beats reference clusters by name
         const attributes = Array.from(clustersElement.attributes);
         attributes.forEach((attr, index) => {
           if (attr.name.startsWith('cluster')) {
-            const clusterId = `cluster_${index}`;
             const clusterName = attr.value;
             clusters.push({
-              id: clusterId,
+              id: clusterName, // Use name as ID - beats reference clusters by name
               name: clusterName,
               type: 'organizational',
               isExpanded: true,
@@ -629,7 +1041,9 @@ export class ASMLParser {
 
     const id = idElement.getAttribute('id') || '';
     const name = idElement.getAttribute('name') || `Beat ${id}`;
-    const cluster = idElement.getAttribute('cluster');
+    const clusterAttr = idElement.getAttribute('cluster');
+    // Ensure cluster is properly undefined if not set, not the string "undefined"
+    const cluster = (clusterAttr && clusterAttr !== 'undefined' && clusterAttr !== 'null') ? clusterAttr : undefined;
 
     // Get beat function/type
     const functionElement = beatElement.querySelector('function');
@@ -638,14 +1052,16 @@ export class ASMLParser {
       return null;
     }
 
-    const beatType = functionElement.getAttribute('kind') || '';
+    const rawBeatType = functionElement.getAttribute('kind') || '';
+    // Convert legacy beat types to modern equivalents
+    const beatType = LEGACY_TYPE_MAP[rawBeatType] || rawBeatType;
 
     // Create beat configuration
     const config: BeatConfig = {
       id,
       name,
       type: beatType,
-      cluster: cluster || undefined
+      cluster
     };
 
     // Parse transition
@@ -688,8 +1104,75 @@ export class ASMLParser {
     }
 
     // Parse beat-specific parameters and connections
-    const { parameters, connections } = this.parseBeatFunction(functionElement, beatType, config);
+    // Pass rawBeatType so we can parse legacy formats correctly
+    const { parameters, connections } = this.parseBeatFunction(functionElement, rawBeatType, config);
     config.parameters = parameters;
+
+    // Apply import-time auto-sizing to locations BEFORE beat creation
+    // This ensures the beat is created with correct dimensions
+    if (config.locations && config.locations.length > 0) {
+      const allLocations = config.locations;
+      console.log(`[ASMLParser] Sizing ${allLocations.length} locations for beat ${id} (${beatType})`);
+
+      // Helper to detect if a location is actually a button (legacy ASML uses kind="text" for buttons)
+      const isButtonLocation = (loc: Location): boolean => {
+        if (loc.kind === 'button') return true;
+        const nameLower = (loc.name || '').toLowerCase();
+        return nameLower.includes('button') ||
+               nameLower.includes('start') ||
+               nameLower.includes('continue') ||
+               nameLower.includes('restart') ||
+               nameLower.includes('credits') ||
+               nameLower.includes('submit') ||
+               nameLower.includes('skip') ||
+               nameLower.includes('play');
+      };
+
+      allLocations.forEach((location: Location) => {
+        // Process ALL text and button elements - always calculate proper dimensions
+        if (location.kind === 'text' || location.kind === 'button') {
+          // Determine actual element type (legacy ASML uses kind="text" for buttons)
+          const isButton = isButtonLocation(location);
+          const elementType: 'button' | 'text' = isButton ? 'button' : 'text';
+
+          // Update kind to 'button' if it's actually a button (for consistent handling later)
+          if (isButton && location.kind !== 'button') {
+            location.kind = 'button';
+          }
+
+          const content = getContentForLocation(location, beatType, parameters, allLocations);
+          console.log(`[ASMLParser] Location "${location.name}" (${elementType}): content="${content?.substring(0, 30)}...", original size=${location.width}x${location.height}`);
+          if (content) {
+            const fit = fitTextToBox(
+              content,
+              location.width,
+              location.height,
+              elementType
+            );
+            console.log(`[ASMLParser] -> fitTextToBox result: fontSize=${fit.fontSize}, size=${fit.width}x${fit.height}`);
+            // Always set fontSize and dimensions
+            location.fontSize = fit.fontSize;
+            location.width = fit.width;
+            location.height = fit.height;
+          } else {
+            console.log(`[ASMLParser] -> No content found, using defaults`);
+            // No content found, set default fontSize and reasonable size
+            location.fontSize = location.fontSize ?? DEFAULT_FONT_SIZE;
+            if (isButton) {
+              location.width = Math.min(location.width, 150);
+              location.height = Math.min(location.height, 40);
+            }
+          }
+        }
+      });
+
+      // Prevent overlaps between elements
+      preventOverlaps(allLocations);
+
+      // Clamp all elements to canvas bounds (prevent overrunning edges)
+      clampToCanvas(allLocations);
+      console.log(`[ASMLParser] After overlap prevention and clamping:`, allLocations.map(l => ({ name: l.name, kind: l.kind, x: l.x, y: l.y, w: l.width, h: l.height })));
+    }
 
     // Create beat instance
     let beat: Beat;
@@ -717,7 +1200,7 @@ export class ASMLParser {
       
       // Add connections to the beat
       connections.forEach(conn => beat.addConnection(conn));
-      
+
       return beat;
     } catch (error: any) {
       this.warnings.push(`Failed to create beat ${id} of type ${beatType}: ${error.message}`);
@@ -750,9 +1233,34 @@ export class ASMLParser {
 
     // Parse nested elements based on beat type
     switch (beatType) {
-      case 'introText':
       case 'titleScreen':
+        // Parse titleScreen-specific elements
+        const titleEl = functionElement.querySelector('title');
+        if (titleEl) {
+          parameters.title = titleEl.textContent || '';
+        }
+        const authorEl = functionElement.querySelector('author');
+        if (authorEl) {
+          parameters.author = authorEl.textContent || '';
+        }
+        // Button text parsed below in generic section
+        // Connection handled at end via <target> element
+        break;
+
       case 'durScreen':
+        // Parse durScreen-specific elements
+        const durTextEl = functionElement.querySelector('text');
+        if (durTextEl) {
+          parameters.text = durTextEl.textContent || '';
+        }
+        const durationEl = functionElement.querySelector('duration');
+        if (durationEl) {
+          parameters.duration = parseInt(durationEl.textContent || '3000');
+        }
+        // Connection handled at end via <target> element
+        break;
+
+      case 'introText':
       case 'endScreen':
       case 'setVariable':
       case 'setCounter':
@@ -761,6 +1269,30 @@ export class ASMLParser {
         const connectionEl = functionElement.querySelector('connection');
         if (connectionEl) {
           connections.push(this.parseConnection(connectionEl));
+        }
+        break;
+
+      case 'setGlobal':
+        // Legacy beat type - convert to setVariable format
+        // Legacy format: <global name="..." val="..."/>, <target targetBeat="..."/>
+        const globalEl = functionElement.querySelector('global');
+        if (globalEl) {
+          parameters.variable = globalEl.getAttribute('name');
+          parameters.value = globalEl.getAttribute('val');
+          // Convert "true"/"false" strings to booleans for display
+          if (parameters.value === 'true') parameters.value = true;
+          else if (parameters.value === 'false') parameters.value = false;
+        }
+        // Parse target for next beat
+        const setGlobalTargetEl = functionElement.querySelector('target');
+        if (setGlobalTargetEl) {
+          const targetBeat = setGlobalTargetEl.getAttribute('targetBeat');
+          if (targetBeat) {
+            parameters.target = targetBeat;
+            connections.push({
+              targetId: targetBeat
+            });
+          }
         }
         break;
         
@@ -820,8 +1352,10 @@ export class ASMLParser {
           const choice = {
             id: choiceEl.getAttribute('id'),
             text: choiceEl.getAttribute('text'),
-            location: choiceEl.getAttribute('location'),
-            target: choiceEl.getAttribute('target')
+            // Legacy ASML uses 'loc', modern uses 'location'
+            location: choiceEl.getAttribute('location') || choiceEl.getAttribute('loc'),
+            // Legacy ASML uses 'targetBeat', modern uses 'target'
+            target: choiceEl.getAttribute('target') || choiceEl.getAttribute('targetBeat')
           };
           choices.push(choice);
 
@@ -974,36 +1508,181 @@ export class ASMLParser {
         }
         break;
 
-      case 'conversationChoice':
-        // Legacy beat type - parse similar to dialogTree
-        const questioner = functionElement.querySelector('questioner');
-        const question = functionElement.querySelector('question');
-        
-        if (questioner) {
-          parameters.questioner = questioner.textContent;
-        }
-        if (question) {
-          parameters.question = question.textContent;
-        }
-        
-        // Parse choices
-        const convChoices: any[] = [];
-        const convChoiceElements = functionElement.querySelectorAll('choice');
-        convChoiceElements.forEach(choiceEl => {
-          const choice = {
-            text: choiceEl.textContent,
-            target: choiceEl.getAttribute('targetBeat') || choiceEl.getAttribute('target')
+      case 'conditionCheck':
+        // Legacy beat type - convert to conditionBeat format
+        // Legacy format: <method val="type"/>, <cond NoTargetBeat="..." YesTargetBeat="..." .../>
+        const methodEl = functionElement.querySelector('method');
+        const condMethod = methodEl?.getAttribute('val') || 'global';
+
+        // Handle different condition check formats
+        if (condMethod === 'idClicked') {
+          // Multiple targets based on clicked button ID
+          // <cond targetBeat="9" val="1"/> means if button 1 clicked, go to beat 9
+          const idCondElements = functionElement.querySelectorAll('cond');
+          const idChoices: any[] = [];
+          idCondElements.forEach(condEl => {
+            const targetBeat = condEl.getAttribute('targetBeat');
+            const buttonVal = condEl.getAttribute('val');
+            if (targetBeat) {
+              idChoices.push({
+                buttonId: buttonVal,
+                target: targetBeat
+              });
+              connections.push({
+                targetId: targetBeat,
+                label: `Button ${buttonVal}`
+              });
+            }
+          });
+          parameters.condition = {
+            type: 'idClicked',
+            choices: idChoices
           };
-          convChoices.push(choice);
-          
-          if (choice.target) {
+        } else {
+          // Single condition with Yes/No targets (inventory, global, counter)
+          const singleCondEl = functionElement.querySelector('cond');
+          if (singleCondEl) {
+            const yesTarget = singleCondEl.getAttribute('YesTargetBeat');
+            const noTarget = singleCondEl.getAttribute('NoTargetBeat');
+
+            // Build condition based on method type
+            if (condMethod === 'inventory') {
+              parameters.condition = {
+                type: 'inventory',
+                character: singleCondEl.getAttribute('char'),
+                item: singleCondEl.getAttribute('val')
+              };
+            } else if (condMethod === 'global') {
+              const varName = singleCondEl.getAttribute('name') || '';
+              const varValue = singleCondEl.getAttribute('val');
+              parameters.condition = {
+                type: 'variable',
+                // Use canonical field name AND legacy fields for compatibility
+                variableName: varName,
+                left: varName,
+                operator: '==',
+                value: varValue === 'true' ? true : varValue === 'false' ? false : varValue,
+                right: varValue === 'true' ? true : varValue === 'false' ? false : varValue
+              };
+            } else if (condMethod === 'counter') {
+              const counterOp = singleCondEl.getAttribute('operator') || 'equal';
+              // Convert legacy operator names to modern format
+              let operator = '==';
+              if (counterOp === 'over') operator = '>';
+              else if (counterOp === 'under') operator = '<';
+              else if (counterOp === 'equal') operator = '==';
+              else if (counterOp === 'notEqual') operator = '!=';
+
+              const counterName = singleCondEl.getAttribute('name') || '';
+              const counterVal = parseInt(singleCondEl.getAttribute('val') || '0');
+              parameters.condition = {
+                type: 'counter',
+                // Use both canonical and legacy field names
+                variableName: counterName,
+                left: counterName,
+                operator: operator,
+                value: counterVal,
+                right: counterVal
+              };
+            }
+
+            // Set true/false targets
+            if (yesTarget) {
+              parameters.trueTarget = yesTarget;
+              connections.push({
+                targetId: yesTarget,
+                label: 'true'
+              });
+            }
+            if (noTarget) {
+              parameters.falseTarget = noTarget;
+              connections.push({
+                targetId: noTarget,
+                label: 'false'
+              });
+            }
+          }
+        }
+        break;
+
+      case 'conversationChoice':
+        // Legacy beat type - convert to dialogTree format
+        const convQuestioner = functionElement.querySelector('questioner');
+        const convQuestion = functionElement.querySelector('question');
+        const convDelayEl = functionElement.querySelector('delay');
+
+        // Parse choice delay
+        if (convDelayEl) {
+          const delayVal = convDelayEl.textContent || convDelayEl.getAttribute('val');
+          if (delayVal) {
+            const delay = parseFloat(delayVal);
+            if (!isNaN(delay) && delay > 0) {
+              parameters.choiceDelay = delay;
+            }
+          }
+        }
+
+        // Build dialogTree structure (same format as modern dialogTree beats)
+        const convDialogTree: any = {
+          speaker: convQuestioner?.textContent || 'Character',
+          text: convQuestion?.textContent || '',
+          choices: []
+        };
+
+        // Parse choices with proper attributes
+        const convChoiceElements = functionElement.querySelectorAll('choice');
+        convChoiceElements.forEach((choiceEl, index) => {
+          // In old ASML, 'content' attribute has the text, NOT textContent
+          const choiceText = choiceEl.getAttribute('content') || choiceEl.textContent || '';
+          const choiceTarget = choiceEl.getAttribute('targetBeat') || choiceEl.getAttribute('target');
+          const choiceId = choiceEl.getAttribute('id') || `choice_${index + 1}`;
+          const counterAttr = choiceEl.getAttribute('counter');
+          const buttonsound = choiceEl.getAttribute('buttonsound');
+
+          const choice: any = {
+            id: choiceId,
+            text: choiceText,
+            target: choiceTarget || undefined
+          };
+
+          // Parse counter attribute (format: "counterName,value" e.g. "friendly,02")
+          if (counterAttr && counterAttr !== 'undefined,00') {
+            const [counterName, counterVal] = counterAttr.split(',');
+            if (counterName && counterName !== 'undefined') {
+              choice.effects = [{
+                type: 'counter',
+                counter: counterName,
+                operation: 'add',
+                value: parseInt(counterVal) || 0
+              }];
+            }
+          }
+
+          convDialogTree.choices.push(choice);
+
+          // Add connection for graph visualization
+          if (choiceTarget) {
             connections.push({
-              targetId: choice.target,
-              label: choice.text || undefined
+              targetId: choiceTarget,
+              label: choiceText || undefined
+            });
+          }
+
+          // Add buttonsound to locations if present
+          if (buttonsound && buttonsound !== 'undefined' && config.locations) {
+            config.locations.push({
+              kind: 'button',
+              name: choiceText || `Choice ${index + 1}`,
+              x: 0, y: 0, width: 100, height: 50,
+              sound: buttonsound
             });
           }
         });
-        parameters.choices = convChoices;
+
+        parameters.dialogTree = convDialogTree;
+        // Also set speaker and text at top level for compatibility
+        parameters.speaker = convDialogTree.speaker;
+        parameters.text = convDialogTree.text;
         break;
 
       case 'randomTarget':
@@ -1286,19 +1965,41 @@ export class ASMLParser {
 
   /**
    * Parse locations
+   * Scales coordinates from legacy 800x600 to modern 1024x768
    */
   private parseLocations(locsElement: Element): Location[] {
     const locations: Location[] = [];
 
+    // Legacy ASML uses 800x600, modern uses 1024x768
+    // Scale factor: 1024/800 = 1.28
+    const SCALE_FACTOR = 1024 / 800;
+
     const locElements = locsElement.querySelectorAll('loc');
     locElements.forEach(locEl => {
+      // Normalize legacy kind values
+      let kind = locEl.getAttribute('kind') || 'text';
+      if (kind === 'char') kind = 'character'; // Legacy ASML uses 'char' instead of 'character'
+      if (kind === 'prop') kind = 'prop'; // Props are already correct
+
+      // Parse raw coordinates
+      const rawX = parseInt(locEl.getAttribute('x') || '0');
+      const rawY = parseInt(locEl.getAttribute('y') || '0');
+      const rawWidth = parseInt(locEl.getAttribute('width') || '100');
+      const rawHeight = parseInt(locEl.getAttribute('height') || '100');
+
+      // Detect if this is legacy 800x600 coordinates (values are within that range)
+      // and scale to 1024x768
+      const isLegacy = rawX < 850 && rawY < 650;
+
+      // Scale all dimensions uniformly for legacy imports
+      // Import-time auto-sizing will adjust text/button sizes based on content
       const location: Location = {
-        kind: locEl.getAttribute('kind') as any || 'text',
+        kind: kind as any,
         name: locEl.getAttribute('name') || '',
-        x: parseInt(locEl.getAttribute('x') || '0'),
-        y: parseInt(locEl.getAttribute('y') || '0'),
-        width: parseInt(locEl.getAttribute('width') || '100'),
-        height: parseInt(locEl.getAttribute('height') || '100'),
+        x: isLegacy ? Math.round(rawX * SCALE_FACTOR) : rawX,
+        y: isLegacy ? Math.round(rawY * SCALE_FACTOR) : rawY,
+        width: isLegacy ? Math.round(rawWidth * SCALE_FACTOR) : rawWidth,
+        height: isLegacy ? Math.round(rawHeight * SCALE_FACTOR) : rawHeight,
         zIndex: parseInt(locEl.getAttribute('zIndex') || '0')
       };
 
@@ -1321,6 +2022,29 @@ export class ASMLParser {
 
       const autosize = locEl.getAttribute('autosize');
       if (autosize) location.autosize = autosize === 'true';
+
+      // Parse character-specific properties (for kind='character')
+      if (location.kind === 'character') {
+        const characterId = locEl.getAttribute('characterId');
+        if (characterId) location.characterId = characterId;
+
+        // characterName can come from 'characterName' attr or fall back to 'name' for legacy ASML
+        const characterName = locEl.getAttribute('characterName');
+        if (characterName) {
+          location.characterName = characterName;
+        } else if (location.name) {
+          // Legacy ASML uses 'name' for character name
+          location.characterName = location.name;
+        }
+
+        // stateId comes from 'state' attribute
+        const stateId = locEl.getAttribute('state');
+        if (stateId) location.stateId = stateId;
+
+        // size is scale percentage
+        const size = locEl.getAttribute('size');
+        if (size) location.size = parseInt(size);
+      }
 
       locations.push(location);
     });
