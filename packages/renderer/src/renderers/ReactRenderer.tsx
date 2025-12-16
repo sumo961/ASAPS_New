@@ -718,11 +718,21 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
-    // Store dialog context for renderChoices to use
-    // NOTE: We don't render anything here - renderChoices will handle all rendering
-    // for dialog trees using the DialogWithChoicesDisplay component.
-    // This prevents the flicker between renderDialog and renderChoices views.
+    // Store dialog context for renderChoices to use later
     this.setState('dialogContext', { speaker, text, emotion });
+
+    // Render dialog immediately WITHOUT choices (don't wait for action)
+    // This ensures the dialog text, background, and characters are visible
+    // even if there's a choiceDelay before showing the choice buttons
+    if (locations && locations.length > 0) {
+      // Filter out button locations - only render text, characters, props, etc.
+      const nonButtonLocations = locations.filter(loc => loc.kind !== 'button');
+      if (nonButtonLocations.length > 0) {
+        const content = { text, speaker, emotion, choices: [] };
+        // waitForAction=false means render and return immediately
+        await this.renderPositionedBeat('dialogTree', content, nonButtonLocations, false);
+      }
+    }
   }
 
   async renderChoices(choices: { id: string; text: string }[], locations?: Location[]): Promise<string> {
@@ -750,86 +760,56 @@ export class ReactRenderer extends BaseRenderer {
         return this.renderPositionedBeat('dialogTree', content, locations, true);
       }
 
-      // Nested dialog: reuse root layout positions but with new content
-      // Create modified locations that map nested content to root positions by index
-      // Note: Dialog text elements can have kind 'text' or 'dialog'
+      // Choice text doesn't match button names - map choices to buttons by index
+      // Use EXACT locations from visual editor - don't modify dimensions
       const textLocations = locations.filter(loc => loc.kind === 'text' || loc.kind === 'dialog');
       const characterLocations = locations.filter(loc => loc.kind === 'character');
+      const propLocations = locations.filter(loc => loc.kind === 'prop');
 
-      console.log('[renderChoices] Nested dialog detected');
-      console.log('[renderChoices] textLocations:', textLocations.length, textLocations.map(l => ({ name: l.name, kind: l.kind })));
-      console.log('[renderChoices] buttonLocations:', buttonLocations.length, buttonLocations.map(l => ({ name: l.name, kind: l.kind })));
-      console.log('[renderChoices] dialogContext.text:', dialogContext.text?.substring(0, 50));
-      console.log('[renderChoices] choices:', choices.map(c => c.text));
-
-      // Build new locations array: remap text element name to "text" for content mapping
-      // Calculate expanded dimensions for nested content
-      const textHeight = 300; // Minimum height for nested text
-      const textWidth = 500;  // Minimum width for nested text
-      const buttonWidth = 450; // Minimum width for buttons
-      const buttonHeight = 60; // Minimum height for buttons
-      const textLoc = textLocations[0];
-      const heightDiff = textLoc ? Math.max(0, textHeight - textLoc.height) : 0;
-
-      const nestedLocations: Location[] = [
-        // Update text location name to "text" so getContentForLocation can map it
-        // Use larger dimensions to accommodate longer nested content
+      // Build locations array with choices mapped to button positions by index
+      const mappedLocations: Location[] = [
+        // Keep text/dialog locations as-is (just rename to 'text' for content mapping)
         ...textLocations.map(loc => ({
           ...loc,
           name: 'text',
-          height: Math.max(loc.height, textHeight),
-          width: Math.max(loc.width, textWidth),
         })),
         ...characterLocations,
+        ...propLocations,
       ];
 
-      // Map nested choices to button positions by index
-      // Offset buttons down if text box was expanded, and ensure adequate button size
-      // FIX: Create new button locations for choices that exceed existing button count
-      const buttonSpacing = 15;
-      let lastButtonY = buttonLocations.length > 0
-        ? buttonLocations[buttonLocations.length - 1].y + heightDiff + buttonHeight + buttonSpacing
-        : (textLocations[0]?.y || 100) + (textLocations[0]?.height || textHeight) + 20 + heightDiff;
-
+      // Map choices to existing button locations by index
+      // Use EXACT button positions from visual editor
       choices.forEach((choice, index) => {
         if (index < buttonLocations.length) {
-          // Reuse existing button location
+          // Use existing button location with choice text as name
           const btnLoc = buttonLocations[index];
-          nestedLocations.push({
+          mappedLocations.push({
             ...btnLoc,
             name: choice.text,
-            y: btnLoc.y + heightDiff,
-            width: Math.max(btnLoc.width, buttonWidth),
-            height: Math.max(btnLoc.height, buttonHeight),
           });
         } else {
-          // Create new button location for additional choices
-          const baseBtn = buttonLocations[0] || {
-            kind: 'button' as const,
-            x: (1024 - buttonWidth) / 2, // Center on stage
-            zIndex: 10,
-          };
-          nestedLocations.push({
-            kind: 'button',
-            name: choice.text,
-            x: baseBtn.x,
-            y: lastButtonY,
-            width: buttonWidth,
-            height: buttonHeight,
-            zIndex: 10 + index,
-          });
-          lastButtonY += buttonHeight + buttonSpacing;
+          // Additional choices beyond defined buttons - stack below last button
+          const lastBtn = buttonLocations[buttonLocations.length - 1] || buttonLocations[0];
+          if (lastBtn) {
+            const buttonSpacing = 15;
+            mappedLocations.push({
+              kind: 'button',
+              name: choice.text,
+              x: lastBtn.x,
+              y: lastBtn.y + (lastBtn.height + buttonSpacing) * (index - buttonLocations.length + 1),
+              width: lastBtn.width,
+              height: lastBtn.height,
+              zIndex: (lastBtn.zIndex || 10) + index,
+            });
+          }
         }
       });
-
-      console.log('[renderChoices] nestedLocations:', nestedLocations.map(l => ({ name: l.name, kind: l.kind })));
 
       const content: Record<string, any> = {
         text: dialogContext.text || '',
         choices
       };
-      console.log('[renderChoices] content.text:', content.text?.substring(0, 50));
-      return this.renderPositionedBeat('dialogTree', content, nestedLocations, true);
+      return this.renderPositionedBeat('dialogTree', content, mappedLocations, true);
     }
 
     // No locations provided - generate default locations from schema

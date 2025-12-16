@@ -355,11 +355,16 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   }
 
   // DEBUG: Log the position values being used for rendering
-  console.log(`[PositionedBeatView] Rendering "${location.name}" (${location.kind}) at x=${location.x}, y=${location.y}, size=${(location as any).size}`);
+  console.log(`[PositionedBeatView] Rendering "${location.name}" (${location.kind}) at x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}, size=${(location as any).size}`);
 
-  // For character/prop elements with size percentage, use auto sizing to preserve natural image dimensions
+  // For character/prop elements, use auto sizing to preserve natural image dimensions when:
+  // 1. They have a size percentage specified, OR
+  // 2. They have default/scaled default dimensions (100x100 or 128x128 from ASML import)
   // The size percentage will be applied as a CSS scale transform in AssetElement
-  const isAssetWithSize = (location.kind === 'character' || location.kind === 'prop') && (location as any).size !== undefined;
+  const hasDefaultDimensions = (location.width === 100 && location.height === 100) ||
+                               (location.width === 128 && location.height === 128);
+  const isAssetWithSize = (location.kind === 'character' || location.kind === 'prop') &&
+                          ((location as any).size !== undefined || hasDefaultDimensions);
 
   // Ensure text/button/dialog elements always appear above characters/props
   // Characters and props get z-index 0-99, text/button/dialog get 100+
@@ -479,6 +484,9 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           name={location.name}
           kind={location.kind}
           size={location.size}
+          interactive={interactive}
+          actionId={element.actionId}
+          onAction={onAction}
         />
       );
 
@@ -849,7 +857,19 @@ const AssetElement: React.FC<{
   name: string;
   kind: string;
   size?: number;  // Character-specific: scale percentage (e.g., 90 = 90% scale)
-}> = ({ style, assetUrl, assetId, name, kind, size }) => {
+  interactive?: boolean;
+  actionId?: string;
+  onAction?: (id: string) => void;
+}> = ({ style, assetUrl, assetId, name, kind, size, interactive, actionId, onAction }) => {
+  // Click handler for interactive props (PickProp beat)
+  const handleClick = () => {
+    if (interactive && actionId && onAction) {
+      console.log(`[AssetElement] Clicked "${name}" with actionId: ${actionId}`);
+      onAction(actionId);
+    }
+  };
+
+  const isClickable = interactive && actionId && onAction;
   // Apply character-specific size scaling
   // size is a percentage (e.g., 90 means 90% of the original size, 115 means 115%)
   const finalStyle: React.CSSProperties = { ...style };
@@ -878,8 +898,24 @@ const AssetElement: React.FC<{
           objectFit: 'none',
           maxWidth: 'none',
           maxHeight: 'none',
+          // Make clickable props visually interactive
+          cursor: isClickable ? 'pointer' : 'default',
+          transition: isClickable ? 'transform 0.1s ease, filter 0.1s ease' : undefined,
         }}
         draggable={false}
+        onClick={handleClick}
+        onMouseEnter={(e) => {
+          if (isClickable) {
+            e.currentTarget.style.filter = 'brightness(1.1)';
+            e.currentTarget.style.transform = (finalStyle.transform || '') + ' scale(1.05)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (isClickable) {
+            e.currentTarget.style.filter = '';
+            e.currentTarget.style.transform = finalStyle.transform || '';
+          }
+        }}
       />
     );
   }
