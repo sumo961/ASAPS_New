@@ -1379,7 +1379,9 @@ export class ASMLParser {
     // Parse default target (legacy)
     const defaultTargetElement = beatElement.querySelector('defaulttarget');
     if (defaultTargetElement) {
-      config.defaultTarget = defaultTargetElement.getAttribute('targetBeat') || undefined;
+      const targetBeat = defaultTargetElement.getAttribute('targetBeat');
+      // Filter out literal string "undefined" from legacy ASML files
+      config.defaultTarget = (targetBeat && targetBeat !== 'undefined') ? targetBeat : undefined;
 
       // Parse delay (val attribute)
       const valAttr = defaultTargetElement.getAttribute('val');
@@ -1612,9 +1614,11 @@ export class ASMLParser {
           parameters.timerName = timerEl.getAttribute('name');
           parameters.name = timerEl.getAttribute('name'); // Compatibility
           parameters.value = parseInt(timerEl.getAttribute('val') || '0');
-          parameters.target = timerEl.getAttribute('target');
-          parameters.timerTarget = timerEl.getAttribute('target'); // Compatibility
-          
+          // Filter out literal string "undefined" from legacy ASML files
+          const timerTarget = timerEl.getAttribute('target');
+          parameters.target = (timerTarget && timerTarget !== 'undefined') ? timerTarget : undefined;
+          parameters.timerTarget = parameters.target; // Compatibility
+
           // The timer target is NOT a regular connection - it's stored as a parameter
           // But we do need to create a special connection for graph visualization
           if (parameters.target) {
@@ -1686,13 +1690,15 @@ export class ASMLParser {
             counterName = counterAttr;
           }
 
+          // Filter out literal string "undefined" from legacy ASML files
+          const rawTarget = choiceEl.getAttribute('target') || choiceEl.getAttribute('targetBeat');
           const choice = {
             id: choiceEl.getAttribute('id'),
             text: choiceEl.getAttribute('text'),
             // Legacy ASML uses 'loc', modern uses 'location'
             location: choiceEl.getAttribute('location') || choiceEl.getAttribute('loc'),
             // Legacy ASML uses 'targetBeat', modern uses 'target'
-            target: choiceEl.getAttribute('target') || choiceEl.getAttribute('targetBeat'),
+            target: (rawTarget && rawTarget !== 'undefined') ? rawTarget : undefined,
             counter: counterName,
             counterOperation: counterName ? 'change' : undefined,
             counterValue: counterValue
@@ -1769,11 +1775,13 @@ export class ASMLParser {
         // First try <prop> elements (old/test format)
         const propElements = functionElement.querySelectorAll('prop');
         propElements.forEach(propEl => {
+          // Filter out literal string "undefined" from legacy ASML files
+          const rawTarget = propEl.getAttribute('target') || propEl.getAttribute('targetBeat');
           const prop = {
             id: propEl.getAttribute('id'),
             name: propEl.getAttribute('name'),
             description: propEl.getAttribute('description') || propEl.getAttribute('desc'),
-            target: propEl.getAttribute('target') || propEl.getAttribute('targetBeat')
+            target: (rawTarget && rawTarget !== 'undefined') ? rawTarget : undefined
           };
           props.push(prop);
 
@@ -1815,11 +1823,13 @@ export class ASMLParser {
               counterName = counterAttr;
             }
 
+            // Filter out literal string "undefined" from legacy ASML files
+            const rawTarget = choiceEl.getAttribute('targetBeat') || choiceEl.getAttribute('target');
             const prop = {
               id: choiceEl.getAttribute('id'),
               name: locName, // 'loc' attribute is the prop/location name
               description: choiceEl.getAttribute('desc') || choiceEl.getAttribute('description'),
-              target: choiceEl.getAttribute('targetBeat') || choiceEl.getAttribute('target'),
+              target: (rawTarget && rawTarget !== 'undefined') ? rawTarget : undefined,
               counter: counterName,
               counterOperation: counterName ? 'change' : undefined,
               counterValue: counterValue
@@ -2034,7 +2044,9 @@ export class ASMLParser {
         convChoiceElements.forEach((choiceEl, index) => {
           // In old ASML, 'content' attribute has the text, NOT textContent
           const choiceText = choiceEl.getAttribute('content') || choiceEl.textContent || '';
-          const choiceTarget = choiceEl.getAttribute('targetBeat') || choiceEl.getAttribute('target');
+          const rawTarget = choiceEl.getAttribute('targetBeat') || choiceEl.getAttribute('target');
+          // Filter out literal string "undefined" from legacy ASML files
+          const choiceTarget = (rawTarget && rawTarget !== 'undefined') ? rawTarget : undefined;
           const choiceId = choiceEl.getAttribute('id') || `choice_${index + 1}`;
           const counterAttr = choiceEl.getAttribute('counter');
           const buttonsound = choiceEl.getAttribute('buttonsound');
@@ -2042,7 +2054,7 @@ export class ASMLParser {
           const choice: any = {
             id: choiceId,
             text: choiceText,
-            target: choiceTarget || undefined
+            target: choiceTarget
           };
 
           // Parse counter attribute (format: "counterName,value" e.g. "friendly,02")
@@ -2236,8 +2248,9 @@ export class ASMLParser {
       };
 
       // target attribute is always a beat ID string (new format)
+      // Filter out literal string "undefined" from legacy ASML files
       const targetAttr = choiceEl.getAttribute('target');
-      if (targetAttr) {
+      if (targetAttr && targetAttr !== 'undefined') {
         choice.target = targetAttr;
       }
 
@@ -2509,8 +2522,10 @@ export class ASMLParser {
    * Parse connection element
    */
   private parseConnection(connectionElement: Element): Connection {
+    const target = connectionElement.getAttribute('target');
+    // Filter out literal string "undefined" from legacy ASML files
     return {
-      targetId: connectionElement.getAttribute('target') || '',
+      targetId: (target && target !== 'undefined') ? target : '',
       label: connectionElement.getAttribute('label') || undefined
     };
   }

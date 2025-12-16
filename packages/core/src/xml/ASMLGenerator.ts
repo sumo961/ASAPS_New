@@ -477,8 +477,8 @@ export class ASMLGenerator {
       lines.push(`${beatIndent}${this.indent}</locs>`);
     }
     
-    // Default target
-    if (beat.defaultTarget) {
+    // Default target - don't export "undefined" string
+    if (beat.defaultTarget && beat.defaultTarget !== 'undefined') {
       const delay = beat.defaultTargetDelay || 0;
       const attrs = [`targetBeat="${beat.defaultTarget}"`, `val="${delay}"`];
 
@@ -773,14 +773,15 @@ export class ASMLGenerator {
           }
           
           lines.push(`${indent}${this.indent}<condition ${condAttrs.join(' ')} />`);
-          
+
           const trueConn = connections.find(c => c.label === 'true');
           const falseConn = connections.find(c => c.label === 'false');
-          
-          if (trueConn) {
+
+          // Don't export "undefined" string as target
+          if (trueConn && trueConn.targetId && trueConn.targetId !== 'undefined') {
             lines.push(`${indent}${this.indent}<trueTarget targetBeat="${trueConn.targetId}" />`);
           }
-          if (falseConn) {
+          if (falseConn && falseConn.targetId && falseConn.targetId !== 'undefined') {
             lines.push(`${indent}${this.indent}<falseTarget targetBeat="${falseConn.targetId}" />`);
           }
         }
@@ -1222,7 +1223,8 @@ export class ASMLGenerator {
   private generateConnection(connection: Connection | any, lines: string[], indent: string): void {
     const attrs: string[] = [];
     const targetId = connection.targetId || connection.target;
-    if (targetId) attrs.push(`target="${targetId}"`);
+    // Don't export "undefined" string as target
+    if (targetId && targetId !== 'undefined') attrs.push(`target="${targetId}"`);
     if (connection.label) attrs.push(`label="${this.escapeXml(connection.label)}"`);
 
     // Add sound effect (from button location)
