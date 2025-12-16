@@ -331,7 +331,32 @@ export class DialogTreeBeat extends Beat {
           locations
         );
 
-        const selectedChoice = visibleChoices.find(c => c.id === choiceId);
+        // First try to match by exact ID
+        let selectedChoice = visibleChoices.find(c => c.id === choiceId);
+
+        // Fallback: if choiceId looks like a button index (e.g., "button1", "button2"),
+        // try to match by index. This handles cases where ASML import creates
+        // button locations with names like "button1" but choices with IDs like "choice_1"
+        if (!selectedChoice && choiceId) {
+          const indexMatch = choiceId.toLowerCase().match(/button\s*(\d+)/);
+          if (indexMatch) {
+            const index = parseInt(indexMatch[1], 10) - 1;
+            if (index >= 0 && index < visibleChoices.length) {
+              selectedChoice = visibleChoices[index];
+              console.log(`[DialogTreeBeat] Matched choice by index: ${choiceId} → ${selectedChoice?.id}`);
+            }
+          }
+        }
+
+        // Second fallback: try to match by choice text (for nested dialogs where
+        // button locations are named after choice text)
+        if (!selectedChoice && choiceId) {
+          selectedChoice = visibleChoices.find(c => c.text === choiceId);
+          if (selectedChoice) {
+            console.log(`[DialogTreeBeat] Matched choice by text: ${choiceId} → ${selectedChoice?.id}`);
+          }
+        }
+
         if (selectedChoice) {
           // Apply effects from the selected choice
           if (selectedChoice.effects) {
