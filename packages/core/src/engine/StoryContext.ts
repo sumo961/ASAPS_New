@@ -233,6 +233,25 @@ export class StoryContext extends EventEmitter {
       return hasVisited;
     }
 
+    // Handle inventory conditions specially - ASML uses 'character' and 'item' fields
+    if (condition.type === 'inventory') {
+      // Get item to check - support both ASML format (item) and standard format (value/right)
+      const itemToCheck = (condition as any).item || condition.value || condition.right;
+      if (!itemToCheck) {
+        console.warn('inventory condition missing item to check');
+        return false;
+      }
+
+      const hasItem = this.state.inventory.includes(itemToCheck);
+      console.log(`[StoryContext] Inventory check: "${itemToCheck}" in [${this.state.inventory.join(', ')}] = ${hasItem}`);
+
+      // Support negation operators
+      if (condition.operator === '!=' || condition.operator === 'not') {
+        return !hasItem;
+      }
+      return hasItem;
+    }
+
     // Get variable name - support both new (variableName) and old (left) field names
     const varName = condition.variableName || condition.left;
 
@@ -253,11 +272,6 @@ export class StoryContext extends EventEmitter {
         break;
       case 'variable':
         leftValue = this.state.variables[varName];
-        break;
-      case 'inventory':
-        // For inventory conditions, varName is the character name, check their inventory
-        // For now, we'll check the main inventory - could be extended for character-specific inventories
-        leftValue = this.state.inventory;
         break;
       case 'timer':
         leftValue = this.state.timers[varName]?.value || 0;
@@ -338,6 +352,10 @@ export class StoryContext extends EventEmitter {
 
   getInventory(): string[] {
     return [...this.state.inventory];
+  }
+
+  getTimers(): Record<string, { value: number; target?: string }> {
+    return { ...this.state.timers };
   }
 
   reset(): void {

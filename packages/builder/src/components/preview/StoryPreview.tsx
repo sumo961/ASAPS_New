@@ -421,6 +421,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
               variables: context.getVariables(),
               counters: context.getCounters(),
               inventory: context.getInventory(),
+              timers: context.getTimers(),
             });
           }
         });
@@ -437,15 +438,31 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
           variables: context.getVariables(),
           counters: context.getCounters(),
           inventory: context.getInventory(),
+          timers: context.getTimers(),
         }));
       };
       
+      // Listen for state changes to update debug info in real-time
+      const updateDebugState = () => {
+        setDebugInfo((prev: any) => ({
+          ...prev,
+          variables: context.getVariables(),
+          counters: context.getCounters(),
+          inventory: context.getInventory(),
+          timers: context.getTimers(),
+        }));
+      };
+
+      context.on('counterChanged', updateDebugState);
+      context.on('inventoryChanged', updateDebugState);
+      context.on('variableChanged', updateDebugState);
+
       const timerManager = context.getTimerManager();
-      
+
       const updateTimers = () => {
         setActiveTimers(timerManager.getActiveTimers());
       };
-      
+
       timerManager.on('timerStarted', updateTimers);
       timerManager.on('timerTick', updateTimers);
       timerManager.on('timerStopped', updateTimers);
@@ -808,6 +825,23 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
                   </div>
                 )}
                 
+                {debugInfo.timers && Object.keys(debugInfo.timers).length > 0 && (
+                  <div className="bg-white p-3 rounded-lg">
+                    <div className="text-sm font-medium text-gray-600 mb-2">Timers</div>
+                    <div className="space-y-1">
+                      {Object.entries(debugInfo.timers).map(([key, timer]: [string, any]) => (
+                        <div key={key} className="text-xs">
+                          <span className="font-mono text-gray-600">{key}:</span>
+                          <span className="ml-2 font-bold">{timer.value}s</span>
+                          {timer.target && (
+                            <span className="ml-2 text-gray-500">→ {timer.target}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {activeTimers.length > 0 && (
                   <div className="bg-white p-3 rounded-lg">
                     <div className="text-sm font-medium text-gray-600 mb-2">Active Timers</div>

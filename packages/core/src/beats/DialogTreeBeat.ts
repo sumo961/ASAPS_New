@@ -363,6 +363,26 @@ export class DialogTreeBeat extends Beat {
             selectedChoice.effects.forEach(effect => context.applyEffect(effect));
           }
 
+          // Apply direct counter fields (used by editor) if present
+          const choiceWithCounter = selectedChoice as any;
+          if (choiceWithCounter.counter) {
+            const counterName = choiceWithCounter.counter;
+            const operation = choiceWithCounter.counterOperation || 'change';
+            const value = choiceWithCounter.counterValue ?? 1;
+
+            console.log(`[DialogTreeBeat] Applying counter effect: ${counterName} ${operation} ${value}`);
+
+            switch (operation) {
+              case 'set':
+                context.setCounter(counterName, value);
+                break;
+              case 'change':
+              default:
+                context.incrementCounter(counterName, value);
+                break;
+            }
+          }
+
           // New format: target is beat ID to exit, dialogNode continues conversation
           if (selectedChoice.target) {
             // Exit to another beat
