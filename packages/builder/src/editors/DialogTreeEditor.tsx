@@ -497,20 +497,23 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                       {/* Counter effect controls */}
                       <div className="mt-2 flex gap-2 items-center">
                         <span className="text-xs text-gray-600">Counter:</span>
-                        <select
+                        <input
+                          type="text"
+                          list={`counters-${path.join('-')}-${index}`}
                           value={choice.counter || ''}
                           onChange={(e) => updateChoiceAtPath(path, index, {
                             counter: e.target.value || undefined,
-                            counterOperation: e.target.value ? 'change' : undefined,
-                            counterValue: e.target.value ? 0 : undefined
+                            counterOperation: e.target.value ? (choice.counterOperation || 'change') : undefined,
+                            counterValue: e.target.value ? (choice.counterValue ?? 0) : undefined
                           })}
+                          placeholder="e.g., courage"
                           className="flex-1 px-2 py-1 text-xs border rounded"
-                        >
-                          <option value="">None</option>
+                        />
+                        <datalist id={`counters-${path.join('-')}-${index}`}>
                           {availableCounters.map(counter => (
-                            <option key={counter} value={counter}>{counter}</option>
+                            <option key={counter} value={counter} />
                           ))}
-                        </select>
+                        </datalist>
                         {choice.counter && (
                           <>
                             <select
