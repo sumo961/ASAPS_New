@@ -234,6 +234,13 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         name: beatData.name || 'unnamed',
         type: beatData.type
       });
+      // Log location positions during deserialization
+      if (beatData.locations && beatData.locations.length > 0) {
+        console.log(`[deserializeBeats] Beat ${beatData.id} has ${beatData.locations.length} locations:`);
+        beatData.locations.forEach((loc: any) => {
+          console.log(`[deserializeBeats]   - "${loc.name}": x=${loc.x}, y=${loc.y}, size=${loc.size}`);
+        });
+      }
 
       // Apply migrations for deprecated features
       migrateDialogTreeDefaultConnection(beatData);

@@ -9,7 +9,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { getStorageManager, type Project, type StorageManager, type GlobalSettings } from '../storage';
+import { getStorageManager, getStorageAdapter, type Project, type StorageManager, type GlobalSettings } from '../storage';
 import { CommandManager, type Command } from '../commands';
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave';
 
@@ -536,6 +536,18 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
       if (!result.success) {
         throw result.error || new Error('Failed to save project');
+      }
+
+      // CRITICAL: Migrate assets from old project to new project BEFORE deleting old project
+      // This ensures assets are associated with the new project ID
+      try {
+        const adapter = getStorageAdapter();
+        await adapter.initialize();
+        const migratedCount = await adapter.migrateProjectAssets(projectToSave.id, newProjectId);
+        console.log(`[PersistenceContext] Migrated ${migratedCount} assets to new project`);
+      } catch (migrateError) {
+        console.error('[PersistenceContext] Failed to migrate assets:', migrateError);
+        // Continue - project is saved, assets might need manual recovery
       }
 
       // Delete the old untitled project if it was "Untitled Project"

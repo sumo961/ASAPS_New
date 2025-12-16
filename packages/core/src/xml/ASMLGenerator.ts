@@ -1162,6 +1162,16 @@ export class ASMLGenerator {
     if (location.textAlign) attrs.push(`textAlign="${location.textAlign}"`);
     if (location.autosize !== undefined) attrs.push(`autosize="${location.autosize}"`);
 
+    // Character-specific properties (for kind='character')
+    if (location.kind === 'character') {
+      if (location.characterId) attrs.push(`characterId="${location.characterId}"`);
+      // characterName is used for ASML compatibility - exports as 'name' attribute
+      // but we also add it explicitly for clarity
+      if (location.characterName) attrs.push(`characterName="${this.escapeXml(location.characterName)}"`);
+      if (location.stateId) attrs.push(`state="${location.stateId}"`);
+      if (location.size !== undefined) attrs.push(`size="${location.size}"`);
+    }
+
     lines.push(`${indent}<loc ${attrs.join(' ')} />`);
   }
   
@@ -1194,6 +1204,14 @@ export class ASMLGenerator {
     if (loc.fontSize !== undefined) attrs.push(`fontSize="${loc.fontSize}"`);
     if (loc.textAlign) attrs.push(`textAlign="${loc.textAlign}"`);
     if (loc.autosize !== undefined) attrs.push(`autosize="${loc.autosize}"`);
+
+    // Character-specific properties (for kind='character')
+    if (loc.kind === 'character') {
+      if (loc.characterId) attrs.push(`characterId="${loc.characterId}"`);
+      if (loc.characterName) attrs.push(`characterName="${this.escapeXml(loc.characterName)}"`);
+      if (loc.stateId) attrs.push(`state="${loc.stateId}"`);
+      if (loc.size !== undefined) attrs.push(`size="${loc.size}"`);
+    }
 
     lines.push(`${indent}<loc ${attrs.join(' ')} />`);
   }

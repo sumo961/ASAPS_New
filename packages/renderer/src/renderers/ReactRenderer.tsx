@@ -483,6 +483,7 @@ export class ReactRenderer extends BaseRenderer {
   private instanceId: string;
   protected backgroundImageUrl: string | null = null;  // Changed to protected
   private assetResolver: ((assetId: string) => string | undefined) | null = null;  // NEW: Asset resolver function
+  private characterResolver: ((characterId: string, stateId?: string) => string | undefined) | null = null;  // NEW: Character state resolver
   protected hideTextBoxes: boolean = false;  // NEW: Whether to hide text box backgrounds
   protected hideButtonBoxes: boolean = false;  // NEW: Whether to hide button box backgrounds
   protected theme: RenderThemeSettings | undefined = undefined;  // NEW: Theme settings for styling
@@ -564,6 +565,15 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Set the character resolver function
+   * This allows the renderer to convert characterId + stateId to an image URL
+   * The resolver should look up the character, find the state, and return the image URL
+   */
+  setCharacterResolver(resolver: (characterId: string, stateId?: string) => string | undefined): void {
+    this.characterResolver = resolver;
+  }
+
+  /**
    * Resolve an asset ID to a URL using the asset resolver
    */
   protected resolveAssetUrl(assetId: string | undefined | null): string | null {
@@ -611,6 +621,17 @@ export class ReactRenderer extends BaseRenderer {
   ): Promise<string> {
     console.log(`[ReactRenderer ${this.instanceId}] Rendering positioned ${beatType} with ${locations.length} elements`);
 
+    // Debug: Log all character/prop locations and their assetIds
+    const charPropLocations = locations.filter(loc => loc.kind === 'character' || loc.kind === 'prop');
+    if (charPropLocations.length > 0) {
+      console.log(`[ReactRenderer ${this.instanceId}] Character/Prop locations:`, charPropLocations.map(loc => ({
+        name: loc.name,
+        kind: loc.kind,
+        assetId: loc.assetId,
+        hasAssetResolver: !!this.assetResolver
+      })));
+    }
+
     return new Promise(resolve => {
       if (waitForAction) {
         this.resolveAction = (id: string) => {
@@ -621,12 +642,13 @@ export class ReactRenderer extends BaseRenderer {
         resolve('');
       }
 
-      // Create element data using the shared helper, passing the asset resolver
+      // Create element data using the shared helper, passing the asset and character resolvers
       const elements: PositionedElementData[] = createPositionedElementData(
         locations,
         content,
         beatType,
-        this.assetResolver || undefined
+        this.assetResolver || undefined,
+        this.characterResolver || undefined
       );
 
       // Determine background - consistent for all beat types
@@ -763,8 +785,15 @@ export class ReactRenderer extends BaseRenderer {
 
       // Map nested choices to button positions by index
       // Offset buttons down if text box was expanded, and ensure adequate button size
+      // FIX: Create new button locations for choices that exceed existing button count
+      const buttonSpacing = 15;
+      let lastButtonY = buttonLocations.length > 0
+        ? buttonLocations[buttonLocations.length - 1].y + heightDiff + buttonHeight + buttonSpacing
+        : (textLocations[0]?.y || 100) + (textLocations[0]?.height || textHeight) + 20 + heightDiff;
+
       choices.forEach((choice, index) => {
         if (index < buttonLocations.length) {
+          // Reuse existing button location
           const btnLoc = buttonLocations[index];
           nestedLocations.push({
             ...btnLoc,
@@ -773,6 +802,23 @@ export class ReactRenderer extends BaseRenderer {
             width: Math.max(btnLoc.width, buttonWidth),
             height: Math.max(btnLoc.height, buttonHeight),
           });
+        } else {
+          // Create new button location for additional choices
+          const baseBtn = buttonLocations[0] || {
+            kind: 'button' as const,
+            x: (1024 - buttonWidth) / 2, // Center on stage
+            zIndex: 10,
+          };
+          nestedLocations.push({
+            kind: 'button',
+            name: choice.text,
+            x: baseBtn.x,
+            y: lastButtonY,
+            width: buttonWidth,
+            height: buttonHeight,
+            zIndex: 10 + index,
+          });
+          lastButtonY += buttonHeight + buttonSpacing;
         }
       });
 

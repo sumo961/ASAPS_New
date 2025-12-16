@@ -122,7 +122,16 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const nodes = useMemo(() => {
     // Only show beats that are NOT in a cluster as separate nodes
     // Beats inside clusters are rendered within the cluster container
-    const unclusteredBeats = beats.filter(beat => !beat.cluster);
+    // Also check for string "undefined" which can occur from serialization issues
+    const unclusteredBeats = beats.filter(beat => !beat.cluster || beat.cluster === 'undefined');
+
+    // Debug: log why beats might be filtered out
+    if (beats.length > 0 && unclusteredBeats.length === 0) {
+      console.log('[GraphEditor] ALL beats filtered out! First beat cluster value:', beats[0]?.cluster, 'typeof:', typeof beats[0]?.cluster);
+      console.log('[GraphEditor] Sample beat:', { id: beats[0]?.id, cluster: beats[0]?.cluster, x: beats[0]?.x, y: beats[0]?.y });
+    } else if (beats.length > 0) {
+      console.log('[GraphEditor] Unclustered beats:', unclusteredBeats.length, 'of', beats.length);
+    }
 
     const beatNodes = unclusteredBeats.map((beat) => ({
       id: beat.id,
@@ -574,6 +583,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       } else if (beat.connections) {
         // Fallback to direct property access
         connections = beat.connections;
+      }
+
+      // Debug: Log connections for troubleshooting
+      if (connections.length > 0 || beat.defaultTarget) {
+        console.log(`[GraphEditor] Beat ${beat.id} (${beat.type}): connections=${connections.length}, defaultTarget=${beat.defaultTarget}`);
       }
 
       // Add connections with unique IDs, resolving cluster boundaries

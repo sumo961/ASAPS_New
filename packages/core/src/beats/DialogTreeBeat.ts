@@ -10,6 +10,8 @@ export class DialogTreeBeat extends Beat {
   public text: string;
   public emotion?: string;
   public choiceDelay?: number; // Delay in seconds before showing choices
+  public backgroundUrl?: string; // Direct URL for background from ASML import
+  public backgroundAssetId?: string; // Asset ID for background
   private currentNode: DialogNode | null = null;
 
   constructor(config: BeatConfig & {
@@ -204,7 +206,9 @@ export class DialogTreeBeat extends Beat {
       text: this.text,
       emotion: this.emotion,
       node: this.node,
-      choiceDelay: this.choiceDelay
+      choiceDelay: this.choiceDelay,
+      backgroundUrl: this.backgroundUrl,
+      backgroundAssetId: this.backgroundAssetId
     };
   }
 
@@ -225,6 +229,8 @@ export class DialogTreeBeat extends Beat {
     if (params.emotion !== undefined) this.emotion = params.emotion;
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
+    if (params.backgroundUrl !== undefined) this.backgroundUrl = params.backgroundUrl;
+    if (params.backgroundAssetId !== undefined) this.backgroundAssetId = params.backgroundAssetId;
 
     // Sync instance properties back to dialogTree
     if (this.dialogTree && typeof this.dialogTree === 'object') {
@@ -247,7 +253,11 @@ export class DialogTreeBeat extends Beat {
       speaker: this.speaker,
       text: this.text,
       emotion: this.emotion,
-      choiceDelay: this.choiceDelay
+      choiceDelay: this.choiceDelay,
+      // CRITICAL: Include background properties for persistence
+      node: this.node,
+      backgroundUrl: this.backgroundUrl,
+      backgroundAssetId: this.backgroundAssetId
     };
   }
 

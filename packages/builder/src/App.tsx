@@ -8,7 +8,8 @@ import { GlobalSettingsInspector } from './components/settings/GlobalSettingsIns
 import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
 import { AssetManager } from './components/assets/AssetManager';
-import { Story } from '@asaps/core';
+import { ImportAsmlDialog } from './components/ImportAsmlDialog';
+import { Story, ASMLParser, type AssetManifest } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { Character } from './types/character';
@@ -34,6 +35,7 @@ function App() {
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [showCharacterManager, setShowCharacterManager] = useState(false);
+  const characterSelectionCallbackRef = useRef<((character: Character) => void) | null>(null);
   const [showAssetManager, setShowAssetManager] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -42,6 +44,11 @@ function App() {
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Import ASML dialog state
+  const [showImportAsmlDialog, setShowImportAsmlDialog] = useState(false);
+  const [importAsmlContent, setImportAsmlContent] = useState('');
+  const [importAsmlManifest, setImportAsmlManifest] = useState<AssetManifest | null>(null);
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -625,24 +632,33 @@ function App() {
     const wsInstanceId = `ws_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     // Flag to prevent reconnection after cleanup (important for HMR)
     let isCleanedUp = false;
+    // Track if we've logged connection failure (to reduce spam)
+    let hasLoggedFailure = false;
+    let connectionAttempts = 0;
 
     // Connect to WebSocket server
     const connectWebSocket = () => {
       // Don't reconnect if we've been cleaned up (HMR or unmount)
       if (isCleanedUp) {
-        console.log(`[App] Skipping WebSocket reconnect - instance ${wsInstanceId} was cleaned up`);
         return;
       }
 
+      connectionAttempts++;
       const wsUrl = 'ws://localhost:3001';
-      console.log(`[App] Connecting to WebSocket server: ${wsUrl} (instance: ${wsInstanceId})`);
+
+      // Only log first connection attempt
+      if (connectionAttempts === 1) {
+        console.log(`[App] Connecting to WebSocket server: ${wsUrl}`);
+      }
 
       try {
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
-          console.log(`[App] WebSocket connected to API server (instance: ${wsInstanceId})`);
+          console.log(`[App] WebSocket connected to API server`);
+          hasLoggedFailure = false; // Reset on successful connection
+          connectionAttempts = 0;
         };
 
         ws.onmessage = (event) => {
@@ -678,22 +694,29 @@ function App() {
         };
 
         ws.onclose = () => {
-          console.log(`[App] WebSocket disconnected (instance: ${wsInstanceId}), isCleanedUp: ${isCleanedUp}`);
           wsRef.current = null;
-          // Only reconnect if we haven't been cleaned up
+          // Only reconnect if we haven't been cleaned up, with longer interval
           if (!isCleanedUp) {
-            setTimeout(connectWebSocket, 3000);
+            setTimeout(connectWebSocket, 10000); // 10 seconds instead of 3
           }
         };
 
-        ws.onerror = (error) => {
-          console.error('[App] WebSocket error:', error);
+        ws.onerror = () => {
+          // Only log error once to reduce console spam
+          if (!hasLoggedFailure) {
+            console.log('[App] WebSocket server not available (MCP server not running) - will retry silently');
+            hasLoggedFailure = true;
+          }
         };
       } catch (error) {
-        console.error('[App] Failed to create WebSocket connection:', error);
+        // Only log once
+        if (!hasLoggedFailure) {
+          console.log('[App] WebSocket connection failed - MCP server not running');
+          hasLoggedFailure = true;
+        }
         // Only retry if we haven't been cleaned up
         if (!isCleanedUp) {
-          setTimeout(connectWebSocket, 3000);
+          setTimeout(connectWebSocket, 10000);
         }
       }
     };
@@ -701,7 +724,6 @@ function App() {
     connectWebSocket();
 
     return () => {
-      console.log(`[App] Cleaning up WebSocket instance ${wsInstanceId}`);
       isCleanedUp = true;
       if (wsRef.current) {
         wsRef.current.close();
@@ -938,6 +960,48 @@ function App() {
 
             setAssets(uiAssets);
             console.log('[App] >>> Total assets loaded:', uiAssets.length);
+
+            // CRITICAL: Reconstruct character image URLs from asset IDs
+            // Characters were saved with asset IDs, but blob URLs are invalid after reload
+            console.log('[App] >>> Checking character URL reconstruction...');
+            console.log('[App] >>> projectData.characters:', projectData.characters?.length || 0);
+            console.log('[App] >>> uiAssets:', uiAssets.length);
+            if (projectData.characters && projectData.characters.length > 0) {
+              const assetUrlMap = new Map(uiAssets.map(a => [a.id, a.url]));
+              console.log('[App] >>> Asset URL map size:', assetUrlMap.size);
+              const updatedCharacters = projectData.characters.map((char: any) => {
+                // Update default image
+                const defaultAssetId = char.visual?.defaultAssetId;
+                const defaultUrl = defaultAssetId ? assetUrlMap.get(defaultAssetId) : null;
+                console.log(`[App] >>> Character "${char.displayName}": defaultAssetId=${defaultAssetId}, resolved=${!!defaultUrl}`);
+
+                // Update state images
+                const updatedStates = (char.states || []).map((state: any) => {
+                  const stateAssetId = state.visual?.assetId;
+                  const stateUrl = stateAssetId ? assetUrlMap.get(stateAssetId) : null;
+                  console.log(`[App] >>>   State "${state.id}": assetId=${stateAssetId}, resolved=${!!stateUrl}`);
+                  return {
+                    ...state,
+                    visual: {
+                      ...state.visual,
+                      image: stateUrl || state.visual?.image // Use reconstructed URL or keep existing
+                    }
+                  };
+                });
+
+                return {
+                  ...char,
+                  visual: {
+                    ...char.visual,
+                    defaultImage: defaultUrl || char.visual?.defaultImage
+                  },
+                  states: updatedStates
+                };
+              });
+
+              setCharacters(updatedCharacters);
+              console.log('[App] >>> Character URLs reconstructed from assets');
+            }
           } catch (err) {
             console.error('[App] >>> Error loading assets:', err);
           }
@@ -1057,17 +1121,122 @@ function App() {
 
       try {
         const text = await file.text();
-        await actions.importStory(text);
-        setSelectedBeat(null);
-        alert('Story imported successfully!');
+
+        // Check if the ASML file references assets
+        const manifest = ASMLParser.getAssetManifest(text);
+
+        if (manifest.hasAssets()) {
+          // Show import dialog for asset selection
+          setImportAsmlContent(text);
+          setImportAsmlManifest(manifest);
+          setShowImportAsmlDialog(true);
+        } else {
+          // No assets, import directly
+          await actions.importStory(text);
+          setSelectedBeat(null);
+          alert('Story imported successfully!');
+        }
       } catch (error) {
+        // Log full error details for debugging
         console.error('Import failed:', error);
-        alert('Failed to import story. Please check that it\'s a valid ASML file.');
+        if (error instanceof Error) {
+          console.error('Error message:', error.message);
+          console.error('Error stack:', error.stack);
+        } else {
+          console.error('Non-Error thrown:', JSON.stringify(error, null, 2));
+        }
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        alert(`Failed to import story: ${errorMsg}`);
       }
     };
 
     input.click();
   }, [actions]);
+
+  /**
+   * Handle import dialog completion (with or without assets)
+   */
+  const handleImportAsmlComplete = useCallback(async (result: {
+    fileMap: Map<string, File>;
+    filesFound: number;
+    filesMissing: number;
+  }) => {
+    setShowImportAsmlDialog(false);
+
+    try {
+      const projectId = currentProject?.id || 'temp-project';
+
+      // Import with or without assets
+      const importResult = await actions.importStory(importAsmlContent, {
+        fileMap: result.fileMap,
+        addAsset: async (asset: Asset, blob: Blob) => {
+          try {
+            // Convert to stored format and persist using HybridStorageAdapter
+            const storedAsset = await assetToStored(asset, projectId, blob);
+            const storage = getStorageAdapter();
+            await storage.initialize();
+            await storage.saveAsset(storedAsset);
+            console.log('[handleImportAsmlComplete] Persisted asset:', asset.name);
+
+            // Add to local state
+            setAssets(prev => [...prev, asset]);
+            return true;
+          } catch (err) {
+            console.error('[handleImportAsmlComplete] Failed to persist asset:', asset.name, err);
+            // Still add to local state as fallback
+            setAssets(prev => [...prev, asset]);
+            return true;
+          }
+        },
+        projectId
+      });
+
+      setSelectedBeat(null);
+
+      // Add imported characters to character state
+      if (importResult.characters && importResult.characters.length > 0) {
+        setCharacters(prev => [...prev, ...importResult.characters]);
+        console.log('[handleImportAsmlComplete] Added characters:', importResult.characters.map(c => c.displayName));
+      }
+
+      // Show summary
+      let message = 'Story imported successfully!';
+      if (importResult.assetStats) {
+        const stats = importResult.assetStats;
+        message += `\n\nAssets imported:`;
+        message += `\n- Backgrounds: ${stats.backgroundsImported}`;
+        message += `\n- Props: ${stats.propsImported}`;
+        message += `\n- Sounds: ${stats.soundsImported}`;
+        message += `\n- Characters: ${stats.charactersCreated} (${stats.characterImagesImported} images)`;
+        if (stats.totalFilesMissing > 0) {
+          message += `\n\nWarning: ${stats.totalFilesMissing} files were not found`;
+        }
+      }
+      if (importResult.errors.length > 0) {
+        message += `\n\nWarnings: ${importResult.errors.length} issues`;
+        console.warn('Import warnings:', importResult.errors);
+      }
+
+      alert(message);
+    } catch (error) {
+      console.error('Import failed:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      alert(`Failed to import story: ${errorMsg}`);
+    }
+
+    // Clear import state
+    setImportAsmlContent('');
+    setImportAsmlManifest(null);
+  }, [actions, importAsmlContent, currentProject?.id]);
+
+  /**
+   * Handle import dialog cancellation
+   */
+  const handleImportAsmlCancel = useCallback(() => {
+    setShowImportAsmlDialog(false);
+    setImportAsmlContent('');
+    setImportAsmlManifest(null);
+  }, []);
 
   const handleExportZip = useCallback(async () => {
     if (!currentProject) {
@@ -1206,11 +1375,14 @@ function App() {
   }, [markChanged]);
 
   const handleOpenCharacterManager = useCallback((callback?: (character: Character) => void) => {
+    // Store the callback so we can call it when a character is selected
+    characterSelectionCallbackRef.current = callback || null;
     setShowCharacterManager(true);
   }, []);
 
   const handleCloseCharacterManager = useCallback(() => {
     setShowCharacterManager(false);
+    characterSelectionCallbackRef.current = null;
   }, []);
 
   const handleOpenAssetManager = useCallback(() => {
@@ -1852,6 +2024,7 @@ function App() {
                 markChanged();
               }
             }}
+            characters={characters}
           />
 
           {selectedBeat && (
@@ -1887,7 +2060,9 @@ function App() {
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white rounded-lg w-full max-w-6xl h-5/6 m-4 flex flex-col">
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-xl font-semibold">Character Manager</h2>
+              <h2 className="text-xl font-semibold">
+                {characterSelectionCallbackRef.current ? 'Select Character' : 'Character Manager'}
+              </h2>
               <button
                 onClick={handleCloseCharacterManager}
                 className="p-2 hover:bg-gray-100 rounded"
@@ -1901,6 +2076,13 @@ function App() {
                 onCharactersChange={handleCharactersChange}
                 assets={assets}
                 onAssetAdd={handleAssetAdd}
+                selectionMode={characterSelectionCallbackRef.current !== null}
+                onCharacterSelect={(character) => {
+                  if (characterSelectionCallbackRef.current) {
+                    characterSelectionCallbackRef.current(character);
+                    handleCloseCharacterManager();
+                  }
+                }}
               />
             </div>
           </div>
@@ -1930,6 +2112,17 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Import ASML Dialog */}
+      {showImportAsmlDialog && importAsmlManifest && (
+        <ImportAsmlDialog
+          isOpen={showImportAsmlDialog}
+          xmlContent={importAsmlContent}
+          manifest={importAsmlManifest}
+          onImport={handleImportAsmlComplete}
+          onCancel={handleImportAsmlCancel}
+        />
       )}
 
       {/* Settings Modal */}

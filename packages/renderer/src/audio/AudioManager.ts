@@ -72,8 +72,11 @@ export class AudioManager {
 
   /**
    * Play a sound from URL
+   * @param url - URL of the sound file
+   * @param volume - Volume level (0-1), defaults to 1.0
+   * @param loop - Whether to loop the sound (for background music), defaults to false
    */
-  async playSound(url: string, volume: number = 1.0): Promise<void> {
+  async playSound(url: string, volume: number = 1.0, loop: boolean = false): Promise<void> {
     this.initAudioContext();
     if (!this.audioContext || !this.masterGainNode) {
       console.warn('[AudioManager] Audio context not available');
@@ -102,6 +105,7 @@ export class AudioManager {
       // Create source node
       const source = this.audioContext.createBufferSource();
       source.buffer = buffer;
+      source.loop = loop;
 
       // Create gain node for this sound
       const gainNode = this.audioContext.createGain();
@@ -114,7 +118,7 @@ export class AudioManager {
       // Track active source
       this.activeSourceNodes.add(source);
 
-      // Remove from active set when done
+      // Remove from active set when done (only if not looping)
       source.onended = () => {
         this.activeSourceNodes.delete(source);
       };

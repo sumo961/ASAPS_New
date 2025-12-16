@@ -12,7 +12,8 @@ export interface Character {
   // Visual Configuration
   visual: {
     type: 'static' | 'sprite';
-    defaultImage?: string;  // Asset ID or URL for static characters
+    defaultImage?: string;  // URL for static characters (blob URL for display)
+    defaultAssetId?: string; // Asset ID for persistence (resolves to URL after reload)
     spriteSheet?: {
       url: string;
       frameWidth: number;
@@ -42,7 +43,8 @@ export interface CharacterState {
   name: string;
   displayName: string;
   visual: {
-    image?: string;        // Static image for this state
+    image?: string;        // Static image URL for this state (blob URL for display)
+    assetId?: string;      // Asset ID for persistence (resolves to URL after reload)
     animation?: string;    // Sprite animation name
     effects?: VisualEffect[];
   };

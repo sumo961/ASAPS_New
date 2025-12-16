@@ -11,6 +11,94 @@ import type {
   Effect
 } from '../types';
 
+// ============================================
+// Asset Manifest Types for ASML Import
+// ============================================
+
+/**
+ * Represents an asset file reference extracted from ASML
+ */
+export interface AssetReference {
+  /** Asset name (used for linking to beats) */
+  name: string;
+  /** File path from ASML fPath attribute */
+  fPath: string;
+  /** Original ASML element ID */
+  id: string;
+}
+
+/**
+ * Character state with file path
+ */
+export interface CharacterStateReference {
+  /** State kind (e.g., 'default', 'happy', 'right') */
+  kind: string;
+  /** File path for this state's image */
+  fPath: string;
+}
+
+/**
+ * Character definition from ASML with graphics states
+ */
+export interface CharacterReference {
+  /** Character ID from ASML */
+  id: string;
+  /** Character name */
+  name: string;
+  /** Character role (e.g., 'interactor' for player) */
+  role?: string;
+  /** Graphics states with file paths */
+  states: CharacterStateReference[];
+  /** Counter definitions */
+  counters?: Array<{ name: string; value: number }>;
+  /** Initial inventory items */
+  inventory?: string[];
+}
+
+/**
+ * Complete manifest of all assets referenced in an ASML file
+ */
+export interface AssetManifest {
+  /** Background images (from <environment>/<node>) */
+  backgrounds: AssetReference[];
+  /** Props/interactive objects (from <environment>/<prop>) */
+  props: AssetReference[];
+  /** Sound effects (from <environment>/<sound>) */
+  sounds: AssetReference[];
+  /** Characters with their graphic states (from <chars>) */
+  characters: CharacterReference[];
+
+  /**
+   * Check if this manifest has any assets to import
+   */
+  hasAssets(): boolean;
+
+  /**
+   * Get total count of asset files
+   */
+  getTotalFileCount(): number;
+
+  /**
+   * Get all unique file paths
+   */
+  getAllFilePaths(): string[];
+}
+
+/**
+ * Create an empty asset manifest (used for error cases)
+ */
+function createEmptyManifest(): AssetManifest {
+  return {
+    backgrounds: [],
+    props: [],
+    sounds: [],
+    characters: [],
+    hasAssets() { return false; },
+    getTotalFileCount() { return 0; },
+    getAllFilePaths() { return []; }
+  };
+}
+
 /**
  * Maps legacy ASML beat type names to modern equivalents.
  * This ensures old story files are properly converted on import.
@@ -423,6 +511,201 @@ export class ASMLParser {
   }
 
   /**
+   * Extract asset manifest from ASML XML without full parsing.
+   * Use this to discover required assets before importing a story.
+   *
+   * @param xmlContent - Raw ASML XML string
+   * @returns AssetManifest with all referenced asset files
+   */
+  static getAssetManifest(xmlContent: string): AssetManifest {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+
+    const backgrounds: AssetReference[] = [];
+    const props: AssetReference[] = [];
+    const sounds: AssetReference[] = [];
+    const characters: CharacterReference[] = [];
+
+    // Check for XML parsing errors
+    const parserError = xmlDoc.querySelector('parsererror');
+    if (parserError) {
+      console.error('[ASMLParser.getAssetManifest] XML parsing error:', parserError.textContent);
+      return createEmptyManifest();
+    }
+
+    // Parse environment section for backgrounds, props, and sounds
+    const environmentElement = xmlDoc.querySelector('environment');
+    if (environmentElement) {
+      // Parse nodes (backgrounds)
+      const nodeElements = environmentElement.querySelectorAll('node');
+      nodeElements.forEach(nodeEl => {
+        const fPath = nodeEl.getAttribute('fPath');
+        if (fPath) {
+          backgrounds.push({
+            name: nodeEl.getAttribute('name') || '',
+            fPath,
+            id: nodeEl.getAttribute('id') || ''
+          });
+        }
+      });
+
+      // Parse props
+      const propElements = environmentElement.querySelectorAll('prop');
+      propElements.forEach(propEl => {
+        const fPath = propEl.getAttribute('fPath');
+        if (fPath) {
+          props.push({
+            name: propEl.getAttribute('name') || '',
+            fPath,
+            id: propEl.getAttribute('id') || ''
+          });
+        }
+      });
+
+      // Parse sounds
+      const soundElements = environmentElement.querySelectorAll('sound');
+      soundElements.forEach(soundEl => {
+        const fPath = soundEl.getAttribute('fPath');
+        if (fPath) {
+          sounds.push({
+            name: soundEl.getAttribute('name') || '',
+            fPath,
+            id: soundEl.getAttribute('id') || ''
+          });
+        }
+      });
+    }
+
+    // Parse characters section
+    const charsElement = xmlDoc.querySelector('chars');
+    if (charsElement) {
+      const charElements = charsElement.querySelectorAll('char');
+      charElements.forEach(charEl => {
+        const charRef: CharacterReference = {
+          id: '',
+          name: '',
+          states: [],
+          counters: [],
+          inventory: []
+        };
+
+        // Get character ID
+        const idEl = charEl.querySelector('id');
+        if (idEl) {
+          charRef.id = idEl.textContent || '';
+        }
+
+        // Get character name
+        const nameEl = charEl.querySelector('name');
+        if (nameEl) {
+          charRef.name = nameEl.textContent || '';
+        }
+
+        // Get role from <role> element
+        const roleEl = charEl.querySelector('role');
+        if (roleEl) {
+          charRef.role = roleEl.getAttribute('kind') || undefined;
+        }
+
+        // Parse graphics/states
+        const graphicsEl = charEl.querySelector('graphics');
+        if (graphicsEl) {
+          const stateElements = graphicsEl.querySelectorAll('state');
+          stateElements.forEach(stateEl => {
+            const fPath = stateEl.getAttribute('fPath');
+            if (fPath) {
+              charRef.states.push({
+                kind: stateEl.getAttribute('kind') || 'default',
+                fPath
+              });
+            }
+          });
+        }
+
+        // Parse counters
+        const countersEl = charEl.querySelector('counters');
+        if (countersEl) {
+          const counterElements = countersEl.querySelectorAll('counter');
+          counterElements.forEach(counterEl => {
+            const name = counterEl.getAttribute('name');
+            const val = counterEl.getAttribute('val');
+            if (name) {
+              charRef.counters!.push({
+                name,
+                value: parseInt(val || '0')
+              });
+            }
+          });
+        }
+
+        // Parse inventory
+        const inventoryEl = charEl.querySelector('inventory');
+        if (inventoryEl) {
+          const itemElements = inventoryEl.querySelectorAll('item');
+          itemElements.forEach(itemEl => {
+            const itemName = itemEl.getAttribute('name');
+            if (itemName) {
+              charRef.inventory!.push(itemName);
+            }
+          });
+        }
+
+        characters.push(charRef);
+      });
+    }
+
+    // Create manifest object with helper methods
+    const manifest: AssetManifest = {
+      backgrounds,
+      props,
+      sounds,
+      characters,
+
+      hasAssets(): boolean {
+        return (
+          this.backgrounds.length > 0 ||
+          this.props.length > 0 ||
+          this.sounds.length > 0 ||
+          this.characters.some(c => c.states.length > 0)
+        );
+      },
+
+      getTotalFileCount(): number {
+        const imageCount = this.backgrounds.length + this.props.length;
+        const audioCount = this.sounds.length;
+        const characterImageCount = this.characters.reduce(
+          (sum, char) => sum + char.states.length,
+          0
+        );
+        return imageCount + audioCount + characterImageCount;
+      },
+
+      getAllFilePaths(): string[] {
+        const paths = new Set<string>();
+
+        this.backgrounds.forEach(b => paths.add(b.fPath));
+        this.props.forEach(p => paths.add(p.fPath));
+        this.sounds.forEach(s => paths.add(s.fPath));
+        this.characters.forEach(c => {
+          c.states.forEach(state => paths.add(state.fPath));
+        });
+
+        return Array.from(paths);
+      }
+    };
+
+    console.log('[ASMLParser.getAssetManifest] Found:', {
+      backgrounds: backgrounds.length,
+      props: props.length,
+      sounds: sounds.length,
+      characters: characters.length,
+      totalFiles: manifest.getTotalFileCount()
+    });
+
+    return manifest;
+  }
+
+  /**
    * Parse ASML XML content into a Story object
    */
   async parse(xmlContent: string): Promise<{
@@ -431,6 +714,7 @@ export class ASMLParser {
     errors: string[];
     warnings: string[];
   }> {
+    console.warn('[ASMLParser] ★★★ PARSE CALLED ★★★ - If you see this, ASMLParser is running');
     this.warnings = [];
     this.errors = [];
 
@@ -1076,6 +1360,16 @@ export class ASMLParser {
       config.sound = this.parseSound(soundElement);
     }
 
+    // Parse node (background) - this is at the beat level, not inside function
+    const nodeElement = beatElement.querySelector('node');
+    if (nodeElement && nodeElement.textContent) {
+      // Store as top-level config property for later use
+      (config as any).node = nodeElement.textContent;
+      console.log(`[ASMLParser] Beat ${id}: Found <node> element at beat level: "${nodeElement.textContent}"`);
+    } else {
+      console.log(`[ASMLParser] Beat ${id}: NO <node> element found at beat level`);
+    }
+
     // Parse locations
     const locsElement = beatElement.querySelector('locs');
     if (locsElement) {
@@ -1106,6 +1400,16 @@ export class ASMLParser {
     // Parse beat-specific parameters and connections
     // Pass rawBeatType so we can parse legacy formats correctly
     const { parameters, connections } = this.parseBeatFunction(functionElement, rawBeatType, config);
+
+    // CRITICAL: Transfer node from config to parameters (node is at beat level, not inside function)
+    console.log(`[ASMLParser] Beat ${id} (${beatType}): config.node="${(config as any).node}", parameters.node="${parameters.node}"`);
+    if ((config as any).node && !parameters.node) {
+      parameters.node = (config as any).node;
+      console.log(`[ASMLParser] Beat ${id}: Transferred beat-level node "${parameters.node}" to parameters`);
+    }
+    console.log(`[ASMLParser] Beat ${id}: FINAL parameters.node="${parameters.node}"`);
+
+
     config.parameters = parameters;
 
     // Apply import-time auto-sizing to locations BEFORE beat creation
@@ -1178,14 +1482,19 @@ export class ASMLParser {
     let beat: Beat;
     try {
       beat = this.beatTypeRegistry.createBeat(beatType, config);
-      
+
+      // DEBUG: Log locations after beat creation
+      console.log(`[ASMLParser] Beat ${id} created with ${beat.locations.size} locations:`);
+      beat.locations.forEach((loc, key) => {
+        console.log(`[ASMLParser]   - ${key}: x=${loc.x}, y=${loc.y}, size=${(loc as any).size}`);
+      });
+
       // Store parameters on the beat using updateParameters to ensure proper handling
       if (parameters && beat.updateParameters) {
-        console.log('[ASMLParser] About to update beat with parameters:', parameters);
-        console.log('[ASMLParser] BEFORE updateParameters - beat.node:', (beat as any).node);
+        console.log(`[ASMLParser] Beat ${id}: About to update with parameters.node="${parameters.node}"`);
         beat.updateParameters(parameters);
-        console.log('[ASMLParser] AFTER updateParameters - beat.node:', (beat as any).node);
-        console.log('[ASMLParser] AFTER updateParameters - beat.parameters:', (beat as any).parameters);
+        const afterParams = beat.getParameters?.() || {};
+        console.log(`[ASMLParser] Beat ${id}: AFTER updateParameters - getParameters().node="${afterParams.node}"`);
       } else {
         console.log('[ASMLParser] No parameters or updateParameters method. Parameters:', parameters);
       }
@@ -1333,10 +1642,25 @@ export class ASMLParser {
         break;
 
       case 'movementChoice':
+        // Parse question element for display text
+        const movementQuestionEl = functionElement.querySelector('question');
+        if (movementQuestionEl) {
+          // Store as 'question' - VisualWorkspace looks for this parameter
+          parameters.question = movementQuestionEl.textContent || '';
+          // Also store as 'text' for consistency with other beat types
+          parameters.text = movementQuestionEl.textContent || '';
+        }
+
+        // Parse questioner element (character asking the question)
+        const movementQuestionerEl = functionElement.querySelector('questioner');
+        if (movementQuestionerEl) {
+          parameters.questioner = movementQuestionerEl.textContent || '';
+        }
+
         // Parse delay element if present
         const movementDelayEl = functionElement.querySelector('delay');
         if (movementDelayEl) {
-          const val = movementDelayEl.getAttribute('val');
+          const val = movementDelayEl.getAttribute('val') || movementDelayEl.textContent;
           if (val) {
             const delay = parseFloat(val);
             if (!isNaN(delay) && delay > 0) {
@@ -1349,13 +1673,29 @@ export class ASMLParser {
         const choices: any[] = [];
         const choiceElements = functionElement.querySelectorAll('choice');
         choiceElements.forEach(choiceEl => {
+          // Parse counter attribute: format is "counterName,value" (e.g., "friendly,02")
+          const counterAttr = choiceEl.getAttribute('counter');
+          let counterName: string | undefined;
+          let counterValue: number | undefined;
+          if (counterAttr && counterAttr.includes(',')) {
+            const [name, value] = counterAttr.split(',');
+            counterName = name;
+            counterValue = parseInt(value, 10);
+            if (isNaN(counterValue)) counterValue = 0;
+          } else if (counterAttr) {
+            counterName = counterAttr;
+          }
+
           const choice = {
             id: choiceEl.getAttribute('id'),
             text: choiceEl.getAttribute('text'),
             // Legacy ASML uses 'loc', modern uses 'location'
             location: choiceEl.getAttribute('location') || choiceEl.getAttribute('loc'),
             // Legacy ASML uses 'targetBeat', modern uses 'target'
-            target: choiceEl.getAttribute('target') || choiceEl.getAttribute('targetBeat')
+            target: choiceEl.getAttribute('target') || choiceEl.getAttribute('targetBeat'),
+            counter: counterName,
+            counterOperation: counterName ? 'change' : undefined,
+            counterValue: counterValue
           };
           choices.push(choice);
 
@@ -1404,36 +1744,45 @@ export class ASMLParser {
           }
         }
 
-        // Parse props which contain targets
+        // Parse question element (child element in real ASML)
+        const pickPropQuestionEl = functionElement.querySelector('question');
+        if (pickPropQuestionEl) {
+          parameters.question = pickPropQuestionEl.textContent || '';
+          parameters.text = pickPropQuestionEl.textContent || '';
+        }
+        // Also check for question attribute (alternative format)
+        const pickPropQuestionAttr = functionElement.getAttribute('question');
+        if (pickPropQuestionAttr && !parameters.question) {
+          parameters.question = pickPropQuestionAttr;
+          parameters.text = pickPropQuestionAttr;
+        }
+
+        // Parse questioner element
+        const pickPropQuestionerEl = functionElement.querySelector('questioner');
+        if (pickPropQuestionerEl) {
+          parameters.questioner = pickPropQuestionerEl.textContent || '';
+        }
+
+        // Parse props - try both <prop> elements (old format) and <choice> elements (ASML format)
         const props: any[] = [];
+
+        // First try <prop> elements (old/test format)
         const propElements = functionElement.querySelectorAll('prop');
         propElements.forEach(propEl => {
           const prop = {
             id: propEl.getAttribute('id'),
             name: propEl.getAttribute('name'),
-            description: propEl.getAttribute('description'),
-            target: propEl.getAttribute('target')
+            description: propEl.getAttribute('description') || propEl.getAttribute('desc'),
+            target: propEl.getAttribute('target') || propEl.getAttribute('targetBeat')
           };
           props.push(prop);
 
           // Import buttonsound attribute → add/update location with sound
           const buttonsound = propEl.getAttribute('buttonsound');
           if (buttonsound && prop.name && config.locations) {
-            // For props, the location name matches the prop name
             const existingLoc = config.locations.find((loc: any) => loc.name === prop.name);
             if (existingLoc) {
               existingLoc.sound = buttonsound;
-            } else {
-              // Create a minimal location for this prop with sound
-              config.locations.push({
-                kind: 'prop',
-                name: prop.name,
-                x: 0,
-                y: 0,
-                width: 100,
-                height: 100,
-                sound: buttonsound
-              });
             }
           }
 
@@ -1445,6 +1794,57 @@ export class ASMLParser {
             });
           }
         });
+
+        // Then try <choice> elements (real ASML format)
+        // Only process if we didn't find <prop> elements
+        if (props.length === 0) {
+          const choiceElements = functionElement.querySelectorAll('choice');
+          choiceElements.forEach(choiceEl => {
+            const locName = choiceEl.getAttribute('loc');
+
+            // Parse counter attribute: format is "counterName,value" (e.g., "friendly,02")
+            const counterAttr = choiceEl.getAttribute('counter');
+            let counterName: string | undefined;
+            let counterValue: number | undefined;
+            if (counterAttr && counterAttr.includes(',')) {
+              const [name, value] = counterAttr.split(',');
+              counterName = name;
+              counterValue = parseInt(value, 10);
+              if (isNaN(counterValue)) counterValue = 0;
+            } else if (counterAttr) {
+              counterName = counterAttr;
+            }
+
+            const prop = {
+              id: choiceEl.getAttribute('id'),
+              name: locName, // 'loc' attribute is the prop/location name
+              description: choiceEl.getAttribute('desc') || choiceEl.getAttribute('description'),
+              target: choiceEl.getAttribute('targetBeat') || choiceEl.getAttribute('target'),
+              counter: counterName,
+              counterOperation: counterName ? 'change' : undefined,
+              counterValue: counterValue
+            };
+            props.push(prop);
+
+            // Import buttonsound attribute → add/update location with sound
+            const buttonsound = choiceEl.getAttribute('buttonsound');
+            if (buttonsound && locName && config.locations) {
+              const existingLoc = config.locations.find((loc: any) => loc.name === locName);
+              if (existingLoc) {
+                existingLoc.sound = buttonsound;
+              }
+            }
+
+            // Add connection for this prop choice
+            if (prop.target) {
+              connections.push({
+                targetId: prop.target,
+                label: prop.description || prop.name || undefined
+              });
+            }
+          });
+        }
+
         parameters.props = props;
         break;
 
@@ -1670,12 +2070,32 @@ export class ASMLParser {
 
           // Add buttonsound to locations if present
           if (buttonsound && buttonsound !== 'undefined' && config.locations) {
-            config.locations.push({
-              kind: 'button',
-              name: choiceText || `Choice ${index + 1}`,
-              x: 0, y: 0, width: 100, height: 50,
-              sound: buttonsound
-            });
+            const buttonName = choiceText || `Choice ${index + 1}`;
+            // Check if a button/text element already exists for this choice:
+            // 1. By exact name match (for buttons with choice text as name)
+            // 2. By index pattern (button1 → choice 0, button2 → choice 1)
+            const expectedIndexName = `button${index + 1}`;
+            const existingButton = config.locations.find(
+              (loc: any) => {
+                // Match by name (choice text)
+                if (loc.name === buttonName) return true;
+                // Match by index pattern (button1, button2, etc.) - these will be converted to buttons later
+                if (loc.name?.toLowerCase() === expectedIndexName) return true;
+                return false;
+              }
+            );
+            if (existingButton) {
+              // Just add the sound to the existing button
+              existingButton.sound = buttonsound;
+            } else {
+              // Create a new button location
+              config.locations.push({
+                kind: 'button',
+                name: buttonName,
+                x: 0, y: 0, width: 100, height: 50,
+                sound: buttonsound
+              });
+            }
           }
         });
 
@@ -1968,11 +2388,15 @@ export class ASMLParser {
    * Scales coordinates from legacy 800x600 to modern 1024x768
    */
   private parseLocations(locsElement: Element): Location[] {
+    // Use console.warn for visibility - won't get lost in regular logs
+    console.warn('[ASMLParser] ========== SCALING LOCATIONS (800x600 → 1024x768) ==========');
     const locations: Location[] = [];
 
     // Legacy ASML uses 800x600, modern uses 1024x768
-    // Scale factor: 1024/800 = 1.28
-    const SCALE_FACTOR = 1024 / 800;
+    // Scale factors for proportional scaling
+    const SCALE_X = 1024 / 800;  // 1.28
+    const SCALE_Y = 768 / 600;   // 1.28
+    console.warn(`[ASMLParser] Scale factors: X=${SCALE_X}, Y=${SCALE_Y}`);
 
     const locElements = locsElement.querySelectorAll('loc');
     locElements.forEach(locEl => {
@@ -1984,22 +2408,38 @@ export class ASMLParser {
       // Parse raw coordinates
       const rawX = parseInt(locEl.getAttribute('x') || '0');
       const rawY = parseInt(locEl.getAttribute('y') || '0');
-      const rawWidth = parseInt(locEl.getAttribute('width') || '100');
-      const rawHeight = parseInt(locEl.getAttribute('height') || '100');
+      let rawWidth = locEl.getAttribute('width') ? parseInt(locEl.getAttribute('width')!) : null;
+      let rawHeight = locEl.getAttribute('height') ? parseInt(locEl.getAttribute('height')!) : null;
 
-      // Detect if this is legacy 800x600 coordinates (values are within that range)
-      // and scale to 1024x768
-      const isLegacy = rawX < 850 && rawY < 650;
+      // For props (and other non-character types), 'size' attribute specifies square dimensions
+      // Characters use 'size' as a scale percentage, but props use it as pixel dimensions
+      if (kind === 'prop' && rawWidth === null && rawHeight === null) {
+        const sizeAttr = locEl.getAttribute('size');
+        if (sizeAttr) {
+          const sizeValue = parseInt(sizeAttr);
+          rawWidth = sizeValue;
+          rawHeight = sizeValue;
+          console.warn(`[ASMLParser] Prop "${locEl.getAttribute('name')}" using size attr: ${sizeValue}x${sizeValue}`);
+        }
+      }
+
+      // Always scale ASML imports - they are always legacy 800x600 format
+      // Scale x and width by SCALE_X, y and height by SCALE_Y
+      const scaledX = Math.round(rawX * SCALE_X);
+      const scaledY = Math.round(rawY * SCALE_Y);
+      const scaledWidth = rawWidth !== null ? Math.round(rawWidth * SCALE_X) : undefined;
+      const scaledHeight = rawHeight !== null ? Math.round(rawHeight * SCALE_Y) : undefined;
+
+      console.warn(`[ASMLParser] Scaling ${kind}/${locEl.getAttribute('name')}: (${rawX},${rawY}) → (${scaledX},${scaledY}), size: ${rawWidth}x${rawHeight} → ${scaledWidth}x${scaledHeight}`);
 
       // Scale all dimensions uniformly for legacy imports
-      // Import-time auto-sizing will adjust text/button sizes based on content
       const location: Location = {
         kind: kind as any,
         name: locEl.getAttribute('name') || '',
-        x: isLegacy ? Math.round(rawX * SCALE_FACTOR) : rawX,
-        y: isLegacy ? Math.round(rawY * SCALE_FACTOR) : rawY,
-        width: isLegacy ? Math.round(rawWidth * SCALE_FACTOR) : rawWidth,
-        height: isLegacy ? Math.round(rawHeight * SCALE_FACTOR) : rawHeight,
+        x: scaledX,
+        y: scaledY,
+        width: scaledWidth ?? 100,
+        height: scaledHeight ?? 100,
         zIndex: parseInt(locEl.getAttribute('zIndex') || '0')
       };
 
@@ -2041,9 +2481,15 @@ export class ASMLParser {
         const stateId = locEl.getAttribute('state');
         if (stateId) location.stateId = stateId;
 
-        // size is scale percentage
+        // size is scale percentage - also needs to scale for larger stage
         const size = locEl.getAttribute('size');
-        if (size) location.size = parseInt(size);
+        if (size) {
+          const rawSize = parseInt(size);
+          // Scale size proportionally (average of X and Y scale factors)
+          const sizeScale = (SCALE_X + SCALE_Y) / 2;
+          location.size = Math.round(rawSize * sizeScale);
+          console.log(`[ASMLParser] Scaling character size: ${rawSize}% -> ${location.size}%`);
+        }
       }
 
       locations.push(location);

@@ -16,6 +16,11 @@ export interface Location {
   // Transform properties for visual elements
   rotation?: number;  // Rotation in degrees
   scale?: number;     // Scale factor (1 = 100%)
+  // Character-specific fields (for kind='character')
+  characterId?: string;     // Reference to Character definition (modern)
+  characterName?: string;   // Character name for ASML export and legacy import
+  stateId?: string;         // Which character state to display
+  size?: number;            // Scale percentage (e.g., 90 = 90% scale, like ASML size attribute)
   // Font properties for text/button/dialog elements
   font?: string;
   fontSize?: number;

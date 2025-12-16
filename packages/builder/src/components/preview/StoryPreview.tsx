@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from
 import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { Story, StoryEngine, Beat } from '@asaps/core';
 import type { StatePreset } from '@asaps/core';
-import { ReactRenderer } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import type { Asset } from '../assets/AssetManager';
 import type { Character } from '../../types/character';
@@ -195,6 +195,43 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         console.log('[StoryPreview] Asset resolver set up with', assets.length, 'assets');
       }
 
+      // Set up character resolver to resolve characterId + stateId to image URL
+      if (characters && characters.length > 0) {
+        (reactRenderer as any).setCharacterResolver((characterId: string, stateId?: string) => {
+          const character = characters.find(c => c.id === characterId);
+          if (!character) {
+            console.log(`[StoryPreview] Character not found: ${characterId}`);
+            return undefined;
+          }
+
+          // If stateId provided, look up that state's image
+          if (stateId) {
+            const state = character.states.find(s => s.id === stateId);
+            if (state?.visual?.image) {
+              console.log(`[StoryPreview] Resolved character ${character.name} state ${stateId} → ${state.visual.image.substring(0, 50)}...`);
+              return state.visual.image;
+            }
+          }
+
+          // Fall back to default state
+          const defaultState = character.states.find(s => s.id === character.defaultState);
+          if (defaultState?.visual?.image) {
+            console.log(`[StoryPreview] Resolved character ${character.name} default state → ${defaultState.visual.image.substring(0, 50)}...`);
+            return defaultState.visual.image;
+          }
+
+          // Fall back to character's default image
+          if (character.visual.defaultImage) {
+            console.log(`[StoryPreview] Resolved character ${character.name} defaultImage → ${character.visual.defaultImage.substring(0, 50)}...`);
+            return character.visual.defaultImage;
+          }
+
+          console.log(`[StoryPreview] No image found for character ${character.name}`);
+          return undefined;
+        });
+        console.log('[StoryPreview] Character resolver set up with', characters.length, 'characters');
+      }
+
       // Create story engine - cast renderer to any to bypass type check
       // ReactRenderer DOES implement IRenderer, but TS can't see it across packages
       const engine = new StoryEngine(reactRenderer as any);
@@ -269,24 +306,50 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
       console.log('[StoryPreview] Initializing locations for', allBeats.length, 'beats');
       initializeBeatLocations(allBeats, STAGE_WIDTH, STAGE_HEIGHT);
 
-      // CRITICAL: Populate environment.nodes from builder assets for self-contained story
+      // CRITICAL: Merge environment.nodes from both imported ASML and builder assets
       // This makes the Story object self-contained with all asset URLs, enabling:
       // 1. Beat.execute() to find background URLs via environment.nodes lookup
       // 2. Future standalone engine export where Story is the single source of truth
-      if (assets && assets.length > 0) {
-        const existingEnvironment = story.getEnvironment() || {};
-        const environmentNodes = assets.map(asset => ({
-          id: asset.id,
-          url: asset.url,
-          type: asset.type,
-          name: asset.name
-        }));
-        story.setEnvironment({
-          ...existingEnvironment,
-          nodes: environmentNodes
-        });
-        console.log('[StoryPreview] Populated environment.nodes with', assets.length, 'assets');
+      const existingEnvironment = story.getEnvironment() || {};
+      const existingNodes = existingEnvironment.nodes || [];
+
+      // Convert builder assets to environment nodes format
+      const assetNodes = (assets || []).map(asset => ({
+        id: asset.id,
+        url: asset.url,
+        type: asset.type,
+        name: asset.name,
+        // Also store file path for legacy ASML compatibility
+        file: asset.url
+      }));
+
+      // Merge: asset nodes take priority (newer), then existing nodes from import
+      const nodeMap = new Map<string, any>();
+
+      // First add existing nodes from ASML import
+      for (const node of existingNodes) {
+        if (node.id) {
+          // Ensure node has url property (legacy ASML uses 'file')
+          nodeMap.set(node.id, {
+            ...node,
+            url: node.url || node.file || node.path || node.src
+          });
+        }
       }
+
+      // Then add/override with builder assets
+      for (const node of assetNodes) {
+        nodeMap.set(node.id, node);
+      }
+
+      const mergedNodes = Array.from(nodeMap.values());
+
+      story.setEnvironment({
+        ...existingEnvironment,
+        nodes: mergedNodes
+      });
+      console.log('[StoryPreview] Merged environment.nodes:', mergedNodes.length,
+        '(from assets:', assetNodes.length, ', from import:', existingNodes.length, ')');
 
       // Set up asset resolver for backgrounds (uses the populated environment.nodes)
       if (rendererRef.current && 'setAssetResolver' in rendererRef.current) {
@@ -426,13 +489,40 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
 
       await engineRef.current.start(startBeatId);
 
+      // Start background music if configured
+      const storySettings = story.getSettings();
+      if (storySettings?.sound?.backgroundMusic && !storySettings.sound.mute) {
+        try {
+          const audioManager = getAudioManager();
+          const volume = (storySettings.sound.backgroundVolume || 70) / 100;
+
+          // Try to find the audio asset URL
+          let audioUrl = storySettings.sound.backgroundMusic;
+
+          // Check if it's a reference to an asset
+          const audioAsset = assets?.find(a =>
+            a.id === audioUrl ||
+            a.name === audioUrl ||
+            a.name.replace(/\.[^/.]+$/, '') === audioUrl // match without extension
+          );
+          if (audioAsset) {
+            audioUrl = audioAsset.url;
+          }
+
+          console.log(`[StoryPreview] Starting background music: ${audioUrl} at volume ${volume}`);
+          await audioManager.playSound(audioUrl, volume, true); // true = loop
+        } catch (error) {
+          console.warn('[StoryPreview] Failed to start background music:', error);
+        }
+      }
+
     } catch (error) {
       console.error('Preview error:', error);
       alert('Error during preview: ' + error);
     } finally {
       setIsRunning(false);
     }
-  }, [story, settings, selectedPreset]);
+  }, [story, settings, selectedPreset, assets]);
 
   const handleRestart = useCallback(() => {
     if (rendererRef.current) {
@@ -445,6 +535,15 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   }, [startPreview]);
 
   const stopPreview = useCallback(() => {
+    // Stop background music and all sounds
+    try {
+      const audioManager = getAudioManager();
+      audioManager.stopAllSounds();
+      console.log('[StoryPreview] Stopped all sounds');
+    } catch (error) {
+      console.warn('[StoryPreview] Error stopping audio:', error);
+    }
+
     if (engineRef.current) {
       const context = engineRef.current.getContext();
       const timerManager = context.getTimerManager();

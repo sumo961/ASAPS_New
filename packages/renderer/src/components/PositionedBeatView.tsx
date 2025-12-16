@@ -354,13 +354,27 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
     transforms.push(`scale(${location.scale})`);
   }
 
+  // DEBUG: Log the position values being used for rendering
+  console.log(`[PositionedBeatView] Rendering "${location.name}" (${location.kind}) at x=${location.x}, y=${location.y}, size=${(location as any).size}`);
+
+  // For character/prop elements with size percentage, use auto sizing to preserve natural image dimensions
+  // The size percentage will be applied as a CSS scale transform in AssetElement
+  const isAssetWithSize = (location.kind === 'character' || location.kind === 'prop') && (location as any).size !== undefined;
+
+  // Ensure text/button/dialog elements always appear above characters/props
+  // Characters and props get z-index 0-99, text/button/dialog get 100+
+  const isTextOrUI = ['text', 'button', 'dialog', 'hotspot'].includes(location.kind);
+  const baseZIndex = isTextOrUI ? 100 : 0;
+  const effectiveZIndex = (location.zIndex || index) + baseZIndex;
+
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
     left: `${location.x}px`,
     top: `${location.y}px`,
-    width: `${location.width}px`,
-    height: `${location.height}px`,
-    zIndex: location.zIndex || index,
+    // For assets with size percentage, don't constrain dimensions - let image use natural size
+    width: isAssetWithSize ? 'auto' : `${location.width}px`,
+    height: isAssetWithSize ? 'auto' : `${location.height}px`,
+    zIndex: effectiveZIndex,
     transform: transforms.length > 0 ? transforms.join(' ') : undefined,
     transformOrigin: 'center center',
   };
@@ -384,7 +398,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
 
   // Render based on element kind
   switch (location.kind) {
-    case 'text':
+    case 'text': {
+      // Use stored dimensions directly - auto-sizing happens at import time
       return (
         <TextElement
           style={baseStyle}
@@ -395,8 +410,10 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           previewMode={previewMode}
         />
       );
+    }
 
-    case 'button':
+    case 'button': {
+      // Use stored dimensions directly - auto-sizing happens at import time
       return (
         <ButtonElement
           style={baseStyle}
@@ -409,6 +426,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           theme={theme}
         />
       );
+    }
 
     case 'hotspot':
       return (
@@ -460,6 +478,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           assetId={location.assetId}
           name={location.name}
           kind={location.kind}
+          size={location.size}
         />
       );
 
@@ -510,32 +529,9 @@ const TextElement: React.FC<{
     }
   }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed]);
 
-  // Calculate font size based on autosize setting or explicit fontSize
-  let computedFontSize: number;
-  if (location.fontSize !== undefined) {
-    // Explicit font size set
-    computedFontSize = location.fontSize;
-  } else if (location.autosize !== false) {
-    // Auto-size based on box dimensions and content length
-    const boxArea = location.width * location.height;
-    const contentLength = content.length;
-
-    // Smart autosize: smaller text for longer content, larger for short content
-    if (contentLength < 20) {
-      // Short text - use box height as primary factor
-      computedFontSize = Math.min(Math.floor(location.height * 0.4), 48);
-    } else if (contentLength < 50) {
-      // Medium text
-      computedFontSize = Math.min(Math.floor(location.height * 0.3), 32);
-    } else {
-      // Long text - prioritize fitting content
-      const charsPerSqPx = contentLength / boxArea;
-      computedFontSize = Math.max(Math.min(Math.floor(Math.sqrt(boxArea / contentLength) * 2), 24), 12);
-    }
-  } else {
-    // Default size
-    computedFontSize = 16;
-  }
+  // Use stored fontSize directly - auto-sizing happens at import time
+  // Default to 16px if not set
+  const computedFontSize = location.fontSize ?? 16;
 
   const computedTextAlign = location.textAlign || 'center';
   const computedFont = location.font || theme.fonts.textFont;
@@ -596,15 +592,20 @@ const TextElement: React.FC<{
           textAlign: computedTextAlign,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
-          overflow: 'hidden',
+          overflow: 'auto', // Allow scrolling if text still doesn't fit
           lineHeight: '1.4',
           boxSizing: 'border-box',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: computedTextAlign === 'center' ? 'center' : (computedTextAlign === 'right' ? 'flex-end' : 'flex-start'),
+          // Use CSS table-cell for vertical centering that clips from bottom, not center
+          display: 'table',
         }}
       >
-        {displayedText}
+        <span style={{
+          display: 'table-cell',
+          verticalAlign: 'middle',
+          textAlign: computedTextAlign,
+        }}>
+          {displayedText}
+        </span>
       </div>
     </>
   );
@@ -626,23 +627,16 @@ const ButtonElement: React.FC<{
 }> = ({ style, content, location, actionId, onAction, interactive, hideButtonBox = false, editorMode = false, theme }) => {
   const [isHovered, setIsHovered] = React.useState(false);
 
-  // Calculate font size based on autosize setting or explicit fontSize
-  let computedFontSize: number;
-  if (location.fontSize !== undefined) {
-    computedFontSize = location.fontSize;
-  } else if (location.autosize !== false) {
-    // Auto-size for buttons - simpler logic than text
-    computedFontSize = Math.min(Math.floor(location.height * 0.35), 32);
-  } else {
-    computedFontSize = 18;
-  }
+  // Use stored fontSize directly - auto-sizing happens at import time
+  // Default to 16px if not set
+  const computedFontSize = location.fontSize ?? 16;
 
   const computedTextAlign = location.textAlign || 'center';
   const computedFont = location.font || theme.fonts.buttonFont;
 
-  // Calculate padding as percentage of box size
-  const paddingHorizontal = Math.max(Math.floor(location.width * 0.04), 12);
-  const paddingVertical = Math.max(Math.floor(location.height * 0.15), 8);
+  // Use fixed, compact padding for better appearance
+  const paddingHorizontal = 12;
+  const paddingVertical = 6;
 
   // Determine background color based on mode
   let backgroundColor: string;
@@ -665,14 +659,16 @@ const ButtonElement: React.FC<{
     fontWeight: '600',
     textAlign: computedTextAlign,
     transition: 'all 0.2s',
-    boxShadow: hideButtonBox ? 'none' : (isHovered ? '0 6px 12px rgba(0,0,0,0.15)' : '0 4px 6px rgba(0,0,0,0.1)'),
-    transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+    boxShadow: hideButtonBox ? 'none' : (isHovered ? '0 4px 8px rgba(0,0,0,0.12)' : '0 2px 4px rgba(0,0,0,0.08)'),
+    transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
     cursor: interactive ? 'pointer' : 'default',
     wordWrap: 'break-word',
     overflowWrap: 'break-word',
     boxSizing: 'border-box',
-    display: 'block',
-    lineHeight: '1.4',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: '1.2',
     overflow: 'hidden',
   };
 
@@ -852,39 +848,63 @@ const AssetElement: React.FC<{
   assetId?: string;
   name: string;
   kind: string;
-}> = ({ style, assetUrl, assetId, name, kind }) => {
+  size?: number;  // Character-specific: scale percentage (e.g., 90 = 90% scale)
+}> = ({ style, assetUrl, assetId, name, kind, size }) => {
+  // Apply character-specific size scaling
+  // size is a percentage (e.g., 90 means 90% of the original size, 115 means 115%)
+  const finalStyle: React.CSSProperties = { ...style };
+
+  // Always apply size scaling for character/prop elements when size is defined
+  // This works with width/height: 'auto' to scale the natural image dimensions
+  if (size !== undefined) {
+    const scaleFactor = size / 100;
+    // Add scale transform to existing transforms
+    const existingTransform = finalStyle.transform || '';
+    finalStyle.transform = existingTransform
+      ? `${existingTransform} scale(${scaleFactor})`
+      : `scale(${scaleFactor})`;
+    // Keep the transform origin at top-left so position matches
+    finalStyle.transformOrigin = 'top left';
+  }
+
   if (assetUrl) {
     return (
       <img
         src={assetUrl}
         alt={name}
         style={{
-          ...style,
-          objectFit: 'fill',
+          ...finalStyle,
+          // Don't constrain image - let it render at natural size (scaled by size %)
+          objectFit: 'none',
+          maxWidth: 'none',
+          maxHeight: 'none',
         }}
         draggable={false}
       />
     );
   }
 
-  // Placeholder for missing asset
+  // Placeholder for missing asset - use reasonable default size
+  const placeholderStyle: React.CSSProperties = {
+    ...finalStyle,
+    // Use explicit dimensions for placeholder when style has 'auto'
+    width: style.width === 'auto' ? '150px' : style.width,
+    height: style.height === 'auto' ? '200px' : style.height,
+    backgroundColor: 'rgba(211, 211, 211, 0.5)',
+    borderRadius: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '12px',
+    color: '#6b7280',
+    border: '2px dashed #9ca3af',
+    padding: '8px',
+    textAlign: 'center',
+  };
+
   return (
-    <div
-      style={{
-        ...style,
-        backgroundColor: 'rgba(211, 211, 211, 0.5)',
-        borderRadius: '8px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '12px',
-        color: '#6b7280',
-        border: '2px dashed #9ca3af',
-        padding: '8px',
-        textAlign: 'center',
-      }}
-    >
+    <div style={placeholderStyle}>
       <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{name}</div>
       <div style={{ fontSize: '10px', opacity: 0.7 }}>({kind})</div>
       {assetId && (
@@ -928,7 +948,8 @@ export function createPositionedElementData(
   locations: Location[],
   content: Record<string, any>,
   beatType: string,
-  assetResolver?: (assetId: string) => string | undefined
+  assetResolver?: (assetId: string) => string | undefined,
+  characterResolver?: (characterId: string, stateId?: string) => string | undefined
 ): PositionedElementData[] {
   console.log('[createPositionedElementData] Creating elements:', { beatType, content, locationCount: locations.length });
 
@@ -936,9 +957,17 @@ export function createPositionedElementData(
     const elementContent = getContentForLocation(location, content, beatType);
     console.log(`[createPositionedElementData] Location "${location.name}" (${location.kind}) → content: "${elementContent}"`);
 
-    // Resolve asset URL: try assetId first, then fall back to direct imageUrl
+    // Resolve asset URL: handle character elements specially
     let resolvedAssetUrl: string | undefined;
-    if (location.assetId && assetResolver) {
+
+    // For character elements, use characterResolver to resolve characterId + stateId to image URL
+    if (location.kind === 'character' && location.characterId && characterResolver) {
+      resolvedAssetUrl = characterResolver(location.characterId, location.stateId);
+      console.log(`[createPositionedElementData] Character "${location.name}" → resolved via characterResolver: ${resolvedAssetUrl ? 'found' : 'not found'}`);
+    }
+
+    // Fall back to assetId resolution for non-character elements or if character resolver didn't find anything
+    if (!resolvedAssetUrl && location.assetId && assetResolver) {
       resolvedAssetUrl = assetResolver(location.assetId);
     }
     if (!resolvedAssetUrl && location.imageUrl) {
@@ -953,7 +982,7 @@ export function createPositionedElementData(
     // Extract actionId for beats that have choice/option mappings
     let actionId: string | undefined;
 
-    // For movementChoice: match location.name to choice.text (or choice.location as fallback)
+    // For movementChoice: match location.name to choice properties with multiple fallbacks
     if (beatType === 'movementChoice' && content.choices && Array.isArray(content.choices)) {
       // Try matching by text first (since SchemaLocationInitializer uses choice.text for location.name)
       let choice = content.choices.find((c: any) => c.text === location.name);
@@ -961,18 +990,69 @@ export function createPositionedElementData(
       if (!choice) {
         choice = content.choices.find((c: any) => c.location === location.name);
       }
+      // Fallback to id match (for legacy imports where hotspot name matches choice id)
+      if (!choice) {
+        choice = content.choices.find((c: any) => c.id === location.name);
+      }
+      // Fallback to index match if location.name has numeric suffix (e.g., "hotspot_0" → choices[0])
+      if (!choice && location.name) {
+        const indexMatch = location.name.match(/[_-]?(\d+)$/);
+        if (indexMatch) {
+          const index = parseInt(indexMatch[1], 10);
+          if (index >= 0 && index < content.choices.length) {
+            choice = content.choices[index];
+            console.log(`[createPositionedElementData] MovementChoice: matched by index ${index}`);
+          }
+        }
+      }
+      // Fallback to case-insensitive partial match - ONLY for hotspot elements
+      // Don't try to match text, character, or other non-interactive elements to choices
+      if (!choice && location.name && location.kind === 'hotspot') {
+        const locNameLower = location.name.toLowerCase();
+        choice = content.choices.find((c: any) => {
+          // Only match if both sides have content
+          const choiceText = c.text?.toLowerCase();
+          const choiceLoc = c.location?.toLowerCase();
+          if (choiceText && choiceText.includes(locNameLower)) return true;
+          if (choiceLoc && choiceLoc.includes(locNameLower)) return true;
+          if (choiceText && locNameLower.includes(choiceText)) return true;
+          if (choiceLoc && locNameLower.includes(choiceLoc)) return true;
+          return false;
+        });
+        if (choice) {
+          console.log(`[createPositionedElementData] MovementChoice: matched by partial/case-insensitive match`);
+        }
+      }
       if (choice) {
         actionId = choice.id;
         console.log(`[createPositionedElementData] MovementChoice: location "${location.name}" → choice ID "${actionId}"`);
       } else {
-        console.log(`[createPositionedElementData] MovementChoice: NO MATCH for location "${location.name}"`);
+        console.warn(`[createPositionedElementData] MovementChoice: NO MATCH for location "${location.name}"`);
         console.log(`[createPositionedElementData] Available choices:`, content.choices.map((c: any) => ({ id: c.id, text: c.text, location: c.location })));
       }
     }
 
-    // For dialogTree: match location.name to choice.text to get choice.id
+    // For dialogTree: match location.name to choice.text or index to get choice.id
     if (beatType === 'dialogTree' && content.choices && Array.isArray(content.choices)) {
-      const choice = content.choices.find((c: any) => c.text === location.name);
+      const locNameLower = location.name?.toLowerCase() || '';
+      // Try exact text match first
+      let choice = content.choices.find((c: any) => c.text === location.name);
+      if (!choice) {
+        // Try matching by index (e.g., "button1" → choices[0])
+        const indexMatch = locNameLower.match(/button\s*(\d+)/);
+        if (indexMatch) {
+          const index = parseInt(indexMatch[1], 10) - 1;
+          if (index >= 0 && index < content.choices.length) {
+            choice = content.choices[index];
+            console.log(`[createPositionedElementData] DialogTree: matched by index ${index}`);
+          }
+        }
+      }
+      // Fallback: use first choice for any button
+      if (!choice && location.kind === 'button' && content.choices.length > 0) {
+        choice = content.choices[0];
+        console.log(`[createPositionedElementData] DialogTree: using first choice as fallback`);
+      }
       if (choice) {
         actionId = choice.id;
         console.log(`[createPositionedElementData] DialogTree: location "${location.name}" → choice ID "${actionId}"`);
@@ -1063,24 +1143,45 @@ function getContentForLocation(
     if (loc.kind === 'text' || nameLower.includes('text') || nameLower.includes('dialog')) {
       return content.text || '';
     }
-    // Button elements - match by choice text
-    if (loc.kind === 'button' && content.choices) {
-      const choice = content.choices.find((c: any) => c.text === loc.name);
-      if (choice) {
-        return choice.text;
+    // Button elements - match by choice text or index
+    if (loc.kind === 'button' && content.choices && content.choices.length > 0) {
+      // Try exact match first
+      const exactChoice = content.choices.find((c: any) => c.text === loc.name);
+      if (exactChoice) {
+        return exactChoice.text;
       }
+      // Try matching by index (e.g., "button1" → choices[0], "button2" → choices[1])
+      const indexMatch = nameLower.match(/button\s*(\d+)/);
+      if (indexMatch) {
+        const index = parseInt(indexMatch[1], 10) - 1; // button1 = index 0
+        if (index >= 0 && index < content.choices.length) {
+          return content.choices[index].text;
+        }
+      }
+      // Fallback: return first choice text for any button
+      return content.choices[0].text;
     }
   }
 
   // End Screen specific elements
   if (beatType === 'endScreen') {
+    // Check for specific patterns first
     if (nameLower.includes('restart') || nameLower.includes('play') || nameLower.includes('again')) {
       return content.restartText || content.buttonText || 'Play Again';
     }
     if (nameLower.includes('credits')) {
       return content.creditsText || 'Credits';
     }
-    if (nameLower.includes('message') || nameLower.includes('end')) {
+    if (nameLower.includes('message') || nameLower.includes('end') || nameLower.includes('text')) {
+      return content.message || 'The End';
+    }
+    // Fallback based on element kind for legacy imports
+    if (loc.kind === 'button') {
+      // Any button on endScreen is likely restart or credits
+      return content.restartText || content.buttonText || 'Play Again';
+    }
+    if (loc.kind === 'text') {
+      // Any text on endScreen is likely the message
       return content.message || 'The End';
     }
   }
@@ -1166,9 +1267,9 @@ function getContentForLocation(
     }
   }
   
-  // Question text for Movement and PickProp
-  if (nameLower.includes('question')) {
-    return content.question || '';
+  // Question text for Movement and PickProp - check both 'question' name AND 'text' name
+  if (nameLower.includes('question') || (nameLower === 'text' && (beatType === 'movementChoice' || beatType === 'pickProp'))) {
+    return content.question || content.text || '';
   }
   
   // InputText elements
@@ -1303,9 +1404,35 @@ const FlexButtonElement: React.FC<{
   }
 
   const handleClick = async () => {
-    if (interactive && onAction) {
-      const actionIdToPass = actionId || location.name || 'continue';
-      onAction(actionIdToPass);
+    if (interactive) {
+      // Play sound if assigned
+      if (location.sound) {
+        try {
+          const audioManager = getAudioManager();
+
+          // Check if it's a preset sound
+          if (isPresetSound(location.sound)) {
+            const preset = getPresetSound(location.sound);
+            if (preset) {
+              console.log(`[FlexButtonElement] Playing preset sound: ${preset.name}`);
+              await audioManager.playSound(preset.url, preset.volume);
+            }
+          } else {
+            // Custom asset
+            console.log(`[FlexButtonElement] Playing custom sound: ${location.sound}`);
+            await audioManager.playSound(location.sound);
+          }
+        } catch (error) {
+          console.error('[FlexButtonElement] Error playing sound:', error);
+          // Don't block the action if sound fails
+        }
+      }
+
+      // Then call the action
+      if (onAction) {
+        const actionIdToPass = actionId || location.name || 'continue';
+        onAction(actionIdToPass);
+      }
     }
   };
 

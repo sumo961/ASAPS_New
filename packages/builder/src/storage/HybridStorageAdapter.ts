@@ -446,6 +446,57 @@ export class HybridStorageAdapter implements IStorageAdapter {
     }
   }
 
+  /**
+   * Migrate all assets from one project to another
+   * Used when saving an untitled project as a named project with a new ID
+   */
+  async migrateProjectAssets(fromProjectId: string, toProjectId: string): Promise<number> {
+    this.ensureReady();
+
+    try {
+      console.log(`[HybridStorageAdapter] Migrating assets from ${fromProjectId} to ${toProjectId}`);
+      const assets = await this.listAssets(fromProjectId);
+
+      if (assets.length === 0) {
+        console.log('[HybridStorageAdapter] No assets to migrate');
+        return 0;
+      }
+
+      console.log(`[HybridStorageAdapter] Found ${assets.length} assets to migrate`);
+
+      for (const assetInfo of assets) {
+        // Update metadata record with new project ID
+        const updatedInfo: AssetStorageInfo = {
+          ...assetInfo,
+          projectId: toProjectId,
+        };
+        await this.db!.put(STORES.assetMetadata, updatedInfo);
+
+        // Also update the asset record in the assets store if it exists there
+        const assetRecord = await this.db!.get(STORES.assets, assetInfo.id);
+        if (assetRecord) {
+          const updatedAsset = {
+            ...assetRecord,
+            projectId: toProjectId,
+          };
+          await this.db!.put(STORES.assets, updatedAsset);
+        }
+
+        console.log(`[HybridStorageAdapter] Migrated asset: ${assetInfo.filename}`);
+      }
+
+      console.log(`[HybridStorageAdapter] Successfully migrated ${assets.length} assets`);
+      return assets.length;
+    } catch (err) {
+      console.error('[HybridStorageAdapter] Failed to migrate assets:', err);
+      throw new StorageError(
+        `Failed to migrate assets from ${fromProjectId} to ${toProjectId}`,
+        'UNKNOWN',
+        err as Error
+      );
+    }
+  }
+
   async getAssetDataURL(assetId: string): Promise<string | null> {
     const blob = await this.loadAsset(assetId);
     if (!blob) return null;

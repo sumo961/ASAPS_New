@@ -27,8 +27,12 @@ export interface VisualElement {
   id: string;
   type: 'character' | 'prop' | 'text' | 'hotspot' | 'dialog' | 'button';
   assetId?: string;
+  assetUrl?: string; // Resolved URL from assetId or character state (for rendering)
   imageUrl?: string; // Direct image URL (for base64 data or when assetId is not available)
   characterId?: string; // For character elements, links to Character definition
+  stateId?: string; // Which character state to display
+  characterName?: string; // Character name for ASML export
+  size?: number; // Scale percentage for characters (e.g., 90 = 90% scale)
   text?: string;
   speaker?: string;
   choices?: string[];
@@ -51,10 +55,12 @@ export interface VisualElement {
 
 interface VisualBeatEditorProps {
   backgroundAssetId?: string;
+  backgroundUrl?: string; // Direct URL from ASML import
   backgroundSound?: string;
   elements: VisualElement[];
   onElementsChange: (elements: VisualElement[]) => void;
   assets: Asset[];
+  characters?: Character[]; // Characters for resolving character element images
   onSelectAsset?: (assetType: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => void;
   onOpenCharacterManager?: (callback: (character: Character) => void) => void;
   beatContent?: {
@@ -80,10 +86,12 @@ interface VisualBeatEditorProps {
 
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   backgroundAssetId,
+  backgroundUrl: backgroundUrlProp,
   backgroundSound,
   elements = [],
   onElementsChange,
   assets,
+  characters = [],
   onSelectAsset,
   onOpenCharacterManager,
   beatContent,
@@ -107,6 +115,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const [tool, setTool] = useState<'select' | 'hotspot' | 'text' | 'character' | 'prop'>('select');
 
   const backgroundAsset = assets.find(a => a.id === backgroundAssetId);
+  // Prioritize asset lookup (fresh URL) over direct URL (may be stale blob URL)
+  const resolvedBackgroundUrl = backgroundAsset?.url || backgroundUrlProp;
+
+  // Debug logging for background
+  console.log(`[VisualBeatEditor] backgroundAssetId="${backgroundAssetId}", found=${!!backgroundAsset}, url="${resolvedBackgroundUrl?.substring(0, 80) || 'none'}", assets.length=${assets.length}`);
 
   // Convert VisualElements to Location objects for the renderer
   const locationsForRenderer: Location[] = elements
@@ -126,6 +139,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       // Include transform properties
       rotation: el.rotation,
       scale: el.scale,
+      // Character-specific fields
+      characterId: el.characterId,
+      characterName: el.characterName,
+      stateId: el.stateId,
+      size: el.size,
       // Include font properties directly in Location
       font: el.font,
       fontSize: el.fontSize,
@@ -150,6 +168,71 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
   // Add asset URLs to elements (keeping this for backwards compatibility)
   positionedElements.forEach(el => {
+    // For character elements, ALWAYS resolve from characters array
+    // This ensures fresh URLs are used after project reload (old blob URLs become invalid)
+    if (el.location.kind === 'character') {
+      let resolved = false;
+
+      // Try by characterId first
+      if (el.location.characterId) {
+        const character = characters.find(c => c.id === el.location.characterId);
+        if (character) {
+          const stateId = el.location.stateId || character.defaultState;
+          const state = character.states?.find(s => s.id === stateId);
+          if (state?.visual?.image) {
+            el.assetUrl = state.visual.image;
+            resolved = true;
+          } else if (character.visual?.defaultImage) {
+            el.assetUrl = character.visual.defaultImage;
+            resolved = true;
+          }
+        }
+      }
+
+      // Try by characterName if characterId didn't work
+      if (!resolved && el.location.characterName) {
+        const charName = el.location.characterName.toLowerCase();
+        const character = characters.find(c =>
+          c.name?.toLowerCase() === charName ||
+          c.displayName?.toLowerCase() === charName
+        );
+        if (character) {
+          const stateId = el.location.stateId || character.defaultState;
+          const state = character.states?.find(s => s.id === stateId);
+          if (state?.visual?.image) {
+            el.assetUrl = state.visual.image;
+            resolved = true;
+          } else if (character.visual?.defaultImage) {
+            el.assetUrl = character.visual.defaultImage;
+            resolved = true;
+          }
+        }
+      }
+    }
+
+    // For prop elements, ALWAYS resolve from assets array (fresh URLs)
+    if (el.location.kind === 'prop') {
+      // Try by assetId first
+      if (el.location.assetId) {
+        const asset = assets.find(a => a.id === el.location.assetId);
+        if (asset) {
+          el.assetUrl = asset.url;
+        }
+      }
+      // Try by prop name if assetId didn't work
+      if (!el.assetUrl && el.location.name) {
+        const propName = el.location.name.toLowerCase();
+        const asset = assets.find(a =>
+          a.name?.toLowerCase() === propName ||
+          a.name?.toLowerCase().includes(propName)
+        );
+        if (asset) {
+          el.assetUrl = asset.url;
+        }
+      }
+    }
+
+    // For other elements, use the original logic
     if (!el.assetUrl) {
       // First try to resolve assetId
       if (el.location.assetId) {
@@ -158,7 +241,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
           el.assetUrl = asset.url;
         }
       }
-      // If no assetUrl from assetId, use direct imageUrl (for character base64 data)
+      // If no assetUrl from assetId, use direct imageUrl
       if (!el.assetUrl && el.location.imageUrl) {
         el.assetUrl = el.location.imageUrl;
       }
@@ -194,8 +277,14 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   }, [onSelectElement]);
 
   // Add new element
-  const addElement = (type: 'hotspot' | 'text' | 'character' | 'prop', x = 100, y = 100, assetId?: string) => {
-    console.log('[addElement] Called with:', { type, x, y, assetId });
+  const addElement = (
+    type: 'hotspot' | 'text' | 'character' | 'prop',
+    x = 100,
+    y = 100,
+    assetId?: string,
+    characterData?: { characterId: string; characterName: string; stateId: string; imageUrl?: string; size?: number }
+  ) => {
+    console.log('[addElement] Called with:', { type, x, y, assetId, characterData });
     const newElement: VisualElement = {
       id: `element_${Date.now()}`,
       type,
@@ -208,9 +297,15 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       scale: 1,
       visible: true,
       locked: false,
-      name: type === 'hotspot' ? 'Hotspot' : type === 'text' ? 'Text' : type === 'character' ? 'Character' : 'Prop',
+      name: type === 'hotspot' ? 'Hotspot' : type === 'text' ? 'Text' : type === 'character' ? (characterData?.characterName || 'Character') : 'Prop',
       text: type === 'text' ? 'New Text' : undefined,
-      assetId: (type === 'character' || type === 'prop') ? assetId : undefined,
+      assetId: type === 'prop' ? assetId : undefined,
+      // Character-specific fields
+      characterId: type === 'character' ? characterData?.characterId : undefined,
+      characterName: type === 'character' ? characterData?.characterName : undefined,
+      stateId: type === 'character' ? characterData?.stateId : undefined,
+      imageUrl: type === 'character' ? characterData?.imageUrl : undefined,
+      size: type === 'character' ? (characterData?.size || 100) : undefined,
       // Add font properties for text elements
       font: type === 'text' ? 'Arial' : undefined,
       fontSize: type === 'text' ? 16 : undefined,
@@ -277,14 +372,30 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
             if (onOpenCharacterManager) {
               onOpenCharacterManager((character) => {
                 console.log('[VisualBeatEditor] Character selected:', character);
-                // TODO: Handle character selection - could add character element to canvas
+                if (character && character.id) {
+                  // Get the default state
+                  const defaultState = character.states?.find((s: { id: string }) => s.id === character.defaultState) || character.states?.[0];
+                  // Get the image from the state or character default
+                  const imageUrl = defaultState?.visual?.image || character.visual?.defaultImage;
+
+                  // Add character element in the center of the canvas
+                  const x = (stageWidth / 2) - 75;
+                  const y = (stageHeight / 2) - 75;
+                  addElement('character', x, y, undefined, {
+                    characterId: character.id,
+                    characterName: character.name,
+                    stateId: defaultState?.id || 'default',
+                    imageUrl: imageUrl,
+                    size: 100 // Default to 100%
+                  });
+                }
               });
             } else {
               console.error('[VisualBeatEditor] onOpenCharacterManager callback not provided!');
             }
           }}
           className={`p-2 rounded ${tool === 'character' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}`}
-          title="Manage Characters"
+          title="Add Character"
         >
           <User className="w-4 h-4" />
         </button>
@@ -476,7 +587,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
               <PositionedBeatView
                 stageWidth={stageWidth}
                 stageHeight={stageHeight}
-                backgroundUrl={backgroundAsset?.url}
+                backgroundUrl={resolvedBackgroundUrl}
                 backgroundColor="transparent"
                 elements={positionedElements}
                 interactive={false}
@@ -549,6 +660,12 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     transforms.push(`scale(${el.scale})`);
                   }
 
+                  // For characters/props with size percentage, the width/height in the element
+                  // should already reflect the effective dimensions (updated by VisualWorkspace).
+                  // Just use el.width and el.height directly.
+                  const displayWidth = el.width;
+                  const displayHeight = el.height;
+
                   return (
                     <div
                       key={`selection-${el.id}`}
@@ -556,8 +673,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         position: 'absolute',
                         left: `${el.x}px`,
                         top: `${el.y}px`,
-                        width: `${el.width}px`,
-                        height: `${el.height}px`,
+                        width: `${displayWidth}px`,
+                        height: `${displayHeight}px`,
                         border: '2px solid #3b82f6',
                         borderRadius: '4px',
                         pointerEvents: 'none',

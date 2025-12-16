@@ -8,9 +8,19 @@ import {
   EndScreenBeat,
   ASMLProcessor,
   ASMLGenerator,
+  ASMLParser,
   Cluster,
   ContainerBeatPosition
 } from '@asaps/core';
+import { applyTreeLayoutToBeats } from '../utils/TreeLayoutAlgorithm';
+import {
+  importAsmlAssets,
+  linkAssetsToBeats,
+  createFileResolver,
+  type AsmlAssetImportResult
+} from '../utils/asmlAssetImporter';
+import type { Asset } from '../components/assets/AssetManager';
+import type { Character } from '../types/character';
 
 interface StoryBuilderState {
   title: string;
@@ -47,10 +57,44 @@ interface StoryBuilderActions {
   renameCluster: (clusterId: string, name: string) => void;
   setClusterMap: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   exportStory: (assets?: any[], characters?: any[]) => string;
-  importStory: (xmlContent: string) => Promise<void>;
+  importStory: (xmlContent: string, options?: ImportStoryOptions) => Promise<ImportStoryResult>;
   clearStory: () => void;
   updateSettings: (settings: any) => void;
   loadStoryData: (storyData: any) => void;
+}
+
+/**
+ * Options for importing a story with assets
+ */
+export interface ImportStoryOptions {
+  /** File map from folder picker (filename -> File) */
+  fileMap?: Map<string, File>;
+  /** Function to add an asset to storage (receives both Asset metadata and the blob for persistence) */
+  addAsset?: (asset: Asset, blob: Blob) => Promise<boolean>;
+  /** Current project ID for asset association */
+  projectId?: string;
+}
+
+/**
+ * Result of story import including imported characters
+ */
+export interface ImportStoryResult {
+  /** Whether import was successful */
+  success: boolean;
+  /** Imported characters (need to be added to character manager) */
+  characters: Character[];
+  /** Asset import stats */
+  assetStats?: {
+    backgroundsImported: number;
+    propsImported: number;
+    soundsImported: number;
+    charactersCreated: number;
+    characterImagesImported: number;
+    totalFilesImported: number;
+    totalFilesMissing: number;
+  };
+  /** Any errors during import */
+  errors: string[];
 }
 
 export function useStoryBuilder() {
@@ -345,63 +389,200 @@ export function useStoryBuilder() {
   }, [state]);
 
   // FIXED: Import story from ASML - preserve ALL data
-  const importStory = useCallback(async (xmlContent: string) => {
+  // Enhanced: Now supports asset import via options
+  const importStory = useCallback(async (
+    xmlContent: string,
+    options?: ImportStoryOptions
+  ): Promise<ImportStoryResult> => {
+    console.warn('[useStoryBuilder] ★★★ importStory CALLED ★★★');
+    const errors: string[] = [];
+    let importedCharacters: Character[] = [];
+    let assetImportResult: AsmlAssetImportResult | undefined;
+
+    // Step 1: If assets need to be imported, do that first
+    if (options?.fileMap && options.fileMap.size > 0 && options.addAsset && options.projectId) {
+      console.log('[importStory] Importing assets from folder...');
+
+      // Extract asset manifest from XML
+      const manifest = ASMLParser.getAssetManifest(xmlContent);
+
+      if (manifest.hasAssets()) {
+        // Create file resolver from the file map
+        const fileResolver = createFileResolver(options.fileMap);
+
+        // Import all assets
+        assetImportResult = await importAsmlAssets({
+          manifest,
+          fileResolver,
+          projectId: options.projectId,
+          addAsset: options.addAsset
+        });
+
+        // Collect characters from import result
+        assetImportResult.characterMap.forEach((character, name) => {
+          // Avoid duplicates (map has both name and lowercase name)
+          if (!importedCharacters.find(c => c.id === character.id)) {
+            importedCharacters.push(character);
+          }
+        });
+
+        // Collect errors
+        errors.push(...assetImportResult.errors);
+
+        console.log('[importStory] Asset import complete:', assetImportResult.stats);
+      }
+    }
+
+    // Step 2: Parse the story
+    console.warn('[importStory] ★★★ About to call ASMLProcessor.parseASML ★★★');
     const processor = new ASMLProcessor();
     const result = await processor.parseASML(xmlContent);
+    console.warn('[importStory] ★★★ parseASML returned ★★★', result.success ? 'SUCCESS' : 'FAILED');
 
-    if (result.success && result.story) {
-      const story = result.story;
-      const metadata = story.getMetadata();
+    if (!result.success || !result.story) {
+      return {
+        success: false,
+        characters: [],
+        errors: [`Failed to import story: ${result.errors.join(', ')}`]
+      };
+    }
 
-      // Important: Get actual Beat instances from the story
-      const beats = story.getAllBeats();
+    const story = result.story;
+    const metadata = story.getMetadata();
 
-      // FIXED: Extract and store all data sections
-      const settings = story.getSettings();
-      const environment = story.getEnvironment();
-      const characters = story.getCharacters();
+    // Important: Get actual Beat instances from the story
+    const beats = story.getAllBeats();
 
-      console.log('Imported story data:', {
-        beats: beats.length,
-        settings,
-        environment,
-        characters,
-      });
+    // DEBUG: Log locations after getting beats from story
+    console.log('[importStory] ========== BEAT LOCATIONS AFTER IMPORT ==========');
+    for (const beat of beats) {
+      if (beat.locations.size > 0) {
+        console.log(`[importStory] Beat ${beat.id} (${beat.type}) locations:`);
+        beat.locations.forEach((loc: any, key: string) => {
+          console.log(`[importStory]   - "${key}": x=${loc.x}, y=${loc.y}, size=${loc.size}`);
+        });
+      }
+    }
+    console.log('[importStory] ===================================================');
 
-      setState({
-        title: metadata?.title || 'Imported Story',
-        author: metadata?.author || 'Unknown Author',
-        beats: beats, // These are Beat instances
-        connections: [],
-        story: story, // Keep the full story for export
-        settings,  // Store imported settings in state
-        environment,
-        characters,
-        clusters: [], // Initialize empty clusters for imported story
-        containerBeatPositions: [], // Initialize empty positions
-      });
+    // FIXED: Extract and store all data sections
+    const settings = story.getSettings();
+    const environment = story.getEnvironment();
+    const characters = story.getCharacters();
+    const clusters = story.getClusters() || [];
 
-      // Reset beat counter - parse actual beat IDs to find the highest number
-      let maxBeatNumber = 0;
-      for (const beat of beats) {
-        const match = beat.id?.match(/^beat_(\d+)$/);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (num > maxBeatNumber) {
-            maxBeatNumber = num;
+    console.log('Imported story data:', {
+      beats: beats.length,
+      settings,
+      environment,
+      characters,
+      clusters: clusters.length,
+    });
+
+    // Step 3: Link assets to beats if we imported assets
+    if (assetImportResult) {
+      console.log('[importStory] Linking assets to beats...');
+      linkAssetsToBeats(beats, assetImportResult);
+    }
+
+    // Extract connections from beats using their getConnections() method
+    const connections: Array<{ source: string; target: string; label?: string }> = [];
+    const seenConnections = new Set<string>();
+
+    for (const beat of beats) {
+      if (typeof beat.getConnections === 'function') {
+        const beatConnections = beat.getConnections();
+        for (const conn of beatConnections) {
+          if (conn.targetId) {
+            const key = `${beat.id}->${conn.targetId}`;
+            if (!seenConnections.has(key)) {
+              seenConnections.add(key);
+              connections.push({
+                source: beat.id,
+                target: conn.targetId,
+                label: conn.label
+              });
+            }
           }
         }
       }
-      beatCounter.current = Math.max(maxBeatNumber + 1, beats.length);
-      console.log('[importStory] Beat counter set to:', beatCounter.current);
-
-      // Log any warnings
-      if (result.warnings.length > 0) {
-        console.warn('Import warnings:', result.warnings);
-      }
-    } else {
-      throw new Error(`Failed to import story: ${result.errors.join(', ')}`);
     }
+
+    console.log('[importStory] Extracted connections:', connections.length);
+
+    // Check if any beats have positions - if not, apply auto-layout
+    const hasPositions = beats.some(b => b.x !== undefined && b.y !== undefined);
+
+    if (!hasPositions && beats.length > 0) {
+      console.log('[importStory] No beat positions found, applying auto-layout');
+
+      // Create layout-compatible beat data
+      const layoutBeats = beats.map(b => ({
+        id: b.id,
+        type: b.type,
+        position: undefined,
+        parameters: b.getParameters()
+      }));
+
+      // Extract edges for layout
+      const edges = connections.map(c => ({
+        source: c.source,
+        target: c.target
+      }));
+
+      // Apply tree layout
+      const positions = applyTreeLayoutToBeats(layoutBeats, undefined, edges);
+
+      // Apply positions to beats
+      for (const beat of beats) {
+        const pos = positions.get(beat.id);
+        if (pos) {
+          (beat as any).x = pos.x;
+          (beat as any).y = pos.y;
+          console.log(`[importStory] Positioned ${beat.id} at (${pos.x}, ${pos.y})`);
+        }
+      }
+    }
+
+    setState({
+      title: metadata?.title || 'Imported Story',
+      author: metadata?.author || 'Unknown Author',
+      beats: beats, // These are Beat instances
+      connections: connections, // Now properly extracted from beats
+      story: story, // Keep the full story for export
+      settings,  // Store imported settings in state
+      environment,
+      characters,
+      clusters: clusters, // Use imported clusters, preserving beat groupings
+      containerBeatPositions: [], // Initialize empty positions
+    });
+
+    // Reset beat counter - parse actual beat IDs to find the highest number
+    let maxBeatNumber = 0;
+    for (const beat of beats) {
+      const match = beat.id?.match(/^beat_(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxBeatNumber) {
+          maxBeatNumber = num;
+        }
+      }
+    }
+    beatCounter.current = Math.max(maxBeatNumber + 1, beats.length);
+    console.log('[importStory] Beat counter set to:', beatCounter.current);
+
+    // Log any warnings
+    if (result.warnings.length > 0) {
+      console.warn('Import warnings:', result.warnings);
+      errors.push(...result.warnings);
+    }
+
+    return {
+      success: true,
+      characters: importedCharacters,
+      assetStats: assetImportResult?.stats,
+      errors
+    };
   }, []);
 
   // Clear story

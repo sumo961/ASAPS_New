@@ -4,15 +4,16 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Grid, 
-  List, 
+import {
+  Plus,
+  Search,
+  Grid,
+  List,
   Filter,
   Download,
   Upload,
-  Users
+  Users,
+  Pencil
 } from 'lucide-react';
 import { Character, CHARACTER_TEMPLATES } from '../../types/character';
 import { CharacterCard } from './CharacterCard';
@@ -110,6 +111,12 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       selectCharacter(character.id);
       setShowEditor(true);
     }
+  };
+
+  // Open editor for a character (used in selection mode's edit button)
+  const handleEditCharacter = (character: Character) => {
+    selectCharacter(character.id);
+    setShowEditor(true);
   };
 
   const handleCharacterRemove = (id: string) => {
@@ -271,6 +278,8 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                 character={character}
                 onClick={() => handleCharacterClick(character)}
                 onRemove={() => handleCharacterRemove(character.id)}
+                onEdit={() => handleEditCharacter(character)}
+                selectionMode={selectionMode}
               />
             ))}
             {/* Add Character Card */}
@@ -288,13 +297,13 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
               <div
                 key={character.id}
                 onClick={() => handleCharacterClick(character)}
-                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
+                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all group"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
                     {character.visual.defaultImage ? (
-                      <img 
-                        src={character.visual.defaultImage} 
+                      <img
+                        src={character.visual.defaultImage}
                         alt={character.displayName}
                         className="w-full h-full object-cover rounded-lg"
                       />
@@ -310,10 +319,25 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                     {character.role}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span>{character.states.length} states</span>
-                  <span>•</span>
-                  <span>{character.counters.length} counters</span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>{character.states.length} states</span>
+                    <span>•</span>
+                    <span>{character.counters.length} counters</span>
+                  </div>
+                  {/* Edit button in selection mode */}
+                  {selectionMode && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditCharacter(character);
+                      }}
+                      className="p-2 rounded-lg hover:bg-blue-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Edit Character"
+                    >
+                      <Pencil className="w-4 h-4 text-blue-500" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

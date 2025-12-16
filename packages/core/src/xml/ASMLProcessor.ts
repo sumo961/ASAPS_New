@@ -20,8 +20,11 @@ export class ASMLProcessor {
     errors: string[];
     warnings: string[];
   }> {
+    console.warn('[ASMLProcessor] ★★★ parseASML called, calling parser.parse() ★★★');
     // Use the new parser's parse method
-    return await this.parser.parse(xmlContent);
+    const result = await this.parser.parse(xmlContent);
+    console.warn('[ASMLProcessor] ★★★ parser.parse() returned ★★★');
+    return result;
   }
 
   /**

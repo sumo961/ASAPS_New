@@ -4,19 +4,23 @@
  */
 
 import React from 'react';
-import { X, User, Users, Heart } from 'lucide-react';
+import { X, User, Users, Heart, Pencil } from 'lucide-react';
 import { Character } from '../../types/character';
 
 interface CharacterCardProps {
   character: Character;
   onClick: () => void;
   onRemove: () => void;
+  onEdit?: () => void; // Optional edit callback for selection mode
+  selectionMode?: boolean; // Whether we're in selection mode
 }
 
 export const CharacterCard: React.FC<CharacterCardProps> = ({
   character,
   onClick,
-  onRemove
+  onRemove,
+  onEdit,
+  selectionMode = false
 }) => {
   const getRoleIcon = (role: Character['role']) => {
     switch (role) {
@@ -41,19 +45,39 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
     onRemove();
   };
 
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) onEdit();
+  };
+
   return (
-    <div 
+    <div
       className="relative group bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer"
       onClick={onClick}
     >
-      {/* Remove Button */}
-      <button
-        onClick={handleRemove}
-        className="absolute top-2 right-2 z-10 p-1.5 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100"
-        title="Remove Character"
-      >
-        <X className="w-4 h-4 text-red-500" />
-      </button>
+      {/* Action Buttons */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Edit Button - shown in selection mode */}
+        {selectionMode && onEdit && (
+          <button
+            onClick={handleEdit}
+            className="p-1.5 bg-white rounded-full hover:bg-blue-100"
+            title="Edit Character"
+          >
+            <Pencil className="w-4 h-4 text-blue-500" />
+          </button>
+        )}
+        {/* Remove Button - hidden in selection mode */}
+        {!selectionMode && (
+          <button
+            onClick={handleRemove}
+            className="p-1.5 bg-white rounded-full hover:bg-red-100"
+            title="Remove Character"
+          >
+            <X className="w-4 h-4 text-red-500" />
+          </button>
+        )}
+      </div>
 
       {/* Character Image/Icon */}
       <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">

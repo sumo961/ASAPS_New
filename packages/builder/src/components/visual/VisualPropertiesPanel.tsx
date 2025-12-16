@@ -22,6 +22,7 @@ import {
 import { getAllPresetSounds, isPresetSound, getPresetSound, type PresetSound } from '@asaps/core';
 import type { Asset } from '../assets/AssetManager';
 import type { VisualElement } from './VisualBeatEditor';
+import type { Character, CharacterState } from '../../types/character';
 
 interface VisualPropertiesPanelProps {
   backgroundAssetId?: string;
@@ -40,6 +41,7 @@ interface VisualPropertiesPanelProps {
   beatType?: string;  // Beat type to control which elements are available
   beatName?: string;  // Beat name for display in header
   onOpenCharacterManager?: (callback: (character: any) => void) => void;  // For changing character
+  characters?: Character[];  // Project characters for state selection
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -67,6 +69,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   beatType,
   beatName,
   onOpenCharacterManager,
+  characters = [],
 }) => {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     background: true,
@@ -396,22 +399,24 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   </div>
                 </div>
 
-                {/* Scale */}
-                <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">
-                    Scale
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="3"
-                    step="0.1"
-                    value={selected.scale}
-                    onChange={(e) => onElementUpdate(selected.id, { scale: parseFloat(e.target.value) })}
-                    className="w-full"
-                  />
-                  <div className="text-xs text-gray-600 text-center">{(selected.scale * 100).toFixed(0)}%</div>
-                </div>
+                {/* Scale - hide for characters since they have their own Size control */}
+                {selected.type !== 'character' && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">
+                      Scale
+                    </label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="3"
+                      step="0.1"
+                      value={selected.scale}
+                      onChange={(e) => onElementUpdate(selected.id, { scale: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                    <div className="text-xs text-gray-600 text-center">{(selected.scale * 100).toFixed(0)}%</div>
+                  </div>
+                )}
 
                 {/* Rotation */}
                 <div>
@@ -539,11 +544,36 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                 imageUrl = convertBase64ToBlob(imageUrl);
                               }
 
-                              onElementUpdate(selected.id, {
-                                name: character.displayName,
-                                characterId: character.id,
-                                imageUrl: imageUrl
-                              });
+                              // Load image to get natural dimensions
+                              const updateCharacter = (width?: number, height?: number) => {
+                                const updates: Record<string, any> = {
+                                  name: character.displayName,
+                                  characterId: character.id,
+                                  characterName: character.name,
+                                  stateId: defaultState?.id || 'default',
+                                  imageUrl: imageUrl,
+                                  size: 100 // Reset to 100% for new character
+                                };
+                                if (width && height) {
+                                  updates.width = width;
+                                  updates.height = height;
+                                }
+                                onElementUpdate(selected.id, updates);
+                              };
+
+                              // Try to load image to get natural dimensions
+                              if (imageUrl) {
+                                const img = new Image();
+                                img.onload = () => {
+                                  updateCharacter(img.naturalWidth, img.naturalHeight);
+                                };
+                                img.onerror = () => {
+                                  updateCharacter();
+                                };
+                                img.src = imageUrl;
+                              } else {
+                                updateCharacter();
+                              }
                             });
                           }
                         }}
@@ -569,6 +599,68 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       </button>
                     )}
                   </div>
+                )}
+
+                {/* Character State and Size Controls - Only for character elements */}
+                {selected.type === 'character' && selected.characterId && (
+                  <>
+                    {/* State Selector */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-700 mb-1 block">
+                        Character State
+                      </label>
+                      <select
+                        value={selected.stateId || 'default'}
+                        onChange={(e) => {
+                          const character = characters.find(c => c.id === selected.characterId);
+                          const newState = character?.states?.find(s => s.id === e.target.value);
+                          const newImageUrl = newState?.visual?.image || character?.visual?.defaultImage;
+                          onElementUpdate(selected.id, {
+                            stateId: e.target.value,
+                            imageUrl: newImageUrl
+                          });
+                        }}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      >
+                        {(() => {
+                          const character = characters.find(c => c.id === selected.characterId);
+                          if (character?.states && character.states.length > 0) {
+                            return character.states.map(state => (
+                              <option key={state.id} value={state.id}>
+                                {state.name}
+                              </option>
+                            ));
+                          }
+                          return <option value="default">Default</option>;
+                        })()}
+                      </select>
+                    </div>
+
+                    {/* Size/Scale Slider */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-700 mb-1 block">
+                        Size ({selected.size || 100}%)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min="10"
+                          max="200"
+                          value={selected.size || 100}
+                          onChange={(e) => onElementUpdate(selected.id, { size: parseInt(e.target.value) })}
+                          className="flex-1"
+                        />
+                        <input
+                          type="number"
+                          min="10"
+                          max="200"
+                          value={selected.size || 100}
+                          onChange={(e) => onElementUpdate(selected.id, { size: parseInt(e.target.value) || 100 })}
+                          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded text-center"
+                        />
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {/* Font Controls - Only for text, dialog, and button elements */}
