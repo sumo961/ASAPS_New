@@ -1671,7 +1671,9 @@ export class ASMLParser {
           if (val) {
             const delay = parseFloat(val);
             if (!isNaN(delay) && delay > 0) {
-              parameters.choiceDelay = delay;
+              // ASML stores delay in milliseconds, convert to seconds
+              // If delay > 100, assume it's milliseconds
+              parameters.choiceDelay = delay > 100 ? delay / 1000 : delay;
             }
           }
         }
@@ -1748,7 +1750,9 @@ export class ASMLParser {
           if (val) {
             const delay = parseFloat(val);
             if (!isNaN(delay) && delay > 0) {
-              parameters.choiceDelay = delay;
+              // ASML stores delay in milliseconds, convert to seconds
+              // If delay > 100, assume it's milliseconds
+              parameters.choiceDelay = delay > 100 ? delay / 1000 : delay;
             }
           }
         }
@@ -1869,7 +1873,9 @@ export class ASMLParser {
           if (val) {
             const delay = parseFloat(val);
             if (!isNaN(delay) && delay > 0) {
-              parameters.choiceDelay = delay;
+              // ASML stores delay in milliseconds, convert to seconds
+              // If delay > 100, assume it's milliseconds
+              parameters.choiceDelay = delay > 100 ? delay / 1000 : delay;
             }
           }
         }
@@ -2030,7 +2036,9 @@ export class ASMLParser {
           if (delayVal) {
             const delay = parseFloat(delayVal);
             if (!isNaN(delay) && delay > 0) {
-              parameters.choiceDelay = delay;
+              // ASML stores delay in milliseconds, convert to seconds
+              // If delay > 100, assume it's milliseconds
+              parameters.choiceDelay = delay > 100 ? delay / 1000 : delay;
             }
           }
         }
