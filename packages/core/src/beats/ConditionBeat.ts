@@ -41,31 +41,36 @@ export class ConditionBeat extends Beat {
     // Initialize from parameters if provided
     const params = config.parameters || {};
 
-    this.conditionType = params.conditionType || config.conditionType || 'counter';
+    // IMPORTANT: ASML parser stores condition data in params.condition (nested object)
+    // We need to extract fields from there if present
+    const conditionObj = (params as any).condition || {};
+
+    // Get conditionType from nested condition.type OR direct params.conditionType
+    this.conditionType = conditionObj.type || params.conditionType || config.conditionType || 'counter';
     this.trueTarget = params.trueTarget || config.trueTarget || '';
     this.falseTarget = params.falseTarget || config.falseTarget;
 
     // Store individual condition parameters
-    // Try params first, then config (which has Partial<ConditionBeatParameters>)
+    // Priority: conditionObj (from ASML) > params (direct) > config
     // Support both new (variableName/value) and legacy (left/right) field names
-    this.variableName = params.variableName || (config as any).variableName;
-    this.left = params.left || (config as any).left;
-    this.operator = params.operator || (config as any).operator || 'eq';
-    this.val = params.val !== undefined ? params.val : (config as any).val;
-    this.value = params.value !== undefined ? params.value : (config as any).value;
-    this.right = params.right !== undefined ? params.right : (config as any).right;
-    this.counter1 = params.counter1 || (config as any).counter1;
-    this.counter2 = params.counter2 || (config as any).counter2;
-    this.timer = params.timer || (config as any).timer;
-    this.inventory = params.inventory || (config as any).inventory;
-    this.variable = params.variable || (config as any).variable;
+    this.variableName = conditionObj.variableName || params.variableName || (config as any).variableName;
+    this.left = conditionObj.left || params.left || (config as any).left;
+    this.operator = conditionObj.operator || params.operator || (config as any).operator || '==';
+    this.val = conditionObj.val ?? params.val ?? (config as any).val;
+    this.value = conditionObj.value ?? params.value ?? (config as any).value;
+    this.right = conditionObj.right ?? params.right ?? (config as any).right;
+    this.counter1 = conditionObj.counter1 || params.counter1 || (config as any).counter1;
+    this.counter2 = conditionObj.counter2 || params.counter2 || (config as any).counter2;
+    this.timer = conditionObj.timer || params.timer || (config as any).timer;
+    this.inventory = conditionObj.inventory || params.inventory || (config as any).inventory;
+    this.variable = conditionObj.variable || params.variable || (config as any).variable;
     // Inventory-specific parameters
-    this.item = params.item || (config as any).item;
-    this.character = params.character || (config as any).character || (params.conditionType === 'inventory' ? 'player' : undefined);
-    this.checkType = params.checkType || (config as any).checkType || (params.conditionType === 'inventory' ? 'has' : undefined);
+    this.item = conditionObj.item || params.item || (config as any).item;
+    this.character = conditionObj.character || params.character || (config as any).character || (this.conditionType === 'inventory' ? 'player' : undefined);
+    this.checkType = conditionObj.checkType || params.checkType || (config as any).checkType || (this.conditionType === 'inventory' ? 'has' : undefined);
     // VisitedBeat-specific parameter
-    this.beatId = params.beatId || (config as any).beatId;
-    
+    this.beatId = conditionObj.beatId || params.beatId || (config as any).beatId;
+
     // Build condition object based on type
     this.condition = this.buildCondition();
   }
