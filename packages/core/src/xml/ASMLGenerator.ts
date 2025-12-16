@@ -1124,8 +1124,12 @@ export class ASMLGenerator {
    * Generate sound element
    */
   private generateSound(sound: Sound, lines: string[], indent: string): void {
+    // Don't export "undefined" sound files
+    if (!sound.file || sound.file === 'undefined') {
+      return;
+    }
     const attrs: string[] = [];
-    if (sound.file) attrs.push(`name="${sound.file}"`);
+    attrs.push(`name="${sound.file}"`);
     if (sound.volume !== undefined) attrs.push(`volume="${sound.volume}"`);
     if (sound.loop !== undefined) attrs.push(`loop="${sound.loop}"`);
     if (sound.fadeIn && sound.fadeIn !== 0) {
@@ -1134,7 +1138,7 @@ export class ASMLGenerator {
     if (sound.fadeOut && sound.fadeOut !== 0) {
       attrs.push(`fadeOut="${sound.fadeOut}"`);
     }
-    
+
     lines.push(`${indent}<sound ${attrs.join(' ')} />`);
   }
   

@@ -1357,7 +1357,10 @@ export class ASMLParser {
     // Parse sound
     const soundElement = beatElement.querySelector('sound');
     if (soundElement) {
-      config.sound = this.parseSound(soundElement);
+      const parsedSound = this.parseSound(soundElement);
+      if (parsedSound) {
+        config.sound = parsedSound;
+      }
     }
 
     // Parse node (background) - this is at the beat level, not inside function
@@ -2393,9 +2396,14 @@ export class ASMLParser {
   /**
    * Parse sound element
    */
-  private parseSound(soundElement: Element): Sound {
+  private parseSound(soundElement: Element): Sound | null {
+    // Filter out literal string "undefined" from legacy ASML files
+    const soundName = soundElement.getAttribute('name') || soundElement.getAttribute('file');
+    if (!soundName || soundName === 'undefined') {
+      return null;
+    }
     return {
-      file: soundElement.getAttribute('name') || soundElement.getAttribute('file') || '',
+      file: soundName,
       volume: parseFloat(soundElement.getAttribute('volume') || '1'),
       loop: soundElement.getAttribute('loop') === 'true',
       fadeIn: parseFloat(soundElement.getAttribute('fadeIn') || '0'),
