@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
-import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database, ZoomIn, ZoomOut, Maximize2, Volume2, VolumeX } from 'lucide-react';
 import { Story, StoryEngine, Beat } from '@asaps/core';
 import type { StatePreset } from '@asaps/core';
 import { ReactRenderer, getAudioManager } from '@asaps/renderer';
@@ -34,6 +34,25 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   const [scale, setScale] = useState(1);
   const [fitScale, setFitScale] = useState(1); // Auto-calculated fit scale
   const [isAutoFit, setIsAutoFit] = useState(true); // Whether to use auto-fit or manual scale
+  const [soundEnabled, setSoundEnabled] = useState(true); // Sound on/off toggle
+
+  // Handle sound toggle during playback - mutes/unmutes ALL sounds (beat sounds + background music)
+  // Uses gain-based muting so sounds continue playing silently and resume when unmuted
+  const handleSoundToggle = useCallback(() => {
+    console.log('[StoryPreview] handleSoundToggle called, current soundEnabled:', soundEnabled);
+    const newSoundEnabled = !soundEnabled;
+    setSoundEnabled(newSoundEnabled);
+
+    try {
+      const audioManager = getAudioManager();
+      // Gain-based muting: sets master gain to 0 when muted, restores when unmuted
+      // This allows sounds to continue playing and resume seamlessly
+      console.log('[StoryPreview] Setting audio muted to:', !newSoundEnabled);
+      audioManager.setMuted(!newSoundEnabled);
+    } catch (error) {
+      console.warn('[StoryPreview] Error toggling sound:', error);
+    }
+  }, [soundEnabled]);
 
   // Store as ReactRenderer, cast to any when passing to StoryEngine to bypass type checking
   const rendererRef = useRef<ReactRenderer | null>(null);
@@ -504,34 +523,52 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         setDebugStartBeat(null);
       }
 
-      await engineRef.current.start(startBeatId);
+      // Start background music BEFORE engine.start() because engine.start() blocks until story ends
+      const soundSettings = settings?.sound;
+      console.log('[StoryPreview] Sound settings check:', {
+        hasSettings: !!settings,
+        hasSoundSettings: !!soundSettings,
+        backgroundMusic: soundSettings?.backgroundMusic?.substring?.(0, 50) || soundSettings?.backgroundMusic,
+        backgroundMusicName: soundSettings?.backgroundMusicName,
+        mute: soundSettings?.mute,
+        soundEnabled,
+        willPlay: !!(soundSettings?.backgroundMusic && !soundSettings.mute && soundEnabled)
+      });
 
-      // Start background music if configured
-      const storySettings = story.getSettings();
-      if (storySettings?.sound?.backgroundMusic && !storySettings.sound.mute) {
+      if (soundSettings?.backgroundMusic && !soundSettings.mute && soundEnabled) {
         try {
           const audioManager = getAudioManager();
-          const volume = (storySettings.sound.backgroundVolume || 70) / 100;
+          const volume = (soundSettings.backgroundVolume || 70) / 100;
 
-          // Try to find the audio asset URL
-          let audioUrl = storySettings.sound.backgroundMusic;
+          // The backgroundMusic should already be a blob URL after linkAssetsToSettings
+          // Only look up in assets if it doesn't look like a URL
+          let audioUrl = soundSettings.backgroundMusic;
 
-          // Check if it's a reference to an asset
-          const audioAsset = assets?.find(a =>
-            a.id === audioUrl ||
-            a.name === audioUrl ||
-            a.name.replace(/\.[^/.]+$/, '') === audioUrl // match without extension
-          );
-          if (audioAsset) {
-            audioUrl = audioAsset.url;
+          if (!audioUrl.startsWith('blob:') && !audioUrl.startsWith('http') && !audioUrl.startsWith('data:')) {
+            // Check if it's a reference to an asset (fallback for non-linked settings)
+            const audioAsset = assets?.find(a =>
+              a.id === audioUrl ||
+              a.name === audioUrl ||
+              a.name?.replace(/\.[^/.]+$/, '') === audioUrl // match without extension
+            );
+            if (audioAsset) {
+              audioUrl = audioAsset.url;
+              console.log(`[StoryPreview] Resolved audio asset: ${audioUrl.substring(0, 50)}...`);
+            }
           }
 
-          console.log(`[StoryPreview] Starting background music: ${audioUrl} at volume ${volume}`);
+          console.log(`[StoryPreview] Starting background music: ${audioUrl.substring(0, 80)}... at volume ${volume}`);
           await audioManager.playSound(audioUrl, volume, true); // true = loop
+          console.log('[StoryPreview] Background music started successfully');
         } catch (error) {
           console.warn('[StoryPreview] Failed to start background music:', error);
         }
+      } else {
+        console.log('[StoryPreview] Background music not started - conditions not met');
       }
+
+      // engine.start() blocks until the story ends or is stopped
+      await engineRef.current.start(startBeatId);
 
     } catch (error) {
       console.error('Preview error:', error);
@@ -542,19 +579,31 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   }, [story, settings, selectedPreset, assets]);
 
   const handleRestart = useCallback(() => {
+    // Stop all sounds before restarting to prevent overlap
+    try {
+      const audioManager = getAudioManager();
+      audioManager.stopAllSounds();
+      audioManager.setMuted(false); // Reset mute state
+      console.log('[StoryPreview] Stopped all sounds for restart');
+    } catch (error) {
+      console.warn('[StoryPreview] Error stopping sounds for restart:', error);
+    }
+
     if (rendererRef.current) {
       rendererRef.current.clear();
     }
     setCurrentBeat(null);
     setDebugInfo({});
     setActiveTimers([]);
+    setSoundEnabled(true); // Reset sound toggle state
     startPreview();
   }, [startPreview]);
 
   const stopPreview = useCallback(() => {
-    // Stop background music and all sounds
+    // Stop background music and all sounds, reset muted state
     try {
       const audioManager = getAudioManager();
+      audioManager.setMuted(false); // Reset muted state for next session
       audioManager.stopAllSounds();
       console.log('[StoryPreview] Stopped all sounds');
     } catch (error) {
@@ -573,7 +622,40 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
     setIsRunning(false);
     setCurrentBeat(null);
     setActiveTimers([]);
+    setSoundEnabled(true); // Reset sound toggle for next session
   }, []);
+
+  // Handle close - stop sounds and reset state before closing
+  const handleClose = useCallback(() => {
+    console.log('[StoryPreview] handleClose called');
+
+    // Stop all audio and reset muted state
+    try {
+      const audioManager = getAudioManager();
+      console.log('[StoryPreview] Stopping all sounds...');
+      audioManager.setMuted(false); // Reset muted state
+      audioManager.stopAllSounds();
+      console.log('[StoryPreview] Closing - stopped all sounds');
+    } catch (error) {
+      console.warn('[StoryPreview] Error stopping audio on close:', error);
+    }
+
+    // Stop engine and timers
+    if (engineRef.current) {
+      try {
+        console.log('[StoryPreview] Stopping engine and timers...');
+        const context = engineRef.current.getContext();
+        const timerManager = context.getTimerManager();
+        timerManager.stopAllTimers();
+        engineRef.current.stop();
+        console.log('[StoryPreview] Engine stopped');
+      } catch (error) {
+        console.warn('[StoryPreview] Error stopping engine on close:', error);
+      }
+    }
+
+    onClose();
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
@@ -612,7 +694,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
               </button>
             )}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
@@ -749,8 +831,25 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
                       <span className="hidden sm:inline">Fit</span>
                     </button>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Stage: {STAGE_WIDTH} x {STAGE_HEIGHT}
+                  {/* Sound Toggle */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleSoundToggle}
+                      className={`p-1.5 rounded transition-colors flex items-center gap-1 text-sm ${
+                        soundEnabled ? 'hover:bg-gray-300' : 'bg-red-100 text-red-700'
+                      }`}
+                      title={soundEnabled ? 'Mute Sound' : 'Unmute Sound'}
+                    >
+                      {soundEnabled ? (
+                        <Volume2 className="w-4 h-4" />
+                      ) : (
+                        <VolumeX className="w-4 h-4" />
+                      )}
+                    </button>
+                    <div className="w-px h-5 bg-gray-400 mx-1" />
+                    <div className="text-xs text-gray-500">
+                      Stage: {STAGE_WIDTH} x {STAGE_HEIGHT}
+                    </div>
                   </div>
                 </div>
               </div>

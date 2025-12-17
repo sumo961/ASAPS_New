@@ -1,5 +1,6 @@
 import type { IRenderer, RenderContext, RenderTheme, AssetCache, RenderOptions } from '../types';
 import type { Transition, Sound, Location } from '@asaps/core';
+import { getAudioManager } from '../audio/AudioManager';
 
 export abstract class BaseRenderer implements IRenderer {
   protected context: RenderContext;
@@ -112,8 +113,20 @@ export abstract class BaseRenderer implements IRenderer {
   }
 
   // Sound handling - FIXED: Handle missing audio files gracefully
+  // Also checks global mute state from AudioManager
   async playSound(sound: Sound): Promise<void> {
     if (!this.options.soundEnabled) return;
+
+    // Check global mute state from AudioManager
+    try {
+      const audioManager = getAudioManager();
+      if (audioManager.isMuted()) {
+        console.log('[BaseRenderer] Sound muted, skipping:', sound.file);
+        return;
+      }
+    } catch (e) {
+      // AudioManager not available, continue with playback
+    }
 
     try {
       let audio = this.assetCache.sounds.get(sound.file);

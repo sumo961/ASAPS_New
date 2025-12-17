@@ -23,6 +23,7 @@ import { getAllPresetSounds, isPresetSound, getPresetSound, type PresetSound } f
 import type { Asset } from '../assets/AssetManager';
 import type { VisualElement } from './VisualBeatEditor';
 import type { Character, CharacterState } from '../../types/character';
+import { useFonts } from '../../hooks/useFonts';
 
 interface VisualPropertiesPanelProps {
   backgroundAssetId?: string;
@@ -78,6 +79,9 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   });
   const [soundTab, setSoundTab] = useState<'presets' | 'custom'>('presets');
   const [playingSound, setPlayingSound] = useState<string | null>(null);
+
+  // Get available fonts (built-in + custom from assets)
+  const { fonts } = useFonts(assets);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
@@ -676,15 +680,20 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         onChange={(e) => onElementUpdate(selected.id, { font: e.target.value })}
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                       >
-                        <option value="Arial">Arial</option>
-                        <option value="Helvetica">Helvetica</option>
-                        <option value="Times New Roman">Times New Roman</option>
-                        <option value="Georgia">Georgia</option>
-                        <option value="Courier New">Courier New</option>
-                        <option value="Verdana">Verdana</option>
-                        <option value="Comic Sans MS">Comic Sans MS</option>
-                        <option value="Impact">Impact</option>
-                        <option value="Trebuchet MS">Trebuchet MS</option>
+                        {fonts.filter(f => f.type === 'builtin').map(font => (
+                          <option key={font.id} value={font.displayName}>
+                            {font.displayName}
+                          </option>
+                        ))}
+                        {fonts.filter(f => f.type === 'custom').length > 0 && (
+                          <optgroup label="Custom Fonts">
+                            {fonts.filter(f => f.type === 'custom').map(font => (
+                              <option key={font.id} value={font.displayName}>
+                                {font.displayName}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                     </div>
 

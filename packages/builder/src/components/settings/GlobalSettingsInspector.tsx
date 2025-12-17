@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save } from 'lucide-react';
+import type { Asset } from '../assets/AssetManager';
+import { useFonts } from '../../hooks/useFonts';
 
 interface GlobalSettings {
   project: {
@@ -46,9 +48,11 @@ interface GlobalSettings {
     highlightColor: string;
   };
   sound: {
-    backgroundMusic: string;    // Background music file
-    backgroundVolume: number;   // Volume 0-100
-    mute: boolean;             // Global mute
+    backgroundMusic: string;       // Background music file/URL
+    backgroundMusicName?: string;  // Original filename for display
+    backgroundMusicAssetId?: string; // Asset ID for reference
+    backgroundVolume: number;      // Volume 0-100
+    mute: boolean;                 // Global mute
   };
   copyright: {
     notice: string;            // Copyright notice text
@@ -66,6 +70,7 @@ interface GlobalSettingsInspectorProps {
   defaultSettings?: GlobalSettings;
   onUpdate: (settings: GlobalSettings) => void;
   onClose: () => void;
+  assets?: Asset[];  // For accessing custom fonts
 }
 
 export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = ({
@@ -73,10 +78,14 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   defaultSettings,
   onUpdate,
   onClose,
+  assets = [],
 }) => {
   const [settings, setSettings] = useState<GlobalSettings>(initialSettings);
   const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'sound' | 'copyright' | 'debug'>('project');
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Get available fonts (built-in + custom from assets)
+  const { fonts, getFontFamily } = useFonts(assets);
 
   const handleChange = (category: keyof GlobalSettings, field: string, value: any) => {
     setSettings(prev => ({
@@ -173,30 +182,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     setHasChanges(true);
   };
 
-  // Available fonts with web-safe mappings
-  const fontMapping: Record<string, string> = {
-    'Arial': 'Arial, sans-serif',
-    'Times New Roman': 'Times New Roman, serif',
-    'Courier New': 'Courier New, monospace',
-    'Georgia': 'Georgia, serif',
-    'Verdana': 'Verdana, sans-serif',
-    'Gothic': 'Georgia, serif',
-    'Handwriting': 'Brush Script MT, cursive',
-    'Handwriting2': 'Lucida Handwriting, cursive',
-    'Comic Sans MS': 'Comic Sans MS, cursive',
-    'Impact': 'Impact, sans-serif',
-    'Lucida Console': 'Lucida Console, monospace',
-    'Palatino': 'Palatino, serif',
-    'Garamond': 'Garamond, serif',
-    'Bookman': 'Bookman, serif',
-    'Trebuchet MS': 'Trebuchet MS, sans-serif'
-  };
-
-  const availableFonts = Object.keys(fontMapping);
-
-  const getFontFamily = (fontName: string) => {
-    return fontMapping[fontName] || fontName;
-  };
+  // Fonts are now provided by useFonts hook (built-in + custom from assets)
+  // getFontFamily is also provided by the hook
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -658,9 +645,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     onChange={(e) => handleChange('fonts', 'titleFont', e.target.value)}
                     className="w-full px-3 py-2 border rounded"
                   >
-                    {availableFonts.map(font => (
-                      <option key={font} value={font}>{font}</option>
+                    {fonts.filter(f => f.type === 'builtin').map(font => (
+                      <option key={font.id} value={font.displayName}>{font.displayName}</option>
                     ))}
+                    {fonts.filter(f => f.type === 'custom').length > 0 && (
+                      <optgroup label="Custom Fonts">
+                        {fonts.filter(f => f.type === 'custom').map(font => (
+                          <option key={font.id} value={font.displayName}>{font.displayName}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
 
@@ -687,9 +681,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     onChange={(e) => handleChange('fonts', 'textFont', e.target.value)}
                     className="w-full px-3 py-2 border rounded"
                   >
-                    {availableFonts.map(font => (
-                      <option key={font} value={font}>{font}</option>
+                    {fonts.filter(f => f.type === 'builtin').map(font => (
+                      <option key={font.id} value={font.displayName}>{font.displayName}</option>
                     ))}
+                    {fonts.filter(f => f.type === 'custom').length > 0 && (
+                      <optgroup label="Custom Fonts">
+                        {fonts.filter(f => f.type === 'custom').map(font => (
+                          <option key={font.id} value={font.displayName}>{font.displayName}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
 
@@ -716,9 +717,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     onChange={(e) => handleChange('fonts', 'btnFont', e.target.value)}
                     className="w-full px-3 py-2 border rounded"
                   >
-                    {availableFonts.map(font => (
-                      <option key={font} value={font}>{font}</option>
+                    {fonts.filter(f => f.type === 'builtin').map(font => (
+                      <option key={font.id} value={font.displayName}>{font.displayName}</option>
                     ))}
+                    {fonts.filter(f => f.type === 'custom').length > 0 && (
+                      <optgroup label="Custom Fonts">
+                        {fonts.filter(f => f.type === 'custom').map(font => (
+                          <option key={font.id} value={font.displayName}>{font.displayName}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
 
@@ -1030,8 +1038,12 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </label>
                   <input
                     type="text"
-                    value={settings.sound.backgroundMusic}
-                    onChange={(e) => handleChange('sound', 'backgroundMusic', e.target.value)}
+                    value={settings.sound.backgroundMusicName || settings.sound.backgroundMusic}
+                    onChange={(e) => {
+                      // When user types, update both name and URL (they're providing a new file reference)
+                      handleChange('sound', 'backgroundMusic', e.target.value);
+                      handleChange('sound', 'backgroundMusicName', e.target.value);
+                    }}
                     className="w-full px-3 py-2 border rounded"
                     placeholder="e.g., background-music.mp3"
                   />
@@ -1072,7 +1084,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     <div className="flex items-center gap-2">
                       <Music className="w-4 h-4 text-gray-500" />
                       <span>
-                        {settings.sound.backgroundMusic || 'No background music set'}
+                        {settings.sound.backgroundMusicName || settings.sound.backgroundMusic || 'No background music set'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">

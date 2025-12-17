@@ -17,6 +17,7 @@ export class AudioManager {
   private activeSourceNodes: Set<AudioBufferSourceNode> = new Set();
   private masterVolume: number;
   private shouldPreloadSounds: boolean;
+  private muted: boolean = false;
 
   constructor(options: AudioManagerOptions = {}) {
     this.masterVolume = options.masterVolume ?? 0.7;
@@ -77,6 +78,11 @@ export class AudioManager {
    * @param loop - Whether to loop the sound (for background music), defaults to false
    */
   async playSound(url: string, volume: number = 1.0, loop: boolean = false): Promise<void> {
+    // Don't play if muted
+    if (this.muted) {
+      return;
+    }
+
     this.initAudioContext();
     if (!this.audioContext || !this.masterGainNode) {
       console.warn('[AudioManager] Audio context not available');
@@ -166,6 +172,28 @@ export class AudioManager {
    */
   getMasterVolume(): number {
     return this.masterVolume;
+  }
+
+  /**
+   * Set muted state - uses gain control to mute/unmute without stopping playback
+   * This allows sounds to continue playing silently and resume when unmuted
+   */
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+
+    // Use gain-based muting to pause/resume without stopping
+    if (this.masterGainNode) {
+      this.masterGainNode.gain.value = muted ? 0 : this.masterVolume;
+    }
+
+    console.log(`[AudioManager] Sound ${muted ? 'muted' : 'unmuted'}`);
+  }
+
+  /**
+   * Check if audio is muted
+   */
+  isMuted(): boolean {
+    return this.muted;
   }
 
   /**

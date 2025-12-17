@@ -24,6 +24,7 @@ import { assetToStored, extractBlobFromAsset } from './storage/AssetStorageAdapt
 import { DebugPanel } from './components/debug/DebugPanel';
 import { applyTreeLayoutToBeats } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
+import { preloadFonts } from './utils/fontRegistry';
 
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
@@ -79,6 +80,11 @@ function App() {
   useEffect(() => {
     charactersRef.current = characters;
   }, [characters]);
+
+  // Preload custom fonts when assets change
+  useEffect(() => {
+    preloadFonts(assets);
+  }, [assets]);
 
   useEffect(() => {
     assetsRef.current = assets;
@@ -1199,6 +1205,44 @@ function App() {
         console.log('[handleImportAsmlComplete] Added characters:', importResult.characters.map(c => c.displayName));
       }
 
+      // Merge imported settings into globalSettings
+      // This is needed because ASML settings (like backgroundMusic) are stored in state.settings
+      // but the UI uses globalSettings
+      // NOTE: We use importResult.settings (returned directly) instead of state.settings
+      // because React's setState is async and state.settings won't be updated yet
+      const importedSettings = importResult.settings;
+      if (importedSettings && Object.keys(importedSettings).length > 0) {
+        console.log('[handleImportAsmlComplete] Merging imported settings:', importedSettings);
+        setGlobalSettings(prev => ({
+          ...prev,
+          // Deep merge all settings categories to preserve defaults
+          sound: {
+            ...prev.sound,
+            ...(importedSettings.sound || {})
+          },
+          colors: {
+            ...prev.colors,
+            ...(importedSettings.colors || {})
+          },
+          fonts: {
+            ...prev.fonts,
+            ...(importedSettings.fonts || {})
+          },
+          textbox: {
+            ...prev.textbox,
+            ...(importedSettings.textbox || {})
+          },
+          debug: {
+            ...prev.debug,
+            ...(importedSettings.debug || {})
+          },
+          copyright: {
+            ...prev.copyright,
+            ...(importedSettings.copyright || {})
+          }
+        }));
+      }
+
       // Show summary
       let message = 'Story imported successfully!';
       if (importResult.assetStats) {
@@ -2131,6 +2175,7 @@ function App() {
           settings={globalSettings}
           onUpdate={(newSettings) => setGlobalSettings(newSettings)}
           onClose={handleCloseSettings}
+          assets={assets}
         />
       )}
 

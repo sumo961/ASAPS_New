@@ -16,6 +16,7 @@ import { applyTreeLayoutToBeats } from '../utils/TreeLayoutAlgorithm';
 import {
   importAsmlAssets,
   linkAssetsToBeats,
+  linkAssetsToSettings,
   createFileResolver,
   type AsmlAssetImportResult
 } from '../utils/asmlAssetImporter';
@@ -95,6 +96,8 @@ export interface ImportStoryResult {
   };
   /** Any errors during import */
   errors: string[];
+  /** Imported settings (for immediate use since setState is async) */
+  settings?: any;
 }
 
 export function useStoryBuilder() {
@@ -479,10 +482,14 @@ export function useStoryBuilder() {
       clusters: clusters.length,
     });
 
-    // Step 3: Link assets to beats if we imported assets
+    // Step 3: Link assets to beats and settings if we imported assets
     if (assetImportResult) {
       console.log('[importStory] Linking assets to beats...');
       linkAssetsToBeats(beats, assetImportResult);
+
+      // Link assets to settings (e.g., background music)
+      console.log('[importStory] Linking assets to settings...');
+      linkAssetsToSettings(settings, assetImportResult);
     }
 
     // Extract connections from beats using their getConnections() method
@@ -581,7 +588,8 @@ export function useStoryBuilder() {
       success: true,
       characters: importedCharacters,
       assetStats: assetImportResult?.stats,
-      errors
+      errors,
+      settings // Return settings so App.tsx can use them immediately (state update is async)
     };
   }, []);
 

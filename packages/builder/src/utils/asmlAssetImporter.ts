@@ -706,3 +706,38 @@ export function linkAssetsToBeats(
     }
   }
 }
+
+/**
+ * Link global settings to imported assets
+ *
+ * This resolves asset references in settings (like backgroundMusic) to actual URLs
+ * so they can be played during preview.
+ */
+export function linkAssetsToSettings(
+  settings: any,
+  importResult: AsmlAssetImportResult
+): void {
+  if (!settings) return;
+
+  const { assetMap, urlMap } = importResult;
+
+  // Link background music - settings.sound.backgroundMusic contains the sound name from ASML
+  if (settings.sound?.backgroundMusic) {
+    const soundName = settings.sound.backgroundMusic;
+
+    // Try prefixed lookup first (sounds are imported with "sound:" prefix)
+    const assetId = assetMap.get(`sound:${soundName}`) || assetMap.get(soundName);
+    const soundUrl = urlMap.get(`sound:${soundName}`) || urlMap.get(soundName);
+
+    if (soundUrl) {
+      // Store the original name for display, and the URL for playback
+      settings.sound.backgroundMusicName = soundName; // Original filename for UI display
+      settings.sound.backgroundMusic = soundUrl;      // Blob URL for playback
+      settings.sound.backgroundMusicAssetId = assetId;
+      console.log(`[linkAssetsToSettings] Linked background music "${soundName}" → ${soundUrl.substring(0, 50)}...`);
+    } else {
+      console.warn(`[linkAssetsToSettings] Background music "${soundName}" not found in imported assets. Available sounds:`,
+        Array.from(assetMap.keys()).filter(k => k.startsWith('sound:')));
+    }
+  }
+}

@@ -4,6 +4,33 @@ import { getPresetSound, isPresetSound } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
 
 /**
+ * Font name to CSS font-family mapping
+ * Used to convert user-friendly font names to proper CSS values
+ */
+const FONT_FAMILIES: Record<string, string> = {
+  'Arial': 'Arial, sans-serif',
+  'Helvetica': 'Helvetica, Arial, sans-serif',
+  'Times New Roman': 'Times New Roman, serif',
+  'Courier New': 'Courier New, monospace',
+  'Georgia': 'Georgia, serif',
+  'Verdana': 'Verdana, sans-serif',
+  'Gothic': 'Georgia, serif',
+  'Handwriting': 'Brush Script MT, cursive',
+  'Handwriting2': 'Lucida Handwriting, cursive',
+  'Comic Sans MS': 'Comic Sans MS, cursive',
+  'Impact': 'Impact, sans-serif',
+  'Trebuchet MS': 'Trebuchet MS, sans-serif',
+  'Palatino': 'Palatino Linotype, Book Antiqua, Palatino, serif',
+};
+
+/**
+ * Convert font name to CSS font-family value
+ */
+function getFontFamily(fontName: string): string {
+  return FONT_FAMILIES[fontName] || fontName;
+}
+
+/**
  * PositionedBeatView - React component for rendering positioned beat elements
  * 
  * This is the core rendering component used by BOTH:
@@ -542,7 +569,8 @@ const TextElement: React.FC<{
   const computedFontSize = location.fontSize ?? 16;
 
   const computedTextAlign = location.textAlign || 'center';
-  const computedFont = location.font || theme.fonts.textFont;
+  // Apply font mapping: element font takes priority, falls back to theme font (already mapped)
+  const computedFont = location.font ? getFontFamily(location.font) : theme.fonts.textFont;
 
   // Use theme padding or calculate based on box size
   const padding = theme.textBox.padding;
@@ -551,9 +579,9 @@ const TextElement: React.FC<{
   const opacityValue = theme.textBox.opacity / 100;
 
   // Parse background color and add opacity
-  const bgColor = hideTextBox ? 'transparent' : theme.textBox.backgroundColor;
+  const bgColor = hideTextBox ? 'transparent' : (theme.textBox?.backgroundColor || '#000000');
   const bgWithOpacity = hideTextBox ? 'transparent' :
-    (bgColor.startsWith('#') ? `${bgColor}${Math.round(opacityValue * 255).toString(16).padStart(2, '0')}` : bgColor);
+    (bgColor?.startsWith?.('#') ? `${bgColor}${Math.round(opacityValue * 255).toString(16).padStart(2, '0')}` : bgColor);
 
   // Parse text color and add opacity
   const textColor = theme.colors.textColor;

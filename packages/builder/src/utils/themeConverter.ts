@@ -9,6 +9,32 @@ import type { RenderThemeSettings } from '@asaps/renderer';
 import type { GlobalSettings } from '../components/settings/GlobalSettingsInspector';
 
 /**
+ * Font name to CSS font-family mapping
+ * Must match the mapping in GlobalSettingsInspector.tsx
+ */
+const FONT_FAMILIES: Record<string, string> = {
+  'Arial': 'Arial, sans-serif',
+  'Times New Roman': 'Times New Roman, serif',
+  'Courier New': 'Courier New, monospace',
+  'Georgia': 'Georgia, serif',
+  'Verdana': 'Verdana, sans-serif',
+  'Gothic': 'Georgia, serif',
+  'Handwriting': 'Brush Script MT, cursive',
+  'Handwriting2': 'Lucida Handwriting, cursive',
+  'Comic Sans MS': 'Comic Sans MS, cursive',
+  'Impact': 'Impact, sans-serif',
+  'Trebuchet MS': 'Trebuchet MS, sans-serif',
+  'Palatino': 'Palatino Linotype, Book Antiqua, Palatino, serif',
+};
+
+/**
+ * Convert font name to CSS font-family value
+ */
+function getFontFamily(fontName: string): string {
+  return FONT_FAMILIES[fontName] || fontName;
+}
+
+/**
  * Normalize opacity values that may have been stored incorrectly.
  * Values are expected to be 0-100 (percentage), but some projects may have
  * values stored as decimals (0.0-1.0) due to a previous bug.
@@ -64,8 +90,8 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       textAlpha: normalizeOpacity(settings.colors.palpha),
     },
     fonts: {
-      textFont: settings.fonts.textFont,
-      buttonFont: settings.fonts.btnFont,
+      textFont: getFontFamily(settings.fonts.textFont),
+      buttonFont: getFontFamily(settings.fonts.btnFont),
     },
     textEffects: {
       animation: settings.textEffects.animation,
