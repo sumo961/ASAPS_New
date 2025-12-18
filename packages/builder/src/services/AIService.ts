@@ -30,6 +30,35 @@ export class AIService {
   private options: AIServiceOptions;
   private validator = getAIValidator();
 
+  /**
+   * Export story + validation details as a downloadable JSON for debugging.
+   * Browser-only; no-op on server.
+   */
+  private exportStoryDebug(story: StoryGenerationResponse, errors: any[]): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const payload = {
+        title: story.metadata?.title,
+        generatedAt: new Date().toISOString(),
+        errors,
+        story,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `story-debug-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      console.log('[AIService] Saved debug story file:', a.download);
+    } catch (err) {
+      console.warn('[AIService] Failed to export story debug file:', err);
+    }
+  }
+
   constructor(options: AIServiceOptions = {}) {
     this.options = {
       validateSchema: true,
@@ -160,6 +189,7 @@ export class AIService {
 
         if (!validation.valid) {
           console.error('[AIService] Story validation failed:', validation.errors);
+          this.exportStoryDebug(response, validation.errors);
           throw new Error(`Story validation failed: ${validation.errors.map(e => e.message).join(', ')}`);
         }
 

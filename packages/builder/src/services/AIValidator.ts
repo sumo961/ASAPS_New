@@ -11,11 +11,19 @@ import type { GeneratedBeat, AIValidationResult, StoryGenerationResponse, Dialog
  */
 async function loadBeatSchema(): Promise<any> {
   try {
-    const response = await fetch('/beat-definitions/core-beats.json');
-    if (!response.ok) {
-      throw new Error('Failed to load beat schema');
+    // Prefer live schema from API server (explicit URL to avoid dev-server HTML responses)
+    const apiResponse = await fetch('http://localhost:3001/api/schema/beats');
+    if (apiResponse.ok) {
+      return await apiResponse.json();
     }
-    return await response.json();
+
+    // Fallback to static asset served from /public/beat-definitions/core-beats.json
+    const staticResponse = await fetch('/beat-definitions/core-beats.json');
+    if (staticResponse.ok) {
+      return await staticResponse.json();
+    }
+
+    throw new Error('Failed to load beat schema from API or static asset');
   } catch (error) {
     console.error('[AIValidator] Failed to load beat schema:', error);
     // Return minimal schema as fallback

@@ -25,6 +25,12 @@ export interface AIProviderConfig {
   /** Maximum tokens to generate */
   maxTokens?: number;
 
+  /**
+   * Reasoning effort for GPT-5 class reasoning models.
+   * Supported values vary by model; gpt-5.1 defaults to 'none'.
+   */
+  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
   /** Custom base URL for API-compatible providers (e.g., ANTHROPIC_BASE_URL) */
   baseUrl?: string;
 
