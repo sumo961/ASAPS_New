@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2025-12-16T02:21:48.735Z
+ * Generated: 2025-12-19T02:07:40.011Z
  */
 
 // ============================================
@@ -36,6 +36,9 @@ export interface DialogChoice {
   conditions?: Condition[];
   effects?: Effect[];
   visible?: boolean;
+  counter?: string;
+  counterOperation?: 'set' | 'change';
+  counterValue?: number;
 }
 
 /**

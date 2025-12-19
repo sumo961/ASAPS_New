@@ -36,9 +36,12 @@
         "dialogNode": "dialogNode?",
         "conditions": "condition[]?",
         "effects": "effect[]?",
-        "visible": "boolean?"
+        "visible": "boolean?",
+        "counter": "string?",
+        "counterOperation": "'set' | 'change'?",
+        "counterValue": "number?"
       },
-      "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both."
+      "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both. Counter fields allow direct counter modification (any counter name) in addition to effects[]."
     },
     "movementOption": {
       "description": "A movement choice",
