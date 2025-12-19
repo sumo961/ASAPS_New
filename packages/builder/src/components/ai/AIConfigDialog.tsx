@@ -326,13 +326,13 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
                 type="number"
                 value={maxTokens}
                 onChange={(e) => setMaxTokens(e.target.value)}
-                placeholder="8000"
+                placeholder="32000"
                 min="1000"
-                max="128000"
+                max="256000"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Max output tokens for story generation. Some providers (Kimi, etc.) may have lower limits. Default: 8000 for custom providers.
+                Max output tokens for story generation. Default: 32000. Kimi K2 supports up to 256K.
               </p>
             </div>
           )}

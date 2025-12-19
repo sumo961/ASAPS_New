@@ -181,9 +181,9 @@ export class ClaudeProvider extends BaseAIProvider {
 
     return this.withRetry(async () => {
       // Use configured maxTokens if available
-      // For direct Claude API: default to 16000
-      // For alternative providers (Kimi, etc.): default to 8000 to avoid truncation
-      const defaultMaxTokens = this.useProxy ? 8000 : 16000;
+      // For story generation, we need high token limits for complex branching narratives
+      // Kimi K2 supports 256K context, Claude supports 200K+
+      const defaultMaxTokens = 32000;
       const maxTokens = this.config?.maxTokens || defaultMaxTokens;
 
       const requestBody = {

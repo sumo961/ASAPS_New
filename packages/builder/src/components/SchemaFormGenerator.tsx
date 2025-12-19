@@ -372,6 +372,21 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
     }
   };
 
+  // Handle undefined beatDefinition gracefully
+  if (!beatDefinition || !beatDefinition.parameters) {
+    console.warn(`[SchemaFormGenerator] No beat definition found for type: ${beatType}`);
+    return (
+      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p className="text-sm text-yellow-700">
+          Unknown beat type: <code className="bg-yellow-100 px-1 rounded">{beatType}</code>
+        </p>
+        <p className="text-xs text-yellow-600 mt-1">
+          This beat type may not be supported or the schema is outdated.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {Object.entries(beatDefinition.parameters).map(([paramName, paramDef]) =>

@@ -23,6 +23,17 @@ type BeatConstructor = new (config: BeatConfig) => Beat;
 export class BeatTypeRegistry {
   private static instance: BeatTypeRegistry;
   private beatTypes: Map<string, BeatConstructor> = new Map();
+  // Case-insensitive lookup map (lowercase -> canonical type)
+  private typeNormalization: Map<string, string> = new Map();
+  // Set of invisible beat type patterns for better fallback behavior
+  private invisibleBeatPatterns: RegExp[] = [
+    /^set/i,           // setVariable, setTimer, setGlobal, SetVariable, etc.
+    /^condition/i,     // conditionBeat, conditionCheck, Condition, etc.
+    /^random/i,        // randomTarget, randomChoice, etc.
+    /inventory/i,      // addRemoveInventory, inventory, etc.
+    /^add/i,           // addRemoveInventory, add*, etc.
+    /^remove/i,        // removeInventory, etc.
+  ];
 
   private constructor() {
     this.registerDefaultBeats();
@@ -49,26 +60,68 @@ export class BeatTypeRegistry {
     this.registerBeatType('SWFBeat', SWFBeat); // Legacy
     this.registerBeatType('inputText', InputTextBeat);
     this.registerBeatType('hyperText', HyperTextBeat);
-    
+
     // Invisible beats
     this.registerBeatType('setVariable', SetVariableBeat);
     this.registerBeatType('setGlobal', SetVariableBeat); // Legacy alias
+    this.registerBeatType('setCounter', SetVariableBeat); // Legacy - now use setVariable with type='counter'
     // SetCounter is obsolete - use setVariable with type='counter' instead
     this.registerBeatType('conditionBeat', ConditionBeat);
     this.registerBeatType('conditionCheck', ConditionBeat); // Legacy alias
+    this.registerBeatType('condition', ConditionBeat); // Common AI variation
     this.registerBeatType('randomTarget', RandomTargetBeat);
     this.registerBeatType('setTimer', SetTimerBeat);
     this.registerBeatType('addRemoveInventory', AddRemoveInventoryBeat);
+    this.registerBeatType('addInventory', AddRemoveInventoryBeat); // Common AI variation
+    this.registerBeatType('removeInventory', AddRemoveInventoryBeat); // Common AI variation
   }
 
   registerBeatType(type: string, constructor: BeatConstructor): void {
     this.beatTypes.set(type, constructor);
+    // Also register case-insensitive lookup
+    this.typeNormalization.set(type.toLowerCase(), type);
+  }
+
+  /**
+   * Check if a type looks like an invisible beat based on naming patterns
+   */
+  private looksLikeInvisibleBeat(type: string): boolean {
+    return this.invisibleBeatPatterns.some(pattern => pattern.test(type));
   }
 
   createBeat(type: string, config: BeatConfig): Beat {
-    const BeatClass = this.beatTypes.get(type);
+    // First, try exact match
+    let BeatClass = this.beatTypes.get(type);
+
+    // If not found, try case-insensitive lookup
     if (!BeatClass) {
-      console.warn(`Unknown beat type: ${type}, falling back to IntroTextBeat`);
+      const normalizedType = this.typeNormalization.get(type.toLowerCase());
+      if (normalizedType) {
+        BeatClass = this.beatTypes.get(normalizedType);
+        console.log(`[BeatRegistry] Normalized beat type "${type}" -> "${normalizedType}"`);
+      }
+    }
+
+    if (!BeatClass) {
+      // Determine better fallback based on type pattern
+      if (this.looksLikeInvisibleBeat(type)) {
+        // For invisible beat types that we don't recognize, use SetVariableBeat
+        // This ensures they don't render anything visible
+        console.warn(`[BeatRegistry] Unknown invisible beat type: "${type}", falling back to SetVariableBeat (no-op)`);
+        return new SetVariableBeat({
+          ...config,
+          type: 'setVariable',
+          parameters: {
+            ...config.parameters,
+            variable: '_unknownBeat_' + type,
+            value: true,
+            type: 'variable'
+          }
+        });
+      }
+
+      // For unknown visible beat types, fall back to IntroTextBeat
+      console.warn(`[BeatRegistry] Unknown visible beat type: "${type}", falling back to IntroTextBeat`);
       return new IntroTextBeat(config);
     }
     return new BeatClass(config);
