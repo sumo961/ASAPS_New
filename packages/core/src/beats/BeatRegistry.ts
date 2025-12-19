@@ -65,6 +65,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('setVariable', SetVariableBeat);
     this.registerBeatType('setGlobal', SetVariableBeat); // Legacy alias
     this.registerBeatType('setCounter', SetVariableBeat); // Legacy - now use setVariable with type='counter'
+    this.registerBeatType('counter', SetVariableBeat); // Common AI variation - treats as setVariable with type='counter'
     // SetCounter is obsolete - use setVariable with type='counter' instead
     this.registerBeatType('conditionBeat', ConditionBeat);
     this.registerBeatType('conditionCheck', ConditionBeat); // Legacy alias

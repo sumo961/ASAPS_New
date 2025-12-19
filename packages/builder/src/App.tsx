@@ -344,7 +344,7 @@ function App() {
       const knownBeatTypes = new Set([
         'titleScreen', 'introText', 'dialogTree', 'conversationChoice', 'movementChoice',
         'pickProp', 'videoBeat', 'endScreen', 'durScreen', 'SWFBeat', 'inputText', 'hyperText',
-        'setVariable', 'setGlobal', 'setCounter', 'conditionBeat', 'conditionCheck', 'condition',
+        'setVariable', 'setGlobal', 'setCounter', 'counter', 'conditionBeat', 'conditionCheck', 'condition',
         'randomTarget', 'setTimer', 'addRemoveInventory', 'addInventory', 'removeInventory'
       ]);
 

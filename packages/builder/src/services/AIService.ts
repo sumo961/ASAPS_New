@@ -156,14 +156,20 @@ export class AIService {
       };
     }
 
-    // Normalize setVariable parameters
-    if (beat.type === 'setVariable') {
+    // Normalize setVariable and counter parameters
+    if (beat.type === 'setVariable' || beat.type === 'counter' || beat.type === 'setCounter') {
       const params = transformed.parameters;
 
       // Map variableName → name (common AI variation)
       if (params.variableName && !params.name) {
         params.name = params.variableName;
-        console.log(`[AIService] Normalized setVariable: variableName → name for beat ${beat.id}`);
+        console.log(`[AIService] Normalized: variableName → name for beat ${beat.id}`);
+      }
+
+      // If beat type is "counter", ensure parameters.type is set to "counter"
+      if (beat.type === 'counter' || beat.type === 'setCounter') {
+        params.type = 'counter';
+        console.log(`[AIService] Set parameters.type="counter" for beat ${beat.id} (beat type was "${beat.type}")`);
       }
 
       // Default type to "variable" if not specified
@@ -175,7 +181,7 @@ export class AIService {
         } else {
           params.type = 'variable';
         }
-        console.log(`[AIService] Inferred setVariable type="${params.type}" for beat ${beat.id}`);
+        console.log(`[AIService] Inferred type="${params.type}" for beat ${beat.id}`);
       }
     }
 
