@@ -314,15 +314,25 @@ function buildCondensedSchema(schema: any): string {
  * Build enhanced system prompt for story generation
  */
 export function buildEnhancedStoryGenerationSystemPrompt(schema: any): string {
-  const beatTypes = Object.keys(schema.beatTypes || {}).join(', ');
+  const beatTypesList = Object.keys(schema.beatTypes || {});
+  const beatTypes = beatTypesList.join(', ');
   const condensedSchema = buildCondensedSchema(schema);
 
   return `You are an expert interactive narrative designer and game writer. You create sophisticated, branching stories using the ASAPS beat system with deep understanding of how different beat types work together.
 
-CRITICAL: Your response MUST be valid JSON. Every property name MUST have a colon after the closing quote. Example: "description": "value" (NOT "description: "value").
+CRITICAL JSON FORMAT:
+- Your response MUST be valid JSON
+- Every property name MUST have a colon after the closing quote: "property": "value" (NOT "property: "value")
+- Beat type names are case-sensitive - use EXACTLY the names listed below
 
-## Available Beat Types
-${beatTypes}
+## Available Beat Types (USE EXACTLY THESE NAMES - case-sensitive)
+${beatTypesList.map(t => `"${t}"`).join(', ')}
+
+IMPORTANT: The "type" field in each beat MUST be one of the exact strings listed above. Do NOT use variations like:
+- "SetVariable" (wrong) → use "setVariable" (correct)
+- "condition" (wrong) → use "conditionBeat" (correct)
+- "set_variable" (wrong) → use "setVariable" (correct)
+- "addInventory" (wrong) → use "addRemoveInventory" (correct)
 
 ${BEAT_TYPE_GUIDE}
 

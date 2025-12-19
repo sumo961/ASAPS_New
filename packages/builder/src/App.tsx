@@ -22,7 +22,7 @@ import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { getStorageAdapter } from './storage/HybridStorageAdapter';
 import { assetToStored, extractBlobFromAsset } from './storage/AssetStorageAdapter';
 import { DebugPanel } from './components/debug/DebugPanel';
-import { applyTreeLayoutToBeats } from './utils/TreeLayoutAlgorithm';
+import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
 import { preloadFonts } from './utils/fontRegistry';
 
@@ -340,15 +340,29 @@ function App() {
 
       // Create all beats without adding to state (batch preparation)
       const createdBeats: Beat[] = [];
+      // Known beat types for validation
+      const knownBeatTypes = new Set([
+        'titleScreen', 'introText', 'dialogTree', 'conversationChoice', 'movementChoice',
+        'pickProp', 'videoBeat', 'endScreen', 'durScreen', 'SWFBeat', 'inputText', 'hyperText',
+        'setVariable', 'setGlobal', 'setCounter', 'conditionBeat', 'conditionCheck', 'condition',
+        'randomTarget', 'setTimer', 'addRemoveInventory', 'addInventory', 'removeInventory'
+      ]);
+
       if (story.beats && Array.isArray(story.beats)) {
         story.beats.forEach((beatData: any) => {
           const position = adjustedPositions.get(beatData.id) ||
             beatData.position ||
             { x: beatData.x || 200, y: beatData.y || 200 };
 
+          // Log warning if AI generated an unknown beat type
+          const beatType = beatData.type || 'introText';
+          if (!knownBeatTypes.has(beatType)) {
+            console.warn(`[App] AI generated unknown beat type: "${beatType}" for beat ${beatData.id}. Check AI prompt constraints.`);
+          }
+
           // Use createBeat (not addBeat) to avoid state updates
           const beat = actions.createBeat(
-            beatData.type || 'introText',
+            beatType,
             position,
             { id: beatData.id, name: beatData.name || beatData.label }
           );
@@ -1070,6 +1084,7 @@ function App() {
     const beatsForLayout = state.beats.map(beat => ({
       id: beat.id,
       type: beat.type,
+      cluster: beat.cluster,
       position: { x: beat.x || 0, y: beat.y || 0 },
       parameters: typeof beat.getParameters === 'function' ? beat.getParameters() : {},
     }));
@@ -1087,16 +1102,58 @@ function App() {
       }
     });
 
-    // Calculate new positions with both parameter edges and external edges
-    const newPositions = applyTreeLayoutToBeats(beatsForLayout, undefined, externalEdges);
+    // Check if there are clusters with beats
+    const clusters = state.clusters || [];
+    const hasClusteredBeats = clusters.length > 0 && state.beats.some(b => b.cluster);
 
-    // Apply new positions to all beats
-    newPositions.forEach((pos, beatId) => {
-      actions.moveBeat(beatId, pos);
-    });
+    if (hasClusteredBeats) {
+      // Use cluster-aware layout
+      const clusterInfos = clusters.map(cluster => ({
+        id: cluster.id,
+        beatIds: state.beats.filter(b => b.cluster === cluster.id).map(b => b.id),
+        containerBounds: cluster.containerBounds,
+        containerPosition: cluster.containerPosition,
+      }));
+
+      const result: ClusterAwareLayoutResult = applyClusterAwareTreeLayout(
+        beatsForLayout,
+        clusterInfos,
+        undefined,
+        externalEdges
+      );
+
+      // Apply positions to unclustered beats
+      result.beatPositions.forEach((pos, beatId) => {
+        actions.moveBeat(beatId, pos);
+      });
+
+      // Apply positions to clusters
+      result.clusterPositions.forEach((pos, clusterId) => {
+        if (actions.moveCluster) {
+          actions.moveCluster(clusterId, pos);
+        }
+      });
+
+      // Apply positions to beats inside clusters
+      result.clusterInternalPositions.forEach((internalPositions, clusterId) => {
+        internalPositions.forEach((pos, beatId) => {
+          if (actions.moveBeatInContainer) {
+            actions.moveBeatInContainer(beatId, clusterId, pos.x, pos.y);
+          }
+        });
+      });
+    } else {
+      // No clusters - use standard layout
+      const newPositions = applyTreeLayoutToBeats(beatsForLayout, undefined, externalEdges);
+
+      // Apply new positions to all beats
+      newPositions.forEach((pos, beatId) => {
+        actions.moveBeat(beatId, pos);
+      });
+    }
 
     markChanged();
-  }, [state.beats, actions, markChanged]);
+  }, [state.beats, state.clusters, actions, markChanged]);
 
   const handleExport = useCallback(async () => {
     try {
