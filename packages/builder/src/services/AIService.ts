@@ -131,19 +131,21 @@ export class AIService {
 
   /**
    * Transform AI-generated beat format to match schema expectations
-   * Converts top-level `connections` array to `parameters.connection`
+   * - Converts top-level `connections` array to `parameters.connection`
+   * - Normalizes setVariable parameters (variableName → name, default type)
    */
   private transformBeatFormat(beat: any): any {
     const transformed = { ...beat };
+
+    if (!transformed.parameters) {
+      transformed.parameters = {};
+    }
 
     // If beat has connections array at top level, convert to parameters.connection
     if (beat.connections && Array.isArray(beat.connections) && beat.connections.length > 0) {
       // For single-connection beats (titleScreen, introText, etc.)
       // Take the first connection and put it in parameters.connection
       const firstConnection = beat.connections[0];
-      if (!transformed.parameters) {
-        transformed.parameters = {};
-      }
 
       // Convert from { targetId: "..." } to { target: "..." }
       transformed.parameters.connection = {
@@ -152,6 +154,29 @@ export class AIService {
         ...(firstConnection.condition && { condition: firstConnection.condition }),
         ...(firstConnection.effects && { effects: firstConnection.effects }),
       };
+    }
+
+    // Normalize setVariable parameters
+    if (beat.type === 'setVariable') {
+      const params = transformed.parameters;
+
+      // Map variableName → name (common AI variation)
+      if (params.variableName && !params.name) {
+        params.name = params.variableName;
+        console.log(`[AIService] Normalized setVariable: variableName → name for beat ${beat.id}`);
+      }
+
+      // Default type to "variable" if not specified
+      if (!params.type) {
+        // Infer type from operation or value
+        if (params.operation === 'add' || params.operation === 'change' ||
+            params.operation === 'subtract' || typeof params.value === 'number') {
+          params.type = 'counter';
+        } else {
+          params.type = 'variable';
+        }
+        console.log(`[AIService] Inferred setVariable type="${params.type}" for beat ${beat.id}`);
+      }
     }
 
     return transformed;

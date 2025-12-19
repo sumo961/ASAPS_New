@@ -19,7 +19,8 @@ export class SetVariableBeat extends Beat {
     // Support both new and legacy parameter names
     // Note: config.type is the BEAT type ('setVariable'), so we check parameters.type first
     this.variableType = config.parameters?.type || 'variable';
-    this.variableName = config.parameters?.name || config.name || config.variable || config.parameters?.variable || '';
+    // Support multiple naming conventions: name (schema), variable (legacy), variableName (AI variation)
+    this.variableName = config.parameters?.name || config.parameters?.variableName || config.name || config.variable || config.parameters?.variable || '';
     this.value = config.parameters?.value ?? config.value ?? '';
     this.operation = config.parameters?.operation || config.operation || 'set';
   }
@@ -37,6 +38,7 @@ export class SetVariableBeat extends Beat {
     if (params.type !== undefined) this.variableType = params.type;
     if (params.name !== undefined) this.variableName = params.name;
     if (params.variable !== undefined) this.variableName = params.variable; // legacy
+    if (params.variableName !== undefined) this.variableName = params.variableName; // AI variation
     if (params.value !== undefined) this.value = params.value;
     if (params.operation !== undefined) this.operation = params.operation;
   }

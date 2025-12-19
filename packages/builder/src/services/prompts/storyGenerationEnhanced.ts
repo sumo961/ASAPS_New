@@ -87,10 +87,15 @@ const BEAT_TYPE_GUIDE = `
 
 **setVariable** - Set/modify story state
 - Use: Track player choices, update counters, set flags
-- Parameters: variableName, value, operation (set|add|subtract)
+- Parameters:
+  - type: "variable" (for text/boolean) or "counter" (for numbers)
+  - name: The variable or counter name (e.g., "hasKey", "sanityScore")
+  - value: The value to set or change by
+  - operation: "set" (replace value) or "change" (add to counter, counters only)
 - Connections: Single → immediately to next beat
 - Pattern: Chain after visible beats to track state
-- Example: After picking sword → setVariable(weapon='sword') → continue story
+- Example: setVariable with type="variable", name="weapon", value="sword"
+- Example: setVariable with type="counter", name="sanityScore", value=-1, operation="change"
 
 **conditionBeat** - State-based branching
 - Use: Check variables, create reconvergent paths, conditional content
