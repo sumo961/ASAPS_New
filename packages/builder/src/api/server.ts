@@ -11,6 +11,8 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { createServer, Server as HTTPServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import fs from 'fs';
+import path from 'path';
 import { getMemoryStorage } from '../storage/MemoryStorageAdapter';
 import { getFilesystemStorage } from '../storage/FilesystemStorageAdapter';
 import type { IStorageAdapter } from '../storage/IStorageAdapter';
@@ -44,6 +46,7 @@ export class APIServer {
   private storage: IStorageAdapter;
   private config: Required<APIServerConfig>;
   private isRunning: boolean = false;
+  private beatSchemaCache: any = null;
 
   constructor(config: APIServerConfig = {}) {
     this.config = {
@@ -155,6 +158,184 @@ export class APIServer {
         path: req.path,
       });
     });
+  }
+
+  /**
+   * Load beat schema from core-beats.json (single source of truth)
+   * Caches the result for subsequent requests
+   */
+  private loadBeatSchema(): any {
+    if (this.beatSchemaCache) {
+      return this.beatSchemaCache;
+    }
+
+    try {
+      // Try multiple paths to find the schema file
+      const possiblePaths = [
+        // Development: relative to project root
+        path.resolve(process.cwd(), 'beat-definitions/core-beats.json'),
+        path.resolve(process.cwd(), '../beat-definitions/core-beats.json'),
+        path.resolve(process.cwd(), '../../beat-definitions/core-beats.json'),
+        // Production: relative to built files
+        path.resolve(__dirname, '../../../../beat-definitions/core-beats.json'),
+        path.resolve(__dirname, '../../../../../beat-definitions/core-beats.json'),
+        // Fallback: public directory
+        path.resolve(process.cwd(), 'public/beat-definitions/core-beats.json'),
+        path.resolve(__dirname, '../../public/beat-definitions/core-beats.json'),
+      ];
+
+      let rawSchema: any = null;
+      let foundPath = '';
+
+      for (const schemaPath of possiblePaths) {
+        if (fs.existsSync(schemaPath)) {
+          const content = fs.readFileSync(schemaPath, 'utf-8');
+          rawSchema = JSON.parse(content);
+          foundPath = schemaPath;
+          console.log(`[API] Loaded beat schema from: ${schemaPath}`);
+          break;
+        }
+      }
+
+      if (!rawSchema) {
+        console.error('[API] Could not find beat-definitions/core-beats.json');
+        return this.getFallbackSchema();
+      }
+
+      // Transform the raw schema into the API format for AI consumption
+      this.beatSchemaCache = this.transformSchemaForAPI(rawSchema, foundPath);
+      return this.beatSchemaCache;
+
+    } catch (error) {
+      console.error('[API] Failed to load beat schema:', error);
+      return this.getFallbackSchema();
+    }
+  }
+
+  /**
+   * Transform the raw beat-definitions schema into the API format
+   * that Claude Desktop and other AI assistants expect
+   */
+  private transformSchemaForAPI(rawSchema: any, sourcePath: string): any {
+    const beatTypes: Record<string, any> = {};
+
+    // Transform each beat type from the schema
+    for (const [beatType, beatDef] of Object.entries(rawSchema.beatTypes || {})) {
+      const def = beatDef as any;
+      beatTypes[beatType] = {
+        category: def.category || 'visible',
+        description: def.description || '',
+        connectionType: def.connectionType || 'single',
+        parameters: this.transformParameters(def.parameters || {}),
+      };
+
+      // Add example if available
+      if (def.example) {
+        beatTypes[beatType].example = def.example;
+      }
+    }
+
+    // Include custom types documentation
+    const customTypes: Record<string, any> = {};
+    for (const [typeName, typeDef] of Object.entries(rawSchema.customTypes || {})) {
+      const def = typeDef as any;
+      customTypes[typeName] = {
+        description: def.description || '',
+        schema: def.schema || {},
+        notes: def.notes || '',
+      };
+    }
+
+    return {
+      version: rawSchema.schema || '2.2.0',
+      description: 'ASAPS Beat Types - Use these to create interactive narratives',
+      source: 'Loaded from beat-definitions/core-beats.json (single source of truth)',
+      loadedFrom: sourcePath,
+
+      beatTypes,
+      customTypes,
+
+      connectionFormat: {
+        description: 'How to specify connections between beats',
+        format: {
+          source: 'string - source beat ID',
+          target: 'string - target beat ID',
+          label: 'string? - optional connection label',
+        },
+        rules: {
+          single: 'Beats with connectionType="single" can ONLY have ONE connection in the connections array.',
+          multiple: 'Beats with connectionType="multiple" define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.',
+          conditional: 'conditionBeat uses trueTarget and falseTarget PARAMETERS, not connections array.',
+        },
+        note: 'IMPORTANT: Do NOT put multiple connections for single-type beats. For branching, use dialogTree or movementChoice instead of multiple connections from introText.',
+      },
+
+      storyStructure: {
+        description: 'Complete story structure for injection',
+        format: {
+          metadata: {
+            title: 'string',
+            author: 'string',
+            description: 'string?',
+          },
+          beats: 'array of beat objects (see beatTypes above)',
+          connections: 'array of { source, target, label? }',
+          characters: 'array of { id, name, displayName? }?',
+          environment: '{ props: [], nodes: [] }?',
+        },
+      },
+
+      tips: [
+        'Start with a titleScreen beat',
+        'Use introText for narration and scene-setting (single connection only!)',
+        'Use dialogTree for character conversations with choices',
+        'dialogTree, movementChoice, and pickProp support "choiceDelay" parameter (seconds before showing choices)',
+        'DialogTree choices can modify counters directly with counter/counterOperation/counterValue',
+        'Use movementChoice for exploration/navigation branching',
+        'IMPORTANT: For branching story points, use dialogTree or movementChoice - NEVER multiple connections from introText',
+        'End branches with endScreen beats',
+        'Position beats using x, y coordinates (grid: ~300px horizontal, ~200px vertical spacing)',
+        'Use meaningful beat IDs like "beat_0", "beat_1", etc.',
+      ],
+    };
+  }
+
+  /**
+   * Transform parameters from schema format to API format
+   */
+  private transformParameters(params: Record<string, any>): Record<string, any> {
+    const result: Record<string, any> = {};
+
+    for (const [paramName, paramDef] of Object.entries(params)) {
+      const def = paramDef as any;
+      result[paramName] = {
+        type: def.type || 'string',
+        required: def.required !== false && !def.type?.endsWith('?'),
+        description: def.description || '',
+      };
+
+      if (def.default !== undefined) {
+        result[paramName].default = def.default;
+      }
+      if (def.enum) {
+        result[paramName].enum = def.enum;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Fallback schema if file cannot be loaded
+   */
+  private getFallbackSchema(): any {
+    return {
+      version: '2.2.0',
+      description: 'ASAPS Beat Types (fallback - could not load from file)',
+      error: 'Could not load beat-definitions/core-beats.json',
+      beatTypes: {},
+      tips: ['Schema file not found - please check installation'],
+    };
   }
 
   /**
@@ -431,6 +612,7 @@ export class APIServer {
 
   /**
    * Create schema routes - provides beat type documentation for AI assistants
+   * Now loads from beat-definitions/core-beats.json as single source of truth
    */
   private createSchemaRoutes(ctx: APIContext): express.Router {
     const router = express.Router();
@@ -438,335 +620,11 @@ export class APIServer {
     /**
      * Get all beat type definitions
      * Used by Claude Desktop to understand ASAPS beat structure
+     * Loads from beat-definitions/core-beats.json (single source of truth)
      */
     router.get('/beats', async (req: Request, res: Response) => {
       try {
-        // Return comprehensive beat schema for AI consumption
-        const beatSchema = {
-          version: '2.2.0',
-          description: 'ASAPS Beat Types - Use these to create interactive narratives',
-
-          beatTypes: {
-            // Visible beats (user-facing)
-            titleScreen: {
-              category: 'visible',
-              description: 'Opening title screen with start button',
-              connectionType: 'single',
-              parameters: {
-                title: { type: 'string', required: true, description: 'Story title text' },
-                author: { type: 'string', required: false, description: 'Author name' },
-                buttonText: { type: 'string', required: false, default: 'Start', description: 'Start button text' },
-                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance (optional)' },
-                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
-              },
-              example: {
-                id: 'beat_0',
-                type: 'titleScreen',
-                name: 'Title',
-                parameters: { title: 'My Story', author: 'Author Name', buttonText: 'Begin' },
-                x: 100, y: 100,
-              },
-            },
-
-            introText: {
-              category: 'visible',
-              description: 'Text display with continue button - use for narration. For branching, use movementChoice or dialogTree instead.',
-              connectionType: 'single',
-              parameters: {
-                text: { type: 'string', required: true, description: 'Text content to display' },
-                buttonText: { type: 'string', required: false, default: 'Continue', description: 'Continue button text' },
-                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance (optional)' },
-                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
-              },
-              example: {
-                id: 'beat_1',
-                type: 'introText',
-                name: 'Introduction',
-                parameters: { text: 'Welcome to the story...', buttonText: 'Continue' },
-                x: 400, y: 100,
-              },
-            },
-
-            dialogTree: {
-              category: 'visible',
-              description: 'Branching conversation with character dialogue and player choices. Targets are in dialogTree.choices[].target, NOT in connections array.',
-              connectionType: 'multiple',
-              parameters: {
-                dialogTree: {
-                  type: 'object',
-                  required: true,
-                  description: 'Root dialog node with nested conversation tree',
-                  schema: {
-                    id: 'string',
-                    speaker: 'string - character name',
-                    text: 'string - what they say',
-                    emotion: 'string? - optional emotion',
-                    choices: 'array of { id, text, target (beatId or nested node) }',
-                    next: 'string (beatId) or nested dialogNode',
-                  },
-                },
-                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no choice made (optional)' },
-                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
-              },
-              example: {
-                id: 'beat_2',
-                type: 'dialogTree',
-                name: 'Conversation',
-                parameters: {
-                  dialogTree: {
-                    id: 'node_0',
-                    speaker: 'Guard',
-                    text: 'Halt! Who goes there?',
-                    choices: [
-                      { id: 'c1', text: 'I am a friend', target: 'beat_3' },
-                      { id: 'c2', text: 'None of your business', target: 'beat_4' },
-                    ],
-                  },
-                },
-                x: 700, y: 100,
-              },
-            },
-
-            movementChoice: {
-              category: 'visible',
-              description: 'Location-based navigation - player chooses where to go. Targets are in choices[].target, NOT in connections array.',
-              connectionType: 'multiple',
-              parameters: {
-                question: { type: 'string', required: true, description: 'Prompt text' },
-                choices: {
-                  type: 'array',
-                  required: true,
-                  description: 'Array of movement options',
-                  itemSchema: {
-                    id: 'string',
-                    text: 'string - choice text',
-                    location: 'string - location name',
-                    target: 'string - target beat ID',
-                  },
-                },
-                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no choice made (optional)' },
-                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
-              },
-              example: {
-                id: 'beat_3',
-                type: 'movementChoice',
-                name: 'Crossroads',
-                parameters: {
-                  question: 'Which path do you take?',
-                  choices: [
-                    { id: 'c1', text: 'Go left', location: 'Forest Path', target: 'beat_5' },
-                    { id: 'c2', text: 'Go right', location: 'Mountain Road', target: 'beat_6' },
-                  ],
-                },
-                x: 400, y: 300,
-              },
-            },
-
-            pickProp: {
-              category: 'visible',
-              description: 'Interactive object selection - player picks up or interacts with items. Targets are in props[].target, NOT in connections array.',
-              connectionType: 'multiple',
-              parameters: {
-                question: { type: 'string', required: true, description: 'Prompt text' },
-                props: {
-                  type: 'array',
-                  required: true,
-                  description: 'Array of interactive props',
-                  itemSchema: {
-                    id: 'string',
-                    name: 'string - prop name',
-                    description: 'string - prop description',
-                    target: 'string - target beat ID',
-                  },
-                },
-                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no choice made (optional)' },
-                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
-              },
-            },
-
-            hyperText: {
-              category: 'visible',
-              description: 'Text with clickable hyperlinked words that branch to different beats. Targets are in hyperlinks[].targetBeatId, NOT in connections array.',
-              connectionType: 'multiple',
-              parameters: {
-                text: { type: 'string', required: true, description: 'Main text with hyperlinked words' },
-                hyperlinks: {
-                  type: 'array',
-                  required: true,
-                  description: 'Array of hyperlink definitions',
-                  itemSchema: {
-                    word: 'string - the clickable word',
-                    targetBeatId: 'string - target beat ID',
-                  },
-                },
-                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no link clicked (optional)' },
-                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
-              },
-            },
-
-            durScreen: {
-              category: 'visible',
-              description: 'Timed display that auto-advances after duration. Does NOT support defaultTarget (already auto-advances by design).',
-              connectionType: 'single',
-              parameters: {
-                text: { type: 'string', required: true, description: 'Text to display' },
-                duration: { type: 'number', required: true, description: 'Duration in milliseconds' },
-              },
-            },
-
-            inputText: {
-              category: 'visible',
-              description: 'Prompts user for text input, stores in variable',
-              connectionType: 'single',
-              parameters: {
-                prompt: { type: 'string', required: true, description: 'Question/prompt text' },
-                saveToType: { type: 'string', required: true, enum: ['variable', 'characterName'] },
-                variable: { type: 'string', required: false, description: 'Variable name to store input' },
-                placeholder: { type: 'string', required: false, description: 'Placeholder text' },
-                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance if no input provided (optional)' },
-                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
-              },
-            },
-
-            videoBeat: {
-              category: 'visible',
-              description: 'Video playback',
-              connectionType: 'single',
-              parameters: {
-                videoFile: { type: 'string', required: true, description: 'Path to video file' },
-                autoplay: { type: 'boolean', required: false, default: true },
-                controls: { type: 'boolean', required: false, default: false },
-                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance (optional)' },
-                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
-              },
-            },
-
-            endScreen: {
-              category: 'visible',
-              description: 'Story ending screen',
-              connectionType: 'single',
-              parameters: {
-                message: { type: 'string', required: false, description: 'Ending message' },
-                showRestart: { type: 'boolean', required: false, default: true },
-                showCredits: { type: 'boolean', required: false, default: false },
-                defaultTarget: { type: 'string', required: false, description: 'Beat ID for timed auto-advance (optional, rare for endings)' },
-                defaultTargetTimeout: { type: 'number', required: false, description: 'Timeout in ms before auto-advance (optional)' },
-              },
-              example: {
-                id: 'beat_end',
-                type: 'endScreen',
-                name: 'The End',
-                parameters: { message: 'Thanks for playing!', showRestart: true },
-                x: 700, y: 500,
-              },
-            },
-
-            // Logic beats (invisible, for game logic)
-            setVariable: {
-              category: 'logic',
-              description: 'Set or modify ONE story variable or counter per beat. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, use multiple consecutive setVariable beats chained together. Never name a beat with multiple operations (e.g., "Health +1, Score +2") - split into separate beats.',
-              connectionType: 'single',
-              parameters: {
-                type: { type: 'string', required: true, enum: ['variable', 'counter'] },
-                name: { type: 'string', required: true, description: 'Variable/counter name' },
-                value: { type: 'any', required: true, description: 'New value' },
-                operation: { type: 'string', required: false, enum: ['set', 'change', 'add', 'subtract'], default: 'set' },
-              },
-            },
-
-            conditionBeat: {
-              category: 'logic',
-              description: 'Conditional branching based on variables/counters/inventory',
-              connectionType: 'conditional',
-              parameters: {
-                conditionType: { type: 'string', required: true, enum: ['variable', 'counter', 'inventory', 'timer'] },
-                variableName: { type: 'string', required: true, description: 'Variable/counter/item name' },
-                operator: { type: 'string', required: true, enum: ['==', '!=', '>', '<', '>=', '<='] },
-                value: { type: 'any', required: true, description: 'Value to compare against' },
-                trueTarget: { type: 'string', required: true, description: 'Beat ID if condition is true' },
-                falseTarget: { type: 'string', required: false, description: 'Beat ID if condition is false' },
-              },
-            },
-
-            randomTarget: {
-              category: 'logic',
-              description: 'Randomly select next beat from choices',
-              connectionType: 'multiple',
-              parameters: {
-                choices: {
-                  type: 'array',
-                  required: true,
-                  description: 'Array of possible target beat IDs',
-                },
-              },
-            },
-
-            addRemoveInventory: {
-              category: 'logic',
-              description: 'Add, remove, or transfer inventory items',
-              connectionType: 'single',
-              parameters: {
-                action: { type: 'string', required: true, enum: ['add', 'remove', 'transfer'] },
-                item: { type: 'string', required: true, description: 'Item name' },
-                character: { type: 'string', required: true, description: 'Character name' },
-              },
-            },
-
-            setTimer: {
-              category: 'logic',
-              description: 'Set or clear a named timer',
-              connectionType: 'single',
-              parameters: {
-                name: { type: 'string', required: true, description: 'Timer name' },
-                value: { type: 'number', required: true, description: 'Duration in seconds (0 to clear)' },
-                timerTarget: { type: 'string', required: true, description: 'Beat ID when timer expires' },
-              },
-            },
-          },
-
-          connectionFormat: {
-            description: 'How to specify connections between beats',
-            format: {
-              source: 'string - source beat ID',
-              target: 'string - target beat ID',
-              label: 'string? - optional connection label',
-            },
-            rules: {
-              single: 'Beats with connectionType="single" (titleScreen, introText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer) can ONLY have ONE connection in the connections array.',
-              multiple: 'Beats with connectionType="multiple" (dialogTree, movementChoice, pickProp, hyperText, randomTarget) define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.',
-              conditional: 'conditionBeat uses trueTarget and falseTarget PARAMETERS, not connections array.',
-            },
-            note: 'IMPORTANT: Do NOT put multiple connections for single-type beats. For branching, use dialogTree or movementChoice instead of multiple connections from introText.',
-          },
-
-          storyStructure: {
-            description: 'Complete story structure for injection',
-            format: {
-              metadata: {
-                title: 'string',
-                author: 'string',
-                description: 'string?',
-              },
-              beats: 'array of beat objects (see beatTypes above)',
-              connections: 'array of { source, target, label? }',
-              characters: 'array of { id, name, displayName? }?',
-              environment: '{ props: [], nodes: [] }?',
-            },
-          },
-
-          tips: [
-            'Start with a titleScreen beat',
-            'Use introText for narration and scene-setting (single connection only!)',
-            'Use dialogTree for character conversations with choices',
-            'Use movementChoice for exploration/navigation branching',
-            'IMPORTANT: For branching story points, use dialogTree or movementChoice - NEVER multiple connections from introText',
-            'End branches with endScreen beats',
-            'Position beats using x, y coordinates (grid: ~300px horizontal, ~200px vertical spacing)',
-            'Use meaningful beat IDs like "beat_0", "beat_1", etc.',
-            'Most visible beats support optional defaultTarget/defaultTargetTimeout for timed auto-advance (except durScreen which already auto-advances)',
-          ],
-        };
-
+        const beatSchema = this.loadBeatSchema();
         res.json(beatSchema);
       } catch (error) {
         res.status(500).json({ error: (error as Error).message });

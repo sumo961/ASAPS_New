@@ -35,6 +35,44 @@
  * - Use clusters when a story has 15+ beats or distinct geographical/thematic sections
  * - Beats without a cluster property remain ungrouped at the top level
  *
+ * CLUSTER MAP FEATURES (for spatial clusters):
+ * Spatial clusters can display a background map/floorplan image:
+ * - mapAssetId: Asset ID referencing the background map image
+ * - mapScale: Scale factor for the map (0.1-3.0, default 1.0)
+ * - mapOpacity: Opacity of the map background (0-1, default 0.5)
+ * - Only available for spatial cluster type (not organizational)
+ *
+ * CHOICE DELAY:
+ * dialogTree, movementChoice, and pickProp beats support the "choiceDelay" parameter:
+ * - Value is in SECONDS (e.g., 2 = 2 second delay before choices appear)
+ * - Choices appear with a fade-in animation after the delay
+ * - Useful for dramatic pauses or ensuring player reads text first
+ * - Example: { "choiceDelay": 1.5 } waits 1.5 seconds before revealing choices
+ *
+ * COUNTER OPERATIONS IN DIALOGTREE:
+ * DialogTree choices can modify counters directly (in addition to effects[] array):
+ * - "counter": counter name (any arbitrary name, e.g., "trust", "fear", "relationship")
+ * - "counterOperation": "set" (replace value) or "change" (increment/decrement)
+ * - "counterValue": numeric value to set or add
+ * - Example: { "counter": "trust", "counterOperation": "change", "counterValue": 1 }
+ * - This allows tracking relationship values, skill points, or any numeric state
+ *
+ * COUNTER COMPARISON CONDITIONS:
+ * The "counterCompare" condition type compares two counters against each other:
+ * - type: "counterCompare"
+ * - counter1: first counter name
+ * - counter2: second counter name
+ * - operator: "==", "!=", ">", "<", ">=", "<="
+ * - Example: { "type": "counterCompare", "counter1": "strength", "counter2": "threshold", "operator": ">=" }
+ * - Useful for: skill checks, relationship comparisons, dynamic difficulty
+ *
+ * ASSET REFERENCES (informational - AI doesn't typically generate these):
+ * The system supports asset references for visuals:
+ * - backgroundAssetId: Background image asset for beats
+ * - assetId: Asset reference in Location elements (character/prop images)
+ * - characterId/stateId: Character and emotional state references for visuals
+ * - These are typically set by the author through the UI, not generated
+ *
  * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from introText!
  */
 export const BEAT_TYPES = {
@@ -43,9 +81,9 @@ export const BEAT_TYPES = {
     introText: 'Narrative text with Continue button. SINGLE CONNECTION: only one target via connections array. For branching, use movementChoice or dialogTree instead. Supports optional defaultTarget for timed auto-advance.',
     endScreen: 'End screen with message. SINGLE CONNECTION or no connections (story ends here). Supports optional defaultTarget for timed auto-advance.',
     // Interactive content - MULTIPLE CONNECTIONS via parameters
-    dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports optional defaultTarget for timed auto-advance if no choice is made.',
-    movementChoice: 'Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. Supports optional defaultTarget for timed auto-advance if no choice is made.',
-    pickProp: 'Interactive prop selection. MULTIPLE TARGETS: define targets in props[].target parameter. Supports optional defaultTarget for timed auto-advance.',
+    dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports choiceDelay (seconds) for delayed choice reveal. Choices can modify counters via counter/counterOperation/counterValue properties.',
+    movementChoice: 'Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. Supports choiceDelay (seconds) for delayed choice reveal.',
+    pickProp: 'Interactive prop selection. MULTIPLE TARGETS: define targets in props[].target parameter. Supports choiceDelay (seconds) for delayed choice reveal.',
     hyperText: 'Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Supports optional defaultTarget for timed auto-advance.',
     inputText: 'Player text input with validation. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance if no input is provided.',
     // Timed content - SINGLE CONNECTION (NO defaultTarget - already timed by design)
@@ -133,6 +171,20 @@ For larger stories (15+ beats) with distinct sections, use clusters to organize 
 - Clusters make large flowcharts more navigable and help authors understand story structure
 - Use clusters for: geographical areas, time periods, character arcs, or thematic sections
 - Beats without a cluster property remain at the top level ungrouped
+
+CHOICE DELAY:
+- dialogTree, movementChoice, and pickProp beats support "choiceDelay" parameter
+- Value in SECONDS (e.g., 1.5 = 1.5 seconds before choices appear)
+- Useful for dramatic pauses or ensuring player reads text first
+- Example: { "choiceDelay": 2 } waits 2 seconds before showing choices
+
+COUNTER OPERATIONS IN DIALOGTREE:
+- Dialogue choices can modify counters directly via choice properties:
+  - "counter": counter name (any name, e.g., "trust", "fear")
+  - "counterOperation": "set" or "change" (increment)
+  - "counterValue": numeric value
+- Example choice: { "text": "Be friendly", "target": "next", "counter": "trust", "counterOperation": "change", "counterValue": 1 }
+- This allows tracking relationships, skills, or any numeric game state
 
 Important:
 - Use descriptive labels for beats
