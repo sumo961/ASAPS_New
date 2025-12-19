@@ -1,6 +1,7 @@
 // Analysis tools for story structure
 export { PathAnalyzer } from './PathAnalyzer';
 export { ReachabilityAnalyzer } from './ReachabilityAnalyzer';
+export { SymbolicPathAnalyzer } from './SymbolicPathAnalyzer';
 export type {
   PathAnalysisResult,
   StoryPath
@@ -11,3 +12,9 @@ export type {
   ReachabilityWarning,
   BrokenConnection
 } from './ReachabilityAnalyzer';
+export type {
+  SymbolicPathResult,
+  SymbolicAnalysisConfig,
+  SymbolicPath,
+  SymbolicPathNode
+} from './SymbolicPathAnalyzer';
