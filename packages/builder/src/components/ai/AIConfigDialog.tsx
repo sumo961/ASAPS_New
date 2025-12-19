@@ -35,9 +35,9 @@ const PROVIDER_PRESETS: Record<ProviderType, ProviderPreset> = {
   },
   openai: {
     name: 'OpenAI',
-    description: 'GPT-4',
+    description: 'GPT-5 (reasoning capable)',
     defaultBaseUrl: '',
-    defaultModel: 'gpt-4-turbo-preview',
+    defaultModel: 'gpt-5.1',
     apiKeyRequired: true,
     apiKeyPlaceholder: 'Enter your OpenAI API key',
     apiKeyHelp: 'Get your API key from platform.openai.com',
@@ -76,6 +76,9 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
   const [model, setModel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [maxTokens, setMaxTokens] = useState('');
+  const [reasoningEffort, setReasoningEffort] = useState<
+    '' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+  >('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -91,6 +94,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
     }
     // Also set default model suggestion
     setModel('');
+    setReasoningEffort('');
   }, [provider]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -111,7 +115,14 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
       const actualProvider = provider === 'local' ? 'openai' : provider;
       // For local, use a dummy API key if none provided (Ollama ignores it)
       const actualApiKey = provider === 'local' && !apiKey.trim() ? 'ollama' : apiKey;
-      configure(actualProvider, actualApiKey, model || undefined, baseUrl || undefined, maxTokensNum);
+      configure(
+        actualProvider,
+        actualApiKey,
+        model || undefined,
+        baseUrl || undefined,
+        maxTokensNum,
+        reasoningEffort || undefined
+      );
       setSuccess(true);
 
       // Close after short delay
@@ -201,7 +212,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
               >
                 <div className="text-center">
                   <p className="font-medium text-gray-900">OpenAI</p>
-                  <p className="text-xs text-gray-500 mt-1">GPT-4</p>
+                  <p className="text-xs text-gray-500 mt-1">GPT-5</p>
                 </div>
               </button>
 
@@ -257,6 +268,32 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
             />
             <p className="mt-1 text-xs text-gray-500">{preset.modelHelp}</p>
           </div>
+
+          {/* Reasoning effort (GPT-5) */}
+          {(provider === 'openai' || provider === 'local') && (
+            <div>
+              <label htmlFor="reasoningEffort" className="block text-sm font-medium text-gray-700 mb-2">
+                Reasoning effort (GPT-5)
+              </label>
+              <select
+                id="reasoningEffort"
+                value={reasoningEffort}
+                onChange={(e) => setReasoningEffort(e.target.value as any)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">Auto (model default)</option>
+                <option value="none">None (no reasoning, fastest)</option>
+                <option value="minimal">Minimal</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="xhigh">X-High (max depth)</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                GPT-5 reasoning uses max_completion_tokens and ignores temperature. Leave blank to use the model default (gpt-5.1 defaults to none).
+              </p>
+            </div>
+          )}
 
           {/* Base URL */}
           <div>

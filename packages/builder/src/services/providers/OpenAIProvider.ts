@@ -5,6 +5,7 @@
  */
 
 import OpenAI from 'openai';
+import type { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
 import { BaseAIProvider } from './IProvider';
 import type {
   StoryGenerationRequest,
@@ -31,7 +32,7 @@ import { getAIValidator } from '../AIValidator';
 export class OpenAIProvider extends BaseAIProvider {
   readonly name = 'openai';
   private client: OpenAI | null = null;
-  private model: string = 'gpt-4-turbo-preview';
+  private model: string = 'gpt-5.1';
   private useJsonFormat: boolean = true;
   private useProxy: boolean = false;
   private proxyEndpoint: string = 'http://localhost:3001/api/ai/openai';
@@ -54,7 +55,7 @@ export class OpenAIProvider extends BaseAIProvider {
         });
       }
 
-      this.model = config.model || 'gpt-4-turbo-preview';
+      this.model = config.model || 'gpt-5.1';
 
       // Disable response_format for third-party providers that may not support it
       // (e.g., Moonshot, DeepSeek, etc.)
@@ -96,6 +97,47 @@ export class OpenAIProvider extends BaseAIProvider {
   }
 
   /**
+   * Build a chat completion request body with GPT-5 reasoning support
+   */
+  private buildChatRequest(
+    messages: Array<{ role: 'system' | 'user'; content: string }>,
+    defaultMaxTokens: number,
+    fallbackTemperature: number
+  ): ChatCompletionCreateParamsNonStreaming & Record<string, any> {
+    const isGPT5 = this.model.startsWith('gpt-5');
+    const reasoningEffort = this.config?.reasoningEffort;
+    const useReasoningModel = isGPT5 || !!reasoningEffort;
+    const maxTokens = this.config?.maxTokens ?? defaultMaxTokens;
+
+    const requestBody: ChatCompletionCreateParamsNonStreaming & Record<string, any> = {
+      model: this.model,
+      messages,
+    };
+
+    if (useReasoningModel) {
+      requestBody.max_completion_tokens = maxTokens;
+    } else {
+      requestBody.max_tokens = maxTokens;
+    }
+
+    if (this.useJsonFormat) {
+      requestBody.response_format = { type: 'json_object' };
+    }
+
+    if (reasoningEffort !== undefined) {
+      // SDK types may lag newest GPT-5 levels (minimal, xhigh); cast to allow them.
+      requestBody.reasoning_effort = reasoningEffort as any;
+    }
+
+    // Temperature is not supported by reasoning models; apply only when allowed
+    if (!useReasoningModel) {
+      requestBody.temperature = this.config?.temperature ?? fallbackTemperature;
+    }
+
+    return requestBody;
+  }
+
+  /**
    * Generate complete story
    */
   async generateStory(request: StoryGenerationRequest): Promise<StoryGenerationResponse> {
@@ -112,22 +154,20 @@ export class OpenAIProvider extends BaseAIProvider {
     console.log('[OpenAIProvider] Generating story with GPT...');
 
     return this.withRetry(async () => {
-      const requestBody = {
-        model: this.model,
-        max_tokens: 8000,
-        temperature: this.config?.temperature || 0.7,
-        ...(this.useJsonFormat && { response_format: { type: 'json_object' as const } }),
-        messages: [
+      const requestBody = this.buildChatRequest(
+        [
           {
-            role: 'system' as const,
+            role: 'system',
             content: systemPrompt + '\n\nRespond with valid JSON only.',
           },
           {
-            role: 'user' as const,
+            role: 'user',
             content: userPrompt,
           },
         ],
-      };
+        8000,
+        0.7
+      );
 
       let response;
 
@@ -170,22 +210,20 @@ export class OpenAIProvider extends BaseAIProvider {
     console.log('[OpenAIProvider] Generating dialog with GPT...');
 
     return this.withRetry(async () => {
-      const requestBody = {
-        model: this.model,
-        max_tokens: 4000,
-        temperature: this.config?.temperature || 0.7,
-        ...(this.useJsonFormat && { response_format: { type: 'json_object' as const } }),
-        messages: [
+      const requestBody = this.buildChatRequest(
+        [
           {
-            role: 'system' as const,
+            role: 'system',
             content: systemPrompt + '\n\nRespond with valid JSON only.',
           },
           {
-            role: 'user' as const,
+            role: 'user',
             content: userPrompt,
           },
         ],
-      };
+        4000,
+        0.7
+      );
 
       let response;
 
@@ -230,22 +268,20 @@ export class OpenAIProvider extends BaseAIProvider {
     console.log('[OpenAIProvider] Generating beat suggestions with GPT...');
 
     return this.withRetry(async () => {
-      const requestBody = {
-        model: this.model,
-        max_tokens: 3000,
-        temperature: this.config?.temperature || 0.6,
-        ...(this.useJsonFormat && { response_format: { type: 'json_object' as const } }),
-        messages: [
+      const requestBody = this.buildChatRequest(
+        [
           {
-            role: 'system' as const,
+            role: 'system',
             content: systemPrompt + '\n\nRespond with valid JSON only.',
           },
           {
-            role: 'user' as const,
+            role: 'user',
             content: userPrompt,
           },
         ],
-      };
+        3000,
+        0.6
+      );
 
       let response;
 
@@ -309,22 +345,20 @@ Respond with JSON in this format:
     console.log('[OpenAIProvider] Creating beat from natural language with GPT...');
 
     return this.withRetry(async () => {
-      const requestBody = {
-        model: this.model,
-        max_tokens: 2000,
-        temperature: this.config?.temperature || 0.7,
-        ...(this.useJsonFormat && { response_format: { type: 'json_object' as const } }),
-        messages: [
+      const requestBody = this.buildChatRequest(
+        [
           {
-            role: 'system' as const,
+            role: 'system',
             content: systemPrompt + '\n\nRespond with valid JSON only.',
           },
           {
-            role: 'user' as const,
+            role: 'user',
             content: userPrompt,
           },
         ],
-      };
+        2000,
+        0.7
+      );
 
       let response;
 
