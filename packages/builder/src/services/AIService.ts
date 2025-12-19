@@ -156,6 +156,22 @@ export class AIService {
       };
     }
 
+    // Normalize inputText parameters
+    if (beat.type === 'inputText') {
+      const params = transformed.parameters;
+
+      // Default saveToType to "variable" if not specified
+      if (!params.saveToType) {
+        params.saveToType = 'variable';
+        console.log(`[AIService] Defaulted inputText saveToType="variable" for beat ${beat.id}`);
+      }
+
+      // If variable is specified but saveToType isn't, ensure consistency
+      if (params.variable && !params.saveToType) {
+        params.saveToType = 'variable';
+      }
+    }
+
     // Normalize setVariable and counter parameters
     if (beat.type === 'setVariable' || beat.type === 'counter' || beat.type === 'setCounter') {
       const params = transformed.parameters;
