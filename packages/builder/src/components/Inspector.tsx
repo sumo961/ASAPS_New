@@ -85,9 +85,22 @@ export const Inspector: React.FC<InspectorProps> = ({
     callback: ((asset: Asset) => void) | null;
   }>({ isOpen: false, type: null, callback: null });
 
-  // Get beat definition from schema
+  // Map alias beat types to their canonical schema types
+  const BEAT_TYPE_ALIASES: Record<string, string> = {
+    'variable': 'setVariable',
+    'counter': 'setVariable',
+    'setCounter': 'setVariable',
+    'setGlobal': 'setVariable',
+    'condition': 'conditionBeat',
+    'conditionCheck': 'conditionBeat',
+    'addInventory': 'addRemoveInventory',
+    'removeInventory': 'addRemoveInventory',
+  };
+
+  // Get beat definition from schema (with alias support)
   const getBeatDefinition = (beatType: string): BeatDefinition => {
-    const beatDef = beatDefinitions.beatTypes[beatType as keyof typeof beatDefinitions.beatTypes];
+    const canonicalType = BEAT_TYPE_ALIASES[beatType] || beatType;
+    const beatDef = beatDefinitions.beatTypes[canonicalType as keyof typeof beatDefinitions.beatTypes];
     return beatDef as BeatDefinition;
   };
 

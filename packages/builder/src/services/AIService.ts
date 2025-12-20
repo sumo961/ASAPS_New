@@ -172,8 +172,8 @@ export class AIService {
       }
     }
 
-    // Normalize setVariable and counter parameters
-    if (beat.type === 'setVariable' || beat.type === 'counter' || beat.type === 'setCounter') {
+    // Normalize setVariable, variable, and counter parameters
+    if (beat.type === 'setVariable' || beat.type === 'counter' || beat.type === 'setCounter' || beat.type === 'variable') {
       const params = transformed.parameters;
 
       // Map variableName → name (common AI variation)
@@ -186,6 +186,12 @@ export class AIService {
       if (beat.type === 'counter' || beat.type === 'setCounter') {
         params.type = 'counter';
         console.log(`[AIService] Set parameters.type="counter" for beat ${beat.id} (beat type was "${beat.type}")`);
+      }
+
+      // If beat type is "variable", ensure parameters.type is set to "variable"
+      if (beat.type === 'variable') {
+        params.type = 'variable';
+        console.log(`[AIService] Set parameters.type="variable" for beat ${beat.id} (beat type was "variable")`);
       }
 
       // Default type to "variable" if not specified

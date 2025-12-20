@@ -32,6 +32,18 @@ interface SchemaFormGeneratorProps {
   customRenderers?: Record<string, (param: string, def: ParameterDefinition) => React.ReactNode>;
 }
 
+// Map alias beat types to their canonical schema types
+const BEAT_TYPE_ALIASES: Record<string, string> = {
+  'variable': 'setVariable',
+  'counter': 'setVariable',
+  'setCounter': 'setVariable',
+  'setGlobal': 'setVariable',
+  'condition': 'conditionBeat',
+  'conditionCheck': 'conditionBeat',
+  'addInventory': 'addRemoveInventory',
+  'removeInventory': 'addRemoveInventory',
+};
+
 /**
  * Schema-driven form field generator
  * Reads beat definitions and generates appropriate form fields
@@ -45,6 +57,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   characters = [],
   customRenderers = {},
 }) => {
+  // Map alias types to canonical types for schema lookup
+  const canonicalType = BEAT_TYPE_ALIASES[beatType] || beatType;
 
   // Skip parameters that should be handled elsewhere (connections, complex types)
   // Note: 'operation' is handled inside the 'value' case for setVariable beats

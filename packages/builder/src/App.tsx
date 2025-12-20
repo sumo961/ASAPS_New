@@ -340,11 +340,11 @@ function App() {
 
       // Create all beats without adding to state (batch preparation)
       const createdBeats: Beat[] = [];
-      // Known beat types for validation
+      // Known beat types for validation (including AI variations that map to canonical types)
       const knownBeatTypes = new Set([
         'titleScreen', 'introText', 'dialogTree', 'conversationChoice', 'movementChoice',
         'pickProp', 'videoBeat', 'endScreen', 'durScreen', 'SWFBeat', 'inputText', 'hyperText',
-        'setVariable', 'setGlobal', 'setCounter', 'counter', 'conditionBeat', 'conditionCheck', 'condition',
+        'setVariable', 'setGlobal', 'setCounter', 'counter', 'variable', 'conditionBeat', 'conditionCheck', 'condition',
         'randomTarget', 'setTimer', 'addRemoveInventory', 'addInventory', 'removeInventory'
       ]);
 
