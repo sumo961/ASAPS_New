@@ -25,6 +25,8 @@ import { DebugPanel } from './components/debug/DebugPanel';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
 import { preloadFonts } from './utils/fontRegistry';
+import { useAIDebug } from './hooks/useAIDebug';
+import { AIDebugModal } from './components/ai/AIDebugModal';
 
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
@@ -45,6 +47,14 @@ function App() {
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // AI Debug hook - automatically runs after AI story generation
+  const {
+    result: aiDebugResult,
+    showModal: showAIDebugModal,
+    runDebug: runAIDebug,
+    closeModal: closeAIDebugModal,
+  } = useAIDebug({ checkUI: true, checkConsole: true, delay: 1500 });
 
   // Import ASML dialog state
   const [showImportAsmlDialog, setShowImportAsmlDialog] = useState(false);
@@ -1974,11 +1984,14 @@ function App() {
         console.log('[App] Auto-saving generated story as new project:', storyTitle);
         await saveCurrent(storyTitle, description);
         console.log('[App] Generated story saved successfully');
+
+        // Trigger AI debug analysis after save completes
+        runAIDebug(beatsRef.current, connectionsRef.current);
       } catch (error) {
         console.error('[App] Failed to auto-save generated story:', error);
       }
     }, 300);
-  }, [actions, markChanged, saveCurrent, syncProjectData]);
+  }, [actions, markChanged, saveCurrent, syncProjectData, runAIDebug]);
 
   /**
    * Handle AI-generated beat from natural language description
@@ -2332,6 +2345,13 @@ function App() {
         onSave={handleSaveUnsavedWork}
         onDiscard={handleDiscardUnsavedWork}
         action={pendingAction === 'newProject' ? 'creating a new project' : 'opening the project library'}
+      />
+
+      {/* AI Debug Modal */}
+      <AIDebugModal
+        isOpen={showAIDebugModal}
+        onClose={closeAIDebugModal}
+        result={aiDebugResult}
       />
     </div>
   );
