@@ -1460,6 +1460,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 onSelectAsset={onAssetSelect}
                 onOpenCharacterManager={onOpenCharacterManager}
                 characters={characters}
+                globalSettings={globalSettings}
+                beatTransition={beat.transition}
+                onBeatTransitionChange={onBeatUpdate ? (transition) => {
+                  onBeatUpdate(beat.id, { transition });
+                  setHasChanges(true);
+                } : undefined}
               />
             )}
 

@@ -1,15 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Beat } from '@asaps/core';
 import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
-import { HyperTextEditor } from '../editors/HyperTextEditor';
 import { VisualBeatEditor, VisualElement } from './visual/VisualBeatEditor';
 import { AssetSelector } from './assets/AssetSelector';
 import { AssetSelectionModal } from './assets/AssetSelectionModal';
-import { SchemaFormGenerator } from './SchemaFormGenerator';
-import { BeatSuggestions } from './ai/BeatSuggestions';
-import type { BeatDefinition } from './SchemaFormGenerator';
 import type { Asset } from './assets/AssetManager';
 
 // Type definitions
@@ -44,15 +40,12 @@ interface InspectorProps {
   allBeats?: Beat[];
   onConnect?: (sourceBeatId: string, targetBeatId: string) => void;
   onDisconnect?: (sourceBeatId: string, targetBeatId: string) => void;
-  onBeatAdd?: (type: string, position?: { x: number; y: number }) => Beat;
   expanded?: boolean;
   assets?: Asset[];
-  onAssetAdd?: (asset: Asset) => Promise<boolean>;
+  onAssetAdd?: (asset: Asset) => void;
   onAssetRemove?: (assetId: string) => void;
   onAssetUpdate?: (assetId: string, updates: Partial<Asset>) => void;
   onOpenAssetManager?: () => void;
-  onAssetSelect?: (type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => void;
-  onOpenCharacterManager?: (callback?: (character: any) => void) => void;
 }
 
 export const Inspector: React.FC<InspectorProps> = ({
@@ -62,22 +55,20 @@ export const Inspector: React.FC<InspectorProps> = ({
   allBeats = [],
   onConnect,
   onDisconnect,
-  onBeatAdd,
   expanded = false,
   assets = [],
   onAssetAdd,
   onAssetRemove,
   onAssetUpdate,
   onOpenAssetManager,
-  onAssetSelect,
-  onOpenCharacterManager,
 }) => {
   const [localBeat, setLocalBeat] = useState<any>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'properties' | 'visual'>('properties');
-
+  const [visualElements, setVisualElements] = useState<VisualElement[]>([]);
+  
   // Asset selection modal state
   const [assetSelectionModal, setAssetSelectionModal] = useState<{
     isOpen: boolean;
@@ -85,23 +76,9 @@ export const Inspector: React.FC<InspectorProps> = ({
     callback: ((asset: Asset) => void) | null;
   }>({ isOpen: false, type: null, callback: null });
 
-  // Map alias beat types to their canonical schema types
-  const BEAT_TYPE_ALIASES: Record<string, string> = {
-    'variable': 'setVariable',
-    'counter': 'setVariable',
-    'setCounter': 'setVariable',
-    'setGlobal': 'setVariable',
-    'condition': 'conditionBeat',
-    'conditionCheck': 'conditionBeat',
-    'addInventory': 'addRemoveInventory',
-    'removeInventory': 'addRemoveInventory',
-  };
-
-  // Get beat definition from schema (with alias support)
-  const getBeatDefinition = (beatType: string): BeatDefinition => {
-    const canonicalType = BEAT_TYPE_ALIASES[beatType] || beatType;
-    const beatDef = beatDefinitions.beatTypes[canonicalType as keyof typeof beatDefinitions.beatTypes];
-    return beatDef as BeatDefinition;
+  // Get beat definition from schema
+  const getBeatDefinition = (beatType: string) => {
+    return beatDefinitions.beatTypes[beatType as keyof typeof beatDefinitions.beatTypes];
   };
 
   // Get available characters - NPCs who can speak
@@ -124,6 +101,11 @@ export const Inspector: React.FC<InspectorProps> = ({
     return visualBeatTypes.includes(beatType);
   };
 
+  // Handle visual elements change
+  const handleVisualElementsChange = (elements: VisualElement[]) => {
+    setVisualElements(elements);
+    setHasChanges(true);
+  };
 
   // Handle asset selection with callback
   const handleAssetSelection = (
@@ -149,16 +131,6 @@ export const Inspector: React.FC<InspectorProps> = ({
   // Helper functions for Dialog Tree
   const handleDialogTreeChange = (newDialogTree: any) => {
     handleParameterChange('dialogTree', newDialogTree);
-
-    // Rebuild connections immediately when dialog tree changes
-    const updatedBeat = {
-      ...localBeat,
-      parameters: {
-        ...localBeat.parameters,
-        dialogTree: newDialogTree
-      }
-    };
-    rebuildConnectionsAndUpdate(updatedBeat);
   };
 
   const handleAddConnection = (targetId: string, label?: string) => {
@@ -203,18 +175,6 @@ export const Inspector: React.FC<InspectorProps> = ({
       };
     }
     handleParameterChange('choices', newChoices);
-
-    // If target changed, rebuild connections immediately
-    if (field === 'target') {
-      const updatedBeat = {
-        ...localBeat,
-        parameters: {
-          ...localBeat.parameters,
-          choices: newChoices
-        }
-      };
-      rebuildConnectionsAndUpdate(updatedBeat);
-    }
   };
 
   // Helper functions for Pick Prop
@@ -251,18 +211,6 @@ export const Inspector: React.FC<InspectorProps> = ({
       };
     }
     handleParameterChange('props', newProps);
-
-    // If target changed, rebuild connections immediately
-    if (field === 'target') {
-      const updatedBeat = {
-        ...localBeat,
-        parameters: {
-          ...localBeat.parameters,
-          props: newProps
-        }
-      };
-      rebuildConnectionsAndUpdate(updatedBeat);
-    }
   };
 
   // Get beat content for visual editor
@@ -274,15 +222,12 @@ export const Inspector: React.FC<InspectorProps> = ({
     switch (beat?.type) {
       case 'titleScreen':
         return {
-          title: params.title || 'Untitled',
-          author: params.author || 'Unknown Author',
-          buttonText: params.buttonText || 'Start',
+          text: `${params.title || 'Untitled'}\nby ${params.author || 'Unknown'}`,
         };
       case 'introText':
       case 'durScreen':
         return {
           text: params.text || '',
-          buttonText: params.buttonText || 'Continue',
         };
       case 'dialogTree':
         return {
@@ -303,7 +248,6 @@ export const Inspector: React.FC<InspectorProps> = ({
       case 'endScreen':
         return {
           text: params.message || 'The End',
-          buttonText: params.buttonText || 'Play Again',
         };
       default:
         return undefined;
@@ -385,6 +329,9 @@ export const Inspector: React.FC<InspectorProps> = ({
       setHasChanges(false);
       setValidationErrors([]);
       
+      // Load visual elements from beat parameters
+      const savedVisualElements = beatData.parameters?.visualElements || [];
+      setVisualElements(savedVisualElements);
       
       // Set default tab based on beat type
       if (supportsVisualEditor(beat.type)) {
@@ -478,188 +425,22 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   const handleChange = (field: string, value: any) => {
-    const updatedBeat = {
-      ...localBeat,
+    setLocalBeat((prev: any) => ({
+      ...prev,
       [field]: value,
-    };
-    setLocalBeat(updatedBeat);
+    }));
     setHasChanges(true);
-
-    // For fields that affect graph visualization, update immediately
-    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name') {
-      if (onUpdate && beat) {
-        onUpdate(beat.id, { [field]: value });
-      }
-    }
   };
 
   const handleParameterChange = (param: string, value: any) => {
-    const updatedBeat = {
-      ...localBeat,
+    setLocalBeat((prev: any) => ({
+      ...prev,
       parameters: {
-        ...localBeat.parameters,
+        ...prev.parameters,
         [param]: value,
       },
-    };
-    setLocalBeat(updatedBeat);
+    }));
     setHasChanges(true);
-
-    // Immediately save parameter changes like we do for connections
-    rebuildConnectionsAndUpdate(updatedBeat);
-  };
-
-  // Helper function to rebuild connections from local state and immediately update
-  const rebuildConnectionsAndUpdate = (updatedLocalBeat?: any) => {
-    if (!beat || !onUpdate) return;
-
-    const beatToUpdate = updatedLocalBeat || localBeat;
-    const beatAny = beat as any;
-
-    // Clear existing connections
-    if (typeof beatAny.clearConnections === 'function') {
-      beatAny.clearConnections();
-    } else {
-      beat.connections = [];
-    }
-
-    // Apply all basic properties from local state
-    beat.name = beatToUpdate.name;
-    beat.cluster = beatToUpdate.cluster;
-    beat.defaultTarget = beatToUpdate.defaultTarget || undefined;
-    beat.transition = beatToUpdate.transition;
-    beat.sound = beatToUpdate.sound;
-
-    // Update parameters
-    if (beatToUpdate.parameters && beat.updateParameters) {
-      const parameters = { ...beatToUpdate.parameters };
-
-      // Ensure button text is saved for applicable beats
-      if (['titleScreen', 'introText', 'durScreen', 'endScreen'].includes(beat.type)) {
-        parameters.buttonText = beatToUpdate.parameters.buttonText ||
-          (beat.type === 'titleScreen' ? 'Start' :
-           beat.type === 'endScreen' ? 'Play Again' :
-           'Continue');
-      }
-
-      beat.updateParameters(parameters);
-    }
-
-    // Use the connection type from the component scope
-    const beatDef = getBeatDefinition(beat.type);
-    const connectionType = beatDef?.connectionType || 'single';
-
-    // Rebuild connections based on beat type
-    if (beat.type === 'dialogTree') {
-      // Handle dialog tree connections
-      const extractConnections = (node: any): any[] => {
-        const connections: any[] = [];
-
-        if (node.choices) {
-          node.choices.forEach((choice: any) => {
-            if (typeof choice.target === 'string' && choice.target) {
-              connections.push({
-                targetId: choice.target,
-                label: choice.text
-              });
-            } else if (typeof choice.target === 'object' && choice.target) {
-              connections.push(...extractConnections(choice.target));
-            }
-          });
-        }
-
-        if (typeof node.next === 'string' && node.next) {
-          connections.push({
-            targetId: node.next,
-            label: 'Continue'
-          });
-        } else if (typeof node.next === 'object' && node.next) {
-          connections.push(...extractConnections(node.next));
-        }
-
-        return connections;
-      };
-
-      const dialogConnections = extractConnections(beatToUpdate.parameters.dialogTree);
-
-      if (beatToUpdate.connections?.length > 0) {
-        const defaultConn = beatToUpdate.connections.find((c: any) => !c.label || c.label === 'Continue');
-        if (defaultConn) {
-          dialogConnections.push(defaultConn);
-        }
-      }
-
-      const uniqueConns = Array.from(
-        new Map(dialogConnections.map(c => [`${c.targetId}-${c.label}`, c])).values()
-      );
-      uniqueConns.forEach(conn => beat.addConnection(conn));
-
-    } else if (beat.type === 'setTimer') {
-      // Timer target connection (from parameters)
-      if (beatToUpdate.parameters?.target) {
-        beat.addConnection({
-          targetId: beatToUpdate.parameters.target,
-          label: 'Timer Target'
-        });
-      }
-      // Normal connection (where to continue immediately)
-      const normalConn = beatToUpdate.connections?.find((c: any) => c.label !== 'Timer Target');
-      if (normalConn) {
-        beat.addConnection(normalConn);
-      }
-
-    } else if (beat.type === 'randomTarget') {
-      // Random target connections
-      const choices = beatToUpdate.parameters?.choices || [];
-      choices.forEach((choice: any, index: number) => {
-        if (choice && choice.trim() !== '') {
-          beat.addConnection({
-            targetId: choice,
-            label: `Random ${index + 1}`
-          });
-        }
-      });
-
-    } else if (connectionType === 'single' && beatToUpdate.connections?.length > 0) {
-      beat.addConnection(beatToUpdate.connections[0]);
-
-    } else if (connectionType === 'multiple') {
-      // Handle multiple connections for choice beats
-      if (beat.type === 'movementChoice' && beatToUpdate.parameters?.choices) {
-        beatToUpdate.parameters.choices.forEach((choice: any) => {
-          if (choice.target) {
-            beat.addConnection({
-              targetId: choice.target,
-              label: choice.text
-            });
-          }
-        });
-      } else if (beat.type === 'pickProp' && beatToUpdate.parameters?.props) {
-        beatToUpdate.parameters.props.forEach((prop: any) => {
-          if (prop.target) {
-            beat.addConnection({
-              targetId: prop.target,
-              label: prop.name
-            });
-          }
-        });
-      }
-
-    } else if (connectionType === 'conditional') {
-      beatToUpdate.connections.forEach((conn: any) => beat.addConnection(conn));
-
-    } else {
-      beatToUpdate.connections.forEach((conn: any) => beat.addConnection(conn));
-    }
-
-    // Call onUpdate with the updated beat and connections
-    const updatedConnections = beat.getConnections ? beat.getConnections() : [];
-    onUpdate(beat.id, {
-      ...beat,
-      connections: updatedConnections
-    });
-
-    // Reset hasChanges since we just saved
-    setHasChanges(false);
   };
 
   const handleSave = () => {
@@ -689,9 +470,9 @@ export const Inspector: React.FC<InspectorProps> = ({
         
         // Include visual elements and sound in parameters
         if (supportsVisualEditor(beat.type)) {
-          // parameters.visualElements = visualElements; // Not defined in this version
+          parameters.visualElements = visualElements;
         }
-
+        
         beat.updateParameters(parameters);
       }
       
@@ -801,14 +582,8 @@ export const Inspector: React.FC<InspectorProps> = ({
       } else {
         localBeat.connections.forEach((conn: any) => beat.addConnection(conn));
       }
-
-      // CRITICAL FIX: Extract connections and include them in the update to force React re-render
-      const updatedConnections = beat.getConnections ? beat.getConnections() : [];
-
-      onUpdate(beat.id, {
-        ...beat,
-        connections: updatedConnections
-      });
+      
+      onUpdate(beat.id, beat);
       setHasChanges(false);
       setValidationErrors([]);
     }
@@ -858,11 +633,40 @@ export const Inspector: React.FC<InspectorProps> = ({
           </div>
         )}
 
-        {/* Content Area - Single Properties tab for all beats */}
+        {/* Tab Navigation for beats with visual editor */}
+        {supportsVisualEditor(beat.type) && (
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('properties')}
+              className={`flex-1 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'properties'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Settings className="w-4 h-4 inline mr-2" />
+              Properties
+            </button>
+            <button
+              onClick={() => setActiveTab('visual')}
+              className={`flex-1 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'visual'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Palette className="w-4 h-4 inline mr-2" />
+              Visual Editor
+            </button>
+          </div>
+        )}
+
+        {/* Content Area */}
         <div className="flex-1 overflow-hidden">
-          <div className="h-full overflow-y-auto">
-            {/* Schema-based Properties */}
-            <div className="p-4 space-y-4">
+          {/* Properties Tab */}
+          {(!supportsVisualEditor(beat.type) || activeTab === 'properties') && (
+            <div className="h-full overflow-y-auto p-4">
+              <div className="space-y-4">
                 {/* Basic Properties */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -900,22 +704,112 @@ export const Inspector: React.FC<InspectorProps> = ({
                   )}
                 </div>
 
-                {/* BEAT-SPECIFIC PARAMETERS - SCHEMA DRIVEN */}
+                {/* BEAT-SPECIFIC PARAMETERS - RESTORED */}
+                
+                {/* Title Screen */}
+                {beat.type === 'titleScreen' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={localBeat.parameters?.title || ''}
+                        onChange={(e) => handleParameterChange('title', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="Enter story title"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Author
+                      </label>
+                      <input
+                        type="text"
+                        value={localBeat.parameters?.author || ''}
+                        onChange={(e) => handleParameterChange('author', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="Enter author name"
+                      />
+                    </div>
+                  </>
+                )}
 
-                {/* Schema-driven simple parameters */}
-                {/* Exclude beat types that have custom hardcoded editors */}
-                {beat.type !== 'dialogTree' && beat.type !== 'movementChoice' &&
-                 beat.type !== 'pickProp' && beat.type !== 'conditionBeat' &&
-                 beat.type !== 'setTimer' && beat.type !== 'randomTarget' &&
-                 beat.type !== 'hyperText' && (
-                  <SchemaFormGenerator
-                    beatType={beat.type}
-                    beatDefinition={getBeatDefinition(beat.type)}
-                    parameters={localBeat.parameters}
-                    onParameterChange={handleParameterChange}
-                    availableTargets={availableTargets}
-                    characters={getAvailableCharacters()}
-                  />
+                {/* Intro Text */}
+                {beat.type === 'introText' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Text Content <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={localBeat.parameters?.text || ''}
+                      onChange={(e) => handleParameterChange('text', e.target.value)}
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="Enter introduction text"
+                    />
+                  </div>
+                )}
+
+                {/* Duration Screen */}
+                {beat.type === 'durScreen' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Text Content
+                      </label>
+                      <textarea
+                        value={localBeat.parameters?.text || ''}
+                        onChange={(e) => handleParameterChange('text', e.target.value)}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="Enter text to display"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Duration (seconds)
+                      </label>
+                      <input
+                        type="number"
+                        value={localBeat.parameters?.duration || 3}
+                        onChange={(e) => handleParameterChange('duration', parseInt(e.target.value))}
+                        min="1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* End Screen */}
+                {beat.type === 'endScreen' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        End Message
+                      </label>
+                      <textarea
+                        value={localBeat.parameters?.message || 'The End'}
+                        onChange={(e) => handleParameterChange('message', e.target.value)}
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Reset on Play Again
+                      </label>
+                      <select
+                        value={localBeat.parameters?.reset || 'true'}
+                        onChange={(e) => handleParameterChange('reset', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="true">Yes - Reset all progress</option>
+                        <option value="false">No - Keep progress</option>
+                      </select>
+                    </div>
+                  </>
                 )}
 
                 {/* Condition Beat */}
@@ -947,8 +841,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </label>
                           <input
                             type="text"
-                            value={localBeat.parameters?.variableName || localBeat.parameters?.left || ''}
-                            onChange={(e) => handleParameterChange('variableName', e.target.value)}
+                            value={localBeat.parameters?.left || ''}
+                            onChange={(e) => handleParameterChange('left', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             placeholder="e.g., courage"
                           />
@@ -958,16 +852,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Operator
                           </label>
                           <select
-                            value={localBeat.parameters?.operator || '=='}
+                            value={localBeat.parameters?.operator || 'gt'}
                             onChange={(e) => handleParameterChange('operator', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
-                            <option value=">">Greater Than (&gt;)</option>
-                            <option value=">=">Greater Than or Equal (≥)</option>
-                            <option value="<">Less Than (&lt;)</option>
-                            <option value="<=">Less Than or Equal (≤)</option>
-                            <option value="==">Equal (=)</option>
-                            <option value="!=">Not Equal (≠)</option>
+                            <option value="gt">Greater Than {'>'}</option>
+                            <option value="gte">Greater Than or Equal (≥)</option>
+                            <option value="lt">Less Than {'<'}</option>
+                            <option value="lte">Less Than or Equal (≤)</option>
+                            <option value="eq">Equal (=)</option>
+                            <option value="neq">Not Equal (≠)</option>
                           </select>
                         </div>
                         <div>
@@ -976,8 +870,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </label>
                           <input
                             type="number"
-                            value={localBeat.parameters?.value ?? localBeat.parameters?.val ?? 0}
-                            onChange={(e) => handleParameterChange('value', parseInt(e.target.value))}
+                            value={localBeat.parameters?.val || 0}
+                            onChange={(e) => handleParameterChange('val', parseInt(e.target.value))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />
                         </div>
@@ -1004,16 +898,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Operator
                           </label>
                           <select
-                            value={localBeat.parameters?.operator || '=='}
+                            value={localBeat.parameters?.operator || 'gt'}
                             onChange={(e) => handleParameterChange('operator', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
-                            <option value=">">Greater Than (&gt;)</option>
-                            <option value=">=">Greater Than or Equal (≥)</option>
-                            <option value="<">Less Than (&lt;)</option>
-                            <option value="<=">Less Than or Equal (≤)</option>
-                            <option value="==">Equal (=)</option>
-                            <option value="!=">Not Equal (≠)</option>
+                            <option value="gt">Greater Than {'>'}</option>
+                            <option value="gte">Greater Than or Equal (≥)</option>
+                            <option value="lt">Less Than {'<'}</option>
+                            <option value="lte">Less Than or Equal (≤)</option>
+                            <option value="eq">Equal (=)</option>
+                            <option value="neq">Not Equal (≠)</option>
                           </select>
                         </div>
                         <div>
@@ -1052,13 +946,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Check Type
                           </label>
                           <select
-                            value={localBeat.parameters?.operator || '>'}
+                            value={localBeat.parameters?.operator || 'gt'}
                             onChange={(e) => handleParameterChange('operator', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
-                            <option value=">">Time Remaining &gt; Value</option>
-                            <option value="<">Time Remaining &lt; Value</option>
-                            <option value="==">Time Remaining = Value</option>
+                            <option value="gt">Time Remaining {'>'} Value</option>
+                            <option value="lt">Time Remaining {'<'} Value</option>
+                            <option value="eq">Time Remaining = Value</option>
                             <option value="expired">Timer Expired</option>
                           </select>
                         </div>
@@ -1069,8 +963,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </label>
                             <input
                               type="number"
-                              value={localBeat.parameters?.value ?? localBeat.parameters?.val ?? 0}
-                              onChange={(e) => handleParameterChange('value', parseInt(e.target.value))}
+                              value={localBeat.parameters?.val || 0}
+                              onChange={(e) => handleParameterChange('val', parseInt(e.target.value))}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             />
                           </div>
@@ -1088,8 +982,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </label>
                           <input
                             type="text"
-                            value={localBeat.parameters?.variableName || localBeat.parameters?.variable || localBeat.parameters?.left || ''}
-                            onChange={(e) => handleParameterChange('variableName', e.target.value)}
+                            value={localBeat.parameters?.variable || ''}
+                            onChange={(e) => handleParameterChange('variable', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             placeholder="e.g., playerName"
                           />
@@ -1099,12 +993,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Operator
                           </label>
                           <select
-                            value={localBeat.parameters?.operator || '=='}
+                            value={localBeat.parameters?.operator || 'eq'}
                             onChange={(e) => handleParameterChange('operator', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
-                            <option value="==">Equals (=)</option>
-                            <option value="!=">Not Equal (≠)</option>
+                            <option value="eq">Equals (=)</option>
+                            <option value="neq">Not Equal (≠)</option>
                             <option value="contains">Contains</option>
                             <option value="exists">Exists</option>
                             <option value="notExists">Does Not Exist</option>
@@ -1117,7 +1011,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </label>
                             <input
                               type="text"
-                              value={localBeat.parameters?.value ?? localBeat.parameters?.val ?? ''}
+                              value={localBeat.parameters?.value || ''}
                               onChange={(e) => handleParameterChange('value', e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                               placeholder="Variable value to check"
@@ -1177,6 +1071,81 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </>
                 )}
 
+                {/* Set Variable Beat */}
+                {beat.type === 'setVariable' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Variable Type
+                      </label>
+                      <select
+                        value={localBeat.parameters?.type || 'variable'}
+                        onChange={(e) => handleParameterChange('type', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="variable">Variable (Text/Boolean)</option>
+                        <option value="counter">Counter (Number)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Name
+                      </label>
+                      <input
+                        type="text"
+                        value={localBeat.parameters?.name || ''}
+                        onChange={(e) => handleParameterChange('name', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="Variable/counter name"
+                      />
+                    </div>
+                    {localBeat.parameters?.type === 'counter' ? (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Operation
+                          </label>
+                          <select
+                            value={localBeat.parameters?.operation || 'set'}
+                            onChange={(e) => handleParameterChange('operation', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="set">Set To</option>
+                            <option value="add">Add</option>
+                            <option value="subtract">Subtract</option>
+                            <option value="multiply">Multiply</option>
+                            <option value="divide">Divide</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Value
+                          </label>
+                          <input
+                            type="number"
+                            value={localBeat.parameters?.value || 0}
+                            onChange={(e) => handleParameterChange('value', parseInt(e.target.value))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Value
+                        </label>
+                        <input
+                          type="text"
+                          value={localBeat.parameters?.value || ''}
+                          onChange={(e) => handleParameterChange('value', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          placeholder="Variable value"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
                 {/* Set Timer Beat */}
                 {beat.type === 'setTimer' && (
                   <>
@@ -1217,19 +1186,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                         //onChange={(e) => handleParameterChange('target', e.target.value)}
                         onChange={(e) => {
                           const targetId = e.target.value;
-                          handleParameterChange('target', targetId);          // ← keep param in sync
+                            handleParameterChange('target', targetId);          // ← keep param in sync
                           //const timerConn = localBeat.connections?.find((c) => c.label === 'Timer Target');
                          // const timerConn = localBeat.connections?.find((c: any) => c.label === 'Timer Target');
                           const timerConn = localBeat.connections?.find((c: { label?: string }) => c.label === 'Timer Target');
                           const newConnections: { targetId: string; label: string }[] = [];
                           if (timerConn) newConnections.push(timerConn);      // preserve existing timer conn
                           if (targetId) newConnections.push({ targetId, label: '' }); // continue conn
-                          const updatedBeat = { ...localBeat, connections: newConnections };
-                          setLocalBeat(updatedBeat);
-                          setHasChanges(true);
-
-                          // Rebuild connections immediately when timer target changes
-                          rebuildConnectionsAndUpdate(updatedBeat);
+                            //setLocalBeat((prev) => ({ ...prev, connections: newConnections }));
+                            setLocalBeat((prev: typeof localBeat) => ({ ...prev, connections: newConnections }));
+                            setHasChanges(true);
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       >
@@ -1261,12 +1227,11 @@ export const Inspector: React.FC<InspectorProps> = ({
                           if (targetId) {
                             newConnections.push({ targetId, label: '' });
                           }
-                          const updatedBeat = { ...localBeat, connections: newConnections };
-                          setLocalBeat(updatedBeat);
+                          setLocalBeat((prev: any) => ({
+                            ...prev,
+                            connections: newConnections
+                          }));
                           setHasChanges(true);
-
-                          // Rebuild connections immediately when continue target changes
-                          rebuildConnectionsAndUpdate(updatedBeat);
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       >
@@ -1352,65 +1317,79 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </div>
                 )}
 
-                {/* Add/Remove Inventory Beat - handled by SchemaFormGenerator */}
-
-                {/* HyperText Editor */}
-                {beat.type === 'hyperText' && (
-                  <div className="space-y-3">
-                    <HyperTextEditor
-                      text={localBeat.parameters?.text || ''}
-                      hyperlinks={localBeat.parameters?.hyperlinks || []}
-                      onChange={(text, hyperlinks) => {
-                        // HyperTextEditor now uses word-based format directly
-                        handleParameterChange('text', text);
-                        handleParameterChange('hyperlinks', hyperlinks);
-                      }}
-                      availableBeats={availableTargets}
-                    />
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="allowMultiple"
-                        checked={localBeat.parameters?.allowMultiple || false}
-                        onChange={(e) => handleParameterChange('allowMultiple', e.target.checked)}
-                        className="rounded border-gray-300"
-                      />
-                      <label htmlFor="allowMultiple" className="text-sm text-gray-700">
-                        Allow Multiple Clicks
-                        <span className="text-xs text-gray-500 block">
-                          Whether user can click multiple links
-                        </span>
+                {/* Add/Remove Inventory Beat */}
+                {beat.type === 'addRemoveInventory' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <Box className="w-4 h-4 inline mr-1" />
+                        Action
                       </label>
+                      <select
+                        value={localBeat.parameters?.action || 'add'}
+                        onChange={(e) => handleParameterChange('action', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="add">Add to Inventory</option>
+                        <option value="remove">Remove from Inventory</option>
+                        <option value="transfer">Transfer Between Characters</option>
+                      </select>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Item Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={localBeat.parameters?.item || ''}
+                        onChange={(e) => handleParameterChange('item', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="e.g., magic_key"
+                      />
+                    </div>
+                    
+                    {localBeat.parameters?.action === 'transfer' ? (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            From Character <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={localBeat.parameters?.fromChar || 'player'}
+                            onChange={(e) => handleParameterChange('fromChar', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="player"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            To Character <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={localBeat.parameters?.toChar || ''}
+                            onChange={(e) => handleParameterChange('toChar', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="e.g., wolf"
+                          />
+                        </div>
+                      </>
+                    ) : (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Highlight Color
+                          Character
                         </label>
                         <input
-                          type="color"
-                          value={localBeat.parameters?.highlightColor || '#0066cc'}
-                          onChange={(e) => handleParameterChange('highlightColor', e.target.value)}
-                          className="w-full h-10 rounded border border-gray-300"
+                          type="text"
+                          value={localBeat.parameters?.character || 'player'}
+                          onChange={(e) => handleParameterChange('character', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          placeholder="Default: player"
                         />
-                        <span className="text-xs text-gray-500">Color for hyperlinked text</span>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Hover Color
-                        </label>
-                        <input
-                          type="color"
-                          value={localBeat.parameters?.hoverColor || '#003366'}
-                          onChange={(e) => handleParameterChange('hoverColor', e.target.value)}
-                          className="w-full h-10 rounded border border-gray-300"
-                        />
-                        <span className="text-xs text-gray-500">Color when hovering</span>
-                      </div>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
 
                 {/* Dialog Tree Editor */}
@@ -1427,26 +1406,34 @@ export const Inspector: React.FC<InspectorProps> = ({
                       characters={getAvailableCharacters()}
                       allBeats={availableTargets}
                     />
-
-                    {showAdvanced && (
-                      <div className="border-t pt-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Choice Delay (seconds)
-                          <span className="text-xs text-gray-500 block font-normal">
-                            Time before choices appear (optional)
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          value={localBeat.parameters?.choiceDelay || 0}
-                          onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
-                          min="0"
-                          step="0.5"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        />
-                      </div>
-                    )}
-
+                    
+                    <div className="border-t pt-3">
+                      <h3 className="text-sm font-medium text-gray-700 mb-2">
+                        After Dialog Ends
+                      </h3>
+                      <select
+                        value={localBeat.connections?.[0]?.targetId || ''}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddConnection(e.target.value, 'Continue');
+                          } else {
+                            setLocalBeat((prev: any) => ({
+                              ...prev,
+                              connections: []
+                            }));
+                            setHasChanges(true);
+                          }
+                        }}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                      >
+                        <option value="">End story here</option>
+                        {availableTargets.map(target => (
+                          <option key={target.id} value={target.id}>
+                            {target.name} ({target.id})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
 
@@ -1462,26 +1449,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
-
-                    {showAdvanced && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Choice Delay (seconds)
-                          <span className="text-xs text-gray-500 block font-normal">
-                            Time before choices appear (optional)
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          value={localBeat.parameters?.choiceDelay || 0}
-                          onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
-                          min="0"
-                          step="0.5"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        />
-                      </div>
-                    )}
-
+                    
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Choices</span>
@@ -1586,26 +1554,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
-
-                    {showAdvanced && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Choice Delay (seconds)
-                          <span className="text-xs text-gray-500 block font-normal">
-                            Time before choices appear (optional)
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          value={localBeat.parameters?.choiceDelay || 0}
-                          onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
-                          min="0"
-                          step="0.5"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        />
-                      </div>
-                    )}
-
+                    
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Props</span>
@@ -1696,7 +1645,30 @@ export const Inspector: React.FC<InspectorProps> = ({
                             )}
                           </div>
                           
-                          {/* Note: Picking a prop automatically adds it to inventory */}
+                          {showAdvanced && (
+                            <div className="p-2 bg-green-50 rounded space-y-2">
+                              <div className="text-xs font-medium text-green-700">Additional Effects (Optional)</div>
+                              
+                              {/* Inventory Effect */}
+                              <div>
+                                <select
+                                  value={prop.effect?.type || 'inventory'}
+                                  onChange={(e) => handleUpdateProp(index, 'effect.type', e.target.value)}
+                                  className="w-full px-2 py-1 text-xs border rounded"
+                                >
+                                  <option value="inventory">Add to Inventory</option>
+                                  <option value="variable">Set Variable</option>
+                                </select>
+                                <input
+                                  type="text"
+                                  value={prop.effect?.name || prop.name}
+                                  onChange={(e) => handleUpdateProp(index, 'effect.name', e.target.value)}
+                                  placeholder="Item/Variable name"
+                                  className="w-full px-2 py-1 text-xs border rounded mt-1"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1722,16 +1694,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                             value={localBeat.connections?.[0]?.targetId || localBeat.defaultTarget || ''}
                             onChange={(e) => {
                               const targetId = e.target.value;
-                              const updatedBeat = {
-                                ...localBeat,
+                              setLocalBeat((prev: any) => ({
+                                ...prev,
                                 connections: targetId ? [{ targetId, label: '' }] : [],
                                 defaultTarget: targetId || undefined
-                              };
-                              setLocalBeat(updatedBeat);
+                              }));
                               setHasChanges(true);
-
-                              // Rebuild connections immediately when target changes
-                              rebuildConnectionsAndUpdate(updatedBeat);
                             }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
@@ -1747,7 +1715,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                     )}
 
                     {/* Conditional Connection Beats */}
-                    {/* ConditionBeat stores targets in parameters (trueTarget/falseTarget), not in connections array */}
                     {connectionType === 'conditional' && beat.type === 'conditionBeat' && (
                       <div className="space-y-3">
                         <div>
@@ -1755,26 +1722,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             True Target <span className="text-red-500">*</span>
                           </label>
                           <select
-                            value={localBeat.parameters?.trueTarget || localBeat.connections?.find((c: any) => c.label === 'true')?.targetId || ''}
+                            value={localBeat.connections?.find((c: any) => c.label === 'true')?.targetId || ''}
                             onChange={(e) => {
                               const targetId = e.target.value;
-                              // Update both parameters and connections for consistency
                               const otherConns = localBeat.connections?.filter((c: any) => c.label !== 'true') || [];
-                              const updatedBeat = {
-                                ...localBeat,
-                                parameters: {
-                                  ...localBeat.parameters,
-                                  trueTarget: targetId || undefined
-                                },
-                                connections: targetId
+                              setLocalBeat((prev: any) => ({
+                                ...prev,
+                                connections: targetId 
                                   ? [...otherConns, { targetId, label: 'true' }]
                                   : otherConns
-                              };
-                              setLocalBeat(updatedBeat);
+                              }));
                               setHasChanges(true);
-
-                              // Rebuild connections immediately when true target changes
-                              rebuildConnectionsAndUpdate(updatedBeat);
                             }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
@@ -1789,29 +1747,20 @@ export const Inspector: React.FC<InspectorProps> = ({
 
                         <div>
                           <label className="block text-xs text-gray-600 mb-1">
-                            False Target{localBeat.parameters?.conditionType === 'timer' ? <span className="text-red-500"> *</span> : ' (Optional)'}
+                            False Target' + (localBeat.parameters?.conditionType === 'timer' ? ' <span className="text-red-500">*</span>' : ' (Optional)')
                           </label>
                           <select
-                            value={localBeat.parameters?.falseTarget || localBeat.connections?.find((c: any) => c.label === 'false')?.targetId || ''}
+                            value={localBeat.connections?.find((c: any) => c.label === 'false')?.targetId || ''}
                             onChange={(e) => {
                               const targetId = e.target.value;
-                              // Update both parameters and connections for consistency
                               const otherConns = localBeat.connections?.filter((c: any) => c.label !== 'false') || [];
-                              const updatedBeat = {
-                                ...localBeat,
-                                parameters: {
-                                  ...localBeat.parameters,
-                                  falseTarget: targetId || undefined
-                                },
-                                connections: targetId
+                              setLocalBeat((prev: any) => ({
+                                ...prev,
+                                connections: targetId 
                                   ? [...otherConns, { targetId, label: 'false' }]
                                   : otherConns
-                              };
-                              setLocalBeat(updatedBeat);
+                              }));
                               setHasChanges(true);
-
-                              // Rebuild connections immediately when false target changes
-                              rebuildConnectionsAndUpdate(updatedBeat);
                             }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
@@ -1828,72 +1777,28 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </div>
                 )}
 
-                {/* Auto-Advance / Timer Settings - shown when advanced is toggled */}
-                {showAdvanced && (
-                  <div className="border-t pt-4 space-y-3">
-                    <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                      <Timer className="w-4 h-4" />
-                      Auto-Advance Settings
-                    </h4>
-                    <p className="text-xs text-gray-600">
-                      Configure automatic progression to create pressure or self-running stories
-                    </p>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Default Target Beat
-                        <span className="text-xs text-gray-500 block font-normal">
-                          Beat to automatically advance to after delay
-                        </span>
-                      </label>
-                      <select
-                        value={localBeat.defaultTarget || ''}
-                        onChange={(e) => handleChange('defaultTarget', e.target.value || undefined)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      >
-                        <option value="">No auto-advance</option>
-                        {availableTargets.map(target => (
-                          <option key={target.id} value={target.id}>
-                            {target.name} ({target.type})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {localBeat.defaultTarget && (
-                      <>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Auto-Advance Delay (seconds)
-                            <span className="text-xs text-gray-500 block font-normal">
-                              Time before auto-advancing to default target
-                            </span>
-                          </label>
-                          <input
-                            type="number"
-                            value={localBeat.defaultTargetDelay || 5}
-                            onChange={(e) => handleChange('defaultTargetDelay', parseInt(e.target.value))}
-                            min="1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={localBeat.showTimer || false}
-                              onChange={(e) => handleChange('showTimer', e.target.checked)}
-                              className="rounded border-gray-300"
-                            />
-                            <span>Show countdown timer to player</span>
-                          </label>
-                          <p className="text-xs text-gray-500 ml-6 mt-1">
-                            Display a visible timer showing time remaining
-                          </p>
-                        </div>
-                      </>
-                    )}
+                {/* BUTTON TEXT - FIXED beat.type === 'durScreen' || */}
+                {(beat.type === 'titleScreen' || beat.type === 'introText' || 
+                  beat.type === 'endScreen') && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Button Text
+                    </label>
+                    <input
+                      type="text"
+                      value={localBeat.parameters?.buttonText || (
+                        beat.type === 'titleScreen' ? 'Start' :
+                        beat.type === 'endScreen' ? 'Play Again' :
+                        'Continue'
+                      )}
+                      onChange={(e) => handleParameterChange('buttonText', e.target.value)}
+                      placeholder={
+                        beat.type === 'titleScreen' ? 'Start' :
+                        beat.type === 'endScreen' ? 'Play Again' :
+                        'Continue'
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
                   </div>
                 )}
 
@@ -1910,49 +1815,28 @@ export const Inspector: React.FC<InspectorProps> = ({
 
               </div>
             </div>
+          )}
+
+          {/* Visual Editor Tab */}
+          {supportsVisualEditor(beat.type) && activeTab === 'visual' && (
+            <div className="h-full">
+              <VisualBeatEditor
+                backgroundAssetId={localBeat.parameters?.backgroundAssetId}
+                backgroundSound={localBeat.parameters?.backgroundSound}
+                elements={visualElements}
+                onElementsChange={handleVisualElementsChange}
+                assets={assets}
+                onSelectAsset={handleAssetSelection}
+                beatContent={getBeatContent()}
+                beatType={beat.type}
+              />
+            </div>
+          )}
         </div>
 
         {/* Fixed Footer Actions - Delete button only (Save is handled by central Save button in header) */}
-        <div className="flex-shrink-0 border-t border-gray-200 bg-white">
-          {/* AI Beat Suggestions */}
-          <div className="p-4 border-b border-gray-200">
-            <BeatSuggestions
-              currentBeat={beat as any}
-              allBeats={allBeats as any}
-              storyMetadata={{
-                title: 'Current Story',
-                genre: beatDef?.category || 'adventure',
-              }}
-              onAddBeat={(suggestion) => {
-                if (!onBeatAdd) {
-                  console.warn('[Inspector] onBeatAdd not provided');
-                  return;
-                }
-
-                // Create beat from AI suggestion
-                // Position it to the right of current beat
-                const position = beat ? {
-                  x: (beat.x || 0) + 300,
-                  y: (beat.y || 0)
-                } : undefined;
-
-                const newBeat = onBeatAdd(suggestion.beatType, position);
-
-                // If suggestion has parameters, update the beat
-                if (suggestion.parameters && Object.keys(suggestion.parameters).length > 0) {
-                  onUpdate(newBeat.id, { ...suggestion.parameters });
-                }
-
-                // Auto-connect if we have a source beat
-                if (beat && onConnect) {
-                  onConnect(beat.id, newBeat.id);
-                }
-              }}
-              count={3}
-            />
-          </div>
-
-          <div className="p-4 space-y-2">
+        <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
+          <div className="space-y-2">
             <button
               onClick={handleDelete}
               className="w-full py-2 px-4 border border-red-300 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
@@ -1981,6 +1865,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                      assetSelectionModal.type === 'sound' ? 'sfx' : undefined}
         title={`Select ${assetSelectionModal.type || 'Asset'}`}
       />
+        {/*</div>*/}
     </>
   );
 };

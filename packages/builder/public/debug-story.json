@@ -1,0 +1,987 @@
+{
+  "title": "The Gilded Manor",
+  "generatedAt": "2025-12-21T12:23:15.351Z",
+  "status": "success",
+  "beatCount": 36,
+  "beatTypes": [
+    "titleScreen",
+    "introText",
+    "dialogTree",
+    "movementChoice",
+    "introText",
+    "dialogTree",
+    "hyperText",
+    "pickProp",
+    "introText",
+    "setVariable",
+    "introText",
+    "introText",
+    "introText",
+    "pickProp",
+    "setVariable",
+    "setVariable",
+    "setVariable",
+    "setVariable",
+    "introText",
+    "introText",
+    "setVariable",
+    "movementChoice",
+    "setVariable",
+    "conditionBeat",
+    "conditionBeat",
+    "introText",
+    "setVariable",
+    "setVariable",
+    "introText",
+    "introText",
+    "conditionBeat",
+    "introText",
+    "introText",
+    "endScreen",
+    "endScreen",
+    "endScreen"
+  ],
+  "errors": [],
+  "warnings": [
+    "beats[6]: Parameter '_rawHyperlinks' not defined in schema for beat type 'hyperText'",
+    "beats[23]: Parameter 'conditionType' not defined in schema for beat type 'conditionBeat'",
+    "beats[23]: Parameter 'variableName' not defined in schema for beat type 'conditionBeat'",
+    "beats[23]: Parameter 'operator' not defined in schema for beat type 'conditionBeat'",
+    "beats[23]: Parameter 'value' not defined in schema for beat type 'conditionBeat'",
+    "beats[24]: Parameter 'conditionType' not defined in schema for beat type 'conditionBeat'",
+    "beats[24]: Parameter 'variableName' not defined in schema for beat type 'conditionBeat'",
+    "beats[24]: Parameter 'operator' not defined in schema for beat type 'conditionBeat'",
+    "beats[24]: Parameter 'value' not defined in schema for beat type 'conditionBeat'",
+    "beats[30]: Parameter 'conditionType' not defined in schema for beat type 'conditionBeat'",
+    "beats[30]: Parameter 'variableName' not defined in schema for beat type 'conditionBeat'",
+    "beats[30]: Parameter 'operator' not defined in schema for beat type 'conditionBeat'",
+    "beats[30]: Parameter 'value' not defined in schema for beat type 'conditionBeat'"
+  ],
+  "story": {
+    "metadata": {
+      "title": "The Gilded Manor",
+      "author": "AI Assistant",
+      "description": "A 1920s private investigator discovers cosmic horrors while investigating insurance fraud at a New England mansion",
+      "genre": "horror"
+    },
+    "beats": [
+      {
+        "id": "beat_0",
+        "name": "Title Screen",
+        "type": "titleScreen",
+        "position": {
+          "x": 100,
+          "y": 300
+        },
+        "parameters": {
+          "title": "The Gilded Manor",
+          "author": "Private Investigator's Journal, 1923",
+          "buttonText": "Begin Investigation",
+          "connection": {
+            "target": "beat_1"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_1"
+          }
+        ]
+      },
+      {
+        "id": "beat_1",
+        "name": "Arrival at Blackwood Estate",
+        "type": "introText",
+        "position": {
+          "x": 400,
+          "y": 300
+        },
+        "parameters": {
+          "text": "September 14th, 1923. The Blackwood Estate rises from the fog like a tombstone, all gables and broken promises. Mr. Howard Blackwood, textile magnate, claims his late father's mansion was robbed of 'priceless antiquities' worth a fortune in insurance money. The police called it an inside job. Blackwood's lawyer called me. Another boring fraud case to pay the rent, I figured. The butler greets you at the door, his face pale as parchment.",
+          "buttonText": "Enter",
+          "connection": {
+            "target": "beat_2"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_2"
+          }
+        ]
+      },
+      {
+        "id": "beat_2",
+        "name": "Initial Briefing",
+        "type": "dialogTree",
+        "position": {
+          "x": 700,
+          "y": 300
+        },
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Butler",
+            "text": "Mr. Blackwood will see you in the study. The robbery occurred three nights ago. The thieves took nothing else—only the collection from the east wing. Very... specific, they were.",
+            "choices": [
+              {
+                "id": "c1",
+                "text": "Sounds like an inside job. Who had access?",
+                "target": "beat_3_hub"
+              },
+              {
+                "id": "c2",
+                "text": "What kind of 'antiquities' are we talking about?",
+                "target": "beat_4_clue"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "beat_3_hub",
+        "name": "Main Hall Hub",
+        "type": "movementChoice",
+        "position": {
+          "x": 1000,
+          "y": 300
+        },
+        "parameters": {
+          "question": "The butler leaves you in the main hall. Where do you investigate?",
+          "choices": [
+            {
+              "id": "c1",
+              "text": "Study - Interview Blackwood",
+              "target": "beat_5_blackwood"
+            },
+            {
+              "id": "c2",
+              "text": "East Wing - Crime Scene",
+              "target": "beat_6_eastwing"
+            },
+            {
+              "id": "c3",
+              "text": "Library - Research the collection",
+              "target": "beat_7_library"
+            }
+          ]
+        }
+      },
+      {
+        "id": "beat_4_clue",
+        "name": "Strange Antiquities",
+        "type": "introText",
+        "position": {
+          "x": 1000,
+          "y": 450
+        },
+        "parameters": {
+          "text": "The butler's eyes dart away. 'Artifacts from the old world, Mr. Cross. Mr. Blackwood's father was... an eccentric collector. Statues, scrolls, things best left undescribed.' He wrings his hands. 'The police laughed at the inventory list.'",
+          "buttonText": "Continue",
+          "connection": {
+            "target": "beat_3_hub"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3_hub"
+          }
+        ]
+      },
+      {
+        "id": "beat_5_blackwood",
+        "name": "Interview with Blackwood",
+        "type": "dialogTree",
+        "position": {
+          "x": 1300,
+          "y": 150
+        },
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Howard Blackwood",
+            "text": "The thieves took the Star Charts of Carcosa, the Mask of Y'ha-nthlei, and seven volumes of the Livre d'Eibon. My father's obsession with the occult was his undoing. I simply want what I'm owed.",
+            "choices": [
+              {
+                "id": "c1",
+                "text": "Those sound like mythological items, not real artifacts.",
+                "dialogNode": {
+                  "id": "c1_response",
+                  "speaker": "Blackwood",
+                  "text": "I assure you, Mr. Cross, they were very real. And very dangerous. Father believed they could... commune with something beyond the stars. I kept them locked away for good reason.",
+                  "choices": [
+                    {
+                      "id": "c1a",
+                      "text": "I'll need to see the crime scene.",
+                      "target": "beat_6_eastwing"
+                    },
+                    {
+                      "id": "c1b",
+                      "text": "Do you have any documentation?",
+                      "target": "beat_7_library"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c2",
+                "text": "You seem nervous about more than the insurance money.",
+                "dialogNode": {
+                  "id": "c2_response",
+                  "speaker": "Blackwood",
+                  "text": "My father died in that wing. They found him in a locked room, his face frozen in... ecstasy? Terror? The coroner couldn't say. The symbols he carved into his own flesh told a story no sane man would believe.",
+                  "choices": [
+                    {
+                      "id": "c2a",
+                      "text": "Symbols? Show me.",
+                      "target": "beat_8_symbols"
+                    },
+                    {
+                      "id": "c2b",
+                      "text": "I think I need a drink first.",
+                      "target": "beat_9_drink"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "beat_6_eastwing",
+        "name": "East Wing Crime Scene",
+        "type": "hyperText",
+        "position": {
+          "x": 1300,
+          "y": 300
+        },
+        "parameters": {
+          "text": "The east wing smells of ozone and decay. Glass cases lie shattered, but the strangest detail is the pattern of destruction—perfect circles of ash on the floor, as if the artifacts simply ceased to exist. You notice strange markings on the wall and a journal half-burnt in the fireplace.",
+          "hyperlinks": [
+            {
+              "word": "strange markings",
+              "targetBeatId": "beat_10_markings"
+            },
+            {
+              "word": "journal",
+              "targetBeatId": "beat_11_journal"
+            }
+          ],
+          "_rawHyperlinks": [
+            {
+              "start": 215,
+              "end": 231,
+              "targetBeatId": "beat_10_markings",
+              "style": {
+                "color": "#0066cc",
+                "underline": true
+              }
+            },
+            {
+              "start": 250,
+              "end": 257,
+              "targetBeatId": "beat_11_journal",
+              "style": {
+                "color": "#0066cc",
+                "underline": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "beat_7_library",
+        "name": "Library Research",
+        "type": "pickProp",
+        "position": {
+          "x": 1300,
+          "y": 450
+        },
+        "parameters": {
+          "question": "The library is a maze of occult texts. What catches your eye?",
+          "props": [
+            {
+              "id": "catalog",
+              "name": "Insurance Catalog",
+              "target": "beat_12_catalog"
+            },
+            {
+              "id": "grimoire",
+              "name": "Ancient Grimoire",
+              "target": "beat_13_grimoire"
+            }
+          ]
+        }
+      },
+      {
+        "id": "beat_8_symbols",
+        "name": "Blackwood's Symbols",
+        "type": "introText",
+        "position": {
+          "x": 1600,
+          "y": 150
+        },
+        "parameters": {
+          "text": "Blackwood rolls up his sleeve, revealing photographs of his father's corpse. The symbols carved into the dead man's arms writhe in the photos, as if they're moving. You feel dizzy looking at them. One symbol repeats: a branching tree with an eye at its center.",
+          "buttonText": "Memorize the pattern",
+          "connection": {
+            "target": "beat_14_symbol_knowledge"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_14_symbol_knowledge"
+          }
+        ]
+      },
+      {
+        "id": "beat_9_drink",
+        "name": "Liquid Courage",
+        "type": "setVariable",
+        "position": {
+          "x": 1600,
+          "y": 200
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "drinksConsumed",
+          "value": 1,
+          "operation": "add",
+          "connection": {
+            "target": "beat_3_hub"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3_hub"
+          }
+        ]
+      },
+      {
+        "id": "beat_10_markings",
+        "name": "Wall Markings",
+        "type": "introText",
+        "position": {
+          "x": 1600,
+          "y": 300
+        },
+        "parameters": {
+          "text": "The markings aren't paint—they're burned into the plaster. They form a spiral pattern that seems to recede infinitely. At the center, a phrase in Latin: 'Quando cadunt tenebrae, aperitur via.' When the shadows fall, the way is opened. You hear whispers that aren't quite words.",
+          "buttonText": "Copy the phrase",
+          "connection": {
+            "target": "beat_15_latin_knowledge"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_15_latin_knowledge"
+          }
+        ]
+      },
+      {
+        "id": "beat_11_journal",
+        "name": "Burnt Journal",
+        "type": "introText",
+        "position": {
+          "x": 1600,
+          "y": 350
+        },
+        "parameters": {
+          "text": "The journal belonged to the elder Blackwood. One passage is legible: 'The Gatekeepers demand tribute. Seven souls for seven stars. The alignment approaches. Howard must not know what I've promised in his name. The children of the water will come to collect.'",
+          "buttonText": "Hide the journal",
+          "connection": {
+            "target": "beat_16_journal_knowledge"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_16_journal_knowledge"
+          }
+        ]
+      },
+      {
+        "id": "beat_12_catalog",
+        "name": "Insurance Catalog",
+        "type": "introText",
+        "position": {
+          "x": 1600,
+          "y": 450
+        },
+        "parameters": {
+          "text": "The catalog lists the stolen items with appraisals. But each entry has a footnote: 'WARNING: Do not appraise under moonlight. Do not allow to be photographed. Do not speak names aloud.' The handwriting is Blackwood's father's. The appraisals are absurdly low for 'priceless' items.",
+          "buttonText": "Note the warnings",
+          "connection": {
+            "target": "beat_17_catalog_knowledge"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_17_catalog_knowledge"
+          }
+        ]
+      },
+      {
+        "id": "beat_13_grimoire",
+        "name": "Ancient Grimoire",
+        "type": "pickProp",
+        "position": {
+          "x": 1600,
+          "y": 500
+        },
+        "parameters": {
+          "question": "The grimoire is locked with a strange mechanism. You see three symbols that might open it.",
+          "props": [
+            {
+              "id": "tree_eye",
+              "name": "Tree with Eye Symbol",
+              "target": "beat_18_correct_symbol"
+            },
+            {
+              "id": "pentagram",
+              "name": "Pentagram",
+              "target": "beat_19_wrong_symbol"
+            },
+            {
+              "id": "spiral",
+              "name": "Infinite Spiral",
+              "target": "beat_19_wrong_symbol"
+            }
+          ]
+        }
+      },
+      {
+        "id": "beat_14_symbol_knowledge",
+        "name": "Symbol Knowledge Gained",
+        "type": "setVariable",
+        "position": {
+          "x": 1900,
+          "y": 150
+        },
+        "parameters": {
+          "type": "variable",
+          "name": "knowsSymbol",
+          "value": true,
+          "connection": {
+            "target": "beat_3_hub"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3_hub"
+          }
+        ]
+      },
+      {
+        "id": "beat_15_latin_knowledge",
+        "name": "Latin Knowledge Gained",
+        "type": "setVariable",
+        "position": {
+          "x": 1900,
+          "y": 300
+        },
+        "parameters": {
+          "type": "variable",
+          "name": "knowsLatin",
+          "value": true,
+          "connection": {
+            "target": "beat_3_hub"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3_hub"
+          }
+        ]
+      },
+      {
+        "id": "beat_16_journal_knowledge",
+        "name": "Journal Knowledge Gained",
+        "type": "setVariable",
+        "position": {
+          "x": 1900,
+          "y": 350
+        },
+        "parameters": {
+          "type": "variable",
+          "name": "knowsJournal",
+          "value": true,
+          "connection": {
+            "target": "beat_3_hub"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3_hub"
+          }
+        ]
+      },
+      {
+        "id": "beat_17_catalog_knowledge",
+        "name": "Catalog Knowledge Gained",
+        "type": "setVariable",
+        "position": {
+          "x": 1900,
+          "y": 450
+        },
+        "parameters": {
+          "type": "variable",
+          "name": "knowsCatalog",
+          "value": true,
+          "connection": {
+            "target": "beat_3_hub"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3_hub"
+          }
+        ]
+      },
+      {
+        "id": "beat_18_correct_symbol",
+        "name": "Grimoire Opens",
+        "type": "introText",
+        "position": {
+          "x": 1900,
+          "y": 500
+        },
+        "parameters": {
+          "text": "The grimoire opens to a page depicting a ritual: 'To seal the Gate and break the covenant, one must speak the unspeakable name while standing within the spiral. But the cost is sanity itself.' The name is written in symbols that hurt to look at.",
+          "buttonText": "Memorize the ritual",
+          "connection": {
+            "target": "beat_20_ritual_knowledge"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_20_ritual_knowledge"
+          }
+        ]
+      },
+      {
+        "id": "beat_19_wrong_symbol",
+        "name": "Grimoire Locked",
+        "type": "introText",
+        "position": {
+          "x": 1900,
+          "y": 550
+        },
+        "parameters": {
+          "text": "The mechanism hisses and emits a puff of black smoke. The grimoire seals itself tighter. You feel a sharp pain behind your eyes and taste copper.",
+          "buttonText": "Back away",
+          "connection": {
+            "target": "beat_3_hub"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3_hub"
+          }
+        ]
+      },
+      {
+        "id": "beat_20_ritual_knowledge",
+        "name": "Ritual Knowledge Gained",
+        "type": "setVariable",
+        "position": {
+          "x": 2200,
+          "y": 500
+        },
+        "parameters": {
+          "type": "variable",
+          "name": "knowsRitual",
+          "value": true,
+          "connection": {
+            "target": "beat_3_hub"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3_hub"
+          }
+        ]
+      },
+      {
+        "id": "beat_21_confrontation",
+        "name": "The Truth Emerges",
+        "type": "movementChoice",
+        "position": {
+          "x": 1000,
+          "y": 600
+        },
+        "parameters": {
+          "question": "Night falls. The symbols on the wall begin to glow. You hear Blackwood screaming from the east wing. The butler blocks your exit, his form shimmering. 'You know too much,' he hisses. What do you do?",
+          "choices": [
+            {
+              "id": "c1",
+              "text": "Confront the butler",
+              "target": "beat_22_fight"
+            },
+            {
+              "id": "c2",
+              "text": "Run to the east wing",
+              "target": "beat_23_ritual"
+            },
+            {
+              "id": "c3",
+              "text": "Flee the mansion",
+              "target": "beat_24_escape"
+            }
+          ]
+        }
+      },
+      {
+        "id": "beat_22_fight",
+        "name": "Fight the Butler",
+        "type": "setVariable",
+        "position": {
+          "x": 1300,
+          "y": 600
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "sanityLost",
+          "value": 3,
+          "operation": "add",
+          "connection": {
+            "target": "beat_25_butler_transform"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_25_butler_transform"
+          }
+        ]
+      },
+      {
+        "id": "beat_23_ritual",
+        "name": "Attempt the Ritual",
+        "type": "conditionBeat",
+        "position": {
+          "x": 1300,
+          "y": 650
+        },
+        "parameters": {
+          "condition": {
+            "type": "variable",
+            "variable": "knowsRitual",
+            "operator": "==",
+            "value": true
+          },
+          "trueConnection": {
+            "target": "beat_26_perform_ritual",
+            "label": "Knows the ritual"
+          },
+          "falseConnection": {
+            "target": "beat_27_ritual_fail",
+            "label": "Doesn't know ritual"
+          },
+          "conditionType": "variable",
+          "variableName": "knowsRitual",
+          "operator": "==",
+          "value": true
+        }
+      },
+      {
+        "id": "beat_24_escape",
+        "name": "Escape Attempt",
+        "type": "conditionBeat",
+        "position": {
+          "x": 1300,
+          "y": 700
+        },
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "drinksConsumed",
+            "operator": ">=",
+            "value": 2
+          },
+          "trueConnection": {
+            "target": "beat_28_escape_slow",
+            "label": "Too drunk to run"
+          },
+          "falseConnection": {
+            "target": "beat_29_escape_fast",
+            "label": "Clear-headed escape"
+          },
+          "conditionType": "counter",
+          "variableName": "drinksConsumed",
+          "operator": ">=",
+          "value": 2
+        }
+      },
+      {
+        "id": "beat_25_butler_transform",
+        "name": "Butler's True Form",
+        "type": "introText",
+        "position": {
+          "x": 1600,
+          "y": 600
+        },
+        "parameters": {
+          "text": "The butler's face splits open, revealing something wet and branched beneath. 'The Gatekeeper takes what is promised,' it gurgles. You empty your revolver into it, but the bullets pass through like water. It advances. You feel your mind fracturing.",
+          "buttonText": "Try to hold on",
+          "connection": {
+            "target": "beat_30_madness_check"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_30_madness_check"
+          }
+        ]
+      },
+      {
+        "id": "beat_26_perform_ritual",
+        "name": "Ritual Success",
+        "type": "setVariable",
+        "position": {
+          "x": 1600,
+          "y": 650
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "sanityLost",
+          "value": 2,
+          "operation": "add",
+          "connection": {
+            "target": "beat_31_ritual_success"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_31_ritual_success"
+          }
+        ]
+      },
+      {
+        "id": "beat_27_ritual_fail",
+        "name": "Ritual Failure",
+        "type": "setVariable",
+        "position": {
+          "x": 1600,
+          "y": 700
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "sanityLost",
+          "value": 5,
+          "operation": "add",
+          "connection": {
+            "target": "beat_32_ritual_fail"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_32_ritual_fail"
+          }
+        ]
+      },
+      {
+        "id": "beat_28_escape_slow",
+        "name": "Slow Escape",
+        "type": "introText",
+        "position": {
+          "x": 1600,
+          "y": 750
+        },
+        "parameters": {
+          "text": "You stumble through the fog, whiskey slowing your legs. Behind you, the mansion groans like a living thing. Something wet drags itself across the threshold. You reach your car but drop the keys. As you fumble, you see tentacles of shadow reaching from the house. The engine turns over. You peel away, not looking back.",
+          "buttonText": "Drive into the night",
+          "connection": {
+            "target": "beat_33_ending_escape"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_33_ending_escape"
+          }
+        ]
+      },
+      {
+        "id": "beat_29_escape_fast",
+        "name": "Fast Escape",
+        "type": "introText",
+        "position": {
+          "x": 1600,
+          "y": 800
+        },
+        "parameters": {
+          "text": "You sprint for the door, clear-headed and fast. The butler's scream follows you—a sound no human throat could make. You don't stop running until you reach your car. The mansion pulses with an inner light, shadows moving against physics. You drive away, hands shaking but mind intact.",
+          "buttonText": "Flee",
+          "connection": {
+            "target": "beat_33_ending_escape"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_33_ending_escape"
+          }
+        ]
+      },
+      {
+        "id": "beat_30_madness_check",
+        "name": "Sanity Check",
+        "type": "conditionBeat",
+        "position": {
+          "x": 1900,
+          "y": 600
+        },
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "sanityLost",
+            "operator": ">=",
+            "value": 5
+          },
+          "trueConnection": {
+            "target": "beat_34_ending_mad",
+            "label": "Sanity shattered"
+          },
+          "falseConnection": {
+            "target": "beat_35_ending_denial",
+            "label": "Hold it together"
+          },
+          "conditionType": "counter",
+          "variableName": "sanityLost",
+          "operator": ">=",
+          "value": 5
+        }
+      },
+      {
+        "id": "beat_31_ritual_success",
+        "name": "Ritual Complete",
+        "type": "introText",
+        "position": {
+          "x": 1900,
+          "y": 650
+        },
+        "parameters": {
+          "text": "You speak the unspeakable name. Reality tears like paper. You stand between worlds, seeing the true shape of things—the tentacled, branched horror that wears Blackwood's skin. You seal the gate with your blood. The mansion screams. Blackwood's body collapses into salt water. You've saved the world, but the memory of what you saw... it doesn't fade.",
+          "buttonText": "Return to the city",
+          "connection": {
+            "target": "beat_30_madness_check"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_30_madness_check"
+          }
+        ]
+      },
+      {
+        "id": "beat_32_ritual_fail",
+        "name": "Ritual Disaster",
+        "type": "introText",
+        "position": {
+          "x": 1900,
+          "y": 700
+        },
+        "parameters": {
+          "text": "You try to remember the words, but they slip through your mind like water. The gate opens wider. You see the thing that wore Blackwood's father like a suit. It has many mouths and they are all smiling. You feel yourself coming apart, memory by memory, replaced by something else.",
+          "buttonText": "Embrace the void",
+          "connection": {
+            "target": "beat_34_ending_mad"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_34_ending_mad"
+          }
+        ]
+      },
+      {
+        "id": "beat_33_ending_escape",
+        "name": "Ending: Escape",
+        "type": "endScreen",
+        "position": {
+          "x": 1900,
+          "y": 775
+        },
+        "parameters": {
+          "message": "You escaped the Blackwood Estate with your life and sanity intact, but the case remains unsolved. The insurance company denies the claim due to 'insufficient evidence.' You never return to New England. Some doors are better left unopened.",
+          "showRestart": true,
+          "showCredits": true
+        }
+      },
+      {
+        "id": "beat_34_ending_mad",
+        "name": "Ending: Madness",
+        "type": "endScreen",
+        "position": {
+          "x": 2200,
+          "y": 600
+        },
+        "parameters": {
+          "message": "You complete the case, but the truth shatters your mind. They find you in the asylum, screaming about the branching tree with the eye, the gatekeepers, the children of the water. The insurance pays out. Blackwood's estate is demolished. You spend your days painting symbols on the walls in your own blood. The stars are right, you whisper. The stars are right.",
+          "showRestart": true,
+          "showCredits": true
+        }
+      },
+      {
+        "id": "beat_35_ending_denial",
+        "name": "Ending: Denial",
+        "type": "endScreen",
+        "position": {
+          "x": 2200,
+          "y": 650
+        },
+        "parameters": {
+          "message": "You complete the case and bury the truth. Official report: Insurance fraud by persons unknown. You collect your fee and try to forget the impossible geometry, the whispers from empty rooms, the way shadows moved without light. The whiskey helps. It helps a lot. By 1925, you're a full-blown alcoholic, but at least you sleep at night. Mostly.",
+          "showRestart": true,
+          "showCredits": true
+        }
+      }
+    ],
+    "variables": [
+      {
+        "name": "drinksConsumed",
+        "initialValue": 0,
+        "description": "Tracks how many times the detective drinks"
+      },
+      {
+        "name": "sanityLost",
+        "initialValue": 0,
+        "description": "Tracks sanity damage from cosmic horror"
+      },
+      {
+        "name": "knowsSymbol",
+        "initialValue": false,
+        "description": "Learned the tree-eye symbol"
+      },
+      {
+        "name": "knowsLatin",
+        "initialValue": false,
+        "description": "Learned the Latin phrase"
+      },
+      {
+        "name": "knowsJournal",
+        "initialValue": false,
+        "description": "Read the burnt journal"
+      },
+      {
+        "name": "knowsCatalog",
+        "initialValue": false,
+        "description": "Examined the insurance catalog"
+      },
+      {
+        "name": "knowsRitual",
+        "initialValue": false,
+        "description": "Learned the sealing ritual"
+      }
+    ],
+    "characters": [
+      {
+        "id": "char_butler",
+        "name": "The Butler",
+        "description": "Inhuman servant of the Blackwood estate"
+      },
+      {
+        "id": "char_blackwood",
+        "name": "Howard Blackwood",
+        "description": "The client, heir to a cursed estate"
+      }
+    ],
+    "reasoning": "This story uses a hub-and-spoke structure centered on beat_3_hub, allowing exploration of the mansion. The puzzle is the grimoire in beat_13_grimoire, requiring the symbol knowledge from beat_14_symbol_knowledge. Backtracking is built into the structure—players return to the hub after each investigation. State tracking via variables determines which endings are accessible: high sanityLost leads to madness ending, high drinksConsumed makes escape harder, and ritual knowledge enables the confrontation path. The three endings are distinct: beat_33_ending_escape (flee), beat_34_ending_mad (madness), and beat_35_ending_denial (alcoholism). Reconvergence happens at beat_21_confrontation and beat_30_madness_check, where accumulated choices determine the finale. The cosmic horror escalates gradually from insurance fraud to occult artifacts to full Lovecraftian horror."
+  }
+}

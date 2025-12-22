@@ -42,7 +42,7 @@ export class HyperTextBeat extends Beat {
     parameters?: Partial<HyperTextParameters>;
   } & Partial<HyperTextParameters>) {
     super(config);
-    
+
     // Initialize from direct properties or parameters object
     this.text = config.text || config.parameters?.text || 'Click on any word to explore.';
     this.hyperlinks = (config.hyperlinks || config.parameters?.hyperlinks || []) as Array<{
@@ -53,7 +53,7 @@ export class HyperTextBeat extends Beat {
     this.allowMultipleClicks = config.allowMultipleClicks ?? config.parameters?.allowMultipleClicks ?? false;
     this.highlightColor = config.highlightColor || config.parameters?.highlightColor || '#0066cc';
     this.hoverColor = config.hoverColor || config.parameters?.hoverColor || '#003366';
-    
+
     // Visual data
     this.node = config.node || config.parameters?.node;
     this.locs = config.locs || config.parameters?.locs || [];
@@ -61,17 +61,20 @@ export class HyperTextBeat extends Beat {
   }
 
   getParameters(): Record<string, any> {
-    return {
+    const params: Record<string, any> = {
       text: this.text,
       hyperlinks: this.hyperlinks,
       allowMultipleClicks: this.allowMultipleClicks,
       highlightColor: this.highlightColor,
       hoverColor: this.hoverColor,
-      // Include visual data
       node: this.node,
-      locs: this.locs,
       backgroundSound: this.backgroundSound
     };
+    // Only include locs if non-empty
+    if (this.locs && this.locs.length > 0) {
+      params.locs = this.locs;
+    }
+    return params;
   }
 
   updateParameters(params: Record<string, any>): void {

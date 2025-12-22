@@ -26,6 +26,7 @@ export interface Location {
   fontSize?: number;
   textAlign?: 'left' | 'center' | 'right';
   autosize?: boolean;  // Auto-calculate font size based on box dimensions
+  fontOverridden?: boolean;  // True if font/size explicitly set, false = use theme defaults
   visible?: boolean;   // Element visibility (false = hidden, true/undefined = visible)
 }
 

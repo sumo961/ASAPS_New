@@ -42,12 +42,26 @@ function getFontFamily(fontName: string): string {
  * @packageDocumentation
  */
 
+/** Hyperlink data for HyperText beat type */
+export interface HyperlinkData {
+  word: string;
+  targetBeatId: string;
+  style?: {
+    color?: string;
+    hoverColor?: string;
+    underline?: boolean;
+    bold?: boolean;
+  };
+}
+
 export interface PositionedElementData {
   location: Location;
   content: string;
   assetUrl?: string;
   /** Optional action ID to return when this element is clicked (e.g., choice ID for movementChoice) */
   actionId?: string;
+  /** Optional hyperlinks for HyperText beat type - words in the text that are clickable */
+  hyperlinks?: HyperlinkData[];
 }
 
 /**
@@ -82,6 +96,7 @@ export interface RenderThemeSettings {
   };
   /** Fonts */
   fonts: {
+    titleFont: string;
     textFont: string;
     buttonFont: string;
   };
@@ -125,7 +140,7 @@ const DEFAULT_THEME: RenderThemeSettings = {
     borderColor: '#CCCCCC',
     borderWidth: 1,
     borderRadius: 8,
-    padding: 16,
+    padding: 20,  // Match defaultSettings.textbox.padding in GlobalSettingsInspector
     opacity: 95,
   },
   button: {
@@ -141,6 +156,7 @@ const DEFAULT_THEME: RenderThemeSettings = {
     textAlpha: 100,
   },
   fonts: {
+    titleFont: 'Arial',
     textFont: 'Arial',
     buttonFont: 'Arial',
   },
@@ -283,6 +299,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                 element={element}
                 hideTextBox={hideTextBoxes}
                 theme={theme}
+                onAction={handleAction}
               />
             </div>
           ))}
@@ -364,7 +381,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   theme,
   previewMode = false,
 }) => {
-  const { location, content, assetUrl } = element;
+  const { location, content, assetUrl, hyperlinks } = element;
 
   // Check if element should be visible (Phase 5 - Optional Text Boxes)
   // If visible is explicitly set to false, don't render the element
@@ -498,6 +515,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           hideTextBox={hideTextBoxes}
           theme={theme}
           previewMode={previewMode}
+          hyperlinks={hyperlinks}
+          onAction={onAction}
         />
       );
 
@@ -569,8 +588,11 @@ const TextElement: React.FC<{
   const computedFontSize = location.fontSize ?? 16;
 
   const computedTextAlign = location.textAlign || 'center';
-  // Apply font mapping: element font takes priority, falls back to theme font (already mapped)
-  const computedFont = location.font ? getFontFamily(location.font) : theme.fonts.textFont;
+  // Apply font mapping: element font takes priority, falls back to theme font
+  // Title/author elements use titleFont, others use textFont
+  const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
+  const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
+  const computedFont = location.font ? getFontFamily(location.font) : defaultFont;
 
   // Use theme padding or calculate based on box size
   const padding = theme.textBox.padding;
@@ -817,6 +839,95 @@ const InputFieldElement: React.FC<{
 };
 
 /**
+ * HyperTextContent - renders text with clickable link words
+ * Finds each hyperlink word in the text and wraps it in a clickable span
+ */
+const HyperTextContent: React.FC<{
+  text: string;
+  hyperlinks: HyperlinkData[];
+  onLinkClick: (targetBeatId: string) => void;
+  defaultLinkStyle?: React.CSSProperties;
+}> = ({ text, hyperlinks, onLinkClick, defaultLinkStyle }) => {
+  const [hoveredLink, setHoveredLink] = React.useState<string | null>(null);
+
+  // If no hyperlinks, just return plain text
+  if (!hyperlinks || hyperlinks.length === 0) {
+    return <>{text}</>;
+  }
+
+  // Build segments: find each hyperlink word in the text and split around them
+  // Sort hyperlinks by their position in the text (first occurrence)
+  const sortedLinks = [...hyperlinks]
+    .map(link => ({
+      ...link,
+      index: text.indexOf(link.word),
+    }))
+    .filter(link => link.index >= 0) // Only include links whose words are found in text
+    .sort((a, b) => a.index - b.index);
+
+  if (sortedLinks.length === 0) {
+    return <>{text}</>;
+  }
+
+  const segments: React.ReactNode[] = [];
+  let lastIndex = 0;
+
+  sortedLinks.forEach((link, i) => {
+    // Add text before this link
+    if (link.index > lastIndex) {
+      segments.push(
+        <span key={`text-${i}`}>{text.substring(lastIndex, link.index)}</span>
+      );
+    }
+
+    // Add the clickable link
+    const isHovered = hoveredLink === link.word;
+    const linkStyle: React.CSSProperties = {
+      color: isHovered && link.style?.hoverColor ? link.style.hoverColor : (link.style?.color || '#3b82f6'),
+      textDecoration: link.style?.underline !== false ? 'underline' : 'none',
+      fontWeight: link.style?.bold ? 'bold' : 'inherit',
+      cursor: 'pointer',
+      ...defaultLinkStyle,
+    };
+
+    segments.push(
+      <span
+        key={`link-${i}`}
+        style={linkStyle}
+        onClick={(e) => {
+          e.stopPropagation();
+          console.log(`[HyperTextContent] Link clicked: "${link.word}" → ${link.targetBeatId}`);
+          onLinkClick(link.targetBeatId);
+        }}
+        onMouseEnter={() => setHoveredLink(link.word)}
+        onMouseLeave={() => setHoveredLink(null)}
+        role="link"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onLinkClick(link.targetBeatId);
+          }
+        }}
+      >
+        {link.word}
+      </span>
+    );
+
+    lastIndex = link.index + link.word.length;
+  });
+
+  // Add any remaining text after the last link
+  if (lastIndex < text.length) {
+    segments.push(
+      <span key="text-end">{text.substring(lastIndex)}</span>
+    );
+  }
+
+  return <>{segments}</>;
+};
+
+/**
  * Dialog element renderer
  */
 const DialogElement: React.FC<{
@@ -826,7 +937,9 @@ const DialogElement: React.FC<{
   hideTextBox?: boolean;
   theme: RenderThemeSettings;
   previewMode?: boolean;
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false }) => {
+  hyperlinks?: HyperlinkData[];
+  onAction?: (actionId: string) => void;
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction }) => {
   // Calculate font size
   let computedFontSize: number;
   if (location.fontSize !== undefined) {
@@ -870,7 +983,15 @@ const DialogElement: React.FC<{
         overflow: 'hidden',
       }}
     >
-      {content}
+      {hyperlinks && hyperlinks.length > 0 && onAction ? (
+        <HyperTextContent
+          text={content}
+          hyperlinks={hyperlinks}
+          onLinkClick={onAction}
+        />
+      ) : (
+        content
+      )}
     </div>
   );
 };
@@ -1132,11 +1253,27 @@ export function createPositionedElementData(
       }
     }
 
+    // For hyperText: include hyperlinks data for clickable text rendering
+    // The links array may come from content.links (from renderHyperText) or content.hyperlinks (from beat params)
+    let hyperlinks: HyperlinkData[] | undefined;
+    if (beatType === 'hyperText') {
+      const links = content.links || content.hyperlinks;
+      if (links && Array.isArray(links)) {
+        hyperlinks = links.map((link: any) => ({
+          word: link.word,
+          targetBeatId: link.targetBeatId || link.target,
+          style: link.style,
+        }));
+        console.log(`[createPositionedElementData] HyperText: found ${hyperlinks.length} hyperlinks`);
+      }
+    }
+
     return {
       location,
       content: elementContent,
       assetUrl: resolvedAssetUrl,
       actionId,
+      hyperlinks,
     };
   });
 }
@@ -1344,9 +1481,14 @@ function getContentForLocation(
     return content.placeholder || 'Type here...';
   }
   
-  // HyperText
+  // HyperText - only render the text location, not the hyperlinks location
   if (nameLower.includes('hypertext') || (beatType === 'hyperText' && (nameLower.includes('main') || nameLower.includes('text')))) {
     return content.text || '';
+  }
+
+  // Skip hyperlinks location for hyperText - the links are rendered as part of the text element
+  if (beatType === 'hyperText' && nameLower.includes('hyperlink')) {
+    return ''; // Return empty to avoid duplicate text
   }
 
   // Skip "Main Text" elements - they are deprecated and cause duplication
@@ -1385,8 +1527,9 @@ const FlexTextElement: React.FC<{
   element: PositionedElementData;
   hideTextBox?: boolean;
   theme: RenderThemeSettings;
-}> = ({ element, hideTextBox = false, theme }) => {
-  const { location, content } = element;
+  onAction?: (actionId: string) => void;
+}> = ({ element, hideTextBox = false, theme, onAction }) => {
+  const { location, content, hyperlinks } = element;
 
   // Calculate font size
   let computedFontSize: number;
@@ -1398,7 +1541,10 @@ const FlexTextElement: React.FC<{
   }
 
   const computedTextAlign = location.textAlign || 'center';
-  const computedFont = location.font || theme.fonts.textFont;
+  // Title/author elements use titleFont, others use textFont
+  const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
+  const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
+  const computedFont = location.font || defaultFont;
   const padding = theme.textBox.padding;
 
   // Convert opacity from 0-100 to 0-1
@@ -1430,7 +1576,15 @@ const FlexTextElement: React.FC<{
         boxSizing: 'border-box',
       }}
     >
-      {content}
+      {hyperlinks && hyperlinks.length > 0 && onAction ? (
+        <HyperTextContent
+          text={content}
+          hyperlinks={hyperlinks}
+          onLinkClick={onAction}
+        />
+      ) : (
+        content
+      )}
     </div>
   );
 };

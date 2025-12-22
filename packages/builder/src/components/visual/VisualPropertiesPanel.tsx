@@ -23,7 +23,11 @@ import { getAllPresetSounds, isPresetSound, getPresetSound, type PresetSound } f
 import type { Asset } from '../assets/AssetManager';
 import type { VisualElement } from './VisualBeatEditor';
 import type { Character, CharacterState } from '../../types/character';
+import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
 import { useFonts } from '../../hooks/useFonts';
+
+// Transition types supported by the renderer
+type TransitionType = 'none' | 'fade' | 'slide' | 'zoom' | 'dissolve';
 
 interface VisualPropertiesPanelProps {
   backgroundAssetId?: string;
@@ -43,6 +47,11 @@ interface VisualPropertiesPanelProps {
   beatName?: string;  // Beat name for display in header
   onOpenCharacterManager?: (callback: (character: any) => void) => void;  // For changing character
   characters?: Character[];  // Project characters for state selection
+  // Beat-level settings
+  beatTransition?: { type: TransitionType; duration: number };
+  onBeatTransitionChange?: (transition: { type: TransitionType; duration: number }) => void;
+  // Global settings for default font fallback
+  globalSettings?: GlobalSettings;
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -71,7 +80,15 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   beatName,
   onOpenCharacterManager,
   characters = [],
+  beatTransition,
+  onBeatTransitionChange,
+  globalSettings,
 }) => {
+  // Get default fonts from global settings based on element type
+  // Renderer uses different fonts for text vs buttons vs titles
+  const defaultTitleFont = globalSettings?.fonts?.titleFont || 'Arial';
+  const defaultTextFont = globalSettings?.fonts?.textFont || 'Arial';
+  const defaultButtonFont = globalSettings?.fonts?.btnFont || 'Arial';
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     background: true,
     elements: true,
@@ -171,6 +188,81 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
             </div>
           )}
         </div>
+
+        {/* Transition Section - Beat-level setting */}
+        {onBeatTransitionChange && (
+          <div className="border-b border-gray-200">
+            <button
+              onClick={() => toggleSection('transition')}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+            >
+              <div className="flex items-center gap-2">
+                <RotateCw className="w-4 h-4" />
+                <span className="font-medium text-sm">Transition</span>
+              </div>
+            </button>
+
+            {expandedSections.transition && (
+              <div className="px-4 pb-4 space-y-3">
+                {/* Transition Type */}
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">
+                    Type
+                  </label>
+                  <select
+                    value={beatTransition?.type || 'none'}
+                    onChange={(e) => onBeatTransitionChange({
+                      type: e.target.value as TransitionType,
+                      duration: beatTransition?.duration || 500
+                    })}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                  >
+                    <option value="none">None</option>
+                    <option value="fade">Fade</option>
+                    <option value="slide">Slide</option>
+                    <option value="zoom">Zoom</option>
+                    <option value="dissolve">Dissolve</option>
+                  </select>
+                </div>
+
+                {/* Transition Duration - only show if type is not 'none' */}
+                {beatTransition?.type && beatTransition.type !== 'none' && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">
+                      Duration (ms)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="100"
+                        max="2000"
+                        step="100"
+                        value={beatTransition?.duration || 500}
+                        onChange={(e) => onBeatTransitionChange({
+                          type: beatTransition?.type || 'fade',
+                          duration: parseInt(e.target.value)
+                        })}
+                        className="flex-1"
+                      />
+                      <input
+                        type="number"
+                        value={beatTransition?.duration || 500}
+                        onChange={(e) => onBeatTransitionChange({
+                          type: beatTransition?.type || 'fade',
+                          duration: parseInt(e.target.value) || 500
+                        })}
+                        className="w-16 px-2 py-1 text-sm border border-gray-300 rounded"
+                        min="100"
+                        max="2000"
+                      />
+                      <span className="text-xs text-gray-600">ms</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Elements Section */}
         <div className="border-b border-gray-200">
@@ -670,14 +762,34 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                 {/* Font Controls - Only for text, dialog, and button elements */}
                 {(selected.type === 'text' || selected.type === 'dialog' || selected.type === 'button') && (
                   <>
-                    {/* Font Family */}
+                    {/* Font Family with Reset Button */}
                     <div>
-                      <label className="text-xs font-medium text-gray-700 mb-1 block">
-                        Font Family
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-gray-700">
+                          Font Family
+                        </label>
+                        {(selected.font || selected.fontSize || selected.fontOverridden) && (
+                          <button
+                            onClick={() => onElementUpdate(selected.id, {
+                              font: undefined,
+                              fontSize: undefined,
+                              fontOverridden: false
+                            })}
+                            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            title="Reset to theme defaults"
+                          >
+                            <RotateCw className="w-3 h-3" />
+                            Reset
+                          </button>
+                        )}
+                      </div>
                       <select
-                        value={selected.font || 'Arial'}
-                        onChange={(e) => onElementUpdate(selected.id, { font: e.target.value })}
+                        value={selected.font || (
+                          selected.type === 'button' ? defaultButtonFont :
+                          (selected.name?.toLowerCase().includes('title') || selected.name?.toLowerCase().includes('author')) ? defaultTitleFont :
+                          defaultTextFont
+                        )}
+                        onChange={(e) => onElementUpdate(selected.id, { font: e.target.value, fontOverridden: true })}
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                       >
                         {fonts.filter(f => f.type === 'builtin').map(font => (
@@ -708,13 +820,13 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                           min="10"
                           max="72"
                           value={selected.fontSize || 16}
-                          onChange={(e) => onElementUpdate(selected.id, { fontSize: parseInt(e.target.value) })}
+                          onChange={(e) => onElementUpdate(selected.id, { fontSize: parseInt(e.target.value), fontOverridden: true })}
                           className="flex-1"
                         />
                         <input
                           type="number"
                           value={selected.fontSize || 16}
-                          onChange={(e) => onElementUpdate(selected.id, { fontSize: parseInt(e.target.value) || 16 })}
+                          onChange={(e) => onElementUpdate(selected.id, { fontSize: parseInt(e.target.value) || 16, fontOverridden: true })}
                           className="w-16 px-2 py-1 text-sm border border-gray-300 rounded"
                           min="10"
                           max="72"

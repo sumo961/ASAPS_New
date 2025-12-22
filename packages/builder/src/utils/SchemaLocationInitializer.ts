@@ -29,6 +29,7 @@ export interface VisualElement {
   font?: string;
   fontSize?: number;
   textAlign?: 'left' | 'center' | 'right';
+  fontOverridden?: boolean;  // True if font/size explicitly set, false = use theme defaults
 }
 
 interface LocationDefinition {
@@ -85,6 +86,7 @@ const LOCATION_TYPE_MAP: Record<string, Partial<LocationDefinition>> = {
 
 /**
  * Auto-size text based on content length
+ * Padding values match renderer: text=16px/side, button=12h+6v per side
  */
 function autoSizeText(
   text: string,
@@ -95,11 +97,17 @@ function autoSizeText(
 ): { width: number; height: number } {
   // Approximate character width (varies by font, this is a reasonable estimate)
   const charWidth = fontSize * 0.6;
-  const estimatedWidth = text.length * charWidth + (isButton ? 40 : 20); // Add padding
+  // Padding to match renderer: buttons 24 horizontal (12*2), text 40 (20*2)
+  const horizontalPadding = isButton ? 24 : 40;
+  // Border width: 2px per side × 2 = 4px total (renderer uses box-sizing: border-box)
+  const borderWidth = 4;
+  const estimatedWidth = text.length * charWidth + horizontalPadding + borderWidth;
 
   const width = Math.max(minWidth, Math.min(maxWidth, estimatedWidth));
   const lines = Math.ceil(estimatedWidth / width);
-  const height = lines * fontSize * 1.5 + (isButton ? 20 : 10); // Line height + padding
+  // Vertical padding: buttons 12 (6*2), text 40 (20*2)
+  const verticalPadding = isButton ? 12 : 40;
+  const height = lines * fontSize * 1.5 + verticalPadding + borderWidth;
 
   return { width, height };
 }
@@ -208,6 +216,10 @@ export function initializeLocationsFromSchema(
     }
     if (beat.type === 'pickProp' && locationName === 'props') {
       return; // Skip - will be created dynamically below
+    }
+    // Skip 'hyperlinks' location for hyperText - links are rendered as part of the text element
+    if (beat.type === 'hyperText' && locationName === 'hyperlinks') {
+      return; // Skip - hyperlinks are rendered as clickable spans within the text
     }
 
     const locationDef = LOCATION_TYPE_MAP[locationName] || { type: 'text' as const };

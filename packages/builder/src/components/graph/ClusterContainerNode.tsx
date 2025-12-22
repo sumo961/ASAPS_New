@@ -27,6 +27,8 @@ interface ClusterContainerNodeData {
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   // Getter function for assets to avoid embedding array in node data (prevents render issues)
   getAssets?: () => Array<{ id: string; url: string; type: string; name?: string }>;
+  // Path highlighting - beats to highlight in the debug path
+  highlightedBeatIds?: Set<string>;
 }
 
 // Beat type colors (same as main flowchart)
@@ -95,7 +97,8 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     allBeats,
     mapAssetUrl,
     onSetClusterMap,
-    getAssets
+    getAssets,
+    highlightedBeatIds
   } = data;
 
   // Get assets via getter function to avoid embedding array in node data
@@ -918,6 +921,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
               const isDragging = draggingBeat === beatInfo.beatId;
               const hasIncoming = externalConnections.incoming.has(beatInfo.beatId);
               const hasOutgoing = externalConnections.outgoing.has(beatInfo.beatId);
+              const isHighlighted = highlightedBeatIds?.has(beatInfo.beatId);
 
               return (
                 <div
@@ -927,6 +931,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                     transition-shadow
                     ${isDragging ? 'shadow-2xl z-50 cursor-grabbing' : 'hover:shadow-xl cursor-grab'}
                     ${isSelected ? 'ring-4 ring-blue-400 ring-opacity-50' : ''}
+                    ${isHighlighted && !isSelected ? 'ring-4 ring-amber-400 ring-opacity-70' : ''}
                   `}
                   style={{
                     left: beatInfo.position.x,

@@ -34,15 +34,24 @@ const BEAT_TYPE_GUIDE = `
 
 **dialogTree** - Branching conversations
 - Use: Character interactions, interrogations, negotiations
-- Parameters: dialogTree with nested dialogNode structure
-  - dialogNode: { id, speaker, text, choices: [] } - NPC/system speaks, then waits for player choice
-  - choice: { id, text, target? | dialogNode? } - What player clicks (text IS the player's line)
-  - target (string): Beat ID to exit dialog - the choice text is player's last line
-  - dialogNode (nested): NPC responds to this choice, conversation continues
+- Parameters: dialogTree with this EXACT structure (NO "root" wrapper!):
+  {
+    "dialogTree": {
+      "id": "root",
+      "speaker": "Character Name",
+      "text": "What the NPC says",
+      "choices": [
+        { "id": "c1", "text": "Player's response", "target": "beat_id" }
+      ]
+    }
+  }
+- ⚠️ WRONG: { "dialogTree": { "root": { ... } } } - NO extra "root" wrapper!
+- choice: { id, text, target? | dialogNode? } - What player clicks (text IS the player's line)
+- target (string): Beat ID to exit dialog
+- dialogNode (nested): NPC responds, conversation continues
 - Connections: Multiple → based on dialog choices leading to beat targets
-- Pattern: dialogNode (NPC speaks) → player choice (text=player's line) → dialogNode (NPC responds) → player choice...
 - IMPORTANT: Choice text IS what the player says. Never use "[Continue]" - use actual dialogue.
-- Example: NPC asks question → [Player response A | Player response B] → NPC responds differently → [Player's closing line exits to beat]
+- Example: NPC asks question → [Player response A | Player response B] → NPC responds
 
 **movementChoice** - Location/direction selection
 - Use: Exploration, navigation, choosing paths
@@ -50,18 +59,38 @@ const BEAT_TYPE_GUIDE = `
 - Connections: Multiple → one per choice
 - Example: "Where to go?" → [Library | Kitchen | Garden] → 3 different beats
 
-**pickProp** - Object/item selection
-- Use: Inventory, evidence gathering, item choices
+**pickProp** - Object/item selection (NOT for action choices!)
+- Use: Selecting physical ITEMS/OBJECTS, NOT for navigation or actions
 - Parameters: question, props (array of {id, name, target})
+  - name: The ITEM NAME (e.g., "Silver Key", "Book", "Lantern")
+  - ⚠️ NOT action descriptions like "Take the key" or "Continue searching"
 - Connections: Multiple → one per prop
 - Combine with: addRemoveInventory (invisible beat after)
-- Example: "Take weapon?" → [Sword | Axe | Nothing] → each leads to different beat + inventory update
+- ⚠️ For action choices, use movementChoice instead!
+- CORRECT: props: [{ "id": "key", "name": "Silver Key", "target": "beat_take_key" }]
+- WRONG: props: [{ "id": "key", "name": "Take the silver key", "target": "..." }]
+- Example: "What do you pick up?" → [Silver Key | Old Book | Nothing] → each leads to different beat
 
-**hyperText** - Clickable word branching
-- Use: Subtle choices, memory/knowledge checks, flavor text
-- Parameters: text with [clickable] words, targets for each
-- Connections: Multiple → based on clicked word
-- Example: "You recall [the letter] you found, or was it [the photograph]?" → 2 paths
+**hyperText** - Clickable word/phrase branching
+- Use: Subtle choices, memory/knowledge checks, exploring details in text
+- Parameters:
+  - text: The main text content (plain text, no brackets)
+  - hyperlinks: Array of { word: "clickable phrase", targetBeatId: "beat_id" }
+- ⚠️ CRITICAL: The "word" MUST appear EXACTLY as written in the text!
+  - Write the text FIRST
+  - Then copy exact phrases from the text into hyperlinks
+  - If text says "silver key on the desk", use "silver key" NOT "the key"
+- Connections: Multiple → based on which hyperlink is clicked
+- IMPORTANT: Do NOT put brackets around words in the text. The hyperlinks array defines what's clickable.
+- Example JSON:
+  {
+    "text": "You see a silver key on the desk and an old photograph on the wall.",
+    "hyperlinks": [
+      { "word": "silver key", "targetBeatId": "beat_key_path" },
+      { "word": "old photograph", "targetBeatId": "beat_photo_path" }
+    ]
+  }
+- ⚠️ WRONG: { "word": "the key" } when text says "silver key" - EXACT MATCH REQUIRED!
 
 **videoBeat** - Video playback
 - Use: Cutscenes, instructions, dramatic moments
@@ -78,34 +107,87 @@ const BEAT_TYPE_GUIDE = `
 
 **endScreen** - Story conclusion
 - Use: Ending (victory, defeat, various endings)
-- Parameters: endMessage, showRestart, showCredits
+- Parameters:
+  - message: "Ending text"  ← NOT "endMessage" or "text"!
+  - showRestart: boolean
+  - showCredits: boolean
+- ⚠️ CRITICAL: Use "message", NOT "endMessage"!
 - Connections: None (terminal beat)
 - Pattern: Multiple endScreens for different endings
-- Example: "Victory!" or "Game Over" or "Secret Ending Unlocked"
+- Example: { "message": "Victory! You solved the mystery.", "showRestart": true, "showCredits": true }
 
 ### INVISIBLE BEATS (Logic/Background Operations)
 
 **setVariable** - Set/modify story state
 - Use: Track player choices, update counters, set flags
-- Parameters:
-  - type: "variable" (for text/boolean) or "counter" (for numbers)
-  - name: The variable or counter name (e.g., "hasKey", "sanityScore")
-  - value: The value to set or change by
-  - operation: "set" (replace value) or "change" (add to counter, counters only)
+- ⚠️ IMPORTANT: Two different "name" fields exist - don't confuse them!
+  - beat.name: The beat's display name (e.g., "Increase Sanity Counter")
+  - beat.parameters.name: The VARIABLE name being set (e.g., "sanityMeter")
+- Parameters (inside "parameters"):
+  - type: "variable" (for text/boolean/simple set) or "counter" (for numeric operations)
+  - name: The VARIABLE/COUNTER name to modify (e.g., "hasKey", "sanityScore") - NOT the beat name!
+  - value: The value to set or modify by
+  - operation: Exactly one of these values:
+    - "set" - Replace the current value entirely
+    - "add" - Add value to current (increment)
+    - "subtract" - Subtract value from current (decrement)
+    - "multiply" - Multiply current by value
+    - "divide" - Divide current by value
+- ⚠️ CRITICAL: If using a math operation (add/subtract/multiply/divide), you MUST use type="counter"
+- ⚠️ DO NOT use "change" - be explicit: use "add" to increment, "subtract" to decrement
 - Connections: Single → immediately to next beat
 - Pattern: Chain after visible beats to track state
-- Example: setVariable with type="variable", name="weapon", value="sword"
-- Example: setVariable with type="counter", name="sanityScore", value=-1, operation="change"
+- Full beat example (note the two different "name" fields):
+  {
+    "id": "beat_set_sanity",
+    "name": "Increase Sanity Counter",    // ← Beat display name (shown in editor)
+    "type": "setVariable",
+    "parameters": {
+      "type": "counter",
+      "name": "sanityMeter",              // ← Variable name being modified
+      "value": 1,
+      "operation": "add"
+    }
+  }
+- More examples (parameters only):
+  - Flag: { "type": "variable", "name": "hasKey", "value": true }
+  - Increment by 1: { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" }
+  - Decrement by 5: { "type": "counter", "name": "sanity", "value": 5, "operation": "subtract" }
+  - Set to specific: { "type": "counter", "name": "score", "value": 100, "operation": "set" }
 
 **conditionBeat** - State-based branching
-- Use: Check variables, create reconvergent paths, conditional content
-- Parameters structure:
-  - condition: { type: "variable"|"counter"|"inventory"|"timer", variableName: "name", operator: "=="|"!="|">"|"<"|">="|"<=", value: any }
-  - trueConnection: { target: "beat_id", label: "description" }
-  - falseConnection: { target: "beat_id", label: "description" }
+- Use: Check variables, counters, inventory, create conditional paths
+- Condition types and their parameters:
+  - **counter**: { type: "counter", variable: "counterName", operator, value }
+  - **variable**: { type: "variable", variable: "varName", operator, value }
+  - **inventory**: { type: "inventory", item: "itemName", character: "player", checkType: "has"|"lacks" }
+  - **timer**: { type: "timer", timer: "timerName", operator, value }
+- ⚠️ CRITICAL PARAMETER NAMES BY CONDITION TYPE:
+  - For counter/variable checks: use "variable" (NOT "variableName")
+  - For inventory checks: use "item" (NOT "variable" or "variableName")
+  - For timer checks: use "timer"
+- Branch destinations:
+  - trueTarget: "beat_id" OR trueConnection: { target: "beat_id" }
+  - falseTarget: "beat_id" OR falseConnection: { target: "beat_id" }
 - Connections: Two → one if true, one if false
 - Pattern: Reconvergence - multiple paths lead here, then branch based on accumulated state
-- Example: condition: { type: "variable", variableName: "hasKey", operator: "==", value: true }
+
+Counter condition example:
+  {
+    "conditionType": "counter",
+    "condition": { "type": "counter", "variable": "cluesFound", "operator": ">=", "value": 3 },
+    "trueTarget": "beat_success",
+    "falseTarget": "beat_hub"
+  }
+
+Inventory condition example (check if player has lantern):
+  {
+    "conditionType": "inventory",
+    "condition": { "type": "inventory", "item": "lantern", "character": "player", "checkType": "has" },
+    "trueTarget": "beat_has_light",
+    "falseTarget": "beat_dark"
+  }
+- ⚠️ WRONG for inventory: { "variableName": "lantern" } - use "item" instead!
 
 **addRemoveInventory** - Inventory manipulation
 - Use: Pick up items, lose items, check what player has
@@ -288,6 +370,12 @@ Clusters are containers that help organize larger projects into logical sections
 
 ❌ Using endScreen before story develops
 ✓ Build narrative arc: setup → complications → climax → resolution
+
+❌ **Creating "orphan" beats that nothing connects to**
+✓ For EVERY beat you create, verify another beat targets it
+✓ Reconvergence points need explicit connections FROM the branches
+✓ Hub returns need the exploration beats to actually connect back
+✓ If you plan beat_X as a reconvergence, add it as target in the branching beats
 `;
 
 /**
@@ -437,6 +525,106 @@ Generate complete, sophisticated interactive story structures that:
 ✓ Add reasoning explaining your structural decisions
 ✓ Position beats with logical spacing
 ✓ Create reconvergent paths, not just endless branching
+✓ **EVERY beat must be reachable** - some other beat must connect TO it (except titleScreen)
+
+## ⚠️ CRITICAL: Data Format Rules (MUST FOLLOW)
+
+### 1. NO DUPLICATE DATA - Put data in ONE place only
+❌ WRONG (dialogTree data in multiple places):
+\`\`\`json
+{
+  "id": "beat_2",
+  "type": "dialogTree",
+  "dialogTree": { ... },           // ❌ WRONG - top level
+  "speaker": "Bob",                // ❌ WRONG - top level
+  "text": "Hello",                 // ❌ WRONG - top level
+  "parameters": {
+    "dialogTree": { ... },         // ✓ CORRECT - only here
+    "speaker": "Bob",              // ❌ WRONG - don't duplicate
+  }
+}
+\`\`\`
+✓ CORRECT (dialogTree data in parameters ONLY):
+\`\`\`json
+{
+  "id": "beat_2",
+  "type": "dialogTree",
+  "parameters": {
+    "dialogTree": {
+      "id": "root",
+      "speaker": "Bob",
+      "text": "Hello",
+      "choices": [...]
+    }
+  }
+}
+\`\`\`
+
+### 2. NO DUPLICATE CONNECTIONS - Each target appears ONCE
+❌ WRONG (same targets listed multiple times):
+\`\`\`json
+"connections": [
+  { "targetId": "beat_3", "label": "Go left" },
+  { "targetId": "beat_4", "label": "Go right" },
+  { "targetId": "beat_3", "label": "Left path" },    // ❌ Duplicate!
+  { "targetId": "beat_4", "label": "Right path" }    // ❌ Duplicate!
+]
+\`\`\`
+✓ CORRECT (each target once):
+\`\`\`json
+"connections": [
+  { "targetId": "beat_3", "label": "Go left" },
+  { "targetId": "beat_4", "label": "Go right" }
+]
+\`\`\`
+
+### 3. conditionBeat - Use ONLY nested format
+❌ WRONG (mixing nested and flat):
+\`\`\`json
+"parameters": {
+  "condition": { "variable": "hasKey", "operator": "==", "value": true },
+  "variableName": "hasKey",      // ❌ WRONG - don't duplicate
+  "operator": "==",              // ❌ WRONG - don't duplicate
+  "value": true,                 // ❌ WRONG - don't duplicate
+  "trueTarget": "beat_5",        // ❌ WRONG - use trueConnection
+  "falseTarget": "beat_6"        // ❌ WRONG - use falseConnection
+}
+\`\`\`
+✓ CORRECT (nested format only):
+\`\`\`json
+"parameters": {
+  "condition": { "type": "variable", "variable": "hasKey", "operator": "==", "value": true },
+  "trueConnection": { "target": "beat_5", "label": "Has key" },
+  "falseConnection": { "target": "beat_6", "label": "No key" }
+}
+\`\`\`
+
+### 4. NEVER generate internal fields
+These are internal editor fields - NEVER include them:
+- ❌ \`_rawHyperlinks\`
+- ❌ \`locs\`
+- ❌ \`locations\`
+
+### 5. Avoid infinite loops without exit
+❌ WRONG (trap loop with no progression):
+\`\`\`
+beat_4 (library) → beat_8 (study book) → beat_13 (learn ritual) → beat_4 (library)
+// Player is stuck in loop forever!
+\`\`\`
+✓ CORRECT (loop has exit condition):
+\`\`\`
+beat_4 (library) → beat_8 (study book) → beat_13 (learn ritual, sets variable) → beat_4 (library)
+beat_4 now checks variable and shows new option to progress
+\`\`\`
+
+## ⚠️ CRITICAL: All Beats Must Be Reachable
+**Every beat you create (except titleScreen) MUST have at least one other beat that connects TO it.**
+- If you create beat_21_confrontation, some beat must have a connection/target pointing to beat_21_confrontation
+- Common error: Creating "reconvergence points" but forgetting to connect any paths to them
+- Check BEFORE finalizing: For each beat, ask "What beat leads here?"
+- Hub beats need incoming connections from exploration branches returning
+- Reconvergent beats need all parallel paths connecting to them
+- The system will detect and warn about unreachable beats
 
 ## ⚠️ CRITICAL: Beat ID Consistency
 **EVERY target ID you reference MUST have a corresponding beat with that exact ID in your beats array.**
@@ -479,6 +667,26 @@ Generate complete, sophisticated interactive story structures that:
   "connections": [
     { "targetId": "beat_3", "label": "Left" },
     { "targetId": "beat_4", "label": "Right" }
+  ]
+}
+\`\`\`
+
+\`\`\`json
+{
+  "id": "beat_5",
+  "name": "Memory Choice",
+  "type": "hyperText",
+  "position": { "x": 1000, "y": 300 },
+  "parameters": {
+    "text": "You recall the letter you found in the study, or was it the photograph from the attic?",
+    "hyperlinks": [
+      { "word": "the letter", "targetBeatId": "beat_6" },
+      { "word": "the photograph", "targetBeatId": "beat_7" }
+    ]
+  },
+  "connections": [
+    { "targetId": "beat_6", "label": "the letter" },
+    { "targetId": "beat_7", "label": "the photograph" }
   ]
 }
 \`\`\``;
@@ -624,7 +832,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             type: "counter",
             name: "cluesFound",
             value: 1,
-            operation: "change",
+            operation: "add",
             connection: { target: "beat_5" }
           },
           connections: [{ targetId: "beat_5" }]
@@ -666,7 +874,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             type: "counter",
             name: "cluesFound",
             value: 1,
-            operation: "change",
+            operation: "add",
             connection: { target: "beat_8" }
           },
           connections: [{ targetId: "beat_8" }]
@@ -721,7 +929,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             type: "counter",
             name: "cluesFound",
             value: 1,
-            operation: "change",
+            operation: "add",
             connection: { target: "beat_11" }
           },
           connections: [{ targetId: "beat_11" }]
@@ -745,7 +953,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             condition: {
               type: "counter",
-              variableName: "cluesFound",
+              variable: "cluesFound",
               operator: ">=",
               value: 2
             },
@@ -794,7 +1002,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           type: "endScreen",
           position: { x: 2500, y: 150 },
           parameters: {
-            endMessage: "Wrong! The butler was innocent. The true killer escapes. CASE UNSOLVED",
+            message: "Wrong! The butler was innocent. The true killer escapes. CASE UNSOLVED",
             showRestart: true,
             showCredits: false
           },
@@ -808,7 +1016,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             condition: {
               type: "counter",
-              variableName: "cluesFound",
+              variable: "cluesFound",
               operator: "==",
               value: 3
             },
@@ -826,7 +1034,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           type: "endScreen",
           position: { x: 2500, y: 450 },
           parameters: {
-            endMessage: "Incorrect! The guest had an alibi. The case goes cold. INVESTIGATION FAILED",
+            message: "Incorrect! The guest had an alibi. The case goes cold. INVESTIGATION FAILED",
             showRestart: true,
             showCredits: false
           },
@@ -838,7 +1046,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           type: "endScreen",
           position: { x: 2800, y: 250 },
           parameters: {
-            endMessage: "Correct! With all evidence, you prove the maid's guilt AND uncover her secret accomplice. PERFECT SOLVE!",
+            message: "Correct! With all evidence, you prove the maid's guilt AND uncover her secret accomplice. PERFECT SOLVE!",
             showRestart: true,
             showCredits: true
           },
@@ -850,7 +1058,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           type: "endScreen",
           position: { x: 2800, y: 350 },
           parameters: {
-            endMessage: "You caught the maid, but without all evidence, her accomplice escapes. CASE CLOSED (Partial Success)",
+            message: "You caught the maid, but without all evidence, her accomplice escapes. CASE CLOSED (Partial Success)",
             showRestart: true,
             showCredits: false
           },

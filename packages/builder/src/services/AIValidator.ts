@@ -141,11 +141,135 @@ export class AIValidator {
       warnings.push(`Beat type '${beat.type}' should have at most one connection`);
     }
 
+    // Beat-type-specific validation
+    this.validateBeatTypeSpecific(beat, errors, warnings);
+
     return {
       valid: errors.length === 0,
       errors,
       warnings
     };
+  }
+
+  /**
+   * Beat-type-specific validation to catch common AI generation issues
+   */
+  private validateBeatTypeSpecific(
+    beat: GeneratedBeat,
+    errors: Array<{ path: string; message: string; severity: 'error' | 'warning' }>,
+    warnings: string[]
+  ): void {
+    const params = beat.parameters || {};
+
+    // DialogTree validation
+    if (beat.type === 'dialogTree') {
+      const dt = params.dialogTree;
+      if (!dt) {
+        errors.push({
+          path: 'parameters.dialogTree',
+          message: 'DialogTree beat missing dialogTree parameter',
+          severity: 'error'
+        });
+      } else {
+        // Check for wrapped structure (common AI mistake)
+        if (dt.root && !dt.id) {
+          warnings.push('DialogTree has extra "root" wrapper - should be unwrapped');
+        }
+        // Check for content
+        const node = dt.root || dt;
+        if (!node.text && !node.speaker) {
+          warnings.push('DialogTree has no speaker or text content');
+        }
+        if (!node.choices || !Array.isArray(node.choices) || node.choices.length === 0) {
+          warnings.push('DialogTree has no choices');
+        }
+      }
+    }
+
+    // ConditionBeat validation
+    if (beat.type === 'conditionBeat') {
+      const cond = params.condition;
+      if (!cond) {
+        errors.push({
+          path: 'parameters.condition',
+          message: 'ConditionBeat missing condition parameter',
+          severity: 'error'
+        });
+      } else {
+        // Check for variable name
+        if (!cond.variable && !cond.variableName && !cond.name) {
+          warnings.push('ConditionBeat missing variable name in condition');
+        }
+        // Check for operator
+        if (!cond.operator) {
+          warnings.push('ConditionBeat missing operator in condition');
+        }
+      }
+      // Check for connection targets
+      if (!params.trueConnection && !params.trueTarget) {
+        warnings.push('ConditionBeat missing trueConnection/trueTarget');
+      }
+    }
+
+    // HyperText validation
+    if (beat.type === 'hyperText') {
+      if (!params.text) {
+        errors.push({
+          path: 'parameters.text',
+          message: 'HyperText beat missing text parameter',
+          severity: 'error'
+        });
+      }
+      if (!params.hyperlinks || !Array.isArray(params.hyperlinks) || params.hyperlinks.length === 0) {
+        warnings.push('HyperText has no hyperlinks defined');
+      } else if (params.text) {
+        // Check if hyperlinks match text
+        for (const link of params.hyperlinks) {
+          const word = link.word || link.text || link.phrase;
+          if (word && !params.text.includes(word)) {
+            warnings.push(`HyperText link "${word}" not found in text`);
+          }
+        }
+      }
+    }
+
+    // EndScreen validation
+    if (beat.type === 'endScreen') {
+      if (!params.message && !params.endMessage && !params.text) {
+        warnings.push('EndScreen has no message/text content');
+      }
+    }
+
+    // SetVariable validation
+    if (beat.type === 'setVariable') {
+      if (!params.name && !params.variableName) {
+        warnings.push('SetVariable missing variable/counter name');
+      }
+      if (params.value === undefined) {
+        warnings.push('SetVariable missing value');
+      }
+      // Check for type/operation mismatch
+      if (params.operation && ['add', 'change', 'subtract', 'multiply', 'divide'].includes(params.operation)) {
+        if (params.type === 'variable') {
+          warnings.push('SetVariable has operation but type="variable" - should be type="counter"');
+        }
+      }
+    }
+
+    // PickProp validation
+    if (beat.type === 'pickProp') {
+      if (params.props && Array.isArray(params.props)) {
+        for (const prop of params.props) {
+          // Check if name looks like an action instead of an item name
+          const name = prop.name || '';
+          const actionWords = ['take', 'pick up', 'continue', 'leave', 'go', 'search', 'examine'];
+          const lowerName = name.toLowerCase();
+          if (actionWords.some(word => lowerName.startsWith(word))) {
+            warnings.push(`PickProp prop "${name}" looks like an action description, not an item name`);
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -251,6 +375,83 @@ export class AIValidator {
             });
           }
         }
+      }
+    }
+
+    // Check for unreachable beats (beats that nothing connects to)
+    // Build set of all target beat IDs
+    const targetedBeatIds = new Set<string>();
+
+    // Helper function to recursively extract targets from dialogTree nodes
+    const extractDialogTreeTargets = (node: any, targets: Set<string>) => {
+      if (!node) return;
+      // Check if node itself has a target
+      if (node.target) targets.add(node.target);
+      if (node.targetId) targets.add(node.targetId);
+      // Check choices array
+      if (node.choices && Array.isArray(node.choices)) {
+        for (const choice of node.choices) {
+          if (choice.target) targets.add(choice.target);
+          if (choice.targetId) targets.add(choice.targetId);
+          // Recursively check nested dialogNode
+          if (choice.dialogNode) {
+            extractDialogTreeTargets(choice.dialogNode, targets);
+          }
+          // Also check if target is an object (nested node)
+          if (typeof choice.target === 'object') {
+            extractDialogTreeTargets(choice.target, targets);
+          }
+        }
+      }
+      // Check next node if present
+      if (node.next) {
+        if (typeof node.next === 'string') {
+          targets.add(node.next);
+        } else {
+          extractDialogTreeTargets(node.next, targets);
+        }
+      }
+    };
+
+    for (const beat of response.beats) {
+      // Add targets from connections array
+      if (beat.connections) {
+        for (const conn of beat.connections) {
+          targetedBeatIds.add(conn.targetId);
+        }
+      }
+      // Add targets from parameters (for beat types that store connections in params)
+      const params = beat.parameters || {};
+      if (params.defaultTarget) targetedBeatIds.add(params.defaultTarget);
+      if (params.trueTarget) targetedBeatIds.add(params.trueTarget);
+      if (params.falseTarget) targetedBeatIds.add(params.falseTarget);
+      if (params.trueConnection?.target) targetedBeatIds.add(params.trueConnection.target);
+      if (params.falseConnection?.target) targetedBeatIds.add(params.falseConnection.target);
+      if (params.target) targetedBeatIds.add(params.target);
+      if (params.timerTarget) targetedBeatIds.add(params.timerTarget);
+      // Check choices arrays (movementChoice, pickProp, randomTarget)
+      const choices = params.choices || params.props || [];
+      for (const choice of choices) {
+        if (choice.target) targetedBeatIds.add(choice.target);
+        if (choice.targetId) targetedBeatIds.add(choice.targetId);
+      }
+      // Recursively extract targets from dialogTree (handles nested dialogNodes)
+      if (params.dialogTree) {
+        extractDialogTreeTargets(params.dialogTree, targetedBeatIds);
+      }
+      // Check hyperlinks for hyperText
+      if (params.hyperlinks) {
+        for (const link of params.hyperlinks) {
+          if (link.targetBeatId) targetedBeatIds.add(link.targetBeatId);
+        }
+      }
+    }
+
+    // Check each beat (except first) is reachable
+    for (let i = 1; i < response.beats.length; i++) {
+      const beat = response.beats[i];
+      if (!targetedBeatIds.has(beat.id)) {
+        warnings.push(`Beat "${beat.name || beat.id}" (${beat.type}) is unreachable - no other beat connects to it`);
       }
     }
 

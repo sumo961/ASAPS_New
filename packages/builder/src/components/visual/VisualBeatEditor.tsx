@@ -51,6 +51,7 @@ export interface VisualElement {
   font?: string;
   fontSize?: number;
   textAlign?: 'left' | 'center' | 'right';
+  fontOverridden?: boolean;  // True if font/size explicitly set, false = use theme defaults
 }
 
 interface VisualBeatEditorProps {

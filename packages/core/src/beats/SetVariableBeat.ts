@@ -20,7 +20,8 @@ export class SetVariableBeat extends Beat {
     // Note: config.type is the BEAT type ('setVariable'), so we check parameters.type first
     this.variableType = config.parameters?.type || 'variable';
     // Support multiple naming conventions: name (schema), variable (legacy), variableName (AI variation)
-    this.variableName = config.parameters?.name || config.parameters?.variableName || config.name || config.variable || config.parameters?.variable || '';
+    // IMPORTANT: Do NOT use config.name as fallback - that's the beat DISPLAY name, not the variable name!
+    this.variableName = config.parameters?.name || config.parameters?.variableName || config.variable || config.parameters?.variable || '';
     this.value = config.parameters?.value ?? config.value ?? '';
     this.operation = config.parameters?.operation || config.operation || 'set';
   }
@@ -58,17 +59,34 @@ export class SetVariableBeat extends Beat {
         const currentValue = context.getCounter(this.variableName) || 0;
         const numValue = Number(this.value) || 0;
         let newValue: number;
-        
-        if (this.operation === 'change') {
-          // Add/subtract from current value
-          newValue = currentValue + numValue;
-        } else {
-          // Set to specific value
-          newValue = numValue;
+
+        switch (this.operation) {
+          case 'change':
+          case 'add':
+            // Add to current value (change is legacy name for add)
+            newValue = currentValue + numValue;
+            break;
+          case 'subtract':
+            // Subtract from current value
+            newValue = currentValue - numValue;
+            break;
+          case 'multiply':
+            // Multiply current value
+            newValue = currentValue * numValue;
+            break;
+          case 'divide':
+            // Divide current value (avoid division by zero)
+            newValue = numValue !== 0 ? currentValue / numValue : currentValue;
+            break;
+          case 'set':
+          default:
+            // Set to specific value
+            newValue = numValue;
+            break;
         }
-        
+
         context.setCounter(this.variableName, newValue);
-        console.log(`SetVariableBeat ${this.id}: Counter '${this.variableName}' ${this.operation} to ${newValue}`);
+        console.log(`SetVariableBeat ${this.id}: Counter '${this.variableName}' ${this.operation} → ${newValue} (was ${currentValue})`);
       } else {
         // Handle variable (always set operation)
         context.setVariable(this.variableName, this.value);

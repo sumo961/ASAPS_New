@@ -35,7 +35,8 @@ export class InputTextBeat extends Beat {
     // Initialize from direct properties or parameters object
     this.prompt = config.prompt || config.parameters?.prompt || 'Please enter your response:';
     this.saveToType = config.saveToType || config.parameters?.saveToType || 'variable';
-    this.variable = config.variable || config.parameters?.variable || 'userInput';
+    // Support both 'variable' (canonical) and 'variableName' (AI-generated variant)
+    this.variable = config.variable || config.parameters?.variable || config.parameters?.variableName || 'userInput';
     this.characterId = config.characterId || config.parameters?.characterId;
     this.placeholder = config.placeholder || config.parameters?.placeholder;
     this.validation = config.validation || config.parameters?.validation || 'none';
@@ -74,6 +75,10 @@ export class InputTextBeat extends Beat {
     if (params.prompt !== undefined) this.prompt = params.prompt;
     if (params.saveToType !== undefined) this.saveToType = params.saveToType;
     if (params.variable !== undefined) this.variable = params.variable;
+    if (params.variableName !== undefined) {
+      console.log(`[InputTextBeat] Setting variable from variableName: "${params.variableName}"`);
+      this.variable = params.variableName; // AI-generated variant
+    }
     if (params.characterId !== undefined) this.characterId = params.characterId;
     if (params.placeholder !== undefined) this.placeholder = params.placeholder;
     if (params.validation !== undefined) this.validation = params.validation;
@@ -177,6 +182,7 @@ export class InputTextBeat extends Beat {
       context.updateCharacterDisplayName(this.characterId, userInput);
     } else if (this.saveToType === 'variable' && this.variable) {
       // Store input in variable
+      console.log(`[InputTextBeat] Saving "${userInput}" to variable "${this.variable}"`);
       context.setVariable(this.variable, userInput);
     }
 

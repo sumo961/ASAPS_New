@@ -190,6 +190,17 @@ export function generateDefaultLocations(
     });
   }
 
+  // Special handling for hyperText: only generate text location, not hyperlinks
+  // The hyperlinks are rendered as clickable spans within the text element
+  if (beatType === 'hyperText') {
+    // Remove any 'hyperlinks' location - links are rendered inside the text element
+    const filteredLocations = locations.filter(loc =>
+      !loc.name.toLowerCase().includes('hyperlink')
+    );
+    console.log(`[DefaultLocationGenerator] Generated ${filteredLocations.length} locations for ${beatType} (filtered hyperlinks)`);
+    return filteredLocations;
+  }
+
   console.log(`[DefaultLocationGenerator] Generated ${locations.length} locations for ${beatType}`);
   return locations;
 }

@@ -25,13 +25,17 @@ export class IntroTextBeat extends Beat {
   }
 
   getParameters(): Record<string, any> {
-    return {
+    // NOTE: locs is an internal visual field, only include if non-empty
+    const params: Record<string, any> = {
       text: this.text,
       buttonText: this.buttonText,
       node: this.node,
-      locs: this.locs,
       backgroundSound: this.backgroundSound
     };
+    if (this.locs && this.locs.length > 0) {
+      params.locs = this.locs;
+    }
+    return params;
   }
 
   updateParameters(params: Record<string, any>): void {

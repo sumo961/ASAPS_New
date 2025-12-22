@@ -13,6 +13,7 @@ import { createServer, Server as HTTPServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { getMemoryStorage } from '../storage/MemoryStorageAdapter';
 import { getFilesystemStorage } from '../storage/FilesystemStorageAdapter';
 import type { IStorageAdapter } from '../storage/IStorageAdapter';
@@ -170,18 +171,23 @@ export class APIServer {
     }
 
     try {
+      // Get __dirname equivalent for ESM
+      const currentFileUrl = import.meta.url;
+      const currentFilePath = fileURLToPath(currentFileUrl);
+      const currentDir = path.dirname(currentFilePath);
+
       // Try multiple paths to find the schema file
       const possiblePaths = [
         // Development: relative to project root
         path.resolve(process.cwd(), 'beat-definitions/core-beats.json'),
         path.resolve(process.cwd(), '../beat-definitions/core-beats.json'),
         path.resolve(process.cwd(), '../../beat-definitions/core-beats.json'),
-        // Production: relative to built files
-        path.resolve(__dirname, '../../../../beat-definitions/core-beats.json'),
-        path.resolve(__dirname, '../../../../../beat-definitions/core-beats.json'),
+        // Production: relative to built files (ESM compatible)
+        path.resolve(currentDir, '../../../../beat-definitions/core-beats.json'),
+        path.resolve(currentDir, '../../../../../beat-definitions/core-beats.json'),
         // Fallback: public directory
         path.resolve(process.cwd(), 'public/beat-definitions/core-beats.json'),
-        path.resolve(__dirname, '../../public/beat-definitions/core-beats.json'),
+        path.resolve(currentDir, '../../public/beat-definitions/core-beats.json'),
       ];
 
       let rawSchema: any = null;

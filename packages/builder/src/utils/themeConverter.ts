@@ -90,6 +90,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       textAlpha: normalizeOpacity(settings.colors.palpha),
     },
     fonts: {
+      titleFont: getFontFamily(settings.fonts.titleFont),
       textFont: getFontFamily(settings.fonts.textFont),
       buttonFont: getFontFamily(settings.fonts.btnFont),
     },

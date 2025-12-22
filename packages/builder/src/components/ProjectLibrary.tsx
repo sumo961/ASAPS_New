@@ -35,6 +35,9 @@ export interface ProjectLibraryProps {
 
   /** Called when modal should close */
   onClose?: () => void;
+
+  /** Currently active/open project ID */
+  currentProjectId?: string;
 }
 
 /**
@@ -68,7 +71,8 @@ const ProjectCard: React.FC<{
   isSelected?: boolean;
   onToggleSelect?: () => void;
   showCheckbox?: boolean;
-}> = ({ project, onLoad, onDelete, onRename, viewMode, isSelected = false, onToggleSelect, showCheckbox = false }) => {
+  isCurrentProject?: boolean;
+}> = ({ project, onLoad, onDelete, onRename, viewMode, isSelected = false, onToggleSelect, showCheckbox = false, isCurrentProject = false }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
@@ -117,11 +121,21 @@ const ProjectCard: React.FC<{
   if (viewMode === 'list') {
     return (
       <div
-        className={`flex items-center gap-4 p-4 bg-white border rounded-lg hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
-          isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+        className={`flex items-center gap-4 p-4 border rounded-lg hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
+          isCurrentProject
+            ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+            : isSelected
+            ? 'border-blue-500 bg-blue-50'
+            : 'bg-white border-gray-200'
         }`}
         onClick={onLoad}
       >
+        {/* Current project indicator */}
+        {isCurrentProject && (
+          <div className="flex-shrink-0 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded">
+            OPEN
+          </div>
+        )}
         {showCheckbox && (
           <button
             onClick={(e) => {
@@ -232,11 +246,21 @@ const ProjectCard: React.FC<{
 
   return (
     <div
-      className={`bg-white border rounded-lg p-6 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
-        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+      className={`relative border rounded-lg p-6 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
+        isCurrentProject
+          ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+          : isSelected
+          ? 'border-blue-500 bg-blue-50'
+          : 'bg-white border-gray-200'
       }`}
       onClick={onLoad}
     >
+      {/* Current project badge */}
+      {isCurrentProject && (
+        <div className="absolute -top-2 left-4 px-2 py-0.5 bg-green-500 text-white text-xs font-semibold rounded shadow">
+          OPEN
+        </div>
+      )}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-2">
           {showCheckbox && (
@@ -360,6 +384,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   onRenameProject,
   isModal = false,
   onClose,
+  currentProjectId,
 }) => {
   const { storage } = usePersistence();
   const { updateMetadata } = useProject();
@@ -728,6 +753,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                   isSelected={selectedProjects.has(project.id)}
                   onToggleSelect={() => handleToggleSelect(project.id)}
                   showCheckbox={selectionMode}
+                  isCurrentProject={project.id === currentProjectId}
                 />
               ))}
             </div>

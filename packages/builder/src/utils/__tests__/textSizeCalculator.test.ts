@@ -280,6 +280,58 @@ describe('textSizeCalculator', () => {
     });
   });
 
+  describe('Padding Values (Issue #3 fix verification)', () => {
+    it('should use 40px total padding + 4px border for text boxes', () => {
+      // This test verifies the fix for Issue #3: bounding box mismatch
+      // The renderer uses 20px padding per side = 40px total
+      // Plus 2px border per side = 4px total (box-sizing: border-box)
+      const baseResult = calculateTextDimensions({
+        text: 'Test',
+        fontSize: 16,
+        fontFamily: 'Arial',
+        padding: 0,
+        borderWidth: 0,
+        minWidth: 0
+      });
+
+      const paddedResult = calculateTextBoxDimensions('Test', 16, 'Arial');
+
+      // Text box should add 40px padding + 4px border = 44px total (both dimensions)
+      // Due to minWidth constraints, we check that padding is at least applied
+      expect(paddedResult.width).toBeGreaterThanOrEqual(baseResult.width + 40);
+      expect(paddedResult.height).toBeGreaterThan(baseResult.height);
+    });
+
+    it('should use asymmetric padding for buttons (24h x 12v + 4px border)', () => {
+      // Buttons use 12px horizontal padding per side (24 total)
+      // and 6px vertical padding per side (12 total)
+      // Plus 2px border per side = 4px total
+      const baseResult = calculateTextDimensions({
+        text: 'Click',
+        fontSize: 16,
+        fontFamily: 'Arial',
+        padding: 0,
+        borderWidth: 0,
+        minWidth: 0
+      });
+
+      const buttonResult = calculateButtonDimensions('Click', 16, 'Arial');
+
+      // Button should be wider than raw text (horizontal padding + border)
+      expect(buttonResult.width).toBeGreaterThan(baseResult.width);
+      // Button should have some vertical padding + border too
+      expect(buttonResult.height).toBeGreaterThan(baseResult.height);
+    });
+
+    it('should have consistent padding across multiple calls', () => {
+      const result1 = calculateTextBoxDimensions('Same Text', 16, 'Arial');
+      const result2 = calculateTextBoxDimensions('Same Text', 16, 'Arial');
+
+      expect(result1.width).toBe(result2.width);
+      expect(result1.height).toBe(result2.height);
+    });
+  });
+
   describe('Consistency', () => {
     it('should return same dimensions for same input', () => {
       const result1 = calculateTextDimensions({

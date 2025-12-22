@@ -515,3 +515,194 @@ export function applyTreeLayoutToBeats(
   const { positions } = calculateTreeLayout(nodes, allEdges, options);
   return positions;
 }
+
+/**
+ * Cluster information for layout
+ */
+interface ClusterInfo {
+  id: string;
+  beatIds: string[];
+  containerBounds: { width: number; height: number };
+  containerPosition?: { x: number; y: number };
+}
+
+/**
+ * Result of cluster-aware layout
+ */
+export interface ClusterAwareLayoutResult {
+  /** Positions for unclustered beats */
+  beatPositions: Map<string, { x: number; y: number }>;
+  /** Positions for cluster containers */
+  clusterPositions: Map<string, { x: number; y: number }>;
+  /** Positions for beats within each cluster (relative to cluster origin) */
+  clusterInternalPositions: Map<string, Map<string, { x: number; y: number }>>;
+}
+
+/**
+ * Apply tree layout with cluster awareness
+ *
+ * Clusters are treated as single nodes in the main layout, with their internal
+ * beats positioned separately within the cluster bounds.
+ *
+ * @param beats - Array of story beats with cluster assignment
+ * @param clusters - Array of cluster definitions
+ * @param options - Layout options
+ * @param externalEdges - Optional external edges
+ * @returns Layout result with positions for beats, clusters, and internal cluster beats
+ */
+export function applyClusterAwareTreeLayout(
+  beats: Array<{
+    id: string;
+    type: string;
+    cluster?: string;
+    position?: { x: number; y: number };
+    parameters?: Record<string, any>;
+  }>,
+  clusters: ClusterInfo[],
+  options?: LayoutOptions,
+  externalEdges?: Array<{ source: string; target: string }>
+): ClusterAwareLayoutResult {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+
+  // Build cluster map for quick lookup
+  const clusterMap = new Map<string, ClusterInfo>();
+  clusters.forEach(c => clusterMap.set(c.id, c));
+
+  // Separate beats into clustered and unclustered
+  const unclusteredBeats = beats.filter(b => !b.cluster);
+  const clusteredBeats = beats.filter(b => b.cluster);
+
+  // Group beats by cluster
+  const beatsByCluster = new Map<string, typeof beats>();
+  clusteredBeats.forEach(beat => {
+    if (beat.cluster) {
+      const existing = beatsByCluster.get(beat.cluster) || [];
+      existing.push(beat);
+      beatsByCluster.set(beat.cluster, existing);
+    }
+  });
+
+  // Create virtual nodes for clusters (treating them as single large nodes)
+  const virtualClusterNodes = clusters.map(cluster => ({
+    id: `cluster:${cluster.id}`,
+    position: cluster.containerPosition,
+  }));
+
+  // Extract edges, replacing clustered beat references with cluster references
+  const allEdges = extractConnectionsFromBeats(beats);
+  if (externalEdges) {
+    const seenEdges = new Set(allEdges.map(e => `${e.source}->${e.target}`));
+    externalEdges.forEach(edge => {
+      const key = `${edge.source}->${edge.target}`;
+      if (!seenEdges.has(key)) {
+        allEdges.push(edge);
+        seenEdges.add(key);
+      }
+    });
+  }
+
+  // Transform edges: if source or target is in a cluster, point to/from the cluster instead
+  const beatToCluster = new Map<string, string>();
+  clusteredBeats.forEach(beat => {
+    if (beat.cluster) {
+      beatToCluster.set(beat.id, beat.cluster);
+    }
+  });
+
+  const transformedEdges: EdgeData[] = [];
+  const seenTransformed = new Set<string>();
+
+  allEdges.forEach(edge => {
+    const sourceCluster = beatToCluster.get(edge.source);
+    const targetCluster = beatToCluster.get(edge.target);
+
+    // Determine actual source/target (either beat ID or cluster virtual node ID)
+    const actualSource = sourceCluster ? `cluster:${sourceCluster}` : edge.source;
+    const actualTarget = targetCluster ? `cluster:${targetCluster}` : edge.target;
+
+    // Skip internal cluster edges (both source and target in same cluster)
+    if (sourceCluster && targetCluster && sourceCluster === targetCluster) {
+      return;
+    }
+
+    // Skip self-loops
+    if (actualSource === actualTarget) {
+      return;
+    }
+
+    const key = `${actualSource}->${actualTarget}`;
+    if (!seenTransformed.has(key)) {
+      seenTransformed.add(key);
+      transformedEdges.push({ source: actualSource, target: actualTarget });
+    }
+  });
+
+  // Create nodes for main layout: unclustered beats + virtual cluster nodes
+  const mainLayoutNodes: NodeData[] = [
+    ...unclusteredBeats.map(b => ({ id: b.id, position: b.position })),
+    ...virtualClusterNodes,
+  ];
+
+  // Run main layout
+  const { positions: mainPositions } = calculateTreeLayout(
+    mainLayoutNodes,
+    transformedEdges,
+    {
+      ...opts,
+      // Use larger spacing for clusters since they're bigger
+      nodeSpacingX: Math.max(opts.nodeSpacingX, 300),
+      nodeSpacingY: Math.max(opts.nodeSpacingY, 200),
+    }
+  );
+
+  // Extract beat and cluster positions from main layout
+  const beatPositions = new Map<string, { x: number; y: number }>();
+  const clusterPositions = new Map<string, { x: number; y: number }>();
+
+  mainPositions.forEach((pos, id) => {
+    if (id.startsWith('cluster:')) {
+      const clusterId = id.replace('cluster:', '');
+      clusterPositions.set(clusterId, pos);
+    } else {
+      beatPositions.set(id, pos);
+    }
+  });
+
+  // Layout beats within each cluster
+  const clusterInternalPositions = new Map<string, Map<string, { x: number; y: number }>>();
+
+  clusters.forEach(cluster => {
+    const clusterBeats = beatsByCluster.get(cluster.id) || [];
+    if (clusterBeats.length === 0) {
+      clusterInternalPositions.set(cluster.id, new Map());
+      return;
+    }
+
+    // Extract internal edges (edges between beats in this cluster)
+    const clusterBeatIds = new Set(clusterBeats.map(b => b.id));
+    const internalEdges = allEdges.filter(
+      e => clusterBeatIds.has(e.source) && clusterBeatIds.has(e.target)
+    );
+
+    // Layout internal beats with smaller spacing
+    const internalNodes = clusterBeats.map(b => ({ id: b.id }));
+    const { positions: internalPos } = calculateTreeLayout(
+      internalNodes,
+      internalEdges,
+      {
+        nodeSpacingX: 180,
+        nodeSpacingY: 100,
+        startX: 40,  // Padding inside cluster
+        startY: 60,  // Account for cluster header
+      }
+    );
+
+    clusterInternalPositions.set(cluster.id, internalPos);
+  });
+
+  return {
+    beatPositions,
+    clusterPositions,
+    clusterInternalPositions,
+  };
+}

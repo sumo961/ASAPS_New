@@ -14,6 +14,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
 }) => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['summary']));
   const [searchTerm, setSearchTerm] = useState('');
+  const [hideSinglePathWarnings, setHideSinglePathWarnings] = useState(false);
 
   // Run analysis
   const analysis = useMemo<ReachabilityResult>(() => {
@@ -73,6 +74,14 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
   const filteredReachable = filterBeats(reachableBeatsArray);
   const filteredUnreachable = filterBeats(analysis.unreachableBeats.map(b => b.beatId));
   const filteredOrphaned = filterBeats(analysis.orphanedBeats);
+
+  // Filter warnings based on settings
+  const filteredWarnings = useMemo(() => {
+    return analysis.warnings.filter(w =>
+      !hideSinglePathWarnings || w.type !== 'single-path'
+    );
+  }, [analysis.warnings, hideSinglePathWarnings]);
+  const hiddenWarningCount = analysis.warnings.length - filteredWarnings.length;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
@@ -163,11 +172,14 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
               </div>
             )}
 
-            {analysis.warnings.length > 0 && (
+            {filteredWarnings.length > 0 && (
               <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
                 <div className="flex items-center gap-2 text-sm text-yellow-800">
                   <AlertTriangle className="w-4 h-4" />
-                  <span className="font-medium">{analysis.warnings.length} warning(s) detected</span>
+                  <span className="font-medium">
+                    {filteredWarnings.length} warning(s) detected
+                    {hiddenWarningCount > 0 && ` (${hiddenWarningCount} hidden)`}
+                  </span>
                 </div>
               </div>
             )}
@@ -419,13 +431,27 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
               <AlertTriangle className="w-4 h-4 text-yellow-600" />
               <span className="font-medium">Warnings</span>
             </div>
-            <span className="text-sm text-gray-600">{analysis.warnings.length}</span>
+            <span className="text-sm text-gray-600">
+              {filteredWarnings.length}
+              {hiddenWarningCount > 0 && ` (+${hiddenWarningCount} hidden)`}
+            </span>
           </button>
 
           {expandedSections.has('warnings') && (
             <div className="px-4 pb-3">
+              {/* Toggle for single-path warnings */}
+              <label className="flex items-center gap-2 mb-3 text-sm text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hideSinglePathWarnings}
+                  onChange={(e) => setHideSinglePathWarnings(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>Hide &quot;single incoming connection&quot; warnings</span>
+              </label>
+
               <div className="space-y-2">
-                {analysis.warnings.map((warning, index) => (
+                {filteredWarnings.map((warning, index) => (
                   <div
                     key={index}
                     onClick={() => onHighlightBeat?.(warning.beatId)}

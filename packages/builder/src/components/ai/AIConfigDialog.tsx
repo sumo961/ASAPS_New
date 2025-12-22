@@ -5,8 +5,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Key, Sparkles, CheckCircle, AlertCircle, Server } from 'lucide-react';
-import { useAI } from '../../hooks/useAI';
+import { X, Key, Sparkles, CheckCircle, AlertCircle, Server, Trash2 } from 'lucide-react';
+import { useAI, getSavedAIConfig, clearSavedAIConfig } from '../../hooks/useAI';
 
 // Provider presets for easy configuration
 type ProviderType = 'claude' | 'openai' | 'local';
@@ -81,21 +81,50 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
   >('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [hasLoadedSaved, setHasLoadedSaved] = useState(false);
 
   const preset = PROVIDER_PRESETS[provider];
 
-  // Update baseUrl when provider changes
+  // Load saved configuration when dialog opens
   useEffect(() => {
-    const newPreset = PROVIDER_PRESETS[provider];
+    if (isOpen && !hasLoadedSaved) {
+      const savedConfig = getSavedAIConfig();
+      if (savedConfig) {
+        // Determine the provider type for UI
+        const savedProviderType = savedConfig.providerType || savedConfig.provider;
+        setProvider(savedProviderType as ProviderType);
+        setApiKey(savedConfig.apiKey || '');
+        setModel(savedConfig.model || '');
+        setBaseUrl(savedConfig.baseUrl || '');
+        setMaxTokens(savedConfig.maxTokens?.toString() || '');
+        setReasoningEffort(savedConfig.reasoningEffort || '');
+        console.log('[AIConfigDialog] Loaded saved configuration for:', savedProviderType);
+      }
+      setHasLoadedSaved(true);
+    }
+  }, [isOpen, hasLoadedSaved]);
+
+  // Reset hasLoadedSaved when dialog closes so it reloads on next open
+  useEffect(() => {
+    if (!isOpen) {
+      setHasLoadedSaved(false);
+    }
+  }, [isOpen]);
+
+  // Update baseUrl when provider changes (only if user manually changes provider)
+  const handleProviderChange = (newProvider: ProviderType) => {
+    setProvider(newProvider);
+    const newPreset = PROVIDER_PRESETS[newProvider];
     if (newPreset.defaultBaseUrl) {
       setBaseUrl(newPreset.defaultBaseUrl);
     } else {
       setBaseUrl('');
     }
-    // Also set default model suggestion
+    // Clear other fields when switching providers
     setModel('');
     setReasoningEffort('');
-  }, [provider]);
+    setApiKey('');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +150,8 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
         model || undefined,
         baseUrl || undefined,
         maxTokensNum,
-        reasoningEffort || undefined
+        reasoningEffort || undefined,
+        provider // Pass the original provider type for UI display
       );
       setSuccess(true);
 
@@ -133,6 +163,18 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Configuration failed');
     }
+  };
+
+  const handleClearSavedConfig = () => {
+    clearSavedAIConfig();
+    setApiKey('');
+    setModel('');
+    setBaseUrl('');
+    setMaxTokens('');
+    setReasoningEffort('');
+    setProvider('claude');
+    setSuccess(false);
+    setError('');
   };
 
   if (!isOpen) return null;
@@ -188,7 +230,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
             <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
-                onClick={() => setProvider('claude')}
+                onClick={() => handleProviderChange('claude')}
                 className={`p-4 border-2 rounded-lg transition-all ${
                   provider === 'claude'
                     ? 'border-purple-500 bg-purple-50'
@@ -203,7 +245,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
 
               <button
                 type="button"
-                onClick={() => setProvider('openai')}
+                onClick={() => handleProviderChange('openai')}
                 className={`p-4 border-2 rounded-lg transition-all ${
                   provider === 'openai'
                     ? 'border-purple-500 bg-purple-50'
@@ -218,7 +260,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
 
               <button
                 type="button"
-                onClick={() => setProvider('local')}
+                onClick={() => handleProviderChange('local')}
                 className={`p-4 border-2 rounded-lg transition-all ${
                   provider === 'local'
                     ? 'border-purple-500 bg-purple-50'
@@ -391,10 +433,20 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
           </div>
         ) : (
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-900">
-              <strong>Note:</strong> API keys are stored in memory only and are not persisted. You'll
-              need to re-enter them when you reload the application.
-            </p>
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-blue-900 flex-1">
+                <strong>Note:</strong> Your API key is saved in browser storage and will persist across sessions.
+                Use the button to clear saved credentials.
+              </p>
+              <button
+                type="button"
+                onClick={handleClearSavedConfig}
+                className="ml-3 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 text-sm"
+                title="Clear saved configuration"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>

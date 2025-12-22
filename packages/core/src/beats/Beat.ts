@@ -281,10 +281,13 @@ export abstract class Beat {
   }
 
   toJSON(): any {
-    // CRITICAL: Use getConnections() to include derived connections from choices/props
-    // For MovementChoice, PickProp, etc., connections are stored in the choices array
-    // and getConnections() extracts them properly
-    const allConnections = this.getConnections();
+    // IMPORTANT: Use this.connections directly, NOT getConnections()
+    // getConnections() may include derived connections (e.g., from dialogTree choices)
+    // which should be re-derived on load, not stored and accumulated.
+    // For beats like movementChoice, pickProp, etc., connections are defined in
+    // the choices/props arrays within parameters, not in the connections array.
+    // Storing derived connections causes duplication on each save/load cycle.
+    const storedConnections = [...this.connections];
 
     const json = {
       id: this.id,
@@ -294,7 +297,7 @@ export abstract class Beat {
       transition: this.transition,
       sound: this.sound,
       locations: Array.from(this.locations.values()),
-      connections: allConnections,
+      connections: storedConnections,
       defaultTarget: this.defaultTarget,
       defaultTargetDelay: this.defaultTargetDelay,
       showTimer: this.showTimer,
@@ -303,12 +306,6 @@ export abstract class Beat {
       node: this.node,
       parameters: this.getParameters()
     };
-    console.log(`[${this.type} ${this.id}].toJSON():`, {
-      node: this.node,
-      connectionsCount: allConnections.length,
-      parameters_node: json.parameters.node,
-      has_node_in_params: json.parameters.node !== undefined
-    });
     return json;
   }
 }

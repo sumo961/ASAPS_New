@@ -477,6 +477,9 @@ export async function importAsmlAssets(
       // Store with "sound:" prefix - don't store unprefixed to avoid overwriting backgrounds
       assetMap.set(`sound:${soundRef.name}`, result.assetId);
       urlMap.set(`sound:${soundRef.name}`, result.url);
+      // Also store by lowercase name for case-insensitive lookups
+      assetMap.set(`sound:${soundRef.name.toLowerCase()}`, result.assetId);
+      urlMap.set(`sound:${soundRef.name.toLowerCase()}`, result.url);
       filePathMap.set(soundRef.fPath, result.assetId);
       stats.soundsImported++;
       stats.totalFilesImported++;
@@ -595,9 +598,9 @@ export function linkAssetsToBeats(
     // Link sound - replace file name with actual URL for playback
     if (beat.sound?.file) {
       const soundName = beat.sound.file;
-      // Try prefixed lookup first to avoid collision with backgrounds of same name (e.g., "forest")
-      const assetId = assetMap.get(`sound:${soundName}`) || assetMap.get(soundName);
-      const soundUrl = urlMap.get(`sound:${soundName}`) || urlMap.get(soundName);
+      // Try prefixed lookup first, then case-insensitive fallback
+      const assetId = assetMap.get(`sound:${soundName}`) || assetMap.get(`sound:${soundName.toLowerCase()}`) || assetMap.get(soundName);
+      const soundUrl = urlMap.get(`sound:${soundName}`) || urlMap.get(`sound:${soundName.toLowerCase()}`) || urlMap.get(soundName);
       if (assetId) {
         beat.sound.assetId = assetId;
         // Replace file with URL so renderer can play it directly
@@ -654,13 +657,16 @@ export function linkAssetsToBeats(
         }
 
         // Link location sounds - replace with URL for playback
+        // Try prefixed lookup first, then case-insensitive fallback
         if (loc.sound) {
-          const soundAssetId = assetMap.get(loc.sound);
-          const soundUrl = urlMap.get(loc.sound);
+          const soundName = loc.sound;
+          const soundAssetId = assetMap.get(`sound:${soundName}`) || assetMap.get(`sound:${soundName.toLowerCase()}`) || assetMap.get(soundName);
+          const soundUrl = urlMap.get(`sound:${soundName}`) || urlMap.get(`sound:${soundName.toLowerCase()}`) || urlMap.get(soundName);
           if (soundAssetId) {
             loc.soundAssetId = soundAssetId;
             if (soundUrl) {
               loc.sound = soundUrl; // Replace with URL for direct playback
+              console.log(`[linkAssetsToBeats] Beat ${beat.id}: linked location sound "${soundName}" → ${soundAssetId}`);
             }
           }
         }
@@ -692,13 +698,16 @@ export function linkAssetsToBeats(
         }
 
         // Link location sounds - replace with URL for playback
+        // Try prefixed lookup first, then case-insensitive fallback
         if (loc.sound) {
-          const soundAssetId = assetMap.get(loc.sound);
-          const soundUrl = urlMap.get(loc.sound);
+          const soundName = loc.sound;
+          const soundAssetId = assetMap.get(`sound:${soundName}`) || assetMap.get(`sound:${soundName.toLowerCase()}`) || assetMap.get(soundName);
+          const soundUrl = urlMap.get(`sound:${soundName}`) || urlMap.get(`sound:${soundName.toLowerCase()}`) || urlMap.get(soundName);
           if (soundAssetId) {
             loc.soundAssetId = soundAssetId;
             if (soundUrl) {
               loc.sound = soundUrl; // Replace with URL for direct playback
+              console.log(`[linkAssetsToBeats] Beat ${beat.id}: linked location sound "${soundName}" → ${soundAssetId}`);
             }
           }
         }
@@ -725,9 +734,9 @@ export function linkAssetsToSettings(
   if (settings.sound?.backgroundMusic) {
     const soundName = settings.sound.backgroundMusic;
 
-    // Try prefixed lookup first (sounds are imported with "sound:" prefix)
-    const assetId = assetMap.get(`sound:${soundName}`) || assetMap.get(soundName);
-    const soundUrl = urlMap.get(`sound:${soundName}`) || urlMap.get(soundName);
+    // Try prefixed lookup first, then case-insensitive fallback
+    const assetId = assetMap.get(`sound:${soundName}`) || assetMap.get(`sound:${soundName.toLowerCase()}`) || assetMap.get(soundName);
+    const soundUrl = urlMap.get(`sound:${soundName}`) || urlMap.get(`sound:${soundName.toLowerCase()}`) || urlMap.get(soundName);
 
     if (soundUrl) {
       // Store the original name for display, and the URL for playback

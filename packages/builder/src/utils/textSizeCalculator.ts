@@ -19,6 +19,7 @@ export interface TextMeasurementOptions {
   padding?: number;
   lineHeight?: number;
   isButton?: boolean;
+  borderWidth?: number; // Total border width (both sides), default 4 (2px per side)
 }
 
 /**
@@ -64,16 +65,17 @@ export function calculateTextDimensions(options: TextMeasurementOptions): TextDi
     fontFamily = 'Arial',
     minWidth = 100,
     maxWidth = 824,
-    padding = 24, // Equal padding on all sides
+    padding = 40, // Total padding (20px per side × 2) to match defaultSettings.textbox.padding
     lineHeight = 1.4,
-    isButton = false
+    isButton = false,
+    borderWidth = 4 // Total border (2px per side × 2) to match defaultSettings.textbox.borderWidth
   } = options;
 
   if (!text || text.trim().length === 0) {
     // Empty text: return minimum size
     return {
       width: minWidth,
-      height: fontSize * lineHeight + padding
+      height: fontSize * lineHeight + padding + borderWidth
     };
   }
 
@@ -84,7 +86,7 @@ export function calculateTextDimensions(options: TextMeasurementOptions): TextDi
   // For buttons, prefer single line if possible
   if (isButton) {
     const buttonWidth = Math.max(minWidth, Math.min(singleLineWidth, maxWidth));
-    const buttonHeight = fontSize * lineHeight + padding;
+    const buttonHeight = fontSize * lineHeight + padding + borderWidth;
     return {
       width: Math.round(buttonWidth),
       height: Math.round(buttonHeight)
@@ -127,9 +129,9 @@ export function calculateTextDimensions(options: TextMeasurementOptions): TextDi
     lines = Math.max(1, Math.ceil(charCount / charsPerLine));
   }
 
-  // Calculate height with equal padding
+  // Calculate height with equal padding and border
   const contentHeight = lines * fontSize * lineHeight;
-  const height = contentHeight + padding;
+  const height = contentHeight + padding + borderWidth;
 
   return {
     width: Math.round(width),
@@ -140,21 +142,33 @@ export function calculateTextDimensions(options: TextMeasurementOptions): TextDi
 /**
  * Calculate dimensions for a button with text
  * Buttons prefer single line and have specific size constraints
+ * Buttons have asymmetric padding: 12px horizontal, 6px vertical per side
  */
 export function calculateButtonDimensions(
   text: string,
   fontSize: number = 16,
   fontFamily: string = 'Arial'
 ): TextDimensions {
-  return calculateTextDimensions({
-    text,
-    fontSize,
-    fontFamily,
-    minWidth: 120,
-    maxWidth: 400,
-    padding: 32, // More padding for buttons
-    isButton: true
-  });
+  // Measure text width
+  const measured = measureTextCanvas(text, fontSize, fontFamily);
+
+  // Button padding matches renderer: 12px horizontal per side, 6px vertical per side
+  const horizontalPadding = 24; // 12 * 2 sides
+  const verticalPadding = 12;   // 6 * 2 sides
+  const borderWidth = 4;        // 2px per side × 2 to match theme.button.borderWidth
+  const lineHeight = 1.4;
+
+  const minWidth = 120;
+  const maxWidth = 400;
+
+  const contentWidth = measured.width + horizontalPadding + borderWidth;
+  const width = Math.max(minWidth, Math.min(contentWidth, maxWidth));
+  const height = fontSize * lineHeight + verticalPadding + borderWidth;
+
+  return {
+    width: Math.round(width),
+    height: Math.round(height)
+  };
 }
 
 /**
@@ -172,7 +186,7 @@ export function calculateTextBoxDimensions(
     fontFamily,
     minWidth: 100,
     maxWidth: 824,
-    padding: 24,
+    padding: 40, // 20px per side × 2 to match defaultSettings.textbox.padding
     isButton: false
   });
 }
@@ -180,6 +194,7 @@ export function calculateTextBoxDimensions(
 /**
  * Calculate dimensions for a dialog box
  * Dialog boxes are similar to text boxes but may have different defaults
+ * Renderer uses dynamic padding: h=max(width*0.04,12), v=max(height*0.1,12) per side
  */
 export function calculateDialogDimensions(
   text: string,
@@ -192,7 +207,7 @@ export function calculateDialogDimensions(
     fontFamily,
     minWidth: 200,
     maxWidth: 600,
-    padding: 28, // Slightly more padding for dialog
+    padding: 36, // Approximate: accounts for min 12px + dynamic padding
     isButton: false
   });
 }

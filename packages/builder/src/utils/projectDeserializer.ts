@@ -212,6 +212,82 @@ function migrateDialogTreeDefaultConnection(beatData: any): void {
 }
 
 /**
+ * Migrate hyperText beats that have bracketed text but no hyperlinks array
+ * Extracts [bracketed text] and creates hyperlinks from them
+ */
+function migrateHyperTextBrackets(beatData: any): void {
+  if (beatData.type !== 'hyperText') return;
+
+  const params = beatData.parameters || {};
+
+  // If text contains [bracketed] text but hyperlinks array is empty/missing, extract them
+  if (params.text && (!params.hyperlinks || params.hyperlinks.length === 0)) {
+    const bracketRegex = /\[([^\]]+)\]/g;
+    const matches = [...params.text.matchAll(bracketRegex)];
+
+    if (matches.length > 0) {
+      console.log(`[migrateHyperText] Found ${matches.length} bracketed text in beat ${beatData.id}, extracting as hyperlinks`);
+
+      // Create hyperlinks from bracketed text
+      params.hyperlinks = [];
+      const connections = beatData.connections || [];
+
+      matches.forEach((match: RegExpMatchArray, index: number) => {
+        const word = match[1]; // Text inside brackets
+        // Try to find corresponding target from connections
+        const targetConnection = connections[index];
+        const targetBeatId = targetConnection?.targetId || targetConnection?.target || `${beatData.id}_link_${index}`;
+
+        params.hyperlinks.push({
+          word: word,
+          targetBeatId: targetBeatId
+        });
+
+        console.log(`[migrateHyperText] Created hyperlink: "${word}" → ${targetBeatId}`);
+      });
+
+      // Remove brackets from the text itself
+      params.text = params.text.replace(bracketRegex, '$1');
+      console.log(`[migrateHyperText] Cleaned text (removed brackets)`);
+
+      // Update beatData.parameters
+      beatData.parameters = params;
+    }
+  }
+
+  // Also normalize hyperlink property names if needed
+  if (params.hyperlinks && Array.isArray(params.hyperlinks)) {
+    params.hyperlinks = params.hyperlinks.map((link: any) => ({
+      word: link.word || link.text || link.phrase,
+      targetBeatId: link.targetBeatId || link.target || link.beatId,
+      style: link.style
+    }));
+  }
+}
+
+/**
+ * Normalize beat type aliases to canonical names
+ * This ensures consistent naming across the UI
+ */
+const BEAT_TYPE_ALIASES: Record<string, string> = {
+  'variable': 'setVariable',
+  'counter': 'setVariable',
+  'setCounter': 'setVariable',
+  'setGlobal': 'setVariable',
+  'condition': 'conditionBeat',
+  'conditionCheck': 'conditionBeat',
+  'addInventory': 'addRemoveInventory',
+  'removeInventory': 'addRemoveInventory',
+};
+
+/**
+ * Normalize beat type to canonical name
+ */
+function normalizeBeatType(type: string): string {
+  return BEAT_TYPE_ALIASES[type] || type;
+}
+
+/**
  * Deserialize beats from stored project data
  * Converts plain objects back into Beat class instances
  */
@@ -229,6 +305,31 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         continue;
       }
 
+      // Normalize beat type aliases to canonical names
+      const originalType = beatData.type;
+      const normalizedType = normalizeBeatType(beatData.type);
+      if (normalizedType !== originalType) {
+        console.log(`[deserializeBeats] Normalized beat type: "${originalType}" → "${normalizedType}" for beat ${beatData.id}`);
+        beatData.type = normalizedType;
+
+        // For variable/counter aliases, ensure parameters.type is set correctly
+        if (originalType === 'counter' || originalType === 'setCounter') {
+          beatData.parameters = beatData.parameters || {};
+          beatData.parameters.type = 'counter';
+        } else if (originalType === 'variable') {
+          beatData.parameters = beatData.parameters || {};
+          beatData.parameters.type = 'variable';
+        }
+        // For addInventory/removeInventory aliases, set the action parameter
+        if (originalType === 'addInventory') {
+          beatData.parameters = beatData.parameters || {};
+          beatData.parameters.action = 'add';
+        } else if (originalType === 'removeInventory') {
+          beatData.parameters = beatData.parameters || {};
+          beatData.parameters.action = 'remove';
+        }
+      }
+
       console.log('[deserializeBeats] Processing beat:', {
         id: beatData.id,
         name: beatData.name || 'unnamed',
@@ -244,6 +345,68 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
 
       // Apply migrations for deprecated features
       migrateDialogTreeDefaultConnection(beatData);
+      migrateHyperTextBrackets(beatData);
+
+      // === CLEANUP: Remove legacy duplicate/internal fields ===
+      const params = beatData.parameters || {};
+
+      // 1. Remove _rawHyperlinks (internal editor field) - whether empty or not
+      if (params._rawHyperlinks !== undefined) {
+        delete params._rawHyperlinks;
+        console.log(`[deserializeBeats] Removed _rawHyperlinks from beat ${beatData.id}`);
+      }
+
+      // 2. Remove empty locs array (internal field)
+      if (params.locs !== undefined && Array.isArray(params.locs) && params.locs.length === 0) {
+        delete params.locs;
+      }
+
+      // 3. For dialogTree, remove duplicate speaker/text/emotion from parameters root
+      // (they should only be in parameters.dialogTree)
+      if (beatData.type === 'dialogTree' && params.dialogTree) {
+        if (params.speaker !== undefined && params.dialogTree.speaker !== undefined) {
+          delete params.speaker;
+        }
+        if (params.text !== undefined && params.dialogTree.text !== undefined) {
+          delete params.text;
+        }
+        if (params.emotion !== undefined && params.dialogTree.emotion !== undefined) {
+          delete params.emotion;
+        }
+      }
+
+      // 4. For conditionBeat with inventory type, convert variableName → item
+      if (beatData.type === 'conditionBeat' && params.conditionType === 'inventory') {
+        if (params.variableName && !params.item) {
+          params.item = params.variableName;
+          console.log(`[deserializeBeats] Converted variableName → item for conditionBeat ${beatData.id}: ${params.item}`);
+        }
+        // Also fix condition object
+        if (params.condition && params.condition.type === 'inventory') {
+          if (!params.condition.item && params.variableName) {
+            params.condition.item = params.variableName;
+          }
+        }
+      }
+
+      // 5. For beats with derived connections, deduplicate by targetId
+      // (remove connections with same target but different labels - keep only one)
+      const BEATS_WITH_DERIVED_CONNECTIONS = ['dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'conditionBeat', 'randomTarget'];
+      if (BEATS_WITH_DERIVED_CONNECTIONS.includes(beatData.type) && beatData.connections) {
+        const seenTargets = new Set<string>();
+        beatData.connections = beatData.connections.filter((conn: any) => {
+          const targetId = conn.targetId || conn.target;
+          if (!targetId) return false;
+          if (seenTargets.has(targetId)) {
+            console.log(`[deserializeBeats] Removed duplicate connection to ${targetId} from beat ${beatData.id}`);
+            return false;
+          }
+          seenTargets.add(targetId);
+          return true;
+        });
+      }
+
+      beatData.parameters = params;
 
       // Create beat config from stored data
       const config = {
@@ -270,6 +433,16 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
       // Update beat with parameters if they exist
       if (beatData.parameters) {
         beat.updateParameters(beatData.parameters);
+      }
+
+      // CRITICAL FIX: For inputText, ensure variableName is applied to variable
+      // AI generates 'variableName' but InputTextBeat uses 'variable'
+      if (beatData.type === 'inputText' && beatData.parameters) {
+        const inputBeat = beat as any;
+        if (beatData.parameters.variableName && inputBeat.variable === 'userInput') {
+          inputBeat.variable = beatData.parameters.variableName;
+          console.log(`[deserializeBeats] InputTextBeat: Set variable from variableName: "${inputBeat.variable}"`);
+        }
       }
 
       // CRITICAL FIX: For conditionBeat, ensure trueTarget/falseTarget are set directly
@@ -463,6 +636,18 @@ export function loadProjectData(project: Project): {
     beatsById.set(beat.id, beat);
   }
 
+  // Beat types that derive their connections via getConnections() from parameters
+  // We should NOT add derived connections to beat.connections for these types
+  // because they already derive them at runtime, and storing them causes duplication
+  const BEAT_TYPES_WITH_DERIVED_CONNECTIONS = [
+    'dialogTree',
+    'movementChoice',
+    'pickProp',
+    'hyperText',
+    'conditionBeat',
+    'randomTarget'
+  ];
+
   for (const beatData of beatsData) {
     const derivedConnections = extractConnectionsFromBeatParameters(beatData);
     for (const conn of derivedConnections) {
@@ -474,23 +659,24 @@ export function loadProjectData(project: Project): {
         connections.push(conn);
       }
 
-      // CRITICAL: ALWAYS add to the Beat instance's connections array
-      // This ensures beat.getConnections() returns the derived connections
-      // even if the connection was already in story.connections
       const beat = beatsById.get(conn.source);
       if (beat) {
-        // Convert to Connection format expected by Beat
-        const beatConnection = {
-          targetId: conn.target,
-          label: conn.label,
-        };
-        // Check if this connection already exists in the beat
-        const alreadyExists = beat.connections.some(
-          (c: any) => c.targetId === conn.target || c.target === conn.target
-        );
-        if (!alreadyExists) {
-          beat.connections.push(beatConnection);
-          console.log(`[loadProjectData] Added derived connection to beat ${conn.source}: -> ${conn.target}`);
+        // For beat types that derive their own connections via getConnections(),
+        // do NOT add to beat.connections - they will be derived at runtime.
+        // This prevents duplication on each save/load cycle.
+        // Only add for simple beat types that don't override getConnections().
+        if (!BEAT_TYPES_WITH_DERIVED_CONNECTIONS.includes(beat.type)) {
+          const beatConnection = {
+            targetId: conn.target,
+            label: conn.label,
+          };
+          const alreadyExists = beat.connections.some(
+            (c: any) => c.targetId === conn.target || c.target === conn.target
+          );
+          if (!alreadyExists) {
+            beat.connections.push(beatConnection);
+            console.log(`[loadProjectData] Added derived connection to beat ${conn.source}: -> ${conn.target}`);
+          }
         }
 
         // ALSO update beat-specific target properties for inspector compatibility

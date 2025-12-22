@@ -1,14 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Link, X, Plus, Palette, Underline as UnderlineIcon } from 'lucide-react';
+import React, { useState, useRef, useMemo } from 'react';
+import { Link, X, Palette, Underline as UnderlineIcon } from 'lucide-react';
 import { Beat } from '@asaps/core';
 
-interface HyperLink {
-  start: number;
-  end: number;
+/**
+ * Word-based hyperlink format (canonical storage format)
+ */
+export interface HyperLink {
+  word: string;
   targetBeatId: string;
-  style: {
-    color: string;
-    underline: boolean;
+  style?: {
+    color?: string;
+    underline?: boolean;
   };
 }
 
@@ -19,31 +21,47 @@ interface HyperTextEditorProps {
   availableBeats: Beat[];
 }
 
+/**
+ * Find the position of a word in text (case-insensitive)
+ */
+function findWordPosition(text: string, word: string): { start: number; end: number } | null {
+  const lowerText = text.toLowerCase();
+  const lowerWord = word.toLowerCase();
+  const index = lowerText.indexOf(lowerWord);
+  if (index === -1) return null;
+  return { start: index, end: index + word.length };
+}
+
 export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
   text,
   hyperlinks,
   onChange,
   availableBeats
 }) => {
-  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
+  const [selection, setSelection] = useState<{ start: number; end: number; word: string } | null>(null);
   const [editingLinkIndex, setEditingLinkIndex] = useState<number | null>(null);
-  const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  // Compute positions for all hyperlinks (for display only)
+  const hyperlinksWithPositions = useMemo(() => {
+    return hyperlinks.map(link => {
+      const pos = findWordPosition(text, link.word);
+      return {
+        ...link,
+        start: pos?.start ?? -1,
+        end: pos?.end ?? -1,
+        found: pos !== null
+      };
+    }).filter(link => link.found);
+  }, [text, hyperlinks]);
 
   // Handle text change
   const handleTextChange = (newText: string) => {
-    // Adjust existing hyperlinks if text length changes
-    const updatedLinks = hyperlinks.map(link => {
-      // If link is beyond new text length, remove it
-      if (link.start >= newText.length) {
-        return null;
-      }
-      // If link end is beyond new text, truncate it
-      if (link.end > newText.length) {
-        return { ...link, end: newText.length };
-      }
-      return link;
-    }).filter(Boolean) as HyperLink[];
+    // Filter out hyperlinks whose words no longer exist in the text
+    const updatedLinks = hyperlinks.filter(link => {
+      const lowerText = newText.toLowerCase();
+      return lowerText.includes(link.word.toLowerCase());
+    });
 
     onChange(newText, updatedLinks);
   };
@@ -57,7 +75,7 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
     const previewEl = previewRef.current;
     if (!previewEl || !previewEl.contains(range.commonAncestorContainer)) return;
 
-    const selectedText = windowSelection.toString();
+    const selectedText = windowSelection.toString().trim();
     if (!selectedText || selectedText.length === 0) return;
 
     // Calculate actual position by walking through all text nodes
@@ -69,18 +87,18 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
       if (node.nodeType === Node.TEXT_NODE) {
         const nodeText = node.textContent || '';
         const nodeLength = nodeText.length;
-        
+
         if (node === range.startContainer) {
           start = currentPos + range.startOffset;
         }
         if (node === range.endContainer) {
           end = currentPos + range.endOffset;
-          return true; // Found both, stop
+          return true;
         }
-        
+
         currentPos += nodeLength;
       } else if (node.nodeType === Node.ELEMENT_NODE) {
-        for (let child of Array.from(node.childNodes)) {
+        for (const child of Array.from(node.childNodes)) {
           if (findPosition(child)) return true;
         }
       }
@@ -90,8 +108,10 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
     findPosition(previewEl);
 
     if (start !== -1 && end !== -1 && start < end) {
-      setSelection({ start, end });
-      console.log('Selection created:', { start, end, text: selectedText });
+      const word = text.substring(start, end).trim();
+      if (word.length > 0) {
+        setSelection({ start, end, word });
+      }
     }
   };
 
@@ -99,24 +119,19 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
   const handleAddLink = () => {
     if (!selection) return;
 
-    // Check for overlapping links
-    const hasOverlap = hyperlinks.some(link => {
-      return (
-        (selection.start >= link.start && selection.start < link.end) ||
-        (selection.end > link.start && selection.end <= link.end) ||
-        (selection.start <= link.start && selection.end >= link.end)
-      );
-    });
+    // Check if this word already has a link
+    const hasExisting = hyperlinks.some(
+      link => link.word.toLowerCase() === selection.word.toLowerCase()
+    );
 
-    if (hasOverlap) {
-      alert('This selection overlaps with an existing link. Please select different text.');
+    if (hasExisting) {
+      alert('This word already has a hyperlink.');
       setSelection(null);
       return;
     }
 
     const newLink: HyperLink = {
-      start: selection.start,
-      end: selection.end,
+      word: selection.word,
       targetBeatId: '',
       style: {
         color: '#0066cc',
@@ -149,14 +164,14 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
   const renderPreview = () => {
     if (!text) return <span className="text-gray-400 italic">Enter text above...</span>;
 
-    // Sort links by start position
-    const sortedLinks = [...hyperlinks].sort((a, b) => a.start - b.start);
-    
+    // Sort links by position
+    const sortedLinks = [...hyperlinksWithPositions].sort((a, b) => a.start - b.start);
+
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
 
     sortedLinks.forEach((link, i) => {
-      // Add text before link (preserve all characters including spaces)
+      // Add text before link
       if (link.start > lastIndex) {
         const beforeText = text.substring(lastIndex, link.start);
         parts.push(
@@ -167,21 +182,22 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
       // Add linked text
       const linkText = text.substring(link.start, link.end);
       const beat = availableBeats.find(b => b.id === link.targetBeatId);
-      
+      const originalIndex = hyperlinks.findIndex(h => h.word === link.word);
+
       parts.push(
         <span
           key={`link-${i}`}
           className={`cursor-pointer hover:opacity-75 transition-opacity ${
-            editingLinkIndex === i ? 'ring-2 ring-blue-400 ring-offset-2' : ''
+            editingLinkIndex === originalIndex ? 'ring-2 ring-blue-400 ring-offset-2' : ''
           }`}
           style={{
-            color: link.style.color,
-            textDecoration: link.style.underline ? 'underline' : 'none',
-            textDecorationColor: link.style.color
+            color: link.style?.color || '#0066cc',
+            textDecoration: link.style?.underline !== false ? 'underline' : 'none',
+            textDecorationColor: link.style?.color || '#0066cc'
           }}
           onClick={(e) => {
             e.stopPropagation();
-            setEditingLinkIndex(i);
+            setEditingLinkIndex(originalIndex);
           }}
           title={beat ? `→ ${beat.name}` : 'No target set'}
         >
@@ -192,7 +208,7 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
       lastIndex = link.end;
     });
 
-    // Add remaining text (preserve all characters including spaces)
+    // Add remaining text
     if (lastIndex < text.length) {
       const remainingText = text.substring(lastIndex);
       parts.push(
@@ -203,12 +219,6 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
     return parts;
   };
 
-  // Get selected text
-  const getSelectedText = () => {
-    if (!selection) return '';
-    return text.substring(selection.start, selection.end);
-  };
-
   return (
     <div className="space-y-4">
       {/* Text Input */}
@@ -217,7 +227,6 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
           Main Text <span className="text-red-500">*</span>
         </label>
         <textarea
-          ref={textAreaRef}
           value={text}
           onChange={(e) => handleTextChange(e.target.value)}
           rows={4}
@@ -247,10 +256,7 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
           <div className="flex items-center justify-between mb-2">
             <div>
               <div className="text-sm font-medium text-blue-900">
-                Selected: "{getSelectedText()}"
-              </div>
-              <div className="text-xs text-blue-600">
-                Position: {selection.start} - {selection.end}
+                Selected: "{selection.word}"
               </div>
             </div>
             <button
@@ -281,17 +287,20 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
 
         <div className="space-y-2">
           {hyperlinks.map((link, index) => {
-            const linkText = text.substring(link.start, link.end);
             const beat = availableBeats.find(b => b.id === link.targetBeatId);
             const isEditing = editingLinkIndex === index;
+            const pos = findWordPosition(text, link.word);
+            const isValid = pos !== null;
 
             return (
               <div
                 key={index}
                 className={`p-3 rounded-lg border-2 transition-all ${
-                  isEditing 
-                    ? 'bg-blue-50 border-blue-400' 
-                    : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                  isEditing
+                    ? 'bg-blue-50 border-blue-400'
+                    : isValid
+                    ? 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                    : 'bg-red-50 border-red-200'
                 }`}
               >
                 <div className="flex items-start justify-between mb-2">
@@ -300,15 +309,17 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
                       <span
                         className="font-medium text-sm"
                         style={{
-                          color: link.style.color,
-                          textDecoration: link.style.underline ? 'underline' : 'none'
+                          color: link.style?.color || '#0066cc',
+                          textDecoration: link.style?.underline !== false ? 'underline' : 'none'
                         }}
                       >
-                        "{linkText}"
+                        "{link.word}"
                       </span>
-                      <span className="text-xs text-gray-500">
-                        ({link.start}-{link.end})
-                      </span>
+                      {!isValid && (
+                        <span className="text-xs text-red-500">
+                          (not found in text)
+                        </span>
+                      )}
                     </div>
                     {beat ? (
                       <div className="text-xs text-gray-600">
@@ -329,7 +340,7 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
                   </button>
                 </div>
 
-                {/* Link Settings - Always visible for easier access */}
+                {/* Link Settings */}
                 <div className="space-y-2 mt-2 pt-2 border-t border-gray-200">
                   {/* Target Beat */}
                   <div>
@@ -360,7 +371,7 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
-                          value={link.style.color}
+                          value={link.style?.color || '#0066cc'}
                           onChange={(e) => handleUpdateLink(index, {
                             style: { ...link.style, color: e.target.value }
                           })}
@@ -377,14 +388,14 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={link.style.underline}
+                            checked={link.style?.underline !== false}
                             onChange={(e) => handleUpdateLink(index, {
                               style: { ...link.style, underline: e.target.checked }
                             })}
                             className="rounded border-gray-300"
                           />
                           <span className="text-sm text-gray-700">
-                            {link.style.underline ? 'On' : 'Off'}
+                            {link.style?.underline !== false ? 'On' : 'Off'}
                           </span>
                         </label>
                       </div>

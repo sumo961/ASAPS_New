@@ -47,8 +47,16 @@ export class ConditionBeat extends Beat {
 
     // Get conditionType from nested condition.type OR direct params.conditionType
     this.conditionType = conditionObj.type || params.conditionType || config.conditionType || 'counter';
-    this.trueTarget = params.trueTarget || config.trueTarget || '';
-    this.falseTarget = params.falseTarget || config.falseTarget;
+
+    // Extract trueTarget/falseTarget - support both direct values and connection objects
+    // AI generates: trueConnection: { target: "beat_id" }
+    // We need: trueTarget: "beat_id"
+    const trueConn = (params as any).trueConnection;
+    const falseConn = (params as any).falseConnection;
+    this.trueTarget = params.trueTarget || config.trueTarget ||
+      (trueConn ? (typeof trueConn === 'string' ? trueConn : trueConn.target) : '') || '';
+    this.falseTarget = params.falseTarget || config.falseTarget ||
+      (falseConn ? (typeof falseConn === 'string' ? falseConn : falseConn.target) : undefined);
 
     // Store individual condition parameters
     // Priority: conditionObj (from ASML) > params (direct) > config
@@ -138,6 +146,38 @@ export class ConditionBeat extends Beat {
       checkType: this.checkType,
       beatId: this.beatId
     };
+  }
+
+  /**
+   * Override getConnections to return connections from trueTarget/falseTarget
+   * This ensures the graph visualization shows the condition branches
+   */
+  getConnections(): Array<{ targetId: string; label?: string; condition?: any }> {
+    const connections: Array<{ targetId: string; label?: string; condition?: any }> = [];
+
+    if (this.trueTarget) {
+      connections.push({
+        targetId: this.trueTarget,
+        label: 'true'
+      });
+    }
+
+    if (this.falseTarget) {
+      connections.push({
+        targetId: this.falseTarget,
+        label: 'false'
+      });
+    }
+
+    // Also include any base connections
+    const baseConnections = super.getConnections();
+    for (const conn of baseConnections) {
+      if (!connections.some(c => c.targetId === conn.targetId && c.label === conn.label)) {
+        connections.push(conn);
+      }
+    }
+
+    return connections;
   }
 
   updateParameters(params: Record<string, any>): void {

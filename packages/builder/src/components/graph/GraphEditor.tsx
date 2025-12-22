@@ -221,6 +221,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           onSetClusterMap: onSetClusterMap,
           // Pass a getter function for assets to avoid embedding the whole array in node data
           getAssets: () => assetsRef.current,
+          // Pass highlighted beat IDs for path visualization within cluster
+          highlightedBeatIds: highlightedBeatIds.length > 0 ? new Set(highlightedBeatIds) : undefined,
         },
         style: {
           width: cluster.containerBounds.width,

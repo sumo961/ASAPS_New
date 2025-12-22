@@ -38,6 +38,7 @@ export interface PathAnalysisResult {
   deadEnds: string[]; // Beat IDs with no outgoing connections
   cycles: string[][]; // Arrays of beat IDs in cycles
   endingBeats: string[]; // Beat IDs that are story endings
+  truncated: boolean; // Whether analysis was stopped due to path limit
 }
 
 /**
@@ -45,6 +46,7 @@ export interface PathAnalysisResult {
  */
 export interface PathAnalysisConfig {
   maxDepth?: number; // Maximum path length (default: 100)
+  maxPaths?: number; // Maximum number of paths to explore (default: 10000)
   includeConditionalPaths?: boolean; // Include paths with conditions (default: true)
   trackCycles?: boolean; // Track and report cycles (default: true)
 }
@@ -67,6 +69,7 @@ export class PathAnalyzer {
     this.story = story;
     this.config = {
       maxDepth: config.maxDepth ?? 100,
+      maxPaths: config.maxPaths ?? 10000,
       includeConditionalPaths: config.includeConditionalPaths ?? true,
       trackCycles: config.trackCycles ?? true
     };
@@ -103,9 +106,14 @@ export class PathAnalyzer {
     this.visitedInPath = new Set();
     this.explorePath(firstBeat, []);
 
-    console.log(`[PathAnalyzer] Analysis complete. Found ${this.allPaths.length} paths`);
+    const truncated = this.allPaths.length >= this.config.maxPaths;
+    if (truncated) {
+      console.log(`[PathAnalyzer] Analysis stopped at ${this.allPaths.length} paths (limit: ${this.config.maxPaths})`);
+    } else {
+      console.log(`[PathAnalyzer] Analysis complete. Found ${this.allPaths.length} paths`);
+    }
 
-    return this.compileResults();
+    return this.compileResults(truncated);
   }
 
   /**
@@ -182,9 +190,34 @@ export class PathAnalyzer {
   }
 
   /**
+   * Check if a beat type represents a player choice (branches are alternatives)
+   * vs automatic branching (like ConditionBeat which branches based on state)
+   */
+  private isPlayerChoiceBeat(beatType: string): boolean {
+    // These beat types represent actual player choices
+    const choiceTypes = ['movementChoice', 'dialogTree', 'pickProp', 'hyperText'];
+    return choiceTypes.includes(beatType);
+  }
+
+  /**
+   * Check if a beat type is an automatic/invisible beat that branches based on state
+   */
+  private isAutomaticBranchBeat(beatType: string): boolean {
+    // These beats branch automatically without player input
+    // For path analysis, we should only follow ONE branch (they're mutually exclusive)
+    const automaticTypes = ['conditionBeat', 'condition', 'randomTarget', 'setVariable', 'addRemoveInventory', 'setTimer'];
+    return automaticTypes.includes(beatType);
+  }
+
+  /**
    * Explore a path using DFS
    */
   private explorePath(beat: Beat, currentPath: PathNode[]): void {
+    // Check path limit
+    if (this.allPaths.length >= this.config.maxPaths) {
+      return;
+    }
+
     const beatId = beat.id;
 
     // Check for cycle
@@ -232,10 +265,22 @@ export class PathAnalyzer {
       return;
     }
 
+    // Determine exploration strategy based on beat type
+    const isAutomatic = this.isAutomaticBranchBeat(beat.type);
+
+    // For automatic beats (like ConditionBeat), connections are mutually exclusive
+    // We still explore all to find all possible paths, but this is semantically different
+    // from player choice beats where the player actively chooses
+
     // Explore all connections
     let exploredAny = false;
 
     for (const connection of connections) {
+      // Check path limit before each exploration
+      if (this.allPaths.length >= this.config.maxPaths) {
+        break;
+      }
+
       const targetBeat = this.story.getBeat(connection.targetId);
       if (!targetBeat) {
         console.warn(`[PathAnalyzer] Target beat not found: ${connection.targetId}`);
@@ -257,7 +302,7 @@ export class PathAnalyzer {
     }
 
     // Explore defaultTarget if present
-    if (defaultTarget) {
+    if (defaultTarget && this.allPaths.length < this.config.maxPaths) {
       const targetBeat = this.story.getBeat(defaultTarget);
       if (targetBeat) {
         this.explorePath(targetBeat, newPath);
@@ -317,7 +362,7 @@ export class PathAnalyzer {
   /**
    * Compile final results
    */
-  private compileResults(): PathAnalysisResult {
+  private compileResults(truncated: boolean = false): PathAnalysisResult {
     if (this.allPaths.length === 0) {
       return this.createEmptyResult();
     }
@@ -365,7 +410,8 @@ export class PathAnalyzer {
       averagePathLength,
       deadEnds,
       cycles,
-      endingBeats
+      endingBeats,
+      truncated
     };
   }
 
@@ -381,7 +427,8 @@ export class PathAnalyzer {
       averagePathLength: 0,
       deadEnds: [],
       cycles: [],
-      endingBeats: []
+      endingBeats: [],
+      truncated: false
     };
   }
 }

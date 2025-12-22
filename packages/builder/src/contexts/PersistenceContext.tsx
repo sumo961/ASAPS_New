@@ -259,6 +259,21 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    */
   const loadProject = useCallback(async (projectId: string): Promise<boolean> => {
     try {
+      // CRITICAL: If currently on an untitled project, discard it before loading new one
+      // This prevents accumulation of "Untitled Project" entries in storage
+      const currentProj = currentProjectRef.current;
+      if (currentProj && currentProj.name === 'Untitled Project' && isUntitledProjectRef.current) {
+        console.log('[PersistenceProvider] Discarding untitled project before loading:', currentProj.id);
+        try {
+          await storage.deleteProject(currentProj.id);
+        } catch (e) {
+          console.warn('[PersistenceProvider] Failed to delete untitled project:', e);
+        }
+        // Clear untitled state
+        isUntitledProjectRef.current = false;
+        setIsUntitledProject(false);
+      }
+
       const result = await storage.getProject(projectId);
 
       if (!result.success || !result.data) {
@@ -325,6 +340,15 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       setProjectId(newProjectId);
       commandManager.setProjectId(newProjectId);
       commandManager.clear();
+
+      // CRITICAL: If creating an "Untitled Project", mark it as untitled to block auto-save
+      // This prevents the default 3-beat project from being auto-saved before user makes changes
+      // or before an AI-generated story replaces it
+      if (name === 'Untitled Project') {
+        isUntitledProjectRef.current = true;
+        setIsUntitledProject(true);
+        console.log('[PersistenceProvider] Created untitled project - auto-save blocked');
+      }
 
       return newProjectId;
     } catch (error) {

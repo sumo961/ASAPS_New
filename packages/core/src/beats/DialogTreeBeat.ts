@@ -200,11 +200,17 @@ export class DialogTreeBeat extends Beat {
   }
 
   getParameters(): Record<string, any> {
+    // NOTE: speaker/text/emotion are stored ONLY in dialogTree to avoid duplication.
+    // The dialogTree is the single source of truth for dialog content.
+    // Sync instance properties to dialogTree before returning.
+    const dt = this.dialogTree || { id: 'root', speaker: '', text: '', choices: [] };
+    dt.speaker = this.speaker;
+    dt.text = this.text;
+    if (this.emotion) dt.emotion = this.emotion;
+
     return {
-      dialogTree: this.dialogTree || { id: 'root', speaker: this.speaker, text: this.text },
-      speaker: this.speaker,
-      text: this.text,
-      emotion: this.emotion,
+      dialogTree: dt,
+      // Do NOT include speaker/text/emotion separately - they're in dialogTree
       node: this.node,
       choiceDelay: this.choiceDelay,
       backgroundUrl: this.backgroundUrl,
@@ -244,21 +250,15 @@ export class DialogTreeBeat extends Beat {
 
   /**
    * Override toJSON to ensure dialogTree is safely serialized
+   * NOTE: We rely on getParameters() to include all dialog data in the 'parameters' object.
+   * We do NOT add dialogTree/speaker/text/emotion at the top level to avoid duplication.
+   * The base toJSON() already includes parameters: this.getParameters().
    */
   toJSON(): any {
-    const base = super.toJSON();
-    return {
-      ...base,
-      dialogTree: this.dialogTree || { id: 'root', speaker: this.speaker, text: this.text },
-      speaker: this.speaker,
-      text: this.text,
-      emotion: this.emotion,
-      choiceDelay: this.choiceDelay,
-      // CRITICAL: Include background properties for persistence
-      node: this.node,
-      backgroundUrl: this.backgroundUrl,
-      backgroundAssetId: this.backgroundAssetId
-    };
+    // Just use base toJSON - it already includes parameters from getParameters()
+    // which contains dialogTree, speaker, text, emotion, etc.
+    // Do NOT add these properties at top-level to avoid duplication.
+    return super.toJSON();
   }
 
   protected async performAction(

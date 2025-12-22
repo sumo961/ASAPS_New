@@ -107,6 +107,71 @@ function App() {
     }));
   }, [state.title, state.author]);
 
+  // DEBUG HELPER: Expose function to load debug story from console
+  // Usage: window.loadDebugStory() or window.loadDebugStory('/path/to/debug.json')
+  useEffect(() => {
+    (window as any).loadDebugStory = async (url = '/debug-story.json') => {
+      try {
+        console.log('[Debug] Fetching debug story from:', url);
+        const response = await fetch(url);
+        const debugData = await response.json();
+
+        console.log('[Debug] Loaded debug file:', {
+          title: debugData.title,
+          beatCount: debugData.beatCount,
+          status: debugData.status
+        });
+
+        if (!debugData.story?.beats) {
+          console.error('[Debug] No beats found in debug file');
+          return;
+        }
+
+        // Create beats using the registry
+        const { BeatTypeRegistry } = await import('@asaps/core');
+        const registry = BeatTypeRegistry.getInstance();
+
+        const createdBeats = debugData.story.beats.map((beatData: any) => {
+          const beat = registry.createBeat(beatData.type, {
+            ...beatData,
+            parameters: beatData.parameters || {}
+          });
+          // Set position
+          if (beatData.position) {
+            beat.x = beatData.position.x;
+            beat.y = beatData.position.y;
+          }
+          return beat;
+        });
+
+        console.log('[Debug] Created', createdBeats.length, 'beats');
+
+        // Load into the app
+        actions.loadStoryData({
+          title: debugData.story.metadata?.title || debugData.title || 'Debug Story',
+          author: debugData.story.metadata?.author || 'Debug',
+          beats: createdBeats,
+          connections: [],
+          settings: {},
+          characters: [],
+          clusters: []
+        });
+
+        console.log('[Debug] Story loaded successfully!');
+        return { success: true, beatCount: createdBeats.length };
+      } catch (error) {
+        console.error('[Debug] Failed to load debug story:', error);
+        return { success: false, error };
+      }
+    };
+
+    console.log('[Debug] Debug helper available: window.loadDebugStory()');
+
+    return () => {
+      delete (window as any).loadDebugStory;
+    };
+  }, [actions]);
+
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     project: {
       width: 1024,
@@ -376,7 +441,8 @@ function App() {
               if (params.condition) {
                 const cond = params.condition;
                 params.conditionType = cond.type || params.conditionType;
-                params.variableName = cond.variableName || cond.left || params.variableName;
+                // AI may generate 'variable', 'variableName', or 'left' - support all
+                params.variableName = cond.variableName || cond.variable || cond.left || params.variableName;
                 params.operator = cond.operator || params.operator;
                 params.value = cond.value ?? cond.right ?? params.value;
                 delete params.condition;
@@ -1739,7 +1805,8 @@ function App() {
             if (params.condition) {
               const cond = params.condition;
               params.conditionType = cond.type || params.conditionType;
-              params.variableName = cond.variableName || cond.left || params.variableName;
+              // AI may generate 'variable', 'variableName', or 'left' - support all
+              params.variableName = cond.variableName || cond.variable || cond.left || params.variableName;
               params.operator = cond.operator || params.operator;
               params.value = cond.value ?? cond.right ?? params.value;
               params.counter1 = cond.counter1 || params.counter1;
@@ -1762,7 +1829,10 @@ function App() {
             }
           }
 
-          actions.updateBeat(beat.id, params);
+          // CRITICAL: Call updateParameters() directly on the beat instance
+          // Using actions.updateBeat() would use Object.assign which bypasses
+          // the beat's proper parameter handling (e.g., DialogTree migration)
+          beat.updateParameters(params);
         }
       });
     }
@@ -1986,6 +2056,7 @@ function App() {
         onRenameProject={handleRenameProject}
         isUntitledProject={isUntitledProject}
         hasUnsavedChanges={hasUnsavedChanges}
+        currentProjectId={currentProject?.id}
       />
 
       <div className="flex flex-1 overflow-hidden">

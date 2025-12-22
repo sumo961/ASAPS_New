@@ -32,6 +32,7 @@ interface HeaderProps {
   onRenameProject?: (projectId: string, newName: string) => Promise<void>;
   isUntitledProject?: boolean;
   hasUnsavedChanges?: boolean;
+  currentProjectId?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -55,7 +56,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSaveProject,
   onRenameProject,
   isUntitledProject,
-  hasUnsavedChanges
+  hasUnsavedChanges,
+  currentProjectId
 }) => {
   const { status, lastSaved, error: saveError } = useSave();
   const { load } = useProject();
@@ -317,6 +319,7 @@ export const Header: React.FC<HeaderProps> = ({
           onRenameProject={onRenameProject}
           isModal={true}
           onClose={() => setShowProjectLibrary(false)}
+          currentProjectId={currentProjectId}
         />
       )}
 

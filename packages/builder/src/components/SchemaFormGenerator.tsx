@@ -223,6 +223,19 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           );
         }
 
+        // Conditional visibility for addRemoveInventory fields
+        if (beatType === 'addRemoveInventory') {
+          const action = parameters.action || 'add';
+          // Hide 'character' when action is 'transfer' (use fromChar/toChar instead)
+          if (paramName === 'character' && action === 'transfer') {
+            return null;
+          }
+          // Hide 'fromChar' and 'toChar' when action is NOT 'transfer'
+          if ((paramName === 'fromChar' || paramName === 'toChar') && action !== 'transfer') {
+            return null;
+          }
+        }
+
         // Handle variable name fields
         if (paramName === 'variable' || paramName === 'timer' || paramName === 'item' ||
             paramName === 'timerName' || paramName === 'character' ||
