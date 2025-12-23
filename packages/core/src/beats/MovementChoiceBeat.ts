@@ -135,7 +135,16 @@ export class MovementChoiceBeat extends Beat {
       locations
     );
 
-    const selectedChoice = availableChoices.find(c => c.id === choiceId);
+    // Find selected choice - match by id first, then by text (for choices without id)
+    let selectedChoice = availableChoices.find(c => c.id === choiceId);
+    if (!selectedChoice) {
+      // Fallback: match by text (case-insensitive)
+      const choiceIdLower = choiceId?.toLowerCase();
+      selectedChoice = availableChoices.find(c =>
+        c.text?.toLowerCase() === choiceIdLower
+      );
+    }
+
     if (selectedChoice) {
       // Apply any location effects
       if (selectedChoice.location) {
@@ -144,6 +153,7 @@ export class MovementChoiceBeat extends Beat {
       return selectedChoice.target;
     }
 
+    console.warn(`[MovementChoiceBeat] No matching choice found for "${choiceId}". Available: ${availableChoices.map(c => c.id || c.text).join(', ')}`);
     return this.getNextBeat(context);
   }
 }

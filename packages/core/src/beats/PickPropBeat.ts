@@ -109,7 +109,16 @@ export class PickPropBeat extends Beat {
       locations
     );
 
-    const selectedProp = availableProps.find(p => p.id === propId);
+    // Find selected prop - match by id first, then by name (for props without id)
+    let selectedProp = availableProps.find(p => p.id === propId);
+    if (!selectedProp) {
+      // Fallback: match by name (case-insensitive)
+      const propIdLower = propId?.toLowerCase();
+      selectedProp = availableProps.find(p =>
+        p.name?.toLowerCase() === propIdLower
+      );
+    }
+
     if (selectedProp) {
       // Apply prop effects (e.g., add to inventory)
       if (selectedProp.effects) {
@@ -122,6 +131,7 @@ export class PickPropBeat extends Beat {
       return selectedProp.target;
     }
 
+    console.warn(`[PickPropBeat] No matching prop found for "${propId}". Available: ${availableProps.map(p => p.id || p.name).join(', ')}`);
     return this.getNextBeat(context);
   }
 }
