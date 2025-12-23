@@ -1429,21 +1429,38 @@ export const Inspector: React.FC<InspectorProps> = ({
                     />
 
                     {showAdvanced && (
-                      <div className="border-t pt-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Choice Delay (seconds)
-                          <span className="text-xs text-gray-500 block font-normal">
-                            Time before choices appear (optional)
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          value={localBeat.parameters?.choiceDelay || 0}
-                          onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
-                          min="0"
-                          step="0.5"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        />
+                      <div className="border-t pt-3 space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Choice Delay (seconds)
+                            <span className="text-xs text-gray-500 block font-normal">
+                              Time before choices appear (optional)
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            value={localBeat.parameters?.choiceDelay || 0}
+                            onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
+                            min="0"
+                            step="0.5"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="markVisited-dialog"
+                            checked={localBeat.parameters?.markVisited || false}
+                            onChange={(e) => handleParameterChange('markVisited', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="markVisited-dialog" className="text-sm text-gray-700">
+                            Mark already visited choices
+                            <span className="text-xs text-gray-500 block">
+                              Dim choices leading to previously visited beats
+                            </span>
+                          </label>
+                        </div>
                       </div>
                     )}
 
@@ -1464,21 +1481,53 @@ export const Inspector: React.FC<InspectorProps> = ({
                     </div>
 
                     {showAdvanced && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Choice Delay (seconds)
-                          <span className="text-xs text-gray-500 block font-normal">
-                            Time before choices appear (optional)
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          value={localBeat.parameters?.choiceDelay || 0}
-                          onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
-                          min="0"
-                          step="0.5"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        />
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Choice Delay (seconds)
+                            <span className="text-xs text-gray-500 block font-normal">
+                              Time before choices appear (optional)
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            value={localBeat.parameters?.choiceDelay || 0}
+                            onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
+                            min="0"
+                            step="0.5"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="markVisited-movement"
+                            checked={localBeat.parameters?.markVisited || false}
+                            onChange={(e) => handleParameterChange('markVisited', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="markVisited-movement" className="text-sm text-gray-700">
+                            Mark already visited choices
+                            <span className="text-xs text-gray-500 block">
+                              Dim choices leading to previously visited beats
+                            </span>
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="showTextOnHover-movement"
+                            checked={localBeat.parameters?.showTextOnHover || false}
+                            onChange={(e) => handleParameterChange('showTextOnHover', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="showTextOnHover-movement" className="text-sm text-gray-700">
+                            Show text on hover only
+                            <span className="text-xs text-gray-500 block">
+                              Hotspot text appears when cursor hovers over it
+                            </span>
+                          </label>
+                        </div>
                       </div>
                     )}
 
@@ -1588,21 +1637,38 @@ export const Inspector: React.FC<InspectorProps> = ({
                     </div>
 
                     {showAdvanced && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Choice Delay (seconds)
-                          <span className="text-xs text-gray-500 block font-normal">
-                            Time before choices appear (optional)
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          value={localBeat.parameters?.choiceDelay || 0}
-                          onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
-                          min="0"
-                          step="0.5"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        />
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Choice Delay (seconds)
+                            <span className="text-xs text-gray-500 block font-normal">
+                              Time before choices appear (optional)
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            value={localBeat.parameters?.choiceDelay || 0}
+                            onChange={(e) => handleParameterChange('choiceDelay', parseFloat(e.target.value))}
+                            min="0"
+                            step="0.5"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="markVisited-pickprop"
+                            checked={localBeat.parameters?.markVisited || false}
+                            onChange={(e) => handleParameterChange('markVisited', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="markVisited-pickprop" className="text-sm text-gray-700">
+                            Mark already visited choices
+                            <span className="text-xs text-gray-500 block">
+                              Dim choices leading to previously visited beats
+                            </span>
+                          </label>
+                        </div>
                       </div>
                     )}
 
@@ -1644,7 +1710,25 @@ export const Inspector: React.FC<InspectorProps> = ({
                             placeholder="Description"
                             className="w-full px-2 py-1 text-sm border rounded"
                           />
-                          
+
+                          {/* Prop Graphic Asset Selector */}
+                          <div>
+                            <label className="text-xs text-gray-600 mb-1 block">Prop Graphic (optional)</label>
+                            <select
+                              value={(prop as any).assetId || ''}
+                              onChange={(e) => handleUpdateProp(index, 'assetId', e.target.value || undefined)}
+                              className="w-full px-2 py-1 text-sm border rounded"
+                            >
+                              <option value="">None (use button)</option>
+                              {assets.filter(a => a.type === 'image').map(asset => (
+                                <option key={asset.id} value={asset.id}>{asset.name}</option>
+                              ))}
+                            </select>
+                            <span className="text-xs text-gray-400">
+                              Select an image to display as clickable prop
+                            </span>
+                          </div>
+
                           <select
                             value={prop.target || ''}
                             onChange={(e) => handleUpdateProp(index, 'target', e.target.value)}

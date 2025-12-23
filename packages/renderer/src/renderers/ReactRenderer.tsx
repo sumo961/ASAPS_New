@@ -487,6 +487,7 @@ export class ReactRenderer extends BaseRenderer {
   protected hideTextBoxes: boolean = false;  // NEW: Whether to hide text box backgrounds
   protected hideButtonBoxes: boolean = false;  // NEW: Whether to hide button box backgrounds
   protected theme: RenderThemeSettings | undefined = undefined;  // NEW: Theme settings for styling
+  protected visitedBeats: string[] = [];  // NEW: Array of visited beat IDs for marking visited choices
   
   private get root(): ReactDOM.Root | null {
     return this._root;
@@ -606,6 +607,14 @@ export class ReactRenderer extends BaseRenderer {
     this.theme = theme;
   }
 
+  /**
+   * Set the array of visited beat IDs
+   * Used for marking choices that lead to already-visited beats
+   */
+  setVisitedBeats(visitedBeats: string[]): void {
+    this.visitedBeats = visitedBeats;
+  }
+
   // ============= UNIFIED POSITIONED RENDERING SYSTEM =============
   
   /**
@@ -657,7 +666,10 @@ export class ReactRenderer extends BaseRenderer {
       const backgroundColor = this.backgroundImageUrl
         ? 'transparent'
         : (this.theme?.backgroundColor || defaultGradient);
-      
+
+      // Get showTextOnHover from renderer state (set by MovementChoiceBeat)
+      const showTextOnHover = this.getState('showTextOnHover') || false;
+
       // Render using the shared PositionedBeatView component
       // NOTE: previewMode=false to use absolute positioning from Visual Editor
       // previewMode=true uses a flex layout that ignores element positions
@@ -675,6 +687,8 @@ export class ReactRenderer extends BaseRenderer {
             hideButtonBoxes={this.hideButtonBoxes}
             theme={this.theme}
             previewMode={false}
+            visitedBeats={this.visitedBeats}
+            showTextOnHover={showTextOnHover}
           />
         </div>
       );
@@ -743,6 +757,9 @@ export class ReactRenderer extends BaseRenderer {
     // Get dialog context from prior renderDialog call
     const dialogContext = this.getState('dialogContext') || {};
 
+    // Get markVisited from renderer state (set by the beat)
+    const markVisited = this.getState('markVisited') || false;
+
     // Use positioned rendering if locations are available
     if (locations && locations.length > 0) {
       // Check if current choices match the location names (for buttons)
@@ -755,7 +772,8 @@ export class ReactRenderer extends BaseRenderer {
         // Root level dialog or no button locations - use positioned rendering as-is
         const content: Record<string, any> = {
           text: dialogContext.text || '',
-          choices
+          choices,
+          markVisited
         };
         return this.renderPositionedBeat('dialogTree', content, locations, true);
       }
@@ -807,7 +825,8 @@ export class ReactRenderer extends BaseRenderer {
 
       const content: Record<string, any> = {
         text: dialogContext.text || '',
-        choices
+        choices,
+        markVisited
       };
       return this.renderPositionedBeat('dialogTree', content, mappedLocations, true);
     }
@@ -815,7 +834,8 @@ export class ReactRenderer extends BaseRenderer {
     // No locations provided - generate default locations from schema
     const content: Record<string, any> = {
       text: dialogContext.text || '',
-      choices
+      choices,
+      markVisited
     };
     const defaultLocations = generateDefaultLocations('dialogTree', content);
     return this.renderPositionedBeat('dialogTree', content, defaultLocations, true);
@@ -826,8 +846,11 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
+    // Get markVisited from renderer state (set by the beat)
+    const markVisited = this.getState('markVisited') || false;
+
     // Use provided locations or generate default locations from schema
-    const content = { question, choices };
+    const content = { question, choices, markVisited };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('movementChoice', content);
 
     return this.renderPositionedBeat('movementChoice', content, effectiveLocations, true);
@@ -838,8 +861,11 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
+    // Get markVisited from renderer state (set by the beat)
+    const markVisited = this.getState('markVisited') || false;
+
     // Use provided locations or generate default locations from schema
-    const content = { question, props };
+    const content = { question, props, markVisited };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('pickProp', content);
 
     return this.renderPositionedBeat('pickProp', content, effectiveLocations, true);

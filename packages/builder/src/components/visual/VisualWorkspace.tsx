@@ -120,6 +120,66 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     return calculateDialogDimensions(text, fontSize, fontFamily);
   }, []);
 
+  /**
+   * Sync visual elements to beat.locations Map
+   * This is called whenever elements change to ensure preview always has latest positions
+   */
+  const syncElementsToBeatLocations = useCallback((elements: VisualElement[], targetBeat: Beat) => {
+    if (!targetBeat) return;
+
+    targetBeat.locations.clear();
+
+    elements.forEach((el: VisualElement) => {
+      if (el.name === 'Main Text') return;
+
+      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog';
+      if (el.type === 'character') kind = 'character';
+      else if (el.type === 'prop') kind = 'prop';
+      else if (el.type === 'dialog') kind = 'dialog';
+      else if (el.type === 'button') kind = 'button';
+      else if (el.type === 'hotspot') kind = 'hotspot';
+      else kind = 'text';
+
+      const location: any = {
+        kind,
+        name: el.name || el.text || '',
+        x: Math.round(el.x),
+        y: Math.round(el.y),
+        width: Math.round(el.width),
+        height: Math.round(el.height),
+        zIndex: el.z
+      };
+
+      // Add optional properties
+      if (el.assetId) location.assetId = el.assetId;
+      if (el.imageUrl) location.imageUrl = el.imageUrl;
+      if (el.sound) location.sound = el.sound;
+      if (el.font) location.font = el.font;
+      if (el.fontSize !== undefined) location.fontSize = el.fontSize;
+      if (el.textAlign) location.textAlign = el.textAlign;
+      location.autosize = el.fontSize === undefined;
+
+      // Add character-specific properties
+      if (el.type === 'character') {
+        if (el.characterId) location.characterId = el.characterId;
+        if (el.characterName) location.characterName = el.characterName;
+        if (el.stateId) location.stateId = el.stateId;
+        if (el.size !== undefined) location.size = el.size;
+        // Look up character name if not already set
+        if (!location.characterName) {
+          const character = charactersRef.current.find(c => c.id === el.characterId);
+          if (character) {
+            location.characterName = character.name;
+          }
+        }
+      }
+
+      targetBeat.locations.set(el.name || el.id, location);
+    });
+
+    console.log(`[VisualWorkspace] Synced ${targetBeat.locations.size} locations to beat.locations`);
+  }, []);
+
   // Save changes when switching to a different beat - MUST run before load
   const prevBeatIdRef = useRef(beat?.id);
 
@@ -1501,6 +1561,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           onElementsChange={(elements) => {
             setVisualElements(elements);
             setHasChanges(true);
+            // CRITICAL: Sync to beat.locations immediately so preview has latest positions
+            if (beat) {
+              syncElementsToBeatLocations(elements, beat);
+            }
           }}
           assets={assets}
           characters={characters}

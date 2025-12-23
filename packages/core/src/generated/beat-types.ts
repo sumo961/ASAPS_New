@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2025-12-23T01:41:02.588Z
+ * Generated: 2025-12-23T17:03:39.576Z
  */
 
 // ============================================
@@ -60,6 +60,7 @@ export interface PropOption {
   id: string;
   name: string;
   description: string;
+  assetId?: string;
   target: string;
   conditions?: Condition[];
   effects?: Effect[];
@@ -109,6 +110,8 @@ export interface DialogTreeParameters {
   dialogTree: DialogNode;
   /** Delay in seconds before showing choices with fade-in */
   choiceDelay?: number | undefined;
+  /** Show visual indication for choices leading to already-visited beats */
+  markVisited?: boolean | undefined;
 }
 
 /**
@@ -123,6 +126,10 @@ export interface MovementChoiceParameters {
   choices: MovementOption[];
   /** Delay in seconds before showing choices with fade-in */
   choiceDelay?: number | undefined;
+  /** Show visual indication for choices leading to already-visited beats */
+  markVisited?: boolean | undefined;
+  /** Only show choice text when hovering over the hotspot */
+  showTextOnHover?: boolean | undefined;
 }
 
 /**
@@ -137,6 +144,8 @@ export interface PickPropParameters {
   props: PropOption[];
   /** Delay in seconds before showing choices with fade-in */
   choiceDelay?: number | undefined;
+  /** Show visual indication for choices leading to already-visited beats */
+  markVisited?: boolean | undefined;
 }
 
 /**

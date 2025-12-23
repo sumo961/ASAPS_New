@@ -759,6 +759,84 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   </>
                 )}
 
+                {/* Hotspot Settings - Only for hotspot elements */}
+                {selected.type === 'hotspot' && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <label className="text-xs font-medium text-gray-700 mb-2 block">
+                      Hotspot Settings (Per-Element Override)
+                    </label>
+
+                    {/* Override Global Settings Checkbox */}
+                    <label className="flex items-center gap-2 mb-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.hotspotOverride?.enabled ?? false}
+                        onChange={(e) => onElementUpdate(selected.id, {
+                          hotspotOverride: {
+                            ...selected.hotspotOverride,
+                            enabled: e.target.checked
+                          }
+                        })}
+                        className="rounded"
+                      />
+                      <span className="text-xs text-gray-700">Override global hotspot settings</span>
+                    </label>
+
+                    {/* Override Controls - Only show when override is enabled */}
+                    {selected.hotspotOverride?.enabled && (
+                      <div className="space-y-3 pl-2 border-l-2 border-blue-200">
+                        {/* Opacity Slider */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 mb-1 block">
+                            Opacity
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={selected.hotspotOverride?.opacity ?? globalSettings?.hotspots?.opacity ?? 30}
+                              onChange={(e) => onElementUpdate(selected.id, {
+                                hotspotOverride: {
+                                  ...selected.hotspotOverride,
+                                  enabled: true,
+                                  opacity: parseInt(e.target.value)
+                                }
+                              })}
+                              className="flex-1"
+                            />
+                            <span className="text-xs text-gray-600 w-8 text-right">
+                              {selected.hotspotOverride?.opacity ?? globalSettings?.hotspots?.opacity ?? 30}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Preview Mode Visibility */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 mb-1 block">
+                            Preview Visibility
+                          </label>
+                          <select
+                            value={selected.hotspotOverride?.showInPreview ?? globalSettings?.hotspots?.showInPreview ?? 'visible'}
+                            onChange={(e) => onElementUpdate(selected.id, {
+                              hotspotOverride: {
+                                ...selected.hotspotOverride,
+                                enabled: true,
+                                showInPreview: e.target.value as 'visible' | 'onHover' | 'invisible'
+                              }
+                            })}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                          >
+                            <option value="visible">Visible (always show)</option>
+                            <option value="onHover">On Hover only</option>
+                            <option value="invisible">Invisible (no feedback)</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Font Controls - Only for text, dialog, and button elements */}
                 {(selected.type === 'text' || selected.type === 'dialog' || selected.type === 'button') && (
                   <>

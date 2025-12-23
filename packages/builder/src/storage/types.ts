@@ -58,6 +58,8 @@ export interface GlobalSettings {
     visible: boolean;
     labels: boolean;
     highlightColor: string;
+    opacity: number;  // 0-100 percentage
+    showInPreview: 'visible' | 'onHover' | 'invisible';  // Preview mode visibility
   };
   sound: {
     backgroundMusic: string;    // Background music file

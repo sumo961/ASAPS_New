@@ -46,6 +46,8 @@ interface GlobalSettings {
     visible: boolean;
     labels: boolean;
     highlightColor: string;
+    opacity: number;  // 0-100 percentage
+    showInPreview: 'visible' | 'onHover' | 'invisible';  // Preview mode visibility
   };
   sound: {
     backgroundMusic: string;       // Background music file/URL
@@ -162,6 +164,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
         visible: true,
         labels: true,
         highlightColor: '#ffff00',
+        opacity: 30,
+        showInPreview: 'visible',
       },
       sound: {
         backgroundMusic: '',
@@ -972,8 +976,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
                 <div className="pt-4 border-t">
                   <h4 className="font-medium text-gray-700 mb-3">Hotspot Settings</h4>
-                  
-                  <div className="space-y-3">
+
+                  <div className="space-y-4">
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -983,7 +987,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       />
                       <span className="text-sm">Show hotspots</span>
                     </label>
-                    
+
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -993,6 +997,39 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       />
                       <span className="text-sm">Show hotspot labels</span>
                     </label>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Hotspot Opacity
+                      </label>
+                      <input
+                        type="range"
+                        value={settings.hotspots.opacity ?? 30}
+                        onChange={(e) => handleChange('hotspots', 'opacity', parseInt(e.target.value))}
+                        min="0"
+                        max="100"
+                        className="w-full"
+                      />
+                      <div className="text-xs text-gray-500 text-center">{settings.hotspots.opacity ?? 30}%</div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Preview Mode Visibility
+                      </label>
+                      <select
+                        value={settings.hotspots.showInPreview ?? 'visible'}
+                        onChange={(e) => handleChange('hotspots', 'showInPreview', e.target.value)}
+                        className="w-full px-3 py-2 border rounded"
+                      >
+                        <option value="visible">Visible (always show colored area)</option>
+                        <option value="onHover">On Hover (only show color when hovering)</option>
+                        <option value="invisible">Invisible (no visual feedback - user must find them)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Controls how hotspots appear during story preview
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -1009,15 +1046,31 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         'Text will appear instantly without animation.'}
                     </p>
                     {settings.hotspots.visible && (
-                      <div className="mt-3 inline-block">
-                        <div 
-                          className="px-3 py-1 rounded border-2"
-                          style={{ 
-                            borderColor: settings.hotspots.highlightColor,
-                            backgroundColor: `${settings.hotspots.highlightColor}22`
-                          }}
-                        >
-                          {settings.hotspots.labels ? 'Hotspot with label' : 'Hotspot'}
+                      <div className="mt-3 space-y-2">
+                        <div className="text-sm text-gray-600">Hotspot Preview (opacity: {settings.hotspots.opacity ?? 30}%)</div>
+                        <div className="flex gap-4">
+                          <div
+                            className="px-4 py-2 rounded border-2"
+                            style={{
+                              borderColor: settings.hotspots.highlightColor,
+                              backgroundColor: `${settings.hotspots.highlightColor}${Math.round((settings.hotspots.opacity ?? 30) * 2.55).toString(16).padStart(2, '0')}`,
+                            }}
+                          >
+                            {settings.hotspots.labels ? 'Normal' : ''}
+                          </div>
+                          <div
+                            className="px-4 py-2 rounded border-2"
+                            style={{
+                              borderColor: settings.hotspots.highlightColor,
+                              backgroundColor: `${settings.hotspots.highlightColor}${Math.round(((settings.hotspots.opacity ?? 30) * 1.5) * 2.55).toString(16).padStart(2, '0')}`,
+                            }}
+                          >
+                            {settings.hotspots.labels ? 'Hovered' : ''}
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Mode: {(settings.hotspots.showInPreview ?? 'visible') === 'visible' ? 'Always visible' :
+                                 (settings.hotspots.showInPreview ?? 'visible') === 'onHover' ? 'Only on hover' : 'Invisible (no feedback)'}
                         </div>
                       </div>
                     )}

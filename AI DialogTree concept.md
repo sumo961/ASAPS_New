@@ -38,3 +38,7 @@ Theme system
 
 expose all changes to AI
 
+Expose playtrace to AI
+
+have movmentChoice beats with elements marked already visited once visited
+

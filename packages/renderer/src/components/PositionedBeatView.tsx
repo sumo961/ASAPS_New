@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import type { Location } from '@asaps/core';
 import { getPresetSound, isPresetSound } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
@@ -60,6 +61,8 @@ export interface PositionedElementData {
   assetUrl?: string;
   /** Optional action ID to return when this element is clicked (e.g., choice ID for movementChoice) */
   actionId?: string;
+  /** Optional target beat ID for checking if this choice leads to a visited beat */
+  targetBeatId?: string;
   /** Optional hyperlinks for HyperText beat type - words in the text that are clickable */
   hyperlinks?: HyperlinkData[];
 }
@@ -106,6 +109,14 @@ export interface RenderThemeSettings {
     typewriterSpeed: number;  // Characters per second
     fadeInDuration: number;    // Milliseconds
   };
+  /** Hotspot styling */
+  hotspot?: {
+    highlightColor: string;  // Color for hotspot fill (default yellow #ffff00)
+    visible: boolean;        // Whether hotspots are visible at all
+    showLabels: boolean;     // Whether to show text labels on hotspots
+    opacity: number;         // Base opacity 0-1 (default 0.3)
+    showInPreview: 'visible' | 'onHover' | 'invisible';  // Preview mode visibility
+  };
 }
 
 export interface PositionedBeatViewProps {
@@ -131,6 +142,10 @@ export interface PositionedBeatViewProps {
   theme?: RenderThemeSettings;
   /** Enable preview mode - auto-sizes text boxes to fit content */
   previewMode?: boolean;
+  /** Array of visited beat IDs (for marking visited choices) */
+  visitedBeats?: string[];
+  /** Only show choice text when hovering over the hotspot (for movementChoice) */
+  showTextOnHover?: boolean;
 }
 
 // Default theme to use if none provided
@@ -160,6 +175,13 @@ const DEFAULT_THEME: RenderThemeSettings = {
     textFont: 'Arial',
     buttonFont: 'Arial',
   },
+  hotspot: {
+    highlightColor: '#ffff00',  // Yellow highlight color (default)
+    visible: true,
+    showLabels: true,
+    opacity: 0.3,  // Default 30% opacity (normalized 0-1)
+    showInPreview: 'visible',  // Default: always show hotspots
+  },
 };
 
 /**
@@ -177,6 +199,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   hideButtonBoxes = false,
   theme = DEFAULT_THEME,
   previewMode = false,
+  visitedBeats = [],
+  showTextOnHover = false,
 }) => {
   // FIX #3: Add debugging logs
   console.log('[PositionedBeatView] ============================================');
@@ -271,6 +295,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             hideButtonBoxes={hideButtonBoxes}
             theme={theme}
             previewMode={false} // Keep absolute for assets
+            visitedBeats={visitedBeats}
+            showTextOnHover={showTextOnHover}
           />
         ))}
 
@@ -314,16 +340,21 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
               justifyContent: 'center',
               width: '100%',
             }}>
-              {buttonElements.map((element, index) => (
-                <FlexButtonElement
-                  key={`btn-${index}-${element.location.name}`}
-                  element={element}
-                  onAction={handleAction}
-                  interactive={interactive}
-                  hideButtonBox={hideButtonBoxes}
-                  theme={theme}
-                />
-              ))}
+              {buttonElements.map((element, index) => {
+                // Check if this button leads to a visited beat
+                const isButtonVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
+                return (
+                  <FlexButtonElement
+                    key={`btn-${index}-${element.location.name}`}
+                    element={element}
+                    onAction={handleAction}
+                    interactive={interactive}
+                    hideButtonBox={hideButtonBoxes}
+                    theme={theme}
+                    isVisited={isButtonVisited}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
@@ -347,6 +378,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           hideButtonBoxes={hideButtonBoxes}
           theme={theme}
           previewMode={previewMode}
+          visitedBeats={visitedBeats}
+          showTextOnHover={showTextOnHover}
         />
       ))}
     </div>
@@ -367,6 +400,8 @@ interface PositionedElementProps {
   hideButtonBoxes?: boolean;
   theme: RenderThemeSettings;
   previewMode?: boolean;
+  visitedBeats?: string[];
+  showTextOnHover?: boolean;
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -380,6 +415,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   hideButtonBoxes = false,
   theme,
   previewMode = false,
+  visitedBeats = [],
+  showTextOnHover = false,
 }) => {
   const { location, content, assetUrl, hyperlinks } = element;
 
@@ -463,6 +500,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
 
     case 'button': {
       // Use stored dimensions directly - auto-sizing happens at import time
+      // Check if this button leads to a visited beat
+      const isButtonVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
       return (
         <ButtonElement
           style={baseStyle}
@@ -473,11 +512,14 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           interactive={interactive}
           hideButtonBox={hideButtonBoxes}
           theme={theme}
+          isVisited={isButtonVisited}
         />
       );
     }
 
-    case 'hotspot':
+    case 'hotspot': {
+      // Check if this hotspot leads to a visited beat
+      const isHotspotVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
       return (
         <ButtonElement
           style={baseStyle}
@@ -489,8 +531,11 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           hideButtonBox={true} // Always hide button box for hotspots
           editorMode={!interactive} // Editor mode when not interactive
           theme={theme}
+          isVisited={isHotspotVisited}
+          showTextOnHover={showTextOnHover}
         />
       );
+    }
 
     case 'input':
       return (
@@ -670,6 +715,24 @@ const TextElement: React.FC<{
 };
 
 /**
+ * Convert hex color to rgba with opacity
+ */
+function hexToRgba(hex: string, opacity: number): string {
+  // Handle invalid or non-hex values
+  if (!hex || !hex.startsWith('#')) {
+    return `rgba(255, 255, 0, ${opacity})`; // Default yellow
+  }
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) {
+    return `rgba(255, 255, 0, ${opacity})`; // Default yellow
+  }
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+/**
  * Button element renderer
  */
 const ButtonElement: React.FC<{
@@ -682,8 +745,12 @@ const ButtonElement: React.FC<{
   hideButtonBox?: boolean;
   editorMode?: boolean;
   theme: RenderThemeSettings;
-}> = ({ style, content, location, actionId, onAction, interactive, hideButtonBox = false, editorMode = false, theme }) => {
+  isVisited?: boolean; // Whether this choice leads to an already-visited beat
+  showTextOnHover?: boolean; // Only show text when hovering over the hotspot
+}> = ({ style, content, location, actionId, onAction, interactive, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false }) => {
   const [isHovered, setIsHovered] = React.useState(false);
+  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
 
   // Use stored fontSize directly - auto-sizing happens at import time
   // Default to 16px if not set
@@ -696,22 +763,74 @@ const ButtonElement: React.FC<{
   const paddingHorizontal = 12;
   const paddingVertical = 6;
 
-  // Determine background color based on mode
+  // Get hotspot settings from theme
+  const hotspotColor = theme.hotspot?.highlightColor || '#ffff00';
+  const hotspotOpacity = theme.hotspot?.opacity ?? 0.3;  // 0-1 normalized
+  const showInPreview = theme.hotspot?.showInPreview ?? 'visible';
+  const hotspotVisible = theme.hotspot?.visible ?? true;  // "Show hotspots" checkbox
+
+  // Determine if this is preview mode (interactive but not in editor)
+  const isPreviewMode = interactive && !editorMode;
+
+  // Determine background color based on mode and visited state
   let backgroundColor: string;
   if (hideButtonBox) {
-    // Hotspot mode: semi-transparent in editor, fully transparent in preview
-    backgroundColor = editorMode ? 'rgba(59, 130, 246, 0.2)' : 'transparent'; // blue-500 at 20% opacity in editor
+    // Hotspot mode: use highlight color with configurable opacity
+    if (editorMode) {
+      // Editor mode: always show with slightly reduced opacity
+      const baseOpacity = hotspotOpacity * 0.7;
+      const hoverOpacity = hotspotOpacity * 1.3;
+      backgroundColor = hexToRgba(hotspotColor, isHovered ? hoverOpacity : baseOpacity);
+    } else if (!hotspotVisible) {
+      // "Show hotspots" unchecked: fully transparent but tooltips still work
+      backgroundColor = 'transparent';
+    } else if (showInPreview === 'invisible') {
+      // Invisible mode: fully transparent (no tooltip either)
+      backgroundColor = 'transparent';
+    } else if (showInPreview === 'onHover') {
+      // Only visible on hover
+      backgroundColor = isHovered ? hexToRgba(hotspotColor, hotspotOpacity) : 'transparent';
+    } else {
+      // Normal visible mode
+      const hoverOpacity = Math.min(hotspotOpacity * 1.5, 1);
+      backgroundColor = hexToRgba(hotspotColor, isHovered ? hoverOpacity : hotspotOpacity);
+    }
+  } else if (isVisited) {
+    // Visited state: use a dimmed gray color
+    backgroundColor = isHovered ? '#c0c0c0' : '#e0e0e0';
   } else {
     backgroundColor = isHovered ? theme.button.hoverBackgroundColor : theme.button.backgroundColor;
   }
 
+  // Determine border color based on mode
+  let borderColor: string;
+  let borderStyle: string;
+  if (hideButtonBox) {
+    // Hotspot: use highlight color for border in editor mode
+    borderColor = hotspotColor;
+    borderStyle = editorMode ? `2px dashed ${hexToRgba(hotspotColor, 0.7)}` : 'none';
+  } else if (isVisited) {
+    borderColor = '#999999';
+    borderStyle = `${theme.button.borderWidth}px solid ${borderColor}`;
+  } else {
+    borderColor = theme.button.borderColor;
+    borderStyle = `${theme.button.borderWidth}px solid ${borderColor}`;
+  }
+
+  // Determine if text should be visible inside the button
+  // For hotspots in PREVIEW mode (interactive, not editorMode): hide text, use tooltip instead
+  // For hotspots in EDITOR mode: show text inside so users can see/edit labels
+  // For regular buttons: always show text
+  const shouldShowText = !hideButtonBox || !isPreviewMode;
+
   const buttonStyle: React.CSSProperties = {
     ...style,
     backgroundColor,
-    color: hideButtonBox ? theme.colors.textColor : theme.button.textColor,
-    border: hideButtonBox ? (editorMode ? '2px dashed rgba(59, 130, 246, 0.5)' : 'none') : `${theme.button.borderWidth}px solid ${theme.button.borderColor}`,
+    color: hideButtonBox ? theme.colors.textColor : (isVisited ? '#666666' : theme.button.textColor),
+    border: borderStyle,
+    opacity: isVisited ? 0.7 : 1,
     borderRadius: hideButtonBox ? '4px' : `${theme.button.borderRadius}px`,
-    padding: hideButtonBox ? '0' : `${paddingVertical}px ${paddingHorizontal}px`,
+    padding: hideButtonBox ? '8px 12px' : `${paddingVertical}px ${paddingHorizontal}px`,
     fontSize: `${computedFontSize}px`,
     fontFamily: computedFont,
     fontWeight: '600',
@@ -729,6 +848,7 @@ const ButtonElement: React.FC<{
     lineHeight: '1.2',
     overflow: 'hidden',
   };
+
 
   const handleClick = async () => {
     if (interactive) {
@@ -764,16 +884,56 @@ const ButtonElement: React.FC<{
     }
   };
 
+  // Show custom tooltip in PREVIEW mode for hotspots (not in editor mode)
+  // Don't show tooltip in invisible mode or when labels are disabled
+  const showLabels = theme.hotspot?.showLabels ?? true;
+  const showTooltip = hideButtonBox && isPreviewMode && showInPreview !== 'invisible' && showLabels && content && content.length > 0 && isHovered;
+
+  // Handle mouse move to track cursor position for tooltip
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  // Tooltip styles using theme colors
+  const tooltipStyle: React.CSSProperties = {
+    position: 'fixed',
+    left: mousePos.x + 12,
+    top: mousePos.y - 8,
+    backgroundColor: theme.button.backgroundColor,
+    color: theme.button.textColor,
+    padding: '6px 12px',
+    borderRadius: `${theme.button.borderRadius}px`,
+    fontSize: '14px',
+    fontFamily: theme.fonts.buttonFont,
+    fontWeight: '600',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+    border: `1px solid ${theme.button.borderColor}`,
+    pointerEvents: 'none',
+    zIndex: 10000,
+    whiteSpace: 'nowrap',
+    maxWidth: '300px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  };
+
   return (
-    <button
-      style={buttonStyle}
-      onClick={handleClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      disabled={!interactive}
-    >
-      {content}
-    </button>
+    <>
+      <button
+        ref={buttonRef}
+        style={buttonStyle}
+        onClick={handleClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onMouseMove={handleMouseMove}
+        disabled={!interactive}
+      >
+        {shouldShowText ? content : ''}
+      </button>
+      {showTooltip && ReactDOM.createPortal(
+        <div style={tooltipStyle}>{content}</div>,
+        document.body
+      )}
+    </>
   );
 };
 
@@ -1164,8 +1324,11 @@ export function createPositionedElementData(
       }
     }
 
-    // Extract actionId for beats that have choice/option mappings
+    // Extract actionId and targetBeatId for beats that have choice/option mappings
+    // Only set targetBeatId when content.markVisited is true (per-beat toggle)
     let actionId: string | undefined;
+    let targetBeatId: string | undefined;
+    const markVisited = content.markVisited || false;
 
     // For movementChoice: match location.name to choice properties with multiple fallbacks
     if (beatType === 'movementChoice' && content.choices && Array.isArray(content.choices)) {
@@ -1210,7 +1373,11 @@ export function createPositionedElementData(
       }
       if (choice) {
         actionId = choice.id;
-        console.log(`[createPositionedElementData] MovementChoice: location "${location.name}" → choice ID "${actionId}"`);
+        // Only set targetBeatId when markVisited is enabled for this beat
+        if (markVisited) {
+          targetBeatId = choice.target;
+        }
+        console.log(`[createPositionedElementData] MovementChoice: location "${location.name}" → choice ID "${actionId}", target "${targetBeatId}", markVisited=${markVisited}`);
       } else {
         console.warn(`[createPositionedElementData] MovementChoice: NO MATCH for location "${location.name}"`);
         console.log(`[createPositionedElementData] Available choices:`, content.choices.map((c: any) => ({ id: c.id, text: c.text, location: c.location })));
@@ -1240,7 +1407,12 @@ export function createPositionedElementData(
       }
       if (choice) {
         actionId = choice.id;
-        console.log(`[createPositionedElementData] DialogTree: location "${location.name}" → choice ID "${actionId}"`);
+        // DialogTree choices can have target (beat ID) or dialogNode (nested dialog)
+        // Only set targetBeatId when markVisited is enabled for this beat
+        if (markVisited) {
+          targetBeatId = choice.target;
+        }
+        console.log(`[createPositionedElementData] DialogTree: location "${location.name}" → choice ID "${actionId}", target "${targetBeatId}", markVisited=${markVisited}`);
       }
     }
 
@@ -1249,7 +1421,11 @@ export function createPositionedElementData(
       const prop = content.props.find((p: any) => p.name === location.name);
       if (prop) {
         actionId = prop.id;
-        console.log(`[createPositionedElementData] PickProp: location "${location.name}" → prop ID "${actionId}"`);
+        // Only set targetBeatId when markVisited is enabled for this beat
+        if (markVisited) {
+          targetBeatId = prop.target;
+        }
+        console.log(`[createPositionedElementData] PickProp: location "${location.name}" → prop ID "${actionId}", target "${targetBeatId}", markVisited=${markVisited}`);
       }
     }
 
@@ -1273,6 +1449,7 @@ export function createPositionedElementData(
       content: elementContent,
       assetUrl: resolvedAssetUrl,
       actionId,
+      targetBeatId, // Include target beat ID for visited marking
       hyperlinks,
     };
   });
@@ -1598,7 +1775,8 @@ const FlexButtonElement: React.FC<{
   interactive: boolean;
   hideButtonBox?: boolean;
   theme: RenderThemeSettings;
-}> = ({ element, onAction, interactive, hideButtonBox = false, theme }) => {
+  isVisited?: boolean;
+}> = ({ element, onAction, interactive, hideButtonBox = false, theme, isVisited = false }) => {
   const { location, content, actionId } = element;
   const [isHovered, setIsHovered] = React.useState(false);
 
@@ -1613,13 +1791,18 @@ const FlexButtonElement: React.FC<{
   const computedTextAlign = location.textAlign || 'center';
   const computedFont = location.font || theme.fonts.buttonFont;
 
-  // Determine background color
+  // Determine background color based on visited state
   let backgroundColor: string;
   if (hideButtonBox) {
     backgroundColor = 'transparent';
+  } else if (isVisited) {
+    backgroundColor = isHovered ? '#c0c0c0' : '#e0e0e0';
   } else {
     backgroundColor = isHovered ? theme.button.hoverBackgroundColor : theme.button.backgroundColor;
   }
+
+  // Determine border color based on visited state
+  const borderColor = isVisited && !hideButtonBox ? '#999999' : theme.button.borderColor;
 
   const handleClick = async () => {
     if (interactive) {
@@ -1660,8 +1843,8 @@ const FlexButtonElement: React.FC<{
         minWidth: `${Math.min(location.width, 200)}px`,
         padding: hideButtonBox ? '0' : '12px 24px',
         backgroundColor,
-        color: hideButtonBox ? theme.colors.textColor : theme.button.textColor,
-        border: hideButtonBox ? 'none' : `${theme.button.borderWidth}px solid ${theme.button.borderColor}`,
+        color: hideButtonBox ? theme.colors.textColor : (isVisited ? '#666666' : theme.button.textColor),
+        border: hideButtonBox ? 'none' : `${theme.button.borderWidth}px solid ${borderColor}`,
         borderRadius: hideButtonBox ? '4px' : `${theme.button.borderRadius}px`,
         fontSize: `${computedFontSize}px`,
         fontFamily: computedFont,
@@ -1671,6 +1854,7 @@ const FlexButtonElement: React.FC<{
         boxShadow: hideButtonBox ? 'none' : (isHovered ? '0 6px 12px rgba(0,0,0,0.15)' : '0 4px 6px rgba(0,0,0,0.1)'),
         transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
         cursor: interactive ? 'pointer' : 'default',
+        opacity: isVisited ? 0.7 : 1,
         wordWrap: 'break-word',
         overflowWrap: 'break-word',
         boxSizing: 'border-box',

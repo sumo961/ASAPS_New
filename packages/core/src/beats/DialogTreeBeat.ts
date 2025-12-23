@@ -10,6 +10,7 @@ export class DialogTreeBeat extends Beat {
   public text: string;
   public emotion?: string;
   public choiceDelay?: number; // Delay in seconds before showing choices
+  public markVisited?: boolean; // Show visual indication for choices leading to already-visited beats
   public backgroundUrl?: string; // Direct URL for background from ASML import
   public backgroundAssetId?: string; // Asset ID for background
   private currentNode: DialogNode | null = null;
@@ -23,6 +24,7 @@ export class DialogTreeBeat extends Beat {
     // CRITICAL FIX: Ensure dialogTree is ALWAYS a valid object, never undefined
     const dialogTreeParam = config.dialogTree || config.parameters?.dialogTree;
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
+    this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
 
     if (dialogTreeParam) {
       // Migrate old format to new format if needed
@@ -213,6 +215,7 @@ export class DialogTreeBeat extends Beat {
       // Do NOT include speaker/text/emotion separately - they're in dialogTree
       node: this.node,
       choiceDelay: this.choiceDelay,
+      markVisited: this.markVisited,
       backgroundUrl: this.backgroundUrl,
       backgroundAssetId: this.backgroundAssetId
     };
@@ -235,6 +238,7 @@ export class DialogTreeBeat extends Beat {
     if (params.emotion !== undefined) this.emotion = params.emotion;
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
+    if (params.markVisited !== undefined) this.markVisited = params.markVisited;
     if (params.backgroundUrl !== undefined) this.backgroundUrl = params.backgroundUrl;
     if (params.backgroundAssetId !== undefined) this.backgroundAssetId = params.backgroundAssetId;
 
@@ -269,6 +273,9 @@ export class DialogTreeBeat extends Beat {
     if (this.node) {
       renderer.setState('backgroundAssetId', this.node);
     }
+
+    // Set markVisited state for renderer to use when rendering choices
+    renderer.setState('markVisited', this.markVisited || false);
 
     this.currentNode = this.dialogTree;
 

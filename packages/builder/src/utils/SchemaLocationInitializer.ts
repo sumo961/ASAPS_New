@@ -403,24 +403,45 @@ export function initializeLocationsFromSchema(
       const x = startX + (col * (propWidth + spacing));
       const y = currentY + (row * (propHeight + spacing));
 
-      elements.push({
-        id: `prop_${index}_${Date.now()}`,
-        type: 'button',
-        name: propName, // Use actual name for visual editor display
-        text: propName,
-        x,
-        y,
-        z: 10 + index,
-        width: propWidth,
-        height: propHeight,
-        rotation: 0,
-        scale: 1,
-        visible: true,
-        locked: false,
-        font: 'Arial',
-        fontSize: 14,
-        textAlign: 'center',
-      });
+      // If prop has assetId, create a 'prop' type element with the asset
+      // Otherwise, create a button element
+      if (prop.assetId) {
+        elements.push({
+          id: `prop_${index}_${Date.now()}`,
+          type: 'prop',  // Prop type for graphic-based props
+          name: propName,
+          text: propName,
+          x,
+          y,
+          z: 10 + index,
+          width: 128,  // Default prop size
+          height: 128,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          assetId: prop.assetId,  // Include the asset ID
+        });
+      } else {
+        elements.push({
+          id: `prop_${index}_${Date.now()}`,
+          type: 'button',
+          name: propName, // Use actual name for visual editor display
+          text: propName,
+          x,
+          y,
+          z: 10 + index,
+          width: propWidth,
+          height: propHeight,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          font: 'Arial',
+          fontSize: 14,
+          textAlign: 'center',
+        });
+      }
     });
   }
 
@@ -597,24 +618,45 @@ export function regenerateChoiceElements(
       const x = startX + (col * (propWidth + spacing));
       const y = currentY + (row * (propHeight + spacing));
 
-      elements.push({
-        id: `prop_${index}_${Date.now()}`,
-        type: 'button',
-        name: propName, // Use actual name for visual editor
-        text: propName,
-        x,
-        y,
-        z: 10 + index,
-        width: propWidth,
-        height: propHeight,
-        rotation: 0,
-        scale: 1,
-        visible: true,
-        locked: false,
-        font: 'Arial',
-        fontSize: 14,
-        textAlign: 'center',
-      });
+      // If prop has assetId, create a 'prop' type element with the asset
+      // Otherwise, create a button element
+      if (prop.assetId) {
+        elements.push({
+          id: `prop_${index}_${Date.now()}`,
+          type: 'prop',  // Prop type for graphic-based props
+          name: propName,
+          text: propName,
+          x,
+          y,
+          z: 10 + index,
+          width: 128,
+          height: 128,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          assetId: prop.assetId,
+        });
+      } else {
+        elements.push({
+          id: `prop_${index}_${Date.now()}`,
+          type: 'button',
+          name: propName, // Use actual name for visual editor
+          text: propName,
+          x,
+          y,
+          z: 10 + index,
+          width: propWidth,
+          height: propHeight,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          font: 'Arial',
+          fontSize: 14,
+          textAlign: 'center',
+        });
+      }
     });
   }
 

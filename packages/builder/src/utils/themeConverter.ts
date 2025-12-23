@@ -99,5 +99,12 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       typewriterSpeed: settings.textEffects.typewriterSpeed,
       fadeInDuration: settings.textEffects.fadeInDuration,
     },
+    hotspot: {
+      highlightColor: settings.hotspots.highlightColor || '#ffff00',
+      visible: settings.hotspots.visible ?? true,
+      showLabels: settings.hotspots.labels ?? true,
+      opacity: (settings.hotspots.opacity ?? 30) / 100,  // Normalize to 0-1
+      showInPreview: settings.hotspots.showInPreview ?? 'visible',
+    },
   };
 }

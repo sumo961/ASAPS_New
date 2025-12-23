@@ -8,6 +8,8 @@ export class MovementChoiceBeat extends Beat {
   public question: string;
   public choices: MovementOption[];
   public choiceDelay?: number; // Delay in seconds before showing choices
+  public markVisited?: boolean; // Show visual indication for choices leading to already-visited beats
+  public showTextOnHover?: boolean; // Only show choice text when hovering over the hotspot
 
   constructor(config: BeatConfig & {
     parameters?: Partial<MovementChoiceParameters>;
@@ -16,6 +18,8 @@ export class MovementChoiceBeat extends Beat {
     this.question = config.question || config.parameters?.question || 'Where do you want to go?';
     this.choices = config.choices || config.parameters?.choices || [];
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
+    this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
+    this.showTextOnHover = config.showTextOnHover ?? config.parameters?.showTextOnHover ?? false;
 
     console.log(`[MovementChoiceBeat constructor] config.node: ${(config as any).node}`);
     console.log(`[MovementChoiceBeat constructor] config.parameters.node: ${config.parameters?.node}`);
@@ -27,7 +31,9 @@ export class MovementChoiceBeat extends Beat {
       question: this.question,
       choices: this.choices,
       node: this.node,
-      choiceDelay: this.choiceDelay
+      choiceDelay: this.choiceDelay,
+      markVisited: this.markVisited,
+      showTextOnHover: this.showTextOnHover
     };
     console.log('[MovementChoiceBeat.getParameters] Returning:', params);
     return params;
@@ -51,12 +57,16 @@ export class MovementChoiceBeat extends Beat {
     if (params.choices !== undefined) this.choices = params.choices;
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
+    if (params.markVisited !== undefined) this.markVisited = params.markVisited;
+    if (params.showTextOnHover !== undefined) this.showTextOnHover = params.showTextOnHover;
 
     console.log('[MovementChoiceBeat.updateParameters] AFTER:', {
       question: this.question,
       choicesLength: this.choices.length,
       node: this.node,
-      choiceDelay: this.choiceDelay
+      choiceDelay: this.choiceDelay,
+      markVisited: this.markVisited,
+      showTextOnHover: this.showTextOnHover
     });
   }
 
@@ -100,6 +110,12 @@ export class MovementChoiceBeat extends Beat {
     if (this.node) {
       renderer.setState('backgroundAssetId', this.node);
     }
+
+    // Set markVisited state for renderer to use when rendering choices
+    renderer.setState('markVisited', this.markVisited || false);
+
+    // Set showTextOnHover state for renderer to use when rendering hotspots
+    renderer.setState('showTextOnHover', this.showTextOnHover || false);
 
     // Filter choices based on conditions
     const availableChoices = this.choices.filter(choice => {

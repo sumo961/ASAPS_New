@@ -305,6 +305,15 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
     }
   }, [settings]);
 
+  // Update renderer visited beats when debug info changes
+  // This enables the "mark already visited choices" feature
+  useEffect(() => {
+    if (rendererRef.current && debugInfo.visitedBeats && 'setVisitedBeats' in rendererRef.current) {
+      (rendererRef.current as any).setVisitedBeats(debugInfo.visitedBeats);
+      console.log('[StoryPreview] Updated visitedBeats:', debugInfo.visitedBeats.length, 'beats');
+    }
+  }, [debugInfo.visitedBeats]);
+
   const startPreview = useCallback(async () => {
     if (!engineRef.current || !rendererRef.current) return;
 

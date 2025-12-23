@@ -52,6 +52,12 @@ export interface VisualElement {
   fontSize?: number;
   textAlign?: 'left' | 'center' | 'right';
   fontOverridden?: boolean;  // True if font/size explicitly set, false = use theme defaults
+  // Hotspot override properties (per-element)
+  hotspotOverride?: {
+    enabled: boolean;
+    opacity?: number;  // 0-100 percentage
+    showInPreview?: 'visible' | 'onHover' | 'invisible';
+  };
 }
 
 interface VisualBeatEditorProps {

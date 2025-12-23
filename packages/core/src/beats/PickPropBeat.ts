@@ -8,6 +8,7 @@ export class PickPropBeat extends Beat {
   public question: string;
   public props: PropOption[];
   public choiceDelay?: number; // Delay in seconds before showing choices
+  public markVisited?: boolean; // Show visual indication for choices leading to already-visited beats
 
   constructor(config: BeatConfig & {
     parameters?: Partial<PickPropParameters>;
@@ -16,6 +17,7 @@ export class PickPropBeat extends Beat {
     this.question = config.question || config.parameters?.question || 'What do you want to interact with?';
     this.props = config.props || config.parameters?.props || [];
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
+    this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
   }
 
   getParameters(): Record<string, any> {
@@ -23,7 +25,8 @@ export class PickPropBeat extends Beat {
       question: this.question,
       props: this.props,
       node: this.node,
-      choiceDelay: this.choiceDelay
+      choiceDelay: this.choiceDelay,
+      markVisited: this.markVisited
     };
   }
 
@@ -32,6 +35,7 @@ export class PickPropBeat extends Beat {
     if (params.props !== undefined) this.props = params.props;
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
+    if (params.markVisited !== undefined) this.markVisited = params.markVisited;
   }
 
   /**
@@ -74,6 +78,9 @@ export class PickPropBeat extends Beat {
     if (this.node) {
       renderer.setState('backgroundAssetId', this.node);
     }
+
+    // Set markVisited state for renderer to use when rendering choices
+    renderer.setState('markVisited', this.markVisited || false);
 
     // Filter props based on conditions
     const availableProps = this.props.filter(prop => {

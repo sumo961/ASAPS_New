@@ -224,7 +224,9 @@ function App() {
     hotspots: {
       visible: true,
       labels: true,
-      highlightColor: '#ffff00'
+      highlightColor: '#ffff00',
+      opacity: 30,
+      showInPreview: 'visible'
     },
     sound: {
       backgroundMusic: '',

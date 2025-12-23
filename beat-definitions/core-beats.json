@@ -60,10 +60,12 @@
         "id": "string",
         "name": "string",
         "description": "string",
+        "assetId": "string?",
         "target": "string",
         "conditions": "condition[]?",
         "effects": "effect[]?"
-      }
+      },
+      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button."
     },
     "condition": {
       "description": "Condition for beat logic",
@@ -215,6 +217,12 @@
             "step": 0.5,
             "label": "Choice Delay (seconds)"
           }
+        },
+        "markVisited": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Show visual indication for choices leading to already-visited beats"
         }
       },
       "locations": ["dialog", "choices"],
@@ -264,6 +272,18 @@
             "step": 0.5,
             "label": "Choice Delay (seconds)"
           }
+        },
+        "markVisited": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Show visual indication for choices leading to already-visited beats"
+        },
+        "showTextOnHover": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Only show choice text when hovering over the hotspot"
         }
       },
       "locations": ["question", "choices"],
@@ -305,6 +325,12 @@
             "step": 0.5,
             "label": "Choice Delay (seconds)"
           }
+        },
+        "markVisited": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Show visual indication for choices leading to already-visited beats"
         }
       },
       "locations": ["question", "props"],
