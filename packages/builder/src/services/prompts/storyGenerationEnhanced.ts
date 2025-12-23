@@ -55,7 +55,10 @@ const BEAT_TYPE_GUIDE = `
 
 **movementChoice** - Location/direction selection
 - Use: Exploration, navigation, choosing paths
-- Parameters: question, choices (array of {text, target})
+- Parameters: question, choices (array of {id, text, target})
+  - id: Unique identifier for the choice (e.g., "choice_library", "c1")
+  - text: What the player sees (e.g., "Go to the Library")
+  - target: Beat ID to navigate to
 - Connections: Multiple → one per choice
 - Example: "Where to go?" → [Library | Kitchen | Garden] → 3 different beats
 
@@ -795,9 +798,9 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             question: "Where do you want to investigate?",
             choices: [
-              { text: "Search the Library", target: "beat_3" },
-              { text: "Examine the Study", target: "beat_6" },
-              { text: "Question the Servants", target: "beat_9" }
+              { id: "c1", text: "Search the Library", target: "beat_3" },
+              { id: "c2", text: "Examine the Study", target: "beat_6" },
+              { id: "c3", text: "Question the Servants", target: "beat_9" }
             ]
           },
           connections: [
@@ -985,9 +988,9 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             question: "Who murdered Lord Blackwood?",
             choices: [
-              { text: "The Butler", target: "beat_15" },
-              { text: "The Maid", target: "beat_16" },
-              { text: "The Guest", target: "beat_17" }
+              { id: "accuse_butler", text: "The Butler", target: "beat_15" },
+              { id: "accuse_maid", text: "The Maid", target: "beat_16" },
+              { id: "accuse_guest", text: "The Guest", target: "beat_17" }
             ]
           },
           connections: [

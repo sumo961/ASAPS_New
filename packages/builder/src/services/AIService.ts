@@ -601,6 +601,42 @@ export class AIService {
       }
     }
 
+    // Normalize MovementChoice - ensure choices have id fields
+    if (beat.type === 'movementChoice') {
+      const params = transformed.parameters;
+      if (params.choices && Array.isArray(params.choices)) {
+        params.choices = params.choices.map((choice: any, index: number) => {
+          if (!choice.id) {
+            // Generate id from text or use index
+            const generatedId = choice.text
+              ? `choice_${choice.text.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 20)}`
+              : `choice_${index}`;
+            console.log(`[AIService] Generated id "${generatedId}" for movementChoice choice in beat ${beat.id}`);
+            return { ...choice, id: generatedId };
+          }
+          return choice;
+        });
+      }
+    }
+
+    // Normalize PickProp - ensure props have id fields
+    if (beat.type === 'pickProp') {
+      const params = transformed.parameters;
+      if (params.props && Array.isArray(params.props)) {
+        params.props = params.props.map((prop: any, index: number) => {
+          if (!prop.id) {
+            // Generate id from name or use index
+            const generatedId = prop.name
+              ? `prop_${prop.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 20)}`
+              : `prop_${index}`;
+            console.log(`[AIService] Generated id "${generatedId}" for pickProp prop in beat ${beat.id}`);
+            return { ...prop, id: generatedId };
+          }
+          return prop;
+        });
+      }
+    }
+
     // Validate and normalize HyperText links
     if (beat.type === 'hyperText') {
       const params = transformed.parameters;
