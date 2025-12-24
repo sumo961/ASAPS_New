@@ -2,11 +2,12 @@
  * IndexedDB Schema Definition
  *
  * Defines the database schema for ASAPS persistence using the idb library.
- * Includes object stores for projects, assets, command history, and auto-save drafts.
+ * Includes object stores for projects, assets, command history, auto-save drafts, and themes.
  *
  * Version History:
  * - v1: Initial schema with projects, assets, history, drafts
  * - v2: Added asset-metadata store for hybrid storage support
+ * - v3: Added themes, theme-assets, theme-asset-metadata stores for theme system
  */
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
@@ -18,6 +19,7 @@ import type {
   AssetType,
 } from './types';
 import type { AssetStorageInfo, StorageLocation } from './IStorageAdapter';
+import type { StoredTheme, StoredThemeAsset, ThemeAssetRole } from '@asaps/core';
 
 // ============================================================================
 // Database Schema Interface
@@ -91,6 +93,64 @@ export interface AsapsDBSchema extends DBSchema {
       'by-timestamp': Date;
     };
   };
+
+  /**
+   * Themes object store
+   * Key: themeId (string UUID)
+   * Added in v3
+   */
+  themes: {
+    key: string;
+    value: StoredTheme & { id: string };
+    indexes: {
+      'by-name': string;
+      'by-source': 'built-in' | 'imported' | 'custom';
+      'by-lastUsed': string;
+    };
+  };
+
+  /**
+   * Theme assets object store (stores blobs for small theme assets)
+   * Key: assetId (string UUID)
+   * Added in v3
+   */
+  'theme-assets': {
+    key: string;
+    value: StoredThemeAsset;
+    indexes: {
+      'by-theme': string;
+      'by-role': ThemeAssetRole;
+    };
+  };
+
+  /**
+   * Theme asset metadata store (for hybrid storage tracking)
+   * Key: assetId (string UUID)
+   * Added in v3
+   */
+  'theme-asset-metadata': {
+    key: string;
+    value: ThemeAssetStorageInfo;
+    indexes: {
+      'by-theme': string;
+      'by-location': StorageLocation;
+    };
+  };
+}
+
+/**
+ * Theme asset storage info (parallel to AssetStorageInfo for project assets)
+ */
+export interface ThemeAssetStorageInfo {
+  id: string;
+  themeId: string;
+  location: StorageLocation;
+  size: number;
+  path?: string;
+  mimeType: string;
+  filename: string;
+  role: ThemeAssetRole;
+  uploadedAt: string;
 }
 
 // ============================================================================
@@ -98,7 +158,7 @@ export interface AsapsDBSchema extends DBSchema {
 // ============================================================================
 
 export const DB_NAME = 'asaps-storage';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 // ============================================================================
 // Database Initialization
@@ -155,9 +215,34 @@ export async function initDatabase(): Promise<IDBPDatabase<AsapsDBSchema>> {
       }
 
       // ============================================
+      // V3: Theme system stores
+      // ============================================
+      if (!db.objectStoreNames.contains('themes')) {
+        const themeStore = db.createObjectStore('themes', { keyPath: 'id' });
+        themeStore.createIndex('by-name', 'definition.meta.name');
+        themeStore.createIndex('by-source', 'source');
+        themeStore.createIndex('by-lastUsed', 'lastUsedAt');
+        console.log('[Storage] Created themes object store (v3)');
+      }
+
+      if (!db.objectStoreNames.contains('theme-assets')) {
+        const themeAssetStore = db.createObjectStore('theme-assets', { keyPath: 'id' });
+        themeAssetStore.createIndex('by-theme', 'themeId');
+        themeAssetStore.createIndex('by-role', 'role');
+        console.log('[Storage] Created theme-assets object store (v3)');
+      }
+
+      if (!db.objectStoreNames.contains('theme-asset-metadata')) {
+        const themeAssetMetaStore = db.createObjectStore('theme-asset-metadata', { keyPath: 'id' });
+        themeAssetMetaStore.createIndex('by-theme', 'themeId');
+        themeAssetMetaStore.createIndex('by-location', 'location');
+        console.log('[Storage] Created theme-asset-metadata object store (v3)');
+      }
+
+      // ============================================
       // V1 -> V2 MIGRATION: Migrate existing assets
       // ============================================
-      if (oldVersion === 1 && newVersion === 2) {
+      if (oldVersion === 1 && newVersion !== null && newVersion >= 2) {
         console.log('[Storage] Migrating v1 assets to v2 format...');
 
         // We need to migrate existing assets to have metadata entries

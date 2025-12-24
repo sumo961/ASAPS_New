@@ -1,5 +1,182 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-24: Typewriter Text Animation
+
+### Overview
+
+Implemented a true typewriter animation for text elements where characters appear one by one without any text shifting or repositioning.
+
+### Features Added
+
+#### Typewriter Animation (`packages/renderer/src/components/PositionedBeatView.tsx`)
+
+1. **Character-by-character reveal**
+   - Text appears one character at a time (M...y...space...I...)
+   - Configurable speed via Global Settings (default: 15 characters/second)
+   - Text position stays fixed throughout animation - no shifting or sliding
+
+2. **Implementation approach**
+   - Full text is always rendered (maintains layout and centering)
+   - Unrevealed characters have `color: transparent` (invisible but occupy space)
+   - Characters become visible sequentially via `setInterval`
+   - Works with both centered and left-aligned text
+
+3. **Sequential animation for title screens**
+   - Title text animates first
+   - Author text starts animating after title completes
+   - Animation delay calculated based on text length and speed
+
+4. **Applied to both element types**
+   - `TextElement`: Title/author text boxes
+   - `DialogElement`: Intro text and dialog boxes
+
+#### Settings Integration
+
+- Speed controlled via **Global Settings > Effects > Typewriter Speed**
+- Animation type selectable: None, Typewriter, Fade
+- Default speed: 15 characters/second
+
+### Technical Details
+
+```typescript
+// Typewriter with stable positioning
+const revealedLength = displayedText.length;
+
+{animation === 'typewriter' ? (
+  <>
+    {/* Revealed portion - visible */}
+    <span>{content.substring(0, revealedLength)}</span>
+    {/* Unrevealed portion - transparent (maintains spacing) */}
+    <span style={{ color: 'transparent' }}>{content.substring(revealedLength)}</span>
+  </>
+) : displayedText}
+```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/renderer/src/components/PositionedBeatView.tsx` | TextElement and DialogElement typewriter animation |
+| `packages/builder/src/App.tsx` | Default typewriter speed (15 chars/sec) |
+
+### Key Design Decision
+
+Previous attempts used `paddingLeft` transitions to center text after animation, but this caused visible movement. The final solution renders the full text with transparent characters, ensuring text position never changes during or after animation.
+
+---
+
+## 2024-12-24: Theme System Implementation
+
+### Overview
+
+Implemented a comprehensive theme system that enables transferable themes between projects, with support for optional asset bundling, built-in presets, and theme inheritance.
+
+### Features Added
+
+#### Core Theme Types (`packages/core/src/types/theme.ts`)
+- **ThemeDefinition**: Complete theme interface with colors, fonts, textBox, button, hotspot, and effects
+- **ThemeMeta**: Metadata including id, name, version, inheritance (extends), tags, compatibility
+- **ThemeAssets**: Optional bundled assets (fonts, UI graphics, sounds, default backgrounds)
+- **StoredTheme**: IndexedDB storage format with source tracking (built-in, imported, custom)
+- **DEFAULT_THEME_VALUES**: Fallback values for theme properties
+
+#### Built-in Preset Themes (`packages/core/src/themes/presets.ts`)
+
+1. **Visual Novel** (`builtin-visual-novel`)
+   - Ren'Py-inspired style with semi-transparent text box at bottom
+   - Typewriter text animation, golden character name highlights
+   - Dark overlay aesthetic, fade transitions
+
+2. **Text Adventure** (`builtin-twine`)
+   - Twine/SugarCube-inspired minimal UI
+   - Link-based navigation with blue hyperlinks
+   - Serif typography, no visible text box frame
+   - Centered text, dark background
+
+3. **Point & Click Adventure** (`builtin-point-and-click`)
+   - LucasArts/Sierra classic aesthetic
+   - Golden text on dark blue surfaces
+   - Prominent hotspot indicators (always visible)
+   - Sharp corners, pixelated feel
+
+#### Theme Service (`packages/builder/src/services/ThemeService.ts`)
+- CRUD operations (create, read, update, delete themes)
+- Theme asset management with hybrid storage
+- Theme inheritance resolution (child extends parent)
+- Built-in theme registration
+- Recently used themes tracking
+
+#### GlobalSettings Adapter (`packages/builder/src/themes/migration/GlobalSettingsAdapter.ts`)
+- `globalSettingsToTheme()`: Convert project settings to theme format
+- `themeToGlobalSettings()`: Convert theme back to settings (backward compatibility)
+- `applyThemeOverrides()`: Merge project-specific overrides with base theme
+- `extractThemeOverrides()`: Detect what changed from base theme
+
+#### Theme Selection UI (`packages/builder/src/components/settings/GlobalSettingsInspector.tsx`)
+- Theme dropdown in Global Settings header
+- Built-in themes and custom themes sections
+- "Save as Theme" button to save current settings
+- "Modified from [Theme]" indicator when settings differ from base theme
+
+#### React Integration (`packages/builder/src/hooks/useThemes.ts`)
+- `useThemes()`: Hook for theme listing, selection, and management
+- `useTheme()`: Hook for loading a single theme by ID
+- Automatic built-in theme registration on initialization
+
+### Database Changes
+
+Updated IndexedDB schema to v3 with new object stores:
+- `themes`: Theme definitions with indexes by name, source, lastUsed
+- `theme-assets`: Theme asset blobs with indexes by theme and role
+- `theme-asset-metadata`: Hybrid storage tracking for theme assets
+
+Updated Project interface with:
+- `themeId?: string`: Optional reference to applied theme
+- `themeOverrides?: Partial<ThemeDefinition>`: Per-project customizations
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `packages/core/src/types/theme.ts` | Core theme type definitions |
+| `packages/core/src/themes/presets.ts` | Built-in preset themes |
+| `packages/builder/src/services/ThemeService.ts` | Theme CRUD and management |
+| `packages/builder/src/themes/migration/GlobalSettingsAdapter.ts` | Settings migration |
+| `packages/builder/src/hooks/useThemes.ts` | React hooks for themes |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `packages/core/src/types/index.ts` | Export theme types |
+| `packages/core/src/index.ts` | Export preset themes |
+| `packages/builder/src/storage/schema.ts` | v3 with theme stores |
+| `packages/builder/src/storage/types.ts` | Project themeId, themeOverrides |
+| `packages/builder/src/services/index.ts` | Export ThemeService |
+| `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` | Theme selector UI |
+
+### Usage
+
+```typescript
+// Using themes in a component
+import { useThemes } from '../hooks/useThemes';
+
+const { themes, selectedThemeId, applyThemeToSettings, saveAsTheme } = useThemes();
+
+// Apply a theme
+const newSettings = await applyThemeToSettings('builtin-visual-novel', currentSettings);
+
+// Save current settings as a custom theme
+const themeId = await saveAsTheme(settings, 'My Custom Theme');
+```
+
+### Future Enhancements
+- Theme import/export (.asaps-theme ZIP format)
+- Theme preview in editor
+- Runtime theme switching
+- Twine/Ren'Py import support
+- Unity/Unreal export support
+
+---
+
 ## 2024-12-24: Hotspot Opacity and Visibility Settings
 
 ### Features Added

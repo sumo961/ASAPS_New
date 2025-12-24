@@ -60,6 +60,27 @@ function normalizeOpacity(value: number): number {
 }
 
 /**
+ * Lighten a hex color by a percentage
+ * @param hex - The hex color code (e.g., "#1a1a2e")
+ * @param percent - The percentage to lighten (0.0-1.0)
+ * @returns The lightened hex color
+ */
+function lightenColor(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const amt = Math.round(255 * percent);
+
+  let r = (num >> 16) + amt;
+  let g = ((num >> 8) & 0x00ff) + amt;
+  let b = (num & 0x0000ff) + amt;
+
+  r = Math.min(255, Math.max(0, r));
+  g = Math.min(255, Math.max(0, g));
+  b = Math.min(255, Math.max(0, b));
+
+  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
+/**
  * Convert GlobalSettings to RenderThemeSettings
  *
  * @param settings - Global settings from the builder
@@ -78,12 +99,13 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       opacity: normalizeOpacity(settings.textbox.opacity),
     },
     button: {
-      backgroundColor: '#3b82f6', // Default blue - could be added to settings later
-      hoverBackgroundColor: '#2563eb', // Darker blue on hover
-      textColor: '#FFFFFF', // White text on buttons
-      borderColor: '#2563eb',
-      borderWidth: 2,
-      borderRadius: 8,
+      // Button styling derived from text box and text colors for theme consistency
+      backgroundColor: settings.colors.textBoxBg,
+      hoverBackgroundColor: lightenColor(settings.colors.textBoxBg, 0.15),
+      textColor: settings.colors.pcolor,
+      borderColor: settings.colors.textBoxBorder,
+      borderWidth: settings.textbox.borderWidth,
+      borderRadius: settings.textbox.radius,
     },
     colors: {
       textColor: settings.colors.pcolor, // Use player color for text

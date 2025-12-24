@@ -1,6 +1,7 @@
 // Core type definitions
 import type { AnimationPath } from './animation';
 export * from './ClusterTypes';
+export * from './theme';
 
 export interface Location {
   kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input';

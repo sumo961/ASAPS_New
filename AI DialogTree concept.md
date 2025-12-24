@@ -42,3 +42,15 @@ Expose playtrace to AI
 
 have movmentChoice beats with elements marked already visited once visited
 
+Let's consider theme support. The idea here is to enable themes that
+  combine fonts, textbox stylying and graphics. themes should be transferable
+  between different projects. Example themes could be as simple as mimiking
+  twine or more complex like typical visual novels or early point and click
+  adventure games 
+
+Path analysis needs to be revisited
+
+autodistribute on flowchart needs to be revisited
+
+
+

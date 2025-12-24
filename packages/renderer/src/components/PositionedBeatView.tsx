@@ -148,32 +148,32 @@ export interface PositionedBeatViewProps {
   showTextOnHover?: boolean;
 }
 
-// Default theme to use if none provided
+// Default theme to use if none provided (matches Visual Novel preset style)
 const DEFAULT_THEME: RenderThemeSettings = {
   textBox: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CCCCCC',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 20,  // Match defaultSettings.textbox.padding in GlobalSettingsInspector
-    opacity: 95,
-  },
-  button: {
-    backgroundColor: '#3b82f6',
-    hoverBackgroundColor: '#2563eb',
-    textColor: '#FFFFFF',
-    borderColor: '#2563eb',
+    backgroundColor: '#16213e',  // Dark blue surface
+    borderColor: '#4a90d9',      // Blue border
     borderWidth: 2,
     borderRadius: 8,
+    padding: 20,
+    opacity: 90,
+  },
+  button: {
+    backgroundColor: '#0f3460',       // Dark blue button
+    hoverBackgroundColor: '#1a4a7a',  // Lighter on hover
+    textColor: '#ffffff',             // White text
+    borderColor: '#4a90d9',           // Blue border
+    borderWidth: 1,
+    borderRadius: 4,
   },
   colors: {
-    textColor: '#000000',
+    textColor: '#ffffff',  // White text
     textAlpha: 100,
   },
   fonts: {
-    titleFont: 'Arial',
-    textFont: 'Arial',
-    buttonFont: 'Arial',
+    titleFont: 'serif',
+    textFont: 'sans-serif',
+    buttonFont: 'sans-serif',
   },
   hotspot: {
     highlightColor: '#ffff00',  // Yellow highlight color (default)
@@ -279,6 +279,44 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       el.location.kind !== 'text' && el.location.kind !== 'dialog' && el.location.kind !== 'button'
     );
 
+    // Sort text elements for animation sequencing: title first, then author, then others
+    const sortedTextElements = [...textElements].sort((a, b) => {
+      const aName = a.location.name?.toLowerCase() || '';
+      const bName = b.location.name?.toLowerCase() || '';
+
+      // Title comes first (but not "titleScreen" - just "title")
+      const aIsTitle = aName.includes('title') && !aName.includes('screen');
+      const bIsTitle = bName.includes('title') && !bName.includes('screen');
+      if (aIsTitle && !bIsTitle) return -1;
+      if (!aIsTitle && bIsTitle) return 1;
+
+      // Author comes second
+      const aIsAuthor = aName.includes('author');
+      const bIsAuthor = bName.includes('author');
+      if (aIsAuthor && !bIsAuthor) return -1;
+      if (!aIsAuthor && bIsAuthor) return 1;
+
+      return 0;
+    });
+
+    // Calculate animation delays for sequenced typewriter effect
+    const animation = theme.textEffects?.animation || 'none';
+    const speed = theme.textEffects?.typewriterSpeed || 30;
+    const msPerChar = 1000 / speed;
+    const bufferMs = 300; // Small pause between animations
+
+    const animationDelays: number[] = [];
+    let cumulativeDelay = 0;
+
+    for (const element of sortedTextElements) {
+      animationDelays.push(cumulativeDelay);
+      if (animation === 'typewriter') {
+        // Next element starts after this one finishes + buffer
+        const elementDuration = (element.content?.length || 0) * msPerChar + bufferMs;
+        cumulativeDelay += elementDuration;
+      }
+    }
+
     return (
       <div style={containerStyle}>
         {/* Render other elements (characters, props) with absolute positioning */}
@@ -303,7 +341,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         {/* Flex container for text and buttons */}
         <div style={{
           position: 'absolute',
-          top: textElements[0]?.location.y || 50,
+          top: sortedTextElements[0]?.location.y || 50,
           left: 0,
           right: 0,
           display: 'flex',
@@ -312,8 +350,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           gap: '20px',
           padding: '0 20px',
         }}>
-          {/* Text elements */}
-          {textElements.map((element, index) => (
+          {/* Text elements with sequenced animation */}
+          {sortedTextElements.map((element, index) => (
             <div
               key={`text-${index}-${element.location.name}`}
               style={{
@@ -326,6 +364,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                 hideTextBox={hideTextBoxes}
                 theme={theme}
                 onAction={handleAction}
+                animationDelay={animationDelays[index] || 0}
               />
             </div>
           ))}
@@ -363,6 +402,48 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   }
 
   // Non-preview mode: use absolute positioning for all elements
+  // Calculate animation delays for sequenced typewriter effect on text elements
+  const animation = theme.textEffects?.animation || 'none';
+  const speed = theme.textEffects?.typewriterSpeed || 30;
+  const msPerChar = 1000 / speed;
+  const bufferMs = 300; // Small pause between animations
+
+  // Sort text elements for animation sequencing: title first, then author, then others
+  const textElements = elements.filter(el =>
+    el.location.kind === 'text' || el.location.kind === 'dialog'
+  );
+  const sortedTextElements = [...textElements].sort((a, b) => {
+    const aName = a.location.name?.toLowerCase() || '';
+    const bName = b.location.name?.toLowerCase() || '';
+
+    // Title comes first (but not "titleScreen" - just "title")
+    const aIsTitle = aName.includes('title') && !aName.includes('screen');
+    const bIsTitle = bName.includes('title') && !bName.includes('screen');
+    if (aIsTitle && !bIsTitle) return -1;
+    if (!aIsTitle && bIsTitle) return 1;
+
+    // Author comes second
+    const aIsAuthor = aName.includes('author');
+    const bIsAuthor = bName.includes('author');
+    if (aIsAuthor && !bIsAuthor) return -1;
+    if (!aIsAuthor && bIsAuthor) return 1;
+
+    return 0;
+  });
+
+  // Build a map of element name to animation delay
+  const animationDelayMap = new Map<string, number>();
+  let cumulativeDelay = 0;
+
+  for (const element of sortedTextElements) {
+    animationDelayMap.set(element.location.name, cumulativeDelay);
+    if (animation === 'typewriter') {
+      // Next element starts after this one finishes + buffer
+      const elementDuration = (element.content?.length || 0) * msPerChar + bufferMs;
+      cumulativeDelay += elementDuration;
+    }
+  }
+
   return (
     <div style={containerStyle}>
       {elements.map((element, index) => (
@@ -380,6 +461,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           previewMode={previewMode}
           visitedBeats={visitedBeats}
           showTextOnHover={showTextOnHover}
+          animationDelay={animationDelayMap.get(element.location.name) || 0}
         />
       ))}
     </div>
@@ -402,6 +484,7 @@ interface PositionedElementProps {
   previewMode?: boolean;
   visitedBeats?: string[];
   showTextOnHover?: boolean;
+  animationDelay?: number;  // Delay in ms before starting animation
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -417,6 +500,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   previewMode = false,
   visitedBeats = [],
   showTextOnHover = false,
+  animationDelay = 0,
 }) => {
   const { location, content, assetUrl, hyperlinks } = element;
 
@@ -494,6 +578,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           hideTextBox={hideTextBoxes}
           theme={theme}
           previewMode={previewMode}
+          animationDelay={animationDelay}
         />
       );
     }
@@ -562,6 +647,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           previewMode={previewMode}
           hyperlinks={hyperlinks}
           onAction={onAction}
+          animationDelay={animationDelay}
         />
       );
 
@@ -596,37 +682,54 @@ const TextElement: React.FC<{
   hideTextBox?: boolean;
   theme: RenderThemeSettings;
   previewMode?: boolean;
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false }) => {
+  animationDelay?: number;  // Delay in ms before starting animation
+  onAnimationComplete?: () => void;  // Callback when animation finishes
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
+  const [animationStarted, setAnimationStarted] = React.useState(false);
 
-  // Typewriter animation effect
+  // Typewriter animation effect with delay support
   React.useEffect(() => {
     const animation = theme.textEffects?.animation || 'none';
 
     if (animation === 'typewriter') {
       setDisplayedText('');
       setIsAnimating(true);
+      setAnimationStarted(false);
+
       const speed = theme.textEffects?.typewriterSpeed || 30;
       const msPerChar = 1000 / speed;
       let currentIndex = 0;
+      let intervalId: ReturnType<typeof setInterval> | null = null;
 
-      const interval = setInterval(() => {
-        if (currentIndex < content.length) {
-          setDisplayedText(content.substring(0, currentIndex + 1));
-          currentIndex++;
-        } else {
-          setIsAnimating(false);
-          clearInterval(interval);
-        }
-      }, msPerChar);
+      // Start animation after delay
+      const delayTimeoutId = setTimeout(() => {
+        setAnimationStarted(true);
+        intervalId = setInterval(() => {
+          if (currentIndex < content.length) {
+            setDisplayedText(content.substring(0, currentIndex + 1));
+            currentIndex++;
+          } else {
+            setIsAnimating(false);
+            if (intervalId) clearInterval(intervalId);
+            onAnimationComplete?.();
+          }
+        }, msPerChar);
+      }, animationDelay);
 
-      return () => clearInterval(interval);
+      return () => {
+        clearTimeout(delayTimeoutId);
+        if (intervalId) clearInterval(intervalId);
+      };
     } else {
       setDisplayedText(content);
       setIsAnimating(false);
+      // For non-animated content, call completion immediately after a short delay
+      const timeoutId = setTimeout(() => onAnimationComplete?.(), animationDelay + 50);
+      return () => clearTimeout(timeoutId);
     }
-  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed]);
+  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, onAnimationComplete]);
 
   // Use stored fontSize directly - auto-sizing happens at import time
   // Default to 16px if not set
@@ -667,6 +770,10 @@ const TextElement: React.FC<{
     ? { height: 'auto', minHeight: '60px', maxHeight: `${location.height}px` }
     : { height: style.height };
 
+  // For typewriter animation, render full text but make unrevealed characters transparent
+  // This keeps text centered while characters appear one by one
+  const revealedLength = displayedText.length;
+
   return (
     <>
       <style>
@@ -695,19 +802,29 @@ const TextElement: React.FC<{
           textAlign: computedTextAlign,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
-          overflow: 'auto', // Allow scrolling if text still doesn't fit
+          overflow: 'hidden',
           lineHeight: '1.4',
           boxSizing: 'border-box',
-          // Use CSS table-cell for vertical centering that clips from bottom, not center
           display: 'table',
         }}
       >
-        <span style={{
-          display: 'table-cell',
-          verticalAlign: 'middle',
-          textAlign: computedTextAlign,
-        }}>
-          {displayedText}
+        <span
+          style={{
+            display: 'table-cell',
+            verticalAlign: 'middle',
+            textAlign: computedTextAlign,
+          }}
+        >
+          {animation === 'typewriter' ? (
+            <>
+              {/* Revealed portion - visible */}
+              <span>{content.substring(0, revealedLength)}</span>
+              {/* Unrevealed portion - transparent (maintains spacing) */}
+              <span style={{ color: 'transparent' }}>{content.substring(revealedLength)}</span>
+            </>
+          ) : (
+            displayedText
+          )}
         </span>
       </div>
     </>
@@ -1099,7 +1216,47 @@ const DialogElement: React.FC<{
   previewMode?: boolean;
   hyperlinks?: HyperlinkData[];
   onAction?: (actionId: string) => void;
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction }) => {
+  animationDelay?: number;
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0 }) => {
+  const [displayedText, setDisplayedText] = React.useState('');
+  const [isAnimating, setIsAnimating] = React.useState(true);
+
+  // Typewriter animation effect with delay support
+  React.useEffect(() => {
+    const animation = theme.textEffects?.animation || 'none';
+
+    if (animation === 'typewriter') {
+      setDisplayedText('');
+      setIsAnimating(true);
+
+      const speed = theme.textEffects?.typewriterSpeed || 30;
+      const msPerChar = 1000 / speed;
+      let currentIndex = 0;
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+
+      // Start animation after delay
+      const delayTimeoutId = setTimeout(() => {
+        intervalId = setInterval(() => {
+          if (currentIndex < content.length) {
+            setDisplayedText(content.substring(0, currentIndex + 1));
+            currentIndex++;
+          } else {
+            setIsAnimating(false);
+            if (intervalId) clearInterval(intervalId);
+          }
+        }, msPerChar);
+      }, animationDelay);
+
+      return () => {
+        clearTimeout(delayTimeoutId);
+        if (intervalId) clearInterval(intervalId);
+      };
+    } else {
+      setDisplayedText(content);
+      setIsAnimating(false);
+    }
+  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay]);
+
   // Calculate font size
   let computedFontSize: number;
   if (location.fontSize !== undefined) {
@@ -1110,6 +1267,7 @@ const DialogElement: React.FC<{
     computedFontSize = 16;
   }
 
+  const animation = theme.textEffects?.animation || 'none';
   const computedTextAlign = location.textAlign || 'left';
   const computedFont = location.font || 'Arial';
 
@@ -1122,17 +1280,28 @@ const DialogElement: React.FC<{
     ? { height: 'auto', minHeight: '60px', maxHeight: `${location.height}px` }
     : { height: style.height };
 
+  // Use theme colors for text box styling
+  const opacityValue = theme.textBox.opacity / 100;
+  const bgColor = hideTextBox ? 'transparent' : theme.textBox.backgroundColor;
+  const bgColorWithOpacity = bgColor.startsWith('#') && !hideTextBox
+    ? `rgba(${parseInt(bgColor.slice(1,3), 16)}, ${parseInt(bgColor.slice(3,5), 16)}, ${parseInt(bgColor.slice(5,7), 16)}, ${opacityValue})`
+    : bgColor;
+
+  // For typewriter animation, render full text but make unrevealed characters transparent
+  const revealedLength = displayedText.length;
+
   return (
     <div
       style={{
         ...style,
         ...heightStyle,
-        backgroundColor: hideTextBox ? 'transparent' : 'rgba(255, 255, 255, 0.95)',
-        borderRadius: hideTextBox ? '0' : '12px',
+        backgroundColor: bgColorWithOpacity,
+        border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
+        borderRadius: hideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
         padding: hideTextBox ? '0' : `${paddingVertical}px ${paddingHorizontal}px`,
         fontSize: `${computedFontSize}px`,
         fontFamily: computedFont,
-        color: '#1f2937',
+        color: theme.colors.textColor,
         boxShadow: hideTextBox ? 'none' : '0 4px 12px rgba(0,0,0,0.15)',
         textAlign: computedTextAlign,
         wordWrap: 'break-word',
@@ -1143,15 +1312,35 @@ const DialogElement: React.FC<{
         overflow: 'hidden',
       }}
     >
-      {hyperlinks && hyperlinks.length > 0 && onAction ? (
-        <HyperTextContent
-          text={content}
-          hyperlinks={hyperlinks}
-          onLinkClick={onAction}
-        />
-      ) : (
-        content
-      )}
+      <span style={{ display: 'inline' }}>
+        {animation === 'typewriter' ? (
+          hyperlinks && hyperlinks.length > 0 && onAction ? (
+            // For hypertext, just show the revealed portion (hyperlinks would be complex to handle with transparency)
+            <HyperTextContent
+              text={displayedText}
+              hyperlinks={hyperlinks}
+              onLinkClick={onAction}
+            />
+          ) : (
+            <>
+              {/* Revealed portion - visible */}
+              <span>{content.substring(0, revealedLength)}</span>
+              {/* Unrevealed portion - transparent (maintains spacing) */}
+              <span style={{ color: 'transparent' }}>{content.substring(revealedLength)}</span>
+            </>
+          )
+        ) : (
+          hyperlinks && hyperlinks.length > 0 && onAction ? (
+            <HyperTextContent
+              text={displayedText}
+              hyperlinks={hyperlinks}
+              onLinkClick={onAction}
+            />
+          ) : (
+            displayedText
+          )
+        )}
+      </span>
     </div>
   );
 };
@@ -1699,14 +1888,60 @@ function getContentForLocation(
 
 /**
  * Text element for flex layout (no absolute positioning)
+ * Supports typewriter animation with delay for sequencing
  */
 const FlexTextElement: React.FC<{
   element: PositionedElementData;
   hideTextBox?: boolean;
   theme: RenderThemeSettings;
   onAction?: (actionId: string) => void;
-}> = ({ element, hideTextBox = false, theme, onAction }) => {
+  animationDelay?: number;  // Delay in ms before starting animation
+  onAnimationComplete?: () => void;  // Callback when animation finishes
+}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete }) => {
   const { location, content, hyperlinks } = element;
+
+  // Typewriter animation state
+  const [displayedText, setDisplayedText] = React.useState('');
+  const [animationStarted, setAnimationStarted] = React.useState(false);
+
+  // Typewriter animation effect with delay support
+  React.useEffect(() => {
+    const animation = theme.textEffects?.animation || 'none';
+
+    if (animation === 'typewriter') {
+      setDisplayedText('');
+      setAnimationStarted(false);
+
+      const speed = theme.textEffects?.typewriterSpeed || 30;
+      const msPerChar = 1000 / speed;
+      let currentIndex = 0;
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+
+      // Start animation after delay
+      const delayTimeoutId = setTimeout(() => {
+        setAnimationStarted(true);
+        intervalId = setInterval(() => {
+          if (currentIndex < content.length) {
+            setDisplayedText(content.substring(0, currentIndex + 1));
+            currentIndex++;
+          } else {
+            if (intervalId) clearInterval(intervalId);
+            onAnimationComplete?.();
+          }
+        }, msPerChar);
+      }, animationDelay);
+
+      return () => {
+        clearTimeout(delayTimeoutId);
+        if (intervalId) clearInterval(intervalId);
+      };
+    } else {
+      setDisplayedText(content);
+      // For non-animated content, call completion immediately after a short delay
+      const timeoutId = setTimeout(() => onAnimationComplete?.(), animationDelay + 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, onAnimationComplete]);
 
   // Calculate font size
   let computedFontSize: number;
@@ -1733,36 +1968,60 @@ const FlexTextElement: React.FC<{
   const textColor = theme.colors.textColor;
   const textAlpha = theme.colors.textAlpha / 100;
 
+  // Determine animation style
+  const animation = theme.textEffects?.animation || 'none';
+  const fadeInDuration = theme.textEffects?.fadeInDuration || 500;
+  const animationStyle: React.CSSProperties = animation === 'fade'
+    ? { animation: `fadeIn ${fadeInDuration}ms ease-in` }
+    : {};
+
+  // Text to display (animated or full content)
+  const textToDisplay = animation === 'typewriter' ? displayedText : content;
+
   return (
-    <div
-      style={{
-        backgroundColor: bgWithOpacity,
-        padding: hideTextBox ? '0' : `${padding}px`,
-        border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
-        borderRadius: hideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
-        fontSize: `${computedFontSize}px`,
-        fontFamily: computedFont,
-        fontWeight: '500',
-        color: textColor,
-        opacity: textAlpha,
-        boxShadow: hideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
-        textAlign: computedTextAlign,
-        wordWrap: 'break-word',
-        overflowWrap: 'break-word',
-        lineHeight: '1.4',
-        boxSizing: 'border-box',
-      }}
-    >
-      {hyperlinks && hyperlinks.length > 0 && onAction ? (
-        <HyperTextContent
-          text={content}
-          hyperlinks={hyperlinks}
-          onLinkClick={onAction}
-        />
-      ) : (
-        content
+    <>
+      {animation === 'fade' && (
+        <style>
+          {`
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: ${textAlpha}; }
+            }
+          `}
+        </style>
       )}
-    </div>
+      <div
+        style={{
+          ...animationStyle,
+          backgroundColor: bgWithOpacity,
+          padding: hideTextBox ? '0' : `${padding}px`,
+          border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
+          borderRadius: hideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
+          fontSize: `${computedFontSize}px`,
+          fontFamily: computedFont,
+          fontWeight: '500',
+          color: textColor,
+          opacity: animation === 'fade' ? undefined : textAlpha,
+          boxShadow: hideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
+          textAlign: computedTextAlign,
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word',
+          lineHeight: '1.4',
+          boxSizing: 'border-box',
+          minHeight: '1.4em', // Prevent layout shift during typewriter
+        }}
+      >
+        {hyperlinks && hyperlinks.length > 0 && onAction ? (
+          <HyperTextContent
+            text={textToDisplay}
+            hyperlinks={hyperlinks}
+            onLinkClick={onAction}
+          />
+        ) : (
+          textToDisplay
+        )}
+      </div>
+    </>
   );
 };
 

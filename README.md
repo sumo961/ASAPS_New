@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.8.8)
+## ⚠️ Development Status (v0.8.9)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -250,7 +250,18 @@ To use the MCP server, configure it in your AI assistant's MCP settings pointing
 
 ## 📋 Version History
 
-### v0.8.8 (2025-12-12)
+### v0.8.9 (2024-12-24)
+- **Theme system**: Comprehensive theme management with built-in presets (Visual Novel, Text Adventure, Point & Click), custom theme creation, and theme inheritance
+- **Built-in theme presets**: Three professionally designed themes matching popular interactive fiction styles
+- **Theme UI**: Theme selector dropdown in Global Settings, "Save as Theme" button, modified indicator
+- **Hotspot visibility controls**: New settings for hotspot opacity, show/hide hotspots, show/hide labels, and preview mode visibility (visible, on hover, invisible)
+- **Per-element hotspot overrides**: Individual hotspots can override global visibility settings
+- **Custom tooltips**: Themed tooltips replace browser native tooltips with immediate display
+- **Typewriter text animation**: True character-by-character text reveal with stable positioning (no text shifting)
+- **Sequential title animation**: Title animates first, then author, with configurable speed
+- **Database upgrade**: IndexedDB v3 with theme storage (themes, theme-assets, theme-asset-metadata stores)
+
+### v0.8.8 (2024-12-12)
 - **Preview zoom controls**: Add zoom in/out buttons, percentage indicator, and "Fit" button for auto-scale to window
 - **Preview scaling**: Stage automatically scales to fit dialog window while maintaining aspect ratio
 - **Default theme change**: New projects now use a light blue background (#87CEEB) with white text boxes and black text instead of dark theme

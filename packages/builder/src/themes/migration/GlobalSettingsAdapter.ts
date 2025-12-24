@@ -1,0 +1,447 @@
+/**
+ * GlobalSettings Adapter
+ *
+ * Provides bidirectional conversion between GlobalSettings (legacy/current format)
+ * and ThemeDefinition (new theme system format).
+ *
+ * This enables:
+ * - Migration of existing projects to the theme system
+ * - Backward compatibility with projects that use GlobalSettings directly
+ * - "Save as Theme" functionality
+ */
+
+import { v4 as uuidv4 } from 'uuid';
+import type {
+  ThemeDefinition,
+  ThemeColors,
+  ThemeFonts,
+  ThemeTextBox,
+  ThemeButton,
+  ThemeHotspot,
+  ThemeEffects,
+  ThemeColor,
+  ThemeMeta,
+} from '@asaps/core';
+import type { GlobalSettings } from '../../storage/types';
+
+// ============================================================================
+// GlobalSettings → ThemeDefinition
+// ============================================================================
+
+/**
+ * Convert GlobalSettings to ThemeDefinition
+ *
+ * @param settings - The GlobalSettings to convert
+ * @param name - Optional name for the theme (defaults to "Custom Theme")
+ * @param id - Optional ID for the theme (defaults to generated UUID)
+ */
+export function globalSettingsToTheme(
+  settings: GlobalSettings,
+  name: string = 'Custom Theme',
+  id?: string
+): ThemeDefinition {
+  const themeId = id || uuidv4();
+  const now = new Date().toISOString();
+
+  return {
+    meta: {
+      id: themeId,
+      name,
+      version: '1.0.0',
+      description: 'Theme converted from project settings',
+      tags: ['converted'],
+      compatibility: {
+        asapsVersion: '2.0.0',
+      },
+      createdAt: now,
+      modifiedAt: now,
+    },
+    colors: convertColors(settings.colors),
+    fonts: convertFonts(settings.fonts),
+    textBox: convertTextBox(settings.textbox, settings.colors),
+    button: convertButton(settings.colors),
+    hotspot: convertHotspot(settings.hotspots),
+    effects: convertEffects(settings.textEffects),
+  };
+}
+
+/**
+ * Convert GlobalSettings colors to ThemeColors
+ */
+function convertColors(colors: GlobalSettings['colors']): ThemeColors {
+  return {
+    primary: { hex: colors.pcolor, alpha: colors.palpha },
+    secondary: { hex: colors.nonpcolor, alpha: colors.nonpalpha },
+    accent: { hex: colors.pcolor }, // Use primary as accent
+    background: { hex: colors.bgColor },
+    surface: { hex: colors.textBoxBg },
+    buttonNormal: { hex: colors.textBoxBg }, // Default button uses surface color
+    buttonHover: { hex: lightenColor(colors.textBoxBg, 0.1) },
+    buttonText: { hex: colors.pcolor },
+    border: { hex: colors.textBoxBorder },
+  };
+}
+
+/**
+ * Convert GlobalSettings fonts to ThemeFonts
+ */
+function convertFonts(fonts: GlobalSettings['fonts']): ThemeFonts {
+  return {
+    title: {
+      family: fonts.titleFont || 'serif',
+      size: fonts.fontSize.title,
+      weight: 'bold',
+      lineHeight: 1.2,
+    },
+    body: {
+      family: fonts.textFont || 'sans-serif',
+      size: fonts.fontSize.text,
+      weight: 'normal',
+      lineHeight: 1.6,
+    },
+    button: {
+      family: fonts.btnFont || 'sans-serif',
+      size: fonts.fontSize.button,
+      weight: 'bold',
+    },
+    dialog: {
+      family: fonts.textFont || 'sans-serif',
+      size: fonts.fontSize.text,
+      weight: 'normal',
+      lineHeight: 1.5,
+    },
+    scale: 1,
+  };
+}
+
+/**
+ * Convert GlobalSettings textbox to ThemeTextBox
+ */
+function convertTextBox(
+  textbox: GlobalSettings['textbox'],
+  colors: GlobalSettings['colors']
+): ThemeTextBox {
+  return {
+    background: { hex: colors.textBoxBg },
+    borderColor: { hex: colors.textBoxBorder },
+    borderWidth: textbox.borderWidth,
+    borderRadius: textbox.radius,
+    padding: textbox.padding,
+    opacity: textbox.opacity / 100, // Convert 0-100 to 0-1
+    position: textbox.position,
+  };
+}
+
+/**
+ * Convert GlobalSettings colors to ThemeButton
+ */
+function convertButton(colors: GlobalSettings['colors']): ThemeButton {
+  return {
+    background: { hex: colors.textBoxBg },
+    hoverBackground: { hex: lightenColor(colors.textBoxBg, 0.15) },
+    activeBackground: { hex: lightenColor(colors.textBoxBg, 0.2) },
+    disabledBackground: { hex: colors.textBoxBg, alpha: 0.5 },
+    textColor: { hex: colors.pcolor },
+    borderColor: { hex: colors.textBoxBorder },
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: { horizontal: 16, vertical: 8 },
+    transitionDuration: 200,
+  };
+}
+
+/**
+ * Convert GlobalSettings hotspots to ThemeHotspot
+ */
+function convertHotspot(hotspots: GlobalSettings['hotspots']): ThemeHotspot {
+  return {
+    highlightColor: hotspots.highlightColor,
+    opacity: hotspots.opacity / 100, // Convert 0-100 to 0-1
+    visible: hotspots.visible,
+    showLabels: hotspots.labels,
+    showInPreview: hotspots.showInPreview,
+  };
+}
+
+/**
+ * Convert GlobalSettings textEffects to ThemeEffects
+ */
+function convertEffects(textEffects: GlobalSettings['textEffects']): ThemeEffects {
+  return {
+    textAnimation: textEffects.animation,
+    typewriterSpeed: textEffects.typewriterSpeed,
+    fadeInDuration: textEffects.fadeInDuration,
+  };
+}
+
+// ============================================================================
+// ThemeDefinition → GlobalSettings
+// ============================================================================
+
+/**
+ * Convert ThemeDefinition to GlobalSettings
+ *
+ * This enables backward compatibility by converting a theme back to
+ * the GlobalSettings format used by existing code.
+ *
+ * @param theme - The ThemeDefinition to convert
+ * @param existingSettings - Optional existing settings to merge with
+ */
+export function themeToGlobalSettings(
+  theme: ThemeDefinition,
+  existingSettings?: Partial<GlobalSettings>
+): GlobalSettings {
+  return {
+    project: existingSettings?.project || {
+      width: 1024,
+      height: 768,
+      aspectRatio: '4:3',
+      scalingMode: 'fit',
+    },
+    colors: {
+      pcolor: theme.colors.primary.hex,
+      palpha: theme.colors.primary.alpha ?? 1,
+      nonpcolor: theme.colors.secondary.hex,
+      nonpalpha: theme.colors.secondary.alpha ?? 1,
+      bgColor: theme.colors.background.hex,
+      textBoxBg: theme.colors.surface.hex,
+      textBoxBorder: theme.colors.border.hex,
+    },
+    fonts: {
+      titleFont: theme.fonts.title.family,
+      textFont: theme.fonts.body.family,
+      btnFont: theme.fonts.button.family,
+      fontSize: {
+        title: theme.fonts.title.size,
+        text: theme.fonts.body.size,
+        button: theme.fonts.button.size,
+      },
+    },
+    textbox: {
+      radius: theme.textBox.borderRadius,
+      padding: theme.textBox.padding,
+      borderWidth: theme.textBox.borderWidth,
+      opacity: Math.round(theme.textBox.opacity * 100), // Convert 0-1 to 0-100
+      position: theme.textBox.position === 'custom' ? 'bottom' : theme.textBox.position,
+      boxVisibility: existingSettings?.textbox?.boxVisibility || 'all',
+    },
+    textEffects: {
+      animation: theme.effects.textAnimation,
+      typewriterSpeed: theme.effects.typewriterSpeed,
+      fadeInDuration: theme.effects.fadeInDuration,
+    },
+    hotspots: {
+      visible: theme.hotspot.visible,
+      labels: theme.hotspot.showLabels,
+      highlightColor: theme.hotspot.highlightColor,
+      opacity: Math.round(theme.hotspot.opacity * 100), // Convert 0-1 to 0-100
+      showInPreview: theme.hotspot.showInPreview,
+    },
+    sound: existingSettings?.sound || {
+      backgroundMusic: '',
+      backgroundVolume: 50,
+      mute: false,
+    },
+    copyright: existingSettings?.copyright || {
+      notice: '',
+      year: new Date().getFullYear().toString(),
+      owner: '',
+    },
+    debug: existingSettings?.debug || {
+      firstbeat: '',
+      showvals: false,
+    },
+  };
+}
+
+// ============================================================================
+// Merge Theme Overrides
+// ============================================================================
+
+/**
+ * Apply per-project theme overrides to a resolved theme
+ *
+ * @param baseTheme - The base theme definition
+ * @param overrides - Partial theme overrides from the project
+ */
+export function applyThemeOverrides(
+  baseTheme: ThemeDefinition,
+  overrides: Partial<ThemeDefinition>
+): ThemeDefinition {
+  return {
+    meta: { ...baseTheme.meta, ...overrides.meta },
+    colors: { ...baseTheme.colors, ...overrides.colors },
+    fonts: { ...baseTheme.fonts, ...overrides.fonts },
+    textBox: { ...baseTheme.textBox, ...overrides.textBox },
+    button: { ...baseTheme.button, ...overrides.button },
+    hotspot: { ...baseTheme.hotspot, ...overrides.hotspot },
+    effects: { ...baseTheme.effects, ...overrides.effects },
+    components: overrides.components || baseTheme.components,
+    assets: overrides.assets || baseTheme.assets,
+  };
+}
+
+/**
+ * Extract theme overrides by comparing project settings to base theme
+ *
+ * @param baseTheme - The base theme being used
+ * @param currentSettings - Current project GlobalSettings
+ */
+export function extractThemeOverrides(
+  baseTheme: ThemeDefinition,
+  currentSettings: GlobalSettings
+): Partial<ThemeDefinition> | undefined {
+  // Convert current settings to theme format
+  const currentAsTheme = globalSettingsToTheme(currentSettings, 'temp');
+
+  // Compare and extract differences
+  const overrides: Partial<ThemeDefinition> = {};
+  let hasOverrides = false;
+
+  // Check colors
+  const colorOverrides = diffColors(baseTheme.colors, currentAsTheme.colors);
+  if (colorOverrides) {
+    overrides.colors = colorOverrides;
+    hasOverrides = true;
+  }
+
+  // Check fonts
+  const fontOverrides = diffFonts(baseTheme.fonts, currentAsTheme.fonts);
+  if (fontOverrides) {
+    overrides.fonts = fontOverrides;
+    hasOverrides = true;
+  }
+
+  // Check textBox
+  const textBoxOverrides = diffTextBox(baseTheme.textBox, currentAsTheme.textBox);
+  if (textBoxOverrides) {
+    overrides.textBox = textBoxOverrides;
+    hasOverrides = true;
+  }
+
+  // Check hotspot
+  const hotspotOverrides = diffHotspot(baseTheme.hotspot, currentAsTheme.hotspot);
+  if (hotspotOverrides) {
+    overrides.hotspot = hotspotOverrides;
+    hasOverrides = true;
+  }
+
+  // Check effects
+  const effectsOverrides = diffEffects(baseTheme.effects, currentAsTheme.effects);
+  if (effectsOverrides) {
+    overrides.effects = effectsOverrides;
+    hasOverrides = true;
+  }
+
+  return hasOverrides ? overrides : undefined;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Lighten a hex color by a percentage
+ */
+function lightenColor(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const amt = Math.round(255 * percent);
+
+  let r = (num >> 16) + amt;
+  let g = ((num >> 8) & 0x00ff) + amt;
+  let b = (num & 0x0000ff) + amt;
+
+  r = Math.min(255, Math.max(0, r));
+  g = Math.min(255, Math.max(0, g));
+  b = Math.min(255, Math.max(0, b));
+
+  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
+/**
+ * Compare two ThemeColor values
+ */
+function colorsEqual(a: ThemeColor, b: ThemeColor): boolean {
+  return a.hex.toLowerCase() === b.hex.toLowerCase() && (a.alpha ?? 1) === (b.alpha ?? 1);
+}
+
+/**
+ * Diff colors and return overrides if different
+ */
+function diffColors(base: ThemeColors, current: ThemeColors): ThemeColors | undefined {
+  const diff: Partial<ThemeColors> = {};
+  let hasDiff = false;
+
+  for (const key of Object.keys(base) as (keyof ThemeColors)[]) {
+    if (key === 'custom') continue;
+    if (!colorsEqual(base[key] as ThemeColor, current[key] as ThemeColor)) {
+      (diff as any)[key] = current[key];
+      hasDiff = true;
+    }
+  }
+
+  return hasDiff ? { ...base, ...diff } : undefined;
+}
+
+/**
+ * Diff fonts and return overrides if different
+ */
+function diffFonts(base: ThemeFonts, current: ThemeFonts): ThemeFonts | undefined {
+  if (
+    base.title.family !== current.title.family ||
+    base.title.size !== current.title.size ||
+    base.body.family !== current.body.family ||
+    base.body.size !== current.body.size ||
+    base.button.family !== current.button.family ||
+    base.button.size !== current.button.size
+  ) {
+    return current;
+  }
+  return undefined;
+}
+
+/**
+ * Diff textBox and return overrides if different
+ */
+function diffTextBox(base: ThemeTextBox, current: ThemeTextBox): ThemeTextBox | undefined {
+  if (
+    base.borderWidth !== current.borderWidth ||
+    base.borderRadius !== current.borderRadius ||
+    base.padding !== current.padding ||
+    base.opacity !== current.opacity ||
+    base.position !== current.position
+  ) {
+    return current;
+  }
+  return undefined;
+}
+
+/**
+ * Diff hotspot and return overrides if different
+ */
+function diffHotspot(base: ThemeHotspot, current: ThemeHotspot): ThemeHotspot | undefined {
+  if (
+    base.highlightColor !== current.highlightColor ||
+    base.opacity !== current.opacity ||
+    base.visible !== current.visible ||
+    base.showLabels !== current.showLabels ||
+    base.showInPreview !== current.showInPreview
+  ) {
+    return current;
+  }
+  return undefined;
+}
+
+/**
+ * Diff effects and return overrides if different
+ */
+function diffEffects(base: ThemeEffects, current: ThemeEffects): ThemeEffects | undefined {
+  if (
+    base.textAnimation !== current.textAnimation ||
+    base.typewriterSpeed !== current.typewriterSpeed ||
+    base.fadeInDuration !== current.fadeInDuration
+  ) {
+    return current;
+  }
+  return undefined;
+}

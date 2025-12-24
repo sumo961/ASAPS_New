@@ -100,30 +100,30 @@ const DialogWithChoicesDisplay: React.FC<{
   backgroundUrl?: string | null;
   theme?: RenderThemeSettings;
 } & ScreenProps> = ({ text, choices, onAction, backgroundUrl, theme }) => {
-  // Use theme settings or defaults
+  // Use theme settings or defaults (matches Visual Novel preset style)
   const textBox = theme?.textBox || {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CCCCCC',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 16,
-    opacity: 95,
-  };
-  const button = theme?.button || {
-    backgroundColor: '#3B82F6',
-    hoverBackgroundColor: '#2563EB',
-    textColor: '#FFFFFF',
-    borderColor: '#2563EB',
+    backgroundColor: '#16213e',  // Dark blue surface
+    borderColor: '#4a90d9',      // Blue border
     borderWidth: 2,
     borderRadius: 8,
+    padding: 16,
+    opacity: 90,
+  };
+  const button = theme?.button || {
+    backgroundColor: '#0f3460',       // Dark blue button
+    hoverBackgroundColor: '#1a4a7a',  // Lighter on hover
+    textColor: '#ffffff',             // White text
+    borderColor: '#4a90d9',           // Blue border
+    borderWidth: 1,
+    borderRadius: 4,
   };
   const colors = theme?.colors || {
-    textColor: '#1F2937',
+    textColor: '#ffffff',  // White text
     textAlpha: 100,
   };
   const fonts = theme?.fonts || {
-    textFont: 'inherit',
-    buttonFont: 'inherit',
+    textFont: 'sans-serif',
+    buttonFont: 'sans-serif',
   };
 
   // Convert opacity (0-100) to CSS value

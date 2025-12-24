@@ -190,16 +190,16 @@ function App() {
       scalingMode: 'fit'
     },
     colors: {
-      pcolor: '#000000',
-      palpha: 100,  // Text opacity percentage (0-100)
-      nonpcolor: '#000000',
-      nonpalpha: 100,  // Text opacity percentage (0-100)
-      bgColor: '#87CEEB',
-      textBoxBg: '#ffffff',
-      textBoxBorder: '#333333'
+      pcolor: '#ffffff',       // White text (Visual Novel style)
+      palpha: 100,             // Text opacity percentage (0-100)
+      nonpcolor: '#cccccc',    // Light gray for NPC text
+      nonpalpha: 100,          // Text opacity percentage (0-100)
+      bgColor: '#1a1a2e',      // Dark blue background
+      textBoxBg: '#16213e',    // Dark blue surface
+      textBoxBorder: '#4a90d9' // Blue border
     },
     fonts: {
-      titleFont: 'Arial',
+      titleFont: 'Georgia',
       textFont: 'Arial',
       btnFont: 'Arial',
       fontSize: {
@@ -210,15 +210,15 @@ function App() {
     },
     textbox: {
       radius: 8,
-      padding: 16,
+      padding: 20,
       borderWidth: 2,
-      opacity: 80,  // Text box background opacity percentage (0-100)
+      opacity: 90,  // Text box background opacity percentage (0-100)
       position: 'bottom',
       boxVisibility: 'all'
     },
     textEffects: {
-      animation: 'none',
-      typewriterSpeed: 50,
+      animation: 'typewriter',  // Visual Novel style typewriter effect
+      typewriterSpeed: 15,      // Characters per second (slower for visible effect)
       fadeInDuration: 200
     },
     hotspots: {

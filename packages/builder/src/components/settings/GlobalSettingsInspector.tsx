@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
+import { useThemes } from '../../hooks/useThemes';
 
 interface GlobalSettings {
   project: {
@@ -73,6 +74,10 @@ interface GlobalSettingsInspectorProps {
   onUpdate: (settings: GlobalSettings) => void;
   onClose: () => void;
   assets?: Asset[];  // For accessing custom fonts
+  /** Current theme ID (optional) */
+  themeId?: string;
+  /** Callback when theme is changed */
+  onThemeChange?: (themeId: string | undefined) => void;
 }
 
 export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = ({
@@ -81,13 +86,55 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   onUpdate,
   onClose,
   assets = [],
+  themeId: initialThemeId,
+  onThemeChange,
 }) => {
   const [settings, setSettings] = useState<GlobalSettings>(initialSettings);
   const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'sound' | 'copyright' | 'debug'>('project');
   const [hasChanges, setHasChanges] = useState(false);
+  const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+  const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
+  const [newThemeName, setNewThemeName] = useState('');
 
   // Get available fonts (built-in + custom from assets)
   const { fonts, getFontFamily } = useFonts(assets);
+
+  // Theme management
+  const {
+    themes,
+    selectedThemeId,
+    loading: themesLoading,
+    applyThemeToSettings,
+    saveAsTheme,
+    isBuiltIn,
+  } = useThemes(initialThemeId);
+
+  // Handle theme selection
+  const handleThemeSelect = useCallback(async (newThemeId: string) => {
+    const newSettings = await applyThemeToSettings(newThemeId, settings);
+    if (newSettings) {
+      setSettings(newSettings);
+      setHasChanges(true);
+      onThemeChange?.(newThemeId);
+    }
+    setShowThemeDropdown(false);
+  }, [applyThemeToSettings, settings, onThemeChange]);
+
+  // Handle saving current settings as a theme
+  const handleSaveAsTheme = useCallback(async () => {
+    if (!newThemeName.trim()) return;
+    try {
+      const themeId = await saveAsTheme(settings, newThemeName.trim());
+      console.log('[GlobalSettings] Saved theme:', themeId);
+      setSaveThemeDialogOpen(false);
+      setNewThemeName('');
+    } catch (err) {
+      console.error('[GlobalSettings] Failed to save theme:', err);
+    }
+  }, [saveAsTheme, settings, newThemeName]);
+
+  // Get current theme name
+  const currentThemeName = themes.find(t => t.id === selectedThemeId)?.name || 'Custom';
 
   const handleChange = (category: keyof GlobalSettings, field: string, value: any) => {
     setSettings(prev => ({
@@ -205,6 +252,131 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Theme Selector */}
+        <div className="flex items-center gap-4 px-4 py-3 bg-gray-50 border-b">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Brush className="w-4 h-4" />
+            <span>Theme:</span>
+          </div>
+
+          {/* Theme Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowThemeDropdown(!showThemeDropdown)}
+              disabled={themesLoading}
+              className="flex items-center gap-2 px-3 py-1.5 bg-white border rounded-md hover:bg-gray-50 min-w-[180px] justify-between"
+            >
+              <span className="text-sm font-medium truncate">
+                {themesLoading ? 'Loading...' : currentThemeName}
+              </span>
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            </button>
+
+            {showThemeDropdown && (
+              <div className="absolute top-full left-0 mt-1 w-64 bg-white border rounded-md shadow-lg z-50 max-h-64 overflow-auto">
+                {/* Built-in Themes */}
+                <div className="px-2 py-1 text-xs text-gray-500 font-medium bg-gray-50">
+                  Built-in Themes
+                </div>
+                {themes.filter(t => t.source === 'built-in').map(theme => (
+                  <button
+                    key={theme.id}
+                    onClick={() => handleThemeSelect(theme.id)}
+                    className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-center gap-2"
+                  >
+                    {selectedThemeId === theme.id && (
+                      <Check className="w-4 h-4 text-blue-500" />
+                    )}
+                    <div className={selectedThemeId === theme.id ? 'font-medium' : ''}>
+                      <div className="text-sm">{theme.name}</div>
+                      {theme.description && (
+                        <div className="text-xs text-gray-500 truncate">{theme.description}</div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+
+                {/* Custom Themes */}
+                {themes.filter(t => t.source !== 'built-in').length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-xs text-gray-500 font-medium bg-gray-50 mt-1">
+                      Custom Themes
+                    </div>
+                    {themes.filter(t => t.source !== 'built-in').map(theme => (
+                      <button
+                        key={theme.id}
+                        onClick={() => handleThemeSelect(theme.id)}
+                        className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-center gap-2"
+                      >
+                        {selectedThemeId === theme.id && (
+                          <Check className="w-4 h-4 text-blue-500" />
+                        )}
+                        <div className={selectedThemeId === theme.id ? 'font-medium' : ''}>
+                          <div className="text-sm">{theme.name}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Save as Theme Button */}
+          <button
+            onClick={() => setSaveThemeDialogOpen(true)}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-md"
+          >
+            <Save className="w-4 h-4" />
+            Save as Theme
+          </button>
+
+          {/* Current theme indicator */}
+          {selectedThemeId && isBuiltIn(selectedThemeId) && hasChanges && (
+            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+              Modified from {currentThemeName}
+            </span>
+          )}
+        </div>
+
+        {/* Save Theme Dialog */}
+        {saveThemeDialogOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-semibold mb-4">Save as Theme</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Save your current settings as a reusable theme.
+              </p>
+              <input
+                type="text"
+                value={newThemeName}
+                onChange={(e) => setNewThemeName(e.target.value)}
+                placeholder="Enter theme name..."
+                className="w-full px-3 py-2 border rounded-md mb-4"
+                autoFocus
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setSaveThemeDialogOpen(false);
+                    setNewThemeName('');
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveAsTheme}
+                  disabled={!newThemeName.trim()}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                >
+                  Save Theme
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex border-b overflow-x-auto">

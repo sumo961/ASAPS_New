@@ -5,7 +5,7 @@
  * projects, assets, command history, and auto-save drafts.
  */
 
-import type { Beat, BeatConfig, Story } from '@asaps/core';
+import type { Beat, BeatConfig, Story, ThemeDefinition } from '@asaps/core';
 
 // ============================================================================
 // Global Settings Types (per-project)
@@ -105,6 +105,12 @@ export interface Project {
 
   /** Asset references used in this project */
   assetIds: string[];
+
+  /** Theme reference (optional, added in v3 for theme system) */
+  themeId?: string;
+
+  /** Per-project theme overrides (optional, allows customizing theme values) */
+  themeOverrides?: Partial<ThemeDefinition>;
 
   /** Metadata */
   createdAt: Date;

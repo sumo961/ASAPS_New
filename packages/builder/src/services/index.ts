@@ -1,12 +1,13 @@
 /**
- * AI Services Exports
+ * Services Exports
  *
- * Central export point for all AI services
+ * Central export point for all services
  */
 
 // Main services
 export { AIService, getAIService, resetAIService } from './AIService';
 export { AIValidator, getAIValidator } from './AIValidator';
+export { ThemeService, getThemeService, initThemeService } from './ThemeService';
 
 // Provider base and implementations
 export { BaseAIProvider } from './providers/IProvider';
