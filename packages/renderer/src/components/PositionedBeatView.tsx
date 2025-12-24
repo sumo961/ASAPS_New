@@ -202,21 +202,51 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   visitedBeats = [],
   showTextOnHover = false,
 }) => {
-  // FIX #3: Add debugging logs
-  console.log('[PositionedBeatView] ============================================');
-  console.log('[PositionedBeatView] Rendering');
-  console.log('[PositionedBeatView]   - previewMode:', previewMode, '(type:', typeof previewMode, ')');
-  console.log('[PositionedBeatView]   - backgroundUrl:', backgroundUrl);
-  console.log('[PositionedBeatView]   - backgroundColor prop:', backgroundColor);
-  console.log('[PositionedBeatView]   - elements count:', elements.length);
-  console.log('[PositionedBeatView]   - stageSize:', { width: stageWidth, height: stageHeight });
-  console.log('[PositionedBeatView]   - willUseImage:', !!backgroundUrl);
-  console.log('[PositionedBeatView]   - willUseColor:', !backgroundUrl);
-  console.log('[PositionedBeatView]   - BRANCH:', previewMode ? 'FLEX LAYOUT (previewMode=true)' : 'ABSOLUTE POSITIONING (previewMode=false)');
-  console.log('[PositionedBeatView] ============================================');
-
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
+
+  // Animation state for button fade-in after text animation completes
+  const [animationsComplete, setAnimationsComplete] = React.useState(false);
+  const [skipAnimation, setSkipAnimation] = React.useState(false);
+  const animationCompleteCountRef = React.useRef(0);
+  const totalTextElementsRef = React.useRef(0);
+  const prevElementsRef = React.useRef<PositionedElementData[] | null>(null);
+
+  // Track if elements changed this render - if so, force animations to incomplete
+  // This prevents the flash where button appears briefly then disappears when changing beats
+  const elementsChanged = prevElementsRef.current !== null && prevElementsRef.current !== elements;
+  if (elementsChanged) {
+    animationCompleteCountRef.current = 0;
+  }
+  prevElementsRef.current = elements;
+
+  // The effective animation complete state - false if elements just changed
+  const effectiveAnimationsComplete = elementsChanged ? false : animationsComplete;
+  const effectiveSkipAnimation = elementsChanged ? false : skipAnimation;
+
+  // Reset the actual state after render (for subsequent renders)
+  React.useEffect(() => {
+    if (elementsChanged) {
+      setAnimationsComplete(false);
+      setSkipAnimation(false);
+    }
+  }, [elements, elementsChanged]);
+
+  // Handler to track individual animation completions
+  const handleAnimationComplete = React.useCallback(() => {
+    animationCompleteCountRef.current += 1;
+    if (animationCompleteCountRef.current >= totalTextElementsRef.current) {
+      setAnimationsComplete(true);
+    }
+  }, []);
+
+  // Handler to skip all animations (triggered by clicking during animation)
+  const handleSkipAnimations = React.useCallback(() => {
+    if (!effectiveAnimationsComplete) {
+      setSkipAnimation(true);
+      setAnimationsComplete(true);
+    }
+  }, [effectiveAnimationsComplete]);
 
   // Check if this beat has an input field (indicates it's an InputText beat)
   // Check for elements with 'input' in the name regardless of kind
@@ -226,11 +256,6 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
 
   // Wrapped onAction that passes input value for submit buttons in InputText beats
   const handleAction = (actionId: string) => {
-    console.log('[PositionedBeatView] handleAction called');
-    console.log('[PositionedBeatView]   - actionId:', actionId);
-    console.log('[PositionedBeatView]   - hasInputField:', hasInputField);
-    console.log('[PositionedBeatView]   - inputValue:', inputValue);
-    console.log('[PositionedBeatView]   - will pass:', hasInputField ? inputValue : actionId);
     if (onAction) {
       // If this beat has an input field, pass the input value; otherwise pass actionId
       onAction(hasInputField ? inputValue : actionId);
@@ -246,24 +271,13 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   };
 
   // Apply background styles based on whether we have a background image
-  console.log('[PositionedBeatView] Setting up background style:', {
-    hasBackgroundUrl: !!backgroundUrl,
-    backgroundUrl: backgroundUrl?.substring(0, 50),
-    backgroundColor
-  });
   if (backgroundUrl) {
-    // Use individual properties for background image
-    console.log('[PositionedBeatView] Applying background IMAGE');
     containerStyle.backgroundImage = `url(${backgroundUrl})`;
     containerStyle.backgroundSize = 'cover';
     containerStyle.backgroundPosition = 'center';
     containerStyle.backgroundRepeat = 'no-repeat';
-    console.log('[PositionedBeatView] backgroundImage set to:', containerStyle.backgroundImage);
   } else {
-    // Use individual properties for color/gradient
-    console.log('[PositionedBeatView] Applying background COLOR');
     containerStyle.background = backgroundColor;
-    console.log('[PositionedBeatView] background set to:', containerStyle.background);
   }
 
   // In preview mode, use a flex layout for text and buttons to auto-flow
@@ -317,8 +331,17 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       }
     }
 
+    // Track total text elements for animation completion
+    totalTextElementsRef.current = sortedTextElements.length;
+
+    // If no text elements or no animation, buttons should show immediately
+    const shouldShowButtons = effectiveAnimationsComplete || animation === 'none' || sortedTextElements.length === 0;
+
     return (
-      <div style={containerStyle}>
+      <div
+        style={containerStyle}
+        onClick={!effectiveAnimationsComplete && animation === 'typewriter' ? handleSkipAnimations : undefined}
+      >
         {/* Render other elements (characters, props) with absolute positioning */}
         {otherElements.map((element, index) => (
           <PositionedElement
@@ -365,11 +388,13 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                 theme={theme}
                 onAction={handleAction}
                 animationDelay={animationDelays[index] || 0}
+                onAnimationComplete={handleAnimationComplete}
+                skipAnimation={effectiveSkipAnimation}
               />
             </div>
           ))}
 
-          {/* Buttons in a row */}
+          {/* Buttons in a row - fade in after animation completes */}
           {buttonElements.length > 0 && (
             <div style={{
               display: 'flex',
@@ -378,6 +403,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
               gap: '16px',
               justifyContent: 'center',
               width: '100%',
+              opacity: shouldShowButtons ? 1 : 0,
+              transition: 'opacity 300ms ease-in',
+              pointerEvents: shouldShowButtons ? 'auto' : 'none',
             }}>
               {buttonElements.map((element, index) => {
                 // Check if this button leads to a visited beat
@@ -387,7 +415,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                     key={`btn-${index}-${element.location.name}`}
                     element={element}
                     onAction={handleAction}
-                    interactive={interactive}
+                    interactive={interactive && shouldShowButtons}
                     hideButtonBox={hideButtonBoxes}
                     theme={theme}
                     isVisited={isButtonVisited}
@@ -444,8 +472,17 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
     }
   }
 
+  // Track total text elements for animation completion (non-preview mode)
+  totalTextElementsRef.current = sortedTextElements.length;
+
+  // Determine if buttons should be visible
+  const shouldShowButtons = effectiveAnimationsComplete || animation === 'none' || sortedTextElements.length === 0;
+
   return (
-    <div style={containerStyle}>
+    <div
+      style={containerStyle}
+      onClick={!effectiveAnimationsComplete && animation === 'typewriter' ? handleSkipAnimations : undefined}
+    >
       {elements.map((element, index) => (
         <PositionedElement
           key={`element-${index}-${element.location.name}`}
@@ -462,6 +499,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           visitedBeats={visitedBeats}
           showTextOnHover={showTextOnHover}
           animationDelay={animationDelayMap.get(element.location.name) || 0}
+          onAnimationComplete={handleAnimationComplete}
+          skipAnimation={effectiveSkipAnimation}
+          shouldShowButtons={shouldShowButtons}
         />
       ))}
     </div>
@@ -485,6 +525,9 @@ interface PositionedElementProps {
   visitedBeats?: string[];
   showTextOnHover?: boolean;
   animationDelay?: number;  // Delay in ms before starting animation
+  onAnimationComplete?: () => void;  // Callback when text animation finishes
+  skipAnimation?: boolean;  // When true, skip animation and show full text
+  shouldShowButtons?: boolean;  // Whether buttons should be visible (after animation)
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -501,6 +544,9 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   visitedBeats = [],
   showTextOnHover = false,
   animationDelay = 0,
+  onAnimationComplete,
+  skipAnimation = false,
+  shouldShowButtons = true,
 }) => {
   const { location, content, assetUrl, hyperlinks } = element;
 
@@ -518,9 +564,6 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   if (location.scale && location.scale !== 1) {
     transforms.push(`scale(${location.scale})`);
   }
-
-  // DEBUG: Log the position values being used for rendering
-  console.log(`[PositionedBeatView] Rendering "${location.name}" (${location.kind}) at x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}, size=${(location as any).size}`);
 
   // For character/prop elements, use auto sizing to preserve natural image dimensions when:
   // 1. They have a size percentage specified, OR
@@ -579,6 +622,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           theme={theme}
           previewMode={previewMode}
           animationDelay={animationDelay}
+          onAnimationComplete={onAnimationComplete}
+          skipAnimation={skipAnimation}
         />
       );
     }
@@ -587,38 +632,60 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
       // Use stored dimensions directly - auto-sizing happens at import time
       // Check if this button leads to a visited beat
       const isButtonVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
+      // Wrap button in a div that handles the fade-in animation
+      // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       return (
-        <ButtonElement
-          style={baseStyle}
-          content={content}
-          location={location}
-          actionId={element.actionId}
-          onAction={onAction}
-          interactive={interactive}
-          hideButtonBox={hideButtonBoxes}
-          theme={theme}
-          isVisited={isButtonVisited}
-        />
+        <div
+          style={{
+            ...baseStyle,
+            opacity: shouldShowButtons ? 1 : 0,
+            transition: 'opacity 300ms ease-in',
+            pointerEvents: shouldShowButtons ? 'auto' : 'none',
+          }}
+        >
+          <ButtonElement
+            style={{ width: '100%', height: '100%' }}
+            content={content}
+            location={location}
+            actionId={element.actionId}
+            onAction={onAction}
+            interactive={interactive && shouldShowButtons}
+            hideButtonBox={hideButtonBoxes}
+            theme={theme}
+            isVisited={isButtonVisited}
+          />
+        </div>
       );
     }
 
     case 'hotspot': {
       // Check if this hotspot leads to a visited beat
       const isHotspotVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
+      // Wrap hotspot in a div that handles the fade-in animation
+      // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       return (
-        <ButtonElement
-          style={baseStyle}
-          content={content}
-          location={location}
-          actionId={element.actionId}
-          onAction={onAction}
-          interactive={interactive}
-          hideButtonBox={true} // Always hide button box for hotspots
-          editorMode={!interactive} // Editor mode when not interactive
-          theme={theme}
-          isVisited={isHotspotVisited}
-          showTextOnHover={showTextOnHover}
-        />
+        <div
+          style={{
+            ...baseStyle,
+            opacity: shouldShowButtons ? 1 : 0,
+            transition: 'opacity 300ms ease-in',
+            pointerEvents: shouldShowButtons ? 'auto' : 'none',
+          }}
+        >
+          <ButtonElement
+            style={{ width: '100%', height: '100%' }}
+            content={content}
+            location={location}
+            actionId={element.actionId}
+            onAction={onAction}
+            interactive={interactive && shouldShowButtons}
+            hideButtonBox={true} // Always hide button box for hotspots
+            editorMode={!interactive} // Editor mode when not interactive
+            theme={theme}
+            isVisited={isHotspotVisited}
+            showTextOnHover={showTextOnHover}
+          />
+        </div>
       );
     }
 
@@ -648,6 +715,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           hyperlinks={hyperlinks}
           onAction={onAction}
           animationDelay={animationDelay}
+          onAnimationComplete={onAnimationComplete}
+          skipAnimation={skipAnimation}
         />
       );
 
@@ -684,13 +753,35 @@ const TextElement: React.FC<{
   previewMode?: boolean;
   animationDelay?: number;  // Delay in ms before starting animation
   onAnimationComplete?: () => void;  // Callback when animation finishes
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete }) => {
+  skipAnimation?: boolean;  // When true, immediately show full text
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const [animationStarted, setAnimationStarted] = React.useState(false);
+  const animationCompletedRef = React.useRef(false);
+
+  // Handle skip animation - immediately show full text
+  React.useEffect(() => {
+    if (skipAnimation && !animationCompletedRef.current) {
+      setDisplayedText(content);
+      setIsAnimating(false);
+      animationCompletedRef.current = true;
+      onAnimationComplete?.();
+    }
+  }, [skipAnimation, content, onAnimationComplete]);
 
   // Typewriter animation effect with delay support
   React.useEffect(() => {
+    // Reset completion tracking when content changes
+    animationCompletedRef.current = false;
+
+    // If already skipped, don't start animation
+    if (skipAnimation) {
+      setDisplayedText(content);
+      setIsAnimating(false);
+      return;
+    }
+
     const animation = theme.textEffects?.animation || 'none';
 
     if (animation === 'typewriter') {
@@ -713,7 +804,10 @@ const TextElement: React.FC<{
           } else {
             setIsAnimating(false);
             if (intervalId) clearInterval(intervalId);
-            onAnimationComplete?.();
+            if (!animationCompletedRef.current) {
+              animationCompletedRef.current = true;
+              onAnimationComplete?.();
+            }
           }
         }, msPerChar);
       }, animationDelay);
@@ -726,10 +820,15 @@ const TextElement: React.FC<{
       setDisplayedText(content);
       setIsAnimating(false);
       // For non-animated content, call completion immediately after a short delay
-      const timeoutId = setTimeout(() => onAnimationComplete?.(), animationDelay + 50);
+      const timeoutId = setTimeout(() => {
+        if (!animationCompletedRef.current) {
+          animationCompletedRef.current = true;
+          onAnimationComplete?.();
+        }
+      }, animationDelay + 50);
       return () => clearTimeout(timeoutId);
     }
-  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, onAnimationComplete]);
+  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, onAnimationComplete, skipAnimation]);
 
   // Use stored fontSize directly - auto-sizing happens at import time
   // Default to 16px if not set
@@ -1217,15 +1316,33 @@ const DialogElement: React.FC<{
   hyperlinks?: HyperlinkData[];
   onAction?: (actionId: string) => void;
   animationDelay?: number;
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0 }) => {
+  onAnimationComplete?: () => void;
+  skipAnimation?: boolean;
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
+  const hasCalledCompleteRef = React.useRef(false);
+
+  // Handle skip animation
+  React.useEffect(() => {
+    if (skipAnimation && isAnimating) {
+      setDisplayedText(content);
+      setIsAnimating(false);
+      if (!hasCalledCompleteRef.current && onAnimationComplete) {
+        hasCalledCompleteRef.current = true;
+        onAnimationComplete();
+      }
+    }
+  }, [skipAnimation, isAnimating, content, onAnimationComplete]);
 
   // Typewriter animation effect with delay support
   React.useEffect(() => {
+    // Reset completion tracking when content changes
+    hasCalledCompleteRef.current = false;
+
     const animation = theme.textEffects?.animation || 'none';
 
-    if (animation === 'typewriter') {
+    if (animation === 'typewriter' && !skipAnimation) {
       setDisplayedText('');
       setIsAnimating(true);
 
@@ -1243,6 +1360,11 @@ const DialogElement: React.FC<{
           } else {
             setIsAnimating(false);
             if (intervalId) clearInterval(intervalId);
+            // Call completion callback
+            if (!hasCalledCompleteRef.current && onAnimationComplete) {
+              hasCalledCompleteRef.current = true;
+              onAnimationComplete();
+            }
           }
         }, msPerChar);
       }, animationDelay);
@@ -1254,8 +1376,13 @@ const DialogElement: React.FC<{
     } else {
       setDisplayedText(content);
       setIsAnimating(false);
+      // Immediately complete for non-typewriter animations
+      if (!hasCalledCompleteRef.current && onAnimationComplete) {
+        hasCalledCompleteRef.current = true;
+        onAnimationComplete();
+      }
     }
-  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay]);
+  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, skipAnimation, onAnimationComplete]);
 
   // Calculate font size
   let computedFontSize: number;
@@ -1897,15 +2024,35 @@ const FlexTextElement: React.FC<{
   onAction?: (actionId: string) => void;
   animationDelay?: number;  // Delay in ms before starting animation
   onAnimationComplete?: () => void;  // Callback when animation finishes
-}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete }) => {
+  skipAnimation?: boolean;  // When true, immediately show full text
+}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false }) => {
   const { location, content, hyperlinks } = element;
 
   // Typewriter animation state
   const [displayedText, setDisplayedText] = React.useState('');
   const [animationStarted, setAnimationStarted] = React.useState(false);
+  const animationCompletedRef = React.useRef(false);
+
+  // Handle skip animation - immediately show full text
+  React.useEffect(() => {
+    if (skipAnimation && !animationCompletedRef.current) {
+      setDisplayedText(content);
+      animationCompletedRef.current = true;
+      onAnimationComplete?.();
+    }
+  }, [skipAnimation, content, onAnimationComplete]);
 
   // Typewriter animation effect with delay support
   React.useEffect(() => {
+    // Reset completion tracking when content changes
+    animationCompletedRef.current = false;
+
+    // If already skipped, don't start animation
+    if (skipAnimation) {
+      setDisplayedText(content);
+      return;
+    }
+
     const animation = theme.textEffects?.animation || 'none';
 
     if (animation === 'typewriter') {
@@ -1926,7 +2073,10 @@ const FlexTextElement: React.FC<{
             currentIndex++;
           } else {
             if (intervalId) clearInterval(intervalId);
-            onAnimationComplete?.();
+            if (!animationCompletedRef.current) {
+              animationCompletedRef.current = true;
+              onAnimationComplete?.();
+            }
           }
         }, msPerChar);
       }, animationDelay);
@@ -1938,10 +2088,15 @@ const FlexTextElement: React.FC<{
     } else {
       setDisplayedText(content);
       // For non-animated content, call completion immediately after a short delay
-      const timeoutId = setTimeout(() => onAnimationComplete?.(), animationDelay + 50);
+      const timeoutId = setTimeout(() => {
+        if (!animationCompletedRef.current) {
+          animationCompletedRef.current = true;
+          onAnimationComplete?.();
+        }
+      }, animationDelay + 50);
       return () => clearTimeout(timeoutId);
     }
-  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, onAnimationComplete]);
+  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, onAnimationComplete, skipAnimation]);
 
   // Calculate font size
   let computedFontSize: number;
