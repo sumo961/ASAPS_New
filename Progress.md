@@ -1,5 +1,53 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-24: AI Story Generation Improvements
+
+### Overview
+
+Multiple fixes and improvements to AI story generation ensuring reliable story creation and playback.
+
+### Fixes Applied
+
+1. **Beat Type Aliases** (Dec 20)
+   - Added `variable` as alias for `setVariable` beat type
+   - AI can now use either name in generated stories
+   - Schema lookups handle aliases correctly
+
+2. **Story Serialization** (Dec 22)
+   - Fixed beat serialization for AI-generated stories
+   - Fixed hyperlinks system in hyperText beats
+   - Improved error handling and validation
+
+3. **AI Debug Feature** (Dec 22)
+   - Added automated story generation validation in Debug panel
+   - Shows validation errors in real-time
+   - Helps diagnose AI output issues
+
+4. **MovementChoice & PickProp Navigation** (Dec 23)
+   - Fixed navigation when AI omits `id` field on choices
+   - Auto-generates `id` fields during AI story transformation
+   - All choices now navigate correctly in preview
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/utils/SchemaLocationInitializer.ts` | Beat type alias support |
+| `packages/builder/src/components/ai/StoryGenerator.tsx` | ID field auto-generation |
+| `packages/builder/src/components/debug/AIDebugPanel.tsx` | Validation UI |
+| `packages/core/src/beats/*.ts` | Serialization fixes |
+
+### AI Documentation
+
+For comprehensive AI integration documentation, see `dev_docs/AI_INTEGRATION_PROGRESS.md` (local development only - not in git).
+
+Key AI features:
+- **MCP Server** (`mcp-server-desktop/`): Claude Desktop integration for story generation
+- **AI Service** (`packages/builder/src/services/AIService.ts`): Provider-agnostic AI infrastructure
+- **Schema** (`beat-definitions/core-beats.json`): Beat type definitions used by AI
+
+---
+
 ## 2024-12-24: Button Fade-in After Text Animation
 
 ### Overview
