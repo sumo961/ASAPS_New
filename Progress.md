@@ -1,5 +1,49 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-24: Button Fade-in After Text Animation
+
+### Overview
+
+Fixed button fade-in behavior so buttons correctly appear after typewriter text animation completes. Previously, buttons on introText beats would either appear immediately or flash briefly then disappear.
+
+### Issues Fixed
+
+1. **Non-preview mode using stale animation state**
+   - `shouldShowButtons` was using `animationsComplete` instead of `effectiveAnimationsComplete`
+   - This caused buttons to flash briefly when navigating between beats because the old state persisted for the first render
+
+2. **DialogElement missing animation completion callback**
+   - `DialogElement` (used by introText beats with `dialog` kind) didn't have `onAnimationComplete` or `skipAnimation` props
+   - Animation completion was never signaled, so buttons stayed hidden indefinitely
+
+### Behavior
+
+- **During animation**: Buttons are hidden (opacity 0, pointer-events: none)
+- **After animation**: Buttons fade in over 300ms
+- **Click to skip**: Clicking during animation skips to completion and shows buttons immediately
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/renderer/src/components/PositionedBeatView.tsx` | Added `onAnimationComplete` and `skipAnimation` props to DialogElement; fixed non-preview mode to use `effectiveAnimationsComplete` |
+
+### Technical Details
+
+```typescript
+// DialogElement now supports animation callbacks
+const DialogElement: React.FC<{
+  // ... existing props
+  onAnimationComplete?: () => void;  // NEW: Called when animation finishes
+  skipAnimation?: boolean;            // NEW: Skip to end immediately
+}> = ({ ..., onAnimationComplete, skipAnimation = false }) => {
+  // Calls onAnimationComplete when typewriter finishes
+  // Respects skipAnimation to show full text immediately
+};
+```
+
+---
+
 ## 2024-12-24: Typewriter Text Animation
 
 ### Overview
