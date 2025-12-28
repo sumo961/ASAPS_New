@@ -27,8 +27,10 @@ interface ClusterContainerNodeData {
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   // Getter function for assets to avoid embedding array in node data (prevents render issues)
   getAssets?: () => Array<{ id: string; url: string; type: string; name?: string }>;
-  // Path highlighting - beats to highlight in the debug path
-  highlightedBeatIds?: Set<string>;
+  // Getter function for highlighted beat IDs - use getter to avoid triggering re-renders
+  getHighlightedBeatIds?: () => Set<string> | null;
+  // Version string to force re-renders when highlighting changes (used with memo())
+  highlightVersion?: string;
 }
 
 // Beat type colors (same as main flowchart)
@@ -98,11 +100,15 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     mapAssetUrl,
     onSetClusterMap,
     getAssets,
-    highlightedBeatIds
+    getHighlightedBeatIds,
+    highlightVersion: _highlightVersion, // Destructure to ensure memo() detects changes
   } = data;
 
   // Get assets via getter function to avoid embedding array in node data
   const assets = getAssets ? getAssets() : [];
+
+  // Get highlighted beat IDs via getter function to avoid triggering re-renders
+  const highlightedBeatIds = getHighlightedBeatIds ? getHighlightedBeatIds() : null;
 
   // Calculate internal connections between beats in this cluster
   const internalConnections = useMemo(() => {
@@ -927,18 +933,19 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                 <div
                   key={beatInfo.beatId}
                   className={`
-                    absolute rounded-lg border-2 bg-white shadow-lg
+                    absolute rounded-lg border-2 shadow-lg
                     transition-shadow
                     ${isDragging ? 'shadow-2xl z-50 cursor-grabbing' : 'hover:shadow-xl cursor-grab'}
                     ${isSelected ? 'ring-4 ring-blue-400 ring-opacity-50' : ''}
                     ${isHighlighted && !isSelected ? 'ring-4 ring-amber-400 ring-opacity-70' : ''}
+                    ${isHighlighted ? 'bg-amber-50' : 'bg-white'}
                   `}
                   style={{
                     left: beatInfo.position.x,
                     top: beatInfo.position.y,
                     width: NODE_WIDTH,
                     height: NODE_HEIGHT,
-                    borderColor: isSelected ? color : '#d1d5db',
+                    borderColor: isHighlighted ? '#f59e0b' : (isSelected ? color : '#d1d5db'),
                     overflow: 'visible', // Allow handles to extend outside
                   }}
                   onClick={(e) => {

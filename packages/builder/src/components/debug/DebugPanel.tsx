@@ -25,6 +25,11 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
   const dragOffset = useRef({ x: 0, y: 0 });
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Resizable state
+  const [size, setSize] = useState({ width: 650, height: Math.min(window.innerHeight * 0.8, 800) });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStart = useRef({ x: 0, y: 0, width: 0, height: 0 });
+
   // Handle mouse down on header to start dragging
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Only allow dragging from the header area (not buttons)
@@ -73,6 +78,44 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
     };
   }, [isDragging]);
 
+  // Handle resize start
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    resizeStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      width: size.width,
+      height: size.height
+    };
+  }, [size]);
+
+  // Handle mouse move during resize
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - resizeStart.current.x;
+      const deltaY = e.clientY - resizeStart.current.y;
+      const newWidth = Math.max(400, Math.min(window.innerWidth - position.x - 20, resizeStart.current.width + deltaX));
+      const newHeight = Math.max(300, Math.min(window.innerHeight - position.y - 20, resizeStart.current.height + deltaY));
+      setSize({ width: newWidth, height: newHeight });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, position]);
+
   return (
     <div
       ref={panelRef}
@@ -80,10 +123,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
       style={{
         left: position.x,
         top: position.y,
-        width: '600px',
-        height: '70vh',
-        maxHeight: '800px',
-        minHeight: '400px'
+        width: size.width,
+        height: size.height
       }}
     >
       {/* Draggable Header */}
@@ -155,6 +196,17 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Resize Handle */}
+      <div
+        className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
+        style={{
+          background: 'linear-gradient(135deg, transparent 50%, #6366f1 50%)',
+          borderBottomRightRadius: '0.5rem',
+        }}
+        onMouseDown={handleResizeStart}
+        title="Drag to resize"
+      />
     </div>
   );
 };

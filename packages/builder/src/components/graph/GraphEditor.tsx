@@ -111,6 +111,17 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const assetsRef = useRef(assets);
   assetsRef.current = assets;
 
+  // Memoize highlightedBeatIds as a Set to avoid creating new Sets on every render
+  // This is critical for performance - prevents O(n) lookups and unnecessary object creation
+  const highlightedBeatIdsSet = useMemo(() => {
+    return highlightedBeatIds.length > 0 ? new Set(highlightedBeatIds) : null;
+  }, [highlightedBeatIds]);
+
+  // Use ref for highlightedBeatIds to avoid triggering full node recalculation
+  // Nodes will use the ref for highlighting checks, which updates on render
+  const highlightedBeatIdsRef = useRef(highlightedBeatIdsSet);
+  highlightedBeatIdsRef.current = highlightedBeatIdsSet;
+
   // DEBUG: Track initial mounting
   const mountRef = useRef(false);
 
@@ -143,7 +154,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         type: beat.type,
         selected: selectedBeat?.id === beat.id,
         color: beatTypeColors[beat.type] || '#94a3b8',
-        highlighted: highlightedBeatIds.includes(beat.id),
+        highlighted: highlightedBeatIdsRef.current?.has(beat.id) ?? false,
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -221,8 +232,9 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           onSetClusterMap: onSetClusterMap,
           // Pass a getter function for assets to avoid embedding the whole array in node data
           getAssets: () => assetsRef.current,
-          // Pass highlighted beat IDs for path visualization within cluster
-          highlightedBeatIds: highlightedBeatIds.length > 0 ? new Set(highlightedBeatIds) : undefined,
+          // Pass getter for highlighted beat IDs to avoid embedding in node data and prevent re-renders
+          // Use getter function to access the ref so cluster nodes get the current value without being dependencies
+          getHighlightedBeatIds: () => highlightedBeatIdsRef.current,
         },
         style: {
           width: cluster.containerBounds.width,
@@ -234,9 +246,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     return [...beatNodes, ...clusterNodes];
 
     // return totalNodes; // Uncomment to go back to normal
-  // Note: assets is intentionally NOT in dependency array - we use assetsRef to access current assets
-  // This prevents unnecessary node recalculation when assets change, which was causing the flowchart to empty
-  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, highlightedBeatIds, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap]);
+  // Note: assets and highlightedBeatIds are intentionally NOT in dependency array
+  // We use refs to access current values without triggering full node recalculation
+  // This is critical for performance - changing highlighted beats shouldn't rebuild all nodes
+  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(() => {
@@ -670,6 +683,45 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     setEdges(edges);
   }, [edges, setEdges]);
 
+  // Efficiently update node highlighting without full rebuild
+  // This effect updates both beat nodes and cluster nodes when highlightedBeatIdsSet changes
+  useEffect(() => {
+    // Generate a version key to force cluster re-renders
+    const highlightVersion = highlightedBeatIdsSet
+      ? Array.from(highlightedBeatIdsSet).sort().join(',')
+      : '';
+
+    setNodes((currentNodes) => {
+      return currentNodes.map((node) => {
+        if (node.type === 'beat') {
+          const isHighlighted = highlightedBeatIdsSet?.has(node.id) ?? false;
+          if (node.data.highlighted !== isHighlighted) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                highlighted: isHighlighted,
+              },
+            };
+          }
+        }
+        // For cluster nodes, update the highlightVersion to trigger re-render
+        if (node.type === 'cluster') {
+          if (node.data.highlightVersion !== highlightVersion) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                highlightVersion,
+              },
+            };
+          }
+        }
+        return node;
+      });
+    });
+  }, [highlightedBeatIdsSet, setNodes]);
+
   // Handle node click
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
@@ -752,6 +804,9 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     console.log('[GraphEditor] === ReactFlow mounting with', nodesState.length, 'nodes ===');
     console.log('[GraphEditor] ReactFlow node props:', {nodes: nodesState?.length, viewport: 'unknown', zoom: 'unknown'});
   }, [nodesState]);
+
+  // Memoized MiniMap color callback to prevent re-creation on every render
+  const miniMapNodeColor = useCallback((node: Node) => node.data?.color || '#94a3b8', []);
 
   // Debug viewport controller using only the reactFlowInstance
   const debugViewport = useCallback(() => {
@@ -856,8 +911,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           </div>
         )}
         <MiniMap
-          nodeStrokeColor={(node) => node.data?.color || '#94a3b8'}
-          nodeColor={(node) => node.data?.color || '#94a3b8'}
+          nodeStrokeColor={miniMapNodeColor}
+          nodeColor={miniMapNodeColor}
           nodeBorderRadius={8}
           pannable
           zoomable

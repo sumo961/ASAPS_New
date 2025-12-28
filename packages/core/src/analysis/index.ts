@@ -1,20 +1,41 @@
 // Analysis tools for story structure
-export { PathAnalyzer } from './PathAnalyzer';
-export { ReachabilityAnalyzer } from './ReachabilityAnalyzer';
-export { SymbolicPathAnalyzer } from './SymbolicPathAnalyzer';
+
+// Constraint-based path analysis
+export { ConstraintPathAnalyzer } from './ConstraintPathAnalyzer';
+export { BackwardAnalyzer } from './BackwardAnalyzer';
+export { PathQueryEngine } from './PathQuery';
 export type {
-  PathAnalysisResult,
-  StoryPath
-} from './PathAnalyzer';
+  ConstraintAnalysisConfig,
+} from './ConstraintPathAnalyzer';
+export type {
+  ConstraintSet,
+  OutcomeGroup,
+  PathStep,
+  ConstraintPathResult,
+  NumericRange,
+  ValueConstraint,
+} from './ConstraintSet';
+export {
+  createEmptyConstraintSet,
+  constraintSetToStrings,
+  hashConstraintSet,
+} from './ConstraintSet';
+export type {
+  BackwardAnalysisResult,
+  PathRequirement,
+  DecisionPoint,
+} from './BackwardAnalyzer';
+export type {
+  PathQuery,
+  PathQueryType,
+  QueryResult,
+} from './PathQuery';
+
+// Reachability analysis
+export { ReachabilityAnalyzer } from './ReachabilityAnalyzer';
 export type {
   ReachabilityResult,
   UnreachableBeat,
   ReachabilityWarning,
   BrokenConnection
 } from './ReachabilityAnalyzer';
-export type {
-  SymbolicPathResult,
-  SymbolicAnalysisConfig,
-  SymbolicPath,
-  SymbolicPathNode
-} from './SymbolicPathAnalyzer';

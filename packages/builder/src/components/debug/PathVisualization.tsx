@@ -1,224 +1,258 @@
 import React, { useState, useMemo } from 'react';
-import { GitBranch, ChevronRight, Search, Filter, Eye, EyeOff, Zap, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
-import { Story, PathAnalyzer, SymbolicPathAnalyzer } from '@asaps/core';
-import type { StoryPath, SymbolicPathResult, SymbolicPath } from '@asaps/core';
+import { GitBranch, ChevronRight, Search, Clock, AlertTriangle, CheckCircle, Target, ArrowLeft, HelpCircle } from 'lucide-react';
+import {
+  Story,
+  ConstraintPathAnalyzer,
+  BackwardAnalyzer,
+  PathQueryEngine,
+  constraintSetToStrings,
+} from '@asaps/core';
+import type {
+  OutcomeGroup,
+  PathStep,
+  ConstraintPathResult,
+  BackwardAnalysisResult,
+  PathRequirement,
+  DecisionPoint,
+} from '@asaps/core';
 
 interface PathVisualizationProps {
   story: Story;
   onHighlightPath?: (beatIds: string[]) => void;
 }
 
-// Helper to extract beat IDs from a path
-const getPathBeatIds = (path: StoryPath): string[] => path.nodes.map(n => n.beatId);
-
-// Helper to check if path has a cycle
-const pathHasCycle = (path: StoryPath): boolean => path.endType === 'cycle';
-
-// Helper to get ending beat ID
-const getPathEndingId = (path: StoryPath): string | undefined =>
-  path.endType === 'endBeat' ? path.endBeatId : undefined;
-
-// Helpers for symbolic paths
-const getSymbolicPathBeatIds = (path: SymbolicPath): string[] => path.nodes.map(n => n.beatId);
-const symbolicPathHasCycle = (path: SymbolicPath): boolean => path.endType === 'cycle';
-const getSymbolicPathEndingId = (path: SymbolicPath): string | undefined =>
-  path.endType === 'endBeat' ? path.endBeatId : undefined;
-
 export const PathVisualization: React.FC<PathVisualizationProps> = ({
   story,
   onHighlightPath
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPath, setSelectedPath] = useState<number | null>(null);
-  const [filterMode, setFilterMode] = useState<'all' | 'endings' | 'longest' | 'shortest'>('all');
-  const [showCycles, setShowCycles] = useState(true);
-  const [analysisMode, setAnalysisMode] = useState<'basic' | 'symbolic'>('basic');
+  const [queryInput, setQueryInput] = useState('');
+  const [selectedOutcome, setSelectedOutcome] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'forward' | 'backward'>('forward');
+  const [selectedBackwardBeat, setSelectedBackwardBeat] = useState<string | null>(null);
+  const [expandedBackwardPath, setExpandedBackwardPath] = useState<number | null>(null);
 
-  // Symbolic mode specific state
-  const [symbolicSearchTerm, setSymbolicSearchTerm] = useState('');
-  const [selectedSymbolicPath, setSelectedSymbolicPath] = useState<number | null>(null);
-  const [symbolicFilterMode, setSymbolicFilterMode] = useState<'all' | 'endings' | 'longest' | 'shortest'>('all');
-  const [showSymbolicCycles, setShowSymbolicCycles] = useState(true);
-
-  // Run basic path analysis
-  const basicResult = useMemo(() => {
-    const analyzer = new PathAnalyzer(story, { maxPaths: 10000 });
-    return analyzer.analyze();
-  }, [story]);
-
-  const allPaths = basicResult.uniquePaths;
-
-  // Run symbolic path analysis
-  const symbolicResult = useMemo<SymbolicPathResult | null>(() => {
-    if (analysisMode !== 'symbolic') return null;
+  // Run constraint-based path analysis
+  const analysisResult = useMemo<ConstraintPathResult | null>(() => {
     try {
-      const analyzer = new SymbolicPathAnalyzer(story);
+      const analyzer = new ConstraintPathAnalyzer(story, {
+        maxOutcomes: 500,
+        maxDepth: 100,
+        maxConstraintSets: 50,
+      });
       return analyzer.analyze();
     } catch (error) {
-      console.error('[PathVisualization] Symbolic analysis error:', error);
+      console.error('[PathVisualization] Constraint analysis error:', error);
       return null;
     }
-  }, [story, analysisMode]);
+  }, [story]);
+
+  // Get backward analyzer for the story
+  const backwardAnalyzer = useMemo(() => {
+    return new BackwardAnalyzer(story);
+  }, [story]);
+
+  // Get endings for backward analysis
+  const endings = useMemo(() => {
+    return backwardAnalyzer.getEndings();
+  }, [backwardAnalyzer]);
+
+  // Run backward analysis when a beat is selected
+  const backwardResult = useMemo<BackwardAnalysisResult | null>(() => {
+    if (!selectedBackwardBeat) return null;
+    try {
+      return backwardAnalyzer.analyzeBackward(selectedBackwardBeat);
+    } catch (error) {
+      console.error('[PathVisualization] Backward analysis error:', error);
+      return null;
+    }
+  }, [backwardAnalyzer, selectedBackwardBeat]);
+
+  // Query engine for filtering outcomes
+  const queryEngine = useMemo(() => {
+    if (!analysisResult) return null;
+    return new PathQueryEngine(analysisResult);
+  }, [analysisResult]);
+
+  // Filter outcomes by query
+  const filteredOutcomes = useMemo(() => {
+    if (!analysisResult) return [];
+    if (!queryInput.trim() || !queryEngine) return analysisResult.outcomes;
+
+    const parsed = queryEngine.parseQuery(queryInput);
+    if (!parsed) return analysisResult.outcomes;
+
+    const result = queryEngine.query(parsed);
+    return result.matchingOutcomes;
+  }, [analysisResult, queryInput, queryEngine]);
+
+  // Get suggested queries
+  const suggestedQueries = useMemo(() => {
+    if (!queryEngine) return [];
+    return queryEngine.getSuggestedQueries().slice(0, 5);
+  }, [queryEngine]);
 
   const getBeatName = (beatId: string): string => {
     const beat = story.getBeat(beatId);
     return beat ? beat.name : beatId;
   };
 
-  // Filter paths based on mode
-  const filteredPaths = useMemo(() => {
-    let paths = allPaths;
+  // Forward: Handle outcome click - highlight path
+  const handleOutcomeClick = (index: number, outcome: OutcomeGroup) => {
+    const isDeselecting = selectedOutcome === index;
+    setSelectedOutcome(isDeselecting ? null : index);
 
-    // Filter by search term
-    if (searchTerm) {
-      paths = paths.filter(path =>
-        getPathBeatIds(path).some((beatId: string) => {
-          const name = getBeatName(beatId);
-          return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                 beatId.toLowerCase().includes(searchTerm.toLowerCase());
-        })
-      );
-    }
-
-    // Filter by mode
-    switch (filterMode) {
-      case 'endings':
-        paths = paths.filter(p => getPathEndingId(p) !== undefined);
-        break;
-      case 'longest':
-        if (paths.length > 0) {
-          const maxLength = Math.max(...paths.map(p => p.length));
-          paths = paths.filter(p => p.length === maxLength);
-        }
-        break;
-      case 'shortest':
-        if (paths.length > 0) {
-          const minLength = Math.min(...paths.map(p => p.length));
-          paths = paths.filter(p => p.length === minLength);
-        }
-        break;
-    }
-
-    // Filter cycles
-    if (!showCycles) {
-      paths = paths.filter(p => !pathHasCycle(p));
-    }
-
-    return paths;
-  }, [allPaths, searchTerm, filterMode, showCycles]);
-
-  const handlePathClick = (index: number, path: StoryPath) => {
-    const isDeselecting = selectedPath === index;
-    setSelectedPath(isDeselecting ? null : index);
-
-    // Always call highlight callback - either with path beats or empty array to clear
     if (isDeselecting) {
       onHighlightPath?.([]);
     } else {
-      onHighlightPath?.(getPathBeatIds(path));
+      const beatIds = outcome.representativePath.map(step => step.beatId);
+      onHighlightPath?.(beatIds);
     }
   };
 
-  const getPathSummary = (path: StoryPath): string => {
-    const parts: string[] = [];
-    if (pathHasCycle(path)) parts.push('Contains cycle');
-    const endingId = getPathEndingId(path);
-    if (endingId) parts.push(`Ends at ${getBeatName(endingId)}`);
-    else parts.push('No ending');
-    return parts.join(' • ');
-  };
+  // Backward: Handle path click - highlight decision point beats
+  const handleBackwardPathClick = (index: number, req: PathRequirement) => {
+    const isDeselecting = expandedBackwardPath === index;
+    setExpandedBackwardPath(isDeselecting ? null : index);
 
-  // Filter symbolic paths based on mode
-  const filteredSymbolicPaths = useMemo(() => {
-    if (!symbolicResult?.paths) return [];
-    let paths = symbolicResult.paths;
-
-    // Filter by search term
-    if (symbolicSearchTerm) {
-      paths = paths.filter(path =>
-        getSymbolicPathBeatIds(path).some((beatId: string) => {
-          const name = getBeatName(beatId);
-          return name.toLowerCase().includes(symbolicSearchTerm.toLowerCase()) ||
-                 beatId.toLowerCase().includes(symbolicSearchTerm.toLowerCase());
-        })
-      );
-    }
-
-    // Filter by mode
-    switch (symbolicFilterMode) {
-      case 'endings':
-        paths = paths.filter(p => getSymbolicPathEndingId(p) !== undefined);
-        break;
-      case 'longest':
-        if (paths.length > 0) {
-          const maxLength = Math.max(...paths.map(p => p.length));
-          paths = paths.filter(p => p.length === maxLength);
-        }
-        break;
-      case 'shortest':
-        if (paths.length > 0) {
-          const minLength = Math.min(...paths.map(p => p.length));
-          paths = paths.filter(p => p.length === minLength);
-        }
-        break;
-    }
-
-    // Filter cycles
-    if (!showSymbolicCycles) {
-      paths = paths.filter(p => !symbolicPathHasCycle(p));
-    }
-
-    return paths;
-  }, [symbolicResult, symbolicSearchTerm, symbolicFilterMode, showSymbolicCycles]);
-
-  const handleSymbolicPathClick = (index: number, path: SymbolicPath) => {
-    const isDeselecting = selectedSymbolicPath === index;
-    setSelectedSymbolicPath(isDeselecting ? null : index);
-
-    // Always call highlight callback - either with path beats or empty array to clear
     if (isDeselecting) {
       onHighlightPath?.([]);
     } else {
-      onHighlightPath?.(getSymbolicPathBeatIds(path));
+      // Highlight all decision point beats
+      const beatIds = req.decisionPoints.map(dp => dp.beatId);
+      // Add the target beat
+      if (selectedBackwardBeat) {
+        beatIds.push(selectedBackwardBeat);
+      }
+      onHighlightPath?.(beatIds);
     }
   };
 
-  const getSymbolicPathSummary = (path: SymbolicPath): string => {
-    const parts: string[] = [];
-    if (symbolicPathHasCycle(path)) parts.push('Contains cycle');
-    const endingId = getSymbolicPathEndingId(path);
-    if (endingId) parts.push(`Ends at ${getBeatName(endingId)}`);
-    else if (path.endType === 'deadEnd') parts.push('Dead end');
-    else if (path.endType === 'depthLimit') parts.push('Depth limit');
-    else parts.push('No ending');
-    return parts.join(' • ');
+  // Filter constraint strings to only show meaningful ones (not visited beats)
+  const getFilteredConstraints = (constraintStrings: string[]): string[] => {
+    return constraintStrings.filter(c => !c.startsWith('visited beat') && !c.startsWith('not visited beat'));
   };
 
-  const stats = useMemo(() => {
-    // Limit processing to avoid stack overflow with huge path counts
-    const MAX_PATHS_TO_ANALYZE = 10000;
-    const pathsToAnalyze = allPaths.length > MAX_PATHS_TO_ANALYZE
-      ? allPaths.slice(0, MAX_PATHS_TO_ANALYZE)
-      : allPaths;
-    const isTruncated = allPaths.length > MAX_PATHS_TO_ANALYZE;
+  // Extract key decisions from a path (beats where choices/conditions were made)
+  const extractKeyDecisions = (path: PathStep[]): DecisionPoint[] => {
+    const decisions: DecisionPoint[] = [];
+    for (const step of path) {
+      if (step.decisionMade || step.conditionResult !== undefined) {
+        decisions.push({
+          beatId: step.beatId,
+          beatName: step.beatName,
+          beatType: step.beatType,
+          requiredChoice: step.decisionMade,
+          requiredCondition: step.conditionResult !== undefined
+            ? (step.conditionResult ? 'TRUE' : 'FALSE')
+            : undefined,
+        });
+      }
+    }
+    return decisions;
+  };
 
-    const withCycles = pathsToAnalyze.filter(p => pathHasCycle(p)).length;
-    const withEndings = pathsToAnalyze.filter(p => getPathEndingId(p) !== undefined).length;
-    const avgLength = pathsToAnalyze.length > 0
-      ? (pathsToAnalyze.reduce((sum, p) => sum + p.length, 0) / pathsToAnalyze.length).toFixed(1)
-      : 0;
-    // Use reduce instead of Math.max(...) to avoid stack overflow
-    const maxLength = pathsToAnalyze.length > 0
-      ? pathsToAnalyze.reduce((max, p) => Math.max(max, p.length), 0)
-      : 0;
+  const getEndTypeBadge = (endType: string) => {
+    switch (endType) {
+      case 'ending':
+        return <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Ending</span>;
+      case 'deadEnd':
+        return <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Dead End</span>;
+      case 'cycle':
+        return <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Cycle</span>;
+      case 'depthLimit':
+        return <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Depth Limit</span>;
+      default:
+        return null;
+    }
+  };
 
-    return { withCycles, withEndings, avgLength, maxLength, isTruncated, analyzedCount: pathsToAnalyze.length };
-  }, [allPaths]);
+  // Render key decisions (used in both forward and backward)
+  const renderKeyDecisions = (decisionPoints: DecisionPoint[]) => {
+    if (decisionPoints.length === 0) return null;
+    return (
+      <div className="py-2">
+        <div className="text-xs text-gray-500 mb-2">Key decisions:</div>
+        <div className="space-y-1">
+          {decisionPoints.map((dp, dpIndex) => (
+            <div key={dpIndex} className="flex items-start gap-2 text-xs">
+              <span className="font-medium text-gray-700 min-w-0 flex-shrink-0">
+                {dp.beatName}
+              </span>
+              {dp.requiredChoice && (
+                <span className="text-blue-600 break-words">
+                  → Choose "{dp.requiredChoice}"
+                </span>
+              )}
+              {dp.requiredCondition && (
+                <span className="text-purple-600">
+                  → {dp.requiredCondition} branch
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Render path visualization (used in both forward and backward)
+  const renderPathVisualization = (
+    path: Array<{ beatId: string; beatName: string; decisionMade?: string; conditionResult?: boolean }>,
+    endType?: string
+  ) => {
+    return (
+      <div className="py-2">
+        <div className="text-xs text-gray-500 mb-2">Path ({path.length} beats):</div>
+        <div className="space-y-2">
+          {path.map((step, stepIndex) => {
+            const isLast = stepIndex === path.length - 1;
+
+            return (
+              <div key={stepIndex} className="flex items-start gap-2">
+                <div className="flex flex-col items-center">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                    stepIndex === 0
+                      ? 'bg-blue-500 text-white'
+                      : isLast && endType === 'ending'
+                      ? 'bg-green-500 text-white'
+                      : isLast && endType === 'cycle'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-gray-300 text-gray-700'
+                  }`}>
+                    {stepIndex + 1}
+                  </div>
+                  {!isLast && (
+                    <div className="w-0.5 h-6 bg-gray-300" />
+                  )}
+                </div>
+                <div className="flex-1 pt-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {step.beatName}
+                  </div>
+                  <div className="text-xs text-gray-500">{step.beatId}</div>
+                  {step.decisionMade && (
+                    <div className="text-xs text-blue-600 mt-0.5">
+                      → "{step.decisionMade}"
+                    </div>
+                  )}
+                  {step.conditionResult !== undefined && (
+                    <div className={`text-xs mt-0.5 ${step.conditionResult ? 'text-green-600' : 'text-red-600'}`}>
+                      → {step.conditionResult ? 'TRUE' : 'FALSE'} branch
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200">
+      <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-gray-800 flex items-center gap-2">
             <GitBranch className="w-5 h-5" />
@@ -226,501 +260,509 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
           </h3>
           <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
             <button
-              onClick={() => setAnalysisMode('basic')}
+              onClick={() => setViewMode('forward')}
               className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                analysisMode === 'basic'
+                viewMode === 'forward'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Basic
+              Forward
             </button>
             <button
-              onClick={() => setAnalysisMode('symbolic')}
+              onClick={() => setViewMode('backward')}
               className={`px-3 py-1 text-xs rounded-md transition-colors flex items-center gap-1 ${
-                analysisMode === 'symbolic'
-                  ? 'bg-white text-purple-700 shadow-sm'
+                viewMode === 'backward'
+                  ? 'bg-white text-blue-700 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              <Zap className="w-3 h-3" />
-              Symbolic
+              <ArrowLeft className="w-3 h-3" />
+              Backward
             </button>
           </div>
         </div>
         <p className="text-sm text-gray-600 mt-1">
-          {analysisMode === 'basic'
-            ? 'All possible paths through the story'
-            : 'Constraint-based analysis (prunes infeasible paths)'}
+          {viewMode === 'forward'
+            ? 'All possible outcomes from story start'
+            : 'All paths to reach a specific ending'}
         </p>
       </div>
 
-      {/* Warning for large path counts (basic mode only) */}
-      {analysisMode === 'basic' && stats.isTruncated && (
-        <div className="px-4 py-2 bg-yellow-50 border-b border-yellow-200">
-          <p className="text-sm text-yellow-800">
-            <strong>Note:</strong> Story has {allPaths.length.toLocaleString()} paths.
-            Statistics are based on a sample of {stats.analyzedCount.toLocaleString()} paths.
-          </p>
-        </div>
-      )}
-
-      {/* Symbolic Analysis Results */}
-      {analysisMode === 'symbolic' && (
-        <div className="px-4 py-3 border-b border-gray-100">
-          {symbolicResult ? (
-            <>
-              <div className="grid grid-cols-3 gap-3 mb-3">
-                <div className="bg-purple-50 p-2 rounded">
-                  <div className="text-xs text-purple-700">Feasible Paths</div>
-                  <div className="text-xl font-bold text-purple-700">
-                    {symbolicResult.feasiblePaths.toLocaleString()}
+      {/* Forward Analysis View */}
+      {viewMode === 'forward' && (
+        <>
+          {/* Analysis Stats */}
+          {analysisResult && (
+            <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+              <div className="grid grid-cols-4 gap-3 mb-3">
+                <div className="bg-blue-50 p-2 rounded">
+                  <div className="text-xs text-blue-700">Outcomes</div>
+                  <div className="text-xl font-bold text-blue-700">
+                    {analysisResult.outcomes.length}
+                  </div>
+                </div>
+                <div className="bg-indigo-50 p-2 rounded">
+                  <div className="text-xs text-indigo-700">Total Paths</div>
+                  <div className="text-xl font-bold text-indigo-700">
+                    {analysisResult.totalConstraintSets}
                   </div>
                 </div>
                 <div className="bg-green-50 p-2 rounded">
-                  <div className="text-xs text-green-700">Reachable Beats</div>
+                  <div className="text-xs text-green-700">Unique Endings</div>
                   <div className="text-xl font-bold text-green-700">
-                    {symbolicResult.reachableBeats.length}
+                    {analysisResult.uniqueEndings.length}
                   </div>
                 </div>
-                <div className="bg-red-50 p-2 rounded">
-                  <div className="text-xs text-red-700">Pruned Conflicts</div>
-                  <div className="text-xl font-bold text-red-700">
-                    {symbolicResult.constraintConflicts.toLocaleString()}
+                <div className="bg-purple-50 p-2 rounded">
+                  <div className="text-xs text-purple-700">Reachable Beats</div>
+                  <div className="text-xl font-bold text-purple-700">
+                    {analysisResult.reachableBeats.length}
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-4 text-xs text-gray-600">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  {symbolicResult.analysisTime}ms
+                  {analysisResult.analysisTime.toFixed(0)}ms
                 </span>
-                <span>
-                  {symbolicResult.uniqueEndings.length} unique ending{symbolicResult.uniqueEndings.length !== 1 ? 's' : ''}
-                </span>
-                <span>
-                  {symbolicResult.statesCached.toLocaleString()} states cached
-                </span>
-              </div>
-              {symbolicResult.unreachableBeats.length > 0 && (
-                <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
-                  <div className="flex items-center gap-1 text-xs text-yellow-800 font-medium mb-1">
+                {analysisResult.unreachableBeats.length > 0 && (
+                  <span className="flex items-center gap-1 text-yellow-700">
                     <AlertTriangle className="w-3 h-3" />
-                    Unreachable Beats ({symbolicResult.unreachableBeats.length})
-                  </div>
-                  <div className="text-xs text-yellow-700 max-h-24 overflow-y-auto">
-                    {symbolicResult.unreachableBeats.slice(0, 10).map(id => (
-                      <span key={id} className="inline-block bg-yellow-100 px-1.5 py-0.5 rounded mr-1 mb-1">
-                        {getBeatName(id)}
-                      </span>
-                    ))}
-                    {symbolicResult.unreachableBeats.length > 10 && (
-                      <span className="text-yellow-600">
-                        +{symbolicResult.unreachableBeats.length - 10} more
-                      </span>
+                    {analysisResult.unreachableBeats.length} unreachable beats
+                  </span>
+                )}
+                {analysisResult.unreachableBeats.length === 0 && (
+                  <span className="flex items-center gap-1 text-green-700">
+                    <CheckCircle className="w-3 h-3" />
+                    All beats reachable
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Query Input */}
+          <div className="px-4 py-3 border-b border-gray-100 space-y-2 flex-shrink-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={queryInput}
+                onChange={(e) => setQueryInput(e.target.value)}
+                placeholder="Query: adult > 7, has axe, visits beat-123..."
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            {suggestedQueries.length > 0 && !queryInput && (
+              <div className="flex flex-wrap gap-1">
+                <span className="text-xs text-gray-500">Try:</span>
+                {suggestedQueries.map((q, i) => {
+                  const label = q.type === 'hasConstraint' && q.constraint
+                    ? `${q.constraint.variable} ${q.constraint.operator} ${q.constraint.value}`
+                    : q.type === 'reachesEnding' && q.beatId
+                    ? `ends ${getBeatName(q.beatId)}`
+                    : '';
+                  if (!label) return null;
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setQueryInput(label)}
+                      className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded transition-colors"
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Outcome List - expandable */}
+          <div className="divide-y divide-gray-100 overflow-y-auto flex-1 min-h-0">
+            {filteredOutcomes.length > 0 ? (
+              filteredOutcomes.map((outcome, index) => {
+                const allConstraintStrings = outcome.constraintSets.length > 0
+                  ? constraintSetToStrings(outcome.constraintSets[0])
+                  : [];
+                const constraintStrings = getFilteredConstraints(allConstraintStrings);
+                const keyDecisions = extractKeyDecisions(outcome.representativePath);
+
+                return (
+                  <div
+                    key={index}
+                    className={`transition-colors ${
+                      selectedOutcome === index ? 'bg-blue-50' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <button
+                      onClick={() => handleOutcomeClick(index, outcome)}
+                      className="w-full px-4 py-3 flex items-center justify-between text-left"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-900 truncate">
+                            {outcome.endType === 'ending'
+                              ? getBeatName(outcome.endingBeatId)
+                              : `Outcome ${index + 1}`}
+                          </span>
+                          {getEndTypeBadge(outcome.endType)}
+                          {outcome.constraintSets.length > 1 && (
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                              {outcome.constraintSets.length} variations
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          {outcome.representativePath.length} steps
+                          {keyDecisions.length > 0 && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full ml-2">
+                              {keyDecisions.length} decisions
+                            </span>
+                          )}
+                          {constraintStrings.length > 0 && (
+                            <span className="text-blue-600 ml-2">
+                              {constraintStrings.slice(0, 2).join(', ')}
+                              {constraintStrings.length > 2 && '...'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight
+                        className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
+                          selectedOutcome === index ? 'rotate-90' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {selectedOutcome === index && (
+                      <div className="px-4 pb-3 border-t border-gray-100 bg-gray-50">
+                        {/* Required state (filtered constraints) */}
+                        {constraintStrings.length > 0 && (
+                          <div className="py-2 border-b border-gray-200 mb-2">
+                            <div className="text-xs text-gray-500 mb-1">Required state:</div>
+                            <div className="flex flex-wrap gap-1">
+                              {constraintStrings.map((c, ci) => (
+                                <span key={ci} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                                  {c}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show OR alternatives if multiple constraint sets */}
+                        {outcome.constraintSets.length > 1 && (
+                          <div className="py-2 border-b border-gray-200 mb-2">
+                            <div className="text-xs text-gray-500 mb-1">
+                              Alternative paths ({outcome.constraintSets.length} variations):
+                            </div>
+                            <div className="space-y-2">
+                              {outcome.constraintSets.slice(0, 3).map((cs, csIndex) => {
+                                const csStrings = getFilteredConstraints(constraintSetToStrings(cs));
+                                if (csStrings.length === 0) return null;
+                                return (
+                                  <div key={csIndex} className="flex items-start gap-2">
+                                    <span className="text-xs text-gray-400 flex-shrink-0">
+                                      {csIndex === 0 ? 'IF' : 'OR'}
+                                    </span>
+                                    <div className="flex flex-wrap gap-1">
+                                      {csStrings.slice(0, 4).map((c, ci) => (
+                                        <span key={ci} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                          {c}
+                                        </span>
+                                      ))}
+                                      {csStrings.length > 4 && (
+                                        <span className="text-xs text-gray-400">+{csStrings.length - 4} more</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {outcome.constraintSets.length > 3 && (
+                                <div className="text-xs text-gray-400">
+                                  +{outcome.constraintSets.length - 3} more variations...
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Key decisions (like backward analysis) */}
+                        {renderKeyDecisions(keyDecisions)}
+                      </div>
                     )}
                   </div>
-                </div>
-              )}
-              {symbolicResult.unreachableBeats.length === 0 && (
-                <div className="mt-3 p-2 bg-green-50 rounded border border-green-200">
-                  <div className="flex items-center gap-1 text-xs text-green-800">
-                    <CheckCircle className="w-3 h-3" />
-                    All beats are reachable
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-4 text-gray-500">
-              <Zap className="w-8 h-8 mx-auto mb-2 animate-pulse" />
-              <p className="text-sm">Running symbolic analysis...</p>
-            </div>
-          )}
-        </div>
+                );
+              })
+            ) : analysisResult ? (
+              <div className="px-4 py-8 text-center text-gray-500">
+                <GitBranch className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">
+                  {queryInput
+                    ? 'No outcomes match your query'
+                    : 'No outcomes found'}
+                </p>
+              </div>
+            ) : (
+              <div className="px-4 py-8 text-center text-gray-500">
+                <Clock className="w-8 h-8 mx-auto mb-2 animate-pulse" />
+                <p className="text-sm">Analyzing story paths...</p>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      {/* Symbolic Search and Filters */}
-      {analysisMode === 'symbolic' && symbolicResult && symbolicResult.paths.length > 0 && (
-        <div className="px-4 py-3 border-b border-gray-100 space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={symbolicSearchTerm}
-              onChange={(e) => setSymbolicSearchTerm(e.target.value)}
-              placeholder="Search paths..."
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-600">Filter:</span>
-            </div>
-            {(['all', 'endings', 'longest', 'shortest'] as const).map(mode => (
-              <button
-                key={mode}
-                onClick={() => setSymbolicFilterMode(mode)}
-                className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                  symbolicFilterMode === mode
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
-              </button>
-            ))}
-            <button
-              onClick={() => setShowSymbolicCycles(!showSymbolicCycles)}
-              className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-colors ${
-                showSymbolicCycles
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'bg-gray-100 text-gray-500'
-              }`}
-            >
-              {showSymbolicCycles ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-              Cycles
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Symbolic Path List */}
-      {analysisMode === 'symbolic' && symbolicResult && (
-        <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-          {filteredSymbolicPaths.length > 0 ? (
-            filteredSymbolicPaths.map((path, index) => {
-              const beatIds = getSymbolicPathBeatIds(path);
-              const hasCycle = symbolicPathHasCycle(path);
-              const endingId = getSymbolicPathEndingId(path);
-
-              return (
-                <div
-                  key={path.id}
-                  className={`transition-colors ${
-                    selectedSymbolicPath === index ? 'bg-purple-50' : 'hover:bg-gray-50'
-                  }`}
-                >
+      {/* Backward Analysis View */}
+      {viewMode === 'backward' && (
+        <>
+          {/* Target Selection */}
+          <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+            <div className="text-sm text-gray-700 mb-2">Select target beat:</div>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1">
+                {endings.slice(0, 10).map((ending) => (
                   <button
-                    onClick={() => handleSymbolicPathClick(index, path)}
-                    className="w-full px-4 py-3 flex items-center justify-between text-left"
+                    key={ending.beatId}
+                    onClick={() => {
+                      setSelectedBackwardBeat(ending.beatId);
+                      setExpandedBackwardPath(null);
+                      onHighlightPath?.([]);
+                    }}
+                    className={`text-xs px-2 py-1 rounded transition-colors ${
+                      selectedBackwardBeat === ending.beatId
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
                   >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-900">
-                          Path {index + 1}
-                        </span>
-                        {hasCycle && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                            Cycle
-                          </span>
-                        )}
-                        {endingId && (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                            Ends
-                          </span>
-                        )}
-                        {path.constraints.length > 0 && (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                            {path.constraints.length} constraint{path.constraints.length !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        {path.length} beats • {getSymbolicPathSummary(path)}
-                      </div>
-                    </div>
-                    <ChevronRight
-                      className={`w-4 h-4 text-gray-400 transition-transform ${
-                        selectedSymbolicPath === index ? 'rotate-90' : ''
-                      }`}
-                    />
+                    {ending.beatName}
                   </button>
-
-                  {selectedSymbolicPath === index && (
-                    <div className="px-4 pb-3 border-t border-gray-100 bg-gray-50">
-                      {/* Constraints summary */}
-                      {path.constraints.length > 0 && (
-                        <div className="py-2 border-b border-gray-200 mb-2">
-                          <div className="text-xs text-gray-500 mb-1">Required conditions:</div>
-                          <div className="flex flex-wrap gap-1">
-                            {path.constraints.map((c, ci) => (
-                              <span key={ci} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
-                                {c}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <div className="py-2">
-                        <div className="space-y-2">
-                          {beatIds.map((beatId: string, beatIndex: number) => {
-                            const isLast = beatIndex === beatIds.length - 1;
-                            const isCyclePoint = hasCycle && isLast;
-
-                            return (
-                              <div key={beatIndex} className="flex items-start gap-2">
-                                <div className="flex flex-col items-center">
-                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                                    beatIndex === 0
-                                      ? 'bg-purple-500 text-white'
-                                      : isCyclePoint
-                                      ? 'bg-purple-500 text-white'
-                                      : endingId === beatId
-                                      ? 'bg-green-500 text-white'
-                                      : 'bg-gray-300 text-gray-700'
-                                  }`}>
-                                    {beatIndex + 1}
-                                  </div>
-                                  {!isLast && (
-                                    <div className="w-0.5 h-6 bg-gray-300" />
-                                  )}
-                                </div>
-                                <div className="flex-1 pt-1">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {getBeatName(beatId)}
-                                  </div>
-                                  <div className="text-xs text-gray-500">{beatId}</div>
-                                  {isCyclePoint && (
-                                    <div className="text-xs text-purple-700 mt-1">
-                                      Cycles back to earlier beat
-                                    </div>
-                                  )}
-                                  {endingId === beatId && (
-                                    <div className="text-xs text-green-700 mt-1">
-                                      Story ending
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                ))}
+                {endings.length > 10 && (
+                  <span className="text-xs text-gray-500 px-2 py-1">
+                    +{endings.length - 10} more
+                  </span>
+                )}
+              </div>
+              {endings.length === 0 && (
+                <div className="text-xs text-gray-500">
+                  No ending beats found.
                 </div>
-              );
-            })
-          ) : (
-            <div className="px-4 py-8 text-center text-gray-500">
-              <GitBranch className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">
-                {symbolicSearchTerm
-                  ? 'No paths match your search'
-                  : symbolicResult.paths.length === 0
-                  ? 'No feasible paths found'
-                  : 'No paths found with current filters'}
-              </p>
+              )}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Basic Statistics (basic mode only) */}
-      {analysisMode === 'basic' && (
-      <div className="px-4 py-3 border-b border-gray-100">
-        <div className="grid grid-cols-4 gap-3">
-          <div className="bg-blue-50 p-2 rounded">
-            <div className="text-xs text-blue-700">Total Paths</div>
-            <div className="text-xl font-bold text-blue-700">{allPaths.length.toLocaleString()}</div>
           </div>
-          <div className="bg-green-50 p-2 rounded">
-            <div className="text-xs text-green-700">With Endings{stats.isTruncated ? '*' : ''}</div>
-            <div className="text-xl font-bold text-green-700">{stats.withEndings.toLocaleString()}</div>
-          </div>
-          <div className="bg-purple-50 p-2 rounded">
-            <div className="text-xs text-purple-700">Avg Length{stats.isTruncated ? '*' : ''}</div>
-            <div className="text-xl font-bold text-purple-700">{stats.avgLength}</div>
-          </div>
-          <div className="bg-orange-50 p-2 rounded">
-            <div className="text-xs text-orange-700">Max Length{stats.isTruncated ? '*' : ''}</div>
-            <div className="text-xl font-bold text-orange-700">{stats.maxLength}</div>
-          </div>
-        </div>
-      </div>
-      )}
 
-      {/* Search and Filters (basic mode only) */}
-      {analysisMode === 'basic' && (
-      <div className="px-4 py-3 border-b border-gray-100 space-y-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search paths..."
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Filter:</span>
-          </div>
-          {(['all', 'endings', 'longest', 'shortest'] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => setFilterMode(mode)}
-              className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                filterMode === mode
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {mode.charAt(0).toUpperCase() + mode.slice(1)}
-            </button>
-          ))}
-          <button
-            onClick={() => setShowCycles(!showCycles)}
-            className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-colors ${
-              showCycles
-                ? 'bg-purple-100 text-purple-700'
-                : 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            {showCycles ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-            Cycles
-          </button>
-        </div>
-      </div>
-      )}
-
-      {/* Path List (basic mode only) */}
-      {analysisMode === 'basic' && (
-      <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-        {filteredPaths.length > 0 ? (
-          filteredPaths.map((path, index) => {
-            const beatIds = getPathBeatIds(path);
-            const hasCycle = pathHasCycle(path);
-            const endingId = getPathEndingId(path);
-
-            return (
-              <div
-                key={index}
-                className={`transition-colors ${
-                  selectedPath === index ? 'bg-blue-50' : 'hover:bg-gray-50'
-                }`}
-              >
-                <button
-                  onClick={() => handlePathClick(index, path)}
-                  className="w-full px-4 py-3 flex items-center justify-between text-left"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">
-                        Path {index + 1}
-                      </span>
-                      {hasCycle && (
-                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                          Cycle
-                        </span>
-                      )}
-                      {endingId && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                          Ends
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      {path.length} beats • {getPathSummary(path)}
+          {/* Backward Analysis Results */}
+          {backwardResult && (
+            <>
+              <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4 text-blue-600" />
+                  <span className="font-medium text-gray-900">
+                    Paths to "{backwardResult.targetBeatName}"
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-blue-50 p-2 rounded">
+                    <div className="text-xs text-blue-700">Total Paths</div>
+                    <div className="text-xl font-bold text-blue-700">
+                      {backwardResult.requirements.length}
                     </div>
                   </div>
-                  <ChevronRight
-                    className={`w-4 h-4 text-gray-400 transition-transform ${
-                      selectedPath === index ? 'rotate-90' : ''
-                    }`}
-                  />
-                </button>
-
-                {selectedPath === index && (
-                  <div className="px-4 pb-3 border-t border-gray-100 bg-gray-50">
-                    <div className="py-2">
-                      <div className="space-y-2">
-                        {beatIds.map((beatId: string, beatIndex: number) => {
-                          const isLast = beatIndex === beatIds.length - 1;
-                          const isCyclePoint = hasCycle && isLast;
-
-                          return (
-                            <div key={beatIndex} className="flex items-start gap-2">
-                              <div className="flex flex-col items-center">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                                  beatIndex === 0
-                                    ? 'bg-blue-500 text-white'
-                                    : isCyclePoint
-                                    ? 'bg-purple-500 text-white'
-                                    : endingId === beatId
-                                    ? 'bg-green-500 text-white'
-                                    : 'bg-gray-300 text-gray-700'
-                                }`}>
-                                  {beatIndex + 1}
-                                </div>
-                                {!isLast && (
-                                  <div className="w-0.5 h-6 bg-gray-300" />
-                                )}
-                              </div>
-                              <div className="flex-1 pt-1">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {getBeatName(beatId)}
-                                </div>
-                                <div className="text-xs text-gray-500">{beatId}</div>
-                                {isCyclePoint && (
-                                  <div className="text-xs text-purple-700 mt-1">
-                                    Cycles back to earlier beat
-                                  </div>
-                                )}
-                                {endingId === beatId && (
-                                  <div className="text-xs text-green-700 mt-1">
-                                    Story ending
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                  <div className="bg-green-50 p-2 rounded">
+                    <div className="text-xs text-green-700">Min Steps</div>
+                    <div className="text-xl font-bold text-green-700">
+                      {backwardResult.minimumSteps >= 0 ? backwardResult.minimumSteps : '-'}
+                    </div>
+                  </div>
+                  <div className="bg-purple-50 p-2 rounded">
+                    <div className="text-xs text-purple-700">Analysis Time</div>
+                    <div className="text-xl font-bold text-purple-700">
+                      {backwardResult.analysisTime.toFixed(0)}ms
+                    </div>
+                  </div>
+                </div>
+                {backwardResult.necessaryBeats.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-xs text-gray-500 mb-1">Must visit (all paths):</div>
+                    <div className="flex flex-wrap gap-1">
+                      {backwardResult.necessaryBeats.map((beatId) => (
+                        <span key={beatId} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
+                          {getBeatName(beatId)}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
-            );
-          })
-        ) : (
-          <div className="px-4 py-8 text-center text-gray-500">
-            <GitBranch className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">
-              {searchTerm
-                ? 'No paths match your search'
-                : 'No paths found with current filters'}
-            </p>
-          </div>
-        )}
-      </div>
+
+              {/* Requirement Sets - expandable */}
+              <div className="divide-y divide-gray-100 overflow-y-auto flex-1 min-h-0">
+                {backwardResult.requirements.length > 0 ? (
+                  backwardResult.requirements.map((req: PathRequirement, index: number) => {
+                    const constraintStrings = constraintSetToStrings(req.constraints);
+
+                    return (
+                      <div
+                        key={index}
+                        className={`transition-colors ${
+                          expandedBackwardPath === index ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <button
+                          onClick={() => handleBackwardPathClick(index, req)}
+                          className="w-full px-4 py-3 flex items-center justify-between text-left"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                Path {index + 1}
+                              </span>
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                {req.pathLength} steps
+                              </span>
+                              <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
+                                {req.decisionPoints.length} decisions
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1 truncate">
+                              {req.summary || 'No specific requirements'}
+                            </div>
+                          </div>
+                          <ChevronRight
+                            className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
+                              expandedBackwardPath === index ? 'rotate-90' : ''
+                            }`}
+                          />
+                        </button>
+
+                        {expandedBackwardPath === index && (
+                          <div className="px-4 pb-3 border-t border-gray-100 bg-gray-50">
+                            {/* Constraints */}
+                            {constraintStrings.length > 0 && (
+                              <div className="py-2 border-b border-gray-200 mb-2">
+                                <div className="text-xs text-gray-500 mb-1">Required state:</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {constraintStrings.map((c, ci) => (
+                                    <span key={ci} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                                      {c}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Key decisions */}
+                            {renderKeyDecisions(req.decisionPoints)}
+
+                            {/* Path visualization from decision points */}
+                            {req.decisionPoints.length > 0 && (
+                              <div className="py-2 border-t border-gray-200 mt-2">
+                                <div className="text-xs text-gray-500 mb-2">Decision path:</div>
+                                <div className="space-y-2">
+                                  {req.decisionPoints.map((dp, dpIndex) => {
+                                    const isLast = dpIndex === req.decisionPoints.length - 1;
+                                    return (
+                                      <div key={dpIndex} className="flex items-start gap-2">
+                                        <div className="flex flex-col items-center">
+                                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                                            dpIndex === 0
+                                              ? 'bg-blue-500 text-white'
+                                              : isLast
+                                              ? 'bg-green-500 text-white'
+                                              : 'bg-gray-300 text-gray-700'
+                                          }`}>
+                                            {dpIndex + 1}
+                                          </div>
+                                          {!isLast && (
+                                            <div className="w-0.5 h-6 bg-gray-300" />
+                                          )}
+                                        </div>
+                                        <div className="flex-1 pt-1 min-w-0">
+                                          <div className="text-sm font-medium text-gray-900 truncate">
+                                            {dp.beatName}
+                                          </div>
+                                          <div className="text-xs text-gray-500">{dp.beatId}</div>
+                                          {dp.requiredChoice && (
+                                            <div className="text-xs text-blue-600 mt-0.5">
+                                              → "{dp.requiredChoice}"
+                                            </div>
+                                          )}
+                                          {dp.requiredCondition && (
+                                            <div className={`text-xs mt-0.5 ${dp.requiredCondition === 'TRUE' ? 'text-green-600' : 'text-red-600'}`}>
+                                              → {dp.requiredCondition} branch
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  {/* Add target beat at end */}
+                                  <div className="flex items-start gap-2">
+                                    <div className="flex flex-col items-center">
+                                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium bg-green-500 text-white">
+                                        ✓
+                                      </div>
+                                    </div>
+                                    <div className="flex-1 pt-1 min-w-0">
+                                      <div className="text-sm font-medium text-green-700 truncate">
+                                        {backwardResult.targetBeatName}
+                                      </div>
+                                      <div className="text-xs text-gray-500">Target reached</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="px-4 py-8 text-center text-gray-500">
+                    <HelpCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">
+                      No paths found to this beat.
+                      It may be unreachable from the story start.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {!selectedBackwardBeat && (
+            <div className="px-4 py-8 text-center text-gray-500 flex-1">
+              <Target className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">
+                Select a target beat above to analyze
+                what conditions lead to reaching it.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Footer Info */}
-      <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+      {/* Footer */}
+      <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex-shrink-0">
         <div className="text-xs text-gray-600">
-          {analysisMode === 'basic' ? (
+          {viewMode === 'forward' && analysisResult && (
             <>
-              Showing {filteredPaths.length} of {allPaths.length} path{allPaths.length !== 1 ? 's' : ''}
-              {stats.withCycles > 0 && ` • ${stats.withCycles} with cycles`}
-              {basicResult.truncated && ' (truncated)'}
+              Showing {filteredOutcomes.length} of {analysisResult.outcomes.length} outcomes
+              ({analysisResult.totalConstraintSets} total paths)
+              {queryInput && ` matching "${queryInput}"`}
             </>
-          ) : symbolicResult ? (
+          )}
+          {viewMode === 'backward' && backwardResult && (
             <>
-              Showing {filteredSymbolicPaths.length} of {symbolicResult.paths.length} sample path{symbolicResult.paths.length !== 1 ? 's' : ''}
-              {symbolicResult.paths.length < symbolicResult.feasiblePaths && (
-                <span className="text-purple-600"> (of {symbolicResult.feasiblePaths.toLocaleString()} total)</span>
-              )}
-              {' '}• {symbolicResult.reachableBeats.length} reachable beats
+              {backwardResult.requirements.length} paths to "{backwardResult.targetBeatName}"
+              {' '}• Click a path to highlight decision points
             </>
-          ) : (
-            'Analyzing...'
+          )}
+          {viewMode === 'backward' && !backwardResult && (
+            <>Select an ending to analyze paths</>
           )}
         </div>
       </div>
