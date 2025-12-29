@@ -1,5 +1,53 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-29: Cluster-Aware Layout Algorithm
+
+### Problem
+After unifying the layout algorithm, clusters still had issues:
+1. Clusters overlapped with beats above/below them
+2. Cluster sizes didn't auto-grow to fit their content
+3. Beats and clusters could overlap each other
+
+### Solution: Cluster-Aware Layout with Overlap Detection
+
+Enhanced the layout algorithm to treat clusters as "virtual nodes" in the main graph:
+
+1. **Calculate Internal Layout First**: Layout beats inside each cluster to determine required cluster size
+2. **Transform Edges**: Replace beat IDs with cluster IDs for edges that cross cluster boundaries
+3. **Size-Aware Spacing**: Use actual cluster sizes (not fixed values) for node spacing
+4. **Overlap Resolution**: Iterative separation algorithm resolves any remaining overlaps
+
+### Key Algorithm Changes
+
+```
+applyClusterAwareTreeLayout:
+  STEP 1: Layout beats inside each cluster → calculate cluster sizes
+  STEP 2: Transform edges (beat IDs → cluster IDs for external connections)
+  STEP 3: Calculate node sizes (clusters use calculated sizes)
+  STEP 4: Main layout with size-aware spacing
+  STEP 5: Resolve overlaps (iterative separation)
+```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/utils/TreeLayoutAlgorithm.ts` | Major rewrite: cluster-aware layout, overlap resolution |
+| `packages/builder/src/App.tsx` | Apply calculated cluster sizes after layout |
+| `packages/core/src/xml/ASMLParser.ts` | Cluster-aware import layout (same algorithm as auto-arrange) |
+
+### Constants Used
+- `BEAT_WIDTH = 160`, `BEAT_HEIGHT = 60`
+- `CLUSTER_PADDING = 40`, `CLUSTER_HEADER_HEIGHT = 50`
+- Overlap padding: 30px between elements
+
+### Benefits
+- Import and auto-arrange produce identical, non-overlapping layouts
+- Clusters auto-grow to fit their content
+- No more overlaps between beats and clusters
+
+---
+
 ## 2024-12-29: Unified Layout Algorithm
 
 ### Problem
