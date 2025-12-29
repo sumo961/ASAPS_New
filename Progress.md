@@ -1,5 +1,39 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-29: Unified Layout Algorithm
+
+### Problem
+Import and auto-arrange used different layout algorithms, producing inconsistent beat positions:
+- **ASMLParser**: Simple layered BFS that centered each layer independently
+- **TreeLayoutAlgorithm**: Sophisticated Reingold-Tilford that centers parents above children
+
+### Solution: Shared Layout in @asaps/core
+
+Moved the TreeLayoutAlgorithm to `@asaps/core/layout` and updated ASMLParser to use it.
+
+### New Files Created
+
+| File | Purpose |
+|------|---------|
+| `packages/core/src/layout/TreeLayoutAlgorithm.ts` | Core layout algorithm (Reingold-Tilford) |
+| `packages/core/src/layout/index.ts` | Layout module exports |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/core/src/index.ts` | Export layout module |
+| `packages/core/src/xml/ASMLParser.ts` | Use `calculateTreeLayout` instead of custom layout |
+| `packages/builder/src/utils/TreeLayoutAlgorithm.ts` | Re-export from core, keep beat-specific wrappers |
+
+### Benefits
+- Import and auto-arrange now produce identical layouts
+- Parents are properly centered above their children
+- Subtree widths calculated for optimal spacing
+- Single source of truth for layout logic
+
+---
+
 ## 2024-12-29: Sound System & ASML Import Improvements
 
 ### Sound System Fixes

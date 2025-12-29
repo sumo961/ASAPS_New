@@ -8,6 +8,7 @@ export * from './audio/presetSounds';
 export * from './generated/beat-types';
 export * from './analysis';
 export * from './themes/presets';
+export * from './layout';
 
 // Package info
 export const version = '2.0.0';

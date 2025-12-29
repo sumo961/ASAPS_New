@@ -1,6 +1,7 @@
 import { Story } from '../engine/Story';
 import { Beat } from '../beats/Beat';
 import { BeatTypeRegistry } from '../beats/BeatRegistry';
+import { calculateTreeLayout, type LayoutEdge } from '../layout';
 import type {
   BeatConfig,
   Transition,
@@ -810,174 +811,74 @@ export class ASMLParser {
   }
 
   /**
-   * Apply enhanced hierarchical layout to imported beats
-   * Only positions beats that don't already have saved positions
+   * Apply tree layout to imported beats using the same algorithm as auto-arrange.
+   * Only positions beats that don't already have saved positions.
+   * Uses the Reingold-Tilford algorithm from @asaps/core/layout.
    */
   private applyLayout(beats: Beat[]): void {
     if (beats.length === 0) return;
-    
+
     // Separate beats into positioned and unpositioned
-    const positionedBeats = beats.filter(beat => 
+    const positionedBeats = beats.filter(beat =>
       beat.x !== undefined && beat.y !== undefined
     );
-    const unpositionedBeats = beats.filter(beat => 
+    const unpositionedBeats = beats.filter(beat =>
       beat.x === undefined || beat.y === undefined
     );
-    
+
     // If all beats are positioned, skip auto-layout
     if (unpositionedBeats.length === 0) {
-      console.log('All beats have saved positions, skipping auto-layout');
+      console.log('[ASMLParser] All beats have saved positions, skipping auto-layout');
       return;
     }
-    
+
     // If only some beats are positioned, only layout the unpositioned ones
     if (positionedBeats.length > 0) {
-      console.log(`${positionedBeats.length} beats have saved positions, ` +
+      console.log(`[ASMLParser] ${positionedBeats.length} beats have saved positions, ` +
                   `applying auto-layout to ${unpositionedBeats.length} unpositioned beats`);
     }
-    
-    // Apply layout only to unpositioned beats
-    const beatsToLayout = unpositionedBeats.length > 0 ? unpositionedBeats : beats;
-    
-    console.log('Starting enhanced auto-layout for', beatsToLayout.length, 'beats');
-    
-    // Create adjacency map for connections
-    const connections = new Map<string, string[]>();
-    const incomingCount = new Map<string, number>();
-    
-    // Initialize beats to be laid out
-    beatsToLayout.forEach(beat => {
-      connections.set(beat.id, []);
-      incomingCount.set(beat.id, 0);
-    });
-    
-    // Build connection graph
-    beatsToLayout.forEach(beat => {
-      const beatConnections = beat.getConnections();
-      beatConnections.forEach(conn => {
-        if (connections.has(beat.id)) {
-          connections.get(beat.id)!.push(conn.targetId);
-        }
-        // Increase incoming count for target beat
-        const currentCount = incomingCount.get(conn.targetId) || 0;
-        incomingCount.set(conn.targetId, currentCount + 1);
-      });
-    });
-    
-    // Find start beat (beat with no incoming connections, or ID "0")
-    let startBeat = beatsToLayout.find(beat => beat.id === '0');
-    if (!startBeat) {
-      startBeat = beatsToLayout.find(beat => (incomingCount.get(beat.id) || 0) === 0);
-    }
-    if (!startBeat) {
-      startBeat = beatsToLayout[0]; // fallback to first beat
-    }
-    
-    console.log('Start beat:', startBeat.id);
-    
-    // Perform layered layout using modified Sugiyama algorithm
-    const layers = this.createLayers(beatsToLayout, connections, incomingCount, startBeat);
-    
-    // Position beats within layers
-    this.positionBeatsInLayers(layers);
-    
-    console.log('Layout complete. Layers:', layers.length);
-  }
 
-  private createLayers(
-    beats: Beat[], 
-    connections: Map<string, string[]>, 
-    incomingCount: Map<string, number>,
-    startBeat: Beat
-  ): Beat[][] {
-    const layers: Beat[][] = [];
-    const visited = new Set<string>();
-    const beatMap = new Map<string, Beat>();
-    
-    // Create beat lookup map
-    beats.forEach(beat => beatMap.set(beat.id, beat));
-    
-    // Level assignment using BFS with cycle detection
-    const queue: Array<{beat: Beat, level: number}> = [];
-    const beatLevels = new Map<string, number>();
-    
-    // Start with the initial beat
-    queue.push({beat: startBeat, level: 0});
-    beatLevels.set(startBeat.id, 0);
-    
-    // Process beats level by level
-    while (queue.length > 0) {
-      const {beat, level} = queue.shift()!;
-      
-      if (visited.has(beat.id)) continue;
-      visited.add(beat.id);
-      
-      // Ensure we have enough layers
-      while (layers.length <= level) {
-        layers.push([]);
-      }
-      
-      layers[level].push(beat);
-      
-      // Add connected beats to next level
-      const nextConnections = connections.get(beat.id) || [];
-      for (const targetId of nextConnections) {
-        const targetBeat = beatMap.get(targetId);
-        if (targetBeat && !visited.has(targetId)) {
-          // Check if target should be at a deeper level
-          const suggestedLevel = level + 1;
-          const currentLevel = beatLevels.get(targetId);
-          
-          if (currentLevel === undefined || suggestedLevel > currentLevel) {
-            beatLevels.set(targetId, suggestedLevel);
-            // Remove from previous layer if exists
-            if (currentLevel !== undefined && layers[currentLevel]) {
-              layers[currentLevel] = layers[currentLevel].filter(b => b.id !== targetId);
-            }
-            queue.push({beat: targetBeat, level: suggestedLevel});
-          }
+    // Determine which beats to layout
+    const beatsToLayout = unpositionedBeats.length > 0 ? unpositionedBeats : beats;
+
+    console.log('[ASMLParser] Starting tree layout for', beatsToLayout.length, 'beats');
+
+    // Build edges from beat connections
+    const edges: LayoutEdge[] = [];
+    const beatIdSet = new Set(beatsToLayout.map(b => b.id));
+
+    beatsToLayout.forEach(beat => {
+      const connections = beat.getConnections();
+      connections.forEach(conn => {
+        // Only include edges where both source and target are in beats to layout
+        if (beatIdSet.has(conn.targetId)) {
+          edges.push({ source: beat.id, target: conn.targetId });
         }
-      }
-    }
-    
-    // Handle disconnected beats (put them in the last layer)
-    const unvisitedBeats = beats.filter((beat: Beat) => !visited.has(beat.id));
-    if (unvisitedBeats.length > 0) {
-      console.log('Adding', unvisitedBeats.length, 'disconnected beats to final layer');
-      const lastLayerIndex = Math.max(0, layers.length);
-      while (layers.length <= lastLayerIndex) {
-        layers.push([]);
-      }
-      layers[lastLayerIndex].push(...unvisitedBeats);
-    }
-    
-    return layers.filter(layer => layer.length > 0);
-  }
-  
-  private positionBeatsInLayers(layers: Beat[][]): void {
-    const LAYER_HEIGHT = 200; // Vertical spacing between layers
-    const BEAT_WIDTH = 160;   // Width of each beat
-    const BEAT_SPACING = 40;  // Horizontal spacing between beats
-    const START_Y = 100;      // Starting Y position
-    
-    layers.forEach((layer, layerIndex) => {
-      const layerY = START_Y + (layerIndex * LAYER_HEIGHT);
-      
-      // Calculate total width needed for this layer
-      const totalWidth = (layer.length * BEAT_WIDTH) + ((layer.length - 1) * BEAT_SPACING);
-      
-      // Center the layer horizontally
-      const startX = Math.max(100, (1200 - totalWidth) / 2); // Assume canvas width ~1200px
-      
-      layer.forEach((beat, beatIndex) => {
-        const beatX = startX + (beatIndex * (BEAT_WIDTH + BEAT_SPACING));
-        
-        beat.x = beatX;
-        beat.y = layerY;
-        
-        console.log(`Positioned beat ${beat.id} (${beat.name}) at (${beatX}, ${layerY})`);
       });
     });
+
+    // Create nodes for layout
+    const nodes = beatsToLayout.map(beat => ({ id: beat.id }));
+
+    // Calculate positions using tree layout algorithm
+    const { positions } = calculateTreeLayout(nodes, edges, {
+      nodeSpacingX: 200,
+      nodeSpacingY: 150,
+      startX: 100,
+      startY: 50,
+    });
+
+    // Apply positions to beats
+    positions.forEach((pos, beatId) => {
+      const beat = beatsToLayout.find(b => b.id === beatId);
+      if (beat) {
+        beat.x = pos.x;
+        beat.y = pos.y;
+        console.log(`[ASMLParser] Positioned beat ${beat.id} (${beat.name}) at (${pos.x}, ${pos.y})`);
+      }
+    });
+
+    console.log('[ASMLParser] Layout complete');
   }
 
   /**
