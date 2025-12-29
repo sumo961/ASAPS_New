@@ -67,11 +67,16 @@ export class EndScreenBeat extends Beat {
     }
 
     // Set button text in renderer state so it can be used by schema mapping
-    if (this.restartText) {
-      renderer.setState('restartText', this.restartText);
+    // buttonText is legacy - treat it as restartText if restartText not set
+    const effectiveRestartText = this.restartText || this.buttonText;
+    if (effectiveRestartText) {
+      renderer.setState('restartText', effectiveRestartText);
     }
     if (this.creditsText) {
       renderer.setState('creditsText', this.creditsText);
+    }
+    if (this.buttonText) {
+      renderer.setState('buttonText', this.buttonText);
     }
 
     // Process text with variable interpolation

@@ -108,6 +108,7 @@ const LEGACY_TYPE_MAP: Record<string, string> = {
   'conversationChoice': 'dialogTree',
   'conditionCheck': 'conditionBeat',
   'setGlobal': 'setVariable',
+  'globalTimer': 'setTimer',
 };
 
 // ============================================
@@ -1371,10 +1372,12 @@ export class ASMLParser {
       config.defaultTarget = (targetBeat && targetBeat !== 'undefined') ? targetBeat : undefined;
 
       // Parse delay (val attribute)
+      // Legacy ASML uses milliseconds, modern uses seconds - convert if value > 100 (heuristic)
       const valAttr = defaultTargetElement.getAttribute('val');
       if (valAttr) {
-        const delay = parseInt(valAttr);
-        if (!isNaN(delay) && delay > 0) {
+        const rawDelay = parseInt(valAttr);
+        if (!isNaN(rawDelay) && rawDelay > 0) {
+          const delay = rawDelay > 100 ? rawDelay / 1000 : rawDelay;
           (config as any).defaultTargetDelay = delay;
         }
       }
@@ -1560,7 +1563,6 @@ export class ASMLParser {
         break;
 
       case 'introText':
-      case 'endScreen':
       case 'setVariable':
       case 'setCounter':
       case 'videoBeat':
@@ -1568,6 +1570,36 @@ export class ASMLParser {
         const connectionEl = functionElement.querySelector('connection');
         if (connectionEl) {
           connections.push(this.parseConnection(connectionEl));
+        }
+        break;
+
+      case 'endScreen':
+        // Parse title (maps to message) and button text
+        const endTitleEl = functionElement.querySelector('title');
+        if (endTitleEl && endTitleEl.textContent) {
+          parameters.message = endTitleEl.textContent;
+          parameters.text = endTitleEl.textContent; // Also set text for compatibility
+        }
+        const endButtonEl = functionElement.querySelector('button');
+        if (endButtonEl && endButtonEl.textContent) {
+          parameters.buttonText = endButtonEl.textContent;
+        }
+        // Parse target for restart connection
+        const endTargetEl = functionElement.querySelector('target');
+        if (endTargetEl) {
+          const targetBeat = endTargetEl.getAttribute('targetBeat');
+          if (targetBeat && targetBeat !== '0' && targetBeat !== 'undefined') {
+            parameters.restartTarget = targetBeat;
+            connections.push({
+              targetId: targetBeat,
+              label: 'Restart'
+            });
+          }
+        }
+        // Also check for connection element
+        const endConnectionEl = functionElement.querySelector('connection');
+        if (endConnectionEl) {
+          connections.push(this.parseConnection(endConnectionEl));
         }
         break;
 
@@ -1595,41 +1627,60 @@ export class ASMLParser {
         }
         break;
         
+      case 'globalTimer':  // Legacy name - fall through to setTimer
       case 'setTimer':
         // Parse timer element for timer-specific parameters
         const timerEl = functionElement.querySelector('timer');
         if (timerEl) {
           parameters.timerName = timerEl.getAttribute('name');
           parameters.name = timerEl.getAttribute('name'); // Compatibility
-          parameters.value = parseInt(timerEl.getAttribute('val') || '0');
+          // Legacy ASML uses milliseconds, modern uses seconds - convert if value > 100 (heuristic)
+          const rawTimerValue = parseInt(timerEl.getAttribute('val') || '0');
+          const convertedValue = rawTimerValue > 100 ? rawTimerValue / 1000 : rawTimerValue;
+          parameters.value = convertedValue;
+          parameters.timerValue = convertedValue; // Compatibility with SetTimerBeat
           // Filter out literal string "undefined" from legacy ASML files
           const timerTarget = timerEl.getAttribute('target');
-          parameters.target = (timerTarget && timerTarget !== 'undefined') ? timerTarget : undefined;
-          parameters.timerTarget = parameters.target; // Compatibility
+          if (timerTarget && timerTarget !== 'undefined') {
+            // Only set timerTarget, NOT target (target is for continueTarget in updateParameters)
+            parameters.timerTarget = timerTarget;
+          }
+        }
 
-          // The timer target is NOT a regular connection - it's stored as a parameter
-          // But we do need to create a special connection for graph visualization
-          if (parameters.target) {
+        // Legacy format: <timedtarget targetBeat="..."/> for timer expiry target
+        const timedTargetEl = functionElement.querySelector('timedtarget');
+        if (timedTargetEl) {
+          const timedTargetBeat = timedTargetEl.getAttribute('targetBeat');
+          if (timedTargetBeat && timedTargetBeat !== 'undefined') {
+            // Only set timerTarget, NOT target (target is for continueTarget in updateParameters)
+            parameters.timerTarget = timedTargetBeat;
+          }
+        }
+
+        // The timer target needs a connection for graph visualization
+        if (parameters.timerTarget) {
+          connections.push({
+            targetId: parameters.timerTarget,
+            label: 'Timer Target'
+          });
+        }
+
+        // Legacy format: <target targetBeat="..."/> for immediate next beat
+        const timerNextEl = functionElement.querySelector('target');
+        if (timerNextEl) {
+          const nextBeat = timerNextEl.getAttribute('targetBeat');
+          if (nextBeat && nextBeat !== 'undefined') {
             connections.push({
-              targetId: parameters.target,
-              label: 'Timer Target'
+              targetId: nextBeat,
+              label: ''
             });
           }
         }
-        
-        // ALSO parse regular connection for immediate next beat
+
+        // Also parse regular connection for immediate next beat (modern format)
         const normalConnectionEl = functionElement.querySelector('connection');
         if (normalConnectionEl) {
           connections.push(this.parseConnection(normalConnectionEl));
-        }
-        
-        // Also check for restartConnection (for endScreen)
-        const restartConnectionEl = functionElement.querySelector('restartConnection');
-        if (restartConnectionEl) {
-          connections.push({
-            targetId: restartConnectionEl.getAttribute('target') || '0',
-            label: 'Restart'
-          });
         }
         break;
 

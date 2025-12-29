@@ -96,7 +96,7 @@ export class EditableReactRenderer extends ReactRenderer {
   async renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<void> {
     if (this.editMode) {
       this.backgroundImageUrl = this.getState('backgroundAssetUrl') || null;
-      const buttonText = showRestart ? 'Play Again' : 'Close';
+      const buttonText = this.getState('buttonText') || (showRestart ? 'Play Again' : 'Close');
       
       if (locations && locations.length > 0) {
         await this.renderPositionedBeat('endScreen', { message, buttonText, showRestart, showCredits }, locations, false);
