@@ -1,5 +1,69 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-29: Legacy ASML Import Fixes
+
+### Problem
+
+Importing old-style ASML files (e.g., TheHeist) had several parsing issues:
+
+1. **globalTimer beats not recognized**: Legacy `globalTimer` beat type wasn't mapped to modern `setTimer`
+2. **Timer values in wrong units**: Legacy ASML uses milliseconds, modern uses seconds
+3. **setTimer missing timer target**: Legacy format uses `<timedtarget targetBeat="..."/>` instead of timer element attribute
+4. **endScreen missing text**: Legacy `<title>` and `<button>` elements weren't parsed
+
+### Solution
+
+**Legacy Type Mapping** (`ASMLParser.ts`):
+```typescript
+const LEGACY_TYPE_MAP: Record<string, string> = {
+  'conversationChoice': 'dialogTree',
+  'conditionCheck': 'conditionBeat',
+  'setGlobal': 'setVariable',
+  'globalTimer': 'setTimer',  // NEW
+};
+```
+
+**Timer Value Conversion** (ms → seconds):
+```typescript
+// Heuristic: values > 100 assumed to be milliseconds
+const convertedValue = rawTimerValue > 100 ? rawTimerValue / 1000 : rawTimerValue;
+```
+
+**Legacy setTimer Parsing**:
+```xml
+<!-- Legacy format -->
+<timer val="14000"/>
+<timedtarget targetBeat="39"/>
+<target targetBeat="29"/>
+```
+- `<timer val>` → duration (converted to seconds)
+- `<timedtarget>` → timer expiry target (timerTarget parameter)
+- `<target>` → immediate next beat connection
+
+**endScreen Parsing**:
+```xml
+<title>You've won!</title>
+<button>Replay?</button>
+```
+- `<title>` → `parameters.message`
+- `<button>` → `parameters.buttonText` → `restartText` in renderer state
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/core/src/xml/ASMLParser.ts` | Added globalTimer mapping, timer ms→s conversion, legacy setTimer parsing, endScreen title/button parsing |
+| `packages/core/src/beats/EndScreenBeat.ts` | Map buttonText to restartText for renderer state |
+| `packages/renderer/src/renderers/EditableReactRenderer.tsx` | Read buttonText from renderer state |
+
+### Benefits
+- Old ASML files with globalTimer beats now import correctly
+- Timer durations display in seconds (e.g., 14000ms → 14s)
+- endScreen shows custom title and button text instead of defaults
+- Timer target connections properly established
+
+---
+
 ## 2024-12-29: Auto-Arrange Cluster Sizing and Beat Collision Fixes
 
 ### Problem
