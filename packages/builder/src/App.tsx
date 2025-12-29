@@ -1223,15 +1223,6 @@ function App() {
           }
         });
       });
-
-      // Apply calculated cluster sizes (auto-grow to fit content)
-      if (result.clusterSizes) {
-        result.clusterSizes.forEach((size, clusterId) => {
-          if (actions.resizeCluster) {
-            actions.resizeCluster(clusterId, size.width, size.height);
-          }
-        });
-      }
     } else {
       // No clusters - use standard layout
       const newPositions = applyTreeLayoutToBeats(beatsForLayout, undefined, externalEdges);
