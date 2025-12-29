@@ -1187,6 +1187,111 @@ function App() {
     const clusters = state.clusters || [];
     const hasClusteredBeats = clusters.length > 0 && state.beats.some(b => b.cluster);
 
+    // Collision detection helper - resolves overlaps after layout
+    const resolveCollisions = (
+      beatPositions: Map<string, { x: number; y: number }>,
+      clusterPositions: Map<string, { x: number; y: number }>,
+      clusterSizes: Map<string, { width: number; height: number }>
+    ) => {
+      const BEAT_WIDTH = 160;
+      const BEAT_HEIGHT = 80; // Must match NODE_HEIGHT in ClusterContainerNode.tsx
+      const PADDING = 20;
+      const MAX_ITERATIONS = 30;
+
+      interface Element {
+        id: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        isCluster: boolean;
+      }
+
+      const elements: Element[] = [];
+
+      // Add unclustered beats
+      beatPositions.forEach((pos, id) => {
+        elements.push({ id, x: pos.x, y: pos.y, width: BEAT_WIDTH, height: BEAT_HEIGHT, isCluster: false });
+      });
+
+      // Add clusters
+      clusterPositions.forEach((pos, id) => {
+        const size = clusterSizes.get(id) || { width: 300, height: 200 };
+        elements.push({ id, x: pos.x, y: pos.y, width: size.width, height: size.height, isCluster: true });
+      });
+
+      // Check overlap between two elements
+      const overlaps = (a: Element, b: Element): boolean => {
+        return !(a.x + a.width + PADDING < b.x ||
+                 b.x + b.width + PADDING < a.x ||
+                 a.y + a.height + PADDING < b.y ||
+                 b.y + b.height + PADDING < a.y);
+      };
+
+      // Iteratively resolve overlaps
+      for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+        let hadOverlap = false;
+
+        for (let i = 0; i < elements.length; i++) {
+          for (let j = i + 1; j < elements.length; j++) {
+            const a = elements[i];
+            const b = elements[j];
+
+            if (overlaps(a, b)) {
+              hadOverlap = true;
+
+              // Calculate centers
+              const aCenterX = a.x + a.width / 2;
+              const aCenterY = a.y + a.height / 2;
+              const bCenterX = b.x + b.width / 2;
+              const bCenterY = b.y + b.height / 2;
+
+              // Calculate overlap amounts
+              const overlapX = (a.width + b.width) / 2 + PADDING - Math.abs(aCenterX - bCenterX);
+              const overlapY = (a.height + b.height) / 2 + PADDING - Math.abs(aCenterY - bCenterY);
+
+              // Push apart in direction of least overlap
+              if (overlapX < overlapY) {
+                const shift = overlapX / 2 + 1;
+                if (aCenterX < bCenterX) {
+                  a.x -= shift;
+                  b.x += shift;
+                } else {
+                  a.x += shift;
+                  b.x -= shift;
+                }
+              } else {
+                const shift = overlapY / 2 + 1;
+                if (aCenterY < bCenterY) {
+                  a.y -= shift;
+                  b.y += shift;
+                } else {
+                  a.y += shift;
+                  b.y -= shift;
+                }
+              }
+            }
+          }
+        }
+
+        if (!hadOverlap) break;
+      }
+
+      // Extract resolved positions
+      const resolvedBeats = new Map<string, { x: number; y: number }>();
+      const resolvedClusters = new Map<string, { x: number; y: number }>();
+
+      elements.forEach(el => {
+        if (el.isCluster) {
+          resolvedClusters.set(el.id, { x: el.x, y: el.y });
+        } else {
+          resolvedBeats.set(el.id, { x: el.x, y: el.y });
+        }
+      });
+
+      return { resolvedBeats, resolvedClusters };
+    };
+
     if (hasClusteredBeats) {
       // Use cluster-aware layout
       const clusterInfos = clusters.map(cluster => ({
@@ -1203,19 +1308,59 @@ function App() {
         externalEdges
       );
 
-      // Apply positions to unclustered beats
-      result.beatPositions.forEach((pos, beatId) => {
-        actions.moveBeat(beatId, pos);
-      });
+      // Calculate expanded cluster sizes from internal beat positions
+      // This ensures clusters are large enough to show all their beats
+      const BEAT_WIDTH = 160;
+      const BEAT_HEIGHT = 80; // Must match NODE_HEIGHT in ClusterContainerNode.tsx
+      const CLUSTER_PADDING = 40; // Padding around beats inside cluster
 
-      // Apply positions to clusters
-      result.clusterPositions.forEach((pos, clusterId) => {
-        if (actions.moveCluster) {
-          actions.moveCluster(clusterId, pos);
+      const clusterSizes = new Map<string, { width: number; height: number }>();
+      clusters.forEach(c => {
+        const internalPositions = result.clusterInternalPositions.get(c.id);
+        if (internalPositions && internalPositions.size > 0) {
+          // Calculate the maximum extent of internal beats from cluster origin
+          // Internal positions are relative to cluster origin (0,0), with layout starting
+          // at startX=40, startY=60 to account for padding and header
+          let maxX = 0, maxY = 0;
+          internalPositions.forEach((pos) => {
+            maxX = Math.max(maxX, pos.x + BEAT_WIDTH);
+            maxY = Math.max(maxY, pos.y + BEAT_HEIGHT);
+          });
+          // Add padding after the rightmost/bottommost beat
+          const width = Math.max(300, maxX + CLUSTER_PADDING);
+          const height = Math.max(200, maxY + CLUSTER_PADDING);
+          clusterSizes.set(c.id, { width, height });
+        } else {
+          // Fallback to stored bounds or default
+          clusterSizes.set(c.id, c.containerBounds || { width: 300, height: 200 });
         }
       });
 
-      // Apply positions to beats inside clusters
+      // Resolve any overlaps between beats and clusters
+      const { resolvedBeats, resolvedClusters } = resolveCollisions(
+        result.beatPositions,
+        result.clusterPositions,
+        clusterSizes
+      );
+
+      // Apply resolved positions to unclustered beats
+      resolvedBeats.forEach((pos, beatId) => {
+        actions.moveBeat(beatId, pos);
+      });
+
+      // Apply resolved positions to clusters and update their sizes
+      resolvedClusters.forEach((pos, clusterId) => {
+        if (actions.moveCluster) {
+          actions.moveCluster(clusterId, pos);
+        }
+        // Also update cluster size to fit all internal beats
+        const newSize = clusterSizes.get(clusterId);
+        if (newSize && actions.resizeCluster) {
+          actions.resizeCluster(clusterId, newSize.width, newSize.height);
+        }
+      });
+
+      // Apply positions to beats inside clusters (internal positions don't need collision detection)
       result.clusterInternalPositions.forEach((internalPositions, clusterId) => {
         internalPositions.forEach((pos, beatId) => {
           if (actions.moveBeatInContainer) {
