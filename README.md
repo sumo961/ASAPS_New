@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.8.9)
+## ⚠️ Development Status (v0.9.0)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -15,7 +15,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Project switching | Occasional issues; reload interface to resolve |
 | Animation system | Implemented but untested |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
-| Legacy ASML import | Conversion from earlier ASML files may not work |
+| Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
 ## 🎯 Features
 
@@ -249,6 +249,15 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.0 (2024-12-29)
+- **Unified Import/Export menus**: Dropdown menus in header consolidating all import/export options, including new "Export ASML with Assets" option that creates a ZIP with organized asset folders
+- **Enhanced beat selection**: Cyan highlighting for selected beats (distinct from path analysis highlighting), auto-center and zoom (80%) when selecting beats in flowchart
+- **Visual editor resize handles**: Corner resize handles for elements in the visual editor, allowing direct drag-to-resize
+- **Project Library improvements**: Select All checkbox in list view, individual checkboxes always visible in list view for quick multi-select
+- **Auto-save fix**: Empty default projects (only title/intro/end beats) no longer auto-saved, reducing clutter
+- **Cluster beat collision detection**: Beats inside clusters are properly spaced during auto-arrange to prevent overlapping
+- **Legacy ASML import fixes**: globalTimer beats now correctly mapped to setTimer, timer values auto-converted from milliseconds to seconds, endScreen title/button elements properly parsed
 
 ### v0.8.9 (2024-12-24)
 - **Theme system**: Comprehensive theme management with built-in presets (Visual Novel, Text Adventure, Point & Click), custom theme creation, and theme inheritance
