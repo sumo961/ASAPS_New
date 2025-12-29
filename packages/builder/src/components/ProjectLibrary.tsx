@@ -714,6 +714,41 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                   : 'space-y-3'
               }
             >
+              {/* List view header with Select All checkbox */}
+              {viewMode === 'list' && filteredProjects.length > 0 && (
+                <div className="flex items-center gap-4 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-600">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (selectedProjects.size === filteredProjects.length) {
+                        handleDeselectAll();
+                      } else {
+                        handleSelectAll();
+                      }
+                    }}
+                    className="flex-shrink-0 p-1 rounded hover:bg-gray-200"
+                    title={selectedProjects.size === filteredProjects.length ? 'Deselect all' : 'Select all'}
+                  >
+                    {selectedProjects.size === filteredProjects.length && filteredProjects.length > 0 ? (
+                      <CheckSquare className="text-blue-600" size={20} />
+                    ) : selectedProjects.size > 0 ? (
+                      <div className="relative">
+                        <Square className="text-gray-400" size={20} />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-2 h-2 bg-blue-600 rounded-sm" />
+                        </div>
+                      </div>
+                    ) : (
+                      <Square className="text-gray-400" size={20} />
+                    )}
+                  </button>
+                  <span className="flex-shrink-0 w-12" /> {/* Spacer for folder icon */}
+                  <div className="flex-1">Project Name</div>
+                  <div className="w-32 text-center">Modified</div>
+                  <div className="w-32 text-center">Created</div>
+                  <div className="w-10" /> {/* Spacer for delete button */}
+                </div>
+              )}
               {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
@@ -730,7 +765,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                   viewMode={viewMode}
                   isSelected={selectedProjects.has(project.id)}
                   onToggleSelect={() => handleToggleSelect(project.id)}
-                  showCheckbox={selectionMode}
+                  showCheckbox={selectionMode || viewMode === 'list'}
                   isCurrentProject={project.id === currentProjectId}
                 />
               ))}
