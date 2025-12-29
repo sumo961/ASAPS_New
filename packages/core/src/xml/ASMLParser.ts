@@ -114,6 +114,8 @@ const LEGACY_TYPE_MAP: Record<string, string> = {
 // ============================================
 
 const DEFAULT_FONT_SIZE = 16;
+const TITLE_FONT_SIZE = 32;
+const AUTHOR_FONT_SIZE = 20;
 const MIN_FONT_SIZE = 12;
 const MAX_BUTTON_WIDTH_RATIO = 0.4;  // 40% of canvas
 const MAX_TEXT_WIDTH_RATIO = 0.9;    // 90% of canvas
@@ -171,33 +173,44 @@ function calculateIdealDimensions(
 }
 
 /**
- * Fit text content to a box, prioritizing 16px font size
+ * Fit text content to a box, with font size based on element type
  * Returns ideal dimensions and fontSize
  *
  * Strategy:
- * 1. Try 16px font - calculate ideal box size
- * 2. If ideal width exceeds max, reduce font size
- * 3. Use the IDEAL dimensions (not legacy scaled dimensions)
+ * 1. Determine starting font size based on location name (title=32, author=20, default=16)
+ * 2. Calculate ideal box size
+ * 3. If ideal width exceeds max or too many lines, reduce font size
+ * 4. Use the IDEAL dimensions (not legacy scaled dimensions)
  */
 function fitTextToBox(
   content: string,
   scaledWidth: number,
   scaledHeight: number,
-  elementType: 'button' | 'text'
+  elementType: 'button' | 'text',
+  locationName?: string
 ): { fontSize: number; width: number; height: number } {
+  // Determine starting font size based on location name
+  const nameLower = locationName?.toLowerCase() || '';
+  let startingFontSize = DEFAULT_FONT_SIZE;
+  if (nameLower.includes('title') && !nameLower.includes('screen')) {
+    startingFontSize = TITLE_FONT_SIZE;
+  } else if (nameLower.includes('author')) {
+    startingFontSize = AUTHOR_FONT_SIZE;
+  }
+
   if (!content || content.length === 0) {
     // Empty content: use minimal default size
     const minWidth = elementType === 'button' ? 100 : 150;
     const minHeight = elementType === 'button' ? 40 : 50;
-    return { fontSize: DEFAULT_FONT_SIZE, width: minWidth, height: minHeight };
+    return { fontSize: startingFontSize, width: minWidth, height: minHeight };
   }
 
   const maxWidth = elementType === 'button'
     ? CANVAS_WIDTH * MAX_BUTTON_WIDTH_RATIO  // 410px
     : CANVAS_WIDTH * MAX_TEXT_WIDTH_RATIO;   // 922px
 
-  // Start with default 16px and calculate ideal dimensions
-  let fontSize = DEFAULT_FONT_SIZE;
+  // Start with the appropriate font size for this element type
+  let fontSize = startingFontSize;
   let dims = calculateIdealDimensions(content, fontSize, maxWidth, elementType);
 
   // Only reduce font size if we're hitting the width limit AND text is very long
@@ -973,6 +986,19 @@ export class ASMLParser {
   private parseSettings(settingsElement: Element): any {
     const settings: any = {};
 
+    // Debug: log all child elements of settings and persist to localStorage
+    const debugLog: string[] = [];
+    const logDebug = (msg: string) => {
+      console.log(msg);
+      debugLog.push(msg);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('asml_import_debug', debugLog.join('\n'));
+      }
+    };
+
+    logDebug('[ASMLParser] Settings element children: ' + Array.from(settingsElement.children).map(c => c.tagName).join(', '));
+    logDebug('[ASMLParser] Settings XML: ' + settingsElement.outerHTML.substring(0, 1500));
+
     // Debug settings
     const debugElement = settingsElement.querySelector('debug');
     if (debugElement) {
@@ -982,29 +1008,73 @@ export class ASMLParser {
       };
     }
 
-    // Colors
+    // Helper to convert ASML color format (0xRRGGBB) to CSS (#RRGGBB)
+    const convertColor = (color: string | null): string | null => {
+      if (!color) return null;
+      // Convert 0xRRGGBB to #RRGGBB
+      if (color.startsWith('0x') || color.startsWith('0X')) {
+        return '#' + color.substring(2);
+      }
+      // Already in #RRGGBB or other format
+      return color;
+    };
+
+    // Colors - parse all available color settings
     const colorsElement = settingsElement.querySelector('colors');
     if (colorsElement) {
       settings.colors = {
-        pcolor: colorsElement.getAttribute('pcolor'),
-        palpha: parseInt(colorsElement.getAttribute('palpha') || '100')
+        pcolor: convertColor(colorsElement.getAttribute('pcolor')),
+        palpha: parseInt(colorsElement.getAttribute('palpha') || '100'),
+        // Additional color settings from ASML
+        nonpcolor: convertColor(colorsElement.getAttribute('nonpcolor')),
+        nonpalpha: parseInt(colorsElement.getAttribute('nonpalpha') || '100'),
+        bgColor: convertColor(colorsElement.getAttribute('bgColor') || colorsElement.getAttribute('bgcolor')),
       };
+      logDebug('[ASMLParser] Parsed colors: ' + JSON.stringify(settings.colors));
     }
 
-    // Fonts
+    // Fonts - parse all font settings
     const fontsElement = settingsElement.querySelector('fonts');
     if (fontsElement) {
       settings.fonts = {
         titleFont: fontsElement.getAttribute('titleFont'),
-        textFont: fontsElement.getAttribute('textFont')
+        textFont: fontsElement.getAttribute('textFont'),
+        buttonFont: fontsElement.getAttribute('buttonFont') || fontsElement.getAttribute('btnFont'),
       };
     }
 
-    // Textbox
+    // Textbox - parse all textbox styling settings
     const textboxElement = settingsElement.querySelector('textbox');
     if (textboxElement) {
+      // Debug: log all textbox attributes
+      logDebug('[ASMLParser] Textbox element attributes: ' + Array.from(textboxElement.attributes).map(a => `${a.name}="${a.value}"`).join(', '));
+
       settings.textbox = {
-        radius: parseInt(textboxElement.getAttribute('radius') || '0')
+        radius: parseInt(textboxElement.getAttribute('radius') || '0'),
+        // Background color for textboxes
+        bgcolor: textboxElement.getAttribute('bgcolor') || textboxElement.getAttribute('bgColor') || textboxElement.getAttribute('color'),
+        // Border color for textboxes
+        bordercolor: textboxElement.getAttribute('bordercolor') || textboxElement.getAttribute('borderColor'),
+        // Opacity (0-100)
+        opacity: parseInt(textboxElement.getAttribute('opacity') || '90'),
+        // Padding
+        padding: parseInt(textboxElement.getAttribute('padding') || '20'),
+        // Border width
+        borderWidth: parseInt(textboxElement.getAttribute('borderWidth') || textboxElement.getAttribute('border') || '2'),
+      };
+      logDebug('[ASMLParser] Parsed textbox settings: ' + JSON.stringify(settings.textbox));
+    }
+
+    // Button styling - parse if present
+    const buttonElement = settingsElement.querySelector('button') || settingsElement.querySelector('buttons');
+    if (buttonElement) {
+      settings.button = {
+        bgcolor: buttonElement.getAttribute('bgcolor') || buttonElement.getAttribute('bgColor') || buttonElement.getAttribute('color'),
+        textcolor: buttonElement.getAttribute('textcolor') || buttonElement.getAttribute('textColor'),
+        bordercolor: buttonElement.getAttribute('bordercolor') || buttonElement.getAttribute('borderColor'),
+        borderWidth: parseInt(buttonElement.getAttribute('borderWidth') || buttonElement.getAttribute('border') || '1'),
+        borderRadius: parseInt(buttonElement.getAttribute('radius') || buttonElement.getAttribute('borderRadius') || '4'),
+        hoverBgcolor: buttonElement.getAttribute('hoverBgcolor') || buttonElement.getAttribute('hoverbgcolor'),
       };
     }
 
@@ -1270,6 +1340,19 @@ export class ASMLParser {
             cluster.containerBounds = { width: 400, height: 300 };
           }
 
+          // Parse cluster ambient sound
+          const soundEl = clusterEl.querySelector('sound');
+          if (soundEl) {
+            const soundFile = soundEl.getAttribute('file');
+            if (soundFile) {
+              cluster.sound = {
+                file: soundFile,
+                volume: parseFloat(soundEl.getAttribute('volume') || '0.5'),
+                loop: true // Cluster sounds always loop
+              };
+            }
+          }
+
           clusters.push(cluster);
         });
       } else {
@@ -1456,7 +1539,8 @@ export class ASMLParser {
               content,
               location.width,
               location.height,
-              elementType
+              elementType,
+              location.name
             );
             console.log(`[ASMLParser] -> fitTextToBox result: fontSize=${fit.fontSize}, size=${fit.width}x${fit.height}`);
             // Always set fontSize and dimensions
@@ -1845,10 +1929,14 @@ export class ASMLParser {
 
             // Import buttonsound attribute → add/update location with sound
             const buttonsound = choiceEl.getAttribute('buttonsound');
+            console.log(`[ASMLParser] pickProp choice: loc="${locName}", buttonsound="${buttonsound}", locations available:`, config.locations?.map((l: any) => l.name));
             if (buttonsound && locName && config.locations) {
               const existingLoc = config.locations.find((loc: any) => loc.name === locName);
               if (existingLoc) {
                 existingLoc.sound = buttonsound;
+                console.log(`[ASMLParser] Added sound "${buttonsound}" to location "${locName}"`);
+              } else {
+                console.log(`[ASMLParser] WARNING: No location found with name "${locName}"`);
               }
             }
 
@@ -2173,6 +2261,39 @@ export class ASMLParser {
       parameters.buttonText = buttonEl.textContent;
     }
 
+    // Parse <buttonsound name="..."/> element (legacy format)
+    const buttonsoundEl = functionElement.querySelector('buttonsound');
+    if (buttonsoundEl) {
+      const soundName = buttonsoundEl.getAttribute('name');
+      if (soundName && soundName !== 'undefined') {
+        // Ensure config.locations array exists
+        if (!config.locations) {
+          config.locations = [];
+        }
+        // Find the button location and add sound to it
+        const buttonLoc = config.locations.find((loc: any) =>
+          loc.kind === 'button' ||
+          (loc.name && loc.name.toLowerCase().includes('button'))
+        );
+        if (buttonLoc) {
+          buttonLoc.sound = soundName;
+          console.log(`[ASMLParser] Added buttonsound "${soundName}" to button location "${buttonLoc.name}"`);
+        } else {
+          // Create a button location with sound if none exists
+          config.locations.push({
+            kind: 'button',
+            name: 'button',
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            sound: soundName
+          });
+          console.log(`[ASMLParser] Created button location with buttonsound "${soundName}"`);
+        }
+      }
+    }
+
     const targetEl = functionElement.querySelector('target');
     if (targetEl && connections.length === 0) {
       const targetBeat = targetEl.getAttribute('targetBeat');
@@ -2188,7 +2309,11 @@ export class ASMLParser {
     const connectionEl = functionElement.querySelector('connection');
     if (connectionEl) {
       const buttonsound = connectionEl.getAttribute('buttonsound');
-      if (buttonsound && config.locations) {
+      if (buttonsound) {
+        // Ensure config.locations array exists (might not if no <locs> element in XML)
+        if (!config.locations) {
+          config.locations = [];
+        }
         // Create or update a button location with the sound
         const existingButtonLoc = config.locations.find((loc: any) => loc.kind === 'button');
         if (existingButtonLoc) {
@@ -2213,7 +2338,7 @@ export class ASMLParser {
     functionElement.querySelectorAll(':scope > *').forEach(childEl => {
       const tagName = childEl.tagName.toLowerCase();
       // Skip elements already handled in switch cases
-      if (['connection', 'choice', 'prop', 'button', 'target', 'condition', 'truetarget', 'falsetarget', 'set', 'addmarker', 'removemarker', 'capture', 'questioner', 'question', 'variable', 'timer', 'itemaction', 'score', 'lives', 'image'].includes(tagName)) {
+      if (['connection', 'choice', 'prop', 'button', 'buttonsound', 'target', 'condition', 'truetarget', 'falsetarget', 'set', 'addmarker', 'removemarker', 'capture', 'questioner', 'question', 'variable', 'timer', 'itemaction', 'score', 'lives', 'image'].includes(tagName)) {
         return;
       }
 
@@ -2483,8 +2608,12 @@ export class ASMLParser {
       const assetId = locEl.getAttribute('assetId');
       if (assetId) location.assetId = assetId;
 
-      const sound = locEl.getAttribute('sound');
-      if (sound) location.sound = sound;
+      // Parse sound: prefer 'sound' attribute, fallback to 'buttonsound' (legacy format)
+      const sound = locEl.getAttribute('sound') || locEl.getAttribute('buttonsound');
+      if (sound) {
+        location.sound = sound;
+        console.log(`[ASMLParser] Found sound "${sound}" on location "${location.name}"`);
+      }
 
       // Parse font properties
       const font = locEl.getAttribute('font');

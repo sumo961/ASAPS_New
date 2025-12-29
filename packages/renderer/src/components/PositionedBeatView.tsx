@@ -733,6 +733,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           interactive={interactive}
           actionId={element.actionId}
           onAction={onAction}
+          sound={location.sound}
         />
       );
 
@@ -1485,11 +1486,36 @@ const AssetElement: React.FC<{
   interactive?: boolean;
   actionId?: string;
   onAction?: (id: string) => void;
-}> = ({ style, assetUrl, assetId, name, kind, size, interactive, actionId, onAction }) => {
+  sound?: string;  // Sound to play when clicked (for PickProp)
+}> = ({ style, assetUrl, assetId, name, kind, size, interactive, actionId, onAction, sound }) => {
   // Click handler for interactive props (PickProp beat)
-  const handleClick = () => {
+  const handleClick = async () => {
     if (interactive && actionId && onAction) {
       console.log(`[AssetElement] Clicked "${name}" with actionId: ${actionId}`);
+
+      // Play sound if assigned (same as ButtonElement)
+      if (sound) {
+        try {
+          const audioManager = getAudioManager();
+
+          // Check if it's a preset sound
+          if (isPresetSound(sound)) {
+            const preset = getPresetSound(sound);
+            if (preset) {
+              console.log(`[AssetElement] Playing preset sound: ${preset.name}`);
+              await audioManager.playSound(preset.url, preset.volume);
+            }
+          } else {
+            // Custom asset - for now, assume it's a direct URL or will be resolved later
+            console.log(`[AssetElement] Playing custom sound: ${sound}`);
+            await audioManager.playSound(sound);
+          }
+        } catch (error) {
+          console.error('[AssetElement] Error playing sound:', error);
+          // Don't block the action if sound fails
+        }
+      }
+
       onAction(actionId);
     }
   };

@@ -1,5 +1,148 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-29: Sound System & ASML Import Improvements
+
+### Sound System Fixes
+
+1. **PickProp Sounds Now Play**
+   - Added `sound` prop to `AssetElement` component
+   - Props rendered as `AssetElement` (kind="prop") now trigger sounds on click
+   - Uses same sound playback logic as `ButtonElement` (preset sounds + custom assets)
+
+2. **Beat Sounds Stop on Exit**
+   - Added `stopBeatSound()` call in `Beat.onExit()`
+   - Background beat sounds no longer continue playing when transitioning between beats
+
+### ASML Import Styling Improvements
+
+3. **Title/Author Font Sizes**
+   - Title elements now use 32px font size (was 16px default)
+   - Author elements now use 20px font size (was 16px default)
+   - `fitTextToBox()` now accepts location name to determine appropriate starting font
+
+4. **Color Import Fixes**
+   - Fixed ASML color mapping: `nonpcolor` → textBox background, `pcolor` → button background
+   - Added `filterNullValues()` helper to prevent null values from overwriting defaults
+   - Added `convertColor()` to handle ASML `0xRRGGBB` format → CSS `#RRGGBB`
+
+5. **Auto Contrasting Text Color**
+   - Added `getContrastingTextColor()` function using luminance calculation
+   - Text color automatically adjusts based on background brightness
+   - Light backgrounds get dark text (#1a1a1a), dark backgrounds get white text (#ffffff)
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/renderer/src/components/PositionedBeatView.tsx` | Added sound support to AssetElement |
+| `packages/core/src/beats/Beat.ts` | Added stopBeatSound() in onExit() |
+| `packages/core/src/xml/ASMLParser.ts` | Title/author font sizes, buttonsound parsing, color conversion |
+| `packages/builder/src/App.tsx` | filterNullValues, color mapping fixes, auto text color |
+
+---
+
+## 2024-12-28: Path Analysis Redesign
+
+### Problem
+
+The old path analysis system had exponential complexity:
+- **PathAnalyzer**: Enumerated ALL paths through the story (2^n for n conditions)
+- **SymbolicPathAnalyzer**: Attempted optimization but still explored both branches for unconstrained variables
+- Result: 10,000+ paths for complex stories, browser crashes when highlighting
+
+### Solution: Constraint-Based Analysis
+
+Instead of enumerating paths, we now track **constraint sets** that represent classes of execution:
+- Paths with the same constraints and outcome are merged
+- ~100 outcomes instead of 10,000+ paths
+- Analysis completes in milliseconds instead of seconds
+
+### New Files Created
+
+| File | Purpose |
+|------|---------|
+| `packages/core/src/analysis/ConstraintSet.ts` | Core types (ConstraintSet, OutcomeGroup, PathStep) and utilities |
+| `packages/core/src/analysis/ConstraintPathAnalyzer.ts` | Forward analysis: explore from start, group by outcome |
+| `packages/core/src/analysis/BackwardAnalyzer.ts` | Backward analysis: find all paths to a target beat |
+| `packages/core/src/analysis/PathQuery.ts` | Query engine: filter outcomes by constraints |
+
+### Files Removed
+
+| File | Reason |
+|------|--------|
+| `packages/core/src/analysis/PathAnalyzer.ts` | Exponential path enumeration - too slow |
+| `packages/core/src/analysis/SymbolicPathAnalyzer.ts` | Still slow, replaced by constraint approach |
+| `packages/core/tests/analysis/PathAnalyzer.test.ts` | Tests for removed code |
+
+### UI Improvements
+
+#### Debug Modal (DebugPanel.tsx)
+- **Resizable**: Drag the purple corner handle to resize
+- Initial size: 650x80vh, min: 400x300
+
+#### Forward Analysis (PathVisualization.tsx)
+- Filtered constraints: No more "visited beat X" clutter
+- Shows "Required state:" with meaningful constraints only
+- Shows "Key decisions:" extracted from the path
+- Multiple variations shown with IF/OR labels for clarity
+
+#### Cluster Highlighting (ClusterContainerNode.tsx, GraphEditor.tsx)
+- Beats inside clusters now highlight with yellow fill + amber border
+- Uses `highlightVersion` in node data to trigger memo() re-renders
+
+### Key Types
+
+```typescript
+interface ConstraintSet {
+  variables: Map<string, VariableConstraint>;  // e.g., adult: {min: 8}
+  inventory: Map<string, { has: Set<string>; notHas: Set<string> }>;
+  requiredVisits: Set<string>;
+  forbiddenVisits: Set<string>;
+}
+
+interface OutcomeGroup {
+  endingBeatId: string;
+  constraintSets: ConstraintSet[];  // OR - any of these leads here
+  representativePath: PathStep[];
+}
+```
+
+### Usage
+
+```typescript
+import {
+  ConstraintPathAnalyzer,
+  BackwardAnalyzer,
+  PathQueryEngine,
+} from '@asaps/core';
+
+// Forward analysis
+const analyzer = new ConstraintPathAnalyzer(story, {
+  maxOutcomes: 500,
+  maxDepth: 100,
+  maxConstraintSets: 50,
+});
+const result = analyzer.analyze();
+
+// Backward analysis
+const backward = new BackwardAnalyzer(story);
+const paths = backward.analyzeBackward(targetBeatId);
+
+// Query
+const engine = new PathQueryEngine(result);
+const filtered = engine.query({ type: 'hasConstraint', constraint: {...} });
+```
+
+### Performance
+
+| Metric | Old | New |
+|--------|-----|-----|
+| Red Riding Hood paths | ~10,000 | ~72 outcomes |
+| Analysis time | seconds | ~8ms |
+| Memory | browser crashes | stable |
+
+---
+
 ## 2024-12-24: AI Story Generation Improvements
 
 ### Overview

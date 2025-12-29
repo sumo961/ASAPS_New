@@ -64,21 +64,42 @@ export abstract class Beat {
       });
 
       await this.onEnter(context, renderer);
-      
+
       if (this.transition) {
         await renderer.applyTransition(this.transition);
       }
-      
+
+      // Handle cluster sound - look up cluster and play its ambient sound
+      // This will only change the cluster sound if entering a different cluster
+      if (renderer.playClusterSound) {
+        const story = context.getStory();
+        if (story && this.cluster) {
+          const clusters = story.getClusters();
+          const cluster = clusters.find(c => c.id === this.cluster || c.name === this.cluster);
+          if (cluster?.sound) {
+            await renderer.playClusterSound(cluster.id, cluster.sound);
+          } else {
+            // Beat is in a cluster without sound - keep current cluster sound
+            // (AudioManager will detect same clusterId and skip)
+            await renderer.playClusterSound(cluster?.id ?? null, null);
+          }
+        } else {
+          // Beat is not in a cluster - stop cluster sound
+          await renderer.playClusterSound(null, null);
+        }
+      }
+
+      // Play beat-level sound (automatically stops previous beat sound)
       if (this.sound) {
         await renderer.playSound(this.sound);
       }
-      
+
       // Pass locations to renderer
       const locations = Array.from(this.locations.values());
       if (locations.length > 0) {
         renderer.setState('currentBeatLocations', locations);
       }
-      
+
       // Handle background node with improved lookup
       if (this.node) {
         console.log(`[Beat ${this.id}] Looking up background node: ${this.node}`);
@@ -186,6 +207,11 @@ export abstract class Beat {
 
   protected async onExit(context: StoryContext, renderer: IRenderer): Promise<void> {
     console.log(`Exiting beat: ${this.name} (${this.id})`);
+
+    // Stop the beat sound when leaving the beat
+    if (renderer.stopBeatSound) {
+      renderer.stopBeatSound();
+    }
 
     // Cancel default target timer if it exists
     if (this.defaultTarget) {

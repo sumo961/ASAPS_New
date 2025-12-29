@@ -27,6 +27,9 @@ import { validateAIStory, formatValidationResult } from './utils/aiStoryValidato
 import { preloadFonts } from './utils/fontRegistry';
 import { useAIDebug } from './hooks/useAIDebug';
 import { AIDebugModal } from './components/ai/AIDebugModal';
+import { getThemeService } from './services/ThemeService';
+import { themeToGlobalSettings } from './themes/migration/GlobalSettingsAdapter';
+import { BUILT_IN_THEMES } from '@asaps/core';
 
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
@@ -1348,34 +1351,111 @@ function App() {
       const importedSettings = importResult.settings;
       if (importedSettings && Object.keys(importedSettings).length > 0) {
         console.log('[handleImportAsmlComplete] Merging imported settings:', importedSettings);
-        setGlobalSettings(prev => ({
-          ...prev,
-          // Deep merge all settings categories to preserve defaults
-          sound: {
-            ...prev.sound,
-            ...(importedSettings.sound || {})
-          },
-          colors: {
-            ...prev.colors,
-            ...(importedSettings.colors || {})
-          },
-          fonts: {
-            ...prev.fonts,
-            ...(importedSettings.fonts || {})
-          },
-          textbox: {
-            ...prev.textbox,
-            ...(importedSettings.textbox || {})
-          },
-          debug: {
-            ...prev.debug,
-            ...(importedSettings.debug || {})
-          },
-          copyright: {
-            ...prev.copyright,
-            ...(importedSettings.copyright || {})
-          }
-        }));
+        setGlobalSettings(prev => {
+          // Helper to filter out null/undefined values from an object
+          // This prevents null values from overwriting defaults during spread
+          const filterNullValues = (obj: Record<string, any> | undefined): Record<string, any> => {
+            if (!obj) return {};
+            return Object.fromEntries(
+              Object.entries(obj).filter(([_, v]) => v !== null && v !== undefined)
+            );
+          };
+
+          // Helper to calculate contrasting text color based on background
+          // Uses relative luminance formula to determine if background is light or dark
+          const getContrastingTextColor = (bgColor: string): string => {
+            // Parse hex color (supports #RGB, #RRGGBB)
+            let hex = bgColor.replace('#', '');
+            if (hex.length === 3) {
+              hex = hex.split('').map(c => c + c).join('');
+            }
+            const r = parseInt(hex.substring(0, 2), 16) / 255;
+            const g = parseInt(hex.substring(2, 4), 16) / 255;
+            const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+            // Calculate relative luminance (WCAG formula)
+            const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+            // Return dark text for light backgrounds, light text for dark backgrounds
+            return luminance > 0.5 ? '#1a1a1a' : '#ffffff';
+          };
+
+          // Map ASML textbox colors to GlobalSettings colors
+          // ASML stores textbox bgcolor/bordercolor in textbox section, but GlobalSettings uses colors section
+          const textboxBgColor = importedSettings.textbox?.bgcolor;
+          const textboxBorderColor = importedSettings.textbox?.bordercolor;
+
+          // Map ASML button colors to GlobalSettings if present
+          const buttonBgColor = importedSettings.button?.bgcolor;
+          const buttonTextColor = importedSettings.button?.textcolor;
+
+          // Filter imported colors to exclude null values
+          const filteredColors = filterNullValues(importedSettings.colors);
+
+          // Determine the effective textbox background color
+          const effectiveTextBoxBg = textboxBgColor || filteredColors.nonpcolor;
+          // Auto-calculate text color based on background brightness
+          const autoTextColor = effectiveTextBoxBg ? getContrastingTextColor(effectiveTextBoxBg) : null;
+
+          // In old ASML format:
+          // - pcolor/palpha = button BACKGROUND color/alpha (player-interactive)
+          // - nonpcolor/nonpalpha = textbox BACKGROUND color/alpha (non-player)
+          // Map these to GlobalSettings textBoxBg and button background
+
+          return {
+            ...prev,
+            // Deep merge all settings categories to preserve defaults
+            sound: {
+              ...prev.sound,
+              ...filterNullValues(importedSettings.sound)
+            },
+            colors: {
+              ...prev.colors,
+              // Map nonpcolor (textbox background) to textBoxBg
+              ...(filteredColors.nonpcolor ? { textBoxBg: filteredColors.nonpcolor } : {}),
+              // Map pcolor (button background) - store for button styling
+              ...(filteredColors.pcolor ? { buttonBg: filteredColors.pcolor } : {}),
+              // Auto-calculate text color based on background brightness
+              ...(autoTextColor ? { pcolor: autoTextColor } : {}),
+              // Keep nonpcolor/nonpalpha and pcolor/palpha for reference (as original ASML values)
+              ...(filteredColors.nonpcolor ? { nonpcolor: filteredColors.nonpcolor } : {}),
+              ...(filteredColors.nonpalpha ? { nonpalpha: filteredColors.nonpalpha } : {}),
+              // Store original pcolor as buttonBgColor for reference
+              ...(filteredColors.pcolor ? { buttonBgColor: filteredColors.pcolor } : {}),
+              ...(filteredColors.palpha ? { palpha: filteredColors.palpha } : {}),
+              // Override with explicit textbox settings if present
+              ...(textboxBgColor ? { textBoxBg: textboxBgColor } : {}),
+              ...(textboxBorderColor ? { textBoxBorder: textboxBorderColor } : {}),
+            },
+            fonts: {
+              ...prev.fonts,
+              ...filterNullValues(importedSettings.fonts),
+              // Map buttonFont to btnFont
+              ...(importedSettings.fonts?.buttonFont ? { btnFont: importedSettings.fonts.buttonFont } : {}),
+            },
+            textbox: {
+              ...prev.textbox,
+              // Only merge supported textbox properties (already filtering for non-null)
+              ...(importedSettings.textbox?.radius !== undefined ? { radius: importedSettings.textbox.radius } : {}),
+              // Use nonpalpha (textbox background alpha) as opacity, fallback to textbox.opacity
+              ...(filteredColors.nonpalpha !== undefined
+                ? { opacity: filteredColors.nonpalpha }
+                : importedSettings.textbox?.opacity !== undefined
+                  ? { opacity: importedSettings.textbox.opacity }
+                  : {}),
+              ...(importedSettings.textbox?.padding !== undefined ? { padding: importedSettings.textbox.padding } : {}),
+              ...(importedSettings.textbox?.borderWidth !== undefined ? { borderWidth: importedSettings.textbox.borderWidth } : {}),
+            },
+            debug: {
+              ...prev.debug,
+              ...filterNullValues(importedSettings.debug)
+            },
+            copyright: {
+              ...prev.copyright,
+              ...filterNullValues(importedSettings.copyright)
+            }
+          };
+        });
       }
 
       // Show summary
@@ -1782,6 +1862,31 @@ function App() {
       actions.setTitle(storyTitle);
     }
 
+    // Apply suggested theme if provided
+    if (story.suggestedTheme?.themeId) {
+      const themeId = story.suggestedTheme.themeId;
+      console.log('[App] AI suggested theme:', themeId, '-', story.suggestedTheme.reason);
+
+      try {
+        // Initialize theme service and get the theme
+        const themeService = getThemeService();
+        await themeService.initialize();
+        await themeService.registerBuiltInThemes(BUILT_IN_THEMES);
+
+        const theme = await themeService.getResolvedTheme(themeId);
+        if (theme) {
+          // Apply theme to global settings
+          const newSettings = themeToGlobalSettings(theme, globalSettingsRef.current || globalSettings);
+          setGlobalSettings(newSettings);
+          console.log('[App] Applied theme:', theme.meta.name);
+        } else {
+          console.warn('[App] Suggested theme not found:', themeId);
+        }
+      } catch (error) {
+        console.warn('[App] Failed to apply suggested theme:', error);
+      }
+    }
+
     // Apply tree layout to position beats based on their connections
     // Pass both beats (for parameter-embedded connections) and the connections array (for external connections)
     const externalConnections = story.connections && Array.isArray(story.connections)
@@ -1993,7 +2098,7 @@ function App() {
         console.error('[App] Failed to auto-save generated story:', error);
       }
     }, 300);
-  }, [actions, markChanged, saveCurrent, syncProjectData, runAIDebug]);
+  }, [actions, markChanged, saveCurrent, syncProjectData, runAIDebug, globalSettings, setGlobalSettings]);
 
   /**
    * Handle AI-generated beat from natural language description
@@ -2208,6 +2313,12 @@ function App() {
             onSetClusterMap={(clusterId: string, assetId: string | null, scale?: number, opacity?: number) => {
               if (actions.setClusterMap) {
                 actions.setClusterMap(clusterId, assetId, scale, opacity);
+                markChanged();
+              }
+            }}
+            onSetClusterSound={(clusterId: string, soundAssetId: string | null, volume?: number) => {
+              if (actions.setClusterSound) {
+                actions.setClusterSound(clusterId, soundAssetId, volume);
                 markChanged();
               }
             }}
