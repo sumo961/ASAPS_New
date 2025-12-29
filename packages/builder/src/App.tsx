@@ -1208,12 +1208,21 @@ function App() {
         actions.moveBeat(beatId, pos);
       });
 
-      // Apply positions to clusters
+      // Apply positions and sizes to clusters
       result.clusterPositions.forEach((pos, clusterId) => {
         if (actions.moveCluster) {
           actions.moveCluster(clusterId, pos);
         }
       });
+
+      // Apply calculated cluster sizes (auto-grow clusters to fit content)
+      if (result.clusterSizes) {
+        result.clusterSizes.forEach((size, clusterId) => {
+          if (actions.resizeCluster) {
+            actions.resizeCluster(clusterId, size.width, size.height);
+          }
+        });
+      }
 
       // Apply positions to beats inside clusters
       result.clusterInternalPositions.forEach((internalPositions, clusterId) => {

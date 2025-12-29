@@ -782,8 +782,8 @@ export class ASMLParser {
       if (plotElement) {
         const { clusters, beats } = this.parsePlot(plotElement);
 
-        // Apply layout to beats before adding to story
-        this.applyLayout(beats);
+        // Apply layout to beats before adding to story (cluster-aware)
+        this.applyLayout(beats, clusters);
 
         // Add all beats to the story
         beats.forEach(beat => {
@@ -814,8 +814,9 @@ export class ASMLParser {
    * Apply tree layout to imported beats using the same algorithm as auto-arrange.
    * Only positions beats that don't already have saved positions.
    * Uses the Reingold-Tilford algorithm from @asaps/core/layout.
+   * Cluster-aware: positions clusters as single units and lays out beats inside them.
    */
-  private applyLayout(beats: Beat[]): void {
+  private applyLayout(beats: Beat[], clusters: any[] = []): void {
     if (beats.length === 0) return;
 
     // Separate beats into positioned and unpositioned
@@ -843,6 +844,12 @@ export class ASMLParser {
 
     console.log('[ASMLParser] Starting tree layout for', beatsToLayout.length, 'beats');
 
+    // Constants for sizing
+    const BEAT_WIDTH = 160;
+    const BEAT_HEIGHT = 60;
+    const CLUSTER_PADDING = 40;
+    const CLUSTER_HEADER = 50;
+
     // Build edges from beat connections
     const edges: LayoutEdge[] = [];
     const beatIdSet = new Set(beatsToLayout.map(b => b.id));
@@ -850,33 +857,188 @@ export class ASMLParser {
     beatsToLayout.forEach(beat => {
       const connections = beat.getConnections();
       connections.forEach(conn => {
-        // Only include edges where both source and target are in beats to layout
         if (beatIdSet.has(conn.targetId)) {
           edges.push({ source: beat.id, target: conn.targetId });
         }
       });
     });
 
-    // Create nodes for layout
-    const nodes = beatsToLayout.map(beat => ({ id: beat.id }));
+    // Check if we have clusters
+    if (clusters.length > 0) {
+      console.log('[ASMLParser] Applying cluster-aware layout');
 
-    // Calculate positions using tree layout algorithm
-    const { positions } = calculateTreeLayout(nodes, edges, {
-      nodeSpacingX: 200,
-      nodeSpacingY: 150,
-      startX: 100,
-      startY: 50,
-    });
+      // Separate beats into clustered and unclustered
+      const unclusteredBeats = beatsToLayout.filter(b => !b.cluster);
+      const clusteredBeats = beatsToLayout.filter(b => b.cluster);
 
-    // Apply positions to beats
-    positions.forEach((pos, beatId) => {
-      const beat = beatsToLayout.find(b => b.id === beatId);
-      if (beat) {
-        beat.x = pos.x;
-        beat.y = pos.y;
-        console.log(`[ASMLParser] Positioned beat ${beat.id} (${beat.name}) at (${pos.x}, ${pos.y})`);
-      }
-    });
+      // Group beats by cluster
+      const beatsByCluster = new Map<string, Beat[]>();
+      clusteredBeats.forEach(beat => {
+        if (beat.cluster) {
+          const existing = beatsByCluster.get(beat.cluster) || [];
+          existing.push(beat);
+          beatsByCluster.set(beat.cluster, existing);
+        }
+      });
+
+      // STEP 1: Layout beats inside each cluster
+      const clusterSizes = new Map<string, { width: number; height: number }>();
+
+      clusters.forEach(cluster => {
+        const clusterBeats = beatsByCluster.get(cluster.id) || [];
+        if (clusterBeats.length === 0) {
+          clusterSizes.set(cluster.id, {
+            width: cluster.containerBounds?.width || 300,
+            height: cluster.containerBounds?.height || 200
+          });
+          return;
+        }
+
+        // Extract internal edges
+        const clusterBeatIds = new Set(clusterBeats.map(b => b.id));
+        const internalEdges = edges.filter(
+          e => clusterBeatIds.has(e.source) && clusterBeatIds.has(e.target)
+        );
+
+        // Layout internal beats
+        const internalNodes = clusterBeats.map(b => ({ id: b.id }));
+        const { positions: internalPos } = calculateTreeLayout(
+          internalNodes,
+          internalEdges,
+          {
+            nodeSpacingX: 180,
+            nodeSpacingY: 100,
+            startX: CLUSTER_PADDING,
+            startY: CLUSTER_HEADER + CLUSTER_PADDING / 2,
+          }
+        );
+
+        // Apply internal positions and calculate cluster size
+        let maxX = 0;
+        let maxY = 0;
+        internalPos.forEach((pos, beatId) => {
+          const beat = clusterBeats.find(b => b.id === beatId);
+          if (beat) {
+            // Store internal position (relative to cluster)
+            beat.x = pos.x;
+            beat.y = pos.y;
+            maxX = Math.max(maxX, pos.x + BEAT_WIDTH);
+            maxY = Math.max(maxY, pos.y + BEAT_HEIGHT);
+          }
+        });
+
+        // Calculate cluster size
+        const clusterWidth = Math.max(
+          cluster.containerBounds?.width || 0,
+          maxX + CLUSTER_PADDING
+        );
+        const clusterHeight = Math.max(
+          cluster.containerBounds?.height || 0,
+          maxY + CLUSTER_PADDING
+        );
+        clusterSizes.set(cluster.id, { width: clusterWidth, height: clusterHeight });
+
+        // Update cluster bounds
+        cluster.containerBounds = { width: clusterWidth, height: clusterHeight };
+      });
+
+      // STEP 2: Transform edges for cluster-level layout
+      const beatToCluster = new Map<string, string>();
+      clusteredBeats.forEach(beat => {
+        if (beat.cluster) {
+          beatToCluster.set(beat.id, beat.cluster);
+        }
+      });
+
+      const transformedEdges: LayoutEdge[] = [];
+      const seenTransformed = new Set<string>();
+
+      edges.forEach(edge => {
+        const sourceCluster = beatToCluster.get(edge.source);
+        const targetCluster = beatToCluster.get(edge.target);
+
+        const actualSource = sourceCluster ? `cluster:${sourceCluster}` : edge.source;
+        const actualTarget = targetCluster ? `cluster:${targetCluster}` : edge.target;
+
+        // Skip internal edges
+        if (sourceCluster && targetCluster && sourceCluster === targetCluster) {
+          return;
+        }
+        if (actualSource === actualTarget) {
+          return;
+        }
+
+        const key = `${actualSource}->${actualTarget}`;
+        if (!seenTransformed.has(key)) {
+          seenTransformed.add(key);
+          transformedEdges.push({ source: actualSource, target: actualTarget });
+        }
+      });
+
+      // STEP 3: Layout main graph with clusters as nodes
+      const mainNodes = [
+        ...unclusteredBeats.map(b => ({ id: b.id })),
+        ...clusters.map(c => ({ id: `cluster:${c.id}` })),
+      ];
+
+      // Calculate spacing based on largest cluster
+      let maxWidth = BEAT_WIDTH;
+      let maxHeight = BEAT_HEIGHT;
+      clusterSizes.forEach(size => {
+        maxWidth = Math.max(maxWidth, size.width);
+        maxHeight = Math.max(maxHeight, size.height);
+      });
+
+      const { positions: mainPositions } = calculateTreeLayout(
+        mainNodes,
+        transformedEdges,
+        {
+          nodeSpacingX: Math.max(200, maxWidth + 50),
+          nodeSpacingY: Math.max(150, maxHeight + 50),
+          startX: 100,
+          startY: 50,
+        }
+      );
+
+      // Apply positions to unclustered beats
+      mainPositions.forEach((pos, id) => {
+        if (id.startsWith('cluster:')) {
+          const clusterId = id.replace('cluster:', '');
+          const cluster = clusters.find(c => c.id === clusterId);
+          if (cluster) {
+            cluster.containerPosition = pos;
+            console.log(`[ASMLParser] Positioned cluster ${clusterId} at (${pos.x}, ${pos.y})`);
+          }
+        } else {
+          const beat = unclusteredBeats.find(b => b.id === id);
+          if (beat) {
+            beat.x = pos.x;
+            beat.y = pos.y;
+            console.log(`[ASMLParser] Positioned beat ${beat.id} (${beat.name}) at (${pos.x}, ${pos.y})`);
+          }
+        }
+      });
+
+    } else {
+      // No clusters - simple layout
+      const nodes = beatsToLayout.map(beat => ({ id: beat.id }));
+
+      const { positions } = calculateTreeLayout(nodes, edges, {
+        nodeSpacingX: 200,
+        nodeSpacingY: 150,
+        startX: 100,
+        startY: 50,
+      });
+
+      positions.forEach((pos, beatId) => {
+        const beat = beatsToLayout.find(b => b.id === beatId);
+        if (beat) {
+          beat.x = pos.x;
+          beat.y = pos.y;
+          console.log(`[ASMLParser] Positioned beat ${beat.id} (${beat.name}) at (${pos.x}, ${pos.y})`);
+        }
+      });
+    }
 
     console.log('[ASMLParser] Layout complete');
   }
