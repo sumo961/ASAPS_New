@@ -1069,7 +1069,7 @@ const ButtonElement: React.FC<{
 
   const handleClick = async () => {
     if (interactive) {
-      // Play sound if assigned
+      // Play sound if assigned - wait for it to finish before transitioning
       if (location.sound) {
         try {
           const audioManager = getAudioManager();
@@ -1078,13 +1078,13 @@ const ButtonElement: React.FC<{
           if (isPresetSound(location.sound)) {
             const preset = getPresetSound(location.sound);
             if (preset) {
-              console.log(`[ButtonElement] Playing preset sound: ${preset.name}`);
-              await audioManager.playSound(preset.url, preset.volume);
+              console.log(`[ButtonElement] Playing preset sound: ${preset.name} (waiting for completion)`);
+              await audioManager.playSoundAndWait(preset.url, preset.volume);
             }
           } else {
             // Custom asset - for now, assume it's a direct URL or will be resolved later
-            console.log(`[ButtonElement] Playing custom sound: ${location.sound}`);
-            await audioManager.playSound(location.sound);
+            console.log(`[ButtonElement] Playing custom sound: ${location.sound} (waiting for completion)`);
+            await audioManager.playSoundAndWait(location.sound);
           }
         } catch (error) {
           console.error('[ButtonElement] Error playing sound:', error);
@@ -1092,7 +1092,7 @@ const ButtonElement: React.FC<{
         }
       }
 
-      // Then call the action
+      // Then call the action (after sound finishes)
       if (onAction) {
         // Use actionId if available (for movementChoice, pickProp, etc.), otherwise use location name
         const actionIdToPass = actionId || location.name || 'continue';
@@ -1493,7 +1493,7 @@ const AssetElement: React.FC<{
     if (interactive && actionId && onAction) {
       console.log(`[AssetElement] Clicked "${name}" with actionId: ${actionId}`);
 
-      // Play sound if assigned (same as ButtonElement)
+      // Play sound if assigned - wait for it to finish before transitioning
       if (sound) {
         try {
           const audioManager = getAudioManager();
@@ -1502,13 +1502,13 @@ const AssetElement: React.FC<{
           if (isPresetSound(sound)) {
             const preset = getPresetSound(sound);
             if (preset) {
-              console.log(`[AssetElement] Playing preset sound: ${preset.name}`);
-              await audioManager.playSound(preset.url, preset.volume);
+              console.log(`[AssetElement] Playing preset sound: ${preset.name} (waiting for completion)`);
+              await audioManager.playSoundAndWait(preset.url, preset.volume);
             }
           } else {
             // Custom asset - for now, assume it's a direct URL or will be resolved later
-            console.log(`[AssetElement] Playing custom sound: ${sound}`);
-            await audioManager.playSound(sound);
+            console.log(`[AssetElement] Playing custom sound: ${sound} (waiting for completion)`);
+            await audioManager.playSoundAndWait(sound);
           }
         } catch (error) {
           console.error('[AssetElement] Error playing sound:', error);
@@ -2246,7 +2246,7 @@ const FlexButtonElement: React.FC<{
 
   const handleClick = async () => {
     if (interactive) {
-      // Play sound if assigned
+      // Play sound if assigned - wait for it to finish before transitioning
       if (location.sound) {
         try {
           const audioManager = getAudioManager();
@@ -2255,13 +2255,13 @@ const FlexButtonElement: React.FC<{
           if (isPresetSound(location.sound)) {
             const preset = getPresetSound(location.sound);
             if (preset) {
-              console.log(`[FlexButtonElement] Playing preset sound: ${preset.name}`);
-              await audioManager.playSound(preset.url, preset.volume);
+              console.log(`[FlexButtonElement] Playing preset sound: ${preset.name} (waiting for completion)`);
+              await audioManager.playSoundAndWait(preset.url, preset.volume);
             }
           } else {
             // Custom asset
-            console.log(`[FlexButtonElement] Playing custom sound: ${location.sound}`);
-            await audioManager.playSound(location.sound);
+            console.log(`[FlexButtonElement] Playing custom sound: ${location.sound} (waiting for completion)`);
+            await audioManager.playSoundAndWait(location.sound);
           }
         } catch (error) {
           console.error('[FlexButtonElement] Error playing sound:', error);
@@ -2269,7 +2269,7 @@ const FlexButtonElement: React.FC<{
         }
       }
 
-      // Then call the action
+      // Then call the action (after sound finishes)
       if (onAction) {
         const actionIdToPass = actionId || location.name || 'continue';
         onAction(actionIdToPass);

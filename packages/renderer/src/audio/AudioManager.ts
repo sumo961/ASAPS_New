@@ -10,6 +10,15 @@ export interface AudioManagerOptions {
   preloadSounds?: boolean; // Whether to preload sounds, default true
 }
 
+/**
+ * Tracked sound with its gain node for fade control
+ */
+interface TrackedSound {
+  source: AudioBufferSourceNode;
+  gainNode: GainNode;
+  url: string;
+}
+
 export class AudioManager {
   private audioContext: AudioContext | null = null;
   private masterGainNode: GainNode | null = null;
@@ -18,6 +27,11 @@ export class AudioManager {
   private masterVolume: number;
   private shouldPreloadSounds: boolean;
   private muted: boolean = false;
+
+  // Tracked sounds by category for proper lifecycle management
+  private currentBeatSound: TrackedSound | null = null;
+  private currentClusterSound: TrackedSound | null = null;
+  private currentClusterId: string | null = null;
 
   constructor(options: AudioManagerOptions = {}) {
     this.masterVolume = options.masterVolume ?? 0.7;
@@ -144,6 +158,77 @@ export class AudioManager {
   }
 
   /**
+   * Play a sound and wait for it to finish before resolving
+   * Used for button sounds that need to complete before transitioning to the next beat
+   * @param url - URL of the sound file
+   * @param volume - Volume level (0-1), defaults to 1.0
+   * @returns Promise that resolves when sound finishes playing
+   */
+  async playSoundAndWait(url: string, volume: number = 1.0): Promise<void> {
+    // Don't play if muted
+    if (this.muted) {
+      return;
+    }
+
+    this.initAudioContext();
+    if (!this.audioContext || !this.masterGainNode) {
+      console.warn('[AudioManager] Audio context not available');
+      return;
+    }
+
+    try {
+      // Resume audio context if suspended (common on mobile)
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      // Get or load the sound buffer
+      let buffer = this.soundBuffers.get(url);
+      if (!buffer) {
+        // Load on demand if not preloaded
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        buffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+        if (this.shouldPreloadSounds) {
+          this.soundBuffers.set(url, buffer);
+        }
+      }
+
+      // Create source node
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.loop = false; // Never loop for wait-for-completion sounds
+
+      // Create gain node for this sound
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.value = Math.max(0, Math.min(1, volume));
+
+      // Connect: source -> gain -> master gain -> destination
+      source.connect(gainNode);
+      gainNode.connect(this.masterGainNode);
+
+      // Track active source
+      this.activeSourceNodes.add(source);
+
+      // Return a promise that resolves when the sound ends
+      return new Promise<void>((resolve) => {
+        source.onended = () => {
+          this.activeSourceNodes.delete(source);
+          resolve();
+        };
+
+        // Play the sound
+        source.start(0);
+      });
+    } catch (error) {
+      console.error(`[AudioManager] Error playing sound ${url}:`, error);
+      // Resolve anyway to not block UI
+      return;
+    }
+  }
+
+  /**
    * Stop all currently playing sounds
    */
   stopAllSounds(): void {
@@ -155,6 +240,207 @@ export class AudioManager {
       }
     });
     this.activeSourceNodes.clear();
+    this.currentBeatSound = null;
+    this.currentClusterSound = null;
+    this.currentClusterId = null;
+  }
+
+  /**
+   * Play a beat-level sound (stops when leaving the beat)
+   * Automatically stops any previously playing beat sound
+   */
+  async playBeatSound(url: string, volume: number = 1.0, loop: boolean = false, fadeOutMs: number = 200): Promise<void> {
+    // Stop previous beat sound with fade
+    this.stopBeatSound(fadeOutMs);
+
+    if (this.muted || !url) return;
+
+    this.initAudioContext();
+    if (!this.audioContext || !this.masterGainNode) return;
+
+    try {
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      let buffer = this.soundBuffers.get(url);
+      if (!buffer) {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        buffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        if (this.shouldPreloadSounds) {
+          this.soundBuffers.set(url, buffer);
+        }
+      }
+
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.loop = loop;
+
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.value = Math.max(0, Math.min(1, volume));
+
+      source.connect(gainNode);
+      gainNode.connect(this.masterGainNode);
+
+      this.activeSourceNodes.add(source);
+      source.onended = () => {
+        this.activeSourceNodes.delete(source);
+        if (this.currentBeatSound?.source === source) {
+          this.currentBeatSound = null;
+        }
+      };
+
+      this.currentBeatSound = { source, gainNode, url };
+      source.start(0);
+      console.log(`[AudioManager] Started beat sound: ${url}`);
+    } catch (error) {
+      console.error(`[AudioManager] Error playing beat sound ${url}:`, error);
+    }
+  }
+
+  /**
+   * Stop the current beat sound with optional fade out
+   */
+  stopBeatSound(fadeOutMs: number = 200): void {
+    if (!this.currentBeatSound) return;
+
+    const { source, gainNode } = this.currentBeatSound;
+
+    try {
+      if (fadeOutMs > 0 && this.audioContext) {
+        // Fade out before stopping
+        const currentTime = this.audioContext.currentTime;
+        gainNode.gain.setValueAtTime(gainNode.gain.value, currentTime);
+        gainNode.gain.linearRampToValueAtTime(0, currentTime + fadeOutMs / 1000);
+
+        // Stop after fade completes
+        setTimeout(() => {
+          try {
+            source.stop();
+          } catch (e) {
+            // Already stopped
+          }
+        }, fadeOutMs);
+      } else {
+        source.stop();
+      }
+    } catch (e) {
+      // Source may have already stopped
+    }
+
+    this.activeSourceNodes.delete(source);
+    this.currentBeatSound = null;
+    console.log('[AudioManager] Stopped beat sound');
+  }
+
+  /**
+   * Play a cluster-level sound (persists across beats within the same cluster)
+   * Only changes if entering a different cluster
+   * @param clusterId - The cluster ID (null for no cluster)
+   * @param url - Sound URL (null to stop cluster sound)
+   * @param volume - Volume level (0-1)
+   */
+  async playClusterSound(clusterId: string | null, url: string | null, volume: number = 0.5): Promise<void> {
+    // If same cluster, don't restart the sound
+    if (clusterId === this.currentClusterId) {
+      return;
+    }
+
+    // Stop previous cluster sound
+    this.stopClusterSound(500); // Longer fade for ambient sounds
+
+    this.currentClusterId = clusterId;
+
+    if (!url || !clusterId || this.muted) return;
+
+    this.initAudioContext();
+    if (!this.audioContext || !this.masterGainNode) return;
+
+    try {
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      let buffer = this.soundBuffers.get(url);
+      if (!buffer) {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        buffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        if (this.shouldPreloadSounds) {
+          this.soundBuffers.set(url, buffer);
+        }
+      }
+
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true; // Cluster sounds always loop
+
+      const gainNode = this.audioContext.createGain();
+      // Fade in
+      gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(
+        Math.max(0, Math.min(1, volume)),
+        this.audioContext.currentTime + 0.5
+      );
+
+      source.connect(gainNode);
+      gainNode.connect(this.masterGainNode);
+
+      this.activeSourceNodes.add(source);
+      source.onended = () => {
+        this.activeSourceNodes.delete(source);
+        if (this.currentClusterSound?.source === source) {
+          this.currentClusterSound = null;
+        }
+      };
+
+      this.currentClusterSound = { source, gainNode, url };
+      source.start(0);
+      console.log(`[AudioManager] Started cluster sound for "${clusterId}": ${url}`);
+    } catch (error) {
+      console.error(`[AudioManager] Error playing cluster sound ${url}:`, error);
+    }
+  }
+
+  /**
+   * Stop the current cluster sound with fade out
+   */
+  stopClusterSound(fadeOutMs: number = 500): void {
+    if (!this.currentClusterSound) return;
+
+    const { source, gainNode } = this.currentClusterSound;
+
+    try {
+      if (fadeOutMs > 0 && this.audioContext) {
+        const currentTime = this.audioContext.currentTime;
+        gainNode.gain.setValueAtTime(gainNode.gain.value, currentTime);
+        gainNode.gain.linearRampToValueAtTime(0, currentTime + fadeOutMs / 1000);
+
+        setTimeout(() => {
+          try {
+            source.stop();
+          } catch (e) {
+            // Already stopped
+          }
+        }, fadeOutMs);
+      } else {
+        source.stop();
+      }
+    } catch (e) {
+      // Source may have already stopped
+    }
+
+    this.activeSourceNodes.delete(source);
+    this.currentClusterSound = null;
+    console.log('[AudioManager] Stopped cluster sound');
+  }
+
+  /**
+   * Get the current cluster ID for sound tracking
+   */
+  getCurrentClusterId(): string | null {
+    return this.currentClusterId;
   }
 
   /**
