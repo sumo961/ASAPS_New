@@ -1,5 +1,50 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-29: Auto-Arrange Cluster Sizing and Beat Collision Fixes
+
+### Problem
+
+Auto-arrange had two issues causing visual problems:
+
+1. **Clusters cut off beats on the right edge**: The cluster size calculation used span-based approach `(maxX - minX)` which didn't account for the internal layout offset. Internal beat positions start at `(40, 60)` due to padding/header, so clusters needed to encompass from origin `(0,0)` to the maximum beat position.
+
+2. **Unclustered beats overlapping**: The collision detection used `BEAT_HEIGHT = 60` but actual beat nodes are 80px tall (defined as `NODE_HEIGHT = 80` in `ClusterContainerNode.tsx`). This 20px mismatch allowed vertical overlaps.
+
+### Solution
+
+**Cluster Size Fix** (`App.tsx` lines 1324-1331):
+```typescript
+// Before (bug): span-based calculation
+const width = (maxX - minX) + CLUSTER_PADDING * 2;
+const height = (maxY - minY) + CLUSTER_HEADER_HEIGHT + CLUSTER_PADDING * 2;
+
+// After (fix): extent-based calculation
+const width = Math.max(300, maxX + CLUSTER_PADDING);
+const height = Math.max(200, maxY + CLUSTER_PADDING);
+```
+
+**Beat Height Fix** (`App.tsx` lines 1197, 1314):
+```typescript
+// Before (bug)
+const BEAT_HEIGHT = 60;
+
+// After (fix) - matches NODE_HEIGHT in ClusterContainerNode.tsx
+const BEAT_HEIGHT = 80;
+```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/App.tsx` | Fixed cluster extent calculation, corrected BEAT_HEIGHT constant |
+
+### Benefits
+- Clusters now properly contain all internal beats without cutoff
+- Unclustered beats no longer overlap after auto-arrange
+- Collision detection uses correct beat dimensions
+
+---
+
 ## 2024-12-29: Unified Layout Algorithm
 
 ### Problem
