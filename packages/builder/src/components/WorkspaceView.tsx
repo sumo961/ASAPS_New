@@ -46,6 +46,7 @@ interface WorkspaceViewProps {
   onRemoveCluster?: (clusterId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   characters?: Character[];
 }
 
@@ -83,6 +84,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onRemoveCluster,
   onClusterResize,
   onSetClusterMap,
+  onSetClusterSound,
   characters = [],
 }) => {
   const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
@@ -187,6 +189,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onClusterResize={onClusterResize}
               assets={assets}
               onSetClusterMap={onSetClusterMap}
+              onSetClusterSound={onSetClusterSound}
             />
           </div>
         ) : (

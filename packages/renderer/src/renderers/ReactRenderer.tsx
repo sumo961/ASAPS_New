@@ -484,6 +484,7 @@ export class ReactRenderer extends BaseRenderer {
   protected backgroundImageUrl: string | null = null;  // Changed to protected
   private assetResolver: ((assetId: string) => string | undefined) | null = null;  // NEW: Asset resolver function
   private characterResolver: ((characterId: string, stateId?: string) => string | undefined) | null = null;  // NEW: Character state resolver
+  // soundBlobResolver is inherited from BaseRenderer
   protected hideTextBoxes: boolean = false;  // NEW: Whether to hide text box backgrounds
   protected hideButtonBoxes: boolean = false;  // NEW: Whether to hide button box backgrounds
   protected theme: RenderThemeSettings | undefined = undefined;  // NEW: Theme settings for styling
@@ -572,6 +573,23 @@ export class ReactRenderer extends BaseRenderer {
    */
   setCharacterResolver(resolver: (characterId: string, stateId?: string) => string | undefined): void {
     this.characterResolver = resolver;
+  }
+
+  /**
+   * Set the sound blob resolver function
+   * This allows the renderer to load sound blobs from storage for playback
+   * Avoids stale blob URL issues by loading fresh blob data when needed
+   */
+  // Override to call parent implementation (soundBlobResolver is on parent class)
+  override setSoundBlobResolver(resolver: (assetId: string) => Promise<Blob | null>): void {
+    super.setSoundBlobResolver(resolver);
+  }
+
+  /**
+   * Get the sound blob resolver (for passing to components)
+   */
+  getSoundBlobResolver(): ((assetId: string) => Promise<Blob | null>) | null {
+    return this.soundBlobResolver;
   }
 
   /**
@@ -689,6 +707,7 @@ export class ReactRenderer extends BaseRenderer {
             previewMode={false}
             visitedBeats={this.visitedBeats}
             showTextOnHover={showTextOnHover}
+            soundBlobResolver={this.soundBlobResolver || undefined}
           />
         </div>
       );

@@ -37,6 +37,7 @@ interface CanvasProps {
   // Cluster background images
   assets?: Asset[];
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -65,6 +66,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onRemoveCluster,
   assets = [],
   onSetClusterMap,
+  onSetClusterSound,
 }) => {
   const handleBeatMove = (beatId: string, x: number, y: number) => {
     onBeatMove(beatId, { x, y });
@@ -125,6 +127,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onRemoveCluster={onRemoveCluster}
           assets={assets}
           onSetClusterMap={onSetClusterMap}
+          onSetClusterSound={onSetClusterSound}
         />
       </div>
       

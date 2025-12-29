@@ -2622,6 +2622,34 @@ function App() {
           characters={characters}
           settings={globalSettings}
           onClose={handleClosePreview}
+          loadAssetBlob={async (assetIdOrUrl: string) => {
+            // Skip invalid asset IDs
+            if (!assetIdOrUrl || assetIdOrUrl === 'undefined') {
+              return null;
+            }
+
+            try {
+              const storage = getStorageAdapter();
+
+              // First try to load by asset ID directly
+              let blob = await storage.loadAsset(assetIdOrUrl);
+              if (blob) return blob;
+
+              // If not found and it looks like a blob URL, search assets by URL (legacy fallback)
+              if (assetIdOrUrl.startsWith('blob:')) {
+                const matchingAsset = assets.find(a => a.url === assetIdOrUrl);
+                if (matchingAsset) {
+                  blob = await storage.loadAsset(matchingAsset.id);
+                  if (blob) return blob;
+                }
+              }
+
+              return null;
+            } catch (error) {
+              console.warn(`[App loadAssetBlob] Error loading asset: ${assetIdOrUrl}`, error);
+              return null;
+            }
+          }}
         />
       )}
 

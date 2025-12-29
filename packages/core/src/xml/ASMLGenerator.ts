@@ -405,6 +405,15 @@ export class ASMLGenerator {
       lines.push(`${propIndent}<containerBounds width="${Math.round(cluster.containerBounds.width)}" height="${Math.round(cluster.containerBounds.height)}" />`);
     }
 
+    // Cluster ambient sound
+    if (cluster.sound?.file) {
+      const soundAttrs: string[] = [`file="${this.escapeXml(cluster.sound.file)}"`];
+      if (cluster.sound.volume !== undefined) {
+        soundAttrs.push(`volume="${cluster.sound.volume}"`);
+      }
+      lines.push(`${propIndent}<sound ${soundAttrs.join(' ')} />`);
+    }
+
     lines.push(`${clusterIndent}</cluster>`);
   }
 
@@ -674,42 +683,20 @@ export class ASMLGenerator {
       case 'multiple':
         if (beat.type === 'movementChoice' && params.choices) {
           for (const choice of params.choices) {
-            // Enrich choice with sound from its location
-            const enrichedChoice = { ...choice };
-            if (choice.location && beat.locations) {
-              const location = Array.from(beat.locations.values()).find(loc => loc.name === choice.location);
-              if (location?.sound) {
-                enrichedChoice.sound = location.sound;
-              }
-            }
-            this.generateChoice(enrichedChoice, lines, indent + this.indent);
+            // Sound is stored on locations, not on choices - no enrichment needed
+            this.generateChoice(choice, lines, indent + this.indent);
           }
         } else if (beat.type === 'pickProp' && params.props) {
           for (const prop of params.props) {
-            // Enrich prop with sound from its location
-            const enrichedProp = { ...prop };
-            if (prop.name && beat.locations) {
-              // Props use 'name' field to match location name
-              const location = Array.from(beat.locations.values()).find(loc => loc.name === prop.name);
-              if (location?.sound) {
-                enrichedProp.sound = location.sound;
-              }
-            }
-            this.generateProp(enrichedProp, lines, indent + this.indent);
+            // Sound is stored on locations, not on props - no enrichment needed
+            this.generateProp(prop, lines, indent + this.indent);
           }
         } else if (beat.type === 'dialogTree' && params.dialogTree) {
           // Generate nested dialog choices
           if (params.dialogTree.choices) {
             for (const choice of params.dialogTree.choices) {
-              // Enrich choice with sound from its location (matched by text)
-              const enrichedChoice = { ...choice };
-              if (choice.text && beat.locations) {
-                const location = Array.from(beat.locations.values()).find(loc => loc.name === choice.text);
-                if (location?.sound) {
-                  enrichedChoice.sound = location.sound;
-                }
-              }
-              this.generateDialogChoice(enrichedChoice, lines, indent + this.indent);
+              // Sound is stored on locations, not on choices - no enrichment needed
+              this.generateDialogChoice(choice, lines, indent + this.indent);
             }
           }
           // NOTE: No separate <connection> tag needed - dialog exits via choice targets
@@ -793,27 +780,20 @@ export class ASMLGenerator {
         const alreadyHandled = ['setTimer'];
         if (alreadyHandled.includes(beat.type)) break;
 
-        //remaining beats
+        // Remaining beats with single connection
         if (connections.length > 0) {
           const conn = connections[0];
 
-          // Enrich connection with sound from button location
-          const enrichedConn: any = { ...conn };
-          if (beat.locations) {
-            const buttonLocation = Array.from(beat.locations.values()).find(loc => loc.kind === 'button');
-            if (buttonLocation?.sound) {
-              enrichedConn.sound = buttonLocation.sound;
-            }
-          }
+          // Sound is stored on locations, not on connections - no enrichment needed
 
           // Invisible beats and simple progression beats should not have labels on connections
           const noLabelBeats = ['setVariable', 'setTimer', 'addRemoveInventory', 'randomTarget', 'introText', 'durScreen', 'endScreen', 'inputText', 'hyperText'];
           if (noLabelBeats.includes(beat.type)) {
             // Don't include label - button text is shown in visual editor instead
-            this.generateConnection({ ...enrichedConn, label: undefined }, lines, indent + this.indent);
+            this.generateConnection({ ...conn, label: undefined }, lines, indent + this.indent);
           } else {
-            const label = enrichedConn.label || params.buttonText || 'Continue';
-            this.generateConnection({ ...enrichedConn, label }, lines, indent + this.indent);
+            const label = conn.label || params.buttonText || 'Continue';
+            this.generateConnection({ ...conn, label }, lines, indent + this.indent);
           }
         }
         break;
@@ -846,8 +826,7 @@ export class ASMLGenerator {
     const hasNestedDialog = choice.dialogNode || (typeof choice.target === 'object' && choice.target);
     const nestedDialogNode = choice.dialogNode || (typeof choice.target === 'object' ? choice.target : null);
 
-    // Add sound effect (from location)
-    if (choice.sound) attrs.push(`buttonsound="${this.escapeXml(choice.sound)}"`);
+    // NOTE: Sound is stored on locations, not on choices - no buttonsound attribute needed
 
     // Add counter effect as attributes with proper operation and val
     if (choice.counter) {
@@ -1013,8 +992,7 @@ export class ASMLGenerator {
     if (choice.target) attrs.push(`target="${choice.target}"`);
     if (choice.location) attrs.push(`location="${this.escapeXml(choice.location)}"`);
 
-    // Add sound effect (from location)
-    if (choice.sound) attrs.push(`buttonsound="${this.escapeXml(choice.sound)}"`);
+    // NOTE: Sound is stored on locations, not on choices - no buttonsound attribute needed
 
     // Add counter effect as attributes (for movementChoice)
     if (choice.counter) {
@@ -1063,8 +1041,7 @@ export class ASMLGenerator {
     if (prop.description) attrs.push(`description="${this.escapeXml(prop.description)}"`);
     if (prop.target) attrs.push(`target="${prop.target}"`);
 
-    // Add sound effect (from location)
-    if (prop.sound) attrs.push(`buttonsound="${this.escapeXml(prop.sound)}"`);
+    // NOTE: Sound is stored on locations, not on props - no buttonsound attribute needed
 
     // Add counter effect as attributes (for pickProp)
     if (prop.counter) {
@@ -1231,8 +1208,7 @@ export class ASMLGenerator {
     if (targetId && targetId !== 'undefined') attrs.push(`target="${targetId}"`);
     if (connection.label) attrs.push(`label="${this.escapeXml(connection.label)}"`);
 
-    // Add sound effect (from button location)
-    if (connection.sound) attrs.push(`buttonsound="${this.escapeXml(connection.sound)}"`);
+    // NOTE: Sound is stored on locations, not on connections - no buttonsound attribute needed
 
     if (connection.condition) {
       lines.push(`${indent}<connection ${attrs.join(' ')}>`);

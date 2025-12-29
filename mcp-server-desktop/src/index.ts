@@ -111,6 +111,22 @@ const getExampleStoryTool: Tool = {
 };
 
 /**
+ * Get available visual themes
+ */
+const getThemesTool: Tool = {
+  name: 'asaps_get_themes',
+  description:
+    'Get information about available visual themes. ' +
+    'Themes control the visual presentation (colors, fonts, text animation). ' +
+    'Use this to recommend the best theme for a story based on its genre.',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+    required: [],
+  },
+};
+
+/**
  * Inject a complete story into ASAPS Builder
  */
 const injectStoryTool: Tool = {
@@ -179,6 +195,21 @@ const injectStoryTool: Tool = {
           },
         },
       },
+      suggestedTheme: {
+        type: 'object',
+        description: 'Recommended visual theme for this story. Use asaps_get_themes to see available themes.',
+        properties: {
+          themeId: {
+            type: 'string',
+            description: 'Theme ID: "builtin-visual-novel", "builtin-twine", or "builtin-point-and-click"',
+          },
+          reason: {
+            type: 'string',
+            description: 'Brief explanation of why this theme fits the story',
+          },
+        },
+        required: ['themeId', 'reason'],
+      },
     },
     required: ['metadata', 'beats'],
   },
@@ -189,6 +220,7 @@ const tools: Tool[] = [
   checkConnectionTool,
   getBeatSchemaTool,
   getExampleStoryTool,
+  getThemesTool,
   injectStoryTool,
 ];
 
@@ -256,8 +288,78 @@ async function handleGetExampleStory(): Promise<any> {
   }
 }
 
+async function handleGetThemes(): Promise<any> {
+  // Theme information is static - no need to fetch from API
+  const themes = {
+    themes: [
+      {
+        id: 'builtin-visual-novel',
+        name: 'Visual Novel',
+        description: 'Classic visual novel style inspired by Ren\'Py',
+        bestFor: ['romance', 'drama', 'character-driven stories', 'anime-style narratives'],
+        characteristics: [
+          'Semi-transparent text box at bottom of screen',
+          'Character name highlights in golden color',
+          'Typewriter text animation (characters appear one by one)',
+          'Dark overlay for backgrounds',
+          'Serif fonts for elegance',
+        ],
+      },
+      {
+        id: 'builtin-twine',
+        name: 'Text Adventure',
+        description: 'Minimal text adventure style inspired by Twine/SugarCube',
+        bestFor: ['interactive fiction', 'literary narratives', 'mystery stories', 'text-heavy games'],
+        characteristics: [
+          'Minimal UI with no visible text box frame',
+          'Blue hyperlink-style choices (like web links)',
+          'Serif typography (Georgia) for literary feel',
+          'Dark background with light text',
+          'Fade text animation',
+          'Centered text layout',
+        ],
+      },
+      {
+        id: 'builtin-point-and-click',
+        name: 'Point & Click Adventure',
+        description: 'Classic adventure game style inspired by LucasArts',
+        bestFor: ['adventure games', 'puzzle stories', 'exploration', 'mystery with locations'],
+        characteristics: [
+          'Golden text on dark blue surfaces',
+          'Prominent hotspot indicators (always visible)',
+          'Sharp corners, pixelated aesthetic',
+          'Faster typewriter animation',
+          'Dissolve scene transitions',
+          'Inventory/exploration focus',
+        ],
+      },
+    ],
+    recommendationGuide: {
+      'romance': 'builtin-visual-novel',
+      'drama': 'builtin-visual-novel',
+      'mystery (text-based)': 'builtin-twine',
+      'mystery (exploration)': 'builtin-point-and-click',
+      'horror': 'builtin-twine or builtin-visual-novel',
+      'fantasy (epic)': 'builtin-visual-novel',
+      'fantasy (adventure)': 'builtin-point-and-click',
+      'sci-fi': 'builtin-twine or builtin-visual-novel',
+      'comedy': 'builtin-visual-novel',
+      'adventure/exploration': 'builtin-point-and-click',
+      'literary/experimental': 'builtin-twine',
+    },
+    usage: 'Include a suggestedTheme object in your story with themeId and reason fields.',
+  };
+
+  return {
+    success: true,
+    ...themes,
+    message:
+      'Theme information retrieved. Choose a theme based on your story genre and include it in the suggestedTheme field when injecting.',
+  };
+}
+
 async function handleInjectStory(args: any): Promise<any> {
-  const { metadata, beats, connections, characters } = args;
+  const { metadata, beats, connections, characters, suggestedTheme } = args;
 
   // Log injection attempt with timestamp for debugging duplicates
   const injectionTimestamp = new Date().toISOString();
@@ -302,6 +404,9 @@ async function handleInjectStory(args: any): Promise<any> {
 
   try {
     console.error(`[ASAPS MCP Desktop] Sending POST to /api/stories/inject...`);
+    if (suggestedTheme) {
+      console.error(`[ASAPS MCP Desktop] Including suggestedTheme: ${suggestedTheme.themeId}`);
+    }
     const result = await fetchAPI('/api/stories/inject', {
       method: 'POST',
       body: JSON.stringify({
@@ -309,6 +414,7 @@ async function handleInjectStory(args: any): Promise<any> {
         beats,
         connections: connections || [],
         characters: characters || [],
+        suggestedTheme: suggestedTheme || undefined,
       }),
     });
 
@@ -382,6 +488,10 @@ async function main() {
 
         case 'asaps_get_example_story':
           result = await handleGetExampleStory();
+          break;
+
+        case 'asaps_get_themes':
+          result = await handleGetThemes();
           break;
 
         case 'asaps_inject_story':

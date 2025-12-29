@@ -258,8 +258,8 @@ export class ReachabilityAnalyzer {
     for (const beat of allBeats) {
       const params = beat.getParameters();
 
-      // Analyze SetVariable beats
-      if (beat.type === 'setVariable') {
+      // Analyze SetVariable beats (including 'variable' alias)
+      if (beat.type === 'setVariable' || beat.type === 'variable') {
         const varType = params.type; // 'variable' or 'counter'
         const varName = params.name;
         const varValue = params.value;

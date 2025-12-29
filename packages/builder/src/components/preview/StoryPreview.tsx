@@ -20,9 +20,10 @@ interface StoryPreviewProps {
   assets?: Asset[];
   characters?: Character[];
   onClose: () => void;
+  loadAssetBlob?: (assetId: string) => Promise<Blob | null>;
 }
 
-export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, assets = [], characters = [], onClose }) => {
+export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, assets = [], characters = [], onClose, loadAssetBlob }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
@@ -251,6 +252,12 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         console.log('[StoryPreview] Character resolver set up with', characters.length, 'characters');
       }
 
+      // Set up sound blob resolver to load sound assets from storage
+      if (loadAssetBlob) {
+        reactRenderer.setSoundBlobResolver(loadAssetBlob);
+        console.log('[StoryPreview] Sound blob resolver set up');
+      }
+
       // Create story engine - cast renderer to any to bypass type check
       // ReactRenderer DOES implement IRenderer, but TS can't see it across packages
       const engine = new StoryEngine(reactRenderer as any);
@@ -275,7 +282,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         engineRef.current.stop();
       }
     };
-  }, [assets]); // Re-run if assets change
+  }, [assets, characters, loadAssetBlob]); // Re-run if assets, characters, or loadAssetBlob change
 
   // Update renderer visibility settings when dropdown changes
   useEffect(() => {
@@ -544,31 +551,52 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         willPlay: !!(soundSettings?.backgroundMusic && !soundSettings.mute && soundEnabled)
       });
 
-      if (soundSettings?.backgroundMusic && !soundSettings.mute && soundEnabled) {
+      // Check if we have background music configured (either asset ID or URL)
+      const backgroundMusicAssetId = soundSettings?.backgroundMusicAssetId;
+      const backgroundMusicUrl = soundSettings?.backgroundMusic;
+
+      if ((backgroundMusicAssetId || backgroundMusicUrl) && !soundSettings?.mute && soundEnabled) {
         try {
           const audioManager = getAudioManager();
           const volume = (soundSettings.backgroundVolume || 70) / 100;
 
-          // The backgroundMusic should already be a blob URL after linkAssetsToSettings
-          // Only look up in assets if it doesn't look like a URL
-          let audioUrl = soundSettings.backgroundMusic;
+          let audioBlob: Blob | null = null;
+          let cacheKey: string | undefined;
 
-          if (!audioUrl.startsWith('blob:') && !audioUrl.startsWith('http') && !audioUrl.startsWith('data:')) {
-            // Check if it's a reference to an asset (fallback for non-linked settings)
+          // First priority: use backgroundMusicAssetId if available
+          if (backgroundMusicAssetId && loadAssetBlob) {
+            console.log(`[StoryPreview] Loading background music from asset ID: ${backgroundMusicAssetId}`);
+            audioBlob = await loadAssetBlob(backgroundMusicAssetId);
+            cacheKey = backgroundMusicAssetId;
+          }
+
+          // Fallback: try to find asset by URL or name reference
+          if (!audioBlob && backgroundMusicUrl && loadAssetBlob) {
             const audioAsset = assets?.find(a =>
-              a.id === audioUrl ||
-              a.name === audioUrl ||
-              a.name?.replace(/\.[^/.]+$/, '') === audioUrl // match without extension
+              a.id === backgroundMusicUrl ||
+              a.name === backgroundMusicUrl ||
+              a.url === backgroundMusicUrl ||
+              a.name?.replace(/\.[^/.]+$/, '') === backgroundMusicUrl
             );
+
             if (audioAsset) {
-              audioUrl = audioAsset.url;
-              console.log(`[StoryPreview] Resolved audio asset: ${audioUrl.substring(0, 50)}...`);
+              console.log(`[StoryPreview] Loading background music from matched asset: ${audioAsset.id} (${audioAsset.name})`);
+              audioBlob = await loadAssetBlob(audioAsset.id);
+              cacheKey = audioAsset.id;
             }
           }
 
-          console.log(`[StoryPreview] Starting background music: ${audioUrl.substring(0, 80)}... at volume ${volume}`);
-          await audioManager.playSound(audioUrl, volume, true); // true = loop
-          console.log('[StoryPreview] Background music started successfully');
+          if (audioBlob) {
+            console.log(`[StoryPreview] Playing background music from blob at volume ${volume}`);
+            await audioManager.playSoundFromBlob(audioBlob, volume, true, cacheKey); // true = loop
+            console.log('[StoryPreview] Background music started successfully from blob');
+          } else if (backgroundMusicUrl?.startsWith('http')) {
+            // External URL - use regular playSound
+            console.log(`[StoryPreview] Playing external background music: ${backgroundMusicUrl}`);
+            await audioManager.playSound(backgroundMusicUrl, volume, true);
+          } else {
+            console.warn(`[StoryPreview] Could not resolve background music. AssetId: ${backgroundMusicAssetId}, URL: ${backgroundMusicUrl}`);
+          }
         } catch (error) {
           console.warn('[StoryPreview] Failed to start background music:', error);
         }

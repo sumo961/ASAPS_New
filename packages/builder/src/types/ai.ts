@@ -59,6 +59,16 @@ export interface StoryGenerationRequest {
 }
 
 /**
+ * Suggested theme for a generated story
+ */
+export interface SuggestedTheme {
+  /** Theme ID (builtin-visual-novel, builtin-twine, builtin-point-and-click) */
+  themeId: string;
+  /** Reason for the recommendation */
+  reason: string;
+}
+
+/**
  * Story generation response
  */
 export interface StoryGenerationResponse {
@@ -69,6 +79,9 @@ export interface StoryGenerationResponse {
     description?: string;
     genre?: string;
   };
+
+  /** Suggested theme based on genre and story style */
+  suggestedTheme?: SuggestedTheme;
 
   /** Generated beats */
   beats: GeneratedBeat[];

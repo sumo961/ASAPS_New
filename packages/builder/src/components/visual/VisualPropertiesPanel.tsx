@@ -1050,7 +1050,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                       <Volume2 className={`w-3 h-3 ${playingSound === asset.id ? 'text-blue-600' : 'text-gray-600'}`} />
                                     </button>
                                     <button
-                                      onClick={() => onElementUpdate(selected.id, { sound: asset.id })}
+                                      onClick={() => onElementUpdate(selected.id, { sound: asset.id, soundAssetId: asset.id })}
                                       className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
                                     >
                                       {selected.sound === asset.id ? 'Selected' : 'Use'}
@@ -1065,7 +1065,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         {/* Clear Sound Button */}
                         {selected.sound && (
                           <button
-                            onClick={() => onElementUpdate(selected.id, { sound: undefined })}
+                            onClick={() => onElementUpdate(selected.id, { sound: undefined, soundAssetId: undefined })}
                             className="w-full mt-2 px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
                           >
                             Remove Sound

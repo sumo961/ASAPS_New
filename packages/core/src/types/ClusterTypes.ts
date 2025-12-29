@@ -1,5 +1,7 @@
 // Cluster container type definitions for spatial story organization
 
+import type { Sound } from './index';
+
 /**
  * Cluster container for spatial organization of beats within the flowchart
  * Clusters appear as expandable rectangles that can contain reference graphics
@@ -31,6 +33,10 @@ export interface Cluster {
 
   // Visual theming
   color?: string;
+
+  // Ambient sound that plays while in this cluster
+  // Loops automatically and fades in/out when entering/leaving the cluster
+  sound?: Sound;
 }
 
 /**

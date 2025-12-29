@@ -8,6 +8,7 @@ export abstract class BaseRenderer implements IRenderer {
   protected options: RenderOptions;
   protected state: Map<string, any> = new Map();
   private stateListeners: Map<string, Set<(value: any) => void>> = new Map();
+  protected soundBlobResolver: ((assetId: string) => Promise<Blob | null>) | null = null;
 
   constructor(context: RenderContext, options: RenderOptions = {}) {
     this.context = context;
@@ -112,9 +113,89 @@ export abstract class BaseRenderer implements IRenderer {
     return new Promise(() => {}); // Never resolves by default
   }
 
-  // Sound handling - FIXED: Handle missing audio files gracefully
-  // Also checks global mute state from AudioManager
+  // Sound handling - Uses AudioManager for beat-level sounds
+  // Beat sounds automatically stop when transitioning to another beat
   async playSound(sound: Sound): Promise<void> {
+    if (!this.options.soundEnabled) return;
+    if (!sound.file && !sound.assetId) return;
+
+    try {
+      const audioManager = getAudioManager();
+      const volume = sound.volume ?? 1.0;
+      const loop = sound.loop ?? false;
+
+      // Prefer assetId for blob-based playback (works across sessions)
+      if (sound.assetId && this.soundBlobResolver) {
+        console.log(`[BaseRenderer] Loading beat sound from assetId: ${sound.assetId}`);
+        const blob = await this.soundBlobResolver(sound.assetId);
+        if (blob) {
+          await audioManager.playBeatSoundFromBlob(blob, volume, loop, sound.assetId);
+          return;
+        }
+        console.warn(`[BaseRenderer] Could not resolve sound assetId: ${sound.assetId}`);
+      }
+
+      // Fallback to file-based playback (for external URLs)
+      if (sound.file && sound.file.startsWith('http')) {
+        await audioManager.playBeatSound(sound.file, volume, loop);
+        return;
+      }
+
+      console.warn(`[BaseRenderer] Cannot play beat sound - no valid assetId or URL: ${sound.file}`);
+    } catch (error) {
+      console.warn(`[BaseRenderer] Failed to play beat sound: ${sound.file}`, error);
+    }
+  }
+
+  // Set the sound blob resolver
+  setSoundBlobResolver(resolver: (assetId: string) => Promise<Blob | null>): void {
+    this.soundBlobResolver = resolver;
+  }
+
+  /**
+   * Play or update cluster sound based on current cluster
+   * Called during beat transition to handle cluster ambient sounds
+   */
+  async playClusterSound(clusterId: string | null, sound: Sound | null): Promise<void> {
+    if (!this.options.soundEnabled) return;
+
+    try {
+      const audioManager = getAudioManager();
+
+      // Try to resolve sound via assetId first
+      let soundSource: string | Blob | null = null;
+      if (sound?.assetId && this.soundBlobResolver) {
+        soundSource = await this.soundBlobResolver(sound.assetId);
+      }
+      // Fallback to file URL if no blob resolved
+      if (!soundSource && sound?.file && sound.file.startsWith('http')) {
+        soundSource = sound.file;
+      }
+
+      await audioManager.playClusterSound(
+        clusterId,
+        soundSource,
+        sound?.volume ?? 0.5
+      );
+    } catch (error) {
+      console.warn(`[BaseRenderer] Failed to play cluster sound:`, error);
+    }
+  }
+
+  /**
+   * Stop the current beat sound (called when leaving a beat)
+   */
+  stopBeatSound(): void {
+    try {
+      const audioManager = getAudioManager();
+      audioManager.stopBeatSound();
+    } catch (error) {
+      // AudioManager not available
+    }
+  }
+
+  // Legacy sound handling for backwards compatibility - kept for non-beat sounds
+  async playSoundLegacy(sound: Sound): Promise<void> {
     if (!this.options.soundEnabled) return;
 
     // Check global mute state from AudioManager
@@ -130,10 +211,10 @@ export abstract class BaseRenderer implements IRenderer {
 
     try {
       let audio = this.assetCache.sounds.get(sound.file);
-      
+
       if (!audio) {
         audio = new Audio(sound.file);
-        
+
         // Test if audio can be loaded
         await new Promise<void>((resolve, reject) => {
           audio!.addEventListener('canplaythrough', () => resolve(), { once: true });
@@ -141,14 +222,14 @@ export abstract class BaseRenderer implements IRenderer {
             console.warn(`Failed to load audio file: ${sound.file}`, e);
             reject(new Error(`Audio file not found: ${sound.file}`));
           }, { once: true });
-          
+
           // Start loading
           audio!.load();
-          
+
           // Timeout after 5 seconds
           setTimeout(() => reject(new Error(`Audio loading timeout: ${sound.file}`)), 5000);
         });
-        
+
         this.assetCache.sounds.set(sound.file, audio);
       }
 

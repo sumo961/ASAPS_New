@@ -151,6 +151,74 @@ export class AudioManager {
   }
 
   /**
+   * Play a sound directly from a Blob (avoids fetch, works with IndexedDB-stored assets)
+   * @param blob - Audio blob data
+   * @param volume - Volume level (0-1), defaults to 1.0
+   * @param loop - Whether to loop the sound (for background music), defaults to false
+   * @param cacheKey - Optional key to cache the decoded buffer for reuse
+   */
+  async playSoundFromBlob(blob: Blob, volume: number = 1.0, loop: boolean = false, cacheKey?: string): Promise<void> {
+    // Don't play if muted
+    if (this.muted) {
+      return;
+    }
+
+    this.initAudioContext();
+    if (!this.audioContext || !this.masterGainNode) {
+      console.warn('[AudioManager] Audio context not available');
+      return;
+    }
+
+    try {
+      // Resume audio context if suspended (common on mobile)
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      // Check cache first if cacheKey provided
+      let buffer = cacheKey ? this.soundBuffers.get(cacheKey) : undefined;
+
+      if (!buffer) {
+        // Decode directly from blob's array buffer
+        const arrayBuffer = await blob.arrayBuffer();
+        buffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+        // Cache if key provided
+        if (cacheKey && this.shouldPreloadSounds) {
+          this.soundBuffers.set(cacheKey, buffer);
+        }
+      }
+
+      // Create source node
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.loop = loop;
+
+      // Create gain node for this sound
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.value = Math.max(0, Math.min(1, volume));
+
+      // Connect: source -> gain -> master gain -> destination
+      source.connect(gainNode);
+      gainNode.connect(this.masterGainNode);
+
+      // Track active source
+      this.activeSourceNodes.add(source);
+
+      // Remove from active set when done (only if not looping)
+      source.onended = () => {
+        this.activeSourceNodes.delete(source);
+      };
+
+      // Play the sound
+      source.start(0);
+      console.log('[AudioManager] Playing sound from blob successfully');
+    } catch (error) {
+      console.error('[AudioManager] Error playing sound from blob:', error);
+    }
+  }
+
+  /**
    * Play a sound with a preset (reads volume from preset)
    */
   async playSoundWithPreset(soundId: string, soundUrl: string, presetVolume?: number): Promise<void> {
@@ -300,6 +368,60 @@ export class AudioManager {
   }
 
   /**
+   * Play a beat-level sound from a Blob (stops when leaving the beat)
+   * Automatically stops any previously playing beat sound
+   */
+  async playBeatSoundFromBlob(blob: Blob, volume: number = 1.0, loop: boolean = false, cacheKey?: string, fadeOutMs: number = 200): Promise<void> {
+    // Stop previous beat sound with fade
+    this.stopBeatSound(fadeOutMs);
+
+    if (this.muted) return;
+
+    this.initAudioContext();
+    if (!this.audioContext || !this.masterGainNode) return;
+
+    try {
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      // Check cache first if cacheKey provided
+      let buffer = cacheKey ? this.soundBuffers.get(cacheKey) : undefined;
+      if (!buffer) {
+        const arrayBuffer = await blob.arrayBuffer();
+        buffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        if (cacheKey && this.shouldPreloadSounds) {
+          this.soundBuffers.set(cacheKey, buffer);
+        }
+      }
+
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.loop = loop;
+
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.value = Math.max(0, Math.min(1, volume));
+
+      source.connect(gainNode);
+      gainNode.connect(this.masterGainNode);
+
+      this.activeSourceNodes.add(source);
+      source.onended = () => {
+        this.activeSourceNodes.delete(source);
+        if (this.currentBeatSound?.source === source) {
+          this.currentBeatSound = null;
+        }
+      };
+
+      this.currentBeatSound = { source, gainNode, url: cacheKey || 'blob' };
+      source.start(0);
+      console.log(`[AudioManager] Started beat sound from blob (cacheKey: ${cacheKey || 'none'})`);
+    } catch (error) {
+      console.error('[AudioManager] Error playing beat sound from blob:', error);
+    }
+  }
+
+  /**
    * Stop the current beat sound with optional fade out
    */
   stopBeatSound(fadeOutMs: number = 200): void {
@@ -338,10 +460,10 @@ export class AudioManager {
    * Play a cluster-level sound (persists across beats within the same cluster)
    * Only changes if entering a different cluster
    * @param clusterId - The cluster ID (null for no cluster)
-   * @param url - Sound URL (null to stop cluster sound)
+   * @param source - Sound URL or Blob (null to stop cluster sound)
    * @param volume - Volume level (0-1)
    */
-  async playClusterSound(clusterId: string | null, url: string | null, volume: number = 0.5): Promise<void> {
+  async playClusterSound(clusterId: string | null, source: string | Blob | null, volume: number = 0.5): Promise<void> {
     // If same cluster, don't restart the sound
     if (clusterId === this.currentClusterId) {
       return;
@@ -352,7 +474,7 @@ export class AudioManager {
 
     this.currentClusterId = clusterId;
 
-    if (!url || !clusterId || this.muted) return;
+    if (!source || !clusterId || this.muted) return;
 
     this.initAudioContext();
     if (!this.audioContext || !this.masterGainNode) return;
@@ -362,19 +484,27 @@ export class AudioManager {
         await this.audioContext.resume();
       }
 
-      let buffer = this.soundBuffers.get(url);
+      let buffer: AudioBuffer | undefined;
+      const cacheKey = typeof source === 'string' ? source : clusterId;
+
+      buffer = this.soundBuffers.get(cacheKey);
       if (!buffer) {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
+        let arrayBuffer: ArrayBuffer;
+        if (source instanceof Blob) {
+          arrayBuffer = await source.arrayBuffer();
+        } else {
+          const response = await fetch(source);
+          arrayBuffer = await response.arrayBuffer();
+        }
         buffer = await this.audioContext.decodeAudioData(arrayBuffer);
         if (this.shouldPreloadSounds) {
-          this.soundBuffers.set(url, buffer);
+          this.soundBuffers.set(cacheKey, buffer);
         }
       }
 
-      const source = this.audioContext.createBufferSource();
-      source.buffer = buffer;
-      source.loop = true; // Cluster sounds always loop
+      const bufferSource = this.audioContext.createBufferSource();
+      bufferSource.buffer = buffer;
+      bufferSource.loop = true; // Cluster sounds always loop
 
       const gainNode = this.audioContext.createGain();
       // Fade in
@@ -384,22 +514,22 @@ export class AudioManager {
         this.audioContext.currentTime + 0.5
       );
 
-      source.connect(gainNode);
+      bufferSource.connect(gainNode);
       gainNode.connect(this.masterGainNode);
 
-      this.activeSourceNodes.add(source);
-      source.onended = () => {
-        this.activeSourceNodes.delete(source);
-        if (this.currentClusterSound?.source === source) {
+      this.activeSourceNodes.add(bufferSource);
+      bufferSource.onended = () => {
+        this.activeSourceNodes.delete(bufferSource);
+        if (this.currentClusterSound?.source === bufferSource) {
           this.currentClusterSound = null;
         }
       };
 
-      this.currentClusterSound = { source, gainNode, url };
-      source.start(0);
-      console.log(`[AudioManager] Started cluster sound for "${clusterId}": ${url}`);
+      this.currentClusterSound = { source: bufferSource, gainNode, url: cacheKey };
+      bufferSource.start(0);
+      console.log(`[AudioManager] Started cluster sound for "${clusterId}"`);
     } catch (error) {
-      console.error(`[AudioManager] Error playing cluster sound ${url}:`, error);
+      console.error(`[AudioManager] Error playing cluster sound:`, error);
     }
   }
 

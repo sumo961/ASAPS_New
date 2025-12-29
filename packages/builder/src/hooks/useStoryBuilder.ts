@@ -57,6 +57,7 @@ interface StoryBuilderActions {
   removeCluster: (clusterId: string) => void;
   renameCluster: (clusterId: string, name: string) => void;
   setClusterMap: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  setClusterSound: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   exportStory: (assets?: any[], characters?: any[]) => string;
   importStory: (xmlContent: string, options?: ImportStoryOptions) => Promise<ImportStoryResult>;
   clearStory: () => void;
@@ -885,6 +886,28 @@ export function useStoryBuilder() {
     }));
   }, []);
 
+  // Set cluster ambient sound
+  const setClusterSound = useCallback((clusterId: string, soundAssetId: string | null, volume?: number) => {
+    console.log('[useStoryBuilder] Setting cluster sound', clusterId, soundAssetId, volume);
+    setState(prev => ({
+      ...prev,
+      clusters: prev.clusters.map(cluster =>
+        cluster.id === clusterId
+          ? {
+              ...cluster,
+              sound: soundAssetId
+                ? {
+                    file: soundAssetId, // Will be resolved to URL during preview
+                    volume: volume ?? 0.5,
+                    loop: true, // Cluster sounds always loop
+                  }
+                : undefined,
+            }
+          : cluster
+      ),
+    }));
+  }, []);
+
   const actions: StoryBuilderActions = {
     setTitle,
     setAuthor,
@@ -910,6 +933,7 @@ export function useStoryBuilder() {
     removeCluster,
     renameCluster,
     setClusterMap,
+    setClusterSound,
   };
 
   return {

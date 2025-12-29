@@ -40,6 +40,7 @@ export interface Transition {
 
 export interface Sound {
   file: string;
+  assetId?: string; // Asset ID for the sound (preferred over file which may be blob URL)
   volume?: number;
   loop?: boolean;
   fadeIn?: number;
@@ -173,7 +174,11 @@ export interface IRenderer {
   // Transition and effects
   applyTransition(transition: Transition): Promise<void>;
   playSound(sound: Sound): Promise<void>;
-  
+
+  // Cluster and beat sound lifecycle
+  playClusterSound?(clusterId: string | null, sound: Sound | null): Promise<void>;
+  stopBeatSound?(): void;
+
   // User interaction
   waitForUserInput(): Promise<void>;
   

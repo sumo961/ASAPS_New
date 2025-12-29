@@ -7,6 +7,69 @@
 import type { StoryGenerationRequest } from '../../types/ai';
 
 /**
+ * Theme presets guide for AI - describes available visual themes
+ */
+const THEME_GUIDE = `
+## Theme Presets
+
+ASAPS includes built-in theme presets that control the visual presentation of stories. When generating a story, you should recommend the most appropriate theme based on the genre and style.
+
+### Available Themes
+
+**1. builtin-visual-novel** - Visual Novel Theme
+Best for: Romance, drama, character-driven stories, anime-style narratives
+Characteristics:
+- Semi-transparent text box at bottom of screen
+- Character name highlights in golden color
+- Typewriter text animation (characters appear one by one)
+- Dark overlay for backgrounds
+- Serif fonts for elegance
+- Inspired by Ren'Py and Japanese visual novels
+Use when: Story focuses on character dialog, relationships, emotional moments
+
+**2. builtin-twine** - Text Adventure Theme
+Best for: Interactive fiction, literary narratives, choice-based games, mystery stories
+Characteristics:
+- Minimal UI with no visible text box frame
+- Blue hyperlink-style choices (like web links)
+- Serif typography (Georgia) for literary feel
+- Dark background with light text
+- Fade text animation (text fades in)
+- Centered text, lots of reading
+- Invisible hotspots (text-based interaction)
+- Inspired by Twine/SugarCube and classic interactive fiction
+Use when: Story is text-heavy, literary, or where UI should not distract from narrative
+
+**3. builtin-point-and-click** - Point & Click Adventure Theme
+Best for: Adventure games, puzzle stories, exploration, mystery with locations
+Characteristics:
+- Golden text on dark blue surfaces
+- Prominent hotspot indicators (always visible)
+- Sharp corners, pixelated aesthetic
+- Faster typewriter animation
+- Dissolve scene transitions
+- Inventory/exploration focus
+- Inspired by LucasArts (Monkey Island) and Sierra classics
+Use when: Story involves exploration, picking up items, location-based puzzles
+
+### Theme Recommendation Guidelines
+
+| Genre | Recommended Theme | Reason |
+|-------|-------------------|--------|
+| Romance | builtin-visual-novel | Character focus, emotional beats |
+| Drama | builtin-visual-novel | Dialog-heavy, character-driven |
+| Mystery (text-based) | builtin-twine | Literary style, lots of reading |
+| Mystery (exploration) | builtin-point-and-click | Location investigation, item collection |
+| Horror | builtin-twine or builtin-visual-novel | Atmospheric, immersive |
+| Fantasy (epic) | builtin-visual-novel | Character interactions, world-building |
+| Fantasy (adventure) | builtin-point-and-click | Exploration, item puzzles |
+| Sci-Fi | builtin-twine or builtin-visual-novel | Depends on narrative style |
+| Comedy | builtin-visual-novel | Character expressions, timing |
+| Adventure/Exploration | builtin-point-and-click | Locations, inventory, hotspots |
+| Literary/Experimental | builtin-twine | Minimal UI, focus on text |
+`;
+
+/**
  * Beat type usage guide
  */
 const BEAT_TYPE_GUIDE = `
@@ -416,6 +479,8 @@ export function buildEnhancedStoryGenerationSystemPrompt(schema: any): string {
 
   return `You are an expert interactive narrative designer and game writer. You create sophisticated, branching stories using the ASAPS beat system with deep understanding of how different beat types work together.
 
+${THEME_GUIDE}
+
 CRITICAL JSON FORMAT:
 - Your response MUST be valid JSON
 - Every property name MUST have a colon after the closing quote: "property": "value" (NOT "property: "value")
@@ -482,6 +547,10 @@ Generate complete, sophisticated interactive story structures that:
     "description": "Brief story description",
     "genre": "mystery|fantasy|scifi|romance|horror|adventure"
   },
+  "suggestedTheme": {
+    "themeId": "builtin-visual-novel | builtin-twine | builtin-point-and-click",
+    "reason": "Brief explanation of why this theme fits the story"
+  },
   "beats": [
     {
       "id": "beat_0",
@@ -529,6 +598,7 @@ Generate complete, sophisticated interactive story structures that:
 ✓ Position beats with logical spacing
 ✓ Create reconvergent paths, not just endless branching
 ✓ **EVERY beat must be reachable** - some other beat must connect TO it (except titleScreen)
+✓ **Include suggestedTheme** with a theme ID and reason based on genre/style
 
 ## ⚠️ CRITICAL: Data Format Rules (MUST FOLLOW)
 
@@ -765,6 +835,10 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
         author: "AI Assistant",
         description: "A detective mystery where your investigation determines the outcome",
         genre: "mystery"
+      },
+      suggestedTheme: {
+        themeId: "builtin-point-and-click",
+        reason: "Mystery with location exploration, evidence collection, and interrogation fits the classic adventure game style"
       },
       beats: [
         {

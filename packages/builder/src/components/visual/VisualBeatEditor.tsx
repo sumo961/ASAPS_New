@@ -47,6 +47,7 @@ export interface VisualElement {
   locked: boolean;
   name: string;
   sound?: string;
+  soundAssetId?: string; // Asset ID for the sound (preferred over sound which may be blob URL)
   // Font properties for text elements
   font?: string;
   fontSize?: number;
