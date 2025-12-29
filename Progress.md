@@ -1,5 +1,33 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-29: Project Library Select All Checkbox
+
+### Feature
+
+Added Select All functionality to the Project Library list view for easier multi-project management.
+
+### Changes
+
+**List View Header** (`ProjectLibrary.tsx`):
+- New header row with Select All checkbox
+- Shows three states:
+  - Empty square when nothing selected
+  - Small blue square inside when partially selected
+  - Full checkmark when all selected
+- Column headers for Project Name, Modified, Created
+
+**Individual Checkboxes**:
+- Checkboxes now always visible in list view (not just selection mode)
+- Allows quick multi-select without entering selection mode
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/components/ProjectLibrary.tsx` | Added list view header with Select All, always show checkboxes in list view |
+
+---
+
 ## 2024-12-29: Legacy ASML Import Fixes
 
 ### Problem
