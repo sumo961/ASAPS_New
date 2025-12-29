@@ -1,5 +1,27 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-29: Button Sounds Wait for Completion
+
+### Fix
+
+Button sounds now wait to finish playing before transitioning to the next beat. Previously, clicking a button would start the sound but immediately trigger the beat transition, cutting off the sound.
+
+### Changes
+
+**AudioManager** (`packages/renderer/src/audio/AudioManager.ts`):
+- Added `playSoundAndWait()` method that returns a promise resolving when the sound completes
+
+**PositionedBeatView** (`packages/renderer/src/components/PositionedBeatView.tsx`):
+- Updated `ButtonElement.handleClick` to use `playSoundAndWait`
+- Updated `FlexButtonElement.handleClick` to use `playSoundAndWait`
+- Updated `AssetElement.handleClick` to use `playSoundAndWait`
+
+### Technical Details
+
+The new `playSoundAndWait()` method creates a Web Audio source node and returns a promise that resolves in the `onended` callback, ensuring the sound plays completely before the transition.
+
+---
+
 ## 2024-12-29: Project Library Select All Checkbox
 
 ### Feature

@@ -258,6 +258,7 @@ To use the MCP server, configure it in your AI assistant's MCP settings pointing
 - **Auto-save fix**: Empty default projects (only title/intro/end beats) no longer auto-saved, reducing clutter
 - **Cluster beat collision detection**: Beats inside clusters are properly spaced during auto-arrange to prevent overlapping
 - **Legacy ASML import fixes**: globalTimer beats now correctly mapped to setTimer, timer values auto-converted from milliseconds to seconds, endScreen title/button elements properly parsed
+- **Button sound completion**: Button sounds now play completely before transitioning to the next beat
 
 ### v0.8.9 (2024-12-24)
 - **Theme system**: Comprehensive theme management with built-in presets (Visual Novel, Text Adventure, Point & Click), custom theme creation, and theme inheritance
