@@ -614,6 +614,113 @@ Replaced browser native tooltips with custom styled tooltips:
 
 ---
 
+## 2024-12-29: Builder Feature Improvements
+
+Four feature improvements to enhance the ASAPS Builder user experience.
+
+### Feature 1: Auto-Save Fix for Default Projects
+
+**Problem**: Auto-save was saving default/empty projects (untitled with only 3 default beats: TitleScreen → IntroText → EndScreen), cluttering the project library.
+
+**Solution**: Added `isDefaultProject()` check in PersistenceContext that detects when a project has only the 3 default beat types and skips auto-save.
+
+```typescript
+const isDefaultProject = (project: Project): boolean => {
+  const beats = /* extract beats from project */;
+  if (beats.length !== 3) return false;
+  const types = beats.map(b => b.type).sort();
+  const defaultTypes = ['endScreen', 'introText', 'titleScreen'];
+  return JSON.stringify(types) === JSON.stringify(defaultTypes);
+};
+```
+
+**Files Modified**: `packages/builder/src/contexts/PersistenceContext.tsx`
+
+### Feature 2: Unified Import/Export Dropdown Menus
+
+**Problem**: Import/export options were scattered - ASML XML in header, ZIP in Project Library modal.
+
+**Solution**: Created dropdown menus in the header toolbar consolidating all import/export options.
+
+**Import Menu**:
+- Import ASML (XML)
+- Import Project (ZIP)
+
+**Export Menu**:
+- Export ASML (XML only)
+- Export ASML with Assets (NEW - creates ZIP with Story.xml + organized asset folders)
+- Export Project (ZIP)
+
+**Files Modified**:
+- `packages/builder/src/components/Header.tsx` - Dropdown menus with ChevronDown icons
+- `packages/builder/src/components/ProjectLibrary.tsx` - Removed duplicate buttons
+- `packages/builder/src/App.tsx` - Added `handleExportAsmlWithAssets` handler
+- `packages/builder/src/utils/projectZipManager.ts` - Added `exportAsmlWithAssets()` and `downloadAsmlWithAssets()` functions
+
+### Feature 3: Improved Beat Selection Highlighting
+
+**Problem**: Selected beat highlight (blue border) was hard to see when zoomed out, and no auto-center when selecting beats.
+
+**Solution**:
+
+**Cyan Highlight**: Changed selection styling from blue to cyan with background fill:
+```css
+bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500
+```
+
+**Auto-Center/Zoom**: When a beat is selected, viewport automatically centers on it at 80% zoom with 300ms animation. For beats inside clusters, calculates absolute position from cluster position + beat's internal position.
+
+**Files Modified**:
+- `packages/builder/src/components/graph/BeatNode.tsx` - Cyan selection styling
+- `packages/builder/src/components/graph/ClusterContainerNode.tsx` - Cluster beat highlighting with external selection support
+- `packages/builder/src/components/graph/GraphEditor.tsx` - Auto-center useEffect with cluster beat position calculation
+
+### Feature 4: Visual Editor Element Resize Handles
+
+**Problem**: Elements in visual editor could only be moved by dragging, not resized. Users had to use the properties panel.
+
+**Solution**: Added interactive resize handles at all four corners of selected elements.
+
+**Implementation**:
+- Added resize state: `resizingElement`, `resizeCorner`, `resizeStart`
+- Added `startResize()` function to initiate resize operations
+- Updated `handleMouseMove` to handle both dragging and resizing
+- Made corner handles interactive with `pointerEvents: 'auto'`
+- Minimum sizes: 50px width, 30px height
+- Respects `locked` property on elements
+
+**Files Modified**: `packages/builder/src/components/visual/VisualBeatEditor.tsx`
+
+### Feature 5: Cluster Beat Collision Detection
+
+**Problem**: Beats inside clusters could overlap after auto-layout, with one beat obscuring another.
+
+**Solution**: Added `resolveInternalBeatCollisions()` function that iteratively pushes overlapping beats apart when auto-layout is performed.
+
+```typescript
+const resolveInternalBeatCollisions = (beatPositions) => {
+  // Same algorithm as main collision detection:
+  // - Detect overlaps using AABB collision
+  // - Push apart in direction of least overlap
+  // - Iterate until no overlaps or max iterations
+  // - Ensure beats stay inside cluster (min x/y = 20)
+};
+```
+
+**Files Modified**: `packages/builder/src/App.tsx`
+
+### Summary of All Changes
+
+| Feature | Files |
+|---------|-------|
+| Auto-save fix | `PersistenceContext.tsx` |
+| Import/Export menus | `Header.tsx`, `ProjectLibrary.tsx`, `App.tsx`, `projectZipManager.ts` |
+| Beat highlighting | `BeatNode.tsx`, `ClusterContainerNode.tsx`, `GraphEditor.tsx` |
+| Resize handles | `VisualBeatEditor.tsx` |
+| Cluster collision | `App.tsx` |
+
+---
+
 ## Previous Updates
 
 (Add previous progress entries here as needed)

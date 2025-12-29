@@ -69,6 +69,34 @@ export interface PersistenceContextValue {
 
 const PersistenceContext = createContext<PersistenceContextValue | null>(null);
 
+/**
+ * Check if a project is a default/empty project (3 default beats: titleScreen, introText, endScreen)
+ * These shouldn't be auto-saved as they clutter the project library
+ */
+const isDefaultProject = (project: Project): boolean => {
+  const story = project.story as any;
+  if (!story) return false;
+
+  // Get beats from either array or getAllBeats method
+  const beats = Array.isArray(story.beats)
+    ? story.beats
+    : story.getAllBeats
+      ? story.getAllBeats()
+      : story.beats instanceof Map
+        ? Array.from(story.beats.values())
+        : [];
+
+  // Check if exactly 3 beats
+  if (beats.length !== 3) return false;
+
+  // Get beat types and sort for comparison
+  const types = beats.map((b: any) => b.type).sort();
+  const defaultTypes = ['endScreen', 'introText', 'titleScreen'];
+
+  // Check if the types match the default pattern
+  return JSON.stringify(types) === JSON.stringify(defaultTypes);
+};
+
 // ============================================================================
 // Provider Component
 // ============================================================================
@@ -146,6 +174,13 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     if (isUntitledProjectRef.current) {
       console.log('[PersistenceContext] getProjectData - BLOCKING auto-save for untitled project:', projectToUse.name);
       throw new Error('Cannot auto-save untitled project');
+    }
+
+    // CRITICAL FIX: Skip auto-save for default/empty projects (3 default beats only)
+    // These clutter the project library with empty projects
+    if (isDefaultProject(projectToUse)) {
+      console.log('[PersistenceContext] getProjectData - Skipping auto-save for empty default project:', projectToUse.name);
+      throw new Error('Cannot auto-save empty default project');
     }
 
     // Sync project data before retrieving if sync callback is registered

@@ -562,35 +562,13 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
         <div className="flex-shrink-0 border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900">Project Library</h2>
-            <div className="flex gap-2">
-              <button
-                onClick={onCreateProject}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-              >
-                <Plus size={20} />
-                New Project
-              </button>
-              {onExportZip && (
-                <button
-                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                  onClick={onExportZip}
-                  title="Export complete project as ZIP with all assets"
-                >
-                  <Archive className="w-4 h-4" />
-                  Export ZIP
-                </button>
-              )}
-              {onImportZip && (
-                <button
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-                  onClick={onImportZip}
-                  title="Import project from ZIP file"
-                >
-                  <Archive className="w-4 h-4" />
-                  Import ZIP
-                </button>
-              )}
-            </div>
+            <button
+              onClick={onCreateProject}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+            >
+              <Plus size={20} />
+              New Project
+            </button>
           </div>
 
           {/* Search and controls */}

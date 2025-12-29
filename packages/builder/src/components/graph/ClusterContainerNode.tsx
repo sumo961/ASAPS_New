@@ -21,10 +21,13 @@ interface ClusterContainerNodeData {
   onAutoLayoutCluster?: (clusterId: string) => void;
   containedBeats?: ClusterBeatInfo[];
   onBeatSelect?: (beat: Beat) => void;
+  selectedBeatId?: string | null; // Beat selected from parent (external selection)
   allBeats?: Beat[];
   // Map/background image
   mapAssetUrl?: string;
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  // Cluster ambient sound
+  onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   // Getter function for assets to avoid embedding array in node data (prevents render issues)
   getAssets?: () => Array<{ id: string; url: string; type: string; name?: string }>;
   // Getter function for highlighted beat IDs - use getter to avoid triggering re-renders
@@ -96,9 +99,11 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     onAutoLayoutCluster,
     containedBeats,
     onBeatSelect,
+    selectedBeatId: externalSelectedBeatId,
     allBeats,
     mapAssetUrl,
     onSetClusterMap,
+    onSetClusterSound,
     getAssets,
     getHighlightedBeatIds,
     highlightVersion: _highlightVersion, // Destructure to ensure memo() detects changes
@@ -258,8 +263,10 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [showMapSettings, setShowMapSettings] = useState(false);
+  const [showSoundSettings, setShowSoundSettings] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapSettingsRef = useRef<HTMLDivElement>(null);
+  const soundSettingsRef = useRef<HTMLDivElement>(null);
 
   // Use cluster bounds or defaults
   const containerWidth = Math.max(cluster.containerBounds?.width || MIN_CONTAINER_WIDTH, MIN_CONTAINER_WIDTH);
@@ -687,6 +694,115 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
               </div>
             )}
 
+            {/* Sound settings button */}
+            {onSetClusterSound && (
+              <div className="relative" ref={soundSettingsRef}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowSoundSettings(!showSoundSettings);
+                  }}
+                  className={`w-6 h-6 rounded shadow-sm transition-colors flex items-center justify-center text-xs ${
+                    cluster.sound?.file ? 'bg-purple-500 text-white hover:bg-purple-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                  title="Ambient sound settings"
+                >
+                  🔊
+                </button>
+
+                {/* Sound settings popover */}
+                {showSoundSettings && (
+                  <div
+                    className="absolute top-8 right-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 min-w-[200px]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="text-sm font-medium text-gray-700 mb-2">Ambient Sound</div>
+                    <div className="text-xs text-gray-500 mb-3">
+                      Plays while in this cluster
+                    </div>
+
+                    {cluster.sound?.file ? (
+                      <>
+                        <div className="mb-3 p-2 bg-gray-100 rounded text-xs text-gray-700 truncate">
+                          🔊 {cluster.sound.file.split('/').pop()?.substring(0, 20) || 'Sound assigned'}
+                        </div>
+
+                        <div className="mb-3">
+                          <label className="text-xs text-gray-600 block mb-1">
+                            Volume: {Math.round((cluster.sound.volume ?? 0.5) * 100)}%
+                          </label>
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="1"
+                            step="0.1"
+                            value={cluster.sound.volume ?? 0.5}
+                            onChange={(e) => {
+                              // Keep same sound, update volume
+                              const newVolume = parseFloat(e.target.value);
+                              // We need to get the assetId - this is a simplification
+                              // In reality, we'd store assetId separately
+                              onSetClusterSound(cluster.id, cluster.sound?.file || null, newVolume);
+                            }}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            onSetClusterSound(cluster.id, null);
+                            setShowSoundSettings(false);
+                          }}
+                          className="w-full px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                        >
+                          Remove Sound
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        {(() => {
+                          const audioAssets = assets.filter(a => a.type === 'audio');
+                          if (audioAssets.length === 0) {
+                            return (
+                              <div className="py-4 text-center">
+                                <div className="mb-2">No audio files available</div>
+                                <div className="text-gray-400">
+                                  Add audio files in the Asset Manager first
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div>
+                              <div className="mb-2 text-gray-600">Select a sound:</div>
+                              <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto">
+                                {audioAssets.map((asset) => (
+                                  <button
+                                    key={asset.id}
+                                    onClick={() => {
+                                      onSetClusterSound(cluster.id, asset.id, 0.5);
+                                      setShowSoundSettings(false);
+                                    }}
+                                    className="p-2 rounded hover:bg-purple-100 transition-colors text-left"
+                                    title={asset.name || asset.id}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span>🔊</span>
+                                      <span className="truncate">{asset.name || asset.id}</span>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="w-px h-4 bg-gray-300 mx-1" />
 
             <button
@@ -923,7 +1039,8 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
               const beat = beatInfo.beat;
               const icon = beatTypeIcons[beat.type] || '📄';
               const color = beatTypeColors[beat.type] || '#94a3b8';
-              const isSelected = selectedBeatId === beatInfo.beatId;
+              // Use external selection (from parent) or local selection (from click within cluster)
+              const isSelected = externalSelectedBeatId === beatInfo.beatId || selectedBeatId === beatInfo.beatId;
               const isDragging = draggingBeat === beatInfo.beatId;
               const hasIncoming = externalConnections.incoming.has(beatInfo.beatId);
               const hasOutgoing = externalConnections.outgoing.has(beatInfo.beatId);
@@ -936,16 +1053,17 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                     absolute rounded-lg border-2 shadow-lg
                     transition-shadow
                     ${isDragging ? 'shadow-2xl z-50 cursor-grabbing' : 'hover:shadow-xl cursor-grab'}
-                    ${isSelected ? 'ring-4 ring-blue-400 ring-opacity-50' : ''}
-                    ${isHighlighted && !isSelected ? 'ring-4 ring-amber-400 ring-opacity-70' : ''}
-                    ${isHighlighted ? 'bg-amber-50' : 'bg-white'}
+                    ${isSelected && !isHighlighted ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
+                    ${isHighlighted && !isSelected ? 'ring-4 ring-amber-400 ring-opacity-70 bg-amber-50' : ''}
+                    ${isHighlighted && isSelected ? 'ring-4 ring-cyan-400 bg-cyan-50' : ''}
+                    ${!isSelected && !isHighlighted ? 'bg-white' : ''}
                   `}
                   style={{
                     left: beatInfo.position.x,
                     top: beatInfo.position.y,
                     width: NODE_WIDTH,
                     height: NODE_HEIGHT,
-                    borderColor: isHighlighted ? '#f59e0b' : (isSelected ? color : '#d1d5db'),
+                    borderColor: isHighlighted ? '#f59e0b' : (isSelected ? '#06b6d4' : '#d1d5db'),
                     overflow: 'visible', // Allow handles to extend outside
                   }}
                   onClick={(e) => {

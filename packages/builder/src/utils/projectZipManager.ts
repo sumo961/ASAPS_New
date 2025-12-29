@@ -271,6 +271,84 @@ export async function downloadProjectAsZip(projectId: string, projectName: strin
   }
 }
 
+/**
+ * Export ASML XML with organized asset folders
+ * Creates a ZIP with Story.xml and assets in organized folders
+ */
+export async function exportAsmlWithAssets(
+  projectName: string,
+  asmlXml: string,
+  assets: StoredAsset[]
+): Promise<Blob> {
+  const zip = new JSZip();
+
+  // Add ASML file
+  zip.file('Story.xml', asmlXml);
+
+  // Add assets in organized folders
+  const assetsFolder = zip.folder('assets');
+  if (assetsFolder) {
+    for (const asset of assets) {
+      const folder = getAssetFolderName(asset.type, asset.mimeType);
+      const assetSubfolder = assetsFolder.folder(folder);
+      if (assetSubfolder) {
+        const arrayBuffer = await asset.blob.arrayBuffer();
+        assetSubfolder.file(asset.filename, arrayBuffer, { binary: true });
+      }
+    }
+  }
+
+  console.log('[exportAsmlWithAssets] Created ZIP with', assets.length, 'assets');
+  return zip.generateAsync({ type: 'blob' });
+}
+
+/**
+ * Download ASML with assets as ZIP
+ */
+export async function downloadAsmlWithAssets(
+  projectName: string,
+  asmlXml: string,
+  assets: StoredAsset[]
+): Promise<void> {
+  try {
+    const blob = await exportAsmlWithAssets(projectName, asmlXml, assets);
+
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_with_assets.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    console.log('[downloadAsmlWithAssets] Download initiated');
+  } catch (error) {
+    console.error('[downloadAsmlWithAssets] Download failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get organized folder name for asset type (for ASML export)
+ */
+function getAssetFolderName(type: AssetType, mimeType?: string): string {
+  switch (type) {
+    case 'image':
+      // Could further distinguish backgrounds vs characters vs props based on metadata
+      return 'images';
+    case 'audio':
+      return 'sounds';
+    case 'video':
+      return 'videos';
+    case 'font':
+      return 'fonts';
+    default:
+      return 'other';
+  }
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================

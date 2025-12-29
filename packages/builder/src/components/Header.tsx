@@ -17,6 +17,7 @@ interface HeaderProps {
   onExport: () => void;
   onImport: () => void;
   onExportZip?: () => void;
+  onExportAsmlWithAssets?: () => void;
   onImportZip?: () => void;
   onPreview?: () => void;
   onSettings?: () => void;
@@ -42,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExport,
   onImport,
   onExportZip,
+  onExportAsmlWithAssets,
   onImportZip,
   onPreview,
   onSettings,
@@ -67,6 +69,8 @@ export const Header: React.FC<HeaderProps> = ({
   const [showStoryGenerator, setShowStoryGenerator] = useState(false);
   const [showBeatCreator, setShowBeatCreator] = useState(false);
   const [showAIMenu, setShowAIMenu] = useState(false);
+  const [showImportMenu, setShowImportMenu] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const handleLoadProject = async (projectId: string) => {
     const success = await load(projectId);
@@ -162,23 +166,114 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="w-px h-6 bg-gray-300 mx-1" />
 
-          <button
-            className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
-            onClick={onImport}
-            title="Import ASML XML"
-          >
-            <Upload className="w-4 h-4" />
-            Import
-          </button>
+          {/* Import Menu */}
+          <div className="relative">
+            <button
+              className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+              onClick={() => setShowImportMenu(!showImportMenu)}
+              title="Import"
+            >
+              <Upload className="w-4 h-4" />
+              Import
+              <ChevronDown className="w-3 h-3" />
+            </button>
 
-          <button
-            className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
-            onClick={onExport}
-            title="Export as ASML XML"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </button>
+            {showImportMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowImportMenu(false)}
+                />
+                <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                  <button
+                    onClick={() => {
+                      onImport();
+                      setShowImportMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                    title="Import ASML XML file"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Import ASML (XML)
+                  </button>
+                  {onImportZip && (
+                    <button
+                      onClick={() => {
+                        onImportZip();
+                        setShowImportMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Import project from ZIP archive"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Import Project (ZIP)
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Export Menu */}
+          <div className="relative">
+            <button
+              className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              title="Export"
+            >
+              <Download className="w-4 h-4" />
+              Export
+              <ChevronDown className="w-3 h-3" />
+            </button>
+
+            {showExportMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowExportMenu(false)}
+                />
+                <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                  <button
+                    onClick={() => {
+                      onExport();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                    title="Export as ASML XML file"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Export ASML (XML only)
+                  </button>
+                  {onExportAsmlWithAssets && (
+                    <button
+                      onClick={() => {
+                        onExportAsmlWithAssets();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Export ASML XML with organized asset folders"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export ASML with Assets
+                    </button>
+                  )}
+                  {onExportZip && (
+                    <button
+                      onClick={() => {
+                        onExportZip();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Export project with assets as ZIP"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export Project (ZIP)
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Right: Feature buttons */}

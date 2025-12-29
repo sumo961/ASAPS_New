@@ -113,6 +113,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const [draggedElement, setDraggedElement] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
+  // Resize state
+  const [resizingElement, setResizingElement] = useState<string | null>(null);
+  const [resizeCorner, setResizeCorner] = useState<'nw' | 'ne' | 'sw' | 'se' | null>(null);
+  const [resizeStart, setResizeStart] = useState({ mouseX: 0, mouseY: 0, x: 0, y: 0, width: 0, height: 0 });
+
   // Use stage size from project settings, with fallback to 1024×768
   const stageWidth = projectSettings?.width || 1024;
   const stageHeight = projectSettings?.height || 768;
@@ -255,25 +260,86 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     }
   });
 
-  // Handle element drag
+  // Handle element drag and resize
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!draggedElement || !canvasRef.current) return;
+    if (!canvasRef.current) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(stageWidth - 50, 
+
+    // Handle resizing
+    if (resizingElement && resizeCorner) {
+      const deltaX = (e.clientX - resizeStart.mouseX) / zoom;
+      const deltaY = (e.clientY - resizeStart.mouseY) / zoom;
+
+      let newX = resizeStart.x;
+      let newY = resizeStart.y;
+      let newWidth = resizeStart.width;
+      let newHeight = resizeStart.height;
+
+      // Adjust based on corner
+      if (resizeCorner === 'se') {
+        newWidth = Math.max(50, resizeStart.width + deltaX);
+        newHeight = Math.max(30, resizeStart.height + deltaY);
+      } else if (resizeCorner === 'sw') {
+        newWidth = Math.max(50, resizeStart.width - deltaX);
+        newHeight = Math.max(30, resizeStart.height + deltaY);
+        newX = resizeStart.x + (resizeStart.width - newWidth);
+      } else if (resizeCorner === 'ne') {
+        newWidth = Math.max(50, resizeStart.width + deltaX);
+        newHeight = Math.max(30, resizeStart.height - deltaY);
+        newY = resizeStart.y + (resizeStart.height - newHeight);
+      } else if (resizeCorner === 'nw') {
+        newWidth = Math.max(50, resizeStart.width - deltaX);
+        newHeight = Math.max(30, resizeStart.height - deltaY);
+        newX = resizeStart.x + (resizeStart.width - newWidth);
+        newY = resizeStart.y + (resizeStart.height - newHeight);
+      }
+
+      const updatedElements = elements.map(el =>
+        el.id === resizingElement ? { ...el, x: newX, y: newY, width: newWidth, height: newHeight } : el
+      );
+      onElementsChange(updatedElements);
+      return;
+    }
+
+    // Handle dragging
+    if (!draggedElement) return;
+
+    const x = Math.max(0, Math.min(stageWidth - 50,
       (e.clientX - rect.left) / zoom - dragOffset.x));
     const y = Math.max(0, Math.min(stageHeight - 50,
       (e.clientY - rect.top) / zoom - dragOffset.y));
 
-    const updatedElements = elements.map(el => 
+    const updatedElements = elements.map(el =>
       el.id === draggedElement ? { ...el, x, y } : el
     );
     onElementsChange(updatedElements);
   };
 
-  // Handle element drag end
+  // Handle element drag/resize end
   const handleMouseUp = () => {
     setDraggedElement(null);
+    setResizingElement(null);
+    setResizeCorner(null);
+  };
+
+  // Start resize operation
+  const startResize = (e: React.MouseEvent, elementId: string, corner: 'nw' | 'ne' | 'sw' | 'se') => {
+    e.stopPropagation();
+    e.preventDefault();
+    const element = elements.find(el => el.id === elementId);
+    if (!element) return;
+
+    setResizingElement(elementId);
+    setResizeCorner(corner);
+    setResizeStart({
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      x: element.x,
+      y: element.y,
+      width: element.width,
+      height: element.height,
+    });
   };
 
   // Handle background click (deselect) - but not from within renderer
@@ -691,55 +757,82 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         transformOrigin: 'center center',
                       }}
                     >
-                    {/* Resize handles */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      left: '-6px',
-                      width: '12px',
-                      height: '12px',
-                      backgroundColor: '#3b82f6',
-                      border: '2px solid white',
-                      borderRadius: '50%',
-                      cursor: 'nwse-resize',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    }} />
-                    <div style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      right: '-6px',
-                      width: '12px',
-                      height: '12px',
-                      backgroundColor: '#3b82f6',
-                      border: '2px solid white',
-                      borderRadius: '50%',
-                      cursor: 'nesw-resize',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    }} />
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '-6px',
-                      left: '-6px',
-                      width: '12px',
-                      height: '12px',
-                      backgroundColor: '#3b82f6',
-                      border: '2px solid white',
-                      borderRadius: '50%',
-                      cursor: 'nesw-resize',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    }} />
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '-6px',
-                      right: '-6px',
-                      width: '12px',
-                      height: '12px',
-                      backgroundColor: '#3b82f6',
-                      border: '2px solid white',
-                      borderRadius: '50%',
-                      cursor: 'nwse-resize',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    }} />
+                    {/* Resize handles - NW corner */}
+                    {!el.locked && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '-6px',
+                          left: '-6px',
+                          width: '12px',
+                          height: '12px',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid white',
+                          borderRadius: '50%',
+                          cursor: 'nwse-resize',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                          pointerEvents: 'auto',
+                        }}
+                        onMouseDown={(e) => startResize(e, el.id, 'nw')}
+                      />
+                    )}
+                    {/* NE corner */}
+                    {!el.locked && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '-6px',
+                          right: '-6px',
+                          width: '12px',
+                          height: '12px',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid white',
+                          borderRadius: '50%',
+                          cursor: 'nesw-resize',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                          pointerEvents: 'auto',
+                        }}
+                        onMouseDown={(e) => startResize(e, el.id, 'ne')}
+                      />
+                    )}
+                    {/* SW corner */}
+                    {!el.locked && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '-6px',
+                          left: '-6px',
+                          width: '12px',
+                          height: '12px',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid white',
+                          borderRadius: '50%',
+                          cursor: 'nesw-resize',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                          pointerEvents: 'auto',
+                        }}
+                        onMouseDown={(e) => startResize(e, el.id, 'sw')}
+                      />
+                    )}
+                    {/* SE corner */}
+                    {!el.locked && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '-6px',
+                          right: '-6px',
+                          width: '12px',
+                          height: '12px',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid white',
+                          borderRadius: '50%',
+                          cursor: 'nwse-resize',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                          pointerEvents: 'auto',
+                        }}
+                        onMouseDown={(e) => startResize(e, el.id, 'se')}
+                      />
+                    )}
                   </div>
                   );
                 })}

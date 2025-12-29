@@ -51,9 +51,10 @@ interface GraphEditorProps {
   onAutoLayout?: () => void;
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
-  // Asset lookup for cluster backgrounds
+  // Asset lookup for cluster backgrounds and sounds
   assets?: Asset[];
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
 }
 
 const nodeTypes: NodeTypes = {
@@ -103,6 +104,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onRemoveCluster,
   assets = [],
   onSetClusterMap,
+  onSetClusterSound,
 }) => {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
@@ -226,10 +228,13 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           onClusterResize: onClusterResize,
           onAutoLayoutCluster: onAutoLayoutCluster,
           onBeatSelect: onBeatSelect,
+          selectedBeatId: selectedBeat?.id || null, // Pass selected beat ID for highlighting
           allBeats: beats, // Pass all beats for external connection calculation
           // Map background - use ref to get current assets without triggering re-render
           mapAssetUrl: cluster.mapAssetId ? assetsRef.current.find(a => a.id === cluster.mapAssetId)?.url : undefined,
           onSetClusterMap: onSetClusterMap,
+          // Cluster ambient sound
+          onSetClusterSound: onSetClusterSound,
           // Pass a getter function for assets to avoid embedding the whole array in node data
           getAssets: () => assetsRef.current,
           // Pass getter for highlighted beat IDs to avoid embedding in node data and prevent re-renders
@@ -249,7 +254,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Note: assets and highlightedBeatIds are intentionally NOT in dependency array
   // We use refs to access current values without triggering full node recalculation
   // This is critical for performance - changing highlighted beats shouldn't rebuild all nodes
-  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap]);
+  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(() => {
@@ -721,6 +726,54 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       });
     });
   }, [highlightedBeatIdsSet, setNodes]);
+
+  // Auto-center and zoom on selected beat for better visibility
+  useEffect(() => {
+    if (!reactFlowInstance || !selectedBeat) return;
+
+    // Find the node in ReactFlow
+    const node = reactFlowInstance.getNode(selectedBeat.id);
+    if (!node) {
+      // Beat might be inside a cluster - find the cluster and beat position within it
+      const clusterId = selectedBeat.cluster;
+      if (clusterId) {
+        const clusterNode = reactFlowInstance.getNode(clusterId);
+        if (clusterNode) {
+          // Find beat's position within the cluster from containerBeatPositions
+          const beatPosition = containerBeatPositions.find(bp => bp.beatId === selectedBeat.id);
+
+          if (beatPosition?.position) {
+            // Calculate absolute position: cluster position + beat position within cluster
+            // Add 40px for cluster header height
+            const HEADER_HEIGHT = 40;
+            const NODE_WIDTH = 160;
+            const NODE_HEIGHT = 80;
+
+            const absoluteX = clusterNode.position.x + beatPosition.position.x + (NODE_WIDTH / 2);
+            const absoluteY = clusterNode.position.y + HEADER_HEIGHT + beatPosition.position.y + (NODE_HEIGHT / 2);
+
+            reactFlowInstance.setCenter(absoluteX, absoluteY, { zoom: 0.8, duration: 300 });
+          } else {
+            // Fallback: center on cluster if beat position not found
+            reactFlowInstance.setCenter(
+              clusterNode.position.x + (clusterNode.style?.width ? Number(clusterNode.style.width) / 2 : 200),
+              clusterNode.position.y + (clusterNode.style?.height ? Number(clusterNode.style.height) / 2 : 100),
+              { zoom: 0.8, duration: 300 }
+            );
+          }
+        }
+      }
+      return;
+    }
+
+    // Center on the selected beat node at 80% zoom
+    // Node width ~160, height ~80, so center offset is 80, 40
+    reactFlowInstance.setCenter(
+      node.position.x + 80,
+      node.position.y + 40,
+      { zoom: 0.8, duration: 300 }
+    );
+  }, [selectedBeat?.id, reactFlowInstance, containerBeatPositions]);
 
   // Handle node click
   const onNodeClick = useCallback(

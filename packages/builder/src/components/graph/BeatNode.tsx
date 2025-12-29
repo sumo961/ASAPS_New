@@ -28,13 +28,8 @@ const beatTypeIcons: Record<string, string> = {
 };
 
 export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
-  console.log('[BeatNode] Rendering, type:', data?.type, 'label:', data?.label, 'id:', data?.beat?.id);
-  console.log('[BeatNode] Full data object:', data);
-  console.log('[BeatNode] Selected?', selected);
-
   // Safety checks - handle missing or invalid data
   if (!data) {
-    console.log('[BeatNode] ERROR: No data received');
     return (
       <div className="px-8 py-6 bg-red-100 border-4 border-red-500 rounded-lg min-w-[200px] min-h-[80px]">
         <Handle type="target" position={Position.Left} className="w-4 h-4" / >
@@ -45,7 +40,6 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
   }
 
   if (!data.type) {
-    console.log('[BeatNode] ERROR: Missing data.type');
     return (
       <div className="px-8 py-6 bg-orange-100 border-4 border-orange-500 rounded-lg min-w-[200px] min-h-[80px]">
         <Handle type="target" position={Position.Left} className="w-4 h-4" / >
@@ -55,27 +49,25 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
     );
   }
 
-  if (!data.label) {
-    console.log('[BeatNode] WARNING: Missing data.label, using type:', data.type);
-  }
-
   const icon = beatTypeIcons[data.type] || '📄';
   
+  // Determine if this node is truly selected (either ReactFlow selected or data.selected)
+  const isSelected = selected || data.selected;
+
   return (
     <div
       className={`
-        px-4 py-3 rounded-lg border-2 bg-white shadow-lg
+        px-4 py-3 rounded-lg border-2 shadow-lg
         transition-all duration-200 cursor-pointer
-        ${selected ? 'ring-4 ring-blue-400 ring-opacity-50' : ''}
-        ${data.highlighted ? 'ring-4 ring-yellow-400 ring-opacity-70 border-yellow-500' : ''}
-        ${data.selected && !data.highlighted ? 'border-blue-500' : ''}
-        ${!data.selected && !data.highlighted ? 'border-gray-300' : ''}
+        ${isSelected && !data.highlighted ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
+        ${data.highlighted ? 'ring-4 ring-yellow-400 ring-opacity-70 border-yellow-500 bg-yellow-50' : ''}
+        ${!isSelected && !data.highlighted ? 'bg-white border-gray-300' : ''}
         hover:shadow-xl hover:scale-105
       `}
       style={{
-        borderColor: data.highlighted ? '#eab308' : (data.selected ? (data.color || '#d1d5db') : '#d1d5db'),
+        borderColor: data.highlighted ? '#eab308' : (isSelected ? '#06b6d4' : '#d1d5db'),
         minWidth: '150px',
-        backgroundColor: data.highlighted ? '#fef9c3' : 'white',
+        backgroundColor: data.highlighted ? '#fef9c3' : (isSelected ? '#ecfeff' : 'white'),
       }}
     >
       <Handle

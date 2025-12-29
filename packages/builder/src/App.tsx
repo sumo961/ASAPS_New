@@ -1292,6 +1292,102 @@ function App() {
       return { resolvedBeats, resolvedClusters };
     };
 
+    // Helper to resolve collisions between beats inside a cluster
+    const resolveInternalBeatCollisions = (
+      beatPositions: Map<string, { x: number; y: number }>
+    ): Map<string, { x: number; y: number }> => {
+      const BEAT_WIDTH = 160;
+      const BEAT_HEIGHT = 80;
+      const PADDING = 20;
+      const MAX_ITERATIONS = 30;
+
+      // Convert to array for easier manipulation
+      const beats = Array.from(beatPositions.entries()).map(([id, pos]) => ({
+        id,
+        x: pos.x,
+        y: pos.y,
+        width: BEAT_WIDTH,
+        height: BEAT_HEIGHT,
+      }));
+
+      if (beats.length <= 1) {
+        return beatPositions;
+      }
+
+      // Check overlap between two beats
+      const overlaps = (a: typeof beats[0], b: typeof beats[0]): boolean => {
+        return !(a.x + a.width + PADDING < b.x ||
+                 b.x + b.width + PADDING < a.x ||
+                 a.y + a.height + PADDING < b.y ||
+                 b.y + b.height + PADDING < a.y);
+      };
+
+      // Iteratively resolve overlaps
+      for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+        let hadOverlap = false;
+
+        for (let i = 0; i < beats.length; i++) {
+          for (let j = i + 1; j < beats.length; j++) {
+            const a = beats[i];
+            const b = beats[j];
+
+            if (overlaps(a, b)) {
+              hadOverlap = true;
+
+              // Calculate centers
+              const aCenterX = a.x + a.width / 2;
+              const aCenterY = a.y + a.height / 2;
+              const bCenterX = b.x + b.width / 2;
+              const bCenterY = b.y + b.height / 2;
+
+              // Calculate overlap amounts
+              const overlapX = (a.width + b.width) / 2 + PADDING - Math.abs(aCenterX - bCenterX);
+              const overlapY = (a.height + b.height) / 2 + PADDING - Math.abs(aCenterY - bCenterY);
+
+              // Push apart in direction of least overlap
+              if (overlapX < overlapY) {
+                const shift = overlapX / 2 + 1;
+                if (aCenterX < bCenterX) {
+                  a.x -= shift;
+                  b.x += shift;
+                } else {
+                  a.x += shift;
+                  b.x -= shift;
+                }
+              } else {
+                const shift = overlapY / 2 + 1;
+                if (aCenterY < bCenterY) {
+                  a.y -= shift;
+                  b.y += shift;
+                } else {
+                  a.y += shift;
+                  b.y -= shift;
+                }
+              }
+            }
+          }
+        }
+
+        if (!hadOverlap) break;
+      }
+
+      // Ensure minimum x/y values (keep beats inside cluster)
+      const MIN_X = 20;
+      const MIN_Y = 20;
+      beats.forEach(beat => {
+        beat.x = Math.max(MIN_X, beat.x);
+        beat.y = Math.max(MIN_Y, beat.y);
+      });
+
+      // Return resolved positions
+      const resolved = new Map<string, { x: number; y: number }>();
+      beats.forEach(beat => {
+        resolved.set(beat.id, { x: beat.x, y: beat.y });
+      });
+
+      return resolved;
+    };
+
     if (hasClusteredBeats) {
       // Use cluster-aware layout
       const clusterInfos = clusters.map(cluster => ({
@@ -1360,9 +1456,12 @@ function App() {
         }
       });
 
-      // Apply positions to beats inside clusters (internal positions don't need collision detection)
+      // Apply positions to beats inside clusters with collision detection
       result.clusterInternalPositions.forEach((internalPositions, clusterId) => {
-        internalPositions.forEach((pos, beatId) => {
+        // Resolve collisions for beats within this cluster
+        const resolvedInternalPositions = resolveInternalBeatCollisions(internalPositions);
+
+        resolvedInternalPositions.forEach((pos, beatId) => {
           if (actions.moveBeatInContainer) {
             actions.moveBeatInContainer(beatId, clusterId, pos.x, pos.y);
           }
@@ -1661,6 +1760,33 @@ function App() {
       alert('Failed to export project as ZIP. See console for details.');
     }
   }, [currentProject, saveNow]);
+
+  const handleExportAsmlWithAssets = useCallback(async () => {
+    try {
+      // Generate ASML XML
+      const asml = actions.exportStory(assets, characters);
+
+      // Get stored assets for current project
+      const storage = getStorageAdapter();
+      await storage.initialize();
+      const assetsResult = await storage.getProjectAssets(currentProject?.id || 'temp');
+      const storedAssets = assetsResult.success ? assetsResult.data || [] : [];
+
+      // Import the download function dynamically
+      const { downloadAsmlWithAssets } = await import('./utils/projectZipManager');
+
+      await downloadAsmlWithAssets(
+        state.title || 'Untitled',
+        asml,
+        storedAssets
+      );
+
+      alert('ASML with assets exported successfully!');
+    } catch (error) {
+      console.error('Export ASML with assets failed:', error);
+      alert('Failed to export ASML with assets. See console for details.');
+    }
+  }, [actions, assets, characters, state.title, currentProject]);
 
   const handleImportZip = useCallback(async () => {
     const input = document.createElement('input');
@@ -2306,6 +2432,7 @@ function App() {
         onExport={handleExport}
         onImport={handleImport}
         onExportZip={handleExportZip}
+        onExportAsmlWithAssets={handleExportAsmlWithAssets}
         onImportZip={handleImportZip}
         onPreview={handlePreview}
         onCharacters={handleOpenCharacterManager}
