@@ -1,5 +1,69 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-30: Project Export/Import Complete Overhaul
+
+### Problem
+
+Project export/import was losing assets and settings:
+- Assets not found after import (reference issues)
+- Duplicate filenames caused asset overwrites during export
+- globalSettings, themeId, and themeOverrides not exported
+- Background music and character assets lost
+- Asset IDs were unnecessarily regenerated on import
+
+### Solution
+
+Complete rewrite of the ZIP export/import system with proper asset tracking.
+
+### Export Fixes
+
+| Issue | Fix |
+|-------|-----|
+| Duplicate filenames | Use unique filenames: `{assetId}_{filename}` |
+| Missing settings | Export globalSettings, themeId, themeOverrides |
+| Orphaned assets | Scan story and settings for all referenced asset IDs |
+| Export version | Bumped to 1.1.0 |
+
+### Import Fixes
+
+| Issue | Fix |
+|-------|-----|
+| ID regeneration | Changed to `generateNewId: false` - keep original IDs |
+| Settings lost | Restore globalSettings, themeId, themeOverrides |
+| Asset ID matching | Parse asset ID from filename prefix |
+| Reference updates | Update references in story, settings, and globalSettings |
+
+### Character Asset Persistence
+
+Characters now save asset IDs alongside URLs for reliable persistence:
+- `visual.defaultAssetId` saved with `defaultImage`
+- `state.visual.assetId` saved with state image
+- StoryPreview resolves via assetId first, falls back to URL
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/utils/projectZipManager.ts` | Major rewrite - unique filenames, settings export/import, asset scanning |
+| `packages/builder/src/App.tsx` | Changed to `generateNewId: false` |
+| `packages/builder/src/components/characters/CharacterEditor.tsx` | Save assetId with character visuals |
+| `packages/builder/src/components/preview/StoryPreview.tsx` | Resolve via assetId, fall back to URL |
+
+### Key Functions Added
+
+```typescript
+// Extract asset IDs from GlobalSettings
+extractAssetIdsFromGlobalSettings(globalSettings)
+
+// Update asset references in GlobalSettings
+updateGlobalSettingsAssetReferences(globalSettings, assetIdMap)
+
+// Extract asset IDs from story (scans all beats, locations, characters)
+extractAssetIdsFromStory(story)
+```
+
+---
+
 ## 2024-12-29: Button Sounds Wait for Completion
 
 ### Fix
