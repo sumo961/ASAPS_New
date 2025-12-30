@@ -64,25 +64,42 @@ extractAssetIdsFromStory(story)
 
 ---
 
-## 2024-12-29: Button Sounds Wait for Completion
+## 2024-12-30: Button Sounds Wait for Completion (Complete Fix)
 
 ### Fix
 
-Button sounds now wait to finish playing before transitioning to the next beat. Previously, clicking a button would start the sound but immediately trigger the beat transition, cutting off the sound.
+Button sounds now properly wait to finish playing before transitioning to the next beat. The initial implementation only added `playSoundAndWait()` for URL-based sounds but missed blob-based sounds (custom assets from IndexedDB).
+
+### Problem
+
+The existing `playSound()` and `playSoundFromBlob()` methods returned Promises that resolved when playback *started*, not when it *finished*. This caused `onAction()` to fire immediately, cutting off sounds.
 
 ### Changes
 
 **AudioManager** (`packages/renderer/src/audio/AudioManager.ts`):
-- Added `playSoundAndWait()` method that returns a promise resolving when the sound completes
+- Added `playSoundFromBlobAndWait()` method for blob-based sounds
+- Both wait methods return Promises that resolve in `source.onended` callback
 
 **PositionedBeatView** (`packages/renderer/src/components/PositionedBeatView.tsx`):
-- Updated `ButtonElement.handleClick` to use `playSoundAndWait`
-- Updated `FlexButtonElement.handleClick` to use `playSoundAndWait`
-- Updated `AssetElement.handleClick` to use `playSoundAndWait`
+- `ButtonElement.handleClick` → uses `playSoundAndWait` / `playSoundFromBlobAndWait`
+- `FlexButtonElement.handleClick` → uses `playSoundAndWait` / `playSoundFromBlobAndWait`
+- `AssetElement.handleClick` → uses `playSoundAndWait` / `playSoundFromBlobAndWait`
 
 ### Technical Details
 
-The new `playSoundAndWait()` method creates a Web Audio source node and returns a promise that resolves in the `onended` callback, ensuring the sound plays completely before the transition.
+```typescript
+// New method for blob-based sounds
+async playSoundFromBlobAndWait(blob: Blob, volume: number = 1.0, cacheKey?: string): Promise<void> {
+  // ... setup audio context, decode blob ...
+  return new Promise<void>((resolve) => {
+    source.onended = () => {
+      this.activeSourceNodes.delete(source);
+      resolve();  // Resolves when sound finishes
+    };
+    source.start(0);
+  });
+}
+```
 
 ---
 
