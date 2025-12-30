@@ -216,6 +216,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
       }
 
       // Set up character resolver to resolve characterId + stateId to image URL
+      // Uses assetId first (for persistence), falls back to image URL
       if (characters && characters.length > 0) {
         (reactRenderer as any).setCharacterResolver((characterId: string, stateId?: string) => {
           const character = characters.find(c => c.id === characterId);
@@ -224,26 +225,60 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
             return undefined;
           }
 
+          // Helper to resolve image - prefers assetId over direct image URL
+          const resolveImage = (visual: { assetId?: string; image?: string } | undefined): string | undefined => {
+            if (!visual) return undefined;
+
+            // First try assetId (preferred - works after import/reload)
+            if (visual.assetId && assets) {
+              const asset = assets.find(a => a.id === visual.assetId);
+              if (asset?.url) {
+                console.log(`[StoryPreview] Resolved via assetId ${visual.assetId} → ${asset.url.substring(0, 50)}...`);
+                return asset.url;
+              }
+              console.log(`[StoryPreview] Asset not found for assetId: ${visual.assetId}`);
+            }
+
+            // Fall back to direct image URL (for legacy data or external URLs)
+            if (visual.image && !visual.image.startsWith('blob:')) {
+              console.log(`[StoryPreview] Using direct image URL: ${visual.image.substring(0, 50)}...`);
+              return visual.image;
+            }
+
+            // Blob URLs without assetId won't work after reload - log warning
+            if (visual.image?.startsWith('blob:')) {
+              console.warn(`[StoryPreview] Stale blob URL detected (no assetId): ${visual.image.substring(0, 50)}...`);
+            }
+
+            return undefined;
+          };
+
           // If stateId provided, look up that state's image
           if (stateId) {
             const state = character.states.find(s => s.id === stateId);
-            if (state?.visual?.image) {
-              console.log(`[StoryPreview] Resolved character ${character.name} state ${stateId} → ${state.visual.image.substring(0, 50)}...`);
-              return state.visual.image;
+            const resolved = resolveImage(state?.visual);
+            if (resolved) {
+              console.log(`[StoryPreview] Resolved character ${character.name} state ${stateId}`);
+              return resolved;
             }
           }
 
           // Fall back to default state
           const defaultState = character.states.find(s => s.id === character.defaultState);
-          if (defaultState?.visual?.image) {
-            console.log(`[StoryPreview] Resolved character ${character.name} default state → ${defaultState.visual.image.substring(0, 50)}...`);
-            return defaultState.visual.image;
+          const resolvedDefault = resolveImage(defaultState?.visual);
+          if (resolvedDefault) {
+            console.log(`[StoryPreview] Resolved character ${character.name} default state`);
+            return resolvedDefault;
           }
 
           // Fall back to character's default image
-          if (character.visual.defaultImage) {
-            console.log(`[StoryPreview] Resolved character ${character.name} defaultImage → ${character.visual.defaultImage.substring(0, 50)}...`);
-            return character.visual.defaultImage;
+          const resolvedCharDefault = resolveImage({
+            assetId: character.visual.defaultAssetId,
+            image: character.visual.defaultImage
+          });
+          if (resolvedCharDefault) {
+            console.log(`[StoryPreview] Resolved character ${character.name} defaultImage`);
+            return resolvedCharDefault;
           }
 
           console.log(`[StoryPreview] No image found for character ${character.name}`);

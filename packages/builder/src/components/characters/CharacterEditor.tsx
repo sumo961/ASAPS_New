@@ -249,9 +249,14 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             <DirectAssetUpload
               currentAssetUrl={editedCharacter.visual.defaultImage}
               onAssetSelect={(url, metadata) => {
+                // Save both the URL (for display) and assetId (for persistence)
                 setEditedCharacter({
                   ...editedCharacter,
-                  visual: { ...editedCharacter.visual, defaultImage: url }
+                  visual: {
+                    ...editedCharacter.visual,
+                    defaultImage: url,
+                    defaultAssetId: metadata?.id || undefined
+                  }
                 });
               }}
               onAssetAdd={onAssetAdd}
@@ -764,9 +769,10 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                   key={asset.id}
                   onClick={() => {
                     if (showAssetPicker === 'default') {
+                      // Save both URL (for display) and assetId (for persistence)
                       setEditedCharacter({
                         ...editedCharacter,
-                        visual: { ...editedCharacter.visual, defaultImage: asset.url }
+                        visual: { ...editedCharacter.visual, defaultImage: asset.url, defaultAssetId: asset.id }
                       });
                     } else if (showAssetPicker === 'spritesheet') {
                       const newVisual = { ...editedCharacter.visual };
@@ -785,7 +791,8 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                       const stateId = showAssetPicker.replace('state_', '');
                       const newStates = editedCharacter.states.map(s => {
                         if (s.id === stateId) {
-                          return { ...s, visual: { ...s.visual, image: asset.url } };
+                          // Save both URL (for display) and assetId (for persistence)
+                          return { ...s, visual: { ...s.visual, image: asset.url, assetId: asset.id } };
                         }
                         return s;
                       });

@@ -1799,7 +1799,7 @@ function App() {
 
       try {
         const result = await importProjectFromZip(file, {
-          generateNewId: true // Always generate new ID to avoid conflicts
+          generateNewId: false // Keep original IDs for simpler import
         });
 
         if (result.success && result.projectId) {
