@@ -1,5 +1,36 @@
 # ASAPS Modern - Progress Log
 
+## 2024-12-30: Background Sound Asset Pickers
+
+### Features
+
+Added asset picker UI for background sounds in both Inspector and Global Settings, replacing manual text input.
+
+### Inspector (Beat-Level Background Sound)
+
+| Issue | Fix |
+|-------|-----|
+| Sound not displaying | Now reads `beat.sound.assetId` when loading |
+| Sound not saving | Converts `parameters.backgroundSound` to proper `Sound` object |
+| Poor UX | Shows filename with inline Change/Remove buttons |
+
+### Global Settings (Project Background Music)
+
+Replaced the text input field with a proper asset picker:
+- Dropdown shows all audio assets from Asset Manager
+- Displays current selection with music icon and filename
+- Stores `backgroundMusicAssetId` for export/import compatibility
+- "Select Background Music" button when nothing selected
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/components/Inspector.tsx` | Fixed sound loading/saving, improved UI |
+| `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` | Added audio asset picker dropdown |
+
+---
+
 ## 2024-12-30: Project Export/Import Complete Overhaul
 
 ### Problem
