@@ -1479,6 +1479,55 @@ function App() {
       return resolved;
     };
 
+    // Normalize all positions to ensure minimum padding from origin
+    // This prevents beats from being placed at negative coordinates or too close to edges
+    const normalizePositions = (
+      beatPositions: Map<string, { x: number; y: number }>,
+      clusterPositions: Map<string, { x: number; y: number }>,
+      _clusterSizes: Map<string, { width: number; height: number }>
+    ) => {
+      const MIN_X = 100; // Minimum X padding from left edge
+      const MIN_Y = 50;  // Minimum Y padding from top edge
+
+      // Find the minimum X and Y across all elements
+      let minX = Infinity;
+      let minY = Infinity;
+
+      beatPositions.forEach((pos) => {
+        minX = Math.min(minX, pos.x);
+        minY = Math.min(minY, pos.y);
+      });
+
+      clusterPositions.forEach((pos) => {
+        minX = Math.min(minX, pos.x);
+        minY = Math.min(minY, pos.y);
+      });
+
+      // Calculate shift needed to ensure minimum padding
+      const shiftX = minX < MIN_X ? MIN_X - minX : 0;
+      const shiftY = minY < MIN_Y ? MIN_Y - minY : 0;
+
+      // If no shift needed, return original positions
+      if (shiftX === 0 && shiftY === 0) {
+        return { normalizedBeats: beatPositions, normalizedClusters: clusterPositions };
+      }
+
+      // Apply shift to all positions
+      const normalizedBeats = new Map<string, { x: number; y: number }>();
+      const normalizedClusters = new Map<string, { x: number; y: number }>();
+
+      beatPositions.forEach((pos, id) => {
+        normalizedBeats.set(id, { x: pos.x + shiftX, y: pos.y + shiftY });
+      });
+
+      clusterPositions.forEach((pos, id) => {
+        normalizedClusters.set(id, { x: pos.x + shiftX, y: pos.y + shiftY });
+      });
+
+      console.log(`[Auto-layout] Normalized positions: shifted by (${shiftX}, ${shiftY})`);
+      return { normalizedBeats, normalizedClusters };
+    };
+
     if (hasClusteredBeats) {
       // Use cluster-aware layout
       const clusterInfos = clusters.map(cluster => ({
@@ -1530,13 +1579,20 @@ function App() {
         clusterSizes
       );
 
-      // Apply resolved positions to unclustered beats
-      resolvedBeats.forEach((pos, beatId) => {
+      // Normalize positions to ensure all elements are visible (not at negative coords)
+      const { normalizedBeats, normalizedClusters } = normalizePositions(
+        resolvedBeats,
+        resolvedClusters,
+        clusterSizes
+      );
+
+      // Apply normalized positions to unclustered beats
+      normalizedBeats.forEach((pos, beatId) => {
         actions.moveBeat(beatId, pos);
       });
 
-      // Apply resolved positions to clusters and update their sizes
-      resolvedClusters.forEach((pos, clusterId) => {
+      // Apply normalized positions to clusters and update their sizes
+      normalizedClusters.forEach((pos, clusterId) => {
         if (actions.moveCluster) {
           actions.moveCluster(clusterId, pos);
         }
@@ -1562,8 +1618,15 @@ function App() {
       // No clusters - use standard layout
       const newPositions = applyTreeLayoutToBeats(beatsForLayout, undefined, externalEdges);
 
-      // Apply new positions to all beats
-      newPositions.forEach((pos, beatId) => {
+      // Normalize positions for non-clustered layout
+      const { normalizedBeats } = normalizePositions(
+        newPositions,
+        new Map(), // No clusters
+        new Map()  // No cluster sizes
+      );
+
+      // Apply normalized positions to all beats
+      normalizedBeats.forEach((pos, beatId) => {
         actions.moveBeat(beatId, pos);
       });
     }
