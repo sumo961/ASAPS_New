@@ -1618,9 +1618,16 @@ function App() {
       // No clusters - use standard layout
       const newPositions = applyTreeLayoutToBeats(beatsForLayout, undefined, externalEdges);
 
+      // Resolve overlapping beats using collision detection
+      const { resolvedBeats } = resolveCollisions(
+        newPositions,
+        new Map(), // No clusters
+        new Map()  // No cluster sizes
+      );
+
       // Normalize positions for non-clustered layout
       const { normalizedBeats } = normalizePositions(
-        newPositions,
+        resolvedBeats,
         new Map(), // No clusters
         new Map()  // No cluster sizes
       );
