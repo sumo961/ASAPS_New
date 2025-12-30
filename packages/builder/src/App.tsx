@@ -958,13 +958,104 @@ function App() {
       const beatsExist = projectStory?.beats && Array.isArray(projectStory.beats) && projectStory.beats.length > 0;
       const isNewUntitledProject = currentProject.name === 'Untitled Project' && !beatsExist;
 
+      // CRITICAL FIX: Detect if we're SWITCHING from another project
+      // If loadedProjectIdRef is set and different, we're switching projects and should LOAD, not SAVE
+      const isSwitchingFromAnotherProject = loadedProjectIdRef.current !== null &&
+                                             loadedProjectIdRef.current !== currentProject.id;
+
       console.log('[App] projectStory:', !!projectStory);
       console.log('[App] beatsExist:', beatsExist, 'beats.length:', projectStory?.beats?.length);
       console.log('[App] isNewUntitledProject:', isNewUntitledProject);
+      console.log('[App] isSwitchingFromAnotherProject:', isSwitchingFromAnotherProject);
       console.log('[App] current state.beats.length:', state.beats.length);
 
-      if (isNewUntitledProject && state.beats.length > 0) {
+      if (isSwitchingFromAnotherProject) {
+        // SWITCHING PROJECTS: Always load the new project's data
+        console.log('[App] >>> SWITCHING to different project - loading its data');
+        const projectData = loadProjectData(currentProject);
+        console.log('[App] >>> Loaded data:', {
+          title: projectData.title,
+          beats: projectData.beats.length,
+          connections: projectData.connections?.length || 0,
+          characters: projectData.characters?.length || 0,
+          clusters: projectData.clusters?.length || 0,
+          containerBeatPositions: projectData.containerBeatPositions?.length || 0
+        });
+
+        actions.loadStoryData({
+          title: projectData.title,
+          author: projectData.author,
+          beats: projectData.beats,
+          connections: projectData.connections || [],
+          story: currentProject.story,
+          settings: projectData.settings,
+          environment: projectData.environment,
+          characters: projectData.characters,
+          clusters: projectData.clusters,
+          containerBeatPositions: projectData.containerBeatPositions || []
+        });
+
+        setCharacters(projectData.characters || []);
+        if (projectData.settings) {
+          actions.updateSettings(projectData.settings);
+        }
+
+        // Load assets from storage using HybridStorageAdapter
+        const loadAssets = async () => {
+          try {
+            console.log('[App] >>> Loading assets for project:', currentProject.id);
+            const storage = getStorageAdapter();
+            await storage.initialize();
+            console.log('[App] >>> HybridStorageAdapter initialized');
+
+            // listAssets returns metadata only, we need to load blobs separately
+            const assetInfoList = await storage.listAssets(currentProject.id);
+            console.log('[App] >>> Found', assetInfoList.length, 'assets in storage');
+
+            const uiAssets: Asset[] = [];
+            for (const assetInfo of assetInfoList) {
+              // Load the actual blob from storage (respects hybrid storage routing)
+              const blob = await storage.loadAsset(assetInfo.id);
+              if (blob) {
+                const url = URL.createObjectURL(blob);
+                uiAssets.push({
+                  id: assetInfo.id,
+                  name: assetInfo.filename,
+                  type: assetInfo.mimeType.startsWith('image/') ? 'image' :
+                        assetInfo.mimeType.startsWith('audio/') ? 'audio' :
+                        assetInfo.mimeType.startsWith('video/') ? 'video' :
+                        assetInfo.mimeType.includes('font') ? 'font' : 'image',
+                  subType: (assetInfo as { subType?: Asset['subType'] }).subType,
+                  url,
+                  size: assetInfo.size,
+                  uploadedAt: new Date(assetInfo.uploadedAt),
+                });
+                console.log('[App] >>> Asset loaded:', assetInfo.filename, '(location:', assetInfo.location, ')');
+              } else {
+                console.warn('[App] >>> Could not load blob for asset:', assetInfo.filename);
+              }
+            }
+
+            setAssets(uiAssets);
+            console.log('[App] >>> Total assets loaded:', uiAssets.length);
+          } catch (err) {
+            console.error('[App] >>> Error loading assets:', err);
+          }
+        };
+        loadAssets();
+
+        // Restore global settings from project (if saved)
+        if (currentProject.globalSettings) {
+          console.log('[App] >>> Restoring globalSettings from project');
+          setGlobalSettings(currentProject.globalSettings);
+        }
+
+        setIsUntitledProject(currentProject.name === 'Untitled Project');
+        loadedProjectIdRef.current = currentProject.id;
+        console.log('[App] >>> Project switch complete');
+      } else if (isNewUntitledProject && state.beats.length > 0) {
         // New untitled project AND beats have been created - save current story state to it
+        // This only happens when creating a NEW project in this session, not when switching
         console.log('[App] >>> SAVING beats to NEW untitled project');
 
         const storyData = {
