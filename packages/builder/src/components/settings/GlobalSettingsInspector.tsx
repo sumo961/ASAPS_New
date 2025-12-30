@@ -95,6 +95,10 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
   const [newThemeName, setNewThemeName] = useState('');
+  const [showSoundPicker, setShowSoundPicker] = useState(false);
+
+  // Filter audio assets for background music selection
+  const audioAssets = assets.filter(a => a.type === 'audio');
 
   // Get available fonts (built-in + custom from assets)
   const { fonts, getFontFamily } = useFonts(assets);
@@ -1257,24 +1261,86 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               <h3 className="font-medium text-gray-700 mb-3">Sound Settings</h3>
               
               <div className="space-y-4">
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Background Music File
+                    Background Music
                   </label>
-                  <input
-                    type="text"
-                    value={settings.sound.backgroundMusicName || settings.sound.backgroundMusic}
-                    onChange={(e) => {
-                      // When user types, update both name and URL (they're providing a new file reference)
-                      handleChange('sound', 'backgroundMusic', e.target.value);
-                      handleChange('sound', 'backgroundMusicName', e.target.value);
-                    }}
-                    className="w-full px-3 py-2 border rounded"
-                    placeholder="e.g., background-music.mp3"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Enter the filename of your background music (mp3, ogg, wav)
-                  </p>
+                  {settings.sound.backgroundMusicAssetId || settings.sound.backgroundMusic ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 px-3 py-2 bg-gray-50 border rounded text-sm truncate flex items-center gap-2">
+                        <Music className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                        <span className="truncate">
+                          {settings.sound.backgroundMusicName ||
+                           audioAssets.find(a => a.id === settings.sound.backgroundMusicAssetId)?.name ||
+                           settings.sound.backgroundMusic}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setShowSoundPicker(true)}
+                        className="px-3 py-2 border rounded text-sm hover:bg-gray-50"
+                        title="Change music"
+                      >
+                        Change
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleChange('sound', 'backgroundMusic', '');
+                          handleChange('sound', 'backgroundMusicName', '');
+                          handleChange('sound', 'backgroundMusicAssetId', '');
+                        }}
+                        className="px-2 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                        title="Remove music"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowSoundPicker(true)}
+                      className="w-full px-3 py-2 border border-dashed border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50 hover:border-gray-400 flex items-center justify-center gap-2"
+                    >
+                      <Music className="w-4 h-4" />
+                      Select Background Music
+                    </button>
+                  )}
+
+                  {/* Sound Picker Dropdown */}
+                  {showSoundPicker && (
+                    <div className="absolute z-50 mt-1 w-80 bg-white border rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                      <div className="p-2 border-b bg-gray-50 flex justify-between items-center">
+                        <span className="text-sm font-medium">Select Audio</span>
+                        <button
+                          onClick={() => setShowSoundPicker(false)}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {audioAssets.length === 0 ? (
+                        <div className="p-4 text-sm text-gray-500 text-center">
+                          No audio files found. Add audio files in the Asset Manager.
+                        </div>
+                      ) : (
+                        <div className="p-1">
+                          {audioAssets.map((asset) => (
+                            <button
+                              key={asset.id}
+                              onClick={() => {
+                                handleChange('sound', 'backgroundMusic', asset.url || asset.id);
+                                handleChange('sound', 'backgroundMusicName', asset.name);
+                                handleChange('sound', 'backgroundMusicAssetId', asset.id);
+                                setShowSoundPicker(false);
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 rounded flex items-center gap-2"
+                            >
+                              <Music className="w-4 h-4 text-blue-500" />
+                              <span className="truncate">{asset.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>

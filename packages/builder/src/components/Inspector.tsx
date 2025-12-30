@@ -326,8 +326,9 @@ export const Inspector: React.FC<InspectorProps> = ({
       if (!beatData.parameters.visualElements) {
         beatData.parameters.visualElements = [];
       }
+      // Initialize backgroundSound from beat.sound (prefer assetId over file)
       if (!beatData.parameters.backgroundSound) {
-        beatData.parameters.backgroundSound = '';
+        beatData.parameters.backgroundSound = beatData.sound?.assetId || beatData.sound?.file || '';
       }
       
       const beatDef = getBeatDefinition(beat.type);
@@ -527,7 +528,19 @@ export const Inspector: React.FC<InspectorProps> = ({
     beat.cluster = beatToUpdate.cluster;
     beat.defaultTarget = beatToUpdate.defaultTarget || undefined;
     beat.transition = beatToUpdate.transition;
-    beat.sound = beatToUpdate.sound;
+
+    // Convert backgroundSound from parameters to proper Sound object
+    const backgroundSoundId = beatToUpdate.parameters?.backgroundSound;
+    if (backgroundSoundId) {
+      beat.sound = {
+        file: backgroundSoundId,  // For compatibility
+        assetId: backgroundSoundId,  // Preferred reference
+        volume: beatToUpdate.sound?.volume ?? 1.0,
+        loop: beatToUpdate.sound?.loop ?? false,
+      };
+    } else {
+      beat.sound = undefined;
+    }
 
     // Update parameters
     if (beatToUpdate.parameters && beat.updateParameters) {
@@ -674,19 +687,31 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.cluster = localBeat.cluster;
       beat.defaultTarget = localBeat.defaultTarget || undefined;
       beat.transition = localBeat.transition;
-      beat.sound = localBeat.sound;
-      
+
+      // Convert backgroundSound from parameters to proper Sound object
+      const bgSoundId = localBeat.parameters?.backgroundSound;
+      if (bgSoundId) {
+        beat.sound = {
+          file: bgSoundId,
+          assetId: bgSoundId,
+          volume: localBeat.sound?.volume ?? 1.0,
+          loop: localBeat.sound?.loop ?? false,
+        };
+      } else {
+        beat.sound = undefined;
+      }
+
       if (localBeat.parameters && beat.updateParameters) {
         const parameters = { ...localBeat.parameters };
-        
+
         // Ensure button text is saved for applicable beats
         if (['titleScreen', 'introText', 'durScreen', 'endScreen'].includes(beat.type)) {
-          parameters.buttonText = localBeat.parameters.buttonText || 
+          parameters.buttonText = localBeat.parameters.buttonText ||
             (beat.type === 'titleScreen' ? 'Start' :
              beat.type === 'endScreen' ? 'Play Again' :
              'Continue');
         }
-        
+
         // Include visual elements and sound in parameters
         if (supportsVisualEditor(beat.type)) {
           // parameters.visualElements = visualElements; // Not defined in this version
@@ -882,20 +907,37 @@ export const Inspector: React.FC<InspectorProps> = ({
                     <Music className="w-4 h-4 inline mr-1" />
                     Background Sound
                   </label>
-                  <button
-                    onClick={() => handleAssetSelection('sound', (asset) => {
-                      handleParameterChange('backgroundSound', asset.id);
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
-                  >
-                    {localBeat.parameters?.backgroundSound ? 'Change Sound' : 'Add Background Sound'}
-                  </button>
-                  {localBeat.parameters?.backgroundSound && (
+                  {localBeat.parameters?.backgroundSound ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm truncate">
+                        {assets?.find(a => a.id === localBeat.parameters?.backgroundSound)?.name ||
+                         localBeat.parameters.backgroundSound.substring(0, 8) + '...'}
+                      </div>
+                      <button
+                        onClick={() => handleAssetSelection('sound', (asset) => {
+                          handleParameterChange('backgroundSound', asset.id);
+                        })}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                        title="Change sound"
+                      >
+                        Change
+                      </button>
+                      <button
+                        onClick={() => handleParameterChange('backgroundSound', '')}
+                        className="px-2 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
+                        title="Remove sound"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => handleParameterChange('backgroundSound', '')}
-                      className="mt-1 text-xs text-red-600 hover:text-red-800"
+                      onClick={() => handleAssetSelection('sound', (asset) => {
+                        handleParameterChange('backgroundSound', asset.id);
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
                     >
-                      Remove Sound
+                      Add Background Sound
                     </button>
                   )}
                 </div>
