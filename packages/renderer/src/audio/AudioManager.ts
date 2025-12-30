@@ -226,6 +226,80 @@ export class AudioManager {
   }
 
   /**
+   * Play a sound from a Blob and wait for it to finish before resolving
+   * Used for button sounds that need to complete before transitioning to the next beat
+   * @param blob - Audio blob data
+   * @param volume - Volume level (0-1), defaults to 1.0
+   * @param cacheKey - Optional key to cache the decoded buffer for reuse
+   * @returns Promise that resolves when sound finishes playing
+   */
+  async playSoundFromBlobAndWait(blob: Blob, volume: number = 1.0, cacheKey?: string): Promise<void> {
+    // Don't play if muted
+    if (this.muted) {
+      return;
+    }
+
+    this.initAudioContext();
+    if (!this.audioContext || !this.masterGainNode) {
+      console.warn('[AudioManager] Audio context not available');
+      return;
+    }
+
+    try {
+      // Resume audio context if suspended (common on mobile)
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      // Check cache first if cacheKey provided
+      let buffer = cacheKey ? this.soundBuffers.get(cacheKey) : undefined;
+
+      if (!buffer) {
+        // Decode directly from blob's array buffer
+        const arrayBuffer = await blob.arrayBuffer();
+        buffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+        // Cache if key provided
+        if (cacheKey && this.shouldPreloadSounds) {
+          this.soundBuffers.set(cacheKey, buffer);
+        }
+      }
+
+      // Create source node
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.loop = false; // Never loop for wait-for-completion sounds
+
+      // Create gain node for this sound
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.value = Math.max(0, Math.min(1, volume));
+
+      // Connect: source -> gain -> master gain -> destination
+      source.connect(gainNode);
+      gainNode.connect(this.masterGainNode);
+
+      // Track active source
+      this.activeSourceNodes.add(source);
+
+      // Return a promise that resolves when the sound ends
+      return new Promise<void>((resolve) => {
+        source.onended = () => {
+          this.activeSourceNodes.delete(source);
+          resolve();
+        };
+
+        // Play the sound
+        source.start(0);
+        console.log('[AudioManager] Playing sound from blob (waiting for completion)');
+      });
+    } catch (error) {
+      console.error('[AudioManager] Error playing sound from blob:', error);
+      // Resolve anyway to not block UI
+      return;
+    }
+  }
+
+  /**
    * Play a sound and wait for it to finish before resolving
    * Used for button sounds that need to complete before transitioning to the next beat
    * @param url - URL of the sound file

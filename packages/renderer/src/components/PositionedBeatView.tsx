@@ -1091,23 +1091,23 @@ const ButtonElement: React.FC<{
           if (isPresetSound(soundRef)) {
             const preset = getPresetSound(soundRef);
             if (preset) {
-              console.log(`[ButtonElement] Playing preset sound: ${preset.name}`);
-              await audioManager.playSound(preset.url, preset.volume);
+              console.log(`[ButtonElement] Playing preset sound (waiting): ${preset.name}`);
+              await audioManager.playSoundAndWait(preset.url, preset.volume);
             }
           } else if (soundBlobResolver) {
             // Custom asset - use blob resolver to get fresh blob data
             console.log(`[ButtonElement] Loading sound blob for: ${soundRef}`);
             const blob = await soundBlobResolver(soundRef);
             if (blob) {
-              console.log(`[ButtonElement] Playing sound from blob`);
-              await audioManager.playSoundFromBlob(blob, 1.0, false, soundRef);
+              console.log(`[ButtonElement] Playing sound from blob (waiting)`);
+              await audioManager.playSoundFromBlobAndWait(blob, 1.0, soundRef);
             } else {
               console.warn(`[ButtonElement] Could not resolve sound: ${soundRef}`);
             }
           } else if (soundRef.startsWith('http')) {
-            // External URL - use direct playSound
-            console.log(`[ButtonElement] Playing external sound: ${soundRef}`);
-            await audioManager.playSound(soundRef);
+            // External URL - use playSoundAndWait
+            console.log(`[ButtonElement] Playing external sound (waiting): ${soundRef}`);
+            await audioManager.playSoundAndWait(soundRef);
           } else {
             console.warn(`[ButtonElement] No sound resolver available for: ${soundRef}`);
           }
@@ -1117,7 +1117,7 @@ const ButtonElement: React.FC<{
         }
       }
 
-      // Then call the action
+      // Then call the action (after sound completes)
       if (onAction) {
         // Use actionId if available (for movementChoice, pickProp, etc.), otherwise use location name
         const actionIdToPass = actionId || location.name || 'continue';
@@ -1519,7 +1519,7 @@ const AssetElement: React.FC<{
     if (interactive && actionId && onAction) {
       console.log(`[AssetElement] Clicked "${name}" with actionId: ${actionId}`);
 
-      // Play sound if assigned
+      // Play sound if assigned - wait for completion before action
       if (sound) {
         try {
           const audioManager = getAudioManager();
@@ -1528,23 +1528,23 @@ const AssetElement: React.FC<{
           if (isPresetSound(sound)) {
             const preset = getPresetSound(sound);
             if (preset) {
-              console.log(`[AssetElement] Playing preset sound: ${preset.name}`);
-              await audioManager.playSound(preset.url, preset.volume);
+              console.log(`[AssetElement] Playing preset sound (waiting): ${preset.name}`);
+              await audioManager.playSoundAndWait(preset.url, preset.volume);
             }
           } else if (soundBlobResolver) {
             // Custom asset - use blob resolver to get fresh blob data
             console.log(`[AssetElement] Loading sound blob for: ${sound}`);
             const blob = await soundBlobResolver(sound);
             if (blob) {
-              console.log(`[AssetElement] Playing sound from blob`);
-              await audioManager.playSoundFromBlob(blob, 1.0, false, sound);
+              console.log(`[AssetElement] Playing sound from blob (waiting)`);
+              await audioManager.playSoundFromBlobAndWait(blob, 1.0, sound);
             } else {
               console.warn(`[AssetElement] Could not resolve sound: ${sound}`);
             }
           } else if (sound.startsWith('http')) {
-            // External URL - use direct playSound
-            console.log(`[AssetElement] Playing external sound: ${sound}`);
-            await audioManager.playSound(sound);
+            // External URL - use playSoundAndWait
+            console.log(`[AssetElement] Playing external sound (waiting): ${sound}`);
+            await audioManager.playSoundAndWait(sound);
           } else {
             console.warn(`[AssetElement] No sound resolver available for: ${sound}`);
           }
@@ -1554,6 +1554,7 @@ const AssetElement: React.FC<{
         }
       }
 
+      // Call action after sound completes
       onAction(actionId);
     }
   };
@@ -2296,23 +2297,23 @@ const FlexButtonElement: React.FC<{
           if (isPresetSound(soundRef)) {
             const preset = getPresetSound(soundRef);
             if (preset) {
-              console.log(`[FlexButtonElement] Playing preset sound: ${preset.name}`);
-              await audioManager.playSound(preset.url, preset.volume);
+              console.log(`[FlexButtonElement] Playing preset sound (waiting): ${preset.name}`);
+              await audioManager.playSoundAndWait(preset.url, preset.volume);
             }
           } else if (soundBlobResolver) {
             // Custom asset - resolve blob from storage
             console.log(`[FlexButtonElement] Loading custom sound blob: ${soundRef}`);
             const blob = await soundBlobResolver(soundRef);
             if (blob) {
-              console.log(`[FlexButtonElement] Playing custom sound from blob: ${soundRef}`);
-              await audioManager.playSoundFromBlob(blob, 1.0, false, soundRef);
+              console.log(`[FlexButtonElement] Playing custom sound from blob (waiting): ${soundRef}`);
+              await audioManager.playSoundFromBlobAndWait(blob, 1.0, soundRef);
             } else {
               console.warn(`[FlexButtonElement] Could not load sound blob: ${soundRef}`);
             }
           } else {
             // Fallback to URL-based playback (for non-builder contexts)
-            console.log(`[FlexButtonElement] Playing custom sound (fallback): ${soundRef}`);
-            await audioManager.playSound(soundRef);
+            console.log(`[FlexButtonElement] Playing custom sound (waiting, fallback): ${soundRef}`);
+            await audioManager.playSoundAndWait(soundRef);
           }
         } catch (error) {
           console.error('[FlexButtonElement] Error playing sound:', error);
