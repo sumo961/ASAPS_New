@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check } from 'lucide-react';
+import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2 } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
@@ -12,13 +12,13 @@ interface GlobalSettings {
     scalingMode: 'none' | 'fit' | 'fill' | 'stretch';  // How to scale content
   };
   colors: {
-    pcolor: string;         // Player text color
-    palpha: number;         // Player text alpha
-    nonpcolor: string;      // Non-player text color
-    nonpalpha: number;      // Non-player text alpha
-    bgColor: string;        // Background color
-    textBoxBg: string;      // Text box background
-    textBoxBorder: string;  // Text box border
+    pcolor: string;         // Player text box background color
+    palpha: number;         // Player text box opacity (0-100)
+    nonpcolor: string;      // NPC text box background color
+    nonpalpha: number;      // NPC text box opacity (0-100)
+    bgColor: string;        // Stage background color
+    textBoxBg: string;      // Button/generic text box background
+    textBoxBorder: string;  // Text box border color
   };
   fonts: {
     titleFont: string;
@@ -66,6 +66,12 @@ interface GlobalSettings {
     firstbeat: string;
     showvals: boolean;
   };
+  variables?: {
+    name: string;
+    type: 'string' | 'number' | 'boolean';
+    defaultValue?: string | number | boolean;
+    description?: string;
+  }[];
 }
 
 interface GlobalSettingsInspectorProps {
@@ -90,7 +96,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   onThemeChange,
 }) => {
   const [settings, setSettings] = useState<GlobalSettings>(initialSettings);
-  const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'sound' | 'copyright' | 'debug'>('project');
+  const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'sound' | 'copyright' | 'variables' | 'debug'>('project');
   const [hasChanges, setHasChanges] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
@@ -102,6 +108,18 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
   // Get available fonts (built-in + custom from assets)
   const { fonts, getFontFamily } = useFonts(assets);
+
+  // Helper to determine contrasting text color based on background luminance
+  const getContrastColor = (hexColor: string): string => {
+    // Remove # if present
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    // Calculate relative luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5 ? '#000000' : '#ffffff';
+  };
 
   // Theme management
   const {
@@ -140,14 +158,22 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   // Get current theme name
   const currentThemeName = themes.find(t => t.id === selectedThemeId)?.name || 'Custom';
 
-  const handleChange = (category: keyof GlobalSettings, field: string, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [category]: {
-        ...prev[category],
-        [field]: value
-      }
-    }));
+  const handleChange = (category: keyof GlobalSettings, field: string | undefined, value: any) => {
+    if (field === undefined) {
+      // Direct assignment for top-level arrays like 'variables'
+      setSettings(prev => ({
+        ...prev,
+        [category]: value
+      }));
+    } else {
+      setSettings(prev => ({
+        ...prev,
+        [category]: {
+          ...(prev[category] as Record<string, any>),
+          [field]: value
+        }
+      }));
+    }
     setHasChanges(true);
   };
 
@@ -448,6 +474,15 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Copyright
           </button>
           <button
+            onClick={() => setActiveTab('variables')}
+            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'variables' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
+            }`}
+          >
+            <Variable className="w-4 h-4" />
+            Variables
+          </button>
+          <button
             onClick={() => setActiveTab('debug')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'debug' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -633,7 +668,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Player Text Color
+                    Player Text Box Color
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -655,14 +690,15 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       min="0"
                       max="100"
                       className="w-20 px-2 py-1 border rounded text-sm"
-                      placeholder="Alpha"
+                      placeholder="Opacity %"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">Background color for player/interactor dialog boxes</p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    NPC Text Color
+                    NPC Text Box Color
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -684,9 +720,10 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       min="0"
                       max="100"
                       className="w-20 px-2 py-1 border rounded text-sm"
-                      placeholder="Alpha"
+                      placeholder="Opacity %"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">Background color for NPC/narrator dialog boxes</p>
                 </div>
 
                 <div>
@@ -773,37 +810,77 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               {/* Color Preview */}
               <div className="mt-6 p-4 bg-gray-100 rounded">
                 <div className="text-sm font-medium text-gray-600 mb-2">Preview</div>
-                <div 
+                <div
                   className="p-4 rounded"
                   style={{ backgroundColor: settings.colors.bgColor }}
                 >
-                  <div className="space-y-2">
-                    <p style={{ 
-                      color: settings.colors.pcolor, 
-                      opacity: settings.colors.palpha / 100,
-                      margin: 0 
-                    }}>
-                      Player dialog text appears like this
-                    </p>
-                    <p style={{ 
-                      color: settings.colors.nonpcolor,
-                      opacity: settings.colors.nonpalpha / 100,
-                      margin: 0 
-                    }}>
-                      NPC dialog text appears like this
-                    </p>
-                    <div 
-                      style={{
-                        border: `2px solid ${settings.colors.textBoxBorder}`,
-                        backgroundColor: settings.colors.textBoxBg,
-                        padding: '8px',
-                        borderRadius: '4px',
-                        marginTop: '8px'
-                      }}
-                    >
-                      <p style={{ color: settings.colors.pcolor, margin: 0 }}>
-                        Text box with border and background
-                      </p>
+                  <div className="space-y-3">
+                    {/* Player text box - uses pcolor as background */}
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">Player text box (pcolor)</div>
+                      <div
+                        style={{
+                          border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
+                          backgroundColor: settings.colors.pcolor,
+                          padding: `${settings.textbox.padding}px`,
+                          borderRadius: `${settings.textbox.radius}px`,
+                          opacity: settings.colors.palpha / 100
+                        }}
+                      >
+                        <p style={{
+                          color: getContrastColor(settings.colors.pcolor),
+                          margin: 0,
+                          fontFamily: getFontFamily(settings.fonts.textFont),
+                          fontSize: `${settings.fonts.fontSize.text}px`
+                        }}>
+                          Player dialog text appears like this
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* NPC text box - uses nonpcolor as background */}
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">NPC text box (nonpcolor)</div>
+                      <div
+                        style={{
+                          border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
+                          backgroundColor: settings.colors.nonpcolor,
+                          padding: `${settings.textbox.padding}px`,
+                          borderRadius: `${settings.textbox.radius}px`,
+                          opacity: settings.colors.nonpalpha / 100
+                        }}
+                      >
+                        <p style={{
+                          color: getContrastColor(settings.colors.nonpcolor),
+                          margin: 0,
+                          fontFamily: getFontFamily(settings.fonts.textFont),
+                          fontSize: `${settings.fonts.fontSize.text}px`
+                        }}>
+                          NPC dialog text appears like this
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Button preview - uses textBoxBg */}
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">Button (textBoxBg)</div>
+                      <div className="flex gap-2">
+                        <button
+                          style={{
+                            border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
+                            backgroundColor: settings.colors.textBoxBg,
+                            padding: `${settings.textbox.padding}px ${settings.textbox.padding * 1.5}px`,
+                            borderRadius: `${settings.textbox.radius}px`,
+                            opacity: settings.textbox.opacity / 100,
+                            color: getContrastColor(settings.colors.textBoxBg),
+                            fontFamily: getFontFamily(settings.fonts.btnFont),
+                            fontSize: `${settings.fonts.fontSize.button}px`,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Button Style
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -928,31 +1005,48 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               {/* Font Preview */}
               <div className="mt-6 p-4 bg-gray-100 rounded">
                 <div className="text-sm font-medium text-gray-600 mb-2">Preview</div>
-                <div className="space-y-3 bg-white p-4 rounded">
-                  <h1 style={{ 
+                <div
+                  className="space-y-3 p-4 rounded"
+                  style={{ backgroundColor: settings.colors.bgColor }}
+                >
+                  <h1 style={{
                     fontFamily: getFontFamily(settings.fonts.titleFont),
                     fontSize: `${settings.fonts.fontSize.title}px`,
                     margin: 0,
-                    fontWeight: 'bold'
+                    fontWeight: 'bold',
+                    color: getContrastColor(settings.colors.bgColor)
                   }}>
                     Story Title
                   </h1>
-                  <p style={{ 
-                    fontFamily: getFontFamily(settings.fonts.textFont),
-                    fontSize: `${settings.fonts.fontSize.text}px`,
-                    margin: 0
-                  }}>
-                    This is how regular text will appear in your story.
-                  </p>
-                  <button style={{ 
+                  {/* Text in a player-style box */}
+                  <div
+                    style={{
+                      backgroundColor: settings.colors.pcolor,
+                      padding: `${settings.textbox.padding}px`,
+                      borderRadius: `${settings.textbox.radius}px`,
+                      border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
+                      opacity: settings.colors.palpha / 100
+                    }}
+                  >
+                    <p style={{
+                      fontFamily: getFontFamily(settings.fonts.textFont),
+                      fontSize: `${settings.fonts.fontSize.text}px`,
+                      margin: 0,
+                      color: getContrastColor(settings.colors.pcolor)
+                    }}>
+                      This is how regular text will appear in your story.
+                    </p>
+                  </div>
+                  <button style={{
                     fontFamily: getFontFamily(settings.fonts.btnFont),
                     fontSize: `${settings.fonts.fontSize.button}px`,
-                    padding: '8px 16px',
-                    backgroundColor: '#3B82F6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
+                    padding: `${settings.textbox.padding}px ${settings.textbox.padding * 1.5}px`,
+                    backgroundColor: settings.colors.textBoxBg,
+                    color: getContrastColor(settings.colors.textBoxBg),
+                    border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
+                    borderRadius: `${settings.textbox.radius}px`,
+                    cursor: 'pointer',
+                    opacity: settings.textbox.opacity / 100
                   }}>
                     Continue Button
                   </button>
@@ -1467,6 +1561,148 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'variables' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-gray-700">Global Variables</h3>
+                <button
+                  onClick={() => {
+                    const newVar = {
+                      name: `variable_${(settings.variables?.length || 0) + 1}`,
+                      type: 'string' as const,
+                      defaultValue: '',
+                      description: ''
+                    };
+                    handleChange('variables', undefined, [...(settings.variables || []), newVar]);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Variable
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-4">
+                Define global variables that can be used throughout your story. These will appear in dropdowns when selecting variables in beats.
+              </p>
+
+              {(!settings.variables || settings.variables.length === 0) ? (
+                <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
+                  <Variable className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                  <p>No variables defined yet.</p>
+                  <p className="text-sm">Click "Add Variable" to create one.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {settings.variables.map((variable, index) => (
+                    <div key={index} className="p-3 border rounded-lg bg-white">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+                              <input
+                                type="text"
+                                value={variable.name}
+                                onChange={(e) => {
+                                  const updated = [...(settings.variables || [])];
+                                  updated[index] = { ...variable, name: e.target.value };
+                                  handleChange('variables', undefined, updated);
+                                }}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                                placeholder="variableName"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                              <select
+                                value={variable.type}
+                                onChange={(e) => {
+                                  const updated = [...(settings.variables || [])];
+                                  const newType = e.target.value as 'string' | 'number' | 'boolean';
+                                  let newDefault: string | number | boolean = '';
+                                  if (newType === 'number') newDefault = 0;
+                                  if (newType === 'boolean') newDefault = false;
+                                  updated[index] = { ...variable, type: newType, defaultValue: newDefault };
+                                  handleChange('variables', undefined, updated);
+                                }}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                              >
+                                <option value="string">String (Text)</option>
+                                <option value="number">Number</option>
+                                <option value="boolean">Boolean (True/False)</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Default Value</label>
+                              {variable.type === 'boolean' ? (
+                                <select
+                                  value={String(variable.defaultValue ?? false)}
+                                  onChange={(e) => {
+                                    const updated = [...(settings.variables || [])];
+                                    updated[index] = { ...variable, defaultValue: e.target.value === 'true' };
+                                    handleChange('variables', undefined, updated);
+                                  }}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                >
+                                  <option value="false">False</option>
+                                  <option value="true">True</option>
+                                </select>
+                              ) : (
+                                <input
+                                  type={variable.type === 'number' ? 'number' : 'text'}
+                                  value={variable.type === 'number'
+                                    ? (typeof variable.defaultValue === 'number' ? variable.defaultValue : 0)
+                                    : (typeof variable.defaultValue === 'string' ? variable.defaultValue : '')}
+                                  onChange={(e) => {
+                                    const updated = [...(settings.variables || [])];
+                                    const value = variable.type === 'number'
+                                      ? (parseFloat(e.target.value) || 0)
+                                      : e.target.value;
+                                    updated[index] = { ...variable, defaultValue: value };
+                                    handleChange('variables', undefined, updated);
+                                  }}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                  placeholder={variable.type === 'number' ? '0' : 'default value'}
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+                              <input
+                                type="text"
+                                value={variable.description || ''}
+                                onChange={(e) => {
+                                  const updated = [...(settings.variables || [])];
+                                  updated[index] = { ...variable, description: e.target.value };
+                                  handleChange('variables', undefined, updated);
+                                }}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                                placeholder="What is this variable for?"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const updated = settings.variables?.filter((_, i) => i !== index) || [];
+                            handleChange('variables', undefined, updated);
+                          }}
+                          className="p-1 text-red-500 hover:bg-red-50 rounded"
+                          title="Delete variable"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

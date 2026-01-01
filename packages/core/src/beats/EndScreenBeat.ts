@@ -83,12 +83,58 @@ export class EndScreenBeat extends Beat {
     const processedMessage = this.processText(this.message, context);
 
     const locations = Array.from(this.locations.values());
-    await renderer.renderEndScreen(processedMessage, this.showRestart, this.showCredits, locations);
+    console.log('[EndScreenBeat] Rendering with locations:', locations.map(l => ({ name: l.name, kind: l.kind })));
+    console.log('[EndScreenBeat] showRestart:', this.showRestart, 'showCredits:', this.showCredits);
 
-    if (this.showCredits) {
-      await this.showCreditsScreen(context, renderer);
+    const action = await renderer.renderEndScreen(processedMessage, this.showRestart, this.showCredits, locations);
+    console.log('[EndScreenBeat] Received action from renderer:', JSON.stringify(action));
+
+    // Check if user clicked restart (action could be 'restart', 'Play Again', 'restartButton', 'button1', etc.)
+    // Return the action so the engine/player can handle it
+    const actionLower = (action || '').toLowerCase();
+    console.log('[EndScreenBeat] Action lower:', actionLower);
+
+    // Check for explicit restart patterns
+    if (actionLower.includes('restart') || actionLower.includes('play') || actionLower.includes('again')) {
+      console.log('[EndScreenBeat] User requested restart (explicit pattern) - returning __restart__');
+      return '__restart__';  // Special signal for engine to restart
     }
 
+    // Check for credits patterns
+    if (actionLower.includes('credit')) {
+      if (this.showCredits) {
+        console.log('[EndScreenBeat] User requested credits');
+        await this.showCreditsScreen(context, renderer);
+      }
+      console.log('[EndScreenBeat] Credits clicked, returning null');
+      return null;
+    }
+
+    // Handle generic button names from visual editor (button1, button2, etc.)
+    // button1 is typically restart, button2 is typically credits
+    if (actionLower === 'button1' || actionLower === 'button 1') {
+      if (this.showRestart) {
+        console.log('[EndScreenBeat] User clicked button1 with showRestart=true - returning __restart__');
+        return '__restart__';
+      }
+    }
+
+    if (actionLower === 'button2' || actionLower === 'button 2') {
+      if (this.showCredits) {
+        console.log('[EndScreenBeat] User clicked button2 with showCredits=true - showing credits');
+        await this.showCreditsScreen(context, renderer);
+      }
+      console.log('[EndScreenBeat] Button2/credits clicked, returning null');
+      return null;
+    }
+
+    // If only one button exists and showRestart is true, any button click should restart
+    if (this.showRestart && !this.showCredits) {
+      console.log('[EndScreenBeat] Single button with showRestart=true - returning __restart__');
+      return '__restart__';
+    }
+
+    console.log('[EndScreenBeat] No restart detected, returning null');
     return null;
   }
 
