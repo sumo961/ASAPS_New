@@ -1,5 +1,65 @@
 # ASAPS Modern - Progress Log
 
+## 2025-01-01: Color System Refactor
+
+### Overview
+
+Refactored the color system to properly separate button/choice colors from NPC/narrator text box colors, with automatic text color calculation for readability.
+
+### Color Semantics (Corrected)
+
+| Property | Purpose | Description |
+|----------|---------|-------------|
+| `pcolor` | Button/choice background | Player-interactive elements (buttons, choices) |
+| `palpha` | Button/choice opacity | 0-100 percentage |
+| `ptextcolor` | Button/choice text | Auto-calculated from `pcolor` if empty |
+| `nonpcolor` | NPC text box background | Narrator/NPC dialog boxes |
+| `nonpalpha` | NPC text box opacity | 0-100 percentage |
+| `nonptextcolor` | NPC text color | Auto-calculated from `nonpcolor` if empty |
+| `textBoxBorder` | Border color | Shared border color for boxes and buttons |
+
+### Changes Made
+
+**Removed `textBoxBg`** - This redundant property caused confusion. NPC text boxes now use `nonpcolor` directly.
+
+**Added text color controls** - `ptextcolor` and `nonptextcolor` allow explicit text colors while auto-calculating readable defaults using luminance-based contrast.
+
+**Auto-calculation function**:
+```typescript
+function getContrastColor(hexColor: string): string {
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/storage/types.ts` | Updated GlobalSettings colors interface |
+| `packages/builder/src/App.tsx` | Default colors, ASML import mapping |
+| `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` | Color controls, previews, defaults |
+| `packages/builder/src/utils/themeConverter.ts` | Theme conversion with new semantics |
+| `packages/builder/src/themes/migration/GlobalSettingsAdapter.ts` | Theme migration updated |
+| `packages/player/src/PlayerEngine.ts` | Player theme conversion with legacy fallbacks |
+
+### Legacy Support
+
+Old exports with `textBoxBg` or `buttonBg` are still supported via fallback logic in PlayerEngine:
+```typescript
+const buttonBg = settings.colors.pcolor || settings.colors.buttonBg || '#ffffff';
+const textBoxBg = settings.colors.nonpcolor || settings.colors.textBoxBg || '#cccccc';
+```
+
+### GlobalSettings Preview
+
+The Global Settings panel now shows accurate previews:
+- **NPC/Narrator section**: Shows `nonpcolor` background with `nonptextcolor` text
+- **Player choices section**: Shows `pcolor` background with `ptextcolor` text
+- "Auto-calculated from background" hint when text colors are auto-generated
+
+---
+
 ## 2024-12-30: Background Sound Asset Pickers
 
 ### Features
