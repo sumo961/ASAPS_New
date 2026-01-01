@@ -703,17 +703,19 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   <div className="flex gap-2">
                     <input
                       type="color"
-                      value={settings.colors.ptextcolor || '#ffffff'}
+                      value={settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor)}
                       onChange={(e) => handleChange('colors', 'ptextcolor', e.target.value)}
                       className="w-12 h-8 border rounded cursor-pointer"
                     />
                     <input
                       type="text"
-                      value={settings.colors.ptextcolor || '#ffffff'}
+                      value={settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor)}
                       onChange={(e) => handleChange('colors', 'ptextcolor', e.target.value)}
                       className="flex-1 px-2 py-1 border rounded text-sm"
+                      placeholder="Auto"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">{!settings.colors.ptextcolor && 'Auto-calculated from background'}</p>
                 </div>
 
                 <div>
@@ -752,17 +754,19 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   <div className="flex gap-2">
                     <input
                       type="color"
-                      value={settings.colors.nonptextcolor || '#000000'}
+                      value={settings.colors.nonptextcolor || getContrastColor(settings.colors.nonpcolor)}
                       onChange={(e) => handleChange('colors', 'nonptextcolor', e.target.value)}
                       className="w-12 h-8 border rounded cursor-pointer"
                     />
                     <input
                       type="text"
-                      value={settings.colors.nonptextcolor || '#000000'}
+                      value={settings.colors.nonptextcolor || getContrastColor(settings.colors.nonpcolor)}
                       onChange={(e) => handleChange('colors', 'nonptextcolor', e.target.value)}
                       className="flex-1 px-2 py-1 border rounded text-sm"
+                      placeholder="Auto"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">{!settings.colors.nonptextcolor && 'Auto-calculated from background'}</p>
                 </div>
 
                 <div>
