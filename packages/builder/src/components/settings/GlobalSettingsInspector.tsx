@@ -14,10 +14,11 @@ interface GlobalSettings {
   colors: {
     pcolor: string;         // Button/choice background color (player actions)
     palpha: number;         // Button/choice opacity (0-100)
+    ptextcolor: string;     // Button/choice text color
     nonpcolor: string;      // NPC/narrator text box background color
     nonpalpha: number;      // NPC/narrator text box opacity (0-100)
+    nonptextcolor: string;  // NPC/narrator text color
     bgColor: string;        // Stage background color
-    textBoxBg: string;      // Generic text box background (legacy)
     textBoxBorder: string;  // Text box/button border color
   };
   fonts: {
@@ -668,7 +669,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Button/Choice Color
+                    Button/Choice Background
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -693,12 +694,31 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       placeholder="Opacity %"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Background color for player buttons and choices (pcolor)</p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    NPC/Narrator Color
+                    Button/Choice Text
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={settings.colors.ptextcolor || '#ffffff'}
+                      onChange={(e) => handleChange('colors', 'ptextcolor', e.target.value)}
+                      className="w-12 h-8 border rounded cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={settings.colors.ptextcolor || '#ffffff'}
+                      onChange={(e) => handleChange('colors', 'ptextcolor', e.target.value)}
+                      className="flex-1 px-2 py-1 border rounded text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    NPC/Narrator Background
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -723,7 +743,26 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       placeholder="Opacity %"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Background color for NPC/narrator text boxes (nonpcolor)</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    NPC/Narrator Text
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={settings.colors.nonptextcolor || '#000000'}
+                      onChange={(e) => handleChange('colors', 'nonptextcolor', e.target.value)}
+                      className="w-12 h-8 border rounded cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={settings.colors.nonptextcolor || '#000000'}
+                      onChange={(e) => handleChange('colors', 'nonptextcolor', e.target.value)}
+                      className="flex-1 px-2 py-1 border rounded text-sm"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -748,27 +787,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Text Box Background
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={settings.colors.textBoxBg}
-                      onChange={(e) => handleChange('colors', 'textBoxBg', e.target.value)}
-                      className="w-12 h-8 border rounded cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={settings.colors.textBoxBg}
-                      onChange={(e) => handleChange('colors', 'textBoxBg', e.target.value)}
-                      className="flex-1 px-2 py-1 border rounded text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Text Box Border
+                    Border Color
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -817,7 +836,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   <div className="space-y-3">
                     {/* NPC/Narrator text box - uses nonpcolor as background */}
                     <div>
-                      <div className="text-xs text-gray-400 mb-1">NPC/Narrator text (nonpcolor)</div>
+                      <div className="text-xs text-gray-400 mb-1">NPC/Narrator text</div>
                       <div
                         style={{
                           border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
@@ -828,7 +847,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         }}
                       >
                         <p style={{
-                          color: getContrastColor(settings.colors.nonpcolor),
+                          color: settings.colors.nonptextcolor || getContrastColor(settings.colors.nonpcolor),
                           margin: 0,
                           fontFamily: getFontFamily(settings.fonts.textFont),
                           fontSize: `${settings.fonts.fontSize.text}px`
@@ -840,7 +859,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
                     {/* Player choices/buttons - uses pcolor as background */}
                     <div>
-                      <div className="text-xs text-gray-400 mb-1">Player choices (pcolor)</div>
+                      <div className="text-xs text-gray-400 mb-1">Player choices</div>
                       <div className="flex gap-2 flex-wrap">
                         <button
                           style={{
@@ -849,7 +868,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                             padding: `${settings.textbox.padding}px ${settings.textbox.padding * 1.5}px`,
                             borderRadius: `${settings.textbox.radius}px`,
                             opacity: settings.colors.palpha / 100,
-                            color: getContrastColor(settings.colors.pcolor),
+                            color: settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor),
                             fontFamily: getFontFamily(settings.fonts.btnFont),
                             fontSize: `${settings.fonts.fontSize.button}px`,
                             cursor: 'pointer'
@@ -864,7 +883,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                             padding: `${settings.textbox.padding}px ${settings.textbox.padding * 1.5}px`,
                             borderRadius: `${settings.textbox.radius}px`,
                             opacity: settings.colors.palpha / 100,
-                            color: getContrastColor(settings.colors.pcolor),
+                            color: settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor),
                             fontFamily: getFontFamily(settings.fonts.btnFont),
                             fontSize: `${settings.fonts.fontSize.button}px`,
                             cursor: 'pointer'
