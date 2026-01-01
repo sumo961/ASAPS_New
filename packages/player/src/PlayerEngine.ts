@@ -11,14 +11,17 @@ import { EventEmitter } from 'eventemitter3';
  */
 interface GlobalSettings {
   colors: {
-    pcolor: string;
-    palpha: number;
-    nonpcolor: string;
-    nonpalpha: number;
-    bgColor: string;
-    textBoxBg: string;
-    textBoxBorder: string;
-    buttonBg?: string;  // Optional - some exports may not have this
+    pcolor: string;         // Button/choice background color
+    palpha: number;         // Button/choice opacity (0-100)
+    ptextcolor?: string;    // Button/choice text color (auto-calculated if empty)
+    nonpcolor: string;      // NPC/narrator text box background
+    nonpalpha: number;      // NPC/narrator opacity (0-100)
+    nonptextcolor?: string; // NPC/narrator text color (auto-calculated if empty)
+    bgColor: string;        // Stage background color
+    textBoxBorder: string;  // Text box/button border color
+    // Legacy support
+    textBoxBg?: string;     // Old field - map to nonpcolor
+    buttonBg?: string;      // Old field - map to pcolor
   };
   fonts: {
     titleFont: string;
@@ -111,13 +114,35 @@ function lightenColor(hex: string, percent: number): string {
 }
 
 /**
+ * Calculate contrasting text color based on background luminance.
+ * Returns black for light backgrounds, white for dark backgrounds.
+ */
+function getContrastColor(hexColor: string): string {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+/**
  * Convert GlobalSettings to RenderThemeSettings
  */
 function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSettings {
+  // Get effective colors with legacy fallbacks
+  const buttonBg = settings.colors.pcolor || settings.colors.buttonBg || '#ffffff';
+  const textBoxBg = settings.colors.nonpcolor || settings.colors.textBoxBg || '#cccccc';
+
+  // Calculate text colors: use explicit color if set, otherwise auto-calculate from background
+  const buttonTextColor = settings.colors.ptextcolor || getContrastColor(buttonBg);
+  const npcTextColor = settings.colors.nonptextcolor || getContrastColor(textBoxBg);
+
   return {
     backgroundColor: settings.colors.bgColor,
     textBox: {
-      backgroundColor: settings.colors.textBoxBg,
+      // NPC/narrator text box uses nonpcolor
+      backgroundColor: textBoxBg,
       borderColor: settings.colors.textBoxBorder,
       borderWidth: settings.textbox.borderWidth,
       borderRadius: settings.textbox.radius,
@@ -125,16 +150,17 @@ function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSett
       opacity: normalizeOpacity(settings.textbox.opacity),
     },
     button: {
-      backgroundColor: settings.colors.buttonBg || settings.colors.textBoxBg,
-      hoverBackgroundColor: lightenColor(settings.colors.buttonBg || settings.colors.textBoxBg, 0.15),
-      textColor: settings.colors.pcolor,
+      // Button/choice uses pcolor for background
+      backgroundColor: buttonBg,
+      hoverBackgroundColor: lightenColor(buttonBg, 0.15),
+      textColor: buttonTextColor,
       borderColor: settings.colors.textBoxBorder,
       borderWidth: settings.textbox.borderWidth,
       borderRadius: settings.textbox.radius,
     },
     colors: {
-      textColor: settings.colors.pcolor,
-      textAlpha: normalizeOpacity(settings.colors.palpha),
+      textColor: npcTextColor, // NPC/narrator text color
+      textAlpha: normalizeOpacity(settings.colors.nonpalpha),
     },
     fonts: {
       titleFont: getFontFamily(settings.fonts.titleFont),
