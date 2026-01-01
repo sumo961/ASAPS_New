@@ -12,13 +12,13 @@ interface GlobalSettings {
     scalingMode: 'none' | 'fit' | 'fill' | 'stretch';  // How to scale content
   };
   colors: {
-    pcolor: string;         // Player text box background color
-    palpha: number;         // Player text box opacity (0-100)
-    nonpcolor: string;      // NPC text box background color
-    nonpalpha: number;      // NPC text box opacity (0-100)
+    pcolor: string;         // Button/choice background color (player actions)
+    palpha: number;         // Button/choice opacity (0-100)
+    nonpcolor: string;      // NPC/narrator text box background color
+    nonpalpha: number;      // NPC/narrator text box opacity (0-100)
     bgColor: string;        // Stage background color
-    textBoxBg: string;      // Button/generic text box background
-    textBoxBorder: string;  // Text box border color
+    textBoxBg: string;      // Generic text box background (legacy)
+    textBoxBorder: string;  // Text box/button border color
   };
   fonts: {
     titleFont: string;
@@ -668,7 +668,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Player Text Box Color
+                    Button/Choice Color
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -693,12 +693,12 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       placeholder="Opacity %"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Background color for player/interactor dialog boxes</p>
+                  <p className="text-xs text-gray-500 mt-1">Background color for player buttons and choices (pcolor)</p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    NPC Text Box Color
+                    NPC/Narrator Color
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -723,7 +723,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       placeholder="Opacity %"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Background color for NPC/narrator dialog boxes</p>
+                  <p className="text-xs text-gray-500 mt-1">Background color for NPC/narrator text boxes (nonpcolor)</p>
                 </div>
 
                 <div>
@@ -815,32 +815,9 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   style={{ backgroundColor: settings.colors.bgColor }}
                 >
                   <div className="space-y-3">
-                    {/* Player text box - uses pcolor as background */}
+                    {/* NPC/Narrator text box - uses nonpcolor as background */}
                     <div>
-                      <div className="text-xs text-gray-400 mb-1">Player text box (pcolor)</div>
-                      <div
-                        style={{
-                          border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
-                          backgroundColor: settings.colors.pcolor,
-                          padding: `${settings.textbox.padding}px`,
-                          borderRadius: `${settings.textbox.radius}px`,
-                          opacity: settings.colors.palpha / 100
-                        }}
-                      >
-                        <p style={{
-                          color: getContrastColor(settings.colors.pcolor),
-                          margin: 0,
-                          fontFamily: getFontFamily(settings.fonts.textFont),
-                          fontSize: `${settings.fonts.fontSize.text}px`
-                        }}>
-                          Player dialog text appears like this
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* NPC text box - uses nonpcolor as background */}
-                    <div>
-                      <div className="text-xs text-gray-400 mb-1">NPC text box (nonpcolor)</div>
+                      <div className="text-xs text-gray-400 mb-1">NPC/Narrator text (nonpcolor)</div>
                       <div
                         style={{
                           border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
@@ -861,24 +838,39 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       </div>
                     </div>
 
-                    {/* Button preview - uses textBoxBg */}
+                    {/* Player choices/buttons - uses pcolor as background */}
                     <div>
-                      <div className="text-xs text-gray-400 mb-1">Button (textBoxBg)</div>
-                      <div className="flex gap-2">
+                      <div className="text-xs text-gray-400 mb-1">Player choices (pcolor)</div>
+                      <div className="flex gap-2 flex-wrap">
                         <button
                           style={{
                             border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
-                            backgroundColor: settings.colors.textBoxBg,
+                            backgroundColor: settings.colors.pcolor,
                             padding: `${settings.textbox.padding}px ${settings.textbox.padding * 1.5}px`,
                             borderRadius: `${settings.textbox.radius}px`,
-                            opacity: settings.textbox.opacity / 100,
-                            color: getContrastColor(settings.colors.textBoxBg),
+                            opacity: settings.colors.palpha / 100,
+                            color: getContrastColor(settings.colors.pcolor),
                             fontFamily: getFontFamily(settings.fonts.btnFont),
                             fontSize: `${settings.fonts.fontSize.button}px`,
                             cursor: 'pointer'
                           }}
                         >
-                          Button Style
+                          Choice 1
+                        </button>
+                        <button
+                          style={{
+                            border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
+                            backgroundColor: settings.colors.pcolor,
+                            padding: `${settings.textbox.padding}px ${settings.textbox.padding * 1.5}px`,
+                            borderRadius: `${settings.textbox.radius}px`,
+                            opacity: settings.colors.palpha / 100,
+                            color: getContrastColor(settings.colors.pcolor),
+                            fontFamily: getFontFamily(settings.fonts.btnFont),
+                            fontSize: `${settings.fonts.fontSize.button}px`,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Choice 2
                         </button>
                       </div>
                     </div>
