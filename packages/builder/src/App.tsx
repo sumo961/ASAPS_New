@@ -193,12 +193,13 @@ function App() {
       scalingMode: 'fit'
     },
     colors: {
-      pcolor: '#ffffff',       // White text (Visual Novel style)
-      palpha: 100,             // Text opacity percentage (0-100)
-      nonpcolor: '#cccccc',    // Light gray for NPC text
-      nonpalpha: 100,          // Text opacity percentage (0-100)
+      pcolor: '#ffffff',       // Button/choice background color
+      palpha: 100,             // Button/choice opacity (0-100)
+      ptextcolor: '',          // Button text color (auto-calculated if empty)
+      nonpcolor: '#cccccc',    // NPC/narrator text box background
+      nonpalpha: 100,          // NPC/narrator text box opacity (0-100)
+      nonptextcolor: '',       // NPC text color (auto-calculated if empty)
       bgColor: '#1a1a2e',      // Dark blue background
-      textBoxBg: '#16213e',    // Dark blue surface
       textBoxBorder: '#4a90d9' // Blue border
     },
     fonts: {
@@ -1854,15 +1855,10 @@ function App() {
           // Filter imported colors to exclude null values
           const filteredColors = filterNullValues(importedSettings.colors);
 
-          // Determine the effective textbox background color
-          const effectiveTextBoxBg = textboxBgColor || filteredColors.nonpcolor;
-          // Auto-calculate text color based on background brightness
-          const autoTextColor = effectiveTextBoxBg ? getContrastingTextColor(effectiveTextBoxBg) : null;
-
-          // In old ASML format:
-          // - pcolor/palpha = button BACKGROUND color/alpha (player-interactive)
-          // - nonpcolor/nonpalpha = textbox BACKGROUND color/alpha (non-player)
-          // Map these to GlobalSettings textBoxBg and button background
+          // In ASML format:
+          // - pcolor/palpha = button/choice BACKGROUND color/alpha (player-interactive)
+          // - nonpcolor/nonpalpha = NPC textbox BACKGROUND color/alpha
+          // Text colors are auto-calculated from backgrounds for readability
 
           return {
             ...prev,
@@ -1873,20 +1869,16 @@ function App() {
             },
             colors: {
               ...prev.colors,
-              // Map nonpcolor (textbox background) to textBoxBg
-              ...(filteredColors.nonpcolor ? { textBoxBg: filteredColors.nonpcolor } : {}),
-              // Map pcolor (button background) - store for button styling
-              ...(filteredColors.pcolor ? { buttonBg: filteredColors.pcolor } : {}),
-              // Auto-calculate text color based on background brightness
-              ...(autoTextColor ? { pcolor: autoTextColor } : {}),
-              // Keep nonpcolor/nonpalpha and pcolor/palpha for reference (as original ASML values)
+              // Button/choice background from pcolor
+              ...(filteredColors.pcolor ? { pcolor: filteredColors.pcolor } : {}),
+              ...(filteredColors.palpha !== undefined ? { palpha: filteredColors.palpha } : {}),
+              // NPC textbox background from nonpcolor
               ...(filteredColors.nonpcolor ? { nonpcolor: filteredColors.nonpcolor } : {}),
-              ...(filteredColors.nonpalpha ? { nonpalpha: filteredColors.nonpalpha } : {}),
-              // Store original pcolor as buttonBgColor for reference
-              ...(filteredColors.pcolor ? { buttonBgColor: filteredColors.pcolor } : {}),
-              ...(filteredColors.palpha ? { palpha: filteredColors.palpha } : {}),
-              // Override with explicit textbox settings if present
-              ...(textboxBgColor ? { textBoxBg: textboxBgColor } : {}),
+              ...(filteredColors.nonpalpha !== undefined ? { nonpalpha: filteredColors.nonpalpha } : {}),
+              // Text colors are auto-calculated (leave empty for auto)
+              ptextcolor: '',
+              nonptextcolor: '',
+              // Override with explicit textbox border if present
               ...(textboxBorderColor ? { textBoxBorder: textboxBorderColor } : {}),
             },
             fonts: {

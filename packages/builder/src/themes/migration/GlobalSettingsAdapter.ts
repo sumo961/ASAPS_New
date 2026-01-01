@@ -66,18 +66,33 @@ export function globalSettingsToTheme(
 }
 
 /**
+ * Calculate contrasting text color based on background luminance.
+ */
+function getContrastColor(hexColor: string): string {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+/**
  * Convert GlobalSettings colors to ThemeColors
  */
 function convertColors(colors: GlobalSettings['colors']): ThemeColors {
+  // Calculate text colors: use explicit color if set, otherwise auto-calculate
+  const buttonTextColor = colors.ptextcolor || getContrastColor(colors.pcolor);
+
   return {
-    primary: { hex: colors.pcolor, alpha: colors.palpha },
-    secondary: { hex: colors.nonpcolor, alpha: colors.nonpalpha },
+    primary: { hex: colors.pcolor, alpha: colors.palpha / 100 },
+    secondary: { hex: colors.nonpcolor, alpha: colors.nonpalpha / 100 },
     accent: { hex: colors.pcolor }, // Use primary as accent
     background: { hex: colors.bgColor },
-    surface: { hex: colors.textBoxBg },
-    buttonNormal: { hex: colors.textBoxBg }, // Default button uses surface color
-    buttonHover: { hex: lightenColor(colors.textBoxBg, 0.1) },
-    buttonText: { hex: colors.pcolor },
+    surface: { hex: colors.nonpcolor }, // NPC text box background
+    buttonNormal: { hex: colors.pcolor }, // Button uses pcolor
+    buttonHover: { hex: lightenColor(colors.pcolor, 0.1) },
+    buttonText: { hex: buttonTextColor },
     border: { hex: colors.textBoxBorder },
   };
 }
@@ -122,7 +137,7 @@ function convertTextBox(
   colors: GlobalSettings['colors']
 ): ThemeTextBox {
   return {
-    background: { hex: colors.textBoxBg },
+    background: { hex: colors.nonpcolor, alpha: colors.nonpalpha / 100 }, // NPC text box background
     borderColor: { hex: colors.textBoxBorder },
     borderWidth: textbox.borderWidth,
     borderRadius: textbox.radius,
@@ -136,12 +151,15 @@ function convertTextBox(
  * Convert GlobalSettings colors to ThemeButton
  */
 function convertButton(colors: GlobalSettings['colors']): ThemeButton {
+  // Calculate button text color: use explicit color if set, otherwise auto-calculate
+  const buttonTextColor = colors.ptextcolor || getContrastColor(colors.pcolor);
+
   return {
-    background: { hex: colors.textBoxBg },
-    hoverBackground: { hex: lightenColor(colors.textBoxBg, 0.15) },
-    activeBackground: { hex: lightenColor(colors.textBoxBg, 0.2) },
-    disabledBackground: { hex: colors.textBoxBg, alpha: 0.5 },
-    textColor: { hex: colors.pcolor },
+    background: { hex: colors.pcolor, alpha: colors.palpha / 100 }, // Button uses pcolor
+    hoverBackground: { hex: lightenColor(colors.pcolor, 0.15) },
+    activeBackground: { hex: lightenColor(colors.pcolor, 0.2) },
+    disabledBackground: { hex: colors.pcolor, alpha: 0.5 },
+    textColor: { hex: buttonTextColor },
     borderColor: { hex: colors.textBoxBorder },
     borderWidth: 1,
     borderRadius: 4,
@@ -200,11 +218,12 @@ export function themeToGlobalSettings(
     },
     colors: {
       pcolor: theme.colors.primary.hex,
-      palpha: theme.colors.primary.alpha ?? 1,
+      palpha: Math.round((theme.colors.primary.alpha ?? 1) * 100), // Convert 0-1 to 0-100
+      ptextcolor: theme.colors.buttonText?.hex || '',
       nonpcolor: theme.colors.secondary.hex,
-      nonpalpha: theme.colors.secondary.alpha ?? 1,
+      nonpalpha: Math.round((theme.colors.secondary.alpha ?? 1) * 100), // Convert 0-1 to 0-100
+      nonptextcolor: '', // Auto-calculate from nonpcolor
       bgColor: theme.colors.background.hex,
-      textBoxBg: theme.colors.surface.hex,
       textBoxBorder: theme.colors.border.hex,
     },
     fonts: {

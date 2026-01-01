@@ -23,13 +23,14 @@ export interface GlobalSettings {
     scalingMode: 'none' | 'fit' | 'fill' | 'stretch';  // How to scale content
   };
   colors: {
-    pcolor: string;         // Player text color
-    palpha: number;         // Player text alpha
-    nonpcolor: string;      // Non-player text color
-    nonpalpha: number;      // Non-player text alpha
-    bgColor: string;        // Background color
-    textBoxBg: string;      // Text box background
-    textBoxBorder: string;  // Text box border
+    pcolor: string;         // Button/choice background color (player actions)
+    palpha: number;         // Button/choice opacity (0-100)
+    ptextcolor: string;     // Button/choice text color
+    nonpcolor: string;      // NPC/narrator text box background color
+    nonpalpha: number;      // NPC/narrator text box opacity (0-100)
+    nonptextcolor: string;  // NPC/narrator text color
+    bgColor: string;        // Stage background color
+    textBoxBorder: string;  // Text box/button border color
   };
   fonts: {
     titleFont: string;

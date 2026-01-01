@@ -81,17 +81,35 @@ function lightenColor(hex: string, percent: number): string {
 }
 
 /**
+ * Calculate contrasting text color based on background luminance.
+ * Returns black for light backgrounds, white for dark backgrounds.
+ */
+function getContrastColor(hexColor: string): string {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+/**
  * Convert GlobalSettings to RenderThemeSettings
  *
  * @param settings - Global settings from the builder
  * @returns Theme settings for the renderer
  */
 export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSettings {
+  // Calculate text colors: use explicit color if set, otherwise auto-calculate from background
+  const buttonTextColor = settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor);
+  const npcTextColor = settings.colors.nonptextcolor || getContrastColor(settings.colors.nonpcolor);
+
   return {
     // Stage/canvas background color (used when no background image is set)
     backgroundColor: settings.colors.bgColor,
     textBox: {
-      backgroundColor: settings.colors.textBoxBg,
+      // NPC/narrator text box uses nonpcolor
+      backgroundColor: settings.colors.nonpcolor,
       borderColor: settings.colors.textBoxBorder,
       borderWidth: settings.textbox.borderWidth,
       borderRadius: settings.textbox.radius,
@@ -99,17 +117,17 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       opacity: normalizeOpacity(settings.textbox.opacity),
     },
     button: {
-      // Button styling derived from text box and text colors for theme consistency
-      backgroundColor: settings.colors.textBoxBg,
-      hoverBackgroundColor: lightenColor(settings.colors.textBoxBg, 0.15),
-      textColor: settings.colors.pcolor,
+      // Button/choice uses pcolor for background
+      backgroundColor: settings.colors.pcolor,
+      hoverBackgroundColor: lightenColor(settings.colors.pcolor, 0.15),
+      textColor: buttonTextColor,
       borderColor: settings.colors.textBoxBorder,
       borderWidth: settings.textbox.borderWidth,
       borderRadius: settings.textbox.radius,
     },
     colors: {
-      textColor: settings.colors.pcolor, // Use player color for text
-      textAlpha: normalizeOpacity(settings.colors.palpha),
+      textColor: npcTextColor, // NPC/narrator text color
+      textAlpha: normalizeOpacity(settings.colors.nonpalpha),
     },
     fonts: {
       titleFont: getFontFamily(settings.fonts.titleFont),

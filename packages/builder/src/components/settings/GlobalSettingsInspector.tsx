@@ -209,10 +209,11 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
       colors: {
         pcolor: '#7D8DA3',
         palpha: 90,
+        ptextcolor: '',
         nonpcolor: '#CCCCCC',
         nonpalpha: 90,
+        nonptextcolor: '',
         bgColor: '#1a1a1a',
-        textBoxBg: '#000000',
         textBoxBorder: '#333333',
       },
       fonts: {
@@ -1056,12 +1057,12 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     fontFamily: getFontFamily(settings.fonts.btnFont),
                     fontSize: `${settings.fonts.fontSize.button}px`,
                     padding: `${settings.textbox.padding}px ${settings.textbox.padding * 1.5}px`,
-                    backgroundColor: settings.colors.textBoxBg,
-                    color: getContrastColor(settings.colors.textBoxBg),
+                    backgroundColor: settings.colors.pcolor,
+                    color: settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor),
                     border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
                     borderRadius: `${settings.textbox.radius}px`,
                     cursor: 'pointer',
-                    opacity: settings.textbox.opacity / 100
+                    opacity: settings.colors.palpha / 100
                   }}>
                     Continue Button
                   </button>
@@ -1183,16 +1184,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   >
                     <div
                       style={{
-                        backgroundColor: settings.colors.textBoxBg,
-                        opacity: settings.textbox.opacity / 100,
+                        backgroundColor: settings.colors.nonpcolor,
+                        opacity: settings.colors.nonpalpha / 100,
                         borderRadius: `${settings.textbox.radius}px`,
                         padding: `${settings.textbox.padding}px`,
                         border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
                         width: '100%',
                       }}
                     >
-                      <p style={{ 
-                        color: settings.colors.pcolor,
+                      <p style={{
+                        color: settings.colors.nonptextcolor || getContrastColor(settings.colors.nonpcolor),
                         fontFamily: getFontFamily(settings.fonts.textFont),
                         fontSize: `${settings.fonts.fontSize.text}px`,
                         margin: 0
