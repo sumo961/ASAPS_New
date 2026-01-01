@@ -23,6 +23,31 @@ import {
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 
+/**
+ * Helper to resolve fresh image URL from assets using assetId.
+ * Character state images stored with blob URLs become stale after page reload.
+ */
+function resolveCharacterImageUrl(
+  state: { visual?: { assetId?: string; image?: string } } | undefined,
+  defaultImage: string | undefined,
+  assets: Asset[]
+): string | undefined {
+  if (!state?.visual) {
+    return defaultImage;
+  }
+
+  // Try to resolve via assetId first (this gives fresh blob URLs)
+  if (state.visual.assetId) {
+    const asset = assets.find(a => a.id === state.visual!.assetId);
+    if (asset?.url) {
+      return asset.url;
+    }
+  }
+
+  // Fall back to stored image URL (may be stale blob URL)
+  return state.visual.image || defaultImage;
+}
+
 export interface VisualElement {
   id: string;
   type: 'character' | 'prop' | 'text' | 'hotspot' | 'dialog' | 'button';
@@ -184,41 +209,36 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     // For character elements, ALWAYS resolve from characters array
     // This ensures fresh URLs are used after project reload (old blob URLs become invalid)
     if (el.location.kind === 'character') {
-      let resolved = false;
+      let character: Character | undefined;
+      let state: any;
 
       // Try by characterId first
       if (el.location.characterId) {
-        const character = characters.find(c => c.id === el.location.characterId);
+        character = characters.find(c => c.id === el.location.characterId);
         if (character) {
           const stateId = el.location.stateId || character.defaultState;
-          const state = character.states?.find(s => s.id === stateId);
-          if (state?.visual?.image) {
-            el.assetUrl = state.visual.image;
-            resolved = true;
-          } else if (character.visual?.defaultImage) {
-            el.assetUrl = character.visual.defaultImage;
-            resolved = true;
-          }
+          state = character.states?.find(s => s.id === stateId);
         }
       }
 
       // Try by characterName if characterId didn't work
-      if (!resolved && el.location.characterName) {
+      if (!character && el.location.characterName) {
         const charName = el.location.characterName.toLowerCase();
-        const character = characters.find(c =>
+        character = characters.find(c =>
           c.name?.toLowerCase() === charName ||
           c.displayName?.toLowerCase() === charName
         );
         if (character) {
           const stateId = el.location.stateId || character.defaultState;
-          const state = character.states?.find(s => s.id === stateId);
-          if (state?.visual?.image) {
-            el.assetUrl = state.visual.image;
-            resolved = true;
-          } else if (character.visual?.defaultImage) {
-            el.assetUrl = character.visual.defaultImage;
-            resolved = true;
-          }
+          state = character.states?.find(s => s.id === stateId);
+        }
+      }
+
+      // Resolve image URL using helper (handles stale blob URLs via assetId lookup)
+      if (character) {
+        const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
+        if (resolvedUrl) {
+          el.assetUrl = resolvedUrl;
         }
       }
     }

@@ -71,36 +71,39 @@ export const SpriteSheetEditor: React.FC<SpriteSheetEditorProps> = ({
     img.src = spriteSheetUrl;
   }, [spriteSheetUrl]);
 
-  // Calculate grid dimensions with safety checks
-  const calculateGridDimensions = () => {
+  // Calculate grid dimensions with safety checks (using useMemo to avoid re-render loops)
+  const { cols, rows, totalFrames, warning } = React.useMemo(() => {
     // Ensure frame dimensions are valid
     const safeFrameWidth = Math.max(1, localFrameWidth || 1);
     const safeFrameHeight = Math.max(1, localFrameHeight || 1);
-    
+
     // Calculate potential grid dimensions
-    let cols = Math.floor(imageSize.width / safeFrameWidth) || 1;
-    let rows = Math.floor(imageSize.height / safeFrameHeight) || 1;
-    
+    let calcCols = Math.floor(imageSize.width / safeFrameWidth) || 1;
+    let calcRows = Math.floor(imageSize.height / safeFrameHeight) || 1;
+
     // Apply safety limits
-    cols = Math.min(cols, MAX_DIMENSION);
-    rows = Math.min(rows, MAX_DIMENSION);
-    
+    calcCols = Math.min(calcCols, MAX_DIMENSION);
+    calcRows = Math.min(calcRows, MAX_DIMENSION);
+
     // Check total cells
-    const totalCells = cols * rows;
+    const totalCells = calcCols * calcRows;
+    let warningMsg: string | null = null;
+
     if (totalCells > MAX_GRID_CELLS) {
       // Scale down proportionally
       const scale = Math.sqrt(MAX_GRID_CELLS / totalCells);
-      cols = Math.max(1, Math.floor(cols * scale));
-      rows = Math.max(1, Math.floor(rows * scale));
-      setGridWarning(`Grid limited to ${cols}×${rows} to prevent memory overflow`);
-    } else {
-      setGridWarning(null);
+      calcCols = Math.max(1, Math.floor(calcCols * scale));
+      calcRows = Math.max(1, Math.floor(calcRows * scale));
+      warningMsg = `Grid limited to ${calcCols}×${calcRows} to prevent memory overflow`;
     }
-    
-    return { cols, rows, totalFrames: cols * rows };
-  };
-  
-  const { cols, rows, totalFrames } = calculateGridDimensions();
+
+    return { cols: calcCols, rows: calcRows, totalFrames: calcCols * calcRows, warning: warningMsg };
+  }, [localFrameWidth, localFrameHeight, imageSize.width, imageSize.height]);
+
+  // Update warning state when calculated warning changes
+  useEffect(() => {
+    setGridWarning(warning);
+  }, [warning]);
 
   // Animation playback
   useEffect(() => {

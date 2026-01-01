@@ -72,6 +72,30 @@ interface DialogTreeEditorProps {
   expanded?: boolean;
 }
 
+// Speaker color palette - consistent colors for each speaker
+const SPEAKER_COLORS = [
+  { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', accent: 'bg-blue-500' },
+  { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700', accent: 'bg-purple-500' },
+  { bg: 'bg-green-50', border: 'border-green-300', text: 'text-green-700', accent: 'bg-green-500' },
+  { bg: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-700', accent: 'bg-amber-500' },
+  { bg: 'bg-pink-50', border: 'border-pink-300', text: 'text-pink-700', accent: 'bg-pink-500' },
+  { bg: 'bg-cyan-50', border: 'border-cyan-300', text: 'text-cyan-700', accent: 'bg-cyan-500' },
+  { bg: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-700', accent: 'bg-indigo-500' },
+  { bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-700', accent: 'bg-teal-500' },
+];
+
+// Get consistent color for a speaker based on name hash
+const getSpeakerColor = (speaker: string): typeof SPEAKER_COLORS[0] => {
+  if (!speaker) return SPEAKER_COLORS[0];
+  // Simple hash function for consistent color assignment
+  let hash = 0;
+  for (let i = 0; i < speaker.length; i++) {
+    hash = ((hash << 5) - hash) + speaker.charCodeAt(i);
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return SPEAKER_COLORS[Math.abs(hash) % SPEAKER_COLORS.length];
+};
+
 export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   dialogTree,
   onChange,
@@ -327,12 +351,17 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     // For root node or nodes without choices, always show as expanded to display "Add Player Response"
     // For nested nodes (depth > 0), always show content since parent choice was already expanded to get here
     const shouldShowContent = isExpanded || depth > 0 || (!hasChoices && isNPC);
-    
+
+    // Get speaker color for visual distinction
+    const speakerColor = isNPC ? getSpeakerColor(node.speaker) : null;
+
     return (
       <div key={nodeId} className={`${depth > 0 ? 'ml-4' : ''}`}>
         {/* Node Header */}
-        <div className={`flex items-start gap-2 p-2 rounded-lg mb-1 ${
-          isNPC ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+        <div className={`flex items-start gap-2 p-2 rounded-lg mb-1 border ${
+          isNPC && speakerColor
+            ? `${speakerColor.bg} ${speakerColor.border}`
+            : 'bg-gray-50 border-gray-200'
         }`}>
           {/* Expand/Collapse for nodes with choices - only for root level (depth 0) */}
           {hasChoices && depth === 0 ? (
@@ -349,12 +378,16 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
           ) : (
             <div className="w-5" />  // Keep spacing consistent
           )}
-          
+
           {/* Node Content */}
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              {isNPC ? <Users className="w-4 h-4 text-blue-600" /> : <User className="w-4 h-4 text-orange-600" />}
-              <span className="font-medium text-sm">{node.speaker}</span>
+              {/* Speaker color indicator */}
+              {isNPC && speakerColor && (
+                <div className={`w-1.5 h-4 rounded-full ${speakerColor.accent}`} />
+              )}
+              {isNPC ? <Users className={`w-4 h-4 ${speakerColor?.text || 'text-blue-600'}`} /> : <User className="w-4 h-4 text-orange-600" />}
+              <span className={`font-medium text-sm ${isNPC && speakerColor ? speakerColor.text : ''}`}>{node.speaker}</span>
               {/* Only show choice count for root node where collapse/expand is available */}
               {hasChoices && depth === 0 && (
                 <span className="text-xs text-gray-500">
@@ -362,7 +395,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-700">{node.text}</p>
+            <p className="text-sm text-gray-700 break-words whitespace-pre-wrap">{node.text}</p>
           </div>
           
           {/* Edit button for NPC nodes */}
@@ -415,21 +448,25 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               // For regular nested dialogs, show as expandable
               const hasExpandableContent = hasNestedDialog;
 
+              // Get speaker color for nested dialog nodes
+              const nestedSpeakerColor = choice.dialogNode ? getSpeakerColor(choice.dialogNode.speaker || 'NPC') : null;
+
               return (
                 <div key={choice.id} className="mb-2">
                   {/* For collapsible patterns, show the NPC response above the player's exit choice */}
-                  {isCollapsible && choice.dialogNode && (
-                    <div className="mb-1 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  {isCollapsible && choice.dialogNode && nestedSpeakerColor && (
+                    <div className={`mb-1 p-2 ${nestedSpeakerColor.bg} border ${nestedSpeakerColor.border} rounded-lg overflow-hidden`}>
                       <div className="flex items-center gap-2 mb-1">
-                        <Users className="w-3 h-3 text-blue-600" />
-                        <span className="text-xs font-medium text-blue-700">
+                        <div className={`w-1 h-3 rounded-full ${nestedSpeakerColor.accent}`} />
+                        <Users className={`w-3 h-3 ${nestedSpeakerColor.text} flex-shrink-0`} />
+                        <span className={`text-xs font-medium ${nestedSpeakerColor.text} truncate`}>
                           {choice.dialogNode.speaker || 'NPC'} responds:
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700">{choice.dialogNode.text}</p>
+                      <p className="text-sm text-gray-700 break-words whitespace-pre-wrap">{choice.dialogNode.text}</p>
                     </div>
                   )}
-                  <div className="flex items-start gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-start gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg overflow-hidden">
                     {/* Expand/collapse for choice with nested dialog - but NOT for collapsible patterns */}
                     {hasNestedDialog && !isCollapsible && (
                       <button
@@ -445,26 +482,28 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                     )}
                     {(!hasNestedDialog || isCollapsible) && <div className="w-4" />}
 
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <User className="w-3 h-3 text-orange-600" />
-                        <span className="text-xs font-medium text-orange-700">Player says:</span>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                        <User className="w-3 h-3 text-orange-600 flex-shrink-0" />
+                        <span className="text-xs font-medium text-orange-700 flex-shrink-0">Player says:</span>
                         {/* Show target badge for direct targets or collapsible patterns */}
                         {displayTarget && (
-                          <span className="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded flex items-center gap-1">
-                            <ArrowRight className="w-3 h-3" />
-                            {displayTarget}
+                          <span
+                            className="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded flex items-center gap-1 max-w-[100px] flex-shrink"
+                            title={`→ ${displayTarget}`}
+                          >
+                            <ArrowRight className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">{displayTarget}</span>
                           </span>
                         )}
                         {/* Show "Has response" for complex nested dialog when collapsed - NOT for collapsible patterns */}
                         {hasNestedDialog && !isCollapsible && !isChoiceExpanded && (
-                          <span className="text-xs text-blue-600 bg-blue-100 px-1 rounded">
+                          <span className="text-xs text-blue-600 bg-blue-100 px-1 rounded whitespace-nowrap flex-shrink-0">
                             Has response →
                           </span>
                         )}
                       </div>
-                      <input
-                        type="text"
+                      <textarea
                         value={displayText}
                         onChange={(e) => {
                           if (isCollapsible) {
@@ -481,7 +520,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                             updateChoiceAtPath(path, index, { text: e.target.value });
                           }
                         }}
-                        className={`w-full px-2 py-1 text-sm border rounded ${
+                        rows={2}
+                        className={`w-full px-2 py-1 text-sm border rounded resize-y min-h-[36px] ${
                           needsTextReplacement
                             ? 'bg-yellow-50 border-yellow-400'
                             : 'bg-white'
@@ -495,35 +535,78 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                       )}
 
                       {/* Counter effect controls */}
-                      <div className="mt-2 flex gap-2 items-center">
-                        <span className="text-xs text-gray-600">Counter:</span>
-                        <input
-                          type="text"
-                          list={`counters-${path.join('-')}-${index}`}
-                          value={choice.counter || ''}
-                          onChange={(e) => updateChoiceAtPath(path, index, {
-                            counter: e.target.value || undefined,
-                            counterOperation: e.target.value ? (choice.counterOperation || 'change') : undefined,
-                            counterValue: e.target.value ? (choice.counterValue ?? 0) : undefined
-                          })}
-                          placeholder="e.g., courage"
-                          className="flex-1 px-2 py-1 text-xs border rounded"
-                        />
-                        <datalist id={`counters-${path.join('-')}-${index}`}>
-                          {availableCounters.map(counter => (
-                            <option key={counter} value={counter} />
-                          ))}
-                        </datalist>
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <span className="text-xs text-gray-600 flex-shrink-0">Counter:</span>
+                          {/* Check if current value is custom (not in availableCounters list) */}
+                          {choice.counter && !availableCounters.includes(choice.counter) ? (
+                            // Show text input for custom counter with option to switch back
+                            <div className="flex-1 flex gap-1 items-center min-w-[120px]">
+                              <input
+                                type="text"
+                                value={choice.counter}
+                                onChange={(e) => updateChoiceAtPath(path, index, {
+                                  counter: e.target.value || undefined,
+                                  counterOperation: e.target.value ? (choice.counterOperation || 'change') : undefined,
+                                  counterValue: e.target.value ? (choice.counterValue ?? 0) : undefined
+                                })}
+                                placeholder="Custom counter name"
+                                className="flex-1 min-w-0 px-2 py-1 text-xs border rounded"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => updateChoiceAtPath(path, index, {
+                                  counter: undefined,
+                                  counterOperation: undefined,
+                                  counterValue: undefined
+                                })}
+                                className="px-1.5 py-0.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded flex-shrink-0"
+                                title="Clear custom counter"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            // Show dropdown for selecting from available counters
+                            <select
+                              value={choice.counter || ''}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '__custom__') {
+                                  // Switch to custom input mode with empty value
+                                  updateChoiceAtPath(path, index, {
+                                    counter: 'custom_counter',
+                                    counterOperation: choice.counterOperation || 'change',
+                                    counterValue: choice.counterValue ?? 0
+                                  });
+                                } else {
+                                  updateChoiceAtPath(path, index, {
+                                    counter: value || undefined,
+                                    counterOperation: value ? (choice.counterOperation || 'change') : undefined,
+                                    counterValue: value ? (choice.counterValue ?? 0) : undefined
+                                  });
+                                }
+                              }}
+                              className="flex-1 min-w-[100px] max-w-full px-2 py-1 text-xs border rounded bg-white"
+                            >
+                              <option value="">No counter effect</option>
+                              {availableCounters.map(counter => (
+                                <option key={counter} value={counter}>{counter}</option>
+                              ))}
+                              <option value="__custom__">+ Custom counter...</option>
+                            </select>
+                          )}
+                        </div>
                         {choice.counter && (
-                          <>
+                          <div className="flex flex-wrap gap-1.5 items-center ml-[52px]">
                             <select
                               value={choice.counterOperation || 'change'}
                               onChange={(e) => updateChoiceAtPath(path, index, {
                                 counterOperation: e.target.value as 'change' | 'set'
                               })}
-                              className="px-2 py-1 text-xs border rounded"
+                              className="px-2 py-1 text-xs border rounded bg-white flex-shrink-0"
                             >
-                              <option value="change">Change</option>
+                              <option value="change">Change by</option>
                               <option value="set">Set to</option>
                             </select>
                             <input
@@ -532,17 +615,17 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                               onChange={(e) => updateChoiceAtPath(path, index, {
                                 counterValue: parseInt(e.target.value) || 0
                               })}
-                              className="w-20 px-2 py-1 text-xs border rounded"
+                              className="w-16 px-2 py-1 text-xs border rounded flex-shrink-0"
                               placeholder="0"
                             />
-                          </>
+                          </div>
                         )}
                       </div>
 
                       {/* Target selection - show for choices without nested dialog OR collapsible patterns */}
                       {(!hasNestedDialog || isCollapsible) && (
-                        <div className="mt-2 flex gap-2 items-center">
-                          <span className="text-xs text-gray-600">→</span>
+                        <div className="mt-2 flex gap-1.5 items-center">
+                          <span className="text-xs text-gray-600 flex-shrink-0">→</span>
                           <select
                             value={displayTarget || ''}
                             onChange={(e) => {
@@ -562,7 +645,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                                 updateChoiceAtPath(path, index, { target: e.target.value || undefined });
                               }
                             }}
-                            className="flex-1 px-2 py-1 text-xs border rounded"
+                            className="flex-1 min-w-0 px-2 py-1 text-xs border rounded bg-white"
                           >
                             <option value="">Select action...</option>
                             {!isCollapsible && (

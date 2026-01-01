@@ -11,6 +11,8 @@ import { SchemaFormGenerator } from './SchemaFormGenerator';
 import { BeatSuggestions } from './ai/BeatSuggestions';
 import type { BeatDefinition } from './SchemaFormGenerator';
 import type { Asset } from './assets/AssetManager';
+import type { Character } from '../types/character';
+import { useAvailableCounters, useAvailableVariables } from '../hooks/useAvailableCountersAndVariables';
 
 // Type definitions
 interface ChoiceWithCounter {
@@ -53,6 +55,9 @@ interface InspectorProps {
   onOpenAssetManager?: () => void;
   onAssetSelect?: (type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => void;
   onOpenCharacterManager?: (callback?: (character: any) => void) => void;
+  // For counter/variable dropdowns
+  characters?: Character[];
+  globalSettings?: { variables?: { name: string; type: 'string' | 'number' | 'boolean'; defaultValue?: any; description?: string }[] };
 }
 
 export const Inspector: React.FC<InspectorProps> = ({
@@ -71,12 +76,18 @@ export const Inspector: React.FC<InspectorProps> = ({
   onOpenAssetManager,
   onAssetSelect,
   onOpenCharacterManager,
+  characters = [],
+  globalSettings,
 }) => {
   const [localBeat, setLocalBeat] = useState<any>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'properties' | 'visual'>('properties');
+
+  // Get available counters and variables for dropdowns
+  const availableCounters = useAvailableCounters(characters);
+  const availableVariables = useAvailableVariables(globalSettings || null);
 
   // Asset selection modal state
   const [assetSelectionModal, setAssetSelectionModal] = useState<{
@@ -957,6 +968,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                     onParameterChange={handleParameterChange}
                     availableTargets={availableTargets}
                     characters={getAvailableCharacters()}
+                    availableCounters={availableCounters}
+                    availableVariables={availableVariables}
                   />
                 )}
 
@@ -1468,6 +1481,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                       onChange={handleDialogTreeChange}
                       characters={getAvailableCharacters()}
                       allBeats={availableTargets}
+                      counters={availableCounters.map(c => c.name)}
+                      variables={availableVariables.map(v => v.name)}
                     />
 
                     {showAdvanced && (

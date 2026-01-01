@@ -1121,6 +1121,7 @@ const ButtonElement: React.FC<{
       if (onAction) {
         // Use actionId if available (for movementChoice, pickProp, etc.), otherwise use location name
         const actionIdToPass = actionId || location.name || 'continue';
+        console.log(`[ButtonElement] Clicked! actionId="${actionId}", location.name="${location.name}", actionIdToPass="${actionIdToPass}"`);
         onAction(actionIdToPass);
       }
     }

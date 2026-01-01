@@ -143,7 +143,7 @@ export interface IRenderer {
   renderMovement(question: string, choices: { id: string; text: string; location: string }[], locations?: Location[]): Promise<string>;
   renderPropSelection(question: string, props: { id: string; name: string; description: string }[], locations?: Location[]): Promise<string>;
   renderVideo(videoFile: string, autoplay: boolean, controls: boolean): Promise<void>;
-  renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<void>;
+  renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<string>;
   renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void>;
 
   // Show choices with optional fade-in animation

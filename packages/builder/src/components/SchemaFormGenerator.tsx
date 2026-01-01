@@ -1,6 +1,7 @@
 import React from 'react';
-import { Variable, Box, Timer, User } from 'lucide-react';
+import { Variable, Box, Timer, User, ChevronDown } from 'lucide-react';
 import type { Beat } from '@asaps/core';
+import type { AvailableCounter, AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
 
 // Type definitions for beat schema
 interface ParameterDefinition {
@@ -28,6 +29,9 @@ interface SchemaFormGeneratorProps {
   onParameterChange: (param: string, value: any) => void;
   availableTargets?: Beat[];
   characters?: any[];
+  // Available counters and variables for dropdowns
+  availableCounters?: AvailableCounter[];
+  availableVariables?: AvailableVariable[];
   // Callbacks for special cases
   customRenderers?: Record<string, (param: string, def: ParameterDefinition) => React.ReactNode>;
 }
@@ -55,6 +59,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   onParameterChange,
   availableTargets = [],
   characters = [],
+  availableCounters = [],
+  availableVariables = [],
   customRenderers = {},
 }) => {
   // Map alias types to canonical types for schema lookup
@@ -153,20 +159,96 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 value={value || paramDef.default || 'variable'}
                 onChange={(e) => {
                   onParameterChange(paramName, e.target.value);
-                  // Clear the other field when switching
+                  // Clear the other fields when switching
                   if (e.target.value === 'variable') {
                     onParameterChange('characterId', undefined);
+                    onParameterChange('counter', undefined);
+                    onParameterChange('counterOperation', undefined);
                     if (!parameters.variable) {
                       onParameterChange('variable', 'userInput');
                     }
-                  } else {
+                  } else if (e.target.value === 'characterName') {
                     onParameterChange('variable', undefined);
+                    onParameterChange('counter', undefined);
+                    onParameterChange('counterOperation', undefined);
+                  } else if (e.target.value === 'counter') {
+                    onParameterChange('variable', undefined);
+                    onParameterChange('characterId', undefined);
+                    // Auto-set validation to numeric for counter
+                    onParameterChange('validation', 'numeric');
                   }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
                 <option value="variable">Variable</option>
                 <option value="characterName">Character Display Name</option>
+                <option value="counter">Counter (Numeric)</option>
+              </select>
+            </div>
+          );
+        }
+
+        // Counter name field for inputText when saveToType is 'counter'
+        if (paramName === 'counter' && beatType === 'inputText') {
+          // Only show if saveToType is 'counter'
+          if (parameters.saveToType !== 'counter') {
+            return null;
+          }
+          const hasCounters = availableCounters.length > 0;
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <Variable className="w-4 h-4 inline mr-1" />
+                Counter Name {isRequired && <span className="text-red-500">*</span>}
+              </label>
+              <input
+                type="text"
+                value={value || ''}
+                onChange={(e) => onParameterChange(paramName, e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder={hasCounters ? 'Type or select counter...' : 'Enter counter name'}
+                list="inputtext-counter-datalist"
+              />
+              {hasCounters && (
+                <datalist id="inputtext-counter-datalist">
+                  {availableCounters.map((c) => (
+                    <option key={`${c.characterId}-${c.name}`} value={c.name}>
+                      {c.fullName}
+                    </option>
+                  ))}
+                </datalist>
+              )}
+              {hasCounters ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  {availableCounters.length} counter(s) available from characters
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">
+                  No counters defined. Add counters to characters first.
+                </p>
+              )}
+            </div>
+          );
+        }
+
+        // Counter operation for inputText when saveToType is 'counter'
+        if (paramName === 'counterOperation' && beatType === 'inputText') {
+          // Only show if saveToType is 'counter'
+          if (parameters.saveToType !== 'counter') {
+            return null;
+          }
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Counter Operation
+              </label>
+              <select
+                value={value || 'set'}
+                onChange={(e) => onParameterChange(paramName, e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="set">Set To (replace value)</option>
+                <option value="change">Add To (change by amount)</option>
               </select>
             </div>
           );
@@ -236,13 +318,73 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           }
         }
 
-        // Handle variable name fields
+        // Handle variable/counter name field with dropdowns for setVariable beat
+        if (paramName === 'name' && beatType === 'setVariable') {
+          const isCounter = parameters.type === 'counter';
+          const options = isCounter ? availableCounters : availableVariables;
+          const hasOptions = options.length > 0;
+
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <Variable className="w-4 h-4 inline mr-1" />
+                {isCounter ? 'Counter' : 'Variable'} Name {isRequired && <span className="text-red-500">*</span>}
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={value || paramDef.default || ''}
+                    onChange={(e) => onParameterChange(paramName, e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm pr-8"
+                    placeholder={hasOptions ? `Type or select ${isCounter ? 'counter' : 'variable'}...` : `Enter ${isCounter ? 'counter' : 'variable'} name`}
+                    required={isRequired}
+                    list={`${paramName}-datalist`}
+                  />
+                  {hasOptions && (
+                    <datalist id={`${paramName}-datalist`}>
+                      {isCounter
+                        ? availableCounters.map((c) => (
+                            <option key={`${c.characterId}-${c.name}`} value={c.name}>
+                              {c.fullName}
+                            </option>
+                          ))
+                        : availableVariables.map((v) => (
+                            <option key={v.name} value={v.name}>
+                              {v.description || v.name}
+                            </option>
+                          ))}
+                    </datalist>
+                  )}
+                </div>
+              </div>
+              {hasOptions ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  {isCounter
+                    ? `${availableCounters.length} counter(s) available from characters`
+                    : `${availableVariables.length} variable(s) defined in Global Settings`}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">
+                  {isCounter
+                    ? 'No counters defined. Add counters to characters first.'
+                    : 'No variables defined. Add variables in Global Settings.'}
+                </p>
+              )}
+            </div>
+          );
+        }
+
+        // Handle other variable name fields (timer, item, character, etc.)
         if (paramName === 'variable' || paramName === 'timer' || paramName === 'item' ||
             paramName === 'timerName' || paramName === 'character' ||
             paramName === 'fromChar' || paramName === 'toChar' || paramName === 'name') {
           const IconComponent = paramName.includes('timer') || paramName.includes('Timer') ? Timer :
                       paramName.includes('item') || paramName.includes('char') || paramName.includes('Char') ? Box :
                       Variable;
+
+          // For 'variable' field in inputText, show dropdown if available
+          const showVariableDropdown = paramName === 'variable' && beatType === 'inputText' && availableVariables.length > 0;
 
           return (
             <div key={paramName}>
@@ -257,7 +399,17 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 placeholder={paramDef.description || `e.g., ${paramDef.default || paramName}`}
                 required={isRequired}
+                list={showVariableDropdown ? `${paramName}-var-datalist` : undefined}
               />
+              {showVariableDropdown && (
+                <datalist id={`${paramName}-var-datalist`}>
+                  {availableVariables.map((v) => (
+                    <option key={v.name} value={v.name}>
+                      {v.description || v.name}
+                    </option>
+                  ))}
+                </datalist>
+              )}
               {paramDef.description && (
                 <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
               )}

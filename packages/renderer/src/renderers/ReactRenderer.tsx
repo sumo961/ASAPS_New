@@ -552,9 +552,12 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   protected handleAction = (id: string): void => {  // Changed to protected
+    console.log(`[ReactRenderer ${this.instanceId}] handleAction called with id="${id}", hasResolveAction=${!!this.resolveAction}`);
     if (this.resolveAction) {
       this.resolveAction(id);
       this.resolveAction = null;
+    } else {
+      console.warn(`[ReactRenderer ${this.instanceId}] handleAction called but no resolveAction pending!`);
     }
   };
 
@@ -915,7 +918,7 @@ export class ReactRenderer extends BaseRenderer {
     });
   }
 
-  async renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<void> {
+  async renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<string> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
@@ -927,7 +930,8 @@ export class ReactRenderer extends BaseRenderer {
     const content = { message, showRestart, showCredits, restartText, creditsText };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('endScreen', content);
 
-    await this.renderPositionedBeat('endScreen', content, effectiveLocations);
+    // Return the user's action (e.g., 'restart', 'credits', button text)
+    return this.renderPositionedBeat('endScreen', content, effectiveLocations);
   }
 
   async renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void> {

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2025-12-29T18:11:58.277Z
+ * Generated: 2026-01-01T20:36:11.499Z
  */
 
 // ============================================
@@ -288,12 +288,16 @@ export interface AddRemoveInventoryParameters {
 export interface InputTextParameters {
   /** Question or prompt text to display */
   prompt: string;
-  /** Save input to: 'variable' or 'characterName' */
+  /** Save input to: 'variable', 'characterName', or 'counter' */
   saveToType: string;
   /** Variable name to store the input (when saveToType='variable') */
   variable?: string | undefined;
   /** Character ID to update display name (when saveToType='characterName') */
   characterId?: string | undefined;
+  /** Counter name to store numeric input (when saveToType='counter') */
+  counter?: string | undefined;
+  /** Counter operation: 'set' or 'change' (when saveToType='counter') */
+  counterOperation?: string | undefined;
   /** Optional placeholder text for input field */
   placeholder?: string | undefined;
   /** Validation type: none, numeric, email, alphanumeric */

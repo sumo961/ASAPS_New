@@ -10,7 +10,8 @@ import {
   ASMLGenerator,
   ASMLParser,
   Cluster,
-  ContainerBeatPosition
+  ContainerBeatPosition,
+  SharedVisualContent
 } from '@asaps/core';
 import { applyTreeLayoutToBeats } from '../utils/TreeLayoutAlgorithm';
 import {
@@ -58,6 +59,7 @@ interface StoryBuilderActions {
   renameCluster: (clusterId: string, name: string) => void;
   setClusterMap: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   setClusterSound: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
+  setClusterSharedVisuals: (clusterId: string, sharedVisuals: SharedVisualContent | undefined) => void;
   exportStory: (assets?: any[], characters?: any[]) => string;
   importStory: (xmlContent: string, options?: ImportStoryOptions) => Promise<ImportStoryResult>;
   clearStory: () => void;
@@ -908,6 +910,19 @@ export function useStoryBuilder() {
     }));
   }, []);
 
+  // Set cluster shared visual content (inherited by all beats in cluster)
+  const setClusterSharedVisuals = useCallback((clusterId: string, sharedVisuals: SharedVisualContent | undefined) => {
+    console.log('[useStoryBuilder] Setting cluster shared visuals', clusterId, sharedVisuals);
+    setState(prev => ({
+      ...prev,
+      clusters: prev.clusters.map(cluster =>
+        cluster.id === clusterId
+          ? { ...cluster, sharedVisuals }
+          : cluster
+      ),
+    }));
+  }, []);
+
   const actions: StoryBuilderActions = {
     setTitle,
     setAuthor,
@@ -934,6 +949,7 @@ export function useStoryBuilder() {
     renameCluster,
     setClusterMap,
     setClusterSound,
+    setClusterSharedVisuals,
   };
 
   return {

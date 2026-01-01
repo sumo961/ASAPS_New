@@ -38,6 +38,13 @@ interface CanvasProps {
   assets?: Asset[];
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
+  onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
+  // Beat actions for context menu
+  onBeatDuplicate?: (beatId: string) => void;
+  onBeatDelete?: (beatId: string) => void;
+  onBeatCopy?: (beatId: string) => void;
+  onBeatPaste?: (position: { x: number; y: number }) => void;
+  hasBeatClipboard?: boolean;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -67,6 +74,12 @@ export const Canvas: React.FC<CanvasProps> = ({
   assets = [],
   onSetClusterMap,
   onSetClusterSound,
+  onSetClusterSharedVisuals,
+  onBeatDuplicate,
+  onBeatDelete,
+  onBeatCopy,
+  onBeatPaste,
+  hasBeatClipboard = false,
 }) => {
   const handleBeatMove = (beatId: string, x: number, y: number) => {
     onBeatMove(beatId, { x, y });
@@ -128,6 +141,12 @@ export const Canvas: React.FC<CanvasProps> = ({
           assets={assets}
           onSetClusterMap={onSetClusterMap}
           onSetClusterSound={onSetClusterSound}
+          onSetClusterSharedVisuals={onSetClusterSharedVisuals}
+          onBeatDuplicate={onBeatDuplicate}
+          onBeatDelete={onBeatDelete}
+          onBeatCopy={onBeatCopy}
+          onBeatPaste={onBeatPaste}
+          hasBeatClipboard={hasBeatClipboard}
         />
       </div>
       

@@ -14,6 +14,21 @@ interface StoryState {
 }
 
 /**
+ * Serializable version of StoryState for save/load functionality
+ * Used by the standalone player's save system
+ */
+export interface SerializedStoryState {
+  currentBeatId: string;
+  variables: Record<string, any>;
+  counters: Record<string, number>;
+  inventory: string[];
+  characterInventories: Record<string, string[]>;
+  visitedBeats: string[]; // Array instead of Set for JSON serialization
+  timers: Record<string, { value: number; target?: string }>;
+  history: string[]; // Include beat history for proper restoration
+}
+
+/**
  * Debug session tracking
  */
 interface DebugSession {
@@ -588,5 +603,82 @@ export class StoryContext extends EventEmitter {
       this.aiSuggestions.splice(index, 1);
       this.emit('aiSuggestionRemoved', { suggestionId });
     }
+  }
+
+  // ======== Save/Load Serialization ========
+
+  /**
+   * Serialize the current story state for saving
+   * Converts Sets to Arrays for JSON compatibility
+   */
+  serialize(): SerializedStoryState {
+    return {
+      currentBeatId: this.state.currentBeatId,
+      variables: { ...this.state.variables },
+      counters: { ...this.state.counters },
+      inventory: [...this.state.inventory],
+      characterInventories: Object.fromEntries(
+        Object.entries(this.state.characterInventories).map(([k, v]) => [k, [...v]])
+      ),
+      visitedBeats: Array.from(this.state.visitedBeats),
+      timers: { ...this.state.timers },
+      history: [...this.history]
+    };
+  }
+
+  /**
+   * Load state from a serialized save
+   * Restores the context to the saved state
+   */
+  loadFromSerialized(serialized: SerializedStoryState): void {
+    // Stop any active timers before restoring state
+    this.timerManager.stopAllTimers();
+
+    // Restore state
+    this.state = {
+      currentBeatId: serialized.currentBeatId,
+      variables: { ...serialized.variables },
+      counters: { ...serialized.counters },
+      inventory: [...serialized.inventory],
+      characterInventories: Object.fromEntries(
+        Object.entries(serialized.characterInventories || {}).map(([k, v]) => [k, [...v]])
+      ),
+      visitedBeats: new Set(serialized.visitedBeats),
+      timers: { ...serialized.timers }
+    };
+
+    // Restore history
+    this.history = [...serialized.history];
+
+    // Restart any saved timers
+    for (const [name, timer] of Object.entries(serialized.timers)) {
+      if (timer.value > 0) {
+        this.timerManager.startTimer(name, timer.value, timer.target);
+      }
+    }
+
+    this.emit('stateLoaded', { serialized });
+  }
+
+  /**
+   * Get the current beat ID
+   */
+  getCurrentBeatId(): string {
+    return this.state.currentBeatId;
+  }
+
+  /**
+   * Set the current beat ID
+   */
+  setCurrentBeatId(beatId: string): void {
+    this.state.currentBeatId = beatId;
+    this.emit('beatChanged', { beatId });
+  }
+
+  /**
+   * Get the beat history
+   */
+  getHistory(): string[] {
+    return [...this.history];
   }
 }

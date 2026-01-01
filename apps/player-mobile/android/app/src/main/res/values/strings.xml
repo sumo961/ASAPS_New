@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ASAPS Player</string>
+    <string name="title_activity_main">ASAPS Player</string>
+    <string name="package_name">com.asaps.player</string>
+    <string name="custom_url_scheme">com.asaps.player</string>
+</resources>

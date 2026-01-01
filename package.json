@@ -6,7 +6,8 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "author": "Hartmut Koenitz",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "prepare": "npm run build:deps || echo 'Build skipped (CI or first install)'",

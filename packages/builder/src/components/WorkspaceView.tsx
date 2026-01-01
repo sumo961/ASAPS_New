@@ -47,7 +47,14 @@ interface WorkspaceViewProps {
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
+  onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
   characters?: Character[];
+  // Beat context menu actions
+  onBeatDuplicate?: (beatId: string) => void;
+  onBeatDelete?: (beatId: string) => void;
+  onBeatCopy?: (beatId: string) => void;
+  onBeatPaste?: (position: { x: number; y: number }) => void;
+  hasBeatClipboard?: boolean;
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
@@ -85,7 +92,14 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onClusterResize,
   onSetClusterMap,
   onSetClusterSound,
+  onSetClusterSharedVisuals,
   characters = [],
+  // Beat context menu actions
+  onBeatDuplicate,
+  onBeatDelete,
+  onBeatCopy,
+  onBeatPaste,
+  hasBeatClipboard = false,
 }) => {
   const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
 
@@ -108,6 +122,14 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   };
 
   const showVisualTab = supportsVisualEditor(selectedBeat);
+
+  // Find the cluster containing the selected beat (for shared visuals)
+  const selectedBeatCluster = React.useMemo(() => {
+    if (!selectedBeat) return null;
+    const position = containerBeatPositions.find(p => p.beatId === selectedBeat.id);
+    if (!position) return null;
+    return clusters.find(c => c.id === position.clusterId) || null;
+  }, [selectedBeat, containerBeatPositions, clusters]);
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden" style={{ minHeight: 0 }}>
@@ -190,6 +212,12 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               assets={assets}
               onSetClusterMap={onSetClusterMap}
               onSetClusterSound={onSetClusterSound}
+              onSetClusterSharedVisuals={onSetClusterSharedVisuals}
+              onBeatDuplicate={onBeatDuplicate}
+              onBeatDelete={onBeatDelete}
+              onBeatCopy={onBeatCopy}
+              onBeatPaste={onBeatPaste}
+              hasBeatClipboard={hasBeatClipboard}
             />
           </div>
         ) : (
@@ -207,6 +235,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               projectSettings={projectSettings}
               globalSettings={globalSettings}
               characters={characters}
+              cluster={selectedBeatCluster}
+              onSetClusterSharedVisuals={onSetClusterSharedVisuals}
             />
           </div>
         )}

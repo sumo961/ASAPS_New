@@ -27,6 +27,26 @@ import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnima
 import { SpriteSheetEditor } from './SpriteSheetEditor';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
 
+/**
+ * Helper to resolve fresh image URL from assets using assetId.
+ * Character state images stored with blob URLs become stale after page reload.
+ */
+function resolveImageUrl(
+  assetId: string | undefined,
+  image: string | undefined,
+  assets: Array<{ id: string; url: string; }>
+): string | undefined {
+  // Try to resolve via assetId first (this gives fresh blob URLs)
+  if (assetId) {
+    const asset = assets.find(a => a.id === assetId);
+    if (asset?.url) {
+      return asset.url;
+    }
+  }
+  // Fall back to stored image URL (may be stale blob URL after page reload)
+  return image;
+}
+
 interface CharacterEditorProps {
   character: Character;
   onUpdate: (character: Character) => void;
@@ -247,7 +267,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             
             {/* Direct Upload Component */}
             <DirectAssetUpload
-              currentAssetUrl={editedCharacter.visual.defaultImage}
+              currentAssetUrl={resolveImageUrl(editedCharacter.visual.defaultAssetId, editedCharacter.visual.defaultImage, assets)}
               onAssetSelect={(url, metadata) => {
                 // Save both the URL (for display) and assetId (for persistence)
                 setEditedCharacter({
@@ -444,13 +464,16 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  {state.visual.image && (
-                    <img 
-                      src={state.visual.image} 
-                      alt={state.displayName}
-                      className="w-12 h-12 object-cover rounded border"
-                    />
-                  )}
+                  {(() => {
+                    const resolvedUrl = resolveImageUrl(state.visual.assetId, state.visual.image, assets);
+                    return resolvedUrl ? (
+                      <img
+                        src={resolvedUrl}
+                        alt={state.displayName}
+                        className="w-12 h-12 object-cover rounded border"
+                      />
+                    ) : null;
+                  })()}
                   <button
                     onClick={() => setShowAssetPicker(`state_${state.id}`)}
                     className="px-2 py-1 text-xs border rounded hover:bg-gray-50"
@@ -824,15 +847,18 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-              {editedCharacter.visual.defaultImage ? (
-                <img 
-                  src={editedCharacter.visual.defaultImage} 
-                  alt={editedCharacter.displayName}
-                  className="w-full h-full object-cover rounded-lg"
-                />
-              ) : (
-                <User className="w-5 h-5" />
-              )}
+              {(() => {
+                const resolvedUrl = resolveImageUrl(editedCharacter.visual.defaultAssetId, editedCharacter.visual.defaultImage, assets);
+                return resolvedUrl ? (
+                  <img
+                    src={resolvedUrl}
+                    alt={editedCharacter.displayName}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                ) : (
+                  <User className="w-5 h-5" />
+                );
+              })()}
             </div>
             <div>
               <h2 className="text-lg font-semibold">{editedCharacter.displayName}</h2>

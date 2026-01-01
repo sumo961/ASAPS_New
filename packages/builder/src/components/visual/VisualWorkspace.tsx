@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Beat, type Location, type AnimationPath } from '@asaps/core';
+import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
 import { VisualPropertiesPanel } from './VisualPropertiesPanel';
 import { AnimationPanel } from './AnimationPanel';
@@ -12,10 +12,44 @@ import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
 import { calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '../../utils/textSizeCalculator';
-import { Info } from 'lucide-react';
+import { Info, Share2 } from 'lucide-react';
 
 import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
 import type { Character } from '../../types/character';
+
+/**
+ * Helper to resolve fresh image URL from assets using assetId.
+ * Character state images stored with blob URLs become stale after page reload.
+ * This function looks up the assetId in the assets array to get fresh URLs.
+ */
+function resolveCharacterImageUrl(
+  state: { visual?: { assetId?: string; image?: string } } | null,
+  defaultImage: string | undefined,
+  assets: Asset[]
+): string | undefined {
+  if (!state?.visual) {
+    return defaultImage;
+  }
+
+  // Try to resolve via assetId first (this gives fresh blob URLs)
+  if (state.visual.assetId) {
+    const asset = assets.find(a => a.id === state.visual!.assetId);
+    if (asset?.url) {
+      return asset.url;
+    }
+  }
+
+  // Fall back to stored image URL (may be stale blob URL)
+  if (state.visual.image) {
+    // Check if it's a blob URL - these are likely stale after page reload
+    if (state.visual.image.startsWith('blob:')) {
+      console.warn('[VisualWorkspace] Using potentially stale blob URL - no assetId found:', state.visual.image.substring(0, 50));
+    }
+    return state.visual.image;
+  }
+
+  return defaultImage;
+}
 
 interface VisualWorkspaceProps {
   beat: Beat | null;
@@ -35,6 +69,9 @@ interface VisualWorkspaceProps {
   };
   globalSettings?: GlobalSettings;
   characters?: Character[];
+  // Cluster containing this beat (for shared visuals)
+  cluster?: Cluster | null;
+  onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: SharedVisualContent | undefined) => void;
 }
 
 export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
@@ -50,6 +87,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   projectSettings,
   globalSettings,
   characters = [],
+  cluster,
+  onSetClusterSharedVisuals,
 }) => {
   const [visualElements, setVisualElements] = useState<VisualElement[]>([]);
   const [backgroundAssetId, setBackgroundAssetId] = useState<string>('');
@@ -383,6 +422,62 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           }
         }
 
+        // Resolve character images from characters array (fresh URLs, not stale blob URLs)
+        // FIRST OCCURRENCE - for beat.locations path
+        if (element.type === 'character') {
+          let resolved = false;
+          let character: Character | undefined;
+          let state: any;
+
+          // Try by characterId first
+          if (loc.characterId) {
+            character = characters.find(c => c.id === loc.characterId);
+            if (character) {
+              const stateId = loc.stateId || character.defaultState;
+              state = character.states?.find((s: any) => s.id === stateId);
+            }
+          }
+
+          // Try by characterName if characterId didn't work
+          if (!character && loc.characterName) {
+            const charName = loc.characterName.toLowerCase();
+            character = characters.find(c =>
+              c.name?.toLowerCase() === charName ||
+              c.displayName?.toLowerCase() === charName
+            );
+            if (character) {
+              const stateId = loc.stateId || character.defaultState;
+              state = character.states?.find((s: any) => s.id === stateId);
+            }
+          }
+
+          // Try by element name as character name (fallback)
+          if (!character && loc.name) {
+            const charName = loc.name.toLowerCase();
+            character = characters.find(c =>
+              c.name?.toLowerCase() === charName ||
+              c.displayName?.toLowerCase() === charName
+            );
+            if (character) {
+              const stateId = loc.stateId || character.defaultState;
+              state = character.states?.find((s: any) => s.id === stateId);
+            }
+          }
+
+          // Resolve image URL using helper (handles stale blob URLs via assetId lookup)
+          if (character) {
+            const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
+            if (resolvedUrl) {
+              element.imageUrl = resolvedUrl;
+              resolved = true;
+            }
+          }
+
+          if (!resolved) {
+            console.warn('[VisualWorkspace] Character NOT resolved (beat.locations), using original imageUrl:', element.imageUrl);
+          }
+        }
+
         // Populate text content from beat parameters based on element name
         // Note: nameLower is already defined above for button detection
         if (element.type === 'dialog' || element.type === 'text') {
@@ -508,6 +603,56 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             );
             if (asset) {
               element.imageUrl = asset.url;
+            }
+          }
+        }
+
+        // Resolve character images from characters array (fresh URLs, not stale blob URLs)
+        // SECOND OCCURRENCE - for params.locs path
+        if (element.type === 'character') {
+          let character: Character | undefined;
+          let state: any;
+
+          // Try by characterId first
+          if (loc.characterId) {
+            character = characters.find(c => c.id === loc.characterId);
+            if (character) {
+              const stateId = loc.stateId || character.defaultState;
+              state = character.states?.find((s: any) => s.id === stateId);
+            }
+          }
+
+          // Try by characterName if characterId didn't work
+          if (!character && loc.characterName) {
+            const charName = loc.characterName.toLowerCase();
+            character = characters.find(c =>
+              c.name?.toLowerCase() === charName ||
+              c.displayName?.toLowerCase() === charName
+            );
+            if (character) {
+              const stateId = loc.stateId || character.defaultState;
+              state = character.states?.find((s: any) => s.id === stateId);
+            }
+          }
+
+          // Try by element name as character name (fallback)
+          if (!character && loc.name) {
+            const charName = loc.name.toLowerCase();
+            character = characters.find(c =>
+              c.name?.toLowerCase() === charName ||
+              c.displayName?.toLowerCase() === charName
+            );
+            if (character) {
+              const stateId = loc.stateId || character.defaultState;
+              state = character.states?.find((s: any) => s.id === stateId);
+            }
+          }
+
+          // Resolve image URL using helper (handles stale blob URLs via assetId lookup)
+          if (character) {
+            const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
+            if (resolvedUrl) {
+              element.imageUrl = resolvedUrl;
             }
           }
         }
@@ -1176,11 +1321,96 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
   console.log('[VisualWorkspace] beatContent for rendering:', { beatType: beat?.type, content });
 
+  // Handle sharing current background to cluster
+  const handleShareBackgroundToCluster = useCallback(() => {
+    if (!cluster || !onSetClusterSharedVisuals) return;
+
+    const currentSharedVisuals = cluster.sharedVisuals || { locations: [] };
+    const newSharedVisuals: SharedVisualContent = {
+      ...currentSharedVisuals,
+      background: backgroundAssetId ? {
+        assetId: backgroundAssetId,
+        scale: 1,
+        opacity: 1,
+      } : undefined,
+    };
+
+    onSetClusterSharedVisuals(cluster.id, newSharedVisuals);
+    console.log('[VisualWorkspace] Shared background to cluster:', cluster.name, newSharedVisuals);
+  }, [cluster, onSetClusterSharedVisuals, backgroundAssetId]);
+
+  // Handle sharing selected element to cluster
+  const handleShareElementToCluster = useCallback(() => {
+    if (!cluster || !onSetClusterSharedVisuals || !selectedElementId) return;
+
+    const elementToShare = visualElements.find(el => el.id === selectedElementId);
+    if (!elementToShare) return;
+
+    // Convert VisualElement to Location format
+    const locationToShare: Location = {
+      x: elementToShare.x,
+      y: elementToShare.y,
+      width: elementToShare.width,
+      height: elementToShare.height,
+      kind: elementToShare.type,  // Map 'type' to 'kind'
+      name: elementToShare.name || elementToShare.id,  // Use name or fall back to id
+      // Copy relevant properties
+      assetId: elementToShare.assetId,
+      characterId: elementToShare.characterId,
+      fontSize: elementToShare.fontSize,
+    };
+
+    const currentSharedVisuals = cluster.sharedVisuals || { locations: [] };
+    const newSharedVisuals: SharedVisualContent = {
+      ...currentSharedVisuals,
+      locations: [...(currentSharedVisuals.locations || []), locationToShare],
+    };
+
+    onSetClusterSharedVisuals(cluster.id, newSharedVisuals);
+    console.log('[VisualWorkspace] Shared element to cluster:', elementToShare.name, cluster.name);
+  }, [cluster, onSetClusterSharedVisuals, selectedElementId, visualElements]);
+
   return (
     <div className="h-full flex bg-gray-100 relative">
       {/* Left Panel with Tabs */}
       {showProperties && (
         <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+          {/* Cluster Info Banner */}
+          {cluster && (
+            <div className="p-2 bg-teal-50 border-b border-teal-200">
+              <div className="flex items-center gap-2 text-sm">
+                <Share2 className="w-4 h-4 text-teal-600" />
+                <span className="font-medium text-teal-700">In cluster: {cluster.name}</span>
+              </div>
+              {cluster.sharedVisuals && (
+                <div className="mt-1 text-xs text-teal-600">
+                  {cluster.sharedVisuals.background ? '✓ Shared background' : ''}
+                  {cluster.sharedVisuals.locations?.length ? ` • ${cluster.sharedVisuals.locations.length} shared element(s)` : ''}
+                </div>
+              )}
+              <div className="mt-2 flex gap-2">
+                {backgroundAssetId && onSetClusterSharedVisuals && (
+                  <button
+                    onClick={handleShareBackgroundToCluster}
+                    className="px-2 py-1 text-xs bg-teal-500 text-white rounded hover:bg-teal-600"
+                    title="Share current background with all beats in this cluster"
+                  >
+                    Share Background
+                  </button>
+                )}
+                {selectedElementId && onSetClusterSharedVisuals && (
+                  <button
+                    onClick={handleShareElementToCluster}
+                    className="px-2 py-1 text-xs bg-teal-500 text-white rounded hover:bg-teal-600"
+                    title="Share selected element with all beats in this cluster"
+                  >
+                    Share Element
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Tab Buttons */}
           <div className="flex border-b border-gray-200">
             <button

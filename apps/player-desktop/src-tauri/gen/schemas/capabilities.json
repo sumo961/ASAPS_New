@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Default capabilities for the ASAPS Player","local":true,"windows":["main"],"permissions":["core:default","fs:default","fs:allow-read","fs:allow-write","fs:allow-exists","fs:allow-mkdir","dialog:default","dialog:allow-open","dialog:allow-save"]}}

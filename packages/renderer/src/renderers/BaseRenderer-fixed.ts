@@ -57,7 +57,7 @@ export abstract class BaseRenderer implements IRenderer {
     allowMultiple: boolean;
   }): Promise<string>;
   abstract renderVideo(videoFile: string, autoplay: boolean, controls: boolean): Promise<void>;
-  abstract renderEndScreen(message: string, showRestart: boolean, showCredits: boolean): Promise<void>;
+  abstract renderEndScreen(message: string, showRestart: boolean, showCredits: boolean): Promise<string>;
 
   // Shared transition implementation
   async applyTransition(transition: Transition): Promise<void> {

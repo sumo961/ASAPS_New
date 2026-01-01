@@ -1,0 +1,80 @@
+{
+  "name": "@asaps/builder-desktop",
+  "version": "1.0.0",
+  "description": "ASAPS Desktop Builder - Native authoring tool for macOS and Windows",
+  "private": true,
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @asaps/builder\" \"sleep 3 && NODE_ENV=development electron .\"",
+    "build:electron": "vite build",
+    "build:all": "npm run build -w @asaps/builder && npm run build:electron && npm run copy-builder",
+    "copy-builder": "cp -r ../../../packages/builder/dist ./builder",
+    "build:mac": "npm run build:all && electron-builder --mac",
+    "build:win": "npm run build:all && electron-builder --win",
+    "build:linux": "npm run build:all && electron-builder --linux",
+    "build:dir": "npm run build:all && electron-builder --dir"
+  },
+  "dependencies": {
+    "@asaps/builder": "^2.0.0",
+    "@asaps/core": "^2.0.0",
+    "@asaps/renderer": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0",
+    "vite-plugin-electron": "^0.28.0"
+  },
+  "build": {
+    "appId": "com.asaps.builder",
+    "productName": "ASAPS Builder",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "builder/**/*",
+      "dist-electron/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build/icons",
+      "category": "Development"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "fileAssociations": [
+      {
+        "ext": "asaps",
+        "name": "ASAPS Project",
+        "description": "ASAPS Story Project",
+        "mimeType": "application/x-asaps-project"
+      }
+    ]
+  }
+}

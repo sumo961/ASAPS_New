@@ -39,7 +39,7 @@ export abstract class BaseRenderer implements IRenderer {
   abstract renderMovement(question: string, choices: { id: string; text: string; location: string }[]): Promise<string>;
   abstract renderPropSelection(question: string, props: { id: string; name: string; description: string }[]): Promise<string>;
   abstract renderVideo(videoFile: string, autoplay: boolean, controls: boolean): Promise<void>;
-  abstract renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<void>;
+  abstract renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<string>;
   abstract renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void>;
   abstract renderInputText(prompt: string, placeholder?: string, buttonText?: string, options?: {
     validation?: 'none' | 'numeric' | 'email' | 'alphanumeric';

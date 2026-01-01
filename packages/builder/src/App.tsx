@@ -1248,6 +1248,63 @@ function App() {
     markChanged();
   }, [actions, markChanged]);
 
+  // Beat clipboard for copy/paste
+  const [beatClipboard, setBeatClipboard] = useState<{
+    type: string;
+    name: string;
+    parameters: Record<string, any>;
+  } | null>(null);
+
+  const handleBeatDuplicate = useCallback((beatId: string) => {
+    const beat = state.beats.find(b => b.id === beatId);
+    if (!beat) return;
+
+    const position = {
+      x: (beat.x || 0) + 30,
+      y: (beat.y || 0) + 30,
+    };
+
+    const newBeat = actions.addBeat(beat.type, position, {
+      name: `${beat.name} (Copy)`,
+    });
+
+    // Copy parameters if possible
+    if (newBeat && typeof beat.getParameters === 'function') {
+      const params = beat.getParameters();
+      actions.updateBeat(newBeat.id, { parameters: params } as Partial<Beat>);
+    }
+
+    setSelectedBeat(newBeat);
+    markChanged();
+  }, [actions, state.beats, markChanged]);
+
+  const handleBeatCopy = useCallback((beatId: string) => {
+    const beat = state.beats.find(b => b.id === beatId);
+    if (!beat) return;
+
+    setBeatClipboard({
+      type: beat.type,
+      name: beat.name,
+      parameters: typeof beat.getParameters === 'function' ? beat.getParameters() : {},
+    });
+  }, [state.beats]);
+
+  const handleBeatPaste = useCallback((position: { x: number; y: number }) => {
+    if (!beatClipboard) return;
+
+    const newBeat = actions.addBeat(beatClipboard.type, position, {
+      name: `${beatClipboard.name} (Paste)`,
+    });
+
+    // Apply copied parameters
+    if (newBeat && beatClipboard.parameters) {
+      actions.updateBeat(newBeat.id, { parameters: beatClipboard.parameters } as Partial<Beat>);
+    }
+
+    setSelectedBeat(newBeat);
+    markChanged();
+  }, [actions, beatClipboard, markChanged]);
+
   // Auto-layout handler - rearranges all beats using the tree layout algorithm
   const handleAutoLayout = useCallback(() => {
     if (state.beats.length === 0) return;
@@ -2755,7 +2812,18 @@ function App() {
                 markChanged();
               }
             }}
+            onSetClusterSharedVisuals={(clusterId: string, sharedVisuals: any) => {
+              if (actions.setClusterSharedVisuals) {
+                actions.setClusterSharedVisuals(clusterId, sharedVisuals);
+                markChanged();
+              }
+            }}
             characters={characters}
+            onBeatDuplicate={handleBeatDuplicate}
+            onBeatDelete={handleBeatDelete}
+            onBeatCopy={handleBeatCopy}
+            onBeatPaste={handleBeatPaste}
+            hasBeatClipboard={beatClipboard !== null}
           />
 
           {selectedBeat && (
@@ -2770,6 +2838,8 @@ function App() {
               assets={assets}
               onAssetSelect={handleAssetSelect}
               onOpenCharacterManager={handleOpenCharacterManager}
+              characters={characters}
+              globalSettings={globalSettings}
             />
           )}
         </div>

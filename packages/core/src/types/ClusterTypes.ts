@@ -1,6 +1,20 @@
 // Cluster container type definitions for spatial story organization
 
-import type { Sound } from './index';
+import type { Sound, Location } from './index';
+
+/**
+ * Shared visual content that can be inherited by all beats in a cluster
+ */
+export interface SharedVisualContent {
+  /** Shared background settings (different from mapAssetId which is for flowchart view) */
+  background?: {
+    assetId: string;
+    scale?: number;   // Scale factor (default 1.0)
+    opacity?: number; // Opacity (0-1, default 1.0)
+  };
+  /** Shared visual elements (props, characters) inherited by all beats in cluster */
+  locations: Location[];
+}
 
 /**
  * Cluster container for spatial organization of beats within the flowchart
@@ -26,7 +40,7 @@ export interface Cluster {
   // Expand/collapse state
   isExpanded: boolean;
 
-  // Map/background image for spatial clusters
+  // Map/background image for spatial clusters (flowchart view only)
   mapAssetId?: string;
   mapScale?: number;    // Independent scale for background image (0.1-3.0, default 1.0)
   mapOpacity?: number;  // Background image opacity (0-1, default 0.5)
@@ -37,6 +51,10 @@ export interface Cluster {
   // Ambient sound that plays while in this cluster
   // Loops automatically and fades in/out when entering/leaving the cluster
   sound?: Sound;
+
+  // Shared visual content inherited by all beats in this cluster
+  // Beats can override individual elements or the entire background
+  sharedVisuals?: SharedVisualContent;
 }
 
 /**

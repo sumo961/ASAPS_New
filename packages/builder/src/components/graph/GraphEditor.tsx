@@ -55,6 +55,13 @@ interface GraphEditorProps {
   assets?: Asset[];
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
+  onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
+  // Beat actions for context menu
+  onBeatDuplicate?: (beatId: string) => void;
+  onBeatDelete?: (beatId: string) => void;
+  onBeatCopy?: (beatId: string) => void;
+  onBeatPaste?: (position: { x: number; y: number }) => void;
+  hasBeatClipboard?: boolean;
 }
 
 const nodeTypes: NodeTypes = {
@@ -105,8 +112,22 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   assets = [],
   onSetClusterMap,
   onSetClusterSound,
+  onSetClusterSharedVisuals,
+  onBeatDuplicate,
+  onBeatDelete,
+  onBeatCopy,
+  onBeatPaste,
+  hasBeatClipboard = false,
 }) => {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    beatId: string | null;
+    flowPosition: { x: number; y: number } | null;
+  } | null>(null);
 
   // Use ref for assets to avoid triggering unnecessary useMemo recalculations
   // The cluster nodes will access assets via ref for the popover, which updates on render
@@ -235,6 +256,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           onSetClusterMap: onSetClusterMap,
           // Cluster ambient sound
           onSetClusterSound: onSetClusterSound,
+          // Cluster shared visuals
+          onSetClusterSharedVisuals: onSetClusterSharedVisuals,
           // Pass a getter function for assets to avoid embedding the whole array in node data
           getAssets: () => assetsRef.current,
           // Pass getter for highlighted beat IDs to avoid embedding in node data and prevent re-renders
@@ -807,6 +830,95 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     [beats, clusters, onBeatSelect, onClusterSelect, onClusterExpandCollapse]
   );
 
+  // Handle node context menu (right-click)
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      // Only show context menu for beat nodes
+      if (node.type !== 'beat') {
+        return;
+      }
+
+      // Get the flow position for paste operations
+      const flowPosition = reactFlowInstance?.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        beatId: node.id,
+        flowPosition: flowPosition || null,
+      });
+    },
+    [reactFlowInstance]
+  );
+
+  // Handle pane context menu (right-click on empty space)
+  const onPaneContextMenu = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault();
+
+      // Get the flow position for paste operations
+      const flowPosition = reactFlowInstance?.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        beatId: null,
+        flowPosition: flowPosition || null,
+      });
+    },
+    [reactFlowInstance]
+  );
+
+  // Close context menu on click outside
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // Handle context menu actions
+  const handleContextMenuAction = useCallback(
+    (action: 'duplicate' | 'copy' | 'paste' | 'delete') => {
+      if (!contextMenu) return;
+
+      switch (action) {
+        case 'duplicate':
+          if (contextMenu.beatId && onBeatDuplicate) {
+            onBeatDuplicate(contextMenu.beatId);
+          }
+          break;
+        case 'copy':
+          if (contextMenu.beatId && onBeatCopy) {
+            onBeatCopy(contextMenu.beatId);
+          }
+          break;
+        case 'paste':
+          if (contextMenu.flowPosition && onBeatPaste) {
+            onBeatPaste(contextMenu.flowPosition);
+          }
+          break;
+        case 'delete':
+          if (contextMenu.beatId && onBeatDelete) {
+            const beat = beats.find(b => b.id === contextMenu.beatId);
+            const confirmDelete = window.confirm(`Delete beat "${beat?.name || contextMenu.beatId}"?`);
+            if (confirmDelete) {
+              onBeatDelete(contextMenu.beatId);
+            }
+          }
+          break;
+      }
+      closeContextMenu();
+    },
+    [contextMenu, beats, onBeatDuplicate, onBeatCopy, onBeatPaste, onBeatDelete, closeContextMenu]
+  );
+
   // Handle node drag
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: Node) => {
@@ -898,6 +1010,9 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         onConnect={onConnectHandler}
         onNodeClick={onNodeClick}
         onNodeDragStop={onNodeDragStop}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneContextMenu={onPaneContextMenu}
+        onPaneClick={closeContextMenu}
         onInit={(instance) => {
           // Set the instance for viewport controls
           setReactFlowInstance(instance);
@@ -971,6 +1086,62 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           zoomable
         />
       </ReactFlow>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[160px] z-50"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+        >
+          {contextMenu.beatId ? (
+            // Beat context menu
+            <>
+              <button
+                onClick={() => handleContextMenuAction('duplicate')}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                disabled={!onBeatDuplicate}
+              >
+                <span className="text-gray-500">⌘D</span>
+                <span>Duplicate</span>
+              </button>
+              <button
+                onClick={() => handleContextMenuAction('copy')}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                disabled={!onBeatCopy}
+              >
+                <span className="text-gray-500">⌘C</span>
+                <span>Copy</span>
+              </button>
+              <div className="h-px bg-gray-200 my-1" />
+              <button
+                onClick={() => handleContextMenuAction('delete')}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                disabled={!onBeatDelete}
+              >
+                <span className="text-red-400">⌫</span>
+                <span>Delete</span>
+              </button>
+            </>
+          ) : (
+            // Pane context menu (empty space)
+            <>
+              <button
+                onClick={() => handleContextMenuAction('paste')}
+                className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
+                  hasBeatClipboard ? 'hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'
+                }`}
+                disabled={!hasBeatClipboard || !onBeatPaste}
+              >
+                <span className="text-gray-500">⌘V</span>
+                <span>Paste Beat</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };

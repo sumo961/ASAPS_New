@@ -81,4 +81,18 @@ visual-patches/
 *.backup.*
 package-lock*.json
 !package-lock.json
-package.json.backup*AI DialogTree concept.md
+
+# Tauri/Rust build artifacts
+**/src-tauri/target/
+**/target/
+Cargo.lock
+
+# Desktop app bundles (generated)
+*.app/
+*.dmg
+*.AppImage
+*.deb
+*.msi
+
+# Electron build artifacts
+**/dist-electron/

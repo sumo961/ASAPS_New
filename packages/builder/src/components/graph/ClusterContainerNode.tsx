@@ -1,6 +1,6 @@
 import React, { memo, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
-import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
+import { Beat, Cluster, ContainerBeatPosition, SharedVisualContent } from '@asaps/core';
 
 // Extended position info including beat data
 interface ClusterBeatInfo extends ContainerBeatPosition {
@@ -28,6 +28,8 @@ interface ClusterContainerNodeData {
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   // Cluster ambient sound
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
+  // Cluster shared visuals (inherited by all beats in cluster)
+  onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: SharedVisualContent | undefined) => void;
   // Getter function for assets to avoid embedding array in node data (prevents render issues)
   getAssets?: () => Array<{ id: string; url: string; type: string; name?: string }>;
   // Getter function for highlighted beat IDs - use getter to avoid triggering re-renders
@@ -104,6 +106,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     mapAssetUrl,
     onSetClusterMap,
     onSetClusterSound,
+    onSetClusterSharedVisuals,
     getAssets,
     getHighlightedBeatIds,
     highlightVersion: _highlightVersion, // Destructure to ensure memo() detects changes
@@ -264,6 +267,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [showMapSettings, setShowMapSettings] = useState(false);
   const [showSoundSettings, setShowSoundSettings] = useState(false);
+  const [showSharedVisualsSettings, setShowSharedVisualsSettings] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapSettingsRef = useRef<HTMLDivElement>(null);
   const soundSettingsRef = useRef<HTMLDivElement>(null);
@@ -796,6 +800,63 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                             </div>
                           );
                         })()}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Shared visuals button */}
+            {onSetClusterSharedVisuals && (
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowSharedVisualsSettings(!showSharedVisualsSettings);
+                  }}
+                  className={`w-6 h-6 rounded shadow-sm transition-colors flex items-center justify-center text-xs ${
+                    cluster.sharedVisuals?.locations?.length ? 'bg-teal-500 text-white hover:bg-teal-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                  title="Shared visuals (inherited by all beats)"
+                >
+                  👁
+                </button>
+
+                {/* Shared visuals settings popover */}
+                {showSharedVisualsSettings && (
+                  <div
+                    className="absolute top-8 right-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 min-w-[220px]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="text-sm font-medium text-gray-700 mb-2">Shared Visual Content</div>
+                    <div className="text-xs text-gray-500 mb-3">
+                      Elements shared by all beats in this cluster
+                    </div>
+
+                    {cluster.sharedVisuals?.locations?.length ? (
+                      <>
+                        <div className="mb-3 p-2 bg-gray-100 rounded text-xs text-gray-700">
+                          {cluster.sharedVisuals.locations.length} shared element{cluster.sharedVisuals.locations.length !== 1 ? 's' : ''}
+                          {cluster.sharedVisuals.background && ' + background'}
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            onSetClusterSharedVisuals(cluster.id, undefined);
+                            setShowSharedVisualsSettings(false);
+                          }}
+                          className="w-full px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                        >
+                          Clear Shared Visuals
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-xs text-gray-500 py-4 text-center">
+                        <div className="mb-2">No shared visuals</div>
+                        <div className="text-gray-400">
+                          Use the Visual Editor to add shared elements when editing a beat in this cluster
+                        </div>
                       </div>
                     )}
                   </div>

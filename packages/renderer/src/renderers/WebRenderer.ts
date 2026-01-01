@@ -505,47 +505,50 @@ export class WebRenderer extends BaseRenderer {
     }
   }
 
-  async renderEndScreen(message: string, showRestart: boolean, showCredits: boolean): Promise<void> {
-    if (!this.ctx) return;
-    
+  async renderEndScreen(message: string, showRestart: boolean, showCredits: boolean): Promise<string> {
+    if (!this.ctx) return '';
+
     this.clear();
     this.currentScreen = 'end';
-    
+
     const { width, height } = this.context;
-    
+
     // Background gradient
     const gradient = this.ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width);
     gradient.addColorStop(0, '#667eea');
     gradient.addColorStop(1, '#764ba2');
     this.ctx.fillStyle = gradient;
     this.ctx.fillRect(0, 0, width, height);
-    
+
     // End message
     this.ctx.fillStyle = 'white';
     this.ctx.font = 'bold 48px serif';
     this.ctx.textAlign = 'center';
     this.ctx.fillText(message, width / 2, height / 3);
-    
+
     // Buttons
     const buttonY = height * 2 / 3;
     const buttonWidth = 150;
     const buttonHeight = 50;
     const buttonSpacing = 20;
-    
+
     let totalWidth = 0;
     if (showRestart) totalWidth += buttonWidth;
     if (showCredits) totalWidth += buttonWidth + (showRestart ? buttonSpacing : 0);
-    
+
     let currentX = (width - totalWidth) / 2;
-    
+
     if (showRestart) {
       this.drawButton(currentX, buttonY, buttonWidth, buttonHeight, 'Restart');
       currentX += buttonWidth + buttonSpacing;
     }
-    
+
     if (showCredits) {
       this.drawButton(currentX, buttonY, buttonWidth, buttonHeight, 'Credits');
     }
+
+    // WebRenderer doesn't handle click events, return empty string
+    return '';
   }
 
   // Helper methods

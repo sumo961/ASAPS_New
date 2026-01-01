@@ -664,7 +664,7 @@
           "type": "string",
           "required": true,
           "default": "variable",
-          "description": "Save input to: 'variable' or 'characterName'"
+          "description": "Save input to: 'variable', 'characterName', or 'counter'"
         },
         "variable": {
           "type": "string",
@@ -676,6 +676,17 @@
           "type": "string",
           "required": false,
           "description": "Character ID to update display name (when saveToType='characterName')"
+        },
+        "counter": {
+          "type": "string",
+          "required": false,
+          "description": "Counter name to store numeric input (when saveToType='counter')"
+        },
+        "counterOperation": {
+          "type": "string",
+          "required": false,
+          "default": "set",
+          "description": "Counter operation: 'set' or 'change' (when saveToType='counter')"
         },
         "placeholder": {
           "type": "string",

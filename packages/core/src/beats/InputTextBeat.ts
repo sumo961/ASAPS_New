@@ -13,6 +13,8 @@ export class InputTextBeat extends Beat {
   public saveToType: string;
   public variable?: string;
   public characterId?: string;
+  public counter?: string;
+  public counterOperation?: 'set' | 'change';
   public placeholder?: string;
   public validation?: string;
   public minLength?: number;
@@ -38,6 +40,8 @@ export class InputTextBeat extends Beat {
     // Support both 'variable' (canonical) and 'variableName' (AI-generated variant)
     this.variable = config.variable || config.parameters?.variable || config.parameters?.variableName || 'userInput';
     this.characterId = config.characterId || config.parameters?.characterId;
+    this.counter = config.counter || config.parameters?.counter;
+    this.counterOperation = (config.counterOperation || config.parameters?.counterOperation || 'set') as 'set' | 'change';
     this.placeholder = config.placeholder || config.parameters?.placeholder;
     this.validation = config.validation || config.parameters?.validation || 'none';
     this.minLength = config.minLength || config.parameters?.minLength;
@@ -57,6 +61,8 @@ export class InputTextBeat extends Beat {
       saveToType: this.saveToType,
       variable: this.variable,
       characterId: this.characterId,
+      counter: this.counter,
+      counterOperation: this.counterOperation,
       placeholder: this.placeholder,
       validation: this.validation,
       minLength: this.minLength,
@@ -80,6 +86,8 @@ export class InputTextBeat extends Beat {
       this.variable = params.variableName; // AI-generated variant
     }
     if (params.characterId !== undefined) this.characterId = params.characterId;
+    if (params.counter !== undefined) this.counter = params.counter;
+    if (params.counterOperation !== undefined) this.counterOperation = params.counterOperation as 'set' | 'change';
     if (params.placeholder !== undefined) this.placeholder = params.placeholder;
     if (params.validation !== undefined) this.validation = params.validation;
     if (params.minLength !== undefined) this.minLength = params.minLength;
@@ -180,10 +188,37 @@ export class InputTextBeat extends Beat {
     if (this.saveToType === 'characterName' && this.characterId) {
       // Update character display name
       context.updateCharacterDisplayName(this.characterId, userInput);
+    } else if (this.saveToType === 'counter' && this.counter) {
+      // Store input as counter (numeric)
+      const numValue = parseFloat(userInput);
+      if (!isNaN(numValue)) {
+        console.log(`[InputTextBeat] Saving ${numValue} to counter "${this.counter}" (${this.counterOperation || 'set'})`);
+        if (this.counterOperation === 'change') {
+          // Add to existing counter value
+          const currentValue = context.getCounter(this.counter) || 0;
+          context.setCounter(this.counter, currentValue + numValue);
+        } else {
+          // Set counter to value
+          context.setCounter(this.counter, numValue);
+        }
+      } else {
+        console.warn(`[InputTextBeat] Could not parse "${userInput}" as number for counter "${this.counter}"`);
+      }
     } else if (this.saveToType === 'variable' && this.variable) {
       // Store input in variable
       console.log(`[InputTextBeat] Saving "${userInput}" to variable "${this.variable}"`);
-      context.setVariable(this.variable, userInput);
+
+      // Auto-convert to number if validation is numeric
+      if (this.validation === 'numeric') {
+        const numValue = parseFloat(userInput);
+        if (!isNaN(numValue)) {
+          context.setVariable(this.variable, numValue);
+        } else {
+          context.setVariable(this.variable, userInput);
+        }
+      } else {
+        context.setVariable(this.variable, userInput);
+      }
     }
 
     // Continue to next beat
