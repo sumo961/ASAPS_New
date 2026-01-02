@@ -1,5 +1,75 @@
 # ASAPS Modern - Progress Log
 
+## 2025-01-02: Desktop Player Fixes
+
+### Overview
+
+Fixed multiple issues with the Tauri desktop player: viewport scaling, save/load system, menu click interception, and transition flashing.
+
+### Viewport Scaling
+
+**Problem**: The player used hardcoded 1024x768 stage dimensions, causing content to be cut off when the window was smaller than the stage.
+
+**Solution**:
+- Added `ScaledStage` component that scales the stage to fit within the viewport while maintaining aspect ratio
+- Uses project's configured dimensions from `globalSettings.project.width/height`
+- Added `getStageDimensions()` to PlayerEngine and `setStageDimensions()` to BaseRenderer
+
+### Save/Load System Fix
+
+**Problem**: Loading a save always returned to the first beat instead of the saved position.
+
+**Root Cause**: `StoryEngine` updated its own `currentBeatId` during execution but never synced it with `StoryContext`. When `serialize()` was called for saving, it returned the initial beat ID.
+
+**Solution**: Added `context.setCurrentBeatId()` calls in `StoryEngine.start()` to keep the context in sync:
+```typescript
+// In StoryEngine.start()
+this.currentBeatId = startBeatId || this.story.getFirstBeatId();
+this.context.setCurrentBeatId(this.currentBeatId); // Keep context in sync
+
+// After each beat execution
+if (this.currentBeatId) {
+  this.context.setCurrentBeatId(this.currentBeatId);
+}
+```
+
+### Menu Click Fix
+
+**Problem**: Clicking choices at the top of the window opened the settings menu instead of progressing the story.
+
+**Cause**: PlayerUI menu bar had `pointerEvents: 'auto'` even when invisible (opacity: 0).
+
+**Fix**: Made pointer-events conditional on menu visibility:
+```typescript
+pointerEvents: isMenuOpen ? 'auto' : 'none'
+```
+
+### Transition Flash Fix
+
+**Problem**: Beats briefly expanded and then shrank during transitions.
+
+**Causes**:
+1. `ScaledStage` was defined inside render method, causing React to remount it on each beat
+2. `useEffect` calculated scale after paint, causing visible flash
+
+**Solution**:
+1. Moved `ScaledStage` to module level as a stable component
+2. Used `useLayoutEffect` for synchronous scale calculation before paint
+3. Hide content with `visibility: 'hidden'` until scale is calculated
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/core/src/engine/StoryEngine.ts` | Sync currentBeatId to context during execution |
+| `packages/player/src/PlayerEngine.ts` | Add `getStageDimensions()`, project dimensions in GlobalSettings |
+| `packages/player/src/PlayerUI.tsx` | Conditional pointer-events for menu bar |
+| `packages/renderer/src/renderers/ReactRenderer.tsx` | Module-level ScaledStage with useLayoutEffect |
+| `packages/renderer/src/renderers/BaseRenderer.ts` | Add `setStageDimensions()` method |
+| `apps/player-desktop/src/App.tsx` | Update renderer dimensions after loading story |
+
+---
+
 ## 2025-01-01: Color System Refactor
 
 ### Overview
