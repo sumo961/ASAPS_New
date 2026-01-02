@@ -219,6 +219,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     error: saveError,
     saveNow,
     markChanged,
+    cancelPending,
   } = useAutoSave(getProjectData, {
     enabled: autoSave && !!currentProject,
     delay: autoSaveDelay,
@@ -294,6 +295,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    */
   const loadProject = useCallback(async (projectId: string): Promise<boolean> => {
     try {
+      // Cancel any pending auto-save before loading new project
+      // This prevents stale error/pending states from persisting
+      cancelPending();
+
       // CRITICAL: If currently on an untitled project, discard it before loading new one
       // This prevents accumulation of "Untitled Project" entries in storage
       const currentProj = currentProjectRef.current;
@@ -320,6 +325,13 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       setCurrentProject(result.data);
       setProjectId(projectId);
 
+      // CRITICAL: Set isUntitledProject based on the LOADED project's name
+      // This ensures a saved project with a real name doesn't show "Cannot auto-save"
+      const isUntitled = result.data.name === 'Untitled Project';
+      isUntitledProjectRef.current = isUntitled;
+      setIsUntitledProject(isUntitled);
+      console.log('[PersistenceProvider] Project loaded, isUntitledProject:', isUntitled);
+
       // Update command manager
       commandManager.setProjectId(projectId);
       await commandManager.loadFromStorage();
@@ -329,7 +341,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to load project:', error);
       return false;
     }
-  }, [storage, commandManager]);
+  }, [storage, commandManager, cancelPending]);
 
   /**
    * Create a new project

@@ -31,6 +31,27 @@ import { getThemeService } from './services/ThemeService';
 import { themeToGlobalSettings } from './themes/migration/GlobalSettingsAdapter';
 import { BUILT_IN_THEMES } from '@asaps/core';
 
+// Type declaration for Electron API exposed by preload
+declare global {
+  interface Window {
+    electronAPI?: {
+      fs: {
+        readFile: (path: string) => Promise<ArrayBuffer>;
+        writeFile: (path: string, data: ArrayBuffer | string) => Promise<void>;
+      };
+      onMenuNewProject: (callback: () => void) => () => void;
+      onMenuSave: (callback: () => void) => () => void;
+      onMenuExport: (callback: () => void) => () => void;
+      onProjectOpen: (callback: (path: string) => void) => () => void;
+      onProjectSaveAs: (callback: (path: string) => void) => () => void;
+      isElectron: boolean;
+    };
+  }
+}
+
+// Helper to check if running in Electron
+const isElectron = () => typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
+
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
 
@@ -257,6 +278,98 @@ function App() {
   const { markChanged, saveNow } = useSave();
   const { updateStory, updateGlobalSettings, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled } = useProject();
   const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback } = usePersistence();
+
+  // Electron integration - set up menu event listeners
+  useEffect(() => {
+    if (!isElectron() || !window.electronAPI) {
+      return;
+    }
+
+    console.log('[Electron] Setting up menu event listeners');
+
+    // Handle opening a project from File menu
+    const unsubscribeOpen = window.electronAPI.onProjectOpen(async (filePath: string) => {
+      console.log('[Electron] Opening project:', filePath);
+      try {
+        const buffer = await window.electronAPI!.fs.readFile(filePath);
+        const blob = new Blob([buffer]);
+        const fileName = filePath.split('/').pop() || 'project.zip';
+        const file = new File([blob], fileName, { type: 'application/zip' });
+
+        // Import the project using the same logic as handleImportZip
+        const result = await importProjectFromZip(file, {
+          generateNewId: false
+        });
+
+        if (result.success && result.projectId) {
+          await loadProject(result.projectId);
+          console.log('[Electron] Project loaded successfully');
+        } else {
+          throw new Error(result.error || 'Import failed');
+        }
+      } catch (error) {
+        console.error('[Electron] Failed to open project:', error);
+        alert(`Failed to open project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    });
+
+    // Handle Save from File menu
+    const unsubscribeSave = window.electronAPI.onMenuSave(() => {
+      console.log('[Electron] Save requested from menu');
+      saveNow();
+    });
+
+    // Handle Export from File menu
+    const unsubscribeExport = window.electronAPI.onMenuExport(async () => {
+      console.log('[Electron] Export requested from menu');
+      if (currentProject) {
+        try {
+          await downloadProjectAsZip(currentProject.id, currentProject.name || state.title);
+        } catch (error) {
+          console.error('[Electron] Export failed:', error);
+        }
+      }
+    });
+
+    // Handle Save As from File menu - saves to internal storage with new name
+    const unsubscribeSaveAs = window.electronAPI.onProjectSaveAs(async (filePath: string) => {
+      console.log('[Electron] Save As requested:', filePath);
+      try {
+        // Extract project name from file path (e.g., "/path/to/MyStory.asaps.zip" -> "MyStory")
+        const fileName = filePath.split('/').pop() || 'Project';
+        const projectName = fileName
+          .replace(/\.asaps\.zip$/i, '')
+          .replace(/\.zip$/i, '')
+          .replace(/\.asaps$/i, '') || 'Project';
+
+        console.log('[Electron] Saving project as:', projectName);
+
+        // Save to internal storage with the new name
+        const newProjectId = await saveCurrent(projectName);
+        console.log('[Electron] Project saved with new ID:', newProjectId);
+
+        alert(`Project saved as "${projectName}"`);
+      } catch (error) {
+        console.error('[Electron] Save As failed:', error);
+        alert(`Failed to save project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    });
+
+    // Handle New Project from File menu
+    const unsubscribeNew = window.electronAPI.onMenuNewProject(() => {
+      console.log('[Electron] New Project requested from menu');
+      discardUntitled();
+    });
+
+    // Cleanup
+    return () => {
+      unsubscribeOpen();
+      unsubscribeSave();
+      unsubscribeExport();
+      unsubscribeSaveAs();
+      unsubscribeNew();
+    };
+  }, [loadProject, saveNow, currentProject, state.title, discardUntitled, saveCurrent]);
 
   /**
    * Sync current story state to project before saving
@@ -1215,6 +1328,7 @@ function App() {
       console.error('[App] >>> FAILED to load project:', error);
       alert('Failed to load project. See console for details.');
     }
+
     console.log('[App] >>> LOAD EFFECT completed');
     console.log('[App] ==========================================');
   }, [currentProject, actions, setIsUntitledProject, state.beats, state.title, state.author, state.connections, characters, updateMetadata, updateStory]);

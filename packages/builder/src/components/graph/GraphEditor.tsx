@@ -3,6 +3,7 @@ import ReactFlow, {
   Node,
   Edge,
   Controls,
+  ControlButton,
   Background,
   MiniMap,
   useNodesState,
@@ -1030,35 +1031,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
       >
         <Background color="#aaa" gap={16} />
-        <Controls />
-        {/* Auto-layout button positioned next to Controls */}
-        {onAutoLayout && (
-          <div
-            className="react-flow__panel react-flow__controls"
-            style={{
-              position: 'absolute',
-              left: 10,
-              bottom: 150,
-              zIndex: 5,
-            }}
-          >
-            <button
-              onClick={onAutoLayout}
-              className="react-flow__controls-button"
-              title="Auto-arrange beats"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 26,
-                height: 26,
-                padding: 0,
-                border: 'none',
-                background: '#fff',
-                cursor: 'pointer',
-                borderRadius: 2,
-              }}
-            >
+        <Controls showInteractive={false}>
+          {/* Auto-arrange button as first control */}
+          {onAutoLayout && (
+            <ControlButton onClick={onAutoLayout} title="Auto-arrange beats">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -1067,7 +1043,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ width: 14, height: 14 }}
+                style={{ width: 14, height: 14, maxWidth: '100%', maxHeight: '100%' }}
               >
                 <rect x="3" y="3" width="7" height="7" rx="1" />
                 <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -1075,9 +1051,9 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
                 <rect x="14" y="14" width="7" height="7" rx="1" />
                 <path d="M10 6h4M6 10v4M18 10v4M10 18h4" />
               </svg>
-            </button>
-          </div>
-        )}
+            </ControlButton>
+          )}
+        </Controls>
         <MiniMap
           nodeStrokeColor={miniMapNodeColor}
           nodeColor={miniMapNodeColor}

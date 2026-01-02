@@ -284,15 +284,18 @@ export function useAutoSave(
   }, [performSave, log]);
 
   /**
-   * Cancel pending save
+   * Cancel pending save and clear any error state
    */
   const cancelPending = useCallback(() => {
     if (saveTimeoutRef.current !== null) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
-      setStatus('idle');
-      log('Pending save cancelled');
     }
+    // Always reset to idle and clear error when cancelling
+    // This is important when switching projects to clear stale state
+    setStatus('idle');
+    setError(null);
+    log('Pending save cancelled, state reset');
   }, [log]);
 
   /**

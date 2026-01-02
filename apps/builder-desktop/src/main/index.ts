@@ -3,8 +3,12 @@ import { join } from 'path';
 import * as fs from 'fs/promises';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling
-if (require('electron-squirrel-startup')) {
-  app.quit();
+try {
+  if (require('electron-squirrel-startup')) {
+    app.quit();
+  }
+} catch {
+  // electron-squirrel-startup not installed, ignore (only needed for Windows installers)
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -12,10 +16,10 @@ let currentProjectPath: string | null = null;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 768,
+    width: 1800,
+    height: 950,
+    minWidth: 1550,
+    minHeight: 800,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,

@@ -518,15 +518,23 @@ export function loadProjectData(project: Project): {
   console.log('[loadProjectData] Deserialized beats:', beats.length);
 
   // Extract metadata
+  // CRITICAL: Project name takes precedence over story metadata title
+  // This ensures the UI shows consistent project name, not internal story title
   let title = project.name || 'Untitled Project';
   let author = 'Unknown Author';
 
   if (story.getMetadata && typeof story.getMetadata === 'function') {
     const metadata = story.getMetadata();
-    title = metadata?.title || title;
+    // Only use story title if project has no name or is "Untitled Project"
+    if ((!project.name || project.name === 'Untitled Project') && metadata?.title) {
+      title = metadata.title;
+    }
     author = metadata?.author || author;
   } else if (story.metadata) {
-    title = story.metadata.title || title;
+    // Only use story title if project has no name or is "Untitled Project"
+    if ((!project.name || project.name === 'Untitled Project') && story.metadata.title) {
+      title = story.metadata.title;
+    }
     author = story.metadata.author || author;
   }
 

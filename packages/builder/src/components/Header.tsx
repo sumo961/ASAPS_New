@@ -79,10 +79,22 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  // Detect if running in Electron on macOS (traffic lights need space)
+  const isElectronMac = typeof window !== 'undefined' &&
+    !!(window as any).electronAPI?.isElectron &&
+    (window as any).electronAPI?.platform === 'darwin';
+
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-2">
-      {/* Row 1: Logo and Story Title */}
-      <div className="flex items-center justify-between mb-2">
+      {/* Row 1: Logo and Story Title - Draggable on Electron macOS */}
+      <div
+        className="flex items-center justify-between mb-2"
+        style={{
+          paddingLeft: isElectronMac ? '64px' : undefined,
+          // Make this row draggable for window movement on Electron
+          WebkitAppRegion: isElectronMac ? 'drag' : undefined,
+        } as React.CSSProperties}
+      >
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
             <FileText className="w-6 h-6 text-blue-600" />
@@ -91,13 +103,14 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
 
-          {/* Story Title - More prominent */}
+          {/* Story Title - More prominent, no-drag so it's editable */}
           <input
             type="text"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             className="px-3 py-1.5 text-lg font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
             placeholder="Story Title"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           />
         </div>
       </div>
@@ -106,17 +119,6 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center justify-between">
         {/* Left: Project, Undo/Redo, Save, Import/Export */}
         <div className="flex items-center space-x-2">
-          {/* Project Name Display */}
-          {projectName ? (
-            <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium" title={hasUnsavedChanges ? "Unsaved changes" : ""}>
-              {hasUnsavedChanges && isUntitledProject ? "● " : ""}{projectName}
-            </span>
-          ) : (
-            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium italic" title={hasUnsavedChanges ? "Unsaved changes" : ""}>
-              {hasUnsavedChanges && isUntitledProject ? "● " : ""}Untitled
-            </span>
-          )}
-
           {/* Project Selector */}
           <ProjectSelector
             onOpenLibrary={() => {
