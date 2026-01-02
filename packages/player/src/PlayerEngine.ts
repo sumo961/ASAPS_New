@@ -10,6 +10,12 @@ import { EventEmitter } from 'eventemitter3';
  * GlobalSettings from the builder export (simplified version)
  */
 interface GlobalSettings {
+  project?: {
+    width: number;       // Stage width in pixels
+    height: number;      // Stage height in pixels
+    aspectRatio?: string;
+    scalingMode?: 'none' | 'fit' | 'fill' | 'stretch';
+  };
   colors: {
     pcolor: string;         // Button/choice background color
     palpha: number;         // Button/choice opacity (0-100)
@@ -730,16 +736,20 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
    * Resume from a save slot
    */
   async resumeFromSave(slotId: number): Promise<void> {
+    console.log(`[PlayerEngine] resumeFromSave called with slotId: ${slotId}`);
     if (!this.saveSystem || !this.engine) {
       throw new Error('No story loaded. Call loadStory() first.');
     }
 
     const slot = await this.saveSystem.loadFromSlot(slotId);
+    console.log(`[PlayerEngine] Loaded slot:`, slot ? { slotId: slot.slotId, beatId: slot.state?.currentBeatId } : null);
     if (!slot) {
       throw new Error(`Save slot ${slotId} not found`);
     }
 
+    console.log(`[PlayerEngine] Calling engine.loadState with autoResume=true`);
     await this.engine.loadState(slot.state, true);
+    console.log(`[PlayerEngine] loadState completed`);
     this.emit('loaded', slot);
   }
 
@@ -912,6 +922,16 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
    */
   getAssetResolver(): AssetResolver {
     return this.assetResolver;
+  }
+
+  /**
+   * Get stage dimensions from the loaded story's globalSettings
+   * Returns the project's configured width/height, or defaults (1024x768)
+   */
+  getStageDimensions(): { width: number; height: number } {
+    const width = this.globalSettings?.project?.width ?? 1024;
+    const height = this.globalSettings?.project?.height ?? 768;
+    return { width, height };
   }
 
   /**

@@ -114,6 +114,11 @@ const App: React.FC = () => {
           await player.loadStory(data);
           console.log('[App] Story loaded, starting...');
 
+          // Update renderer with story's stage dimensions
+          const stageDimensions = player.getStageDimensions();
+          console.log('[App] Stage dimensions from story:', stageDimensions);
+          renderer.setStageDimensions(stageDimensions.width, stageDimensions.height);
+
           // Start the story (don't await - it runs until story ends)
           player.start().catch(err => {
             console.error('Story execution error:', err);

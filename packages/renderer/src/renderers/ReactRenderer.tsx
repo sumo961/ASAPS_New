@@ -6,6 +6,61 @@ import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 
+// ============= SCALED STAGE COMPONENT =============
+// Handles viewport-responsive scaling for the story stage
+// Defined at module level to prevent recreation on each render
+
+interface ScaledStageProps {
+  children: React.ReactNode;
+  width: number;
+  height: number;
+}
+
+const ScaledStage: React.FC<ScaledStageProps> = ({ children, width, height }) => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [scale, setScale] = React.useState<number | null>(null);
+
+  // Use useLayoutEffect to calculate scale synchronously before paint
+  React.useLayoutEffect(() => {
+    const updateScale = () => {
+      if (containerRef.current) {
+        const parent = containerRef.current.parentElement;
+        if (parent) {
+          const availableWidth = parent.clientWidth;
+          const availableHeight = parent.clientHeight;
+          const scaleX = availableWidth / width;
+          const scaleY = availableHeight / height;
+          // Use the smaller scale to fit entirely within viewport
+          setScale(Math.min(scaleX, scaleY, 1)); // Cap at 1 to not upscale
+        }
+      }
+    };
+
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, [width, height]);
+
+  // Don't render until scale is calculated to prevent flash
+  if (scale === null) {
+    return <div ref={containerRef} style={{ width, height, visibility: 'hidden' }}>{children}</div>;
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        width,
+        height,
+        transform: `scale(${scale})`,
+        transformOrigin: 'center center',
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
 // ============= REACT COMPONENTS (Centered Layouts) =============
 // These are fallback components when no positioning data is available
 
@@ -694,24 +749,30 @@ export class ReactRenderer extends BaseRenderer {
       // Render using the shared PositionedBeatView component
       // NOTE: previewMode=false to use absolute positioning from Visual Editor
       // previewMode=true uses a flex layout that ignores element positions
+      // Use project's stage dimensions from context
+      const stageWidth = this.context.width;
+      const stageHeight = this.context.height;
+
       this.renderComponent(
-        <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <PositionedBeatView
-            stageWidth={1024}
-            stageHeight={768}
-            backgroundUrl={this.backgroundImageUrl}
-            backgroundColor={backgroundColor}
-            elements={elements}
-            onAction={this.handleAction}
-            interactive={true}
-            hideTextBoxes={this.hideTextBoxes}
-            hideButtonBoxes={this.hideButtonBoxes}
-            theme={this.theme}
-            previewMode={false}
-            visitedBeats={this.visitedBeats}
-            showTextOnHover={showTextOnHover}
-            soundBlobResolver={this.soundBlobResolver || undefined}
-          />
+        <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <ScaledStage width={stageWidth} height={stageHeight}>
+            <PositionedBeatView
+              stageWidth={stageWidth}
+              stageHeight={stageHeight}
+              backgroundUrl={this.backgroundImageUrl}
+              backgroundColor={backgroundColor}
+              elements={elements}
+              onAction={this.handleAction}
+              interactive={true}
+              hideTextBoxes={this.hideTextBoxes}
+              hideButtonBoxes={this.hideButtonBoxes}
+              theme={this.theme}
+              previewMode={false}
+              visitedBeats={this.visitedBeats}
+              showTextOnHover={showTextOnHover}
+              soundBlobResolver={this.soundBlobResolver || undefined}
+            />
+          </ScaledStage>
         </div>
       );
     });

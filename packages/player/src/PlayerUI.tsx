@@ -239,7 +239,7 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
       alignItems: 'center',
       padding: '8px 16px',
       background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0))',
-      pointerEvents: 'auto' as const,
+      pointerEvents: isMenuOpen ? 'auto' as const : 'none' as const,
       opacity: isMenuOpen ? 1 : 0,
       transition: 'opacity 0.3s ease',
     },

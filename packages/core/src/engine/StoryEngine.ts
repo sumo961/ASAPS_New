@@ -50,11 +50,14 @@ export class StoryEngine extends EventEmitter {
 
     this.running = true;
     this.currentBeatId = startBeatId || this.story.getFirstBeatId();
-    
+    // Keep context in sync for save/load
+    this.context.setCurrentBeatId(this.currentBeatId);
+
     while (this.running && this.currentBeatId) {
       // Check for timer interrupts
       if (this.timerInterruptBeat) {
         this.currentBeatId = this.timerInterruptBeat;
+        this.context.setCurrentBeatId(this.currentBeatId);
         this.timerInterruptBeat = null;
       }
 
@@ -62,7 +65,7 @@ export class StoryEngine extends EventEmitter {
       if (!beat) {
         throw new Error(`Beat not found: ${this.currentBeatId}`);
       }
-      
+
       try {
         console.log(`[StoryEngine] Executing beat ${this.currentBeatId} (type: ${beat.type})`);
         const nextBeatId = await beat.execute(this.context, this.renderer);
@@ -82,6 +85,10 @@ export class StoryEngine extends EventEmitter {
           this.timerInterruptBeat = null;
         } else {
           this.currentBeatId = nextBeatId || null;
+        }
+        // Keep context in sync for save/load
+        if (this.currentBeatId) {
+          this.context.setCurrentBeatId(this.currentBeatId);
         }
       } catch (error) {
         console.error('Story execution error:', error);
@@ -153,24 +160,30 @@ export class StoryEngine extends EventEmitter {
    * @param autoResume If true, automatically resume playing from the saved beat
    */
   async loadState(serialized: SerializedStoryState, autoResume: boolean = false): Promise<void> {
+    console.log(`[StoryEngine] loadState called, autoResume=${autoResume}, currentBeatId=${serialized.currentBeatId}`);
     if (!this.story) {
       throw new Error('No story loaded. Call loadStory() first.');
     }
 
     // Stop any current execution
+    console.log(`[StoryEngine] Stopping current execution, running=${this.running}`);
     this.stop();
 
     // Load the serialized state into context
+    console.log(`[StoryEngine] Loading serialized state into context`);
     this.context.loadFromSerialized(serialized);
 
     // Update engine's current beat ID
     this.currentBeatId = serialized.currentBeatId;
+    console.log(`[StoryEngine] Updated currentBeatId to: ${this.currentBeatId}`);
 
     this.emit('stateLoaded', { serialized, beatId: this.currentBeatId });
 
     // Optionally resume playing
     if (autoResume && this.currentBeatId) {
+      console.log(`[StoryEngine] Auto-resuming from beat: ${this.currentBeatId}`);
       await this.start(this.currentBeatId);
+      console.log(`[StoryEngine] start() completed`);
     }
   }
 

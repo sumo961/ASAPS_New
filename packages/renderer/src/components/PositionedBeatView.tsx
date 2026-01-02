@@ -2286,6 +2286,7 @@ const FlexButtonElement: React.FC<{
   const borderColor = isVisited && !hideButtonBox ? '#999999' : theme.button.borderColor;
 
   const handleClick = async () => {
+    console.log(`[FlexButtonElement] handleClick called, interactive=${interactive}, hasOnAction=${!!onAction}, actionId="${actionId}", location.name="${location.name}"`);
     if (interactive) {
       // Play sound if assigned - prefer soundAssetId (proper asset ID) over sound (may be blob URL)
       const soundRef = (location as any).soundAssetId || location.sound;
@@ -2325,8 +2326,13 @@ const FlexButtonElement: React.FC<{
       // Then call the action (after sound finishes)
       if (onAction) {
         const actionIdToPass = actionId || location.name || 'continue';
+        console.log(`[FlexButtonElement] Calling onAction with: "${actionIdToPass}"`);
         onAction(actionIdToPass);
+      } else {
+        console.warn(`[FlexButtonElement] No onAction callback available!`);
       }
+    } else {
+      console.warn(`[FlexButtonElement] Click ignored - not interactive`);
     }
   };
 

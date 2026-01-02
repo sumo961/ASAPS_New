@@ -328,6 +328,14 @@ export abstract class BaseRenderer implements IRenderer {
   }
 
   /**
+   * Update the stage dimensions (called after loading a story with custom dimensions)
+   */
+  setStageDimensions(width: number, height: number): void {
+    this.context.width = width;
+    this.context.height = height;
+  }
+
+  /**
    * Register a listener for state changes on a specific key
    * Returns an unsubscribe function
    */
