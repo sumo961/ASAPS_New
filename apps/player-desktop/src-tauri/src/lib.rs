@@ -23,13 +23,35 @@ fn get_working_directory() -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
-/// Get the directory where the executable is located
+/// Get the directory where the app bundle is located (for finding story files)
+/// On macOS, the executable is inside .app/Contents/MacOS/, so we go up 3 levels
 #[tauri::command]
 fn get_executable_directory() -> Result<String, String> {
     env::current_exe()
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::NotFound, "No parent directory")
-        }))
+        .and_then(|exe_path| {
+            let mut path = exe_path.clone();
+
+            // Check if we're inside a macOS .app bundle
+            // Path looks like: /path/to/App.app/Contents/MacOS/executable
+            let path_str = path.to_string_lossy();
+            if path_str.contains(".app/Contents/MacOS") {
+                // Go up 3 levels: MacOS -> Contents -> App.app -> containing folder
+                for _ in 0..3 {
+                    path = path.parent()
+                        .map(|p| p.to_path_buf())
+                        .unwrap_or(path);
+                }
+                Ok(path)
+            } else {
+                // Not in a bundle, just return parent directory
+                path.parent()
+                    .map(|p| p.to_path_buf())
+                    .ok_or_else(|| std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "No parent directory"
+                    ))
+            }
+        })
         .map(|p| p.to_string_lossy().into_owned())
         .map_err(|e| e.to_string())
 }
