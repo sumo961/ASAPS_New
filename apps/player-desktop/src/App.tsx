@@ -32,7 +32,6 @@ const App: React.FC = () => {
         const { invoke } = await import('@tauri-apps/api/core');
 
         // Try multiple directories to find stories
-        let searchDir: string = '';
         let stories: StoryFile[] = [];
 
         // Priority 1: Executable directory (for distribution - player next to story)
@@ -75,7 +74,7 @@ const App: React.FC = () => {
                     path: `${dir}/${entry.name}`,
                     name: entry.name,
                   });
-                  searchDir = dir; // Remember where we found stories
+                  // Found story in: dir
                 }
               }
             }
