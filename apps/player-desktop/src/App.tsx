@@ -1,212 +1,201 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PlayerEngine, PlayerUI } from '@asaps/player';
 import { ReactRenderer, type RenderContext } from '@asaps/renderer';
 
-type AppState = 'library' | 'loading' | 'playing' | 'error';
+type AppState = 'scanning' | 'selecting' | 'loading' | 'playing' | 'error';
 
-interface RecentStory {
+interface StoryFile {
   path: string;
-  title: string;
-  lastPlayed: Date;
-  thumbnail?: string;
+  name: string;
 }
 
 const App: React.FC = () => {
-  const [appState, setAppState] = useState<AppState>('library');
+  const [appState, setAppState] = useState<AppState>('scanning');
   const [error, setError] = useState<string | null>(null);
-  const [recentStories, setRecentStories] = useState<RecentStory[]>([]);
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [storyFiles, setStoryFiles] = useState<StoryFile[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<PlayerEngine | null>(null);
   const rendererRef = useRef<ReactRenderer | null>(null);
 
-  // Load recent stories from localStorage on mount
+  // Scan for story files on startup
   useEffect(() => {
-    const saved = localStorage.getItem('asaps-recent-stories');
-    if (saved) {
+    const scanForStories = async () => {
+      if (!window.__TAURI__) {
+        setError('This player requires the Tauri desktop environment');
+        setAppState('error');
+        return;
+      }
+
       try {
-        const parsed = JSON.parse(saved);
-        setRecentStories(parsed.map((s: RecentStory) => ({
-          ...s,
-          lastPlayed: new Date(s.lastPlayed),
-        })));
-      } catch (e) {
-        console.warn('Failed to load recent stories:', e);
+        const { readDir } = await import('@tauri-apps/plugin-fs');
+        const { invoke } = await import('@tauri-apps/api/core');
+
+        // Try multiple directories to find stories
+        let searchDir: string = '';
+        let stories: StoryFile[] = [];
+
+        // Priority 1: Executable directory (for distribution - player next to story)
+        // Priority 2: Working directory (for dev/testing)
+        const dirsToTry: string[] = [];
+
+        try {
+          const exeDir = await invoke<string>('get_executable_directory');
+          console.log('[App] Executable directory:', exeDir);
+          dirsToTry.push(exeDir);
+        } catch (e) {
+          console.log('[App] Could not get executable directory:', e);
+        }
+
+        try {
+          const workDir = await invoke<string>('get_working_directory');
+          console.log('[App] Working directory:', workDir);
+          // Only add if different from exe dir
+          if (!dirsToTry.includes(workDir)) {
+            dirsToTry.push(workDir);
+          }
+        } catch (e) {
+          console.log('[App] Could not get working directory:', e);
+        }
+
+        console.log('[App] Directories to scan:', dirsToTry);
+
+        // Scan each directory for stories
+        for (const dir of dirsToTry) {
+          try {
+            console.log('[App] Scanning:', dir);
+            const entries = await readDir(dir);
+
+            for (const entry of entries) {
+              if (entry.isFile && entry.name) {
+                const name = entry.name.toLowerCase();
+                if (name.endsWith('.asaps.zip') || name.endsWith('.asaps') ||
+                    (name.endsWith('.zip') && !name.includes('player'))) {
+                  stories.push({
+                    path: `${dir}/${entry.name}`,
+                    name: entry.name,
+                  });
+                  searchDir = dir; // Remember where we found stories
+                }
+              }
+            }
+
+            if (stories.length > 0) {
+              console.log('[App] Found stories in:', dir);
+              break; // Stop at first directory with stories
+            }
+          } catch (e) {
+            console.log('[App] Could not scan', dir, ':', e);
+          }
+        }
+
+        console.log('[App] Found stories:', stories);
+
+        if (stories.length === 0) {
+          const scannedDirs = dirsToTry.join('\n');
+          setError(`No story files found.\n\nScanned directories:\n${scannedDirs}\n\nPlace a .asaps.zip file next to the player.`);
+          setAppState('error');
+        } else if (stories.length === 1) {
+          // Auto-play single story
+          await loadAndPlayStory(stories[0]);
+        } else {
+          // Multiple stories - let user choose
+          setStoryFiles(stories);
+          setAppState('selecting');
+        }
+      } catch (err) {
+        console.error('Failed to scan for stories:', err);
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        setError(`Failed to scan for stories:\n\n${errorMsg}`);
+        setAppState('error');
       }
-    }
+    };
+
+    scanForStories();
   }, []);
 
-  // Save recent stories to localStorage
-  const addRecentStory = useCallback((story: RecentStory) => {
-    setRecentStories(prev => {
-      const filtered = prev.filter(s => s.path !== story.path);
-      const updated = [story, ...filtered].slice(0, 10); // Keep last 10
-      localStorage.setItem('asaps-recent-stories', JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
+  const loadAndPlayStory = async (story: StoryFile) => {
+    setAppState('loading');
+    setError(null);
 
-  // Store pending story data while loading
-  const pendingStoryRef = useRef<{ data: File | ArrayBuffer; title: string } | null>(null);
+    // Wait for container to be available
+    await new Promise(resolve => requestAnimationFrame(resolve));
 
-  const openStory = useCallback(async (data: File | ArrayBuffer, title: string = 'Story') => {
-    try {
-      setAppState('loading');
-      setError(null);
-
-      // Clean up previous player
-      if (playerRef.current) {
-        playerRef.current.dispose();
-        playerRef.current = null;
-      }
-      if (rendererRef.current) {
-        rendererRef.current.clear();
-        rendererRef.current = null;
-      }
-
-      // Store the data and transition to playing state
-      // The actual loading will happen in useEffect when container is visible
-      pendingStoryRef.current = { data, title };
-      setAppState('playing');
-    } catch (err) {
-      console.error('Failed to open story:', err);
-      setError(err instanceof Error ? err.message : 'Failed to open story');
+    if (!containerRef.current) {
+      setError('Player container not ready');
       setAppState('error');
-    }
-  }, []);
-
-  // Load story when we transition to playing state with pending data
-  useEffect(() => {
-    if (appState !== 'playing' || !pendingStoryRef.current || !containerRef.current) {
       return;
     }
 
-    const { data, title } = pendingStoryRef.current;
-    pendingStoryRef.current = null;
+    try {
+      const { readFile } = await import('@tauri-apps/plugin-fs');
+      const { invoke } = await import('@tauri-apps/api/core');
 
-    // Use requestAnimationFrame to ensure DOM has updated and container is visible
-    requestAnimationFrame(() => {
-      const loadStory = async () => {
-        if (!containerRef.current) return;
+      console.log('[App] Loading story:', story.path);
+      const uint8Array = await readFile(story.path);
+      const arrayBuffer = uint8Array.buffer.slice(
+        uint8Array.byteOffset,
+        uint8Array.byteOffset + uint8Array.byteLength
+      );
 
-        try {
-          // Now the container is visible, create renderer and player
-          const rect = containerRef.current.getBoundingClientRect();
-          console.log('[App] Container rect:', rect);
-
-          const context: RenderContext = {
-            container: containerRef.current,
-            width: rect.width || 1280,
-            height: rect.height || 720,
-          };
-          const renderer = new ReactRenderer(context);
-          rendererRef.current = renderer;
-
-          const player = new PlayerEngine({
-            container: containerRef.current,
-            renderer,
-          });
-          playerRef.current = player;
-
-          // Load the story
-          console.log('[App] Loading story...');
-          await player.loadStory(data);
-          console.log('[App] Story loaded, starting...');
-
-          // Update renderer with story's stage dimensions
-          const stageDimensions = player.getStageDimensions();
-          console.log('[App] Stage dimensions from story:', stageDimensions);
-          renderer.setStageDimensions(stageDimensions.width, stageDimensions.height);
-
-          // Start the story (don't await - it runs until story ends)
-          player.start().catch(err => {
-            console.error('Story execution error:', err);
-            setError(err instanceof Error ? err.message : 'Story execution failed');
-            setAppState('error');
-          });
-
-          // Add to recent stories
-          addRecentStory({
-            path: data instanceof File ? data.name : 'story.asaps.zip',
-            title,
-            lastPlayed: new Date(),
-          });
-        } catch (err) {
-          console.error('Failed to load story:', err);
-          setError(err instanceof Error ? err.message : 'Failed to load story');
-          setAppState('error');
-        }
+      // Create renderer
+      const rect = containerRef.current.getBoundingClientRect();
+      const context: RenderContext = {
+        container: containerRef.current,
+        width: rect.width || 1280,
+        height: rect.height || 720,
       };
+      const renderer = new ReactRenderer(context);
+      rendererRef.current = renderer;
 
-      loadStory();
-    });
-  }, [appState, addRecentStory]);
+      // Create player
+      const player = new PlayerEngine({
+        container: containerRef.current,
+        renderer,
+      });
+      playerRef.current = player;
 
-  const handleOpenFile = useCallback(async () => {
-    // Check if we're in Tauri environment
-    if (window.__TAURI__) {
+      // Load the story
+      await player.loadStory(arrayBuffer);
+
+      // Update renderer with story's stage dimensions
+      const stageDimensions = player.getStageDimensions();
+      console.log('[App] Stage dimensions:', stageDimensions);
+      renderer.setStageDimensions(stageDimensions.width, stageDimensions.height);
+
+      // Resize window to match stage dimensions
       try {
-        const { open } = await import('@tauri-apps/plugin-dialog');
-        const { readFile } = await import('@tauri-apps/plugin-fs');
-
-        const selected = await open({
-          multiple: false,
-          filters: [{
-            name: 'ASAPS Story',
-            extensions: ['zip', 'asaps'],
-          }],
+        await invoke('resize_window', {
+          width: stageDimensions.width,
+          height: stageDimensions.height
         });
-
-        if (selected) {
-          const filePath = typeof selected === 'string' ? selected : selected[0];
-          const uint8Array = await readFile(filePath);
-          // Convert Uint8Array to ArrayBuffer
-          const arrayBuffer = uint8Array.buffer.slice(
-            uint8Array.byteOffset,
-            uint8Array.byteOffset + uint8Array.byteLength
-          );
-          await openStory(arrayBuffer, filePath.split('/').pop() || 'Story');
-        }
-      } catch (err) {
-        console.error('Tauri file open failed:', err);
-        setError('Failed to open file dialog');
+        console.log('[App] Window resized to:', stageDimensions);
+      } catch (e) {
+        console.warn('[App] Could not resize window:', e);
       }
-    } else {
-      // Web fallback - use file input
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.zip,.asaps,.asaps.zip';
-      input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-          await openStory(file, file.name);
-        }
-      };
-      input.click();
+
+      setAppState('playing');
+
+      // Start the story
+      player.start().catch(err => {
+        console.error('Story execution error:', err);
+        setError(err instanceof Error ? err.message : 'Story execution failed');
+        setAppState('error');
+      });
+
+    } catch (err) {
+      console.error('Failed to load story:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load story');
+      setAppState('error');
     }
-  }, [openStory]);
+  };
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
+  const handleSelectStory = (story: StoryFile) => {
+    loadAndPlayStory(story);
+  };
 
-    const file = e.dataTransfer.files[0];
-    if (file && (file.name.endsWith('.zip') || file.name.endsWith('.asaps'))) {
-      await openStory(file, file.name);
-    }
-  }, [openStory]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback(() => {
-    setIsDragOver(false);
-  }, []);
-
-  const handleBack = useCallback(() => {
+  const handleRetry = () => {
+    // Cleanup
     if (playerRef.current) {
       playerRef.current.dispose();
       playerRef.current = null;
@@ -215,66 +204,36 @@ const App: React.FC = () => {
       rendererRef.current.clear();
       rendererRef.current = null;
     }
-    setAppState('library');
+    // Rescan
+    setAppState('scanning');
     setError(null);
-  }, []);
+    window.location.reload();
+  };
 
   return (
     <div className="app-container">
-      {appState === 'library' && (
-        <div className="library-view">
-          <div className="library-header">
-            <h1>ASAPS Player</h1>
-            <button className="button button-primary" onClick={handleOpenFile}>
-              Open Story
-            </button>
-          </div>
+      {appState === 'scanning' && (
+        <div className="loading-screen">
+          <div className="spinner" />
+          <div>Scanning for stories...</div>
+        </div>
+      )}
 
-          <div
-            className={`drop-zone ${isDragOver ? 'drag-over' : ''}`}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onClick={handleOpenFile}
-          >
-            <div className="drop-zone-icon">📖</div>
-            <div className="drop-zone-text">
-              Drop a story file here or click to browse
-            </div>
+      {appState === 'selecting' && (
+        <div className="selection-screen">
+          <h1>Select a Story</h1>
+          <p className="selection-hint">Multiple story files found. Choose one to play:</p>
+          <div className="story-list">
+            {storyFiles.map((story, index) => (
+              <button
+                key={index}
+                className="story-button"
+                onClick={() => handleSelectStory(story)}
+              >
+                {story.name.replace(/\.(asaps\.zip|asaps|zip)$/i, '')}
+              </button>
+            ))}
           </div>
-
-          {recentStories.length > 0 && (
-            <>
-              <h2 style={{ marginTop: 24, marginBottom: 16 }}>Recent Stories</h2>
-              <div className="library-grid">
-                {recentStories.map((story, index) => (
-                  <div
-                    key={index}
-                    className="story-card"
-                    onClick={() => {
-                      // For recent stories, we'd need to re-open from the path
-                      // This is a placeholder - in Tauri we'd use the filesystem
-                      handleOpenFile();
-                    }}
-                  >
-                    {story.thumbnail ? (
-                      <img
-                        src={story.thumbnail}
-                        alt=""
-                        className="story-card-thumbnail"
-                      />
-                    ) : (
-                      <div className="story-card-thumbnail" />
-                    )}
-                    <div className="story-card-title">{story.title}</div>
-                    <div className="story-card-meta">
-                      {story.lastPlayed.toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
         </div>
       )}
 
@@ -287,22 +246,19 @@ const App: React.FC = () => {
 
       {appState === 'error' && (
         <div className="error-screen">
-          <div style={{ fontSize: 48 }}>⚠️</div>
-          <div>{error || 'An error occurred'}</div>
-          <button className="button" onClick={handleBack}>
-            Back to Library
+          <div className="error-icon">!</div>
+          <div className="error-message">{error || 'An error occurred'}</div>
+          <button className="button" onClick={handleRetry}>
+            Retry
           </button>
         </div>
       )}
 
-      {/* Player container - always mounted to preserve renderer root */}
+      {/* Player container - always mounted but hidden when not playing */}
       <div
         className="player-view"
-        style={{ display: appState === 'playing' ? 'flex' : 'none' }}
+        style={{ display: appState === 'playing' || appState === 'loading' ? 'block' : 'none' }}
       >
-        <button className="back-button" onClick={handleBack}>
-          ← Back
-        </button>
         <div ref={containerRef} className="player-container" />
         {playerRef.current && <PlayerUI player={playerRef.current} />}
       </div>

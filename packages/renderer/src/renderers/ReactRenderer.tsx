@@ -31,7 +31,13 @@ const ScaledStage: React.FC<ScaledStageProps> = ({ children, width, height }) =>
           const scaleX = availableWidth / width;
           const scaleY = availableHeight / height;
           // Use the smaller scale to fit entirely within viewport
-          setScale(Math.min(scaleX, scaleY, 1)); // Cap at 1 to not upscale
+          let newScale = Math.min(scaleX, scaleY, 1); // Cap at 1 to not upscale
+          console.log(`[ScaledStage] container: ${availableWidth}x${availableHeight}, stage: ${width}x${height}, scaleX: ${scaleX.toFixed(4)}, scaleY: ${scaleY.toFixed(4)}, scale: ${newScale.toFixed(4)}`);
+          // If very close to 1, use exactly 1 to avoid sub-pixel letterboxing
+          if (newScale > 0.99) {
+            newScale = 1;
+          }
+          setScale(newScale);
         }
       }
     };
@@ -46,13 +52,17 @@ const ScaledStage: React.FC<ScaledStageProps> = ({ children, width, height }) =>
     return <div ref={containerRef} style={{ width, height, visibility: 'hidden' }}>{children}</div>;
   }
 
+  // When scale is 1 (or close to it), fill the container entirely
+  // Otherwise center the scaled content
+  const fillContainer = scale >= 0.99;
+
   return (
     <div
       ref={containerRef}
       style={{
-        width,
-        height,
-        transform: `scale(${scale})`,
+        width: fillContainer ? '100%' : width,
+        height: fillContainer ? '100%' : height,
+        transform: fillContainer ? 'none' : `scale(${scale})`,
         transformOrigin: 'center center',
       }}
     >

@@ -1,5 +1,58 @@
 # ASAPS Modern - Progress Log
 
+## 2025-01-02: Simplified Desktop Player
+
+### Overview
+
+Simplified the desktop player to be a pure playback engine that auto-discovers stories in its directory, removing the library UI and file dialogs.
+
+### Player Simplification
+
+**Goal**: Transform from library-based UI to simple playback engine.
+
+**Changes**:
+- Removed library view, recent stories list, and file dialogs
+- Added automatic directory scanning on startup
+- Shows selection screen if multiple stories found, auto-plays if single story
+- Scans both executable directory and working directory for `.asaps.zip` files
+
+### Window Auto-Resize
+
+**Problem**: Window size was fixed, causing letterboxing (dark bars) around the stage content.
+
+**Solution**: Added Rust command to resize window to match story's stage dimensions:
+```rust
+#[tauri::command]
+fn resize_window(app: tauri::AppHandle, width: u32, height: u32) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        // Add height for macOS title bar (32px)
+        let title_bar_height = 32u32;
+        window.set_size(LogicalSize::new(width, height + title_bar_height))
+    }
+}
+```
+
+**Key insight**: The macOS title bar takes 32 pixels from the window height, so the content area is smaller than the window size. Adding 32px to the requested height ensures the content area matches exactly.
+
+### Filesystem Permissions
+
+Added required Tauri filesystem permissions for directory scanning:
+- `fs:allow-read-dir` - Read directory contents
+- `fs:allow-read-file` - Read story files
+- `fs:scope` with `**/*` - Allow access to all paths
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `apps/player-desktop/src-tauri/src/lib.rs` | Added `resize_window`, `get_working_directory`, `get_executable_directory`, `get_cli_args` commands |
+| `apps/player-desktop/src-tauri/capabilities/default.json` | Added filesystem permissions |
+| `apps/player-desktop/src/App.tsx` | Simplified to directory scanning with auto-play/selection |
+| `apps/player-desktop/src/styles.css` | Updated styles for selection screen |
+| `packages/renderer/src/renderers/ReactRenderer.tsx` | Added debug logging for scale calculation |
+
+---
+
 ## 2025-01-02: Desktop Player Fixes
 
 ### Overview

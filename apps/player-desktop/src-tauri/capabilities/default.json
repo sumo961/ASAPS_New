@@ -10,6 +10,12 @@
     "fs:allow-write",
     "fs:allow-exists",
     "fs:allow-mkdir",
+    "fs:allow-read-dir",
+    "fs:allow-read-file",
+    {
+      "identifier": "fs:scope",
+      "allow": ["**/*"]
+    },
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save"
