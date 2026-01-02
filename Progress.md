@@ -1,5 +1,99 @@
 # ASAPS Modern - Progress Log
 
+## 2025-01-02: Desktop Builder Electron Integration
+
+### Overview
+
+Implemented Electron menu integration and UX improvements for the desktop builder app (`apps/builder-desktop`).
+
+### Electron Menu Handlers
+
+Added IPC handlers for native menu commands:
+- **File > Open**: Opens project library modal
+- **File > Save**: Saves to current project (or triggers Save As for untitled)
+- **File > Save As**: Saves project to internal storage with new name (extracted from file path)
+- **File > Export**: Opens export dialog
+
+```typescript
+// Save As extracts project name from file path
+const unsubscribeSaveAs = window.electronAPI.onProjectSaveAs(async (filePath: string) => {
+  const fileName = filePath.split('/').pop() || 'Project';
+  const projectName = fileName
+    .replace(/\.asaps\.zip$/i, '')
+    .replace(/\.zip$/i, '')
+    .replace(/\.asaps$/i, '') || 'Project';
+  const newProjectId = await saveCurrent(projectName);
+});
+```
+
+### macOS Window Improvements
+
+**Traffic Light Overlap Fix**:
+- Added 64px left padding to first header row for macOS traffic lights
+- Only applies when running in Electron on macOS (`-webkit-app-region: drag`)
+- Title input field marked as `no-drag` to remain editable
+
+**Window Sizing**:
+- Default: 1800x950 pixels
+- Minimum: 1550x800 pixels
+- Ensures all toolbar buttons are visible without wrapping
+
+### Project Name Display Fixes
+
+**Problem**: Project name was shown 3 times in header (redundant grey box).
+
+**Solution**: Removed the grey project name box from Header.tsx - project name now only shown in the editable title input.
+
+**Import Title Fix**: When loading projects, now uses `project.name` as primary source instead of `story.metadata.title`. Only falls back to story title if project name is missing or "Untitled Project".
+
+### Auto-Save State Fixes
+
+**Problem**: "Cannot auto-save untitled project" error persisted after loading a named project.
+
+**Root Cause**: Auto-save error state wasn't cleared when switching projects.
+
+**Solution**:
+1. Added `cancelPending()` call at start of `loadProject()` to clear pending saves
+2. Modified `cancelPending()` in useAutoSave to also clear error state and reset to idle
+3. Set `isUntitledProject` based on loaded project's actual name
+
+```typescript
+// In loadProject()
+cancelPending(); // Clear pending saves and errors
+
+// After loading
+const isUntitled = result.data.name === 'Untitled Project';
+setIsUntitledProject(isUntitled);
+```
+
+### Graph Controls Improvements
+
+**Docked Auto-Arrange**: Moved auto-arrange button from floating position to ReactFlow's Controls component:
+
+```typescript
+<Controls showInteractive={false}>
+  <ControlButton onClick={onAutoLayout} title="Auto-arrange beats">
+    <svg>...</svg>
+  </ControlButton>
+</Controls>
+```
+
+**Removed Toggle Interactivity**: Removed the confusing "toggle interactivity" button from Controls while keeping zoom in/out and fit view.
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `apps/builder-desktop/src/main/index.ts` | Window dimensions (1800x950), minWidth 1550 |
+| `packages/builder/src/App.tsx` | Electron menu event listeners for Open/Save/SaveAs/Export |
+| `packages/builder/src/components/Header.tsx` | Removed grey project name, added macOS draggable region |
+| `packages/builder/src/components/graph/GraphEditor.tsx` | Docked auto-arrange, removed interactivity toggle |
+| `packages/builder/src/contexts/PersistenceContext.tsx` | Clear auto-save state on project load |
+| `packages/builder/src/hooks/useAutoSave.ts` | cancelPending clears error state |
+| `packages/builder/src/utils/projectDeserializer.ts` | Priority: project.name over story.metadata.title |
+
+---
+
 ## 2025-01-02: Simplified Desktop Player
 
 ### Overview
