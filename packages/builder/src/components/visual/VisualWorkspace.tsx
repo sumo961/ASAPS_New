@@ -12,7 +12,8 @@ import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
 import { calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '../../utils/textSizeCalculator';
-import { Info, Share2 } from 'lucide-react';
+import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
+import type { DialogNode } from '@asaps/core';
 
 import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
 import type { Character } from '../../types/character';
@@ -49,6 +50,59 @@ function resolveCharacterImageUrl(
   }
 
   return defaultImage;
+}
+
+/**
+ * Phase tree node for DialogTree navigation
+ */
+interface PhaseTreeNode {
+  id: string;
+  speaker: string;
+  text: string;  // Truncated for display
+  fullText: string;  // Full text for reference
+  depth: number;  // Indentation level
+  choiceText?: string;  // The choice that leads to this phase
+  children: PhaseTreeNode[];
+}
+
+/**
+ * Build a tree structure from DialogTree's nested DialogNode structure
+ */
+function buildPhaseTree(dialogTree: DialogNode | undefined): PhaseTreeNode | null {
+  if (!dialogTree) return null;
+
+  function traverse(node: DialogNode, depth: number, choiceText?: string): PhaseTreeNode {
+    const truncatedText = node.text.length > 25
+      ? node.text.substring(0, 25) + '...'
+      : node.text;
+
+    return {
+      id: node.id,
+      speaker: node.speaker || 'NPC',
+      text: truncatedText,
+      fullText: node.text,
+      depth,
+      choiceText: choiceText ? (choiceText.length > 20 ? choiceText.substring(0, 20) + '...' : choiceText) : undefined,
+      children: (node.choices || [])
+        .filter(c => c.dialogNode)
+        .map(c => traverse(c.dialogNode!, depth + 1, c.text)),
+    };
+  }
+
+  return traverse(dialogTree, 0);
+}
+
+/**
+ * Flatten phase tree to array with depth info for rendering
+ */
+function flattenPhaseTree(node: PhaseTreeNode | null): PhaseTreeNode[] {
+  if (!node) return [];
+
+  const result: PhaseTreeNode[] = [node];
+  for (const child of node.children) {
+    result.push(...flattenPhaseTree(child));
+  }
+  return result;
 }
 
 interface VisualWorkspaceProps {
@@ -100,6 +154,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const [activeTab, setActiveTab] = useState<'elements' | 'animations'>('elements');
   const [animations, setAnimations] = useState<AnimationPath[]>([]);
 
+  // Phase navigation state for DialogTree beats
+  const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
+  const [phasesExpanded, setPhasesExpanded] = useState(true);
+
   // Use refs to track current state for cleanup
   const beatRef = useRef(beat);
   const visualElementsRef = useRef(visualElements);
@@ -138,6 +196,26 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     type: 'background' | 'character' | 'prop' | 'sound' | null;
     callback: ((asset: Asset) => void) | null;
   }>({ isOpen: false, type: null, callback: null });
+
+  // Phase tree computation for DialogTree beats
+  const phaseTree = useMemo(() => {
+    if (beat?.type !== 'dialogTree') return null;
+    const params = beat.getParameters?.() as { dialogTree?: DialogNode } | undefined;
+    const dialogTree = params?.dialogTree;
+    return buildPhaseTree(dialogTree);
+  }, [beat]);
+
+  const flattenedPhases = useMemo(() => flattenPhaseTree(phaseTree), [phaseTree]);
+  const isDialogTreeBeat = beat?.type === 'dialogTree' && flattenedPhases.length > 1;
+
+  // Reset selected phase when beat changes
+  useEffect(() => {
+    if (beat?.id) {
+      // Default to root phase when switching beats
+      const rootPhase = phaseTree?.id || null;
+      setSelectedPhaseId(rootPhase);
+    }
+  }, [beat?.id, phaseTree?.id]);
 
   // Helper functions to auto-size text elements based on content and font
   // These use the improved textSizeCalculator utility with font awareness
@@ -1408,6 +1486,61 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   </button>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* DialogTree Phase Navigator */}
+          {isDialogTreeBeat && (
+            <div className="border-b border-gray-200 bg-purple-50">
+              {/* Header with expand/collapse */}
+              <button
+                onClick={() => setPhasesExpanded(!phasesExpanded)}
+                className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors"
+              >
+                {phasesExpanded ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+                <MessageSquare className="w-4 h-4" />
+                <span>Dialog Phases ({flattenedPhases.length})</span>
+              </button>
+
+              {/* Phase tree list */}
+              {phasesExpanded && (
+                <div className="px-2 pb-2 max-h-48 overflow-y-auto">
+                  {flattenedPhases.map((phase, index) => (
+                    <button
+                      key={phase.id}
+                      onClick={() => setSelectedPhaseId(phase.id)}
+                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                        selectedPhaseId === phase.id
+                          ? 'bg-purple-200 text-purple-900 ring-1 ring-purple-400'
+                          : 'hover:bg-purple-100 text-purple-800'
+                      }`}
+                      style={{ paddingLeft: `${8 + phase.depth * 12}px` }}
+                      title={phase.fullText}
+                    >
+                      <div className="flex items-start gap-1">
+                        <span className="text-purple-500 font-medium shrink-0">
+                          {index + 1}.
+                        </span>
+                        <div className="min-w-0">
+                          {phase.choiceText && (
+                            <div className="text-purple-400 text-[10px] truncate">
+                              [{phase.choiceText}] →
+                            </div>
+                          )}
+                          <div className="truncate">
+                            <span className="font-medium">{phase.speaker}:</span>{' '}
+                            {phase.text}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

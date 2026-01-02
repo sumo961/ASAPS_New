@@ -757,8 +757,8 @@ export class ReactRenderer extends BaseRenderer {
       const showTextOnHover = this.getState('showTextOnHover') || false;
 
       // Render using the shared PositionedBeatView component
-      // NOTE: previewMode=false to use absolute positioning from Visual Editor
-      // previewMode=true uses a flex layout that ignores element positions
+      // NOTE: previewMode=false uses absolute positioning from Visual Editor
+      // with smart collision detection for auto-height text boxes
       // Use project's stage dimensions from context
       const stageWidth = this.context.width;
       const stageHeight = this.context.height;

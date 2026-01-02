@@ -195,19 +195,27 @@ export function calculateTextBoxDimensions(
  * Calculate dimensions for a dialog box
  * Dialog boxes are similar to text boxes but may have different defaults
  * Renderer uses dynamic padding: h=max(width*0.04,12), v=max(height*0.1,12) per side
+ * We use generous padding to avoid text clipping
  */
 export function calculateDialogDimensions(
   text: string,
   fontSize: number = 16,
   fontFamily: string = 'Arial'
 ): TextDimensions {
-  return calculateTextDimensions({
+  const result = calculateTextDimensions({
     text,
     fontSize,
     fontFamily,
     minWidth: 200,
     maxWidth: 600,
-    padding: 36, // Approximate: accounts for min 12px + dynamic padding
+    padding: 48, // Increased: 24px per side to account for dynamic vertical padding
     isButton: false
   });
+
+  // Add extra buffer for dynamic vertical padding (10% of height)
+  // This ensures text doesn't get clipped when renderer applies its own padding
+  return {
+    width: result.width,
+    height: Math.round(result.height * 1.15) // 15% buffer for padding variance
+  };
 }

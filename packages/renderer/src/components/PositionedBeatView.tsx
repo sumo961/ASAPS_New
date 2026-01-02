@@ -150,6 +150,192 @@ export interface PositionedBeatViewProps {
   showTextOnHover?: boolean;
 }
 
+/**
+ * Measure text dimensions using canvas
+ * Returns the width needed to fit text on a single line
+ */
+function measureTextWidth(text: string, fontSize: number, fontFamily: string = 'Arial'): number {
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) {
+    return text.length * fontSize * 0.6; // Fallback estimate
+  }
+  context.font = `${fontSize}px ${fontFamily}`;
+  return context.measureText(text).width;
+}
+
+/**
+ * Calculate optimal text box dimensions
+ * Prefers wider boxes (up to maxWidth) before growing taller
+ */
+function calculateTextBoxDimensions(
+  text: string,
+  fontSize: number,
+  fontFamily: string,
+  locationWidth: number,
+  maxWidth: number,
+  padding: number
+): { width: number; height: number } {
+  const lineHeight = 1.4;
+  const contentPadding = padding * 2; // padding on both sides
+
+  // Measure single-line width
+  const textWidth = measureTextWidth(text, fontSize, fontFamily);
+  const singleLineWidth = textWidth + contentPadding;
+
+  // If fits in single line at location width, use location dimensions
+  if (singleLineWidth <= locationWidth) {
+    return {
+      width: locationWidth,
+      height: fontSize * lineHeight + contentPadding
+    };
+  }
+
+  // If fits in single line at max width, expand width
+  if (singleLineWidth <= maxWidth) {
+    return {
+      width: Math.ceil(singleLineWidth),
+      height: fontSize * lineHeight + contentPadding
+    };
+  }
+
+  // Need multiple lines - use max width and calculate height
+  const availableWidth = maxWidth - contentPadding;
+  const avgCharWidth = fontSize * 0.55;
+  const charsPerLine = Math.floor(availableWidth / avgCharWidth);
+  const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+
+  return {
+    width: maxWidth,
+    height: lines * fontSize * lineHeight + contentPadding
+  };
+}
+
+/**
+ * Adjust button positions to avoid collisions with text boxes
+ * Returns adjusted elements array
+ */
+function adjustElementsForCollisions(
+  elements: PositionedElementData[],
+  stageWidth: number,
+  theme: RenderThemeSettings
+): PositionedElementData[] {
+  const padding = theme.textBox.padding || 20;
+  const maxTextWidth = stageWidth * 0.8;
+
+  // Separate text and button elements
+  const textElements = elements.filter(el =>
+    el.location.kind === 'text' || el.location.kind === 'dialog'
+  );
+  const buttonElements = elements.filter(el =>
+    el.location.kind === 'button'
+  );
+  const otherElements = elements.filter(el =>
+    el.location.kind !== 'text' && el.location.kind !== 'dialog' && el.location.kind !== 'button'
+  );
+
+  // Calculate actual dimensions for text elements
+  const textBoxBounds: { bottom: number; left: number; right: number }[] = [];
+  const adjustedTextElements = textElements.map(el => {
+    const fontSize = el.location.fontSize || 16;
+    const fontFamily = el.location.font || 'Arial';
+    const dims = calculateTextBoxDimensions(
+      el.content || '',
+      fontSize,
+      fontFamily,
+      el.location.width,
+      maxTextWidth,
+      padding
+    );
+
+    // Calculate the actual bottom of the text box
+    const bottom = el.location.y + dims.height;
+    const left = el.location.x;
+    const right = el.location.x + dims.width;
+    textBoxBounds.push({ bottom, left, right });
+
+    // Return element with adjusted width if needed
+    const newWidth = Math.max(el.location.width, dims.width);
+    if (newWidth !== el.location.width) {
+      return {
+        ...el,
+        location: {
+          ...el.location,
+          width: newWidth
+        }
+      };
+    }
+    return el;
+  });
+
+  // Adjust button positions to avoid collisions
+  // Keep original X positions but normalize widths and prevent vertical overlaps
+
+  if (buttonElements.length === 0) {
+    return [...otherElements, ...adjustedTextElements];
+  }
+
+  // Calculate uniform button width (use max width among all buttons, capped at 60% stage)
+  const maxButtonWidth = Math.min(
+    Math.max(...buttonElements.map(el => el.location.width)),
+    stageWidth * 0.6
+  );
+
+  // Calculate common X position: average center of all buttons
+  const avgCenterX = buttonElements.reduce((sum, el) => sum + el.location.x + el.location.width / 2, 0) / buttonElements.length;
+  const commonX = Math.max(0, Math.min(avgCenterX - maxButtonWidth / 2, stageWidth - maxButtonWidth));
+
+  // Process buttons in order of their Y position (top to bottom)
+  const sortedButtons = [...buttonElements].sort((a, b) => a.location.y - b.location.y);
+  const adjustedButtonElements: PositionedElementData[] = [];
+  const buttonBounds: { top: number; bottom: number; left: number; right: number }[] = [];
+
+  for (const el of sortedButtons) {
+    let newY = el.location.y;
+    // Use common X position for all buttons (aligned)
+    const newX = commonX;
+    const buttonLeft = newX;
+    const buttonRight = newX + maxButtonWidth;
+    const buttonHeight = el.location.height;
+
+    // Check collision with each text box
+    for (const bounds of textBoxBounds) {
+      const horizontalOverlap = buttonLeft < bounds.right && buttonRight > bounds.left;
+      if (horizontalOverlap && newY < bounds.bottom + 15) {
+        newY = Math.max(newY, bounds.bottom + 15);
+      }
+    }
+
+    // Check collision with previously placed buttons
+    for (const bounds of buttonBounds) {
+      const horizontalOverlap = buttonLeft < bounds.right && buttonRight > bounds.left;
+      if (horizontalOverlap && newY < bounds.bottom + 20 && newY + buttonHeight > bounds.top) {
+        newY = Math.max(newY, bounds.bottom + 20);
+      }
+    }
+
+    // Record this button's bounds for subsequent buttons
+    buttonBounds.push({
+      top: newY,
+      bottom: newY + buttonHeight,
+      left: buttonLeft,
+      right: buttonRight
+    });
+
+    adjustedButtonElements.push({
+      ...el,
+      location: {
+        ...el.location,
+        x: newX,
+        y: newY,
+        width: maxButtonWidth
+      }
+    });
+  }
+
+  return [...otherElements, ...adjustedTextElements, ...adjustedButtonElements];
+}
+
 // Default theme to use if none provided (matches Visual Novel preset style)
 const DEFAULT_THEME: RenderThemeSettings = {
   textBox: {
@@ -434,6 +620,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   }
 
   // Non-preview mode: use absolute positioning for all elements
+  // Apply collision detection to adjust button positions when text boxes grow
+  const adjustedElements = adjustElementsForCollisions(elements, stageWidth, theme);
+
   // Calculate animation delays for sequenced typewriter effect on text elements
   const animation = theme.textEffects?.animation || 'none';
   const speed = theme.textEffects?.typewriterSpeed || 30;
@@ -441,7 +630,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   const bufferMs = 300; // Small pause between animations
 
   // Sort text elements for animation sequencing: title first, then author, then others
-  const textElements = elements.filter(el =>
+  const textElements = adjustedElements.filter(el =>
     el.location.kind === 'text' || el.location.kind === 'dialog'
   );
   const sortedTextElements = [...textElements].sort((a, b) => {
@@ -487,7 +676,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       style={containerStyle}
       onClick={!effectiveAnimationsComplete && animation === 'typewriter' ? handleSkipAnimations : undefined}
     >
-      {elements.map((element, index) => (
+      {adjustedElements.map((element, index) => (
         <PositionedElement
           key={`element-${index}-${element.location.name}`}
           element={element}
@@ -875,10 +1064,9 @@ const TextElement: React.FC<{
     ? { animation: `fadeIn ${fadeInDuration}ms ease-in` }
     : {};
 
-  // In preview mode, use auto height with min/max constraints
-  const heightStyle = previewMode
-    ? { height: 'auto', minHeight: '60px', maxHeight: `${location.height}px` }
-    : { height: style.height };
+  // Always use auto height for text boxes to prevent content clipping
+  // minHeight ensures the box maintains a reasonable size even with short text
+  const heightStyle = { height: 'auto', minHeight: '60px' };
 
   // For typewriter animation, render full text but make unrevealed characters transparent
   // This keeps text centered while characters appear one by one
@@ -1429,10 +1617,9 @@ const DialogElement: React.FC<{
   const paddingHorizontal = Math.max(Math.floor(location.width * 0.04), 12);
   const paddingVertical = Math.max(Math.floor(location.height * 0.1), 12);
 
-  // In preview mode, use auto height with min/max constraints
-  const heightStyle = previewMode
-    ? { height: 'auto', minHeight: '60px', maxHeight: `${location.height}px` }
-    : { height: style.height };
+  // Always use auto height for dialog boxes to prevent content clipping
+  // minHeight ensures the box maintains a reasonable size even with short text
+  const heightStyle = { height: 'auto', minHeight: '60px' };
 
   // Use theme colors for text box styling
   const opacityValue = theme.textBox.opacity / 100;
