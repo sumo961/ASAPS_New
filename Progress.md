@@ -1,5 +1,74 @@
 # ASAPS Modern - Progress Log
 
+## 2026-01-02: DialogTree Rendering Improvements
+
+### Overview
+
+Improved DialogTree beat rendering with auto-sizing text boxes and smart button layout to prevent content clipping and element overlaps.
+
+### Text Box Auto-Sizing
+
+**Problem**: NPC dialog text was being clipped when content exceeded the fixed text box dimensions.
+
+**Solution**:
+- Changed text boxes to use `height: auto` with `minHeight: 60px`
+- Text boxes now expand width first (up to 80% of stage) before growing taller
+- Added canvas-based text measurement for accurate dimension calculation
+
+```typescript
+// Calculate optimal dimensions - prefer wider before taller
+function calculateTextBoxDimensions(text, fontSize, fontFamily, locationWidth, maxWidth, padding) {
+  const textWidth = measureTextWidth(text, fontSize, fontFamily);
+  const singleLineWidth = textWidth + padding * 2;
+
+  if (singleLineWidth <= locationWidth) return { width: locationWidth, height: ... };
+  if (singleLineWidth <= maxWidth) return { width: singleLineWidth, height: ... };
+  // Multi-line at max width
+  return { width: maxWidth, height: lines * lineHeight + padding };
+}
+```
+
+### Smart Collision Detection
+
+**Problem**: Buttons overlapped with expanded text boxes and with each other.
+
+**Solution**: Added `adjustElementsForCollisions()` function that:
+1. Calculates actual text box bounds based on content
+2. Adjusts button Y positions to avoid text box collisions (15px gap)
+3. Detects button-to-button overlaps and stacks them vertically (20px gap)
+4. Normalizes all button widths to the widest button (capped at 60% stage)
+5. Aligns all buttons to a common X position (average center)
+
+```typescript
+// Buttons are processed top-to-bottom, checking collisions with:
+// 1. Text boxes - move below if overlapping
+// 2. Previously placed buttons - stack vertically if overlapping
+for (const bounds of buttonBounds) {
+  const horizontalOverlap = buttonLeft < bounds.right && buttonRight > bounds.left;
+  if (horizontalOverlap && newY < bounds.bottom + 20) {
+    newY = Math.max(newY, bounds.bottom + 20);
+  }
+}
+```
+
+### Phase Tree Navigation (UI Only)
+
+Added phase tree visualization to Visual Workspace for DialogTree beats:
+- Shows nested dialog phases in expandable tree structure
+- Displays speaker, truncated text, and choice paths
+- Foundation for future phase-by-phase visual editing
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/renderer/src/components/PositionedBeatView.tsx` | Auto-height text boxes, collision detection, button normalization |
+| `packages/renderer/src/renderers/ReactRenderer.tsx` | Updated comments for collision detection |
+| `packages/builder/src/utils/textSizeCalculator.ts` | Improved padding calculation for dialog dimensions |
+| `packages/builder/src/components/visual/VisualWorkspace.tsx` | Phase tree navigation UI for DialogTree beats |
+
+---
+
 ## 2025-01-02: Desktop Builder Electron Integration
 
 ### Overview
