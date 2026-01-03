@@ -34,22 +34,28 @@ const App: React.FC = () => {
         // Try multiple directories to find stories
         let stories: StoryFile[] = [];
 
-        // Priority 1: Executable directory (for distribution - player next to story)
-        // Priority 2: Working directory (for dev/testing)
+        // Get all search directories from Tauri backend
+        // On macOS .app bundles: containing folder, MacOS folder, Resources folder
+        // Also includes working directory for dev/testing
         const dirsToTry: string[] = [];
 
         try {
-          const exeDir = await invoke<string>('get_executable_directory');
-          console.log('[App] Executable directory:', exeDir);
-          dirsToTry.push(exeDir);
+          const searchDirs = await invoke<string[]>('get_search_directories');
+          console.log('[App] Search directories from backend:', searchDirs);
+          dirsToTry.push(...searchDirs);
         } catch (e) {
-          console.log('[App] Could not get executable directory:', e);
+          console.log('[App] Could not get search directories:', e);
+          // Fallback to old method
+          try {
+            const exeDir = await invoke<string>('get_executable_directory');
+            dirsToTry.push(exeDir);
+          } catch { /* ignore */ }
         }
 
         try {
           const workDir = await invoke<string>('get_working_directory');
           console.log('[App] Working directory:', workDir);
-          // Only add if different from exe dir
+          // Only add if not already in list
           if (!dirsToTry.includes(workDir)) {
             dirsToTry.push(workDir);
           }

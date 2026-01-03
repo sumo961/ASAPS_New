@@ -23,19 +23,18 @@ fn get_working_directory() -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
-/// Get the directory where the app bundle is located (for finding story files)
-/// On macOS, the executable is inside .app/Contents/MacOS/, so we go up 3 levels
+/// Get directories to search for story files
+/// Returns multiple paths: containing folder, MacOS folder, and Resources folder
 #[tauri::command]
 fn get_executable_directory() -> Result<String, String> {
+    // For backwards compatibility, return the primary search directory
+    // Use get_search_directories for all directories
     env::current_exe()
         .and_then(|exe_path| {
-            let mut path = exe_path.clone();
-
-            // Check if we're inside a macOS .app bundle
-            // Path looks like: /path/to/App.app/Contents/MacOS/executable
-            let path_str = path.to_string_lossy();
+            let path_str = exe_path.to_string_lossy();
             if path_str.contains(".app/Contents/MacOS") {
-                // Go up 3 levels: MacOS -> Contents -> App.app -> containing folder
+                // Go up 3 levels to get containing folder
+                let mut path = exe_path.clone();
                 for _ in 0..3 {
                     path = path.parent()
                         .map(|p| p.to_path_buf())
@@ -43,8 +42,7 @@ fn get_executable_directory() -> Result<String, String> {
                 }
                 Ok(path)
             } else {
-                // Not in a bundle, just return parent directory
-                path.parent()
+                exe_path.parent()
                     .map(|p| p.to_path_buf())
                     .ok_or_else(|| std::io::Error::new(
                         std::io::ErrorKind::NotFound,
@@ -54,6 +52,48 @@ fn get_executable_directory() -> Result<String, String> {
         })
         .map(|p| p.to_string_lossy().into_owned())
         .map_err(|e| e.to_string())
+}
+
+/// Get all directories to search for story files
+/// On macOS .app bundles, returns: containing folder, MacOS folder, Resources folder
+#[tauri::command]
+fn get_search_directories() -> Vec<String> {
+    let mut dirs = Vec::new();
+
+    if let Ok(exe_path) = env::current_exe() {
+        let path_str = exe_path.to_string_lossy();
+
+        if path_str.contains(".app/Contents/MacOS") {
+            // 1. Containing folder (where .app is located)
+            let mut containing = exe_path.clone();
+            for _ in 0..3 {
+                containing = containing.parent()
+                    .map(|p| p.to_path_buf())
+                    .unwrap_or(containing);
+            }
+            dirs.push(containing.to_string_lossy().into_owned());
+
+            // 2. MacOS folder (inside bundle, next to executable)
+            if let Some(macos_dir) = exe_path.parent() {
+                dirs.push(macos_dir.to_string_lossy().into_owned());
+            }
+
+            // 3. Resources folder (standard location for bundled assets)
+            if let Some(macos_dir) = exe_path.parent() {
+                if let Some(contents_dir) = macos_dir.parent() {
+                    let resources = contents_dir.join("Resources");
+                    dirs.push(resources.to_string_lossy().into_owned());
+                }
+            }
+        } else {
+            // Not in a bundle, just use parent directory
+            if let Some(parent) = exe_path.parent() {
+                dirs.push(parent.to_string_lossy().into_owned());
+            }
+        }
+    }
+
+    dirs
 }
 
 /// Get command line arguments (for passing story directory)
@@ -67,7 +107,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![resize_window, get_working_directory, get_executable_directory, get_cli_args])
+        .invoke_handler(tauri::generate_handler![resize_window, get_working_directory, get_executable_directory, get_search_directories, get_cli_args])
         .setup(|app| {
             // Set up single instance on desktop platforms
             #[cfg(desktop)]
