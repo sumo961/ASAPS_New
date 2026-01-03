@@ -235,6 +235,7 @@ function adjustElementsForCollisions(
   );
 
   // Calculate actual dimensions for text elements
+  // Center text boxes horizontally when they need more width
   const textBoxBounds: { bottom: number; left: number; right: number }[] = [];
   const adjustedTextElements = textElements.map(el => {
     const fontSize = el.location.fontSize || 16;
@@ -248,19 +249,39 @@ function adjustElementsForCollisions(
       padding
     );
 
-    // Calculate the actual bottom of the text box
+    // If text needs more width, center it horizontally on the stage
+    const needsMoreWidth = dims.width > el.location.width;
+    const newWidth = needsMoreWidth ? dims.width : el.location.width;
+
+    // Center the text box if it needs more width, otherwise keep original position
+    // Also ensure it doesn't go off-screen
+    let newX = el.location.x;
+    if (needsMoreWidth) {
+      // Center on stage
+      newX = (stageWidth - newWidth) / 2;
+    } else {
+      // Ensure original position doesn't cause overflow
+      if (newX + newWidth > stageWidth - 20) {
+        newX = stageWidth - newWidth - 20;
+      }
+      if (newX < 20) {
+        newX = 20;
+      }
+    }
+
+    // Calculate the actual bounds of the text box
     const bottom = el.location.y + dims.height;
-    const left = el.location.x;
-    const right = el.location.x + dims.width;
+    const left = newX;
+    const right = newX + newWidth;
     textBoxBounds.push({ bottom, left, right });
 
-    // Return element with adjusted width if needed
-    const newWidth = Math.max(el.location.width, dims.width);
-    if (newWidth !== el.location.width) {
+    // Return element with adjusted position and width
+    if (newWidth !== el.location.width || newX !== el.location.x) {
       return {
         ...el,
         location: {
           ...el.location,
+          x: newX,
           width: newWidth
         }
       };
