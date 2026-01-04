@@ -1,5 +1,67 @@
 # ASAPS Modern - Progress Log
 
+## 2026-01-04: Preview Controls and Counter Level Meters
+
+### Overview
+
+Added several quality-of-life improvements to the preview modal and counter system for faster testing and better visualization.
+
+### Text Animation Controls
+
+**Visual Editor**: Disabled text animations (typewriter/fade effects) in the visual editor - they now only appear in preview mode. This makes editing faster without waiting for animations.
+
+**Preview Modal**: Added a toggle button to enable/disable text animations during preview. When disabled (shown as lightning bolt icon), text appears instantly, speeding up story testing.
+
+```typescript
+// Visual editor forces animation to 'none'
+textEffects: {
+  animation: 'none' as const,
+  typewriterSpeed: baseTheme.textEffects?.typewriterSpeed ?? 30,
+  fadeInDuration: baseTheme.textEffects?.fadeInDuration ?? 500,
+}
+```
+
+### Beat Selection for Preview
+
+Added a dropdown menu to start preview from any beat in the story:
+- Click "Start from..." to see all beats
+- Select a beat to jump directly to it when starting preview
+- Useful for testing specific scenes without playing through the entire story
+
+### Counter Level Meters
+
+Added visual level meter display for counters in the preview debug panel:
+
+**New Settings in Character Counter**:
+```typescript
+interface CharacterCounter {
+  // ... existing fields
+  showLevelMeter?: boolean;           // Enable visual meter
+  levelMeterOrientation?: 'horizontal' | 'vertical';
+}
+```
+
+**Character Editor UI**:
+- Checkbox to enable level meter display
+- Orientation buttons (horizontal/vertical)
+- Uses counter's existing color setting
+
+**Preview Display**:
+- Horizontal bar showing percentage filled
+- Vertical bar option for different layouts
+- Smooth transition animation when values change
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/components/visual/VisualBeatEditor.tsx` | Disable animations in visual editor |
+| `packages/builder/src/components/preview/StoryPreview.tsx` | Animation toggle, beat selection dropdown, level meter display |
+| `packages/builder/src/components/characters/CharacterEditor.tsx` | Level meter settings UI in counters tab |
+| `packages/builder/src/types/character.ts` | Added `showLevelMeter` and `levelMeterOrientation` to CharacterCounter |
+
+---
+
 ## 2026-01-04: Visual Editor Layout Matching Preview
 
 ### Overview
