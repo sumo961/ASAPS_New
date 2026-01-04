@@ -4,6 +4,17 @@ import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { DialogTreeParameters, DialogNode, DialogChoice } from '../generated/beat-types';
 
+/**
+ * Phase layout override - stores position adjustments for elements that
+ * differ from auto-layout defaults
+ */
+export interface PhaseOverride {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}
+
 export class DialogTreeBeat extends Beat {
   public dialogTree: DialogNode;
   public speaker: string;
@@ -13,6 +24,7 @@ export class DialogTreeBeat extends Beat {
   public markVisited?: boolean; // Show visual indication for choices leading to already-visited beats
   public backgroundUrl?: string; // Direct URL for background from ASML import
   public backgroundAssetId?: string; // Asset ID for background
+  public phaseOverrides?: Record<string, Record<string, PhaseOverride>>; // Per-phase visual element overrides
   private currentNode: DialogNode | null = null;
 
   constructor(config: BeatConfig & {
@@ -25,6 +37,7 @@ export class DialogTreeBeat extends Beat {
     const dialogTreeParam = config.dialogTree || config.parameters?.dialogTree;
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
+    this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
 
     if (dialogTreeParam) {
       // Migrate old format to new format if needed
@@ -217,7 +230,8 @@ export class DialogTreeBeat extends Beat {
       choiceDelay: this.choiceDelay,
       markVisited: this.markVisited,
       backgroundUrl: this.backgroundUrl,
-      backgroundAssetId: this.backgroundAssetId
+      backgroundAssetId: this.backgroundAssetId,
+      phaseOverrides: this.phaseOverrides
     };
   }
 
@@ -241,6 +255,7 @@ export class DialogTreeBeat extends Beat {
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
     if (params.backgroundUrl !== undefined) this.backgroundUrl = params.backgroundUrl;
     if (params.backgroundAssetId !== undefined) this.backgroundAssetId = params.backgroundAssetId;
+    if (params.phaseOverrides !== undefined) this.phaseOverrides = params.phaseOverrides;
 
     // Sync instance properties back to dialogTree
     if (this.dialogTree && typeof this.dialogTree === 'object') {

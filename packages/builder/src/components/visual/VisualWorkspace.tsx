@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent } from '@asaps/core';
+import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeAutoLayout, type LayoutElement, type AutoLayoutTheme } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
 import { VisualPropertiesPanel } from './VisualPropertiesPanel';
 import { AnimationPanel } from './AnimationPanel';
@@ -105,6 +105,28 @@ function flattenPhaseTree(node: PhaseTreeNode | null): PhaseTreeNode[] {
   return result;
 }
 
+/**
+ * Find a DialogNode by ID in the tree
+ */
+function findPhaseById(dialogTree: DialogNode | undefined, phaseId: string | null): DialogNode | null {
+  if (!dialogTree || !phaseId) return null;
+
+  // Check if this is the node we're looking for
+  if (dialogTree.id === phaseId) {
+    return dialogTree;
+  }
+
+  // Recursively search in choices
+  for (const choice of dialogTree.choices || []) {
+    if (choice.dialogNode) {
+      const found = findPhaseById(choice.dialogNode, phaseId);
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
 interface VisualWorkspaceProps {
   beat: Beat | null;
   beats: Beat[];
@@ -198,15 +220,36 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   }>({ isOpen: false, type: null, callback: null });
 
   // Phase tree computation for DialogTree beats
-  const phaseTree = useMemo(() => {
-    if (beat?.type !== 'dialogTree') return null;
-    const params = beat.getParameters?.() as { dialogTree?: DialogNode } | undefined;
-    const dialogTree = params?.dialogTree;
-    return buildPhaseTree(dialogTree);
-  }, [beat]);
+  // Note: We need to depend on the beat's actual dialogTree content, not just the beat reference
+  const dialogTreeParams = beat?.type === 'dialogTree'
+    ? (beat.getParameters?.() as { dialogTree?: DialogNode } | undefined)?.dialogTree
+    : null;
 
-  const flattenedPhases = useMemo(() => flattenPhaseTree(phaseTree), [phaseTree]);
+  const phaseTree = useMemo(() => {
+    if (beat?.type !== 'dialogTree' || !dialogTreeParams) return null;
+    console.log('[VisualWorkspace] Building phase tree from dialogTree:', dialogTreeParams);
+    const tree = buildPhaseTree(dialogTreeParams);
+    console.log('[VisualWorkspace] Built phase tree:', tree);
+    return tree;
+  }, [beat?.type, dialogTreeParams]);
+
+  const flattenedPhases = useMemo(() => {
+    const flattened = flattenPhaseTree(phaseTree);
+    console.log('[VisualWorkspace] Flattened phases:', flattened.length, flattened.map(p => p.id));
+    return flattened;
+  }, [phaseTree]);
   const isDialogTreeBeat = beat?.type === 'dialogTree' && flattenedPhases.length > 1;
+  console.log('[VisualWorkspace] isDialogTreeBeat:', isDialogTreeBeat, 'phases:', flattenedPhases.length);
+
+  // Get the current phase's DialogNode for phase-aware editing
+  const selectedPhase = useMemo(() => {
+    if (beat?.type !== 'dialogTree' || !selectedPhaseId) return null;
+    const params = beat.getParameters?.() as { dialogTree?: DialogNode } | undefined;
+    return findPhaseById(params?.dialogTree, selectedPhaseId);
+  }, [beat, selectedPhaseId]);
+
+  // Track previous phase ID to detect phase changes for auto-save
+  const prevPhaseIdRef = useRef<string | null>(null);
 
   // Reset selected phase when beat changes
   useEffect(() => {
@@ -214,6 +257,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // Default to root phase when switching beats
       const rootPhase = phaseTree?.id || null;
       setSelectedPhaseId(rootPhase);
+      prevPhaseIdRef.current = rootPhase;
     }
   }, [beat?.id, phaseTree?.id]);
 
@@ -236,6 +280,140 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const fontFamily = element.font || 'Arial';
     return calculateDialogDimensions(text, fontSize, fontFamily);
   }, []);
+
+  /**
+   * Generate visual elements for a specific DialogTree phase
+   * This creates the NPC text box and choice buttons with auto-layout
+   * Matches the preview renderer's flex-based layout positioning
+   */
+  const generatePhaseElements = useCallback((
+    phase: DialogNode,
+    stageWidth: number,
+    stageHeight: number,
+    overrides?: Record<string, Partial<{ x: number; y: number; width: number; height: number }>>
+  ): VisualElement[] => {
+    const defaultFontSize = 16;
+    const defaultFont = globalSettings?.fonts?.textFont || 'Arial';
+    const padding = globalSettings?.textbox?.padding || 20;
+
+    // Gaps match preview renderer's flex layout
+    const textButtonGap = 20; // Gap between text box and first button
+    const buttonGap = 16; // Gap between buttons (matches preview's row gap)
+    const buttonHeight = 50;
+    const startY = 50; // Match preview's starting position
+
+    // Calculate text box dimensions first (same logic as preview/autoLayout)
+    const lineHeight = 1.4;
+    const contentPadding = padding * 2;
+    const text = phase.text || '';
+
+    // Estimate text width (same as autoLayout.ts)
+    const textWidth = text.length * defaultFontSize * 0.55;
+    const maxTextWidth = stageWidth * 0.8;
+
+    let textBoxWidth: number;
+    let textBoxHeight: number;
+
+    if (textWidth + contentPadding <= maxTextWidth) {
+      // Fits in single line - use actual text width
+      textBoxWidth = Math.max(200, Math.min(textWidth + contentPadding, maxTextWidth));
+      textBoxHeight = defaultFontSize * lineHeight + contentPadding;
+    } else {
+      // Multiple lines needed - use max width and calculate height
+      textBoxWidth = maxTextWidth;
+      const availableWidth = maxTextWidth - contentPadding;
+      const avgCharWidth = defaultFontSize * 0.55;
+      const charsPerLine = Math.floor(availableWidth / avgCharWidth);
+      const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+      textBoxHeight = lines * defaultFontSize * lineHeight + contentPadding;
+    }
+
+    // Center text box horizontally
+    const textCenterX = (stageWidth - textBoxWidth) / 2;
+
+    // Create base elements for this phase
+    const baseElements: LayoutElement[] = [];
+
+    // NPC text box - centered horizontally with calculated dimensions
+    baseElements.push({
+      id: 'npc',
+      kind: 'dialog',
+      content: text,
+      x: textCenterX,
+      y: startY,
+      width: textBoxWidth,
+      height: textBoxHeight,
+      fontSize: defaultFontSize,
+      fontFamily: defaultFont,
+      speaker: phase.speaker,
+    });
+
+    // Calculate button positions - immediately after text box
+    const buttonStartY = startY + textBoxHeight + textButtonGap;
+
+    // Calculate button width - max of all button text widths, capped at 60%
+    const maxButtonWidth = stageWidth * 0.6;
+    const choices = phase.choices || [];
+
+    // Estimate each button's natural width based on text
+    const buttonTextWidths = choices.map(choice => {
+      const btnText = choice.text || '';
+      return btnText.length * defaultFontSize * 0.55 + 40; // Add padding for button
+    });
+    const uniformButtonWidth = Math.min(
+      Math.max(200, ...buttonTextWidths),
+      maxButtonWidth
+    );
+    const buttonCenterX = (stageWidth - uniformButtonWidth) / 2;
+
+    // Choice buttons - positioned immediately after text box
+    choices.forEach((choice, idx) => {
+      baseElements.push({
+        id: `choice_${idx}`,
+        kind: 'button',
+        content: choice.text || '',
+        x: buttonCenterX,
+        y: buttonStartY + idx * (buttonHeight + buttonGap),
+        width: uniformButtonWidth,
+        height: buttonHeight,
+        fontSize: defaultFontSize,
+        fontFamily: defaultFont,
+      });
+    });
+
+    // Apply auto-layout (mainly for collision detection and fine-tuning)
+    const layoutTheme: AutoLayoutTheme = {
+      textBoxPadding: padding,
+      maxTextWidthRatio: 0.8,
+      maxButtonWidthRatio: 0.6,
+      textButtonGap: textButtonGap,
+      buttonGap: buttonGap,
+    };
+    const layoutResult = computeAutoLayout(baseElements, stageWidth, stageHeight, layoutTheme);
+
+    // Convert to VisualElements and apply overrides
+    return layoutResult.adjustedElements.map((el) => {
+      const override = overrides?.[el.id];
+      return {
+        id: el.id,
+        type: el.kind === 'dialog' ? 'dialog' : 'button',
+        name: el.id === 'npc' ? `NPC: ${phase.speaker || 'Character'}` : `Choice ${el.id.replace('choice_', '')}`,
+        text: el.content,
+        speaker: el.speaker,
+        x: override?.x ?? el.x,
+        y: override?.y ?? el.y,
+        width: override?.width ?? el.width,
+        height: override?.height ?? el.height,
+        z: 0,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+        font: el.fontFamily,
+        fontSize: el.fontSize,
+      } as VisualElement;
+    });
+  }, [globalSettings]);
 
   /**
    * Sync visual elements to beat.locations Map
@@ -379,9 +557,120 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     prevBeatIdRef.current = beat?.id;
   }, [beat]); // Depend on beat object, not beat?.id, to run before the load
 
+  /**
+   * Save current phase overrides before switching to a new phase
+   */
+  const saveCurrentPhaseOverrides = useCallback(() => {
+    if (!beat || beat.type !== 'dialogTree' || !prevPhaseIdRef.current) return;
+    if (!hasChanges) return; // No changes to save
+
+    const params = beat.getParameters ? beat.getParameters() : {};
+    const phaseKey = prevPhaseIdRef.current;
+
+    // Calculate overrides: elements that differ from auto-layout
+    // For simplicity, save all element positions as overrides
+    const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number }>> = {};
+
+    visualElements.forEach(el => {
+      overrides[el.id] = {
+        x: el.x,
+        y: el.y,
+        width: el.width,
+        height: el.height,
+      };
+    });
+
+    // Save to phaseOverrides
+    const existingOverrides = params.phaseOverrides || {};
+    beat.updateParameters({
+      ...params,
+      phaseOverrides: {
+        ...existingOverrides,
+        [phaseKey]: overrides,
+      },
+    });
+
+    console.log(`[VisualWorkspace] Saved phase overrides for phase: ${phaseKey}`);
+  }, [beat, hasChanges, visualElements]);
+
+  /**
+   * Handle phase selection with auto-save
+   */
+  const handlePhaseSelect = useCallback((phaseId: string) => {
+    if (phaseId === selectedPhaseId) return; // Same phase, no action needed
+
+    console.log(`[VisualWorkspace] Phase switch: ${selectedPhaseId} → ${phaseId}`);
+
+    // Save current phase before switching
+    saveCurrentPhaseOverrides();
+
+    // Switch to new phase - DON'T update prevPhaseIdRef here!
+    // Let the useEffect handle it after loading elements
+    setSelectedPhaseId(phaseId);
+    setHasChanges(false);
+  }, [selectedPhaseId, saveCurrentPhaseOverrides]);
+
+  /**
+   * Load phase-specific elements when phase changes (for DialogTree beats)
+   */
+  useEffect(() => {
+    console.log(`[VisualWorkspace] Phase effect - selectedPhaseId: ${selectedPhaseId}, prevRef: ${prevPhaseIdRef.current}, selectedPhase: ${selectedPhase?.id}`);
+
+    if (!beat || beat.type !== 'dialogTree' || !selectedPhaseId || !selectedPhase) {
+      console.log(`[VisualWorkspace] Phase effect - skipping (missing data)`);
+      return;
+    }
+    if (!projectSettings) {
+      console.log(`[VisualWorkspace] Phase effect - skipping (no project settings)`);
+      return;
+    }
+
+    // Don't reload if this is the same phase and we already have elements
+    if (prevPhaseIdRef.current === selectedPhaseId && visualElements.length > 0) {
+      console.log(`[VisualWorkspace] Phase effect - skipping (same phase, already have elements)`);
+      return;
+    }
+
+    console.log(`[VisualWorkspace] Loading phase elements for: ${selectedPhaseId}, phase text: ${selectedPhase.text}`);
+
+    const params = beat.getParameters ? beat.getParameters() : {};
+    const phaseOverrides = params.phaseOverrides?.[selectedPhaseId];
+
+    // Generate elements for this phase with auto-layout and overrides
+    const phaseElements = generatePhaseElements(
+      selectedPhase,
+      projectSettings.width,
+      projectSettings.height,
+      phaseOverrides
+    );
+
+    setVisualElements(phaseElements);
+    setHasChanges(false);
+    prevPhaseIdRef.current = selectedPhaseId;
+
+    console.log(`[VisualWorkspace] Loaded ${phaseElements.length} elements for phase: ${selectedPhaseId}`);
+  }, [beat, selectedPhaseId, selectedPhase, projectSettings, generatePhaseElements]);
+
   // Initialize from beat parameters
   useEffect(() => {
     if (!beat) return;
+
+    // For DialogTree beats: load background/animations but skip element loading
+    // Elements are handled by phase-aware loading effect
+    if (beat.type === 'dialogTree') {
+      console.log(`[VisualWorkspace] DialogTree: loading background/animations only, elements via phase-aware loading`);
+      const params = beat.getParameters ? beat.getParameters() : {};
+      const bgId = params.node || params.backgroundAssetId || '';
+      const bgUrl = params.backgroundUrl || '';
+      setBackgroundAssetId(bgId);
+      setBackgroundUrl(bgUrl);
+      setBackgroundSound(params.backgroundSound || '');
+      setAnimations(params.animations || []);
+      // Clear visual elements so phase load effect will run
+      // This prevents stale elements from previous beat from showing
+      setVisualElements([]);
+      return;
+    }
 
     console.log(`[VisualWorkspace] LOADING BEAT: ${beat.type} (id: ${beat.id}, name: ${beat.name})`);
 
@@ -566,7 +855,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           } else if (beat.type === 'endScreen' && nameLower.includes('message')) {
             element.text = params.message || 'The End';
           } else if (beat.type === 'dialogTree') {
-            element.text = params.text || '';
+            // DialogTree stores text in dialogTree.text, not params.text
+            element.text = params.dialogTree?.text || params.text || '';
           } else if (beat.type === 'titleScreen') {
             if (nameLower.includes('title')) {
               element.text = params.title || 'Untitled Story';
@@ -1512,7 +1802,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   {flattenedPhases.map((phase, index) => (
                     <button
                       key={phase.id}
-                      onClick={() => setSelectedPhaseId(phase.id)}
+                      onClick={() => handlePhaseSelect(phase.id)}
                       className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
                         selectedPhaseId === phase.id
                           ? 'bg-purple-200 text-purple-900 ring-1 ring-purple-400'

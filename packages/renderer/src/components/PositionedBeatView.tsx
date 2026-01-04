@@ -1889,8 +1889,15 @@ export function createPositionedElementData(
   console.log('[createPositionedElementData] Creating elements:', { beatType, content, locationCount: locations.length });
 
   return locations.map((location) => {
-    const elementContent = getContentForLocation(location, content, beatType);
-    console.log(`[createPositionedElementData] Location "${location.name}" (${location.kind}) → content: "${elementContent}"`);
+    // Use location.content if explicitly provided (for phase-aware rendering)
+    // Otherwise derive from beat content using schema mapping
+    const elementContent = (location as any).content !== undefined
+      ? (location as any).content
+      : getContentForLocation(location, content, beatType);
+    console.log(`[createPositionedElementData] Location "${location.name}" (${location.kind}) → content: "${elementContent}"${(location as any).content !== undefined ? ' (from location)' : ''}`);
+
+    // Store the content in a way that the renderer will use
+    // We need to ensure the content is properly passed through
 
     // Resolve asset URL: handle character elements specially
     let resolvedAssetUrl: string | undefined;
@@ -2107,8 +2114,8 @@ function getContentForLocation(
 
   // Dialog Tree specific elements
   if (beatType === 'dialogTree') {
-    // Text element for dialog content
-    if (loc.kind === 'text' || nameLower.includes('text') || nameLower.includes('dialog')) {
+    // Text element for dialog content (handles both 'text' and 'dialog' kinds)
+    if (loc.kind === 'text' || loc.kind === 'dialog' || nameLower.includes('text') || nameLower.includes('dialog') || nameLower.includes('npc')) {
       return content.text || '';
     }
     // Button elements - match by choice text or index
