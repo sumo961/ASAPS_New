@@ -67,6 +67,10 @@ export interface CharacterCounter {
   visible: boolean;
   icon?: string;
   color?: string;
+  /** Show level meter in preview */
+  showLevelMeter?: boolean;
+  /** Level meter orientation */
+  levelMeterOrientation?: 'horizontal' | 'vertical';
 }
 
 export interface InventoryItem {

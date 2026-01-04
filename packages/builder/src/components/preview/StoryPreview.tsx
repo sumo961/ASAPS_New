@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
-import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database, ZoomIn, ZoomOut, Maximize2, Volume2, VolumeX } from 'lucide-react';
+import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database, ZoomIn, ZoomOut, Maximize2, Volume2, VolumeX, Type, Zap, List } from 'lucide-react';
 import { Story, StoryEngine, Beat } from '@asaps/core';
 import type { StatePreset } from '@asaps/core';
 import { ReactRenderer, getAudioManager } from '@asaps/renderer';
@@ -36,6 +36,9 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   const [fitScale, setFitScale] = useState(1); // Auto-calculated fit scale
   const [isAutoFit, setIsAutoFit] = useState(true); // Whether to use auto-fit or manual scale
   const [soundEnabled, setSoundEnabled] = useState(true); // Sound on/off toggle
+  const [animationEnabled, setAnimationEnabled] = useState(true); // Text animation on/off toggle
+  const [selectedStartBeat, setSelectedStartBeat] = useState<string | null>(null); // Beat to start preview from
+  const [showBeatMenu, setShowBeatMenu] = useState(false); // Beat selection dropdown visibility
 
   // Handle sound toggle during playback - mutes/unmutes ALL sounds (beat sounds + background music)
   // Uses gain-based muting so sounds continue playing silently and resume when unmuted
@@ -336,16 +339,24 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
     }
   }, [boxVisibility]);
 
-  // Update renderer theme when settings change
+  // Update renderer theme when settings or animation toggle changes
   useEffect(() => {
     if (rendererRef.current && settings) {
-      const theme = convertGlobalSettingsToTheme(settings);
+      const baseTheme = convertGlobalSettingsToTheme(settings);
+      // Override animation setting if disabled
+      const theme = animationEnabled ? baseTheme : {
+        ...baseTheme,
+        textEffects: {
+          ...baseTheme.textEffects,
+          animation: 'none' as const,
+        },
+      };
       if ('setTheme' in rendererRef.current) {
         (rendererRef.current as any).setTheme(theme);
       }
-      console.log('[StoryPreview] Updated theme:', theme);
+      console.log('[StoryPreview] Updated theme:', { ...theme, animationEnabled });
     }
-  }, [settings]);
+  }, [settings, animationEnabled]);
 
   // Update renderer visited beats when debug info changes
   // This enables the "mark already visited choices" feature
@@ -364,7 +375,15 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
 
       // Set theme BEFORE starting preview to ensure settings are applied
       if (settings) {
-        const theme = convertGlobalSettingsToTheme(settings);
+        const baseTheme = convertGlobalSettingsToTheme(settings);
+        // Override animation setting if disabled
+        const theme = animationEnabled ? baseTheme : {
+          ...baseTheme,
+          textEffects: {
+            ...baseTheme.textEffects,
+            animation: 'none' as const,
+          },
+        };
         if ('setTheme' in rendererRef.current) {
           (rendererRef.current as any).setTheme(theme);
         }
@@ -563,12 +582,13 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         }
       });
 
-      // Check for debug start beat override
+      // Check for debug start beat override (dropdown selection takes priority)
       const debugFirstBeat = settings?.debug?.firstbeat;
-      const startBeatId = (debugFirstBeat && debugFirstBeat.trim() !== '') ? debugFirstBeat.trim() : undefined;
+      const startBeatId = selectedStartBeat ||
+        ((debugFirstBeat && debugFirstBeat.trim() !== '') ? debugFirstBeat.trim() : undefined);
 
       if (startBeatId && startBeatId !== story.getFirstBeatId()) {
-        console.log(`[StoryPreview] DEBUG MODE: Starting from beat "${startBeatId}" (Story normally starts at "${story.getFirstBeatId()}")`);
+        console.log(`[StoryPreview] Starting from beat "${startBeatId}" (Story normally starts at "${story.getFirstBeatId()}")`);
         setDebugStartBeat(startBeatId);
       } else {
         setDebugStartBeat(null);
@@ -648,7 +668,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
     } finally {
       setIsRunning(false);
     }
-  }, [story, settings, selectedPreset, assets]);
+  }, [story, settings, selectedPreset, assets, animationEnabled, selectedStartBeat]);
 
   const handleRestart = useCallback(() => {
     // Stop all sounds before restarting to prevent overlap
@@ -739,6 +759,56 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
             Story Preview
           </h2>
           <div className="flex items-center gap-2">
+            {/* Beat Selection Dropdown - only show when not running */}
+            {activeTab === 'preview' && !isRunning && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowBeatMenu(!showBeatMenu)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
+                  title="Select starting beat"
+                >
+                  <List className="w-4 h-4" />
+                  <span className="max-w-32 truncate">
+                    {selectedStartBeat
+                      ? story.getBeat(selectedStartBeat)?.name || selectedStartBeat
+                      : 'Start from...'}
+                  </span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {showBeatMenu && (
+                  <div className="absolute right-0 top-full mt-1 w-64 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <button
+                      onClick={() => {
+                        setSelectedStartBeat(null);
+                        setShowBeatMenu(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 ${
+                        !selectedStartBeat ? 'bg-blue-50 text-blue-700' : ''
+                      }`}
+                    >
+                      <Play className="w-3 h-3" />
+                      <span className="font-medium">Start from beginning</span>
+                    </button>
+                    <div className="border-t border-gray-200" />
+                    {story.getAllBeats().map((beat) => (
+                      <button
+                        key={beat.id}
+                        onClick={() => {
+                          setSelectedStartBeat(beat.id);
+                          setShowBeatMenu(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                          selectedStartBeat === beat.id ? 'bg-blue-50 text-blue-700' : ''
+                        }`}
+                      >
+                        <div className="font-medium truncate">{beat.name}</div>
+                        <div className="text-xs text-gray-500">{beat.type} • {beat.id}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {activeTab === 'preview' && !isRunning && !currentBeat && (
               <button
                 onClick={startPreview}
@@ -903,8 +973,23 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
                       <span className="hidden sm:inline">Fit</span>
                     </button>
                   </div>
-                  {/* Sound Toggle */}
+                  {/* Controls: Animation, Sound, Stage info */}
                   <div className="flex items-center gap-2">
+                    {/* Animation Toggle */}
+                    <button
+                      onClick={() => setAnimationEnabled(!animationEnabled)}
+                      className={`p-1.5 rounded transition-colors flex items-center gap-1 text-sm ${
+                        animationEnabled ? 'hover:bg-gray-300' : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                      title={animationEnabled ? 'Disable Text Animation (faster)' : 'Enable Text Animation'}
+                    >
+                      {animationEnabled ? (
+                        <Type className="w-4 h-4" />
+                      ) : (
+                        <Zap className="w-4 h-4" />
+                      )}
+                    </button>
+                    {/* Sound Toggle */}
                     <button
                       onClick={handleSoundToggle}
                       className={`p-1.5 rounded transition-colors flex items-center gap-1 text-sm ${
@@ -972,13 +1057,51 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
                 {debugInfo.counters && Object.keys(debugInfo.counters).length > 0 && (
                   <div className="bg-white p-3 rounded-lg">
                     <div className="text-sm font-medium text-gray-600 mb-2">Counters</div>
-                    <div className="space-y-1">
-                      {Object.entries(debugInfo.counters).map(([key, value]) => (
-                        <div key={key} className="text-xs">
-                          <span className="font-mono text-gray-600">{key}:</span>
-                          <span className="ml-2 font-bold">{value as number}</span>
-                        </div>
-                      ))}
+                    <div className="space-y-2">
+                      {Object.entries(debugInfo.counters).map(([key, value]) => {
+                        // Find counter definition from characters
+                        const counterDef = characters.flatMap(c => c.counters || []).find(c => c.name === key);
+                        const showMeter = counterDef?.showLevelMeter;
+                        const orientation = counterDef?.levelMeterOrientation || 'horizontal';
+                        const color = counterDef?.color || '#3B82F6';
+                        const min = counterDef?.min ?? 0;
+                        const max = counterDef?.max ?? 100;
+                        const percentage = max > min ? Math.min(100, Math.max(0, ((value as number) - min) / (max - min) * 100)) : 0;
+
+                        return (
+                          <div key={key} className="text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-gray-600">{counterDef?.displayName || key}:</span>
+                              <span className="font-bold">{value as number}</span>
+                            </div>
+                            {showMeter && (
+                              orientation === 'horizontal' ? (
+                                <div className="mt-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full transition-all duration-300"
+                                    style={{
+                                      width: `${percentage}%`,
+                                      backgroundColor: color
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="mt-1 flex justify-center">
+                                  <div className="w-3 h-16 bg-gray-200 rounded-full overflow-hidden flex flex-col-reverse">
+                                    <div
+                                      className="w-full rounded-full transition-all duration-300"
+                                      style={{
+                                        height: `${percentage}%`,
+                                        backgroundColor: color
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

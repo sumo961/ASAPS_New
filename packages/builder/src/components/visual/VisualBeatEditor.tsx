@@ -60,6 +60,7 @@ export interface VisualElement {
   size?: number; // Scale percentage for characters (e.g., 90 = 90% scale)
   text?: string;
   speaker?: string;
+  content?: string;  // Direct content for phase-aware rendering (overrides schema-derived content)
   choices?: string[];
   x: number;
   y: number;
@@ -156,6 +157,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Prioritize asset lookup (fresh URL) over direct URL (may be stale blob URL)
   const resolvedBackgroundUrl = backgroundAsset?.url || backgroundUrlProp;
 
+  // Get stage background color from global settings (used when no background image is set)
+  const stageBackgroundColor = globalSettings?.colors?.bgColor || 'transparent';
+
   // Debug logging for background
   console.log(`[VisualBeatEditor] backgroundAssetId="${backgroundAssetId}", found=${!!backgroundAsset}, url="${resolvedBackgroundUrl?.substring(0, 80) || 'none'}", assets.length=${assets.length}`);
 
@@ -188,6 +192,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       textAlign: el.textAlign,
       // Only autosize if fontSize is not explicitly set
       autosize: el.fontSize === undefined,
+      // Pass content directly from visual element (for phase-aware rendering)
+      // Use el.content if explicitly set, otherwise fall back to el.text
+      content: el.content || el.text,
     }));
 
   // Asset resolver function to look up asset URLs by ID
@@ -682,12 +689,23 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                 stageWidth={stageWidth}
                 stageHeight={stageHeight}
                 backgroundUrl={resolvedBackgroundUrl}
-                backgroundColor="transparent"
+                backgroundColor={stageBackgroundColor}
                 elements={positionedElements}
                 interactive={false}
                 hideTextBoxes={activeBoxVisibility === 'hideText' || activeBoxVisibility === 'hideAll'}
                 hideButtonBoxes={activeBoxVisibility === 'hideAll'}
-                theme={globalSettings ? convertGlobalSettingsToTheme(globalSettings) : undefined}
+                theme={globalSettings ? (() => {
+                  const baseTheme = convertGlobalSettingsToTheme(globalSettings);
+                  return {
+                    ...baseTheme,
+                    // Disable text animations in visual editor - they should only appear in preview
+                    textEffects: {
+                      animation: 'none' as const,
+                      typewriterSpeed: baseTheme.textEffects?.typewriterSpeed ?? 30,
+                      fadeInDuration: baseTheme.textEffects?.fadeInDuration ?? 500,
+                    },
+                  };
+                })() : undefined}
               />
               
               {/* Draggable overlay for each element */}

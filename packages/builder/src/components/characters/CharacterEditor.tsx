@@ -4,13 +4,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Save, 
-  User, 
-  Image, 
-  Layers, 
-  Calculator, 
+import {
+  X,
+  Save,
+  User,
+  Image,
+  Layers,
+  Calculator,
   Package,
   Plus,
   Trash2,
@@ -21,7 +21,10 @@ import {
   Grid,
   FileImage,
   Film,
-  Info
+  Info,
+  BarChart3,
+  ArrowLeftRight,
+  ArrowUpDown
 } from 'lucide-react';
 import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation } from '../../types/character';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
@@ -630,6 +633,58 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+            {/* Level Meter Settings */}
+            <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={counter.showLevelMeter || false}
+                  onChange={(e) => {
+                    const newCounters = [...editedCharacter.counters];
+                    newCounters[index] = { ...counter, showLevelMeter: e.target.checked };
+                    setEditedCharacter({ ...editedCharacter, counters: newCounters });
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <BarChart3 className="w-4 h-4 text-gray-500" />
+                <span className="text-gray-600">Show Level Meter</span>
+              </label>
+              {counter.showLevelMeter && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Orientation:</span>
+                  <button
+                    onClick={() => {
+                      const newCounters = [...editedCharacter.counters];
+                      newCounters[index] = { ...counter, levelMeterOrientation: 'horizontal' };
+                      setEditedCharacter({ ...editedCharacter, counters: newCounters });
+                    }}
+                    className={`p-1.5 rounded transition-colors ${
+                      (counter.levelMeterOrientation || 'horizontal') === 'horizontal'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'hover:bg-gray-100 text-gray-500'
+                    }`}
+                    title="Horizontal"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newCounters = [...editedCharacter.counters];
+                      newCounters[index] = { ...counter, levelMeterOrientation: 'vertical' };
+                      setEditedCharacter({ ...editedCharacter, counters: newCounters });
+                    }}
+                    className={`p-1.5 rounded transition-colors ${
+                      counter.levelMeterOrientation === 'vertical'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'hover:bg-gray-100 text-gray-500'
+                    }`}
+                    title="Vertical"
+                  >
+                    <ArrowUpDown className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
