@@ -1,5 +1,62 @@
 # ASAPS Modern - Progress Log
 
+## 2026-01-04: Visual Editor Layout Matching Preview
+
+### Overview
+
+Synchronized the visual editor layout with the preview renderer for DialogTree beats, ensuring WYSIWYG editing where what you see in the editor matches what plays in the preview.
+
+### Problem
+
+The visual editor used fixed positions (text at y=100, buttons at y=300) while the preview renderer dynamically calculated positions based on content. This caused a mismatch where layouts looked different between editing and playback.
+
+### Solution
+
+Rewrote `generatePhaseElements` in VisualWorkspace.tsx to use the same layout algorithm as the preview:
+
+1. **Dynamic text box sizing** - Calculates dimensions based on actual text content
+2. **Proper vertical positioning** - Buttons positioned immediately after text box
+3. **Matching gaps** - 20px gap between text and buttons, 16px between buttons (matching preview's flex layout)
+4. **Shared auto-layout module** - Created `@asaps/core/layout/autoLayout.ts` for consistent layout logic
+
+```typescript
+// Visual editor now calculates text box dimensions dynamically
+const textWidth = text.length * defaultFontSize * 0.55;
+const maxTextWidth = stageWidth * 0.8;
+
+// Buttons positioned after text with proper gaps
+const buttonStartY = startY + textBoxHeight + textButtonGap; // 20px gap
+const buttonY = buttonStartY + idx * (buttonHeight + buttonGap); // 16px between buttons
+```
+
+### Shared Auto-Layout Module
+
+Created `packages/core/src/layout/autoLayout.ts` with:
+- `computeAutoLayout()` - Main layout function for positioning elements
+- `applyLayoutWithOverrides()` - Apply layout respecting manual overrides
+- `calculateOverrides()` - Detect manually positioned elements
+- Text measurement and collision detection utilities
+
+### Phase Tree Navigation
+
+Added phase navigation panel for DialogTree beats:
+- Shows all dialog phases in tree structure
+- Displays speaker name and truncated text
+- Click to switch between phases for editing
+- Foundation for per-phase visual customization
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/components/visual/VisualWorkspace.tsx` | Dynamic layout in `generatePhaseElements`, phase tree navigation |
+| `packages/core/src/layout/autoLayout.ts` | **NEW** - Shared auto-layout logic |
+| `packages/core/src/layout/index.ts` | Export auto-layout module |
+| `packages/core/src/beats/DialogTreeBeat.ts` | Added `PhaseOverride` type for per-phase layouts |
+| `packages/renderer/src/components/PositionedBeatView.tsx` | Minor adjustments for consistency |
+
+---
+
 ## 2026-01-02: DialogTree Rendering Improvements
 
 ### Overview
