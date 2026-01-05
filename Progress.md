@@ -1,5 +1,104 @@
 # ASAPS Modern - Progress Log
 
+## 2026-01-05: Path Animation Playback and Editor Improvements
+
+### Overview
+
+Implemented full path animation playback in the story preview and improved the animation editor UX with better visibility and smarter defaults.
+
+### Path Animation Playback
+
+Animations defined in the visual editor now play correctly during story preview:
+
+**Core Animation Support** (`packages/core/src/beats/Beat.ts`):
+- Added `animations` property to Beat class
+- Animations are passed to renderer via `setState('animations', ...)`
+- Serialization includes animations in parameters for persistence
+
+**Renderer Integration** (`packages/renderer/src/components/PositionedBeatView.tsx`):
+- Track animated positions via `animatedPositions` state
+- AnimationManager plays animations on beat load (trigger: onLoad/autoPlay)
+- Apply animated positions (x, y, scale, rotation, opacity, flipX, flipY) to elements
+- Support for onClick trigger animations
+
+**Animation Engine** (`packages/renderer/src/animation/AnimationEngine.ts`):
+- RequestAnimationFrame-based playback loop
+- Support for play, pause, stop, seek controls
+- Callback system for position updates and completion
+
+### Animation Types Extended
+
+Added flipX/flipY transform properties for sprite direction changes:
+
+```typescript
+interface AnimationWaypoint {
+  x: number;
+  y: number;
+  duration: number;
+  easing?: string;
+  scale?: number;
+  rotation?: number;
+  opacity?: number;
+  flipX?: boolean;  // NEW: Flip horizontally
+  flipY?: boolean;  // NEW: Flip vertically
+}
+```
+
+### Animation Editor Improvements
+
+**Stage Elements Display** (`packages/builder/src/components/animation/PathCanvas.tsx`):
+- Show all stage elements in the animation canvas for reference
+- Highlight the animation target element in orange
+- Display element labels and type indicators
+
+**Better Bezier Handles**:
+- Increased control point size (6-7px instead of 4px)
+- Orange color when selected for better visibility
+- White border and inner highlight for contrast
+- Thicker handle lines (1.5-2px)
+
+**Smart First Waypoint** (`packages/builder/src/components/animation/WaypointList.tsx`):
+- First waypoint now uses element's actual position from visual editor
+- No longer defaults to hardcoded (100, 100)
+
+**Element ID Fix** (`packages/builder/src/components/visual/AnimationPanel.tsx`):
+- Use `element.name` as animation elementId (matches renderer lookup)
+- Previously used generated element IDs which didn't match
+
+### Animation Data Sync Fix
+
+**Problem**: Editing an animation and clicking "Save" in the animation editor only updated local React state. Preview loaded from `beat.animations` which still had old data.
+
+**Solution** (`packages/builder/src/components/visual/VisualWorkspace.tsx`):
+```typescript
+onAnimationsChange={(newAnimations) => {
+  setAnimations(newAnimations);
+  setHasChanges(true);
+  // CRITICAL: Sync to beat.animations immediately
+  if (beat) {
+    beat.animations = newAnimations;
+  }
+}}
+```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/core/src/beats/Beat.ts` | Add animations property, serialization, renderer state |
+| `packages/core/src/types/animation.ts` | Add flipX/flipY transform properties |
+| `packages/renderer/src/components/PositionedBeatView.tsx` | Animation playback, position rendering |
+| `packages/renderer/src/animation/AnimationEngine.ts` | Debug logging |
+| `packages/renderer/src/animation/PathInterpolator.ts` | flipX/flipY interpolation |
+| `packages/renderer/src/renderers/ReactRenderer.tsx` | Pass animations to PositionedBeatView |
+| `packages/builder/src/components/animation/PathCanvas.tsx` | Stage elements, bezier handles |
+| `packages/builder/src/components/animation/AnimationPathEditor.tsx` | Pass element position |
+| `packages/builder/src/components/animation/WaypointList.tsx` | Smart first waypoint position |
+| `packages/builder/src/components/visual/AnimationPanel.tsx` | Use element.name as ID |
+| `packages/builder/src/components/visual/VisualWorkspace.tsx` | Immediate animation sync |
+
+---
+
 ## 2026-01-04: Preview Controls and Counter Level Meters
 
 ### Overview
