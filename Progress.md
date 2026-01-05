@@ -1,5 +1,78 @@
 # ASAPS Modern - Progress Log
 
+## 2026-01-05: Save Eligibility and Flowchart Initial Render Fixes
+
+### Overview
+
+Fixed two bugs: projects with modified default beats being incorrectly auto-discarded, and flowchart not showing all beats immediately when opening a project.
+
+### Save Eligibility Fix (isDefaultEmptyProject)
+
+**Problem**: The `isDefaultEmptyProject` function only checked if a project had exactly 3 beats with default IDs (beat_0, beat_1, beat_2) of types (titleScreen, introText, endScreen). This meant projects where users modified the default beats' content were still considered "empty" and auto-discarded without prompting.
+
+**Solution** (`packages/builder/src/App.tsx`):
+- Now checks actual content against defaults (title, text, buttonText, etc.)
+- Verifies no visual elements (locations) have been added
+- Checks no animations have been created
+- Validates connection count matches default (2 connections)
+
+```typescript
+// Only discard if content EXACTLY matches defaults
+const defaultContent = {
+  'beat_0': { title: 'My Interactive Story', author: 'Story Author', buttonText: 'Start' },
+  'beat_1': { text: 'Welcome to your interactive story...', buttonText: 'Continue' },
+  'beat_2': { message: 'The End', showRestart: true, showCredits: false }
+};
+
+// Check each property, return false if ANY differ
+for (const beat of state.beats) {
+  const params = beat.getParameters?.() || {};
+  // ... content comparison
+  if (beat.locations?.size > 0) return false;  // Has visual elements
+  if (beat.animations?.length > 0) return false;  // Has animations
+}
+```
+
+### Flowchart Initial Render Fix
+
+**Problem**: When opening a project, only some beats would appear in the flowchart initially (e.g., 2 of 4 beats visible). After clicking around, the flowchart would eventually show all beats.
+
+**Solution**:
+
+1. **Key prop on WorkspaceView** (`packages/builder/src/App.tsx`):
+   - Forces React to remount the entire workspace when project changes
+   - Ensures ReactFlow starts fresh with new project data
+   ```typescript
+   <WorkspaceView key={currentProject?.id || 'untitled'} ... />
+   ```
+
+2. **FitView trigger on beat count change** (`packages/builder/src/components/graph/GraphEditor.tsx`):
+   - Tracks previous beat count with useRef
+   - Triggers `fitView()` when beat count changes (project load)
+   - Small delay allows ReactFlow to process node updates first
+   ```typescript
+   const prevBeatsLengthRef = useRef(beats.length);
+
+   useEffect(() => {
+     // ... setNodes ...
+     if (beatsCountChanged && reactFlowInstance && beats.length > 0) {
+       setTimeout(() => {
+         reactFlowInstance.fitView({ padding: 0.2, maxZoom: 1, duration: 200 });
+       }, 100);
+     }
+     prevBeatsLengthRef.current = beats.length;
+   }, [nodes, setNodes, beats.length, clusters.length, reactFlowInstance]);
+   ```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/App.tsx` | Content-aware isDefaultEmptyProject, key prop on WorkspaceView |
+| `packages/builder/src/components/graph/GraphEditor.tsx` | FitView trigger on beat count change |
+
+---
+
 ## 2026-01-05: Animation Editor Visual Elements and Transform Controls
 
 ### Overview
