@@ -694,6 +694,9 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const [nodesState, setNodes, onNodesChange] = useNodesState(nodes);
   const [edgesState, setEdges, onEdgesChange] = useEdgesState(edges);
 
+  // Track previous beats count to detect when project is loaded
+  const prevBeatsLengthRef = useRef(beats.length);
+
   // Update nodes when beats change
   useEffect(() => {
     console.log('[GraphEditor] useEffect - setting nodes TRIGGERED. Nodes length:', nodes.length, 'NodesState length:', nodesState.length, 'TIMESTAMP:', Date.now());
@@ -705,7 +708,19 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     }
 
     setNodes(nodes);
-  }, [nodes, setNodes, beats.length, clusters.length]);
+
+    // If beats count changed significantly (likely project load), trigger fitView after a delay
+    // This ensures all nodes are visible after the graph updates
+    const beatsCountChanged = Math.abs(beats.length - prevBeatsLengthRef.current) > 0;
+    if (beatsCountChanged && reactFlowInstance && beats.length > 0) {
+      // Small delay to let ReactFlow process the node updates
+      setTimeout(() => {
+        console.log('[GraphEditor] Triggering fitView after beat count change');
+        reactFlowInstance.fitView({ padding: 0.2, maxZoom: 1, duration: 200 });
+      }, 100);
+    }
+    prevBeatsLengthRef.current = beats.length;
+  }, [nodes, setNodes, beats.length, clusters.length, reactFlowInstance]);
 
   // Update edges when beats change
   useEffect(() => {

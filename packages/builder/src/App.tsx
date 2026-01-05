@@ -2320,7 +2320,10 @@ function App() {
 
   /**
    * Check if the current project is a "default empty" project
-   * (has only the 3 default beats with default IDs created by initializeStory)
+   * (has only the 3 default beats with default IDs AND default content)
+   *
+   * This is used to auto-discard empty untitled projects without prompting.
+   * We must check content, not just structure, to avoid discarding user work.
    */
   const isDefaultEmptyProject = useCallback(() => {
     if (!isUntitledProject) return false;
@@ -2338,8 +2341,47 @@ function App() {
     const beatTypes = state.beats.map(b => b.type).sort();
     const defaultBeatTypes = ['endScreen', 'introText', 'titleScreen'];
 
-    return JSON.stringify(beatTypes) === JSON.stringify(defaultBeatTypes);
-  }, [isUntitledProject, state.beats]);
+    if (JSON.stringify(beatTypes) !== JSON.stringify(defaultBeatTypes)) return false;
+
+    // CRITICAL: Also check if content matches defaults
+    // This prevents discarding projects where user modified the default beats
+    const defaultContent = {
+      'beat_0': { title: 'My Interactive Story', author: 'Story Author', buttonText: 'Start' },
+      'beat_1': { text: 'Welcome to your interactive story. This is where your narrative begins...', buttonText: 'Continue' },
+      'beat_2': { message: 'The End', showRestart: true, showCredits: false }
+    };
+
+    for (const beat of state.beats) {
+      const params = beat.getParameters?.() || {};
+      const expectedContent = defaultContent[beat.id as keyof typeof defaultContent];
+
+      if (!expectedContent) continue;
+
+      // Check each expected property
+      for (const [key, expectedValue] of Object.entries(expectedContent)) {
+        const actualValue = params[key];
+        if (actualValue !== expectedValue) {
+          // Content has been modified - this is NOT a default empty project
+          return false;
+        }
+      }
+
+      // Check if beat has any visual elements (characters, props, animations)
+      if (beat.locations && beat.locations.size > 0) {
+        return false; // Has visual elements - not empty
+      }
+      if (beat.animations && beat.animations.length > 0) {
+        return false; // Has animations - not empty
+      }
+    }
+
+    // Also check if there are any connections beyond the default 2
+    if (state.connections.length > 2) {
+      return false;
+    }
+
+    return true;
+  }, [isUntitledProject, state.beats, state.connections]);
 
   // Save unsaved work dialog handlers
   const handleShowSaveDialog = useCallback((action: string) => {
@@ -2812,6 +2854,7 @@ function App() {
 
         <div className="flex flex-1 overflow-hidden">
           <WorkspaceView
+            key={currentProject?.id || 'untitled'}
             beats={state.beats}
             connections={state.connections}
             clusters={state.clusters || []}
