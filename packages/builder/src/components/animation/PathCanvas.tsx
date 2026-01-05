@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { AnimationPath, AnimationWaypoint, ControlPoint } from '@asaps/core';
 
 /**
@@ -9,7 +9,7 @@ import type { AnimationPath, AnimationWaypoint, ControlPoint } from '@asaps/core
  * - Drag waypoints to reposition
  * - Drag control points for bezier curves
  * - Visual path preview with curves
- * - Display stage elements for reference
+ * - Display stage elements with actual images/content
  */
 
 /** Stage element to display in the animation canvas */
@@ -22,7 +22,10 @@ export interface StageElement {
   height: number;
   label?: string;
   imageUrl?: string;
+  text?: string;
   isAnimationTarget?: boolean;
+  backgroundColor?: string;
+  textColor?: string;
 }
 
 interface PathCanvasProps {
@@ -84,82 +87,11 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
+    // Clear canvas (transparent background - elements are rendered as HTML overlay)
     ctx.clearRect(0, 0, width, height);
 
-    // Draw background if provided
-    if (backgroundUrl) {
-      const img = new Image();
-      img.src = backgroundUrl;
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, width, height);
-        drawStageElements();
-        drawPath();
-      };
-    } else {
-      // Gray background
-      ctx.fillStyle = '#f3f4f6';
-      ctx.fillRect(0, 0, width, height);
-      drawStageElements();
-      drawPath();
-    }
-
-    // Draw stage elements for reference
-    function drawStageElements() {
-      if (!ctx || stageElements.length === 0) return;
-
-      stageElements.forEach((element) => {
-        const isTarget = element.id === animationTargetId;
-
-        // Draw element bounding box
-        ctx.strokeStyle = isTarget ? '#f97316' : '#94a3b8';
-        ctx.lineWidth = isTarget ? 2 : 1;
-        ctx.setLineDash(isTarget ? [] : [4, 4]);
-
-        // Fill with semi-transparent background
-        ctx.fillStyle = isTarget ? 'rgba(249, 115, 22, 0.15)' : 'rgba(148, 163, 184, 0.1)';
-        ctx.fillRect(element.x, element.y, element.width, element.height);
-        ctx.strokeRect(element.x, element.y, element.width, element.height);
-
-        // Draw element label
-        ctx.setLineDash([]);
-        ctx.fillStyle = isTarget ? '#ea580c' : '#64748b';
-        ctx.font = isTarget ? 'bold 11px Arial' : '10px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-
-        const label = element.label || element.type;
-        const labelPadding = 4;
-
-        // Draw label background
-        const textMetrics = ctx.measureText(label);
-        const labelHeight = 14;
-        ctx.fillStyle = isTarget ? 'rgba(249, 115, 22, 0.9)' : 'rgba(100, 116, 139, 0.8)';
-        ctx.fillRect(
-          element.x,
-          element.y - labelHeight - labelPadding,
-          textMetrics.width + labelPadding * 2,
-          labelHeight + labelPadding
-        );
-
-        // Draw label text
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(label, element.x + labelPadding, element.y - labelHeight);
-
-        // Draw element type icon (small indicator in corner)
-        if (element.type === 'character' || element.type === 'prop') {
-          ctx.fillStyle = isTarget ? '#f97316' : '#94a3b8';
-          ctx.beginPath();
-          ctx.arc(element.x + element.width - 8, element.y + 8, 5, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 8px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(element.type === 'character' ? 'C' : 'P', element.x + element.width - 8, element.y + 8);
-        }
-      });
-    }
+    // Draw the animation path
+    drawPath();
 
     function drawPath() {
       if (!ctx || animation.waypoints.length === 0) return;
@@ -285,7 +217,7 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
       ctx.fillStyle = isSelected ? '#fdba74' : '#9ca3af';
       ctx.fill();
     }
-  }, [animation, width, height, backgroundUrl, selectedWaypointIndex, hoveredWaypoint, stageElements, animationTargetId]);
+  }, [animation, width, height, selectedWaypointIndex, hoveredWaypoint]);
 
   // Handle mouse down - start dragging or add waypoint
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -403,8 +335,130 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
     setDragState(null);
   };
 
+  // Render actual element content as HTML overlay
+  const renderElementOverlay = (element: StageElement) => {
+    const isTarget = element.id === animationTargetId;
+    const baseClasses = `absolute pointer-events-none overflow-hidden ${
+      isTarget ? 'ring-2 ring-orange-500 ring-offset-1' : 'ring-1 ring-slate-400/50'
+    }`;
+
+    // Render image elements (character, prop, background)
+    if (element.imageUrl && (element.type === 'character' || element.type === 'prop' || element.type === 'image')) {
+      return (
+        <div
+          key={element.id}
+          className={baseClasses}
+          style={{
+            left: element.x,
+            top: element.y,
+            width: element.width,
+            height: element.height,
+          }}
+        >
+          <img
+            src={element.imageUrl}
+            alt={element.label || element.type}
+            className="w-full h-full object-contain"
+            style={{ imageRendering: 'auto' }}
+          />
+          {/* Element label */}
+          <div
+            className={`absolute -top-5 left-0 px-1.5 py-0.5 text-[10px] font-medium text-white rounded-t ${
+              isTarget ? 'bg-orange-500' : 'bg-slate-500'
+            }`}
+          >
+            {element.label || element.type}
+          </div>
+        </div>
+      );
+    }
+
+    // Render text elements (textBox, dialog, button)
+    if (element.text || element.type === 'textBox' || element.type === 'button') {
+      const isButton = element.type === 'button';
+      return (
+        <div
+          key={element.id}
+          className={`${baseClasses} flex items-center justify-center`}
+          style={{
+            left: element.x,
+            top: element.y,
+            width: element.width,
+            height: element.height,
+            backgroundColor: element.backgroundColor || (isButton ? '#3b82f6' : 'rgba(0,0,0,0.7)'),
+            borderRadius: isButton ? '6px' : '4px',
+          }}
+        >
+          <span
+            className="px-2 text-center text-sm leading-tight"
+            style={{
+              color: element.textColor || '#ffffff',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+            }}
+          >
+            {element.text || element.label || 'Text'}
+          </span>
+          {/* Element label */}
+          <div
+            className={`absolute -top-5 left-0 px-1.5 py-0.5 text-[10px] font-medium text-white rounded-t ${
+              isTarget ? 'bg-orange-500' : 'bg-slate-500'
+            }`}
+          >
+            {element.label || element.type}
+          </div>
+        </div>
+      );
+    }
+
+    // Fallback: render as a placeholder box
+    return (
+      <div
+        key={element.id}
+        className={`${baseClasses} flex items-center justify-center bg-slate-200`}
+        style={{
+          left: element.x,
+          top: element.y,
+          width: element.width,
+          height: element.height,
+        }}
+      >
+        <span className="text-xs text-slate-500">{element.label || element.type}</span>
+        {/* Element label */}
+        <div
+          className={`absolute -top-5 left-0 px-1.5 py-0.5 text-[10px] font-medium text-white rounded-t ${
+            isTarget ? 'bg-orange-500' : 'bg-slate-500'
+          }`}
+        >
+          {element.label || element.type}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="relative">
+    <div className="relative" style={{ width: `${width}px`, height: `${height}px` }}>
+      {/* Background layer */}
+      {backgroundUrl && (
+        <img
+          src={backgroundUrl}
+          alt="Stage background"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        />
+      )}
+      {!backgroundUrl && (
+        <div className="absolute inset-0 bg-gray-100 pointer-events-none" />
+      )}
+
+      {/* Element overlay layer - renders actual element content */}
+      <div className="absolute inset-0 pointer-events-none">
+        {stageElements.map(renderElementOverlay)}
+      </div>
+
+      {/* Canvas layer - for path drawing and interaction */}
       <canvas
         ref={canvasRef}
         width={width}
@@ -413,10 +467,12 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        className="border border-gray-300 cursor-crosshair"
-        style={{ width: `${width}px`, height: `${height}px` }}
+        className="absolute inset-0 cursor-crosshair"
+        style={{ width: `${width}px`, height: `${height}px`, background: 'transparent' }}
       />
-      <div className="absolute bottom-2 right-2 bg-white bg-opacity-90 px-2 py-1 rounded text-xs text-gray-600">
+
+      {/* Help text */}
+      <div className="absolute bottom-2 right-2 bg-white bg-opacity-90 px-2 py-1 rounded text-xs text-gray-600 pointer-events-none">
         Shift+Click to add waypoint | Drag to move
       </div>
     </div>

@@ -190,32 +190,42 @@ export function interpolateSegment(
     y = lerp(easedProgress, start.y, end.y);
   }
 
-  // Interpolate additional properties
+  // Interpolate additional properties using default values when not specified
+  // Default values: scale=1, rotation=0, opacity=1, flipX=false, flipY=false
+  const startScale = start.scale ?? 1;
+  const endScale = end.scale ?? 1;
+  const startRotation = start.rotation ?? 0;
+  const endRotation = end.rotation ?? 0;
+  const startOpacity = start.opacity ?? 1;
+  const endOpacity = end.opacity ?? 1;
+
   const result: { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean } = {
     x,
     y,
   };
 
-  if (start.scale !== undefined && end.scale !== undefined) {
-    result.scale = lerp(easedProgress, start.scale, end.scale);
+  // Always interpolate transform properties (using defaults if not specified)
+  // Only include in result if either waypoint has a non-default value
+  if (start.scale !== undefined || end.scale !== undefined) {
+    result.scale = lerp(easedProgress, startScale, endScale);
   }
 
-  if (start.rotation !== undefined && end.rotation !== undefined) {
-    result.rotation = lerp(easedProgress, start.rotation, end.rotation);
+  if (start.rotation !== undefined || end.rotation !== undefined) {
+    result.rotation = lerp(easedProgress, startRotation, endRotation);
   }
 
-  if (start.opacity !== undefined && end.opacity !== undefined) {
-    result.opacity = lerp(easedProgress, start.opacity, end.opacity);
+  if (start.opacity !== undefined || end.opacity !== undefined) {
+    result.opacity = lerp(easedProgress, startOpacity, endOpacity);
   }
 
   // Flip properties are boolean - use the end waypoint value when past midpoint
   // This creates a "snap" effect at the midpoint of the transition
   if (start.flipX !== undefined || end.flipX !== undefined) {
-    result.flipX = easedProgress >= 0.5 ? end.flipX : start.flipX;
+    result.flipX = easedProgress >= 0.5 ? (end.flipX ?? false) : (start.flipX ?? false);
   }
 
   if (start.flipY !== undefined || end.flipY !== undefined) {
-    result.flipY = easedProgress >= 0.5 ? end.flipY : start.flipY;
+    result.flipY = easedProgress >= 0.5 ? (end.flipY ?? false) : (start.flipY ?? false);
   }
 
   return result;

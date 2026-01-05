@@ -315,7 +315,8 @@ export const AnimationPathEditor: React.FC<AnimationPathEditorProps> = ({
                   y: el.y,
                   width: el.width,
                   height: el.height,
-                  label: el.text || el.name,
+                  label: el.name || el.type,
+                  text: el.text,
                   imageUrl: el.imageUrl || el.assetUrl,
                   isAnimationTarget: el.name === elementId,
                 }))}

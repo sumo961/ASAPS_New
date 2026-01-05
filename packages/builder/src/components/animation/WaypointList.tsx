@@ -260,24 +260,91 @@ export const WaypointList: React.FC<WaypointListProps> = ({
                     </select>
                   </div>
 
-                  {/* Future properties - commented out for now */}
-                  {/*
-                  <div>
-                    <label className="block text-gray-600 mb-1">Scale</label>
-                    <input
-                      type="number"
-                      value={waypoint.scale || 1}
-                      onChange={(e) =>
-                        updateWaypoint(index, { scale: Number(e.target.value) })
-                      }
-                      onClick={(e) => e.stopPropagation()}
-                      min="0.1"
-                      max="5"
-                      step="0.1"
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                    />
+                  {/* Transform properties */}
+                  <div className="pt-2 border-t border-gray-200 mt-2">
+                    <div className="text-xs font-medium text-gray-500 mb-2">Transform</div>
+
+                    {/* Scale and Rotation */}
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div>
+                        <label className="block text-gray-600 mb-1">Scale</label>
+                        <input
+                          type="number"
+                          value={waypoint.scale ?? 1}
+                          onChange={(e) =>
+                            updateWaypoint(index, { scale: Number(e.target.value) })
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          min="0.1"
+                          max="5"
+                          step="0.1"
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1">Rotation</label>
+                        <input
+                          type="number"
+                          value={waypoint.rotation ?? 0}
+                          onChange={(e) =>
+                            updateWaypoint(index, { rotation: Number(e.target.value) })
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          min="-360"
+                          max="360"
+                          step="5"
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Opacity */}
+                    <div className="mb-2">
+                      <label className="block text-gray-600 mb-1">
+                        Opacity ({Math.round((waypoint.opacity ?? 1) * 100)}%)
+                      </label>
+                      <input
+                        type="range"
+                        value={waypoint.opacity ?? 1}
+                        onChange={(e) =>
+                          updateWaypoint(index, { opacity: Number(e.target.value) })
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Flip X/Y */}
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={waypoint.flipX ?? false}
+                          onChange={(e) =>
+                            updateWaypoint(index, { flipX: e.target.checked })
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-3.5 h-3.5"
+                        />
+                        <span className="text-gray-600">Flip H</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={waypoint.flipY ?? false}
+                          onChange={(e) =>
+                            updateWaypoint(index, { flipY: e.target.checked })
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-3.5 h-3.5"
+                        />
+                        <span className="text-gray-600">Flip V</span>
+                      </label>
+                    </div>
                   </div>
-                  */}
                 </div>
               </div>
             ))}

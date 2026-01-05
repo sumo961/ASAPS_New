@@ -989,11 +989,13 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
       const isButtonVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
       // Wrap button in a div that handles the fade-in animation
       // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
+      // Combine animated opacity with button fade-in: use animated opacity if buttons are shown
+      const buttonOpacity = shouldShowButtons ? (effectiveOpacity ?? 1) : 0;
       return (
         <div
           style={{
             ...baseStyle,
-            opacity: shouldShowButtons ? 1 : 0,
+            opacity: buttonOpacity,
             transition: 'opacity 300ms ease-in',
             pointerEvents: shouldShowButtons ? 'auto' : 'none',
           }}
