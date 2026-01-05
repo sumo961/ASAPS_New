@@ -1,5 +1,70 @@
 # ASAPS Modern - Progress Log
 
+## 2026-01-05: Animation Editor Visual Elements and Transform Controls
+
+### Overview
+
+Enhanced the animation editor to show actual element content (images, text) and added comprehensive transform controls for waypoints.
+
+### Actual Element Display in Animation Editor
+
+**PathCanvas now renders real elements** (`packages/builder/src/components/animation/PathCanvas.tsx`):
+- Elements displayed as HTML overlay (not canvas-drawn outlines)
+- Image elements (character, prop) show actual images with `object-contain`
+- Text elements (textBox, button) show styled text content
+- Animation target highlighted with orange ring
+- Background image rendered as HTML img for better quality
+
+```typescript
+// HTML overlay approach allows:
+// - Actual image rendering without async canvas loading issues
+// - Proper text styling and truncation
+// - Ring highlights for selection states
+```
+
+### Waypoint Transform Controls
+
+**Added full transform editing** (`packages/builder/src/components/animation/WaypointList.tsx`):
+- **Scale**: Number input (0.1 to 5, step 0.1)
+- **Rotation**: Number input (-360 to 360 degrees, step 5)
+- **Opacity**: Slider with percentage display (0-100%)
+- **Flip H**: Checkbox for horizontal flip
+- **Flip V**: Checkbox for vertical flip
+
+### Transform Interpolation Fixes
+
+**Bug**: Scale/opacity only interpolated when BOTH waypoints had values defined.
+
+**Fix** (`packages/renderer/src/animation/PathInterpolator.ts`):
+```typescript
+// Now uses defaults when property not specified:
+const startScale = start.scale ?? 1;
+const endScale = end.scale ?? 1;
+const startOpacity = start.opacity ?? 1;
+const endOpacity = end.opacity ?? 1;
+
+// Interpolates if EITHER waypoint has value (not just both)
+if (start.scale !== undefined || end.scale !== undefined) {
+  result.scale = lerp(easedProgress, startScale, endScale);
+}
+```
+
+**Button opacity fix** (`packages/renderer/src/components/PositionedBeatView.tsx`):
+- Button fade-in wrapper was overwriting animated opacity
+- Now preserves animated opacity: `buttonOpacity = shouldShowButtons ? (effectiveOpacity ?? 1) : 0`
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/components/animation/PathCanvas.tsx` | HTML overlay for actual element rendering |
+| `packages/builder/src/components/animation/AnimationPathEditor.tsx` | Pass text content to PathCanvas |
+| `packages/builder/src/components/animation/WaypointList.tsx` | Scale, rotation, opacity, flip controls |
+| `packages/renderer/src/animation/PathInterpolator.ts` | Default values for interpolation |
+| `packages/renderer/src/components/PositionedBeatView.tsx` | Preserve animated opacity for buttons |
+
+---
+
 ## 2026-01-05: Path Animation Playback and Editor Improvements
 
 ### Overview
