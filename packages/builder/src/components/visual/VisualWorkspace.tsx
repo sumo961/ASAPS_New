@@ -185,6 +185,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const visualElementsRef = useRef(visualElements);
   const backgroundAssetIdRef = useRef(backgroundAssetId);
   const backgroundSoundRef = useRef(backgroundSound);
+  const animationsRef = useRef(animations);
   const hasChangesRef = useRef(hasChanges);
   const charactersRef = useRef(characters);
 
@@ -199,6 +200,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   useEffect(() => {
     backgroundAssetIdRef.current = backgroundAssetId;
   }, [backgroundAssetId]);
+
+  useEffect(() => {
+    animationsRef.current = animations;
+  }, [animations]);
 
   useEffect(() => {
     backgroundSoundRef.current = backgroundSound;
@@ -544,10 +549,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         visualElements: visualElementsRef.current,
         backgroundAssetId: backgroundAssetIdRef.current,
         node: backgroundAssetIdRef.current,
-        backgroundSound: backgroundSoundRef.current
+        backgroundSound: backgroundSoundRef.current,
+        animations: animationsRef.current
       });
 
-      console.log(`[VisualWorkspace] Auto-saved ${prevBeat.locations.size} locations to previous beat`);
+      // Also set animations directly on beat (updateParameters doesn't handle base Beat properties)
+      prevBeat.animations = animationsRef.current;
+
+      console.log(`[VisualWorkspace] Auto-saved ${prevBeat.locations.size} locations and ${animationsRef.current?.length || 0} animations to previous beat`);
     }
 
     // Update beatRef to new beat AFTER saving to previous beat
@@ -665,7 +674,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       setBackgroundAssetId(bgId);
       setBackgroundUrl(bgUrl);
       setBackgroundSound(params.backgroundSound || '');
-      setAnimations(params.animations || []);
+      // Load animations from beat.animations first (direct property), fallback to params.animations
+      console.log(`[VisualWorkspace] DialogTree: Loading animations: beat.animations=${beat.animations?.length || 0}, params.animations=${params.animations?.length || 0}`);
+      setAnimations(beat.animations || params.animations || []);
       // Clear visual elements so phase load effect will run
       // This prevents stale elements from previous beat from showing
       setVisualElements([]);
@@ -1127,7 +1138,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     setBackgroundAssetId(bgId);
     setBackgroundUrl(bgUrl);
     setBackgroundSound(params.backgroundSound || '');
-    setAnimations(params.animations || []);
+    // Load animations from beat.animations first (direct property), fallback to params.animations
+    console.log(`[VisualWorkspace] Loading animations: beat.animations=${beat.animations?.length || 0}, params.animations=${params.animations?.length || 0}`);
+    setAnimations(beat.animations || params.animations || []);
     setHasChanges(false);
 
     // Update character/prop element dimensions based on actual image size
@@ -1650,6 +1663,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       backgroundSound,
       animations
     });
+
+    // Also set animations directly on beat (updateParameters doesn't handle base Beat properties)
+    beat.animations = animations;
+    console.log(`[VisualWorkspace] Saved animations to beat:`, animations.length, animations);
 
     setHasChanges(false);
 
@@ -2197,6 +2214,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 onAnimationsChange={(newAnimations) => {
                   setAnimations(newAnimations);
                   setHasChanges(true);
+                  // CRITICAL: Sync to beat.animations immediately so preview has latest animations
+                  if (beat) {
+                    beat.animations = newAnimations;
+                    console.log(`[VisualWorkspace] Animations immediately synced to beat:`, newAnimations.length, newAnimations);
+                  }
                 }}
               />
             )}

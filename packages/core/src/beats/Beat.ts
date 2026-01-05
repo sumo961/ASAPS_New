@@ -1,9 +1,10 @@
-import type { 
-  BeatConfig, 
-  Connection, 
-  Location, 
-  Transition, 
-  Sound,  
+import type {
+  BeatConfig,
+  Connection,
+  Location,
+  Transition,
+  Sound,
+  AnimationPath,
 } from '../types';
 import type { IRenderer } from '../types';
 
@@ -24,6 +25,7 @@ export abstract class Beat {
   public x?: number;
   public y?: number;
   public node?: string; // Background image/node reference
+  public animations?: AnimationPath[]; // Path animations for elements
 
   constructor(config: BeatConfig) {
     this.id = config.id;
@@ -36,6 +38,7 @@ export abstract class Beat {
     this.defaultTargetDelay = (config as any).defaultTargetDelay || (config.parameters as any)?.defaultTargetDelay;
     this.showTimer = (config as any).showTimer || (config.parameters as any)?.showTimer;
     this.node = (config as any).node || (config.parameters as any)?.node;
+    this.animations = (config as any).animations || (config.parameters as any)?.animations;
     this.x = config.x;
     this.y = config.y;
 
@@ -62,6 +65,15 @@ export abstract class Beat {
         name: this.name,
         type: this.type,
       });
+
+      // Set animations in renderer state for path animations
+      if (this.animations && this.animations.length > 0) {
+        console.log(`[Beat.execute] Setting animations in renderer state:`, this.animations.length, this.animations);
+        renderer.setState('animations', this.animations);
+      } else {
+        console.log(`[Beat.execute] No animations for beat ${this.id}`);
+        renderer.setState('animations', undefined);
+      }
 
       await this.onEnter(context, renderer);
 
@@ -315,6 +327,13 @@ export abstract class Beat {
     // Storing derived connections causes duplication on each save/load cycle.
     const storedConnections = [...this.connections];
 
+    // Merge beat-type-specific parameters with base beat properties like animations
+    const parameters = {
+      ...this.getParameters(),
+      // Include animations in parameters so they're preserved during serialization
+      ...(this.animations && this.animations.length > 0 ? { animations: this.animations } : {})
+    };
+
     const json = {
       id: this.id,
       name: this.name,
@@ -330,7 +349,7 @@ export abstract class Beat {
       x: this.x,
       y: this.y,
       node: this.node,
-      parameters: this.getParameters()
+      parameters: parameters
     };
     return json;
   }

@@ -84,8 +84,9 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
   };
 
   const getElementName = (elementId: string): string => {
-    const element = elements.find(el => el.id === elementId);
-    return element ? `${element.type} (${element.text || element.id.slice(0, 8)})` : elementId;
+    // Look up by name (which is what elementId now represents) or fall back to id
+    const element = elements.find(el => el.name === elementId || el.id === elementId);
+    return element ? `${element.type} (${element.name || element.text || element.id.slice(0, 8)})` : elementId;
   };
 
   return (
@@ -106,8 +107,8 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
           >
             <option value="">Select an element...</option>
             {elements.map((element) => (
-              <option key={element.id} value={element.id}>
-                {element.type} - {element.text || element.id.slice(0, 8)}
+              <option key={element.id} value={element.name}>
+                {element.type} - {element.name || element.text || element.id.slice(0, 8)}
               </option>
             ))}
           </select>
@@ -209,6 +210,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
           stageWidth={stageWidth}
           stageHeight={stageHeight}
           backgroundUrl={backgroundUrl}
+          elements={elements}
           onSave={handleSaveAnimation}
           onClose={handleCloseEditor}
         />

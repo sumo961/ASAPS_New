@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { AnimationPath, AnimationWaypoint } from '@asaps/core';
-import { PathCanvas } from './PathCanvas';
+import { PathCanvas, type StageElement } from './PathCanvas';
 import { WaypointList } from './WaypointList';
 import { Play, Pause, RotateCcw, Save, X } from 'lucide-react';
 
@@ -14,6 +14,20 @@ import { Play, Pause, RotateCcw, Save, X } from 'lucide-react';
  * - Play/pause animation preview
  * - Save/cancel actions
  */
+
+/** Visual element from the stage (simplified for animation editor) */
+interface VisualElement {
+  id: string;
+  name: string;
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text?: string;
+  imageUrl?: string;
+  assetUrl?: string;
+}
 
 interface AnimationPathEditorProps {
   /** Animation being edited (or null for new animation) */
@@ -29,6 +43,9 @@ interface AnimationPathEditorProps {
   /** Background image for reference */
   backgroundUrl?: string;
 
+  /** Visual elements on the stage */
+  elements?: VisualElement[];
+
   /** Callback when animation is saved */
   onSave: (animation: AnimationPath) => void;
 
@@ -42,6 +59,7 @@ export const AnimationPathEditor: React.FC<AnimationPathEditorProps> = ({
   stageWidth,
   stageHeight,
   backgroundUrl,
+  elements = [],
   onSave,
   onClose,
 }) => {
@@ -290,6 +308,18 @@ export const AnimationPathEditor: React.FC<AnimationPathEditorProps> = ({
                 onAnimationChange={setAnimation}
                 selectedWaypointIndex={selectedWaypointIndex}
                 onWaypointSelect={setSelectedWaypointIndex}
+                stageElements={elements.map(el => ({
+                  id: el.name, // Use name as ID since that's what animation targets
+                  type: el.type,
+                  x: el.x,
+                  y: el.y,
+                  width: el.width,
+                  height: el.height,
+                  label: el.text || el.name,
+                  imageUrl: el.imageUrl || el.assetUrl,
+                  isAnimationTarget: el.name === elementId,
+                }))}
+                animationTargetId={elementId}
               />
             </div>
 
@@ -339,6 +369,11 @@ export const AnimationPathEditor: React.FC<AnimationPathEditorProps> = ({
               onAnimationChange={setAnimation}
               selectedWaypointIndex={selectedWaypointIndex}
               onWaypointSelect={setSelectedWaypointIndex}
+              elementPosition={(() => {
+                // Find the target element's position for first waypoint default
+                const targetElement = elements.find(el => el.name === elementId);
+                return targetElement ? { x: targetElement.x, y: targetElement.y } : undefined;
+              })()}
             />
           </div>
         </div>

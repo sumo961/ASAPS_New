@@ -433,6 +433,12 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
       // Update beat with parameters if they exist
       if (beatData.parameters) {
         beat.updateParameters(beatData.parameters);
+
+        // Ensure animations are set on the beat (updateParameters doesn't handle this)
+        if (beatData.parameters.animations) {
+          console.log(`[deserializeBeats] Setting animations on beat ${beatData.id}:`, beatData.parameters.animations.length, beatData.parameters.animations);
+          beat.animations = beatData.parameters.animations;
+        }
       }
 
       // CRITICAL FIX: For inputText, ensure variableName is applied to variable

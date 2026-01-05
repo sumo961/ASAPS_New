@@ -161,7 +161,7 @@ export function interpolateSegment(
   start: AnimationWaypoint,
   end: AnimationWaypoint,
   interpolationType: 'linear' | 'bezier'
-): { x: number; y: number; scale?: number; rotation?: number; opacity?: number } {
+): { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean } {
   // Apply easing to progress
   const easedProgress = applyEasing(progress, end.easing);
 
@@ -191,7 +191,7 @@ export function interpolateSegment(
   }
 
   // Interpolate additional properties
-  const result: { x: number; y: number; scale?: number; rotation?: number; opacity?: number } = {
+  const result: { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean } = {
     x,
     y,
   };
@@ -208,6 +208,16 @@ export function interpolateSegment(
     result.opacity = lerp(easedProgress, start.opacity, end.opacity);
   }
 
+  // Flip properties are boolean - use the end waypoint value when past midpoint
+  // This creates a "snap" effect at the midpoint of the transition
+  if (start.flipX !== undefined || end.flipX !== undefined) {
+    result.flipX = easedProgress >= 0.5 ? end.flipX : start.flipX;
+  }
+
+  if (start.flipY !== undefined || end.flipY !== undefined) {
+    result.flipY = easedProgress >= 0.5 ? end.flipY : start.flipY;
+  }
+
   return result;
 }
 
@@ -222,7 +232,7 @@ export function calculatePositionAtTime(
   waypoints: AnimationWaypoint[],
   currentTime: number,
   interpolationType: 'linear' | 'bezier'
-): { x: number; y: number; scale?: number; rotation?: number; opacity?: number } | null {
+): { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean } | null {
   if (waypoints.length === 0) {
     return null;
   }
@@ -234,6 +244,8 @@ export function calculatePositionAtTime(
       scale: waypoints[0].scale,
       rotation: waypoints[0].rotation,
       opacity: waypoints[0].opacity,
+      flipX: waypoints[0].flipX,
+      flipY: waypoints[0].flipY,
     };
   }
 
@@ -267,5 +279,7 @@ export function calculatePositionAtTime(
     scale: lastWaypoint.scale,
     rotation: lastWaypoint.rotation,
     opacity: lastWaypoint.opacity,
+    flipX: lastWaypoint.flipX,
+    flipY: lastWaypoint.flipY,
   };
 }

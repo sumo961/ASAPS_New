@@ -24,6 +24,9 @@ interface WaypointListProps {
 
   /** Callback when waypoint selection changes */
   onWaypointSelect: (index: number | null) => void;
+
+  /** Target element's initial position (for first waypoint default) */
+  elementPosition?: { x: number; y: number };
 }
 
 const EASING_OPTIONS = [
@@ -39,6 +42,7 @@ export const WaypointList: React.FC<WaypointListProps> = ({
   onAnimationChange,
   selectedWaypointIndex,
   onWaypointSelect,
+  elementPosition,
 }) => {
   const updateWaypoint = (index: number, updates: Partial<AnimationWaypoint>) => {
     const newWaypoints = [...animation.waypoints];
@@ -82,9 +86,12 @@ export const WaypointList: React.FC<WaypointListProps> = ({
 
   const addWaypoint = () => {
     const lastWaypoint = animation.waypoints[animation.waypoints.length - 1];
+    // First waypoint uses element's position, subsequent waypoints offset from previous
+    const defaultX = elementPosition?.x ?? 100;
+    const defaultY = elementPosition?.y ?? 100;
     const newWaypoint: AnimationWaypoint = {
-      x: lastWaypoint ? lastWaypoint.x + 50 : 100,
-      y: lastWaypoint ? lastWaypoint.y : 100,
+      x: lastWaypoint ? lastWaypoint.x + 50 : defaultX,
+      y: lastWaypoint ? lastWaypoint.y : defaultY,
       duration: 1000,
     };
 

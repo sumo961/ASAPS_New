@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
-import type { Location } from '@asaps/core';
+import type { Location, AnimationPath } from '@asaps/core';
 import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
@@ -712,7 +712,8 @@ export class ReactRenderer extends BaseRenderer {
     beatType: string,
     content: Record<string, any>,
     locations: Location[],
-    waitForAction: boolean = true
+    waitForAction: boolean = true,
+    animations?: AnimationPath[]
   ): Promise<string> {
     console.log(`[ReactRenderer ${this.instanceId}] Rendering positioned ${beatType} with ${locations.length} elements`);
 
@@ -756,6 +757,10 @@ export class ReactRenderer extends BaseRenderer {
       // Get showTextOnHover from renderer state (set by MovementChoiceBeat)
       const showTextOnHover = this.getState('showTextOnHover') || false;
 
+      // Get animations from parameter or renderer state (set by beat)
+      const effectiveAnimations = animations || (this.getState('animations') as AnimationPath[] | undefined);
+      console.log(`[ReactRenderer] renderPositionedBeat animations:`, effectiveAnimations?.length || 0, effectiveAnimations);
+
       // Render using the shared PositionedBeatView component
       // NOTE: previewMode=false uses absolute positioning from Visual Editor
       // with smart collision detection for auto-height text boxes
@@ -781,6 +786,7 @@ export class ReactRenderer extends BaseRenderer {
               visitedBeats={this.visitedBeats}
               showTextOnHover={showTextOnHover}
               soundBlobResolver={this.soundBlobResolver || undefined}
+              animations={effectiveAnimations}
             />
           </ScaledStage>
         </div>

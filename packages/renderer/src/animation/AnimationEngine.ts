@@ -26,6 +26,7 @@ export class AnimationEngine {
    * @param options Playback options
    */
   play(animation: AnimationPath, options: AnimationPlayOptions = {}): void {
+    console.log('[AnimationEngine] play() called, animation:', animation.id, 'waypoints:', animation.waypoints?.length, 'duration:', animation.duration);
     // Stop any currently playing animation
     this.stop();
 
@@ -44,6 +45,7 @@ export class AnimationEngine {
 
     // Start playback
     this.startTime = performance.now() - (options.startTime || 0);
+    console.log('[AnimationEngine] Starting animation loop');
     this.animate();
   }
 
@@ -141,6 +143,7 @@ export class AnimationEngine {
    */
   private animate = (): void => {
     if (!this.animationState || !this.animationState.isPlaying) {
+      console.log('[AnimationEngine] animate() early return - not playing');
       return;
     }
 
@@ -149,6 +152,7 @@ export class AnimationEngine {
     const elapsed = (now - this.startTime) * speed;
 
     this.animationState.currentTime = elapsed;
+    console.log('[AnimationEngine] animate() frame, elapsed:', elapsed.toFixed(0), 'duration:', this.animationState.animation.duration);
 
     // Check if animation is complete
     if (elapsed >= this.animationState.animation.duration) {
@@ -203,11 +207,13 @@ export class AnimationEngine {
     if (position) {
       this.animationState.currentPosition = { x: position.x, y: position.y };
 
-      if (position.scale !== undefined || position.rotation !== undefined || position.opacity !== undefined) {
+      if (position.scale !== undefined || position.rotation !== undefined || position.opacity !== undefined || position.flipX !== undefined || position.flipY !== undefined) {
         this.animationState.currentTransform = {
           scale: position.scale,
           rotation: position.rotation,
           opacity: position.opacity,
+          flipX: position.flipX,
+          flipY: position.flipY,
         };
       }
 

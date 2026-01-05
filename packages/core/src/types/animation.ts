@@ -38,7 +38,7 @@ export interface AnimationWaypoint {
   /** Easing function for movement to this waypoint (CSS easing string) */
   easing?: string;
 
-  // Future properties for timeline system:
+  // Transform properties:
 
   /** Scale factor at this waypoint (1 = 100%) */
   scale?: number;
@@ -48,6 +48,12 @@ export interface AnimationWaypoint {
 
   /** Opacity at this waypoint (0-1) */
   opacity?: number;
+
+  /** Flip horizontally (for sprite direction changes) */
+  flipX?: boolean;
+
+  /** Flip vertically */
+  flipY?: boolean;
 }
 
 /**
@@ -124,6 +130,8 @@ export interface AnimationState {
     scale?: number;
     rotation?: number;
     opacity?: number;
+    flipX?: boolean;
+    flipY?: boolean;
   };
 }
 

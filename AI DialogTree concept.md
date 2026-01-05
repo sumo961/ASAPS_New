@@ -62,6 +62,52 @@ Make a plan for standalone playback engines for web, ios, android, MacOs, and wi
 - duplicate graophics
 - allow value inputs by interactors using inputText
 - Shared assets for clusters
-- counters central definition?
+	- counters central definition?
 
+
+Let's consider some UX changes and improvements -
+
+Editor improvements
+
+  1) right now the inspector is quite cramped (see image), especially when it comes to
+  dialogTrees where text overflows. I understand the overflow issue can be
+  solved, but the question is whether the inspector should become a floating
+  modal instead? Make some arguments for and against this change. In any
+  case, allow multiline display of dialog content to fix the overflow issue.
+
+  2) the visual editor for the dialotree needs to be overhauled to it
+  facilitates editing the different phases in the conversation. consider how
+  to best do that, e.g. hilighting the current speaker
+
+Counters and Variables improvements
+
+  3) Counters defined with characters should automatically be available in a
+  dropdown whereever counters can be changed, but it should still be possible
+  to add new ones. Similarly, allow the definition of variables in the global setting and make them available everywhere variables can be used in the same way counters are
+  describe in the previous point.
+
+  4) make sure, inputText can also change calues for existing counters and
+  variables. In therory this should already work, but there could be type
+  issues (string vs. number) 
+
+Efficiency updates
+
+  5) there needs to be a function to duplicate beats with all content intact
+  and settings intact and another one to copy visual content other than text
+  boxes and buttons. maybe this can be done with a context menu
+
+  6) enable shared visual content for clusters - backgrounds, props and
+  characters would be automatically available for all beats in the cluster,
+  but can still be changed per beat
+
+
+───────────────────────────────
+
+
+- No text animations for visual editor
+- option to turn off text animations in preivew
+- allow starting preview at a certain beat - have a menu with all beats in preview
+- optional level meters for counters, setting to turn on/off, as well as color and orientation in character counters tab
+- chat-like option for dialogTree
+- search and replace 
 

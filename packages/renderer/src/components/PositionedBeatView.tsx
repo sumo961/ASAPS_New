@@ -1,8 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import type { Location } from '@asaps/core';
+import type { Location, AnimationPath, AnimationState } from '@asaps/core';
 import { getPresetSound, isPresetSound } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
+import { getAnimationManager } from '../animation/AnimationEngine';
 
 /**
  * Font name to CSS font-family mapping
@@ -148,6 +149,8 @@ export interface PositionedBeatViewProps {
   visitedBeats?: string[];
   /** Only show choice text when hovering over the hotspot (for movementChoice) */
   showTextOnHover?: boolean;
+  /** Animation paths for elements (path animations) */
+  animations?: AnimationPath[];
 }
 
 /**
@@ -411,12 +414,117 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   visitedBeats = [],
   showTextOnHover = false,
   soundBlobResolver,
+  animations = [],
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
 
   // Animation state for button fade-in after text animation completes
   const [animationsComplete, setAnimationsComplete] = React.useState(false);
+
+  // State for tracking path animation positions
+  // Maps elementId to current animated position/transform
+  const [animatedPositions, setAnimatedPositions] = React.useState<
+    Record<string, { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean }>
+  >({});
+
+  // Track which animations have been started (by animation id)
+  const startedAnimationsRef = React.useRef<Set<string>>(new Set());
+
+  // Path animation management effect
+  React.useEffect(() => {
+    console.log('[PositionedBeatView] Animation effect triggered, animations:', animations?.length || 0, animations);
+
+    if (!animations || animations.length === 0) {
+      return;
+    }
+
+    const animationManager = getAnimationManager();
+
+    // Start animations that should auto-play on load
+    animations.forEach((animation) => {
+      console.log('[PositionedBeatView] Processing animation:', animation.id, 'elementId:', animation.elementId, 'trigger:', animation.trigger, 'autoPlay:', animation.autoPlay, 'waypoints:', animation.waypoints?.length);
+      // Only start if not already started and has onLoad trigger or autoPlay
+      const alreadyStarted = startedAnimationsRef.current.has(animation.id);
+      const shouldStart = (animation.trigger === 'onLoad' || animation.autoPlay) && !alreadyStarted;
+      console.log('[PositionedBeatView] shouldStart:', shouldStart, 'alreadyStarted:', alreadyStarted);
+
+      if (shouldStart) {
+        startedAnimationsRef.current.add(animation.id);
+        console.log('[PositionedBeatView] Starting animation:', animation.id);
+
+        animationManager.play(animation.id, animation, {
+          onUpdate: (state: AnimationState) => {
+            console.log('[PositionedBeatView] Animation update:', animation.elementId, state.currentPosition);
+            // Update position for this element
+            setAnimatedPositions(prev => ({
+              ...prev,
+              [animation.elementId]: {
+                x: state.currentPosition.x,
+                y: state.currentPosition.y,
+                scale: state.currentTransform?.scale,
+                rotation: state.currentTransform?.rotation,
+                opacity: state.currentTransform?.opacity,
+                flipX: state.currentTransform?.flipX,
+                flipY: state.currentTransform?.flipY,
+              }
+            }));
+          },
+          onComplete: () => {
+            console.log('[PositionedBeatView] Animation complete:', animation.id);
+            // Animation finished - keep final position or remove if not looping
+            if (!animation.loop) {
+              // Keep the final position (already set by onUpdate)
+            }
+          }
+        });
+      }
+    });
+
+    // Cleanup on unmount or when animations change
+    return () => {
+      animations.forEach((animation) => {
+        animationManager.stop(animation.id);
+      });
+      startedAnimationsRef.current.clear();
+      setAnimatedPositions({});
+    };
+  }, [animations]);
+
+  // Helper to get animated position for an element
+  const getAnimatedPosition = React.useCallback((elementId: string) => {
+    return animatedPositions[elementId];
+  }, [animatedPositions]);
+
+  // Handler to trigger onClick animations for an element
+  const triggerClickAnimation = React.useCallback((elementId: string) => {
+    if (!animations) return;
+
+    const clickAnimations = animations.filter(
+      a => a.elementId === elementId && a.trigger === 'onClick'
+    );
+
+    const animationManager = getAnimationManager();
+
+    clickAnimations.forEach((animation) => {
+      animationManager.play(animation.id, animation, {
+        onUpdate: (state: AnimationState) => {
+          setAnimatedPositions(prev => ({
+            ...prev,
+            [animation.elementId]: {
+              x: state.currentPosition.x,
+              y: state.currentPosition.y,
+              scale: state.currentTransform?.scale,
+              rotation: state.currentTransform?.rotation,
+              opacity: state.currentTransform?.opacity,
+              flipX: state.currentTransform?.flipX,
+              flipY: state.currentTransform?.flipY,
+            }
+          }));
+        }
+      });
+    });
+  }, [animations]);
   const [skipAnimation, setSkipAnimation] = React.useState(false);
   const animationCompleteCountRef = React.useRef(0);
   const totalTextElementsRef = React.useRef(0);
@@ -568,6 +676,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             previewMode={false} // Keep absolute for assets
             visitedBeats={visitedBeats}
             showTextOnHover={showTextOnHover}
+            animatedPosition={getAnimatedPosition(element.location.name)}
+            onTriggerClickAnimation={() => triggerClickAnimation(element.location.name)}
           />
         ))}
 
@@ -717,6 +827,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           skipAnimation={effectiveSkipAnimation}
           shouldShowButtons={shouldShowButtons}
           soundBlobResolver={soundBlobResolver}
+          animatedPosition={getAnimatedPosition(element.location.name)}
+          onTriggerClickAnimation={() => triggerClickAnimation(element.location.name)}
         />
       ))}
     </div>
@@ -744,6 +856,10 @@ interface PositionedElementProps {
   skipAnimation?: boolean;  // When true, skip animation and show full text
   shouldShowButtons?: boolean;  // Whether buttons should be visible (after animation)
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>;  // Resolver for loading sound blobs
+  /** Animated position override from path animations */
+  animatedPosition?: { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean };
+  /** Callback to trigger onClick animations */
+  onTriggerClickAnimation?: () => void;
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -764,6 +880,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   skipAnimation = false,
   shouldShowButtons = true,
   soundBlobResolver,
+  animatedPosition,
+  onTriggerClickAnimation,
 }) => {
   const { location, content, assetUrl, hyperlinks } = element;
 
@@ -773,13 +891,29 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
     return null;
   }
 
-  // Build transform string with rotation and scale
+  // Use animated position if available, otherwise use location
+  const effectiveX = animatedPosition?.x ?? location.x;
+  const effectiveY = animatedPosition?.y ?? location.y;
+
+  // Build transform string with rotation, scale, and flip (use animated values if available)
   const transforms: string[] = [];
-  if (location.rotation) {
-    transforms.push(`rotate(${location.rotation}deg)`);
+  const effectiveRotation = animatedPosition?.rotation ?? location.rotation;
+  const effectiveScale = animatedPosition?.scale ?? location.scale;
+  const effectiveFlipX = animatedPosition?.flipX;
+  const effectiveFlipY = animatedPosition?.flipY;
+
+  if (effectiveRotation) {
+    transforms.push(`rotate(${effectiveRotation}deg)`);
   }
-  if (location.scale && location.scale !== 1) {
-    transforms.push(`scale(${location.scale})`);
+  if (effectiveScale && effectiveScale !== 1) {
+    transforms.push(`scale(${effectiveScale})`);
+  }
+  // Apply flip transforms (for sprite direction changes)
+  if (effectiveFlipX) {
+    transforms.push(`scaleX(-1)`);
+  }
+  if (effectiveFlipY) {
+    transforms.push(`scaleY(-1)`);
   }
 
   // For character/prop elements, use auto sizing to preserve natural image dimensions when:
@@ -797,16 +931,20 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   const baseZIndex = isTextOrUI ? 100 : 0;
   const effectiveZIndex = (location.zIndex || index) + baseZIndex;
 
+  // Apply animated opacity if available
+  const effectiveOpacity = animatedPosition?.opacity;
+
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
-    left: `${location.x}px`,
-    top: `${location.y}px`,
+    left: `${effectiveX}px`,
+    top: `${effectiveY}px`,
     // For assets with size percentage, don't constrain dimensions - let image use natural size
     width: isAssetWithSize ? 'auto' : `${location.width}px`,
     height: isAssetWithSize ? 'auto' : `${location.height}px`,
     zIndex: effectiveZIndex,
     transform: transforms.length > 0 ? transforms.join(' ') : undefined,
     transformOrigin: 'center center',
+    opacity: effectiveOpacity,
   };
 
   // Special handling for input fields (detected by name containing 'input')
