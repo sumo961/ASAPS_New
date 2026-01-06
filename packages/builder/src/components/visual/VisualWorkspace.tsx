@@ -297,12 +297,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
    * Generate visual elements for a specific DialogTree phase
    * This creates the NPC text box and choice buttons with auto-layout
    * Matches the preview renderer's flex-based layout positioning
+   *
+   * Position priority:
+   * 1. phaseOverrides (user-edited positions)
+   * 2. storedLocations (imported ASML positions)
+   * 3. auto-layout (fallback for new beats)
    */
   const generatePhaseElements = useCallback((
     phase: DialogNode,
     stageWidth: number,
     stageHeight: number,
-    overrides?: Record<string, Partial<{ x: number; y: number; width: number; height: number }>>
+    overrides?: Record<string, Partial<{ x: number; y: number; width: number; height: number }>>,
+    storedLocations?: Map<string, Location>
   ): VisualElement[] => {
     const defaultFontSize = 16;
     const defaultFont = globalSettings?.fonts?.textFont || 'Arial';
@@ -403,19 +409,54 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     };
     const layoutResult = computeAutoLayout(baseElements, stageWidth, stageHeight, layoutTheme);
 
-    // Convert to VisualElements and apply overrides
+    // Convert to VisualElements and apply overrides/stored positions
+    // Priority: 1. phaseOverrides, 2. storedLocations, 3. auto-layout
     return layoutResult.adjustedElements.map((el) => {
       const override = overrides?.[el.id];
+
+      // Look for stored position in beat.locations (from ASML import)
+      // Dialog elements: ASML uses kind='text' or kind='dialog'
+      // Button elements: ASML uses kind='button' (converted from 'text' during import)
+      let storedPosition: { x: number; y: number; width: number; height: number } | undefined;
+      if (storedLocations && storedLocations.size > 0) {
+        // For dialog, look for 'dialog' or 'text' kind locations (ASML uses 'text' for dialog boxes)
+        if (el.kind === 'dialog') {
+          storedLocations.forEach((loc) => {
+            // Accept both 'dialog' (modern) and 'text' (legacy ASML) kinds
+            // Exclude buttons by checking that name doesn't match button patterns
+            const isDialogLike = (loc.kind === 'dialog' || loc.kind === 'text') &&
+              !loc.name?.match(/^(choice|button)/i);
+            if (isDialogLike && !storedPosition) {
+              storedPosition = { x: loc.x, y: loc.y, width: loc.width, height: loc.height };
+            }
+          });
+        }
+        // For buttons, look for 'button' kind locations by index
+        if (el.kind === 'button') {
+          const choiceIdx = parseInt(el.id.replace('choice_', ''), 10);
+          let buttonIdx = 0;
+          storedLocations.forEach((loc) => {
+            if (loc.kind === 'button') {
+              if (buttonIdx === choiceIdx && !storedPosition) {
+                storedPosition = { x: loc.x, y: loc.y, width: loc.width, height: loc.height };
+              }
+              buttonIdx++;
+            }
+          });
+        }
+      }
+
       return {
         id: el.id,
         type: el.kind === 'dialog' ? 'dialog' : 'button',
         name: el.id === 'npc' ? `NPC: ${phase.speaker || 'Character'}` : `Choice ${el.id.replace('choice_', '')}`,
         text: el.content,
         speaker: el.speaker,
-        x: override?.x ?? el.x,
-        y: override?.y ?? el.y,
-        width: override?.width ?? el.width,
-        height: override?.height ?? el.height,
+        // Priority: override > storedPosition > auto-layout
+        x: override?.x ?? storedPosition?.x ?? el.x,
+        y: override?.y ?? storedPosition?.y ?? el.y,
+        width: override?.width ?? storedPosition?.width ?? el.width,
+        height: override?.height ?? storedPosition?.height ?? el.height,
         z: 0,
         rotation: 0,
         scale: 1,
@@ -691,12 +732,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const params = beat.getParameters ? beat.getParameters() : {};
     const phaseOverrides = params.phaseOverrides?.[selectedPhaseId];
 
-    // Generate dialog and choice elements for this phase with auto-layout and overrides
+    // Generate dialog and choice elements for this phase
+    // Uses stored positions from beat.locations (ASML import) if available,
+    // otherwise falls back to auto-layout
     const phaseElements = generatePhaseElements(
       selectedPhase,
       stageWidth,
       stageHeight,
-      phaseOverrides
+      phaseOverrides,
+      beat.locations  // Pass stored locations for imported ASML positions
     );
 
     // Also load characters and props from beat.locations (these are shared across all phases)
