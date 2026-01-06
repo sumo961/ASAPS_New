@@ -1,5 +1,55 @@
 # ASAPS Modern - Progress Log
 
+## 2026-01-06: Visual Editor Positioning Fix for Imported ASML Stories
+
+### Overview
+
+Fixed positioning discrepancy between the Visual Editor and Preview for imported ASML stories. Dialog boxes and choice buttons now display at their correct imported positions instead of auto-layout positions.
+
+### Problem
+
+When opening an imported ASML story, the Visual Editor displayed dialog elements (NPC text boxes, choice buttons) at auto-calculated positions instead of using the stored coordinates from the ASML import. The Preview correctly showed elements at their imported positions, causing a confusing mismatch between the two views.
+
+### Root Cause
+
+The `generatePhaseElements()` function in VisualWorkspace.tsx only looked for stored locations with `kind='dialog'`, but ASML imports store dialog boxes with `kind='text'` (legacy format).
+
+```typescript
+// Before: Only matched modern 'dialog' kind
+if (loc.kind === 'dialog') { ... }
+
+// After: Accepts both modern and legacy kinds
+const isDialogLike = (loc.kind === 'dialog' || loc.kind === 'text') &&
+  !loc.name?.match(/^(choice|button)/i);
+```
+
+### Solution
+
+Updated position lookup in `generatePhaseElements()` to:
+1. Accept both `kind='dialog'` (modern) and `kind='text'` (legacy ASML) for dialog boxes
+2. Exclude button elements by checking the name pattern
+3. Pass `beat.locations` to the function for stored position lookup
+
+**Position priority is now:**
+1. `phaseOverrides` - User-edited positions (highest priority)
+2. `storedLocations` - Imported ASML positions
+3. Auto-layout - Fallback for new beats
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/components/visual/VisualWorkspace.tsx` | Updated `generatePhaseElements()` to accept legacy 'text' kind and pass stored locations |
+
+### Testing
+
+Verified with imported Red Riding Hood ASML story (Beat 60):
+- Visual Editor now shows dialog and buttons at same positions as Preview
+- Characters and props retain their imported positions
+- User overrides still take precedence over imported positions
+
+---
+
 ## 2026-01-05: Save Eligibility and Flowchart Initial Render Fixes
 
 ### Overview
