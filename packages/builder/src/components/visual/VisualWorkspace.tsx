@@ -224,6 +224,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     callback: ((asset: Asset) => void) | null;
   }>({ isOpen: false, type: null, callback: null });
 
+  // Meter selection modal state
+  const [meterModal, setMeterModal] = useState<{
+    isOpen: boolean;
+  }>({ isOpen: false });
+
   // Phase tree computation for DialogTree beats
   // Note: We need to depend on the beat's actual dialogTree content, not just the beat reference
   const dialogTreeParams = beat?.type === 'dialogTree'
@@ -262,7 +267,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // Default to root phase when switching beats
       const rootPhase = phaseTree?.id || null;
       setSelectedPhaseId(rootPhase);
-      prevPhaseIdRef.current = rootPhase;
+      // Set prevPhaseIdRef to null so the phase effect knows to reload
+      // (if we set it to rootPhase, the phase effect would skip loading)
+      prevPhaseIdRef.current = null;
     }
   }, [beat?.id, phaseTree?.id]);
 
@@ -432,12 +439,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     elements.forEach((el: VisualElement) => {
       if (el.name === 'Main Text') return;
 
-      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog';
+      // For DialogTree beats, skip dialog and button elements (they're regenerated per phase)
+      if (targetBeat.type === 'dialogTree' && (el.type === 'dialog' || el.type === 'button')) {
+        return;
+      }
+
+      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter';
       if (el.type === 'character') kind = 'character';
       else if (el.type === 'prop') kind = 'prop';
       else if (el.type === 'dialog') kind = 'dialog';
       else if (el.type === 'button') kind = 'button';
       else if (el.type === 'hotspot') kind = 'hotspot';
+      else if (el.type === 'meter') kind = 'meter';
       else kind = 'text';
 
       const location: any = {
@@ -474,6 +487,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         }
       }
 
+      // Add meter-specific properties
+      if (el.type === 'meter') {
+        if (el.characterId) location.characterId = el.characterId;
+        if (el.counterName) location.counterName = el.counterName;
+        if (el.meterOrientation) location.meterOrientation = el.meterOrientation;
+        if (el.showNumericValue !== undefined) location.showNumericValue = el.showNumericValue;
+        if (el.numericFormat) location.numericFormat = el.numericFormat;
+        if (el.meterColor) location.meterColor = el.meterColor;
+        if (el.meterBackgroundColor) location.meterBackgroundColor = el.meterBackgroundColor;
+      }
+
       targetBeat.locations.set(el.name || el.id, location);
     });
 
@@ -493,17 +517,24 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const params = prevBeat.getParameters ? prevBeat.getParameters() : {};
 
       // Clear beat.locations and repopulate with ALL properties
+      // For DialogTree beats: only save characters, props, meters (dialog/buttons are phase-specific)
       prevBeat.locations.clear();
 
       visualElementsRef.current.forEach((el: VisualElement) => {
         if (el.name === 'Main Text') return;
 
-        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog';
+        // For DialogTree beats, skip dialog and button elements (they're regenerated per phase)
+        if (prevBeat.type === 'dialogTree' && (el.type === 'dialog' || el.type === 'button')) {
+          return;
+        }
+
+        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter';
         if (el.type === 'character') kind = 'character';
         else if (el.type === 'prop') kind = 'prop';
         else if (el.type === 'dialog') kind = 'dialog';
         else if (el.type === 'button') kind = 'button';
         else if (el.type === 'hotspot') kind = 'hotspot';
+        else if (el.type === 'meter') kind = 'meter';
         else kind = 'text';
 
         const location: any = {
@@ -540,6 +571,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           }
         }
 
+        // Add meter-specific properties (for kind='meter')
+        if (el.type === 'meter') {
+          if (el.characterId) location.characterId = el.characterId;
+          if (el.counterName) location.counterName = el.counterName;
+          if (el.meterOrientation) location.meterOrientation = el.meterOrientation;
+          if (el.showNumericValue !== undefined) location.showNumericValue = el.showNumericValue;
+          if (el.numericFormat) location.numericFormat = el.numericFormat;
+          if (el.meterColor) location.meterColor = el.meterColor;
+          if (el.meterBackgroundColor) location.meterBackgroundColor = el.meterBackgroundColor;
+        }
+
         prevBeat.locations.set(el.name || el.id, location);
       });
 
@@ -562,8 +604,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Update beatRef to new beat AFTER saving to previous beat
     beatRef.current = beat;
 
-    // Update previous beat ID
-    prevBeatIdRef.current = beat?.id;
+    // NOTE: Don't update prevBeatIdRef here! It's updated by the phase loading effect
+    // so that effect can correctly detect beat changes. The auto-save check at line 512
+    // will still work because prevBeatIdRef isn't updated until AFTER phase loading.
   }, [beat]); // Depend on beat object, not beat?.id, to run before the load
 
   /**
@@ -623,49 +666,113 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
    * Load phase-specific elements when phase changes (for DialogTree beats)
    */
   useEffect(() => {
-    console.log(`[VisualWorkspace] Phase effect - selectedPhaseId: ${selectedPhaseId}, prevRef: ${prevPhaseIdRef.current}, selectedPhase: ${selectedPhase?.id}`);
+    console.log(`[VisualWorkspace] Phase effect - beatId: ${beat?.id}, prevBeatId: ${prevBeatIdRef.current}, selectedPhaseId: ${selectedPhaseId}, prevRef: ${prevPhaseIdRef.current}, selectedPhase: ${selectedPhase?.id}`);
 
     if (!beat || beat.type !== 'dialogTree' || !selectedPhaseId || !selectedPhase) {
-      console.log(`[VisualWorkspace] Phase effect - skipping (missing data)`);
-      return;
-    }
-    if (!projectSettings) {
-      console.log(`[VisualWorkspace] Phase effect - skipping (no project settings)`);
+      console.log(`[VisualWorkspace] Phase effect - skipping (missing data): beat=${!!beat}, type=${beat?.type}, phaseId=${selectedPhaseId}, phase=${!!selectedPhase}`);
       return;
     }
 
-    // Don't reload if this is the same phase and we already have elements
-    if (prevPhaseIdRef.current === selectedPhaseId && visualElements.length > 0) {
-      console.log(`[VisualWorkspace] Phase effect - skipping (same phase, already have elements)`);
+    // Use default project settings if not provided
+    const stageWidth = projectSettings?.width || 1024;
+    const stageHeight = projectSettings?.height || 768;
+
+    // Check if beat changed - always reload when switching to a different beat
+    const beatChanged = prevBeatIdRef.current !== beat.id;
+
+    // Don't reload if this is the same beat AND same phase AND we already have elements
+    if (!beatChanged && prevPhaseIdRef.current === selectedPhaseId && visualElements.length > 0) {
+      console.log(`[VisualWorkspace] Phase effect - skipping (same beat+phase, already have elements)`);
       return;
     }
 
-    console.log(`[VisualWorkspace] Loading phase elements for: ${selectedPhaseId}, phase text: ${selectedPhase.text}`);
+    console.log(`[VisualWorkspace] Loading phase elements for: ${selectedPhaseId}, phase text: ${selectedPhase.text}, beatChanged: ${beatChanged}`);
 
     const params = beat.getParameters ? beat.getParameters() : {};
     const phaseOverrides = params.phaseOverrides?.[selectedPhaseId];
 
-    // Generate elements for this phase with auto-layout and overrides
+    // Generate dialog and choice elements for this phase with auto-layout and overrides
     const phaseElements = generatePhaseElements(
       selectedPhase,
-      projectSettings.width,
-      projectSettings.height,
+      stageWidth,
+      stageHeight,
       phaseOverrides
     );
 
-    setVisualElements(phaseElements);
+    // Also load characters and props from beat.locations (these are shared across all phases)
+    const persistedElements: VisualElement[] = [];
+    if (beat.locations.size > 0) {
+      beat.locations.forEach((loc: Location) => {
+        // Only include characters and props - dialog/buttons come from phase
+        if (loc.kind === 'character' || loc.kind === 'prop') {
+          const element: VisualElement = {
+            id: `element_${Date.now()}_${Math.random()}`,
+            type: loc.kind as 'character' | 'prop',
+            name: loc.name,
+            text: '',
+            assetId: loc.assetId,
+            imageUrl: loc.imageUrl,
+            characterId: loc.characterId,
+            characterName: loc.characterName,
+            stateId: loc.stateId,
+            size: loc.size,
+            x: loc.x,
+            y: loc.y,
+            z: loc.zIndex || 0,
+            width: loc.width,
+            height: loc.height,
+            rotation: 0,
+            scale: 1,
+            visible: true,
+            locked: false,
+            sound: loc.sound,
+          };
+
+          // Resolve character image URLs
+          if (loc.kind === 'character' && loc.characterId) {
+            const character = characters.find(c => c.id === loc.characterId);
+            if (character) {
+              const stateId = loc.stateId || character.defaultState;
+              const state = character.states?.find((s: any) => s.id === stateId);
+              if (state) {
+                const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
+                if (resolvedUrl) {
+                  element.imageUrl = resolvedUrl;
+                }
+              }
+            }
+          }
+
+          // Resolve prop image URLs
+          if (loc.kind === 'prop' && loc.assetId) {
+            const asset = assets.find(a => a.id === loc.assetId);
+            if (asset) {
+              element.imageUrl = asset.url;
+            }
+          }
+
+          persistedElements.push(element);
+        }
+      });
+      console.log(`[VisualWorkspace] Loaded ${persistedElements.length} persisted elements (characters/props) from beat.locations`);
+    }
+
+    // Merge: persisted elements (characters/props) + phase elements (dialog/choices)
+    const allElements = [...persistedElements, ...phaseElements];
+    setVisualElements(allElements);
     setHasChanges(false);
     prevPhaseIdRef.current = selectedPhaseId;
+    prevBeatIdRef.current = beat.id;
 
-    console.log(`[VisualWorkspace] Loaded ${phaseElements.length} elements for phase: ${selectedPhaseId}`);
-  }, [beat, selectedPhaseId, selectedPhase, projectSettings, generatePhaseElements]);
+    console.log(`[VisualWorkspace] Loaded ${allElements.length} elements for phase: ${selectedPhaseId} (${persistedElements.length} persisted + ${phaseElements.length} phase)`);
+  }, [beat, selectedPhaseId, selectedPhase, projectSettings, generatePhaseElements, characters, assets]);
 
   // Initialize from beat parameters
   useEffect(() => {
     if (!beat) return;
 
     // For DialogTree beats: load background/animations but skip element loading
-    // Elements are handled by phase-aware loading effect
+    // Elements are handled by phase-aware loading effect (which runs before this effect)
     if (beat.type === 'dialogTree') {
       console.log(`[VisualWorkspace] DialogTree: loading background/animations only, elements via phase-aware loading`);
       const params = beat.getParameters ? beat.getParameters() : {};
@@ -677,9 +784,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // Load animations from beat.animations first (direct property), fallback to params.animations
       console.log(`[VisualWorkspace] DialogTree: Loading animations: beat.animations=${beat.animations?.length || 0}, params.animations=${params.animations?.length || 0}`);
       setAnimations(beat.animations || params.animations || []);
-      // Clear visual elements so phase load effect will run
-      // This prevents stale elements from previous beat from showing
-      setVisualElements([]);
+      // NOTE: Don't clear visual elements here - the phase loading effect already handles this
+      // by calling setVisualElements(allElements) which replaces all elements
       return;
     }
 
@@ -752,6 +858,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 isButtonByName ? 'button' : // Detect buttons by name for legacy ASML
                 loc.kind === 'dialog' ? 'dialog' :
                 loc.kind === 'hotspot' ? 'hotspot' :
+                loc.kind === 'meter' ? 'meter' :
                 'text',
           name: loc.name,
           text: '', // Will be populated below from params
@@ -775,7 +882,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           // Include font properties from location
           font: loc.font,
           fontSize: loc.fontSize,
-          textAlign: loc.textAlign
+          textAlign: loc.textAlign,
+          // Meter-specific properties
+          counterName: loc.counterName,
+          meterOrientation: loc.meterOrientation,
+          showNumericValue: loc.showNumericValue,
+          numericFormat: loc.numericFormat,
+          meterColor: loc.meterColor,
+          meterBackgroundColor: loc.meterBackgroundColor
         };
 
         // Resolve asset URL for props immediately (so updateImageDimensions can use it)
@@ -937,6 +1051,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 isButtonByName ? 'button' : // Detect buttons by name for legacy ASML
                 loc.kind === 'text' ? 'dialog' : // Convert remaining text to dialog
                 loc.kind === 'inputfield' ? 'hotspot' :
+                loc.kind === 'meter' ? 'meter' :
                 loc.kind,
           name: loc.name,
           text: loc.text, // Will be populated below if missing
@@ -961,7 +1076,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           // Include font properties from location
           font: loc.font,
           fontSize: loc.fontSize,
-          textAlign: loc.textAlign
+          textAlign: loc.textAlign,
+          // Meter-specific properties
+          counterName: loc.counterName,
+          meterOrientation: loc.meterOrientation,
+          showNumericValue: loc.showNumericValue,
+          numericFormat: loc.numericFormat,
+          meterColor: loc.meterColor,
+          meterBackgroundColor: loc.meterBackgroundColor
         };
 
         // Resolve asset URL for props immediately (so updateImageDimensions can use it)
@@ -1075,12 +1197,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // CRITICAL FIX: Also populate beat.locations Map from loaded data
       beat.locations.clear();
       elements.forEach((el: VisualElement) => {
-        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' = el.type as any;
+        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' = el.type as any;
         if (el.type === 'character') kind = 'character';
         else if (el.type === 'prop') kind = 'prop';
         else if (el.type === 'dialog') kind = 'dialog';
         else if (el.type === 'button') kind = 'button';
         else if (el.type === 'hotspot') kind = 'hotspot';
+        else if (el.type === 'meter') kind = 'meter';
         else if (el.type === 'text') kind = 'text';
 
         const location: any = {
@@ -1100,6 +1223,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         if (el.fontSize !== undefined) location.fontSize = el.fontSize;
         if (el.textAlign) location.textAlign = el.textAlign;
         location.autosize = el.fontSize === undefined;
+
+        // Add meter-specific properties
+        if (el.type === 'meter') {
+          if (el.characterId) location.characterId = el.characterId;
+          if (el.counterName) location.counterName = el.counterName;
+          if (el.meterOrientation) location.meterOrientation = el.meterOrientation;
+          if (el.showNumericValue !== undefined) location.showNumericValue = el.showNumericValue;
+          if (el.numericFormat) location.numericFormat = el.numericFormat;
+          if (el.meterColor) location.meterColor = el.meterColor;
+          if (el.meterBackgroundColor) location.meterBackgroundColor = el.meterBackgroundColor;
+        }
 
         beat.locations.set(el.name || el.id, location);
       });
@@ -1191,6 +1325,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     };
 
     updateImageDimensions();
+
+    // Update prevBeatIdRef for non-dialogTree beats (dialogTree updates in phase loading effect)
+    prevBeatIdRef.current = beat.id;
 
     // Reset parameter tracking so second useEffect will run for this beat
     prevParamsRef.current = '';
@@ -1602,15 +1739,22 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         console.log('[DEBUG] Skipping deprecated Main Text element during save');
         return;
       }
-      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' = el.type as any;
-      
+
+      // For DialogTree beats, skip dialog and button elements (they're regenerated per phase)
+      if (beat.type === 'dialogTree' && (el.type === 'dialog' || el.type === 'button')) {
+        return;
+      }
+
+      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' = el.type as any;
+
       if (el.type === 'character') kind = 'character';
       else if (el.type === 'prop') kind = 'prop';
       else if (el.type === 'dialog') kind = 'dialog';
       else if (el.type === 'button') kind = 'button';
       else if (el.type === 'hotspot') kind = 'hotspot';
       else if (el.type === 'text') kind = 'text';
-      
+      else if (el.type === 'meter') kind = 'meter';
+
       const location: any = {
         kind,
         name: el.name || el.text || '',
@@ -1647,6 +1791,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             location.characterName = character.name;
           }
         }
+      }
+
+      // Add meter-specific properties (for kind='meter')
+      if (el.type === 'meter') {
+        if (el.characterId) location.characterId = el.characterId;
+        if (el.counterName) location.counterName = el.counterName;
+        if (el.meterOrientation) location.meterOrientation = el.meterOrientation;
+        if (el.showNumericValue !== undefined) location.showNumericValue = el.showNumericValue;
+        if (el.numericFormat) location.numericFormat = el.numericFormat;
+        if (el.meterColor) location.meterColor = el.meterColor;
+        if (el.meterBackgroundColor) location.meterBackgroundColor = el.meterBackgroundColor;
       }
 
       beat.locations.set(el.name || el.id, location);
@@ -2131,6 +2286,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     return;
                   }
 
+                  // For meter type, open meter selection modal
+                  if (type === 'meter') {
+                    setMeterModal({ isOpen: true });
+                    return;
+                  }
+
                   // For text and hotspot types, create element immediately
                   const newElement: VisualElement = {
                     id: `element_${Date.now()}`,
@@ -2267,6 +2428,107 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         assetSubType={assetModal.type === 'sound' ? 'sfx' : assetModal.type ?? undefined}
         title={`Select ${assetModal.type || 'Asset'}`}
       />
+
+      {/* Meter Selection Modal */}
+      {meterModal.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Select Counter Meter</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {characters.flatMap(character =>
+                (character.counters || [])
+                  .filter(counter => counter.showLevelMeter)
+                  .map(counter => (
+                    <button
+                      key={`${character.id}-${counter.name}`}
+                      onClick={() => {
+                        const stageWidth = projectSettings?.width || 1024;
+                        const stageHeight = projectSettings?.height || 768;
+                        const isHorizontal = (counter.levelMeterOrientation || 'horizontal') === 'horizontal';
+
+                        const newElement: VisualElement = {
+                          id: `meter_${Date.now()}`,
+                          type: 'meter',
+                          name: `${counter.displayName || counter.name} Meter`,
+                          x: 20,
+                          y: 20,
+                          z: 1000, // High z-index for HUD overlay
+                          width: isHorizontal ? 150 : 30,
+                          height: isHorizontal ? 20 : 100,
+                          rotation: 0,
+                          scale: 1,
+                          visible: true,
+                          locked: false,
+                          characterId: character.id,
+                          counterName: counter.name,
+                          meterOrientation: counter.levelMeterOrientation || 'horizontal',
+                          showNumericValue: counter.showNumericValue || false,
+                          numericFormat: counter.numericFormat || 'value',
+                          meterColor: counter.color || '#3B82F6',
+                          meterBackgroundColor: 'rgba(255, 255, 255, 0.3)',
+                        };
+
+                        setVisualElements(prev => [...prev, newElement]);
+                        setSelectedElementId(newElement.id);
+                        setHasChanges(true);
+
+                        // Persist to beat.locations
+                        if (beat) {
+                          const locationName = newElement.name || newElement.id;
+                          beat.locations.set(locationName, {
+                            kind: 'meter',
+                            name: locationName,
+                            x: Math.round(newElement.x),
+                            y: Math.round(newElement.y),
+                            width: Math.round(newElement.width),
+                            height: Math.round(newElement.height),
+                            zIndex: newElement.z,
+                            characterId: character.id,
+                            counterName: counter.name,
+                            meterOrientation: counter.levelMeterOrientation || 'horizontal',
+                            showNumericValue: counter.showNumericValue || false,
+                            numericFormat: counter.numericFormat || 'value',
+                            meterColor: counter.color || '#3B82F6',
+                            meterBackgroundColor: 'rgba(255, 255, 255, 0.3)',
+                          });
+                          console.log(`[VisualWorkspace] Added meter "${locationName}" to beat.locations`);
+                        }
+
+                        setMeterModal({ isOpen: false });
+                      }}
+                      className="w-full px-4 py-3 text-left border rounded-lg hover:bg-gray-50 flex items-center gap-3"
+                    >
+                      <div
+                        className="w-4 h-4 rounded"
+                        style={{ backgroundColor: counter.color || '#3B82F6' }}
+                      />
+                      <div>
+                        <div className="font-medium">{counter.displayName || counter.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {character.displayName || character.name} • {counter.levelMeterOrientation || 'horizontal'}
+                        </div>
+                      </div>
+                    </button>
+                  ))
+              )}
+              {!characters.some(c => c.counters?.some(counter => counter.showLevelMeter)) && (
+                <div className="text-gray-500 text-center py-4">
+                  No counters with level meters enabled.<br />
+                  Enable "Show Level Meter" in Character Editor.
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setMeterModal({ isOpen: false })}
+                className="px-4 py-2 border rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
