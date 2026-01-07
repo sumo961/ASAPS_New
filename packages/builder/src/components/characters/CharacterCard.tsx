@@ -13,6 +13,7 @@ interface CharacterCardProps {
   onRemove: () => void;
   onEdit?: () => void; // Optional edit callback for selection mode
   selectionMode?: boolean; // Whether we're in selection mode
+  imageUrl?: string; // Pre-resolved image URL (resolves stale blob URLs via asset lookup)
 }
 
 export const CharacterCard: React.FC<CharacterCardProps> = ({
@@ -20,7 +21,8 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
   onClick,
   onRemove,
   onEdit,
-  selectionMode = false
+  selectionMode = false,
+  imageUrl
 }) => {
   const getRoleIcon = (role: Character['role']) => {
     switch (role) {
@@ -81,9 +83,9 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
 
       {/* Character Image/Icon */}
       <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-        {character.visual.defaultImage ? (
-          <img 
-            src={character.visual.defaultImage} 
+        {imageUrl ? (
+          <img
+            src={imageUrl}
             alt={character.displayName}
             className="w-full h-full object-cover"
             onError={(e) => {

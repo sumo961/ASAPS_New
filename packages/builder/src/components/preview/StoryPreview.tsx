@@ -319,21 +319,15 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
 
       // Set up character meter frame resolver for HUD overlays
       if (characters && characters.length > 0) {
-        console.log('[StoryPreview] Setting up meter frame resolver with characters:', characters.map(c => ({ id: c.id, name: c.name, hasMeterFrame: !!c.meterFrame })));
         (reactRenderer as any).setCharacterMeterFrameResolver((characterId: string) => {
-          console.log('[StoryPreview] Meter frame resolver called for characterId:', characterId);
           const character = characters.find(c => c.id === characterId);
-          console.log('[StoryPreview] Found character:', character ? { id: character.id, name: character.name, hasMeterFrame: !!character.meterFrame, counters: character.counters?.length } : null);
           if (!character || !character.meterFrame) {
-            console.log('[StoryPreview] No character or no meterFrame config');
             return null;
           }
 
           // Filter to visible counters with showLevelMeter enabled
           const visibleCounters = character.counters.filter(c => c.visible && c.showLevelMeter);
-          console.log('[StoryPreview] Visible counters with showLevelMeter:', visibleCounters.length);
           if (visibleCounters.length === 0) {
-            console.log('[StoryPreview] No visible counters with showLevelMeter');
             return null;
           }
 

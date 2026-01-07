@@ -19,6 +19,26 @@ import { Character, CHARACTER_TEMPLATES } from '../../types/character';
 import { CharacterCard } from './CharacterCard';
 import { CharacterEditor } from './CharacterEditor';
 
+/**
+ * Helper to resolve fresh image URL from assets using assetId.
+ * Character images stored with blob URLs become stale after page reload.
+ */
+function resolveImageUrl(
+  assetId: string | undefined,
+  image: string | undefined,
+  assets: Array<{ id: string; url: string; }>
+): string | undefined {
+  // Try to resolve via assetId first (this gives fresh blob URLs)
+  if (assetId) {
+    const asset = assets.find(a => a.id === assetId);
+    if (asset?.url) {
+      return asset.url;
+    }
+  }
+  // Fall back to stored image URL (might be stale blob URL)
+  return image;
+}
+
   // Use characters from props
 //const characters = initialCharacters;
 
@@ -280,6 +300,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                 onRemove={() => handleCharacterRemove(character.id)}
                 onEdit={() => handleEditCharacter(character)}
                 selectionMode={selectionMode}
+                imageUrl={resolveImageUrl(character.visual.defaultAssetId, character.visual.defaultImage, assets)}
               />
             ))}
             {/* Add Character Card */}
@@ -293,7 +314,9 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredCharacters.map((character) => (
+            {filteredCharacters.map((character) => {
+              const listImageUrl = resolveImageUrl(character.visual.defaultAssetId, character.visual.defaultImage, assets);
+              return (
               <div
                 key={character.id}
                 onClick={() => handleCharacterClick(character)}
@@ -301,9 +324,9 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
               >
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
-                    {character.visual.defaultImage ? (
+                    {listImageUrl ? (
                       <img
-                        src={character.visual.defaultImage}
+                        src={listImageUrl}
                         alt={character.displayName}
                         className="w-full h-full object-cover rounded-lg"
                       />
@@ -340,7 +363,8 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

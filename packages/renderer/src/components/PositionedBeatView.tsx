@@ -1108,18 +1108,9 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
 
     case 'character': {
       // Get meter frame data if character has one configured
-      // Debug logging for meter frame
-      console.log('[PositionedElement] Character location:', {
-        name: location.name,
-        characterId: location.characterId,
-        hasResolver: !!characterMeterFrameResolver
-      });
-
       const meterFrameData = location.characterId && characterMeterFrameResolver
         ? characterMeterFrameResolver(location.characterId)
         : null;
-
-      console.log('[PositionedElement] Meter frame data:', meterFrameData);
 
       return (
         <>
