@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.0)
+## ⚠️ Development Status (v0.9.2)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -13,7 +13,8 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Assets (graphics, sounds, sprite animations) | Mostly implemented, not fully tested |
 | Visual dialog editor | Only supports initial phase of dialog trees |
 | Project switching | Occasional issues; reload interface to resolve |
-| Animation system | Implemented but untested |
+| Animation system | Fully implemented with visual path editor (v0.9.1) |
+| Character meter frames | HUD overlays for counters (v0.9.2) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
@@ -249,6 +250,20 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.2 (2026-01-07)
+- **Character meter frame HUD**: Configurable overlay for displaying character counters (health, energy, etc.) as visual bars
+- **Meter frame docking**: Dock to character (8 anchor positions) or fixed to screen corners
+- **Meter frame styling**: Background, border, opacity, meter dimensions, and label visibility options
+- **Simplified counter display**: All visible counters auto-appear when meter frame is enabled
+- **Character image fix**: Fixed character images not showing in Character Manager grid/list view
+
+### v0.9.1 (2026-01-05)
+- **Path animation system**: Complete implementation for moving elements along curves during playback
+- **Visual animation editor**: PathCanvas with actual element rendering, bezier curve editing
+- **Waypoint controls**: Duration, easing, scale, rotation, opacity, flip H/V per waypoint
+- **Animation playback**: RequestAnimationFrame-based engine with play/pause/stop/seek
+- **Transform interpolation**: Smooth interpolation of all transform properties along paths
 
 ### v0.9.0 (2024-12-29)
 - **Unified Import/Export menus**: Dropdown menus in header consolidating all import/export options, including new "Export ASML with Assets" option that creates a ZIP with organized asset folders

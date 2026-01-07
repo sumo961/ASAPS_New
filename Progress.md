@@ -1,5 +1,129 @@
 # ASAPS Modern - Progress Log
 
+## 2026-01-07: Character Meter Frame HUD (v0.9.2)
+
+### Overview
+
+Added a configurable meter frame HUD overlay for displaying character counters (health, energy, etc.) during story playback. The frame can be docked to the character or fixed to a screen corner.
+
+### Features
+
+#### Meter Frame Component
+- New `CharacterMeterFrame` component in renderer package
+- Displays all visible counters as horizontal bars
+- Shows counter labels, current values, and fill percentage
+- Configurable bar colors based on counter settings
+
+#### Docking Options
+- **Character Docking**: 8 anchor positions around the character (top, bottom, left, right, corners)
+- **Screen Corner Docking**: Fixed to any of the 4 screen corners (top-left, top-right, bottom-left, bottom-right)
+- Offset X/Y controls for fine positioning
+
+#### Style Configuration
+- Background color and opacity
+- Border color, width, and radius
+- Padding
+- Meter width, height, and spacing
+- Show/hide counter labels
+
+#### Simplified Counter Display
+When meter frame is enabled on a character, all counters with `visible: true` automatically appear in the frame. No need for extra per-counter flags.
+
+### Character Manager Image Fix
+
+Fixed character images not showing in the Character Manager grid/list view. The issue was that `CharacterCard` used stale blob URLs from `character.visual.defaultImage` instead of resolving via `defaultAssetId` from the assets array.
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `packages/renderer/src/components/CharacterMeterFrame.tsx` | Meter frame component with positioning logic |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/types/character.ts` | Added `MeterFrameDockMode`, `MeterFrameScreenPosition`, `MeterFrameConfig` types |
+| `packages/builder/src/components/characters/CharacterEditor.tsx` | Meter frame configuration UI in Counters tab |
+| `packages/builder/src/components/characters/CharacterCard.tsx` | Added `imageUrl` prop for resolved image URLs |
+| `packages/builder/src/components/characters/CharacterManager.tsx` | Added `resolveImageUrl` helper, pass resolved URLs to CharacterCard |
+| `packages/builder/src/components/preview/StoryPreview.tsx` | Meter frame resolver setup |
+| `packages/renderer/src/components/PositionedBeatView.tsx` | Integration with character rendering, container dimensions |
+| `packages/renderer/src/renderers/ReactRenderer.tsx` | `setCharacterMeterFrameResolver` method |
+| `packages/renderer/src/components/index.ts` | Export new types |
+
+---
+
+## 2026-01-05: Path Animation System (v0.9.1)
+
+### Overview
+
+Implemented a complete path animation system for moving elements along curves during story playback, with a visual animation editor in the builder.
+
+### Animation Editor
+
+#### PathCanvas Component
+- Shows all stage elements for reference
+- Highlights animation target in orange
+- Renders actual element content (images, text) not just outlines
+- Bezier curve editing with draggable control points
+
+#### WaypointList Component
+- Add/remove waypoints
+- Duration and easing per segment
+- Transform controls: scale, rotation, opacity
+- Flip H/V checkboxes for sprite direction
+
+### Animation Playback
+
+#### Core Animation Support
+- `animations` property added to Beat class
+- Animations serialized with beat parameters
+- Triggers: onLoad/autoPlay, onClick
+
+#### AnimationEngine
+- RequestAnimationFrame-based playback loop
+- Play, pause, stop, seek controls
+- Callback system for position updates
+
+#### PathInterpolator
+- Bezier curve interpolation
+- Transform interpolation (scale, rotation, opacity)
+- FlipX/FlipY support
+- Default values for missing properties
+
+### Transform Properties
+
+```typescript
+interface AnimationWaypoint {
+  x: number;
+  y: number;
+  duration: number;
+  easing?: string;
+  scale?: number;
+  rotation?: number;
+  opacity?: number;
+  flipX?: boolean;
+  flipY?: boolean;
+}
+```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/core/src/beats/Beat.ts` | Add animations property, serialization |
+| `packages/core/src/types/animation.ts` | Add flipX/flipY properties |
+| `packages/renderer/src/components/PositionedBeatView.tsx` | Animation playback, position rendering |
+| `packages/renderer/src/animation/AnimationEngine.ts` | Playback loop |
+| `packages/renderer/src/animation/PathInterpolator.ts` | Curve and transform interpolation |
+| `packages/builder/src/components/animation/PathCanvas.tsx` | Visual editor canvas |
+| `packages/builder/src/components/animation/WaypointList.tsx` | Waypoint editing UI |
+| `packages/builder/src/components/visual/AnimationPanel.tsx` | Animation panel integration |
+| `packages/builder/src/components/visual/VisualWorkspace.tsx` | Animation sync to beat |
+
+---
+
 ## 2026-01-06: Visual Editor Positioning Fix for Imported ASML Stories
 
 ### Overview
