@@ -5,7 +5,7 @@ export * from './animation';
 import type { AnimationPath } from './animation';
 
 export interface Location {
-  kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input';
+  kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input' | 'meter';
   name: string;
   x: number;
   y: number;
@@ -30,6 +30,13 @@ export interface Location {
   autosize?: boolean;  // Auto-calculate font size based on box dimensions
   fontOverridden?: boolean;  // True if font/size explicitly set, false = use theme defaults
   visible?: boolean;   // Element visibility (false = hidden, true/undefined = visible)
+  // Meter-specific fields (for kind='meter')
+  counterName?: string;      // Name of the counter to display
+  meterOrientation?: 'horizontal' | 'vertical';
+  showNumericValue?: boolean;
+  numericFormat?: 'value' | 'fraction' | 'percentage';
+  meterColor?: string;       // Bar fill color
+  meterBackgroundColor?: string;  // Bar background color
 }
 
 export interface Transition {

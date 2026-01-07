@@ -4,6 +4,7 @@ import type { Location, AnimationPath, AnimationState } from '@asaps/core';
 import { getPresetSound, isPresetSound } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
 import { getAnimationManager } from '../animation/AnimationEngine';
+import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
 
 /**
  * Font name to CSS font-family mapping
@@ -66,6 +67,10 @@ export interface PositionedElementData {
   targetBeatId?: string;
   /** Optional hyperlinks for HyperText beat type - words in the text that are clickable */
   hyperlinks?: HyperlinkData[];
+  /** Counter meter value (for kind='meter') */
+  counterValue?: number;
+  counterMin?: number;
+  counterMax?: number;
 }
 
 /**
@@ -151,6 +156,13 @@ export interface PositionedBeatViewProps {
   showTextOnHover?: boolean;
   /** Animation paths for elements (path animations) */
   animations?: AnimationPath[];
+  /** Resolver function to get counter values by name (for meter elements) */
+  counterResolver?: (counterName: string) => { value: number; min: number; max: number } | null;
+  /** Resolver function to get meter frame data for a character (for HUD display) */
+  characterMeterFrameResolver?: (characterId: string) => {
+    counters: MeterCounterData[];
+    config: MeterFrameConfig;
+  } | null;
 }
 
 /**
@@ -415,6 +427,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   showTextOnHover = false,
   soundBlobResolver,
   animations = [],
+  counterResolver,
+  characterMeterFrameResolver,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -678,6 +692,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             showTextOnHover={showTextOnHover}
             animatedPosition={getAnimatedPosition(element.location.name)}
             onTriggerClickAnimation={() => triggerClickAnimation(element.location.name)}
+            characterMeterFrameResolver={characterMeterFrameResolver}
+            containerDimensions={{ width: stageWidth, height: stageHeight }}
           />
         ))}
 
@@ -829,6 +845,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           soundBlobResolver={soundBlobResolver}
           animatedPosition={getAnimatedPosition(element.location.name)}
           onTriggerClickAnimation={() => triggerClickAnimation(element.location.name)}
+          characterMeterFrameResolver={characterMeterFrameResolver}
+          containerDimensions={{ width: stageWidth, height: stageHeight }}
         />
       ))}
     </div>
@@ -860,6 +878,13 @@ interface PositionedElementProps {
   animatedPosition?: { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean };
   /** Callback to trigger onClick animations */
   onTriggerClickAnimation?: () => void;
+  /** Resolver function to get meter frame data for a character (for HUD display) */
+  characterMeterFrameResolver?: (characterId: string) => {
+    counters: MeterCounterData[];
+    config: MeterFrameConfig;
+  } | null;
+  /** Container dimensions for screen-docked meter frames */
+  containerDimensions?: { width: number; height: number };
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -882,6 +907,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   soundBlobResolver,
   animatedPosition,
   onTriggerClickAnimation,
+  characterMeterFrameResolver,
+  containerDimensions,
 }) => {
   const { location, content, assetUrl, hyperlinks } = element;
 
@@ -1079,7 +1106,49 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         />
       );
 
-    case 'character':
+    case 'character': {
+      // Get meter frame data if character has one configured
+      // Debug logging for meter frame
+      console.log('[PositionedElement] Character location:', {
+        name: location.name,
+        characterId: location.characterId,
+        hasResolver: !!characterMeterFrameResolver
+      });
+
+      const meterFrameData = location.characterId && characterMeterFrameResolver
+        ? characterMeterFrameResolver(location.characterId)
+        : null;
+
+      console.log('[PositionedElement] Meter frame data:', meterFrameData);
+
+      return (
+        <>
+          <AssetElement
+            style={baseStyle}
+            assetUrl={assetUrl}
+            assetId={location.assetId}
+            name={location.name}
+            kind={location.kind}
+            size={location.size}
+            interactive={interactive}
+            actionId={element.actionId}
+            onAction={onAction}
+            sound={(location as any).soundAssetId || location.sound}
+            soundBlobResolver={soundBlobResolver}
+          />
+          {meterFrameData && meterFrameData.counters.length > 0 && (
+            <CharacterMeterFrame
+              counters={meterFrameData.counters}
+              config={meterFrameData.config}
+              characterPosition={{ x: effectiveX, y: effectiveY }}
+              characterDimensions={{ width: location.width, height: location.height }}
+              containerDimensions={containerDimensions}
+            />
+          )}
+        </>
+      );
+    }
+
     case 'prop':
       return (
         <AssetElement
@@ -1094,6 +1163,18 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           onAction={onAction}
           sound={(location as any).soundAssetId || location.sound}
           soundBlobResolver={soundBlobResolver}
+        />
+      );
+
+    case 'meter':
+      return (
+        <MeterElement
+          style={baseStyle}
+          location={location}
+          counterValue={element.counterValue ?? 0}
+          counterMin={element.counterMin ?? 0}
+          counterMax={element.counterMax ?? 100}
+          theme={theme}
         />
       );
 
@@ -1992,6 +2073,102 @@ const AssetElement: React.FC<{
 };
 
 /**
+ * Meter element renderer - displays a counter value as a level meter bar
+ */
+const MeterElement: React.FC<{
+  style: React.CSSProperties;
+  location: Location;
+  counterValue: number;
+  counterMin: number;
+  counterMax: number;
+  theme: RenderThemeSettings;
+}> = ({ style, location, counterValue, counterMin, counterMax, theme }) => {
+  const isHorizontal = location.meterOrientation !== 'vertical';
+  const percentage = counterMax > counterMin
+    ? Math.min(100, Math.max(0, ((counterValue - counterMin) / (counterMax - counterMin)) * 100))
+    : 0;
+
+  const barColor = location.meterColor || '#3B82F6';
+  const bgColor = location.meterBackgroundColor || 'rgba(255, 255, 255, 0.3)';
+
+  // Format numeric value based on format setting
+  const formatValue = () => {
+    if (!location.showNumericValue) return null;
+    switch (location.numericFormat) {
+      case 'fraction':
+        return `${counterValue}/${counterMax}`;
+      case 'percentage':
+        return `${Math.round(percentage)}%`;
+      default:
+        return `${counterValue}`;
+    }
+  };
+
+  const numericDisplay = formatValue();
+
+  return (
+    <div style={style}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: isHorizontal ? 'row' : 'column',
+          alignItems: 'center',
+          gap: '6px',
+          width: '100%',
+          height: '100%',
+        }}
+      >
+        {/* Bar container */}
+        <div
+          style={{
+            flex: 1,
+            width: isHorizontal ? '100%' : undefined,
+            height: isHorizontal ? '100%' : '100%',
+            minWidth: isHorizontal ? undefined : '100%',
+            backgroundColor: bgColor,
+            borderRadius: '4px',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: isHorizontal ? 'row' : 'column-reverse',
+            border: '1px solid rgba(0, 0, 0, 0.2)',
+            boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          {/* Fill bar */}
+          <div
+            style={{
+              width: isHorizontal ? `${percentage}%` : '100%',
+              height: isHorizontal ? '100%' : `${percentage}%`,
+              backgroundColor: barColor,
+              borderRadius: '3px',
+              transition: 'all 300ms ease-out',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
+            }}
+          />
+        </div>
+
+        {/* Numeric value display */}
+        {numericDisplay && (
+          <span
+            style={{
+              fontSize: '12px',
+              fontWeight: 'bold',
+              color: theme.colors.textColor,
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+              minWidth: isHorizontal ? '40px' : undefined,
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {numericDisplay}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
  * Helper function to create positioned element data from locations and content
  * @param assetResolver Optional function to resolve asset IDs to URLs
  */
@@ -2024,7 +2201,8 @@ export function createPositionedElementData(
   content: Record<string, any>,
   beatType: string,
   assetResolver?: (assetId: string) => string | undefined,
-  characterResolver?: (characterId: string, stateId?: string) => string | undefined
+  characterResolver?: (characterId: string, stateId?: string) => string | undefined,
+  counterResolver?: (counterName: string) => { value: number; min: number; max: number } | null
 ): PositionedElementData[] {
   console.log('[createPositionedElementData] Creating elements:', { beatType, content, locationCount: locations.length });
 
@@ -2181,6 +2359,19 @@ export function createPositionedElementData(
       }
     }
 
+    // Resolve counter values for meter elements
+    let counterValue: number | undefined;
+    let counterMin: number | undefined;
+    let counterMax: number | undefined;
+    if (location.kind === 'meter' && location.counterName && counterResolver) {
+      const counterData = counterResolver(location.counterName);
+      if (counterData) {
+        counterValue = counterData.value;
+        counterMin = counterData.min;
+        counterMax = counterData.max;
+      }
+    }
+
     return {
       location,
       content: elementContent,
@@ -2188,6 +2379,9 @@ export function createPositionedElementData(
       actionId,
       targetBeatId, // Include target beat ID for visited marking
       hyperlinks,
+      counterValue,
+      counterMin,
+      counterMax,
     };
   });
 }

@@ -50,7 +50,7 @@ function resolveCharacterImageUrl(
 
 export interface VisualElement {
   id: string;
-  type: 'character' | 'prop' | 'text' | 'hotspot' | 'dialog' | 'button';
+  type: 'character' | 'prop' | 'text' | 'hotspot' | 'dialog' | 'button' | 'meter';
   assetId?: string;
   assetUrl?: string; // Resolved URL from assetId or character state (for rendering)
   imageUrl?: string; // Direct image URL (for base64 data or when assetId is not available)
@@ -85,6 +85,13 @@ export interface VisualElement {
     opacity?: number;  // 0-100 percentage
     showInPreview?: 'visible' | 'onHover' | 'invisible';
   };
+  // Meter-specific properties (for type='meter')
+  counterName?: string;      // Name of the counter to display
+  meterOrientation?: 'horizontal' | 'vertical';
+  showNumericValue?: boolean;
+  numericFormat?: 'value' | 'fraction' | 'percentage';
+  meterColor?: string;       // Bar fill color
+  meterBackgroundColor?: string;  // Bar background color
 }
 
 interface VisualBeatEditorProps {
@@ -195,6 +202,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       // Pass content directly from visual element (for phase-aware rendering)
       // Use el.content if explicitly set, otherwise fall back to el.text
       content: el.content || el.text,
+      // Meter-specific fields
+      counterName: el.counterName,
+      meterOrientation: el.meterOrientation,
+      showNumericValue: el.showNumericValue,
+      numericFormat: el.numericFormat,
+      meterColor: el.meterColor,
+      meterBackgroundColor: el.meterBackgroundColor,
     }));
 
   // Asset resolver function to look up asset URLs by ID

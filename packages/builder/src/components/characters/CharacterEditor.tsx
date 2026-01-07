@@ -24,9 +24,10 @@ import {
   Info,
   BarChart3,
   ArrowLeftRight,
-  ArrowUpDown
+  ArrowUpDown,
+  Hash
 } from 'lucide-react';
-import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation } from '../../types/character';
+import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG } from '../../types/character';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
 
@@ -566,6 +567,13 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 placeholder="Display name"
               />
             </div>
+            {/* Value / Min / Max labels */}
+            <div className="grid grid-cols-4 gap-2 mb-1">
+              <label className="text-xs text-gray-500">Initial</label>
+              <label className="text-xs text-gray-500">Min</label>
+              <label className="text-xs text-gray-500">Max</label>
+              <label className="text-xs text-gray-500"></label>
+            </div>
             <div className="grid grid-cols-4 gap-2 mb-2">
               <input
                 type="number"
@@ -576,7 +584,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                   setEditedCharacter({ ...editedCharacter, counters: newCounters });
                 }}
                 className="px-2 py-1 border rounded text-sm"
-                placeholder="Value"
+                placeholder="0"
               />
               <input
                 type="number"
@@ -587,7 +595,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                   setEditedCharacter({ ...editedCharacter, counters: newCounters });
                 }}
                 className="px-2 py-1 border rounded text-sm"
-                placeholder="Min"
+                placeholder="0"
               />
               <input
                 type="number"
@@ -598,7 +606,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                   setEditedCharacter({ ...editedCharacter, counters: newCounters });
                 }}
                 className="px-2 py-1 border rounded text-sm"
-                placeholder="Max"
+                placeholder="100"
               />
               <div className="flex items-center gap-2">
                 <button
@@ -651,43 +659,442 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 <span className="text-gray-600">Show Level Meter</span>
               </label>
               {counter.showLevelMeter && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Orientation:</span>
-                  <button
-                    onClick={() => {
-                      const newCounters = [...editedCharacter.counters];
-                      newCounters[index] = { ...counter, levelMeterOrientation: 'horizontal' };
-                      setEditedCharacter({ ...editedCharacter, counters: newCounters });
-                    }}
-                    className={`p-1.5 rounded transition-colors ${
-                      (counter.levelMeterOrientation || 'horizontal') === 'horizontal'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'hover:bg-gray-100 text-gray-500'
-                    }`}
-                    title="Horizontal"
-                  >
-                    <ArrowLeftRight className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      const newCounters = [...editedCharacter.counters];
-                      newCounters[index] = { ...counter, levelMeterOrientation: 'vertical' };
-                      setEditedCharacter({ ...editedCharacter, counters: newCounters });
-                    }}
-                    className={`p-1.5 rounded transition-colors ${
-                      counter.levelMeterOrientation === 'vertical'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'hover:bg-gray-100 text-gray-500'
-                    }`}
-                    title="Vertical"
-                  >
-                    <ArrowUpDown className="w-4 h-4" />
-                  </button>
-                </div>
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">Orientation:</span>
+                    <button
+                      onClick={() => {
+                        const newCounters = [...editedCharacter.counters];
+                        newCounters[index] = { ...counter, levelMeterOrientation: 'horizontal' };
+                        setEditedCharacter({ ...editedCharacter, counters: newCounters });
+                      }}
+                      className={`p-1.5 rounded transition-colors ${
+                        (counter.levelMeterOrientation || 'horizontal') === 'horizontal'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'hover:bg-gray-100 text-gray-500'
+                      }`}
+                      title="Horizontal"
+                    >
+                      <ArrowLeftRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newCounters = [...editedCharacter.counters];
+                        newCounters[index] = { ...counter, levelMeterOrientation: 'vertical' };
+                        setEditedCharacter({ ...editedCharacter, counters: newCounters });
+                      }}
+                      className={`p-1.5 rounded transition-colors ${
+                        counter.levelMeterOrientation === 'vertical'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'hover:bg-gray-100 text-gray-500'
+                      }`}
+                      title="Vertical"
+                    >
+                      <ArrowUpDown className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {/* Numeric value toggle */}
+                  <label className="flex items-center gap-2 text-sm ml-2">
+                    <input
+                      type="checkbox"
+                      checked={counter.showNumericValue || false}
+                      onChange={(e) => {
+                        const newCounters = [...editedCharacter.counters];
+                        newCounters[index] = { ...counter, showNumericValue: e.target.checked };
+                        setEditedCharacter({ ...editedCharacter, counters: newCounters });
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <Hash className="w-4 h-4 text-gray-500" />
+                    <span className="text-gray-600">Show Value</span>
+                  </label>
+                  {/* Numeric format selector */}
+                  {counter.showNumericValue && (
+                    <select
+                      value={counter.numericFormat || 'value'}
+                      onChange={(e) => {
+                        const newCounters = [...editedCharacter.counters];
+                        newCounters[index] = { ...counter, numericFormat: e.target.value as 'value' | 'fraction' | 'percentage' };
+                        setEditedCharacter({ ...editedCharacter, counters: newCounters });
+                      }}
+                      className="px-2 py-1 border rounded text-xs"
+                    >
+                      <option value="value">75</option>
+                      <option value="fraction">75/100</option>
+                      <option value="percentage">75%</option>
+                    </select>
+                  )}
+                </>
               )}
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Meter Frame Configuration */}
+      <div className="mt-6 pt-6 border-t">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-medium flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Meter Frame (HUD Overlay)
+          </h3>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={!!editedCharacter.meterFrame}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setEditedCharacter({
+                    ...editedCharacter,
+                    meterFrame: { ...DEFAULT_METER_FRAME_CONFIG }
+                  });
+                } else {
+                  const { meterFrame, ...rest } = editedCharacter;
+                  setEditedCharacter(rest as Character);
+                }
+              }}
+              className="rounded border-gray-300"
+            />
+            <span className="text-gray-600">Enable</span>
+          </label>
+        </div>
+
+        {editedCharacter.meterFrame && (
+          <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+            {/* Dock Mode Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Dock To</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      meterFrame: { ...editedCharacter.meterFrame!, dockMode: 'character' }
+                    });
+                  }}
+                  className={`flex-1 px-3 py-2 text-sm rounded border transition-colors ${
+                    (editedCharacter.meterFrame?.dockMode ?? 'character') === 'character'
+                      ? 'bg-blue-500 border-blue-600 text-white'
+                      : 'bg-white border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  Character
+                </button>
+                <button
+                  onClick={() => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      meterFrame: { ...editedCharacter.meterFrame!, dockMode: 'screen' }
+                    });
+                  }}
+                  className={`flex-1 px-3 py-2 text-sm rounded border transition-colors ${
+                    editedCharacter.meterFrame?.dockMode === 'screen'
+                      ? 'bg-blue-500 border-blue-600 text-white'
+                      : 'bg-white border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  Screen Corner
+                </button>
+              </div>
+            </div>
+
+            {/* Character Anchor Position (shown when dockMode is 'character') */}
+            {(editedCharacter.meterFrame?.dockMode ?? 'character') === 'character' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Anchor Position</label>
+                <div className="grid grid-cols-3 gap-1 w-32">
+                  {(['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'] as const).map((pos) => {
+                    const isAnchor = pos !== 'center' && pos !== 'left' && pos !== 'right' ? pos : (pos === 'left' ? 'left' : (pos === 'right' ? 'right' : null));
+                    if (pos === 'center') {
+                      return <div key={pos} className="w-10 h-10 border border-dashed border-gray-300 rounded bg-gray-200" />;
+                    }
+                    return (
+                      <button
+                        key={pos}
+                        onClick={() => {
+                          if (isAnchor) {
+                            setEditedCharacter({
+                              ...editedCharacter,
+                              meterFrame: { ...editedCharacter.meterFrame!, anchor: isAnchor as MeterFrameAnchor }
+                            });
+                          }
+                        }}
+                        className={`w-10 h-10 border rounded transition-colors ${
+                          editedCharacter.meterFrame?.anchor === pos
+                            ? 'bg-blue-500 border-blue-600 text-white'
+                            : 'bg-white border-gray-300 hover:bg-gray-100'
+                        }`}
+                        title={pos}
+                      >
+                        <div className={`w-2 h-2 mx-auto rounded-full ${
+                          editedCharacter.meterFrame?.anchor === pos ? 'bg-white' : 'bg-gray-400'
+                        }`} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Screen Corner Position (shown when dockMode is 'screen') */}
+            {editedCharacter.meterFrame?.dockMode === 'screen' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Screen Corner</label>
+                <div className="grid grid-cols-2 gap-2 w-48">
+                  {([
+                    { pos: 'screen-top-left', label: 'Top Left' },
+                    { pos: 'screen-top-right', label: 'Top Right' },
+                    { pos: 'screen-bottom-left', label: 'Bottom Left' },
+                    { pos: 'screen-bottom-right', label: 'Bottom Right' }
+                  ] as const).map(({ pos, label }) => (
+                    <button
+                      key={pos}
+                      onClick={() => {
+                        setEditedCharacter({
+                          ...editedCharacter,
+                          meterFrame: { ...editedCharacter.meterFrame!, screenPosition: pos as MeterFrameScreenPosition }
+                        });
+                      }}
+                      className={`px-3 py-2 text-sm border rounded transition-colors ${
+                        (editedCharacter.meterFrame?.screenPosition ?? 'screen-top-left') === pos
+                          ? 'bg-blue-500 border-blue-600 text-white'
+                          : 'bg-white border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Offset */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Offset X</label>
+                <input
+                  type="number"
+                  value={editedCharacter.meterFrame.offset.x}
+                  onChange={(e) => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      meterFrame: {
+                        ...editedCharacter.meterFrame!,
+                        offset: { ...editedCharacter.meterFrame!.offset, x: parseInt(e.target.value) || 0 }
+                      }
+                    });
+                  }}
+                  className="w-full px-2 py-1 border rounded text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Offset Y</label>
+                <input
+                  type="number"
+                  value={editedCharacter.meterFrame.offset.y}
+                  onChange={(e) => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      meterFrame: {
+                        ...editedCharacter.meterFrame!,
+                        offset: { ...editedCharacter.meterFrame!.offset, y: parseInt(e.target.value) || 0 }
+                      }
+                    });
+                  }}
+                  className="w-full px-2 py-1 border rounded text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Style Settings */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-gray-700">Style</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Background</label>
+                  <input
+                    type="text"
+                    value={editedCharacter.meterFrame.style.backgroundColor}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        meterFrame: {
+                          ...editedCharacter.meterFrame!,
+                          style: { ...editedCharacter.meterFrame!.style, backgroundColor: e.target.value }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Border Color</label>
+                  <input
+                    type="color"
+                    value={editedCharacter.meterFrame.style.borderColor}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        meterFrame: {
+                          ...editedCharacter.meterFrame!,
+                          style: { ...editedCharacter.meterFrame!.style, borderColor: e.target.value }
+                        }
+                      });
+                    }}
+                    className="w-full h-8 border rounded cursor-pointer"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Border</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={editedCharacter.meterFrame.style.borderWidth}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        meterFrame: {
+                          ...editedCharacter.meterFrame!,
+                          style: { ...editedCharacter.meterFrame!.style, borderWidth: parseInt(e.target.value) || 0 }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Radius</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={editedCharacter.meterFrame.style.borderRadius}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        meterFrame: {
+                          ...editedCharacter.meterFrame!,
+                          style: { ...editedCharacter.meterFrame!.style, borderRadius: parseInt(e.target.value) || 0 }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Padding</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={editedCharacter.meterFrame.style.padding}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        meterFrame: {
+                          ...editedCharacter.meterFrame!,
+                          style: { ...editedCharacter.meterFrame!.style, padding: parseInt(e.target.value) || 0 }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Opacity</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editedCharacter.meterFrame.style.opacity}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        meterFrame: {
+                          ...editedCharacter.meterFrame!,
+                          style: { ...editedCharacter.meterFrame!.style, opacity: parseInt(e.target.value) || 0 }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Display Settings */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-gray-700">Display</h4>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={editedCharacter.meterFrame.showLabels}
+                  onChange={(e) => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      meterFrame: { ...editedCharacter.meterFrame!, showLabels: e.target.checked }
+                    });
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-gray-600">Show Labels</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Meter Width</label>
+                  <input
+                    type="number"
+                    min="50"
+                    max="300"
+                    value={editedCharacter.meterFrame.meterWidth}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        meterFrame: { ...editedCharacter.meterFrame!, meterWidth: parseInt(e.target.value) || 100 }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Meter Height</label>
+                  <input
+                    type="number"
+                    min="4"
+                    max="30"
+                    value={editedCharacter.meterFrame.meterHeight}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        meterFrame: { ...editedCharacter.meterFrame!, meterHeight: parseInt(e.target.value) || 12 }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Spacing</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={editedCharacter.meterFrame.meterSpacing}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        meterFrame: { ...editedCharacter.meterFrame!, meterSpacing: parseInt(e.target.value) || 6 }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

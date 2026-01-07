@@ -4,6 +4,7 @@ import { BaseRenderer } from './BaseRenderer';
 import type { Location, AnimationPath } from '@asaps/core';
 import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
+import type { MeterCounterData, MeterFrameConfig } from '../components/CharacterMeterFrame';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 
 // ============= SCALED STAGE COMPONENT =============
@@ -549,6 +550,8 @@ export class ReactRenderer extends BaseRenderer {
   protected backgroundImageUrl: string | null = null;  // Changed to protected
   private assetResolver: ((assetId: string) => string | undefined) | null = null;  // NEW: Asset resolver function
   private characterResolver: ((characterId: string, stateId?: string) => string | undefined) | null = null;  // NEW: Character state resolver
+  private counterResolver: ((counterName: string) => { value: number; min: number; max: number } | null) | null = null;  // NEW: Counter value resolver
+  private characterMeterFrameResolver: ((characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig } | null) | null = null;  // NEW: Character meter frame resolver
   // soundBlobResolver is inherited from BaseRenderer
   protected hideTextBoxes: boolean = false;  // NEW: Whether to hide text box backgrounds
   protected hideButtonBoxes: boolean = false;  // NEW: Whether to hide button box backgrounds
@@ -641,6 +644,24 @@ export class ReactRenderer extends BaseRenderer {
    */
   setCharacterResolver(resolver: (characterId: string, stateId?: string) => string | undefined): void {
     this.characterResolver = resolver;
+  }
+
+  /**
+   * Set the counter resolver function
+   * This allows the renderer to get counter values for meter elements
+   * The resolver should look up the counter and return { value, min, max }
+   */
+  setCounterResolver(resolver: (counterName: string) => { value: number; min: number; max: number } | null): void {
+    this.counterResolver = resolver;
+  }
+
+  /**
+   * Set the character meter frame resolver function
+   * This allows the renderer to get meter frame data for character HUD overlays
+   * The resolver should look up the character and return { counters, config }
+   */
+  setCharacterMeterFrameResolver(resolver: (characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig } | null): void {
+    this.characterMeterFrameResolver = resolver;
   }
 
   /**
@@ -738,13 +759,14 @@ export class ReactRenderer extends BaseRenderer {
         resolve('');
       }
 
-      // Create element data using the shared helper, passing the asset and character resolvers
+      // Create element data using the shared helper, passing the asset, character, and counter resolvers
       const elements: PositionedElementData[] = createPositionedElementData(
         locations,
         content,
         beatType,
         this.assetResolver || undefined,
-        this.characterResolver || undefined
+        this.characterResolver || undefined,
+        this.counterResolver || undefined
       );
 
       // Determine background - consistent for all beat types
@@ -787,6 +809,7 @@ export class ReactRenderer extends BaseRenderer {
               showTextOnHover={showTextOnHover}
               soundBlobResolver={this.soundBlobResolver || undefined}
               animations={effectiveAnimations}
+              characterMeterFrameResolver={this.characterMeterFrameResolver || undefined}
             />
           </ScaledStage>
         </div>

@@ -18,6 +18,7 @@ import {
   RotateCw,
   Maximize2,
   Volume2,
+  BarChart3,
 } from 'lucide-react';
 import { getAllPresetSounds, isPresetSound, getPresetSound, type PresetSound } from '@asaps/core';
 import type { Asset } from '../assets/AssetManager';
@@ -37,7 +38,7 @@ interface VisualPropertiesPanelProps {
   onElementSelect: (elementId: string | null) => void;
   onElementUpdate: (elementId: string, updates: Partial<VisualElement>) => void;
   onElementDelete: (elementId: string) => void;
-  onElementAdd: (type: 'character' | 'prop' | 'text' | 'hotspot') => void;
+  onElementAdd: (type: 'character' | 'prop' | 'text' | 'hotspot' | 'meter') => void;
   onElementReorder: (elementId: string, direction: 'up' | 'down') => void;
   onSelectAsset?: (assetType: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => void;
   assets: Asset[];
@@ -309,6 +310,17 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   >
                     <MousePointer className="w-3 h-3" />
                     Hotspot
+                  </button>
+                )}
+                {/* Counter Meter button - only show if characters have counters with meters enabled */}
+                {characters.some(c => c.counters?.some(counter => counter.showLevelMeter)) && (
+                  <button
+                    onClick={() => onElementAdd('meter')}
+                    className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"
+                    title="Add counter level meter"
+                  >
+                    <BarChart3 className="w-3 h-3" />
+                    Meter
                   </button>
                 )}
               </div>

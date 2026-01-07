@@ -36,6 +36,10 @@ export interface Character {
   color?: string; // Theme color for UI
   createdAt: string;
   updatedAt: string;
+
+  // Meter Frame Configuration
+  /** Configuration for grouped meter display (HUD overlay) */
+  meterFrame?: MeterFrameConfig;
 }
 
 export interface CharacterState {
@@ -71,7 +75,87 @@ export interface CharacterCounter {
   showLevelMeter?: boolean;
   /** Level meter orientation */
   levelMeterOrientation?: 'horizontal' | 'vertical';
+  /** Show numeric value alongside level meter */
+  showNumericValue?: boolean;
+  /** Numeric display format: 'value' (75), 'fraction' (75/100), 'percentage' (75%) */
+  numericFormat?: 'value' | 'fraction' | 'percentage';
 }
+
+// ============================================
+// Meter Frame Types
+// ============================================
+
+/**
+ * Dock mode: relative to character or fixed to screen corner
+ */
+export type MeterFrameDockMode = 'character' | 'screen';
+
+/**
+ * Anchor position for meter frame relative to character
+ */
+export type MeterFrameAnchor =
+  | 'top' | 'bottom' | 'left' | 'right'
+  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+/**
+ * Screen corner positions for fixed docking
+ */
+export type MeterFrameScreenPosition =
+  | 'screen-top-left' | 'screen-top-right'
+  | 'screen-bottom-left' | 'screen-bottom-right';
+
+/**
+ * Configuration for the grouped meter frame that displays character counters
+ */
+export interface MeterFrameConfig {
+  /** Dock mode: 'character' follows the character, 'screen' is fixed to a corner */
+  dockMode: MeterFrameDockMode;
+  /** Anchor position relative to character (used when dockMode is 'character') */
+  anchor: MeterFrameAnchor;
+  /** Screen corner position (used when dockMode is 'screen') */
+  screenPosition: MeterFrameScreenPosition;
+  /** Offset from anchor/corner position in pixels */
+  offset: { x: number; y: number };
+  /** Visual style settings */
+  style: {
+    backgroundColor: string;
+    borderColor: string;
+    borderWidth: number;
+    borderRadius: number;
+    padding: number;
+    opacity: number;  // 0-100
+  };
+  /** Height of each meter bar in pixels */
+  meterHeight: number;
+  /** Gap between meters in pixels */
+  meterSpacing: number;
+  /** Show displayName label for each counter */
+  showLabels: boolean;
+  /** Width of meter bars in pixels */
+  meterWidth: number;
+}
+
+/**
+ * Default configuration for meter frames
+ */
+export const DEFAULT_METER_FRAME_CONFIG: MeterFrameConfig = {
+  dockMode: 'character',
+  anchor: 'top',
+  screenPosition: 'screen-top-left',
+  offset: { x: 0, y: -10 },
+  style: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderColor: '#4a90d9',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 8,
+    opacity: 90,
+  },
+  meterHeight: 12,
+  meterSpacing: 6,
+  showLabels: true,
+  meterWidth: 100,
+};
 
 export interface InventoryItem {
   id: string;

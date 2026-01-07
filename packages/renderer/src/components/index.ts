@@ -6,3 +6,14 @@ export {
   type PositionedElementData,
   type RenderThemeSettings
 } from './PositionedBeatView';
+
+export {
+  CharacterMeterFrame,
+  type CharacterMeterFrameProps,
+  type MeterFrameConfig,
+  type MeterFrameAnchor,
+  type MeterFrameScreenPosition,
+  type MeterFrameDockMode,
+  type MeterFrameStyle,
+  type MeterCounterData
+} from './CharacterMeterFrame';

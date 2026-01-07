@@ -61,6 +61,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   // Store as ReactRenderer, cast to any when passing to StoryEngine to bypass type checking
   const rendererRef = useRef<ReactRenderer | null>(null);
   const engineRef = useRef<StoryEngine | null>(null);
+  const countersRef = useRef<Record<string, number>>({});  // Ref to hold latest counter values for resolver
 
   // State preset management
   const [activeTab, setActiveTab] = useState<'preview' | 'presets'>('preview');
@@ -193,6 +194,13 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
     setScale(fitScale);
   }, [fitScale]);
 
+  // Keep countersRef updated with latest counter values for the counter resolver
+  useEffect(() => {
+    if (debugInfo.counters) {
+      countersRef.current = debugInfo.counters;
+    }
+  }, [debugInfo.counters]);
+
   useEffect(() => {
     // Only initialize once when container is ready
     if (!containerRef.current) return;
@@ -288,6 +296,66 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
           return undefined;
         });
         console.log('[StoryPreview] Character resolver set up with', characters.length, 'characters');
+      }
+
+      // Set up counter resolver to get counter values for meter elements
+      // Uses countersRef which is updated whenever counters change during playback
+      if (characters && characters.length > 0) {
+        (reactRenderer as any).setCounterResolver((counterName: string) => {
+          // Get current counter value from ref (updated during playback)
+          const value = countersRef.current[counterName] ?? 0;
+
+          // Find counter definition from characters to get min/max
+          const counterDef = characters.flatMap(c => c.counters || []).find(c => c.name === counterName);
+
+          return {
+            value,
+            min: counterDef?.min ?? 0,
+            max: counterDef?.max ?? 100,
+          };
+        });
+        console.log('[StoryPreview] Counter resolver set up');
+      }
+
+      // Set up character meter frame resolver for HUD overlays
+      if (characters && characters.length > 0) {
+        console.log('[StoryPreview] Setting up meter frame resolver with characters:', characters.map(c => ({ id: c.id, name: c.name, hasMeterFrame: !!c.meterFrame })));
+        (reactRenderer as any).setCharacterMeterFrameResolver((characterId: string) => {
+          console.log('[StoryPreview] Meter frame resolver called for characterId:', characterId);
+          const character = characters.find(c => c.id === characterId);
+          console.log('[StoryPreview] Found character:', character ? { id: character.id, name: character.name, hasMeterFrame: !!character.meterFrame, counters: character.counters?.length } : null);
+          if (!character || !character.meterFrame) {
+            console.log('[StoryPreview] No character or no meterFrame config');
+            return null;
+          }
+
+          // Filter to visible counters with showLevelMeter enabled
+          const visibleCounters = character.counters.filter(c => c.visible && c.showLevelMeter);
+          console.log('[StoryPreview] Visible counters with showLevelMeter:', visibleCounters.length);
+          if (visibleCounters.length === 0) {
+            console.log('[StoryPreview] No visible counters with showLevelMeter');
+            return null;
+          }
+
+          // Build counter data with current values
+          const counters = visibleCounters.map(counter => ({
+            name: counter.name,
+            displayName: counter.displayName,
+            value: countersRef.current[counter.name] ?? counter.value,
+            min: counter.min ?? 0,
+            max: counter.max ?? 100,
+            color: counter.color || '#3B82F6',
+            showNumericValue: counter.showNumericValue ?? false,
+            numericFormat: counter.numericFormat || 'value',
+            orientation: counter.levelMeterOrientation || 'horizontal',
+          }));
+
+          return {
+            counters,
+            config: character.meterFrame,
+          };
+        });
+        console.log('[StoryPreview] Character meter frame resolver set up');
       }
 
       // Set up sound blob resolver to load sound assets from storage
