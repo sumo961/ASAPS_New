@@ -325,8 +325,8 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
             return null;
           }
 
-          // Filter to visible counters with showLevelMeter enabled
-          const visibleCounters = character.counters.filter(c => c.visible && c.showLevelMeter);
+          // Filter to visible counters - when meter frame is enabled, show all visible counters
+          const visibleCounters = character.counters.filter(c => c.visible);
           if (visibleCounters.length === 0) {
             return null;
           }
