@@ -1,0 +1,143 @@
+name: Build Desktop Apps
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (without v prefix)'
+        required: false
+        default: ''
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Build Electron app
+        working-directory: apps/builder-desktop
+        run: |
+          npm run build:electron
+          npm run copy-builder
+
+      - name: Package macOS Universal
+        working-directory: apps/builder-desktop
+        run: npx electron-builder --mac --universal
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: apps/builder-desktop/release/*.dmg
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Build Electron app
+        working-directory: apps/builder-desktop
+        run: npm run build:electron
+
+      - name: Copy builder files (Windows)
+        working-directory: apps/builder-desktop
+        run: |
+          if (Test-Path builder) { Remove-Item -Recurse -Force builder }
+          Copy-Item -Recurse ../../packages/builder/dist builder
+        shell: pwsh
+
+      - name: Package Windows
+        working-directory: apps/builder-desktop
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: apps/builder-desktop/release/*.exe
+          if-no-files-found: error
+
+  release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-universal
+          path: release
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-x64
+          path: release
+
+      - name: Get version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ASAPS Builder v${{ steps.version.outputs.version }}
+          draft: true
+          files: |
+            release/*.dmg
+            release/*.exe
+          body: |
+            ## ASAPS Builder v${{ steps.version.outputs.version }}
+
+            ### Downloads
+            - **macOS** (Universal - Intel & Apple Silicon): `ASAPS Builder-${{ steps.version.outputs.version }}-universal.dmg`
+            - **Windows** (64-bit): `ASAPS Builder Setup ${{ steps.version.outputs.version }}.exe`
+
+            ### Installation
+            **macOS**: Open the DMG and drag `ASAPS Builder.app` to Applications.
+            **Windows**: Run the installer and follow the prompts.
+
+            ### What's New
+            <!-- Add release notes here before publishing -->
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

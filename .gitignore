@@ -96,3 +96,7 @@ Cargo.lock
 
 # Electron build artifacts
 **/dist-electron/
+**/release/
+*.exe
+*.exe.blockmap
+builder-debug.yml
