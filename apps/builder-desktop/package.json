@@ -4,6 +4,10 @@
   "description": "ASAPS Desktop Builder - Native authoring tool for macOS and Windows",
   "author": "Hartmut Koenitz",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sumo961/ASAPS_New.git"
+  },
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "concurrently \"npm run dev -w @asaps/builder\" \"sleep 3 && NODE_ENV=development electron .\"",
