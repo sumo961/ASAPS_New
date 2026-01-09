@@ -350,12 +350,12 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 />
               ) : (
                 <div className="relative">
-                  <div className="border-2 border-gray-300 rounded-lg overflow-hidden" 
-                       style={{ maxHeight: '200px', backgroundImage: 'repeating-conic-gradient(#f0f0f0 0% 25%, white 0% 50%)', backgroundSize: '20px 20px' }}>
-                    <img 
-                      src={editedCharacter.visual.spriteSheet.url} 
+                  <div className="border-2 border-gray-300 rounded-lg overflow-hidden"
+                       style={{ maxHeight: '100px', maxWidth: '200px', backgroundImage: 'repeating-conic-gradient(#f0f0f0 0% 25%, white 0% 50%)', backgroundSize: '10px 10px' }}>
+                    <img
+                      src={editedCharacter.visual.spriteSheet.url}
                       alt="Sprite Sheet"
-                      className="w-full object-contain"
+                      className="max-w-full max-h-[100px] object-contain"
                       style={{ imageRendering: 'pixelated' }}
                     />
                   </div>

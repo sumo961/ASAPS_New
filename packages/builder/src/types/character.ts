@@ -18,6 +18,8 @@ export interface Character {
       url: string;
       frameWidth: number;
       frameHeight: number;
+      imageWidth?: number;  // Full sprite sheet image width (for frame position calculation)
+      imageHeight?: number; // Full sprite sheet image height
       animations: SpriteAnimation[];
     };
   };

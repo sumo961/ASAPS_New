@@ -13,6 +13,7 @@ import type { AnimationPath } from '@asaps/core';
 import { AnimationPathEditor } from '../animation/AnimationPathEditor';
 import { Play, Edit, Trash2, Plus } from 'lucide-react';
 import type { VisualElement } from './VisualBeatEditor';
+import type { Character } from '../../types/character';
 
 interface AnimationPanelProps {
   /** Current animations for this beat */
@@ -28,6 +29,9 @@ interface AnimationPanelProps {
   /** Background image URL for reference */
   backgroundUrl?: string;
 
+  /** Characters for spritesheet animation data */
+  characters?: Character[];
+
   /** Callback when animations are updated */
   onAnimationsChange: (animations: AnimationPath[]) => void;
 }
@@ -38,6 +42,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
   stageWidth,
   stageHeight,
   backgroundUrl,
+  characters = [],
   onAnimationsChange,
 }) => {
   const [editingAnimation, setEditingAnimation] = useState<AnimationPath | null>(null);
@@ -84,8 +89,8 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
   };
 
   const getElementName = (elementId: string): string => {
-    // Look up by name (which is what elementId now represents) or fall back to id
-    const element = elements.find(el => el.name === elementId || el.id === elementId);
+    // Look up by id (primary) or fall back to name for backward compatibility
+    const element = elements.find(el => el.id === elementId || el.name === elementId);
     return element ? `${element.type} (${element.name || element.text || element.id.slice(0, 8)})` : elementId;
   };
 
@@ -107,7 +112,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
           >
             <option value="">Select an element...</option>
             {elements.map((element) => (
-              <option key={element.id} value={element.name}>
+              <option key={element.id} value={element.name || element.id}>
                 {element.type} - {element.name || element.text || element.id.slice(0, 8)}
               </option>
             ))}
@@ -211,6 +216,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
           stageHeight={stageHeight}
           backgroundUrl={backgroundUrl}
           elements={elements}
+          characters={characters}
           onSave={handleSaveAnimation}
           onClose={handleCloseEditor}
         />

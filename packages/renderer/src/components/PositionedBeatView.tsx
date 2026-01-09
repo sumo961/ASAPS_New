@@ -57,10 +57,36 @@ export interface HyperlinkData {
   };
 }
 
+/** Sprite animation definition for preview playback */
+export interface SpriteAnimationData {
+  name: string;
+  frames: number[];
+  frameDuration: number;
+  loop: boolean;
+}
+
+/** Sprite sheet configuration for rendering a specific frame */
+export interface SpriteSheetData {
+  /** Width of each frame in pixels */
+  frameWidth: number;
+  /** Height of each frame in pixels */
+  frameHeight: number;
+  /** Default frame index to display (0-based) */
+  defaultFrame?: number;
+  /** Full image width (for calculating columns) */
+  imageWidth?: number;
+  /** Available animations for this sprite */
+  animations?: SpriteAnimationData[];
+  /** Currently active animation name (enables frame cycling) */
+  activeAnimation?: string;
+}
+
 export interface PositionedElementData {
   location: Location;
   content: string;
   assetUrl?: string;
+  /** Sprite sheet configuration for character sprites */
+  spriteSheet?: SpriteSheetData;
   /** Optional action ID to return when this element is clicked (e.g., choice ID for movementChoice) */
   actionId?: string;
   /** Optional target beat ID for checking if this choice leads to a visited beat */
@@ -437,40 +463,72 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   const [animationsComplete, setAnimationsComplete] = React.useState(false);
 
   // State for tracking path animation positions
-  // Maps elementId to current animated position/transform
+  // Maps elementId to current animated position/transform including sprite animation state
   const [animatedPositions, setAnimatedPositions] = React.useState<
-    Record<string, { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean }>
+    Record<string, { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean; spriteAnimation?: string; spriteFrames?: number[]; spriteFrameDuration?: number; isAnimating?: boolean }>
   >({});
 
   // Track which animations have been started (by animation id)
   const startedAnimationsRef = React.useRef<Set<string>>(new Set());
+  // Track the previous animations key to detect actual changes
+  const prevAnimationsKeyRef = React.useRef<string>('');
+
+  // Create a stable key for animations to detect actual content changes
+  // This prevents animation restart when array reference changes but content is same
+  const animationsKey = React.useMemo(() => {
+    if (!animations || animations.length === 0) return '';
+    return animations.map(a => `${a.id}:${a.elementId}:${a.waypoints.length}`).join('|');
+  }, [animations]);
+
+  // Create a stable key for elements to detect beat changes
+  // When elements change (new beat), we need to reset animated positions
+  const elementsKey = React.useMemo(() => {
+    return elements.map(e => `${e.location.name}:${e.location.kind}`).join('|');
+  }, [elements]);
+  const prevElementsKeyRef = React.useRef<string>('');
+
+  // Reset animated positions when beat changes (elements change)
+  React.useEffect(() => {
+    if (prevElementsKeyRef.current !== elementsKey) {
+      // Beat changed - reset all animated positions so scale/rotation/opacity reset to defaults
+      setAnimatedPositions({});
+      startedAnimationsRef.current.clear();
+      prevElementsKeyRef.current = elementsKey;
+    }
+  }, [elementsKey]);
 
   // Path animation management effect
   React.useEffect(() => {
-    console.log('[PositionedBeatView] Animation effect triggered, animations:', animations?.length || 0, animations);
-
     if (!animations || animations.length === 0) {
       return;
     }
 
     const animationManager = getAnimationManager();
 
+    // Check if animations actually changed (not just array reference)
+    const animationsChanged = prevAnimationsKeyRef.current !== animationsKey;
+    if (animationsChanged) {
+      // Clear old state for new animations
+      startedAnimationsRef.current.clear();
+      setAnimatedPositions({});
+      prevAnimationsKeyRef.current = animationsKey;
+    }
+
     // Start animations that should auto-play on load
     animations.forEach((animation) => {
-      console.log('[PositionedBeatView] Processing animation:', animation.id, 'elementId:', animation.elementId, 'trigger:', animation.trigger, 'autoPlay:', animation.autoPlay, 'waypoints:', animation.waypoints?.length);
-      // Only start if not already started and has onLoad trigger or autoPlay
+      // Only start if not already started and has onLoad trigger (or no trigger = default to onLoad)
+      // Don't auto-start onClick or onVariable triggered animations - they wait for their trigger
       const alreadyStarted = startedAnimationsRef.current.has(animation.id);
-      const shouldStart = (animation.trigger === 'onLoad' || animation.autoPlay) && !alreadyStarted;
-      console.log('[PositionedBeatView] shouldStart:', shouldStart, 'alreadyStarted:', alreadyStarted);
+      const isOnLoadTrigger = animation.trigger === 'onLoad' || !animation.trigger;
+      const shouldStart = isOnLoadTrigger && !alreadyStarted;
 
       if (shouldStart) {
         startedAnimationsRef.current.add(animation.id);
-        console.log('[PositionedBeatView] Starting animation:', animation.id);
 
         animationManager.play(animation.id, animation, {
           onUpdate: (state: AnimationState) => {
-            console.log('[PositionedBeatView] Animation update:', animation.elementId, state.currentPosition);
-            // Update position for this element
+            // Update position for this element (using animation.elementId which is the stable element name)
+            // Include sprite animation state so correct animation plays per segment
             setAnimatedPositions(prev => ({
               ...prev,
               [animation.elementId]: {
@@ -481,62 +539,144 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                 opacity: state.currentTransform?.opacity,
                 flipX: state.currentTransform?.flipX,
                 flipY: state.currentTransform?.flipY,
+                spriteAnimation: state.currentTransform?.spriteAnimation,
+                spriteFrames: state.currentTransform?.spriteFrames,
+                spriteFrameDuration: state.currentTransform?.spriteFrameDuration,
+                isAnimating: true, // Animation is in progress
               }
             }));
           },
           onComplete: () => {
-            console.log('[PositionedBeatView] Animation complete:', animation.id);
-            // Animation finished - keep final position or remove if not looping
-            if (!animation.loop) {
-              // Keep the final position (already set by onUpdate)
-            }
+            // Animation finished - stop sprite animation but keep final position
+            setAnimatedPositions(prev => ({
+              ...prev,
+              [animation.elementId]: {
+                ...prev[animation.elementId],
+                spriteAnimation: undefined, // Stop sprite animation
+                spriteFrames: undefined,
+                spriteFrameDuration: undefined,
+                isAnimating: false, // Animation complete
+              }
+            }));
           }
         });
       }
     });
 
-    // Cleanup on unmount or when animations change
+    // Cleanup on unmount
     return () => {
       animations.forEach((animation) => {
         animationManager.stop(animation.id);
       });
-      startedAnimationsRef.current.clear();
-      setAnimatedPositions({});
     };
-  }, [animations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animationsKey]); // Use stable key to prevent restarts on array reference changes
 
   // Helper to get animated position for an element
-  const getAnimatedPosition = React.useCallback((elementId: string) => {
-    return animatedPositions[elementId];
+  // Prioritizes name (stable across save/reload) over id (dynamic)
+  const getAnimatedPosition = React.useCallback((elementId: string, elementName?: string) => {
+    // Try name first (animations use stable element names)
+    if (elementName && animatedPositions[elementName]) {
+      return animatedPositions[elementName];
+    }
+    // Fall back to id for backward compatibility
+    if (animatedPositions[elementId]) {
+      return animatedPositions[elementId];
+    }
+    return undefined;
   }, [animatedPositions]);
 
-  // Handler to trigger onClick animations for an element
-  const triggerClickAnimation = React.useCallback((elementId: string) => {
-    if (!animations) return;
+  // Check if an element has pending onClick animations (not yet triggered)
+  // This is used to suppress idle sprite animations until the onClick trigger fires
+  const hasPendingClickAnimation = React.useCallback((elementId: string, elementName?: string): boolean => {
+    if (!animations) return false;
 
-    const clickAnimations = animations.filter(
-      a => a.elementId === elementId && a.trigger === 'onClick'
-    );
+    // Find onClick animations that target this element (animate this element when something is clicked)
+    const pendingAnimations = animations.filter(a => {
+      if (a.trigger !== 'onClick') return false;
+
+      // Check if this animation animates the given element
+      return (elementName && a.elementId === elementName) || a.elementId === elementId;
+    });
+
+    if (pendingAnimations.length === 0) return false;
+
+    // Check if any of these animations have already started (animatedPositions has entry with isAnimating or completed)
+    const animatedPos = getAnimatedPosition(elementId, elementName);
+    // If we have animatedPosition, the animation has been triggered (either running or completed)
+    // If animatedPosition is undefined, the animation is still pending
+    return !animatedPos;
+  }, [animations, getAnimatedPosition]);
+
+  // Handler to trigger onClick animations for an element
+  // Returns a Promise that resolves when all animations complete (or immediately if no animations)
+  // Animations use stable element names for targeting
+  const triggerClickAnimation = React.useCallback((elementId: string, elementName?: string): Promise<void> => {
+    if (!animations) return Promise.resolve();
+
+    // Find animations triggered by clicking this element
+    // If animation has triggerElementId, use that; otherwise fall back to elementId (animate element itself)
+    const clickAnimations = animations.filter(a => {
+      if (a.trigger !== 'onClick') return false;
+
+      // Determine which element triggers this animation
+      const triggerElement = a.triggerElementId || a.elementId;
+
+      // Match by name (stable) or id (fallback for backward compatibility)
+      return (elementName && triggerElement === elementName) || triggerElement === elementId;
+    });
+
+    if (clickAnimations.length === 0) {
+      return Promise.resolve();
+    }
+
+    console.log(`[triggerClickAnimation] Found ${clickAnimations.length} onClick animations for element:`, elementName || elementId);
 
     const animationManager = getAnimationManager();
 
-    clickAnimations.forEach((animation) => {
-      animationManager.play(animation.id, animation, {
-        onUpdate: (state: AnimationState) => {
-          setAnimatedPositions(prev => ({
-            ...prev,
-            [animation.elementId]: {
-              x: state.currentPosition.x,
-              y: state.currentPosition.y,
-              scale: state.currentTransform?.scale,
-              rotation: state.currentTransform?.rotation,
-              opacity: state.currentTransform?.opacity,
-              flipX: state.currentTransform?.flipX,
-              flipY: state.currentTransform?.flipY,
-            }
-          }));
-        }
+    // Create a promise for each animation that resolves when it completes
+    const animationPromises = clickAnimations.map((animation) => {
+      return new Promise<void>((resolve) => {
+        animationManager.play(animation.id, animation, {
+          onUpdate: (state: AnimationState) => {
+            setAnimatedPositions(prev => ({
+              ...prev,
+              [animation.elementId]: {
+                x: state.currentPosition.x,
+                y: state.currentPosition.y,
+                scale: state.currentTransform?.scale,
+                rotation: state.currentTransform?.rotation,
+                opacity: state.currentTransform?.opacity,
+                flipX: state.currentTransform?.flipX,
+                flipY: state.currentTransform?.flipY,
+                spriteAnimation: state.currentTransform?.spriteAnimation,
+                spriteFrames: state.currentTransform?.spriteFrames,
+                spriteFrameDuration: state.currentTransform?.spriteFrameDuration,
+                isAnimating: true,
+              }
+            }));
+          },
+          onComplete: () => {
+            console.log(`[triggerClickAnimation] Animation completed for:`, animation.elementId);
+            setAnimatedPositions(prev => ({
+              ...prev,
+              [animation.elementId]: {
+                ...prev[animation.elementId],
+                spriteAnimation: undefined,
+                spriteFrames: undefined,
+                spriteFrameDuration: undefined,
+                isAnimating: false,
+              }
+            }));
+            resolve();
+          }
+        });
       });
+    });
+
+    // Return a promise that resolves when all animations complete
+    return Promise.all(animationPromises).then(() => {
+      console.log(`[triggerClickAnimation] All animations complete for:`, elementName || elementId);
     });
   }, [animations]);
   const [skipAnimation, setSkipAnimation] = React.useState(false);
@@ -690,8 +830,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             previewMode={false} // Keep absolute for assets
             visitedBeats={visitedBeats}
             showTextOnHover={showTextOnHover}
-            animatedPosition={getAnimatedPosition(element.location.name)}
-            onTriggerClickAnimation={() => triggerClickAnimation(element.location.name)}
+            animatedPosition={getAnimatedPosition(element.location.id || element.location.name, element.location.name)}
+            onTriggerClickAnimation={() => triggerClickAnimation(element.location.id || element.location.name, element.location.name)}
+            hasPendingClickAnimation={hasPendingClickAnimation(element.location.id || element.location.name, element.location.name)}
             characterMeterFrameResolver={characterMeterFrameResolver}
             containerDimensions={{ width: stageWidth, height: stageHeight }}
           />
@@ -843,8 +984,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           skipAnimation={effectiveSkipAnimation}
           shouldShowButtons={shouldShowButtons}
           soundBlobResolver={soundBlobResolver}
-          animatedPosition={getAnimatedPosition(element.location.name)}
-          onTriggerClickAnimation={() => triggerClickAnimation(element.location.name)}
+          animatedPosition={getAnimatedPosition(element.location.id || element.location.name, element.location.name)}
+          onTriggerClickAnimation={() => triggerClickAnimation(element.location.id || element.location.name, element.location.name)}
+          hasPendingClickAnimation={hasPendingClickAnimation(element.location.id || element.location.name, element.location.name)}
           characterMeterFrameResolver={characterMeterFrameResolver}
           containerDimensions={{ width: stageWidth, height: stageHeight }}
         />
@@ -875,9 +1017,11 @@ interface PositionedElementProps {
   shouldShowButtons?: boolean;  // Whether buttons should be visible (after animation)
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>;  // Resolver for loading sound blobs
   /** Animated position override from path animations */
-  animatedPosition?: { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean };
-  /** Callback to trigger onClick animations */
-  onTriggerClickAnimation?: () => void;
+  animatedPosition?: { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean; spriteAnimation?: string; spriteFrames?: number[]; spriteFrameDuration?: number; isAnimating?: boolean };
+  /** Callback to trigger onClick animations - returns Promise that resolves when animations complete */
+  onTriggerClickAnimation?: () => Promise<void>;
+  /** Whether this element has onClick animations waiting to be triggered (suppresses idle sprite animations) */
+  hasPendingClickAnimation?: boolean;
   /** Resolver function to get meter frame data for a character (for HUD display) */
   characterMeterFrameResolver?: (characterId: string) => {
     counters: MeterCounterData[];
@@ -907,6 +1051,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   soundBlobResolver,
   animatedPosition,
   onTriggerClickAnimation,
+  hasPendingClickAnimation,
   characterMeterFrameResolver,
   containerDimensions,
 }) => {
@@ -1038,6 +1183,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             theme={theme}
             isVisited={isButtonVisited}
             soundBlobResolver={soundBlobResolver}
+            onTriggerClickAnimation={onTriggerClickAnimation}
           />
         </div>
       );
@@ -1070,6 +1216,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             isVisited={isHotspotVisited}
             showTextOnHover={showTextOnHover}
             soundBlobResolver={soundBlobResolver}
+            onTriggerClickAnimation={onTriggerClickAnimation}
           />
         </div>
       );
@@ -1112,6 +1259,52 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         ? characterMeterFrameResolver(location.characterId)
         : null;
 
+      // Merge sprite animation from path animation into spriteSheet
+      // When animatedPosition has sprite animation info and isAnimating is true, use it
+      let effectiveSpriteSheet = element.spriteSheet;
+      if (element.spriteSheet && animatedPosition?.isAnimating) {
+        // Determine which animation to play:
+        // 1. Use spriteAnimation from waypoint if specified
+        // 2. Fall back to element's activeAnimation if set
+        // 3. Fall back to a default animation (walk/idle/first) when animating
+        let effectiveActiveAnim = animatedPosition.spriteAnimation || element.spriteSheet.activeAnimation;
+
+        // If still no animation but we're animating, try to find a default
+        if (!effectiveActiveAnim && element.spriteSheet.animations?.length) {
+          const anims = element.spriteSheet.animations;
+          const defaultAnim = anims.find(a =>
+            a.name.toLowerCase() === 'walk' ||
+            a.name.toLowerCase() === 'walking' ||
+            a.name.toLowerCase() === 'run' ||
+            a.name.toLowerCase() === 'idle'
+          );
+          effectiveActiveAnim = defaultAnim?.name || anims[0]?.name;
+        }
+
+        // Debug: log when sprite animation changes
+        if (effectiveActiveAnim !== element.spriteSheet.activeAnimation) {
+          console.log('[Character] spriteAnimation from path:', animatedPosition.spriteAnimation, '-> effective:', effectiveActiveAnim);
+        }
+        effectiveSpriteSheet = {
+          ...element.spriteSheet,
+          // Use sprite animation from waypoint if specified, otherwise use default
+          activeAnimation: effectiveActiveAnim,
+        };
+      } else if (element.spriteSheet && animatedPosition && !animatedPosition.isAnimating) {
+        // Animation completed - clear activeAnimation to stop sprite cycling
+        effectiveSpriteSheet = {
+          ...element.spriteSheet,
+          activeAnimation: undefined,
+        };
+      } else if (element.spriteSheet && hasPendingClickAnimation) {
+        // Has pending onClick animation - suppress sprite animation until triggered
+        // Show static first frame instead of cycling animation
+        effectiveSpriteSheet = {
+          ...element.spriteSheet,
+          activeAnimation: undefined,
+        };
+      }
+
       return (
         <>
           <AssetElement
@@ -1126,6 +1319,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             onAction={onAction}
             sound={(location as any).soundAssetId || location.sound}
             soundBlobResolver={soundBlobResolver}
+            spriteSheet={effectiveSpriteSheet}
           />
           {meterFrameData && meterFrameData.counters.length > 0 && (
             <CharacterMeterFrame
@@ -1396,7 +1590,8 @@ const ButtonElement: React.FC<{
   isVisited?: boolean; // Whether this choice leads to an already-visited beat
   showTextOnHover?: boolean; // Only show text when hovering over the hotspot
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>; // Resolver for sound blobs
-}> = ({ style, content, location, actionId, onAction, interactive, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, soundBlobResolver }) => {
+  onTriggerClickAnimation?: () => Promise<void>; // Trigger onClick animations and wait for completion
+}> = ({ style, content, location, actionId, onAction, interactive, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, soundBlobResolver, onTriggerClickAnimation }) => {
   const [isHovered, setIsHovered] = React.useState(false);
   const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
   const buttonRef = React.useRef<HTMLButtonElement>(null);
@@ -1538,7 +1733,14 @@ const ButtonElement: React.FC<{
         }
       }
 
-      // Then call the action (after sound completes)
+      // Trigger onClick animations and wait for them to complete
+      if (onTriggerClickAnimation) {
+        console.log(`[ButtonElement] Triggering onClick animations for: ${location.name}`);
+        await onTriggerClickAnimation();
+        console.log(`[ButtonElement] onClick animations complete for: ${location.name}`);
+      }
+
+      // Then call the action (after sound and animations complete)
       if (onAction) {
         // Use actionId if available (for movementChoice, pickProp, etc.), otherwise use location name
         const actionIdToPass = actionId || location.name || 'continue';
@@ -1922,6 +2124,266 @@ const DialogElement: React.FC<{
 /**
  * Asset element renderer (character/prop)
  */
+/**
+ * Animated sprite component that cycles through frames based on active animation
+ * Memoized to prevent re-renders from parent position updates during path animation
+ */
+interface AnimatedSpriteProps {
+  assetUrl: string;
+  spriteSheet: SpriteSheetData;
+  finalStyle: React.CSSProperties;
+  isClickable: boolean;
+  onClick: () => void;
+}
+
+// Track mount count globally for debugging
+let animatedSpriteMountCount = 0;
+
+const AnimatedSpriteInner: React.FC<AnimatedSpriteProps> = ({ assetUrl, spriteSheet, finalStyle, isClickable, onClick }) => {
+  const [currentFrameIndex, setCurrentFrameIndex] = React.useState(0);
+  const startTimeRef = React.useRef<number>(Date.now());
+  const animationFrameIdRef = React.useRef<number | null>(null);
+  const activeAnimRef = React.useRef<{ name: string; frames: number[]; frameDuration: number } | null>(null);
+  const prevAnimationKeyRef = React.useRef<string | null>(null);
+  const prevAnimationsRef = React.useRef<typeof spriteSheet.animations | null>(null);
+
+  // Debug: track mount/unmount
+  React.useEffect(() => {
+    animatedSpriteMountCount++;
+    console.log('[AnimatedSprite] MOUNTED, total mounts:', animatedSpriteMountCount);
+    return () => {
+      console.log('[AnimatedSprite] UNMOUNTED');
+    };
+  }, []);
+
+  // Debug: check if animations array reference changes unexpectedly
+  if (prevAnimationsRef.current !== null && prevAnimationsRef.current !== spriteSheet.animations) {
+    console.warn('[AnimatedSprite] animations array reference changed!', {
+      prevLength: prevAnimationsRef.current?.length,
+      newLength: spriteSheet.animations?.length,
+      activeAnimation: spriteSheet.activeAnimation,
+    });
+  }
+  prevAnimationsRef.current = spriteSheet.animations;
+
+  // Create a stable animations map to avoid recalculating on every render
+  // This uses a ref to compare content and only update when animations actually change
+  const stableAnimationsRef = React.useRef<Map<string, { frames: number[]; frameDuration: number }>>(new Map());
+
+  // Update stable animations map only when content changes
+  React.useMemo(() => {
+    if (!spriteSheet.animations?.length) {
+      stableAnimationsRef.current.clear();
+      return;
+    }
+
+    // Check if content has changed by comparing animation count and content
+    const currentMap = stableAnimationsRef.current;
+    let hasChanged = currentMap.size !== spriteSheet.animations.length;
+
+    if (!hasChanged) {
+      for (const anim of spriteSheet.animations) {
+        const existing = currentMap.get(anim.name);
+        if (!existing ||
+            existing.frameDuration !== anim.frameDuration ||
+            existing.frames.length !== anim.frames.length ||
+            existing.frames.some((f, i) => f !== anim.frames[i])) {
+          hasChanged = true;
+          break;
+        }
+      }
+    }
+
+    if (hasChanged) {
+      currentMap.clear();
+      for (const anim of spriteSheet.animations) {
+        currentMap.set(anim.name, {
+          frames: [...anim.frames],
+          frameDuration: anim.frameDuration,
+        });
+      }
+    }
+  }, [spriteSheet.animations]);
+
+  // Create a stable key for the animation to detect actual content changes
+  // This prevents animation restart when array reference changes but content is same
+  const animationKey = React.useMemo(() => {
+    if (!spriteSheet.activeAnimation) {
+      return null;
+    }
+    const anim = stableAnimationsRef.current.get(spriteSheet.activeAnimation);
+    if (!anim) {
+      // Debug: animation not found
+      if (spriteSheet.animations?.length) {
+        console.warn('[AnimatedSprite] Animation not found:', spriteSheet.activeAnimation, 'available:', Array.from(stableAnimationsRef.current.keys()));
+      }
+      return null;
+    }
+    // Create a key from the animation's actual content
+    return `${spriteSheet.activeAnimation}:${anim.frames.join(',')}:${anim.frameDuration}`;
+  }, [spriteSheet.activeAnimation]);
+
+  // Get the active animation data using stable lookup
+  const activeAnim = React.useMemo(() => {
+    if (!spriteSheet.activeAnimation) {
+      return null;
+    }
+    const animData = stableAnimationsRef.current.get(spriteSheet.activeAnimation);
+    if (!animData) {
+      return null;
+    }
+    return {
+      name: spriteSheet.activeAnimation,
+      frames: animData.frames,
+      frameDuration: animData.frameDuration,
+    };
+  }, [spriteSheet.activeAnimation]);
+
+  // Animation loop - only restart when animationKey changes (actual content change)
+  React.useEffect(() => {
+    // If no animation, stop any running loop
+    if (!activeAnim || activeAnim.frames.length === 0) {
+      if (animationFrameIdRef.current) {
+        console.log('[AnimatedSprite] Stopping animation - no active animation');
+        cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
+      }
+      activeAnimRef.current = null;
+      setCurrentFrameIndex(0);
+      return;
+    }
+
+    // Detect if animation is changing rapidly (potential cause of blinking)
+    if (prevAnimationKeyRef.current !== null && prevAnimationKeyRef.current !== animationKey) {
+      console.log('[AnimatedSprite] Animation key changed from', prevAnimationKeyRef.current, 'to', animationKey);
+    }
+    prevAnimationKeyRef.current = animationKey;
+    console.log('[AnimatedSprite] Animation changed:', activeAnim.name, 'frames:', activeAnim.frames, 'duration:', activeAnim.frameDuration);
+
+    // Store the current animation data in ref for the animation loop to use
+    activeAnimRef.current = {
+      name: activeAnim.name,
+      frames: activeAnim.frames,
+      frameDuration: activeAnim.frameDuration || 100,
+    };
+
+    // Reset frame index when animation changes to start from beginning
+    setCurrentFrameIndex(0);
+
+    // Only start a new animation loop if one isn't already running
+    // or if the animation content actually changed
+    if (animationFrameIdRef.current === null) {
+      console.log('[AnimatedSprite] Starting new animation loop for:', activeAnim.name);
+      startTimeRef.current = Date.now();
+
+      const animate = () => {
+        const anim = activeAnimRef.current;
+        if (!anim) return;
+
+        const elapsed = Date.now() - startTimeRef.current;
+        const frameCount = anim.frames.length;
+        const newIndex = Math.floor(elapsed / anim.frameDuration) % frameCount;
+        setCurrentFrameIndex(newIndex);
+        animationFrameIdRef.current = requestAnimationFrame(animate);
+      };
+
+      animationFrameIdRef.current = requestAnimationFrame(animate);
+    }
+
+    return () => {
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
+      }
+    };
+  }, [animationKey]); // Only depend on the stable animationKey, not the activeAnim object
+
+  // Calculate frame position with bounds checking
+  // When switching animations, currentFrameIndex might be out of bounds for the new animation
+  // Also handle edge case where frames array might be empty
+  const safeFrameIndex = activeAnim && activeAnim.frames.length > 0
+    ? Math.min(Math.max(0, currentFrameIndex), activeAnim.frames.length - 1)
+    : 0;
+  const frameIndex = activeAnim && activeAnim.frames.length > 0
+    ? (activeAnim.frames[safeFrameIndex] ?? spriteSheet.defaultFrame ?? 0)
+    : (spriteSheet.defaultFrame || 0);
+
+  // Debug: track frame index jumps for run animation (high frequency, so only log occasional samples)
+  const frameDebugRef = React.useRef({ lastFrame: -1, sampleCount: 0, loggedFrames: false });
+  if (activeAnim?.name === 'run') {
+    // Log the full frames array once
+    if (!frameDebugRef.current.loggedFrames) {
+      console.log('[AnimatedSprite:run] frames array:', activeAnim.frames, 'frameDuration:', activeAnim.frameDuration);
+      frameDebugRef.current.loggedFrames = true;
+    }
+    if (frameDebugRef.current.sampleCount++ % 30 === 0) {
+      if (frameIndex !== frameDebugRef.current.lastFrame) {
+        console.log('[AnimatedSprite:run] frame jump:', frameDebugRef.current.lastFrame, '->', frameIndex, 'safeIdx:', safeFrameIndex, 'curIdx:', currentFrameIndex);
+        frameDebugRef.current.lastFrame = frameIndex;
+      }
+    }
+  } else {
+    // Reset when not in run animation
+    frameDebugRef.current.loggedFrames = false;
+  }
+  const framesPerRow = spriteSheet.imageWidth
+    ? Math.floor(spriteSheet.imageWidth / spriteSheet.frameWidth)
+    : 10;
+  const col = frameIndex % framesPerRow;
+  const row = Math.floor(frameIndex / framesPerRow);
+  const bgPosX = -col * spriteSheet.frameWidth;
+  const bgPosY = -row * spriteSheet.frameHeight;
+
+  // Debug: log sprite position calculation once for run animation
+  const posDebugRef = React.useRef(false);
+  if (activeAnim?.name === 'run' && !posDebugRef.current) {
+    console.log('[AnimatedSprite:run] sprite calc:', {
+      imageWidth: spriteSheet.imageWidth,
+      frameWidth: spriteSheet.frameWidth,
+      frameHeight: spriteSheet.frameHeight,
+      framesPerRow,
+      frameIndex,
+      col,
+      row,
+      bgPosX,
+      bgPosY,
+    });
+    posDebugRef.current = true;
+  }
+
+  return (
+    <div
+      style={{
+        ...finalStyle,
+        width: spriteSheet.frameWidth,
+        height: spriteSheet.frameHeight,
+        backgroundColor: 'transparent',
+        backgroundImage: `url(${assetUrl})`,
+        backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+        backgroundRepeat: 'no-repeat',
+        imageRendering: 'pixelated',
+        cursor: isClickable ? 'pointer' : 'default',
+        transition: isClickable ? 'filter 0.1s ease' : undefined,
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        if (isClickable) {
+          e.currentTarget.style.filter = 'brightness(1.1)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (isClickable) {
+          e.currentTarget.style.filter = '';
+        }
+      }}
+    />
+  );
+};
+
+// Memoized AnimatedSprite - re-render for all prop changes but the internal animation
+// loop won't restart unless animationKey changes (controlled by useEffect dependency)
+const AnimatedSprite = React.memo(AnimatedSpriteInner);
+
 const AssetElement: React.FC<{
   style: React.CSSProperties;
   assetUrl?: string;
@@ -1934,7 +2396,8 @@ const AssetElement: React.FC<{
   onAction?: (id: string) => void;
   sound?: string;  // Sound to play when clicked (for PickProp)
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>; // Resolver for sound blobs
-}> = ({ style, assetUrl, assetId, name, kind, size, interactive, actionId, onAction, sound, soundBlobResolver }) => {
+  spriteSheet?: SpriteSheetData;  // Sprite sheet configuration for character sprites
+}> = ({ style, assetUrl, assetId, name, kind, size, interactive, actionId, onAction, sound, soundBlobResolver, spriteSheet }) => {
   // Click handler for interactive props (PickProp beat)
   const handleClick = async () => {
     if (interactive && actionId && onAction) {
@@ -1994,11 +2457,85 @@ const AssetElement: React.FC<{
     finalStyle.transform = existingTransform
       ? `${existingTransform} scale(${scaleFactor})`
       : `scale(${scaleFactor})`;
-    // Keep the transform origin at top-left so position matches
-    finalStyle.transformOrigin = 'top left';
+    // Only set top-left origin if there's no existing transform (which might include flip)
+    // If there are flip transforms, keep the center origin for correct flip behavior
+    if (!existingTransform) {
+      finalStyle.transformOrigin = 'top left';
+    }
   }
 
   if (assetUrl) {
+    // For sprite sheets, render using CSS background-position to show a specific frame
+    if (spriteSheet && spriteSheet.frameWidth > 0 && spriteSheet.frameHeight > 0) {
+      // Use AnimatedSprite for active animations, otherwise static sprite
+      const shouldAnimate = spriteSheet.activeAnimation && spriteSheet.animations?.length;
+
+      // Debug: detect when we switch between animated and static
+      const wasAnimatingRef = React.useRef<boolean | null>(null);
+      if (wasAnimatingRef.current !== null && wasAnimatingRef.current !== !!shouldAnimate) {
+        console.warn('[AssetElement] Animation state changed!', {
+          wasAnimating: wasAnimatingRef.current,
+          shouldAnimate: !!shouldAnimate,
+          activeAnimation: spriteSheet.activeAnimation,
+          animationsLength: spriteSheet.animations?.length,
+        });
+      }
+      wasAnimatingRef.current = !!shouldAnimate;
+
+      if (shouldAnimate) {
+        return (
+          <AnimatedSprite
+            assetUrl={assetUrl}
+            spriteSheet={spriteSheet}
+            finalStyle={finalStyle}
+            isClickable={!!isClickable}
+            onClick={handleClick}
+          />
+        );
+      }
+
+      // Static sprite - calculate frame position (default to frame 0)
+      const frameIndex = spriteSheet.defaultFrame || 0;
+      const framesPerRow = spriteSheet.imageWidth
+        ? Math.floor(spriteSheet.imageWidth / spriteSheet.frameWidth)
+        : 10; // Fallback to reasonable default
+      const col = frameIndex % framesPerRow;
+      const row = Math.floor(frameIndex / framesPerRow);
+      const bgPosX = -col * spriteSheet.frameWidth;
+      const bgPosY = -row * spriteSheet.frameHeight;
+
+      return (
+        <div
+          style={{
+            ...finalStyle,
+            width: spriteSheet.frameWidth,
+            height: spriteSheet.frameHeight,
+            backgroundColor: 'transparent',
+            backgroundImage: `url(${assetUrl})`,
+            backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+            backgroundRepeat: 'no-repeat',
+            imageRendering: 'pixelated',
+            cursor: isClickable ? 'pointer' : 'default',
+            transition: isClickable ? 'transform 0.1s ease, filter 0.1s ease' : undefined,
+          }}
+          onClick={handleClick}
+          onMouseEnter={(e) => {
+            if (isClickable) {
+              e.currentTarget.style.filter = 'brightness(1.1)';
+              e.currentTarget.style.transform = (finalStyle.transform || '') + ' scale(1.05)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (isClickable) {
+              e.currentTarget.style.filter = '';
+              e.currentTarget.style.transform = finalStyle.transform || '';
+            }
+          }}
+        />
+      );
+    }
+
+    // Standard image rendering (non-sprite)
     return (
       <img
         src={assetUrl}
@@ -2193,7 +2730,8 @@ export function createPositionedElementData(
   beatType: string,
   assetResolver?: (assetId: string) => string | undefined,
   characterResolver?: (characterId: string, stateId?: string) => string | undefined,
-  counterResolver?: (counterName: string) => { value: number; min: number; max: number } | null
+  counterResolver?: (counterName: string) => { value: number; min: number; max: number } | null,
+  spriteDataResolver?: (characterId: string) => SpriteSheetData | null
 ): PositionedElementData[] {
   console.log('[createPositionedElementData] Creating elements:', { beatType, content, locationCount: locations.length });
 
@@ -2210,11 +2748,26 @@ export function createPositionedElementData(
 
     // Resolve asset URL: handle character elements specially
     let resolvedAssetUrl: string | undefined;
+    let spriteSheet: SpriteSheetData | undefined;
 
     // For character elements, use characterResolver to resolve characterId + stateId to image URL
     if (location.kind === 'character' && location.characterId && characterResolver) {
       resolvedAssetUrl = characterResolver(location.characterId, location.stateId);
       console.log(`[createPositionedElementData] Character "${location.name}" → resolved via characterResolver: ${resolvedAssetUrl ? 'found' : 'not found'}`);
+
+      // Get sprite sheet data if the character has one
+      if (spriteDataResolver) {
+        const spriteData = spriteDataResolver(location.characterId);
+        if (spriteData) {
+          spriteSheet = spriteData;
+          console.log(`[createPositionedElementData] Character "${location.name}" has sprite sheet:`, {
+            frameWidth: spriteData.frameWidth,
+            frameHeight: spriteData.frameHeight,
+            hasAnimations: !!(spriteData as any).animations?.length,
+            activeAnimation: (spriteData as any).activeAnimation,
+          });
+        }
+      }
     }
 
     // Fall back to assetId resolution for non-character elements or if character resolver didn't find anything
@@ -2367,6 +2920,7 @@ export function createPositionedElementData(
       location,
       content: elementContent,
       assetUrl: resolvedAssetUrl,
+      spriteSheet,
       actionId,
       targetBeatId, // Include target beat ID for visited marking
       hyperlinks,

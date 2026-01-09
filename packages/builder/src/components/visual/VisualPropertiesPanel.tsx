@@ -53,6 +53,11 @@ interface VisualPropertiesPanelProps {
   onBeatTransitionChange?: (transition: { type: TransitionType; duration: number }) => void;
   // Global settings for default font fallback
   globalSettings?: GlobalSettings;
+  // DialogTree-specific settings
+  presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble';
+  onPresentationModeChange?: (mode: 'positioned' | 'chat-scroll' | 'chat-bubble') => void;
+  showAvatars?: boolean;
+  onShowAvatarsChange?: (show: boolean) => void;
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -84,6 +89,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   beatTransition,
   onBeatTransitionChange,
   globalSettings,
+  presentationMode,
+  onPresentationModeChange,
+  showAvatars,
+  onShowAvatarsChange,
 }) => {
   // Get default fonts from global settings based on element type
   // Renderer uses different fonts for text vs buttons vs titles
@@ -92,6 +101,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   const defaultButtonFont = globalSettings?.fonts?.btnFont || 'Arial';
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     background: true,
+    dialogSettings: true,  // Show Dialog Settings expanded by default
     elements: true,
     transform: true,
   });
@@ -149,7 +159,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   };
 
   return (
-    <div className="h-full bg-white border-r border-gray-200 flex flex-col w-80">
+    <div className="h-full bg-white flex flex-col w-full">
       {/* Header */}
       <div className="flex-shrink-0 p-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-800">Visual Properties</h2>
@@ -265,6 +275,67 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           </div>
         )}
 
+        {/* Dialog Settings Section - Only for dialogTree beats */}
+        {beatType === 'dialogTree' && onPresentationModeChange && (
+          <div className="border-b border-gray-200">
+            <button
+              onClick={() => toggleSection('dialogSettings')}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+            >
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                <span className="font-medium text-sm">Dialog Settings</span>
+              </div>
+              {expandedSections.dialogSettings ? (
+                <ChevronUp className="w-4 h-4 text-gray-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              )}
+            </button>
+
+            {expandedSections.dialogSettings && (
+              <div className="px-4 pb-4 space-y-3">
+                {/* Presentation Mode */}
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">
+                    Presentation Mode
+                  </label>
+                  <select
+                    value={presentationMode || 'positioned'}
+                    onChange={(e) => onPresentationModeChange(e.target.value as 'positioned' | 'chat-scroll' | 'chat-bubble')}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                  >
+                    <option value="positioned">Positioned (Visual Novel)</option>
+                    <option value="chat-scroll">Chat - Scrollable History</option>
+                    <option value="chat-bubble">Chat - Single Bubble</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {presentationMode === 'chat-scroll' && 'Messages stack vertically with scrollable history'}
+                    {presentationMode === 'chat-bubble' && 'Shows one message at a time in chat style'}
+                    {(!presentationMode || presentationMode === 'positioned') && 'Traditional positioned dialog elements'}
+                  </p>
+                </div>
+
+                {/* Show Avatars - Only visible in chat modes */}
+                {(presentationMode === 'chat-scroll' || presentationMode === 'chat-bubble') && onShowAvatarsChange && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="showAvatars"
+                      checked={showAvatars ?? true}
+                      onChange={(e) => onShowAvatarsChange(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <label htmlFor="showAvatars" className="text-sm text-gray-700">
+                      Show character avatars
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Elements Section */}
         <div className="border-b border-gray-200">
           <button
@@ -276,7 +347,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
               <span className="font-medium text-sm">Elements ({elements.length})</span>
             </div>
           </button>
-          
+
           {expandedSections.elements && (
             <div className="px-4 pb-4 space-y-2">
               {/* Add Element Buttons */}

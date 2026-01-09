@@ -22,6 +22,7 @@ import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { getStorageAdapter } from './storage/HybridStorageAdapter';
 import { assetToStored, extractBlobFromAsset } from './storage/AssetStorageAdapter';
 import { DebugPanel } from './components/debug/DebugPanel';
+import { SearchPanel } from './components/search';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
 import { preloadFonts } from './utils/fontRegistry';
@@ -69,6 +70,7 @@ function App() {
   const [showSaveProjectDialog, setShowSaveProjectDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<string>('');
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -123,6 +125,18 @@ function App() {
   useEffect(() => {
     assetsRef.current = assets;
   }, [assets]);
+
+  // Keyboard shortcut for search (Ctrl+F)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowSearchPanel(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Project and global settings
   const [projectSettings, setProjectSettings] = useState({
@@ -2776,6 +2790,73 @@ function App() {
   }, []);
 
   /**
+   * Handle navigating to a beat from search results
+   */
+  const handleNavigateToBeat = useCallback((beatId: string) => {
+    const beat = state.beats.find(b => b.id === beatId);
+    if (beat) {
+      setSelectedBeat(beat);
+      setHighlightedBeatIds([beatId]);
+    }
+  }, [state.beats]);
+
+  /**
+   * Handle navigating to a character from search results
+   */
+  const handleNavigateToCharacter = useCallback((characterId: string) => {
+    // Open character manager and potentially select the character
+    setShowCharacterManager(true);
+    // TODO: Add support for selecting a specific character in CharacterManager
+  }, []);
+
+  /**
+   * Handle replacing text in a beat
+   * Supports nested field paths like 'dialogTree.text', 'dialogTree.choices[0].text'
+   */
+  const handleReplaceInBeat = useCallback((beatId: string, field: string, oldValue: string, newValue: string) => {
+    const beat = state.beats.find(b => b.id === beatId);
+    if (!beat) return;
+
+    // Get current parameters
+    const params = beat.getParameters();
+
+    // Parse the field path and update the nested value
+    const setNestedValue = (obj: any, path: string, value: string) => {
+      const parts = path.split(/\.|\[|\]/).filter(Boolean);
+      let current = obj;
+
+      for (let i = 0; i < parts.length - 1; i++) {
+        const key = isNaN(Number(parts[i])) ? parts[i] : Number(parts[i]);
+        if (current[key] === undefined) return false;
+        current = current[key];
+      }
+
+      const lastKey = parts[parts.length - 1];
+      const finalKey = isNaN(Number(lastKey)) ? lastKey : Number(lastKey);
+
+      if (current[finalKey] !== oldValue) {
+        console.warn('[App] Replace: value mismatch, expected:', oldValue, 'got:', current[finalKey]);
+        return false;
+      }
+
+      current[finalKey] = newValue;
+      return true;
+    };
+
+    // Handle special case for beat name
+    if (field === 'name') {
+      actions.updateBeat(beatId, { name: newValue } as Partial<Beat>);
+      return;
+    }
+
+    // Clone params and update the nested value
+    const updatedParams = JSON.parse(JSON.stringify(params));
+    if (setNestedValue(updatedParams, field, newValue)) {
+      actions.updateBeat(beatId, { parameters: updatedParams } as Partial<Beat>);
+    }
+  }, [state.beats, actions]);
+
+  /**
    * Handle highlighting a single beat
    */
   const handleHighlightBeat = useCallback((beatId: string) => {
@@ -3122,6 +3203,19 @@ function App() {
           onHighlightPath={handleHighlightPath}
         />
       )}
+
+      {/* Search Panel */}
+      <SearchPanel
+        isOpen={showSearchPanel}
+        onClose={() => setShowSearchPanel(false)}
+        beats={state.beats}
+        characters={characters}
+        assets={assets}
+        metadata={{ title: state.title, author: state.author }}
+        onNavigateToBeat={handleNavigateToBeat}
+        onNavigateToCharacter={handleNavigateToCharacter}
+        onReplaceInBeat={handleReplaceInBeat}
+      />
 
       {/* Save Project Dialog */}
       <SaveProjectDialog

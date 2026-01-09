@@ -17,3 +17,9 @@ export {
   type MeterFrameStyle,
   type MeterCounterData
 } from './CharacterMeterFrame';
+
+export {
+  ChatDialogView,
+  type ChatDialogViewProps,
+  type ChatMessage
+} from './ChatDialogView';

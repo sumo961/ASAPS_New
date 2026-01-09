@@ -1,6 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { AnimationPath, AnimationWaypoint } from '@asaps/core';
-import { Trash2, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, ChevronUp, ChevronDown, Film } from 'lucide-react';
+import type { SpriteAnimation } from '../../types/character';
+
+/** Spritesheet data for the target character */
+interface SpriteSheetData {
+  url: string;
+  frameWidth: number;
+  frameHeight: number;
+  animations: SpriteAnimation[];
+}
 
 /**
  * WaypointList - List view and property editor for animation waypoints
@@ -27,6 +36,9 @@ interface WaypointListProps {
 
   /** Target element's initial position (for first waypoint default) */
   elementPosition?: { x: number; y: number };
+
+  /** Spritesheet data for the target character (if applicable) */
+  spriteSheet?: SpriteSheetData;
 }
 
 const EASING_OPTIONS = [
@@ -43,7 +55,10 @@ export const WaypointList: React.FC<WaypointListProps> = ({
   selectedWaypointIndex,
   onWaypointSelect,
   elementPosition,
+  spriteSheet,
 }) => {
+  // State for frame selector modal
+  const [showFrameSelector, setShowFrameSelector] = useState<number | null>(null);
   const updateWaypoint = (index: number, updates: Partial<AnimationWaypoint>) => {
     const newWaypoints = [...animation.waypoints];
     newWaypoints[index] = { ...newWaypoints[index], ...updates };
@@ -220,26 +235,31 @@ export const WaypointList: React.FC<WaypointListProps> = ({
                     </div>
                   </div>
 
-                  {/* Duration */}
-                  <div>
-                    <label className="block text-gray-600 mb-1">
-                      Duration (ms)
-                      {index === 0 && (
-                        <span className="ml-1 text-gray-400">(from start)</span>
-                      )}
-                    </label>
-                    <input
-                      type="number"
-                      value={waypoint.duration}
-                      onChange={(e) =>
-                        updateWaypoint(index, { duration: Number(e.target.value) })
-                      }
-                      onClick={(e) => e.stopPropagation()}
-                      min="0"
-                      step="100"
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                    />
-                  </div>
+                  {/* Duration - not shown for first waypoint since it's the starting position */}
+                  {index > 0 && (
+                    <div>
+                      <label className="block text-gray-600 mb-1">
+                        Duration (ms)
+                        <span className="ml-1 text-gray-400">(to reach this point)</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={waypoint.duration}
+                        onChange={(e) =>
+                          updateWaypoint(index, { duration: Number(e.target.value) })
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                        min="0"
+                        step="100"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                    </div>
+                  )}
+                  {index === 0 && (
+                    <div className="text-xs text-gray-400 italic">
+                      Starting position (no duration)
+                    </div>
+                  )}
 
                   {/* Easing */}
                   <div>
@@ -345,11 +365,315 @@ export const WaypointList: React.FC<WaypointListProps> = ({
                       </label>
                     </div>
                   </div>
+
+                  {/* Sprite Animation Section - only shown when spritesheet exists */}
+                  {spriteSheet && (
+                    <div className="pt-2 border-t border-gray-200 mt-2">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-2">
+                        <Film size={12} />
+                        <span>Sprite Animation</span>
+                      </div>
+
+                      {/* Predefined Animation Dropdown */}
+                      {spriteSheet.animations.length > 0 && (
+                        <div className="mb-2">
+                          <label className="block text-gray-600 mb-1">Animation</label>
+                          <select
+                            value={waypoint.spriteAnimation || ''}
+                            onChange={(e) => {
+                              const animName = e.target.value || undefined;
+                              // If selecting a predefined animation, clear custom frames
+                              updateWaypoint(index, {
+                                spriteAnimation: animName,
+                                spriteFrames: animName ? undefined : waypoint.spriteFrames,
+                              });
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          >
+                            <option value="">None / Custom</option>
+                            {spriteSheet.animations.map((anim) => (
+                              <option key={anim.name} value={anim.name}>
+                                {anim.name} ({anim.frames.length} frames)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Custom Frame Selection */}
+                      {!waypoint.spriteAnimation && (
+                        <div className="mb-2">
+                          <label className="block text-gray-600 mb-1">Custom Frames</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={waypoint.spriteFrames?.join(', ') || ''}
+                              onChange={(e) => {
+                                const text = e.target.value;
+                                if (!text.trim()) {
+                                  updateWaypoint(index, { spriteFrames: undefined });
+                                  return;
+                                }
+                                // Parse comma-separated frame indices
+                                const frames = text
+                                  .split(',')
+                                  .map(s => parseInt(s.trim(), 10))
+                                  .filter(n => !isNaN(n) && n >= 0);
+                                updateWaypoint(index, { spriteFrames: frames.length > 0 ? frames : undefined });
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="e.g., 0, 1, 2, 3"
+                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowFrameSelector(index);
+                              }}
+                              className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition"
+                              title="Select frames visually"
+                            >
+                              Pick
+                            </button>
+                          </div>
+                          <div className="text-[10px] text-gray-400 mt-1">
+                            Comma-separated frame indices, or use Pick button
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Frame Duration */}
+                      <div>
+                        <label className="block text-gray-600 mb-1">
+                          Frame Duration (ms)
+                        </label>
+                        <input
+                          type="number"
+                          value={waypoint.spriteFrameDuration ?? 100}
+                          onChange={(e) =>
+                            updateWaypoint(index, { spriteFrameDuration: Number(e.target.value) })
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          min="16"
+                          max="1000"
+                          step="16"
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
+      </div>
+
+      {/* Frame Selector Modal */}
+      {showFrameSelector !== null && spriteSheet && (
+        <FrameSelectorModal
+          spriteSheet={spriteSheet}
+          selectedFrames={animation.waypoints[showFrameSelector]?.spriteFrames || []}
+          onConfirm={(frames) => {
+            updateWaypoint(showFrameSelector, { spriteFrames: frames.length > 0 ? frames : undefined });
+            setShowFrameSelector(null);
+          }}
+          onCancel={() => setShowFrameSelector(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+/**
+ * FrameSelectorModal - Visual frame selector for spritesheets
+ */
+interface FrameSelectorModalProps {
+  spriteSheet: SpriteSheetData;
+  selectedFrames: number[];
+  onConfirm: (frames: number[]) => void;
+  onCancel: () => void;
+}
+
+const FrameSelectorModal: React.FC<FrameSelectorModalProps> = ({
+  spriteSheet,
+  selectedFrames: initialSelectedFrames,
+  onConfirm,
+  onCancel,
+}) => {
+  const [selectedFrames, setSelectedFrames] = useState<number[]>(initialSelectedFrames);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+
+  // Calculate number of frames based on image dimensions
+  const framesPerRow = imageDimensions.width > 0 ? Math.floor(imageDimensions.width / spriteSheet.frameWidth) : 0;
+  const totalRows = imageDimensions.height > 0 ? Math.floor(imageDimensions.height / spriteSheet.frameHeight) : 0;
+  const totalFrames = framesPerRow * totalRows;
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+    setImageLoaded(true);
+  };
+
+  const toggleFrame = (frameIndex: number) => {
+    setSelectedFrames(prev => {
+      if (prev.includes(frameIndex)) {
+        return prev.filter(f => f !== frameIndex);
+      } else {
+        return [...prev, frameIndex].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  const selectRange = (start: number, end: number) => {
+    const frames = [];
+    for (let i = Math.min(start, end); i <= Math.max(start, end); i++) {
+      frames.push(i);
+    }
+    setSelectedFrames(frames);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">Select Sprite Frames</h3>
+          <button
+            onClick={onCancel}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            &times;
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-4">
+          {/* Hidden image to get dimensions */}
+          <img
+            src={spriteSheet.url}
+            alt="Spritesheet"
+            onLoad={handleImageLoad}
+            className="hidden"
+          />
+
+          {!imageLoaded ? (
+            <div className="text-center text-gray-500 py-8">Loading spritesheet...</div>
+          ) : (
+            <>
+              {/* Frame info */}
+              <div className="text-sm text-gray-600 mb-3">
+                {totalFrames} frames ({framesPerRow} per row) - Frame size: {spriteSheet.frameWidth}x{spriteSheet.frameHeight}px
+              </div>
+
+              {/* Quick actions */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => setSelectedFrames([])}
+                  className="px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Clear All
+                </button>
+                <button
+                  onClick={() => setSelectedFrames(Array.from({ length: totalFrames }, (_, i) => i))}
+                  className="px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Select All
+                </button>
+                <input
+                  type="text"
+                  placeholder="Range (e.g., 0-5)"
+                  className="px-2 py-1 text-xs border border-gray-300 rounded w-24"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const match = e.currentTarget.value.match(/(\d+)-(\d+)/);
+                      if (match) {
+                        selectRange(parseInt(match[1]), parseInt(match[2]));
+                        e.currentTarget.value = '';
+                      }
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Frame grid */}
+              <div
+                className="grid gap-1 max-h-[50vh] overflow-auto p-2 bg-gray-100 rounded"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.min(framesPerRow, 10)}, 1fr)`,
+                }}
+              >
+                {Array.from({ length: totalFrames }, (_, frameIndex) => {
+                  const row = Math.floor(frameIndex / framesPerRow);
+                  const col = frameIndex % framesPerRow;
+                  const isSelected = selectedFrames.includes(frameIndex);
+                  const orderIndex = selectedFrames.indexOf(frameIndex);
+
+                  return (
+                    <div
+                      key={frameIndex}
+                      onClick={() => toggleFrame(frameIndex)}
+                      className={`relative cursor-pointer border-2 rounded overflow-hidden ${
+                        isSelected ? 'border-blue-500 ring-2 ring-blue-300' : 'border-transparent hover:border-gray-400'
+                      }`}
+                      style={{
+                        width: Math.min(60, spriteSheet.frameWidth),
+                        height: Math.min(60, spriteSheet.frameHeight),
+                      }}
+                    >
+                      {/* Frame image - use background-position to show the right frame */}
+                      <div
+                        className="w-full h-full"
+                        style={{
+                          backgroundImage: `url(${spriteSheet.url})`,
+                          backgroundPosition: `-${col * spriteSheet.frameWidth}px -${row * spriteSheet.frameHeight}px`,
+                          backgroundSize: `${imageDimensions.width}px ${imageDimensions.height}px`,
+                          transform: `scale(${Math.min(60 / spriteSheet.frameWidth, 60 / spriteSheet.frameHeight)})`,
+                          transformOrigin: 'top left',
+                        }}
+                      />
+                      {/* Frame number */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-[8px] text-center">
+                        {frameIndex}
+                      </div>
+                      {/* Selection order badge */}
+                      {isSelected && orderIndex >= 0 && (
+                        <div className="absolute top-0 right-0 bg-blue-500 text-white text-[8px] px-1 rounded-bl">
+                          {orderIndex + 1}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Selected frames preview */}
+              {selectedFrames.length > 0 && (
+                <div className="mt-3 text-sm text-gray-600">
+                  Selected ({selectedFrames.length}): {selectedFrames.join(', ')}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(selectedFrames)}
+            className="px-4 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Confirm ({selectedFrames.length} frames)
+          </button>
+        </div>
       </div>
     </div>
   );

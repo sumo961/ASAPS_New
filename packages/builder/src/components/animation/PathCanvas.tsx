@@ -12,6 +12,28 @@ import type { AnimationPath, AnimationWaypoint, ControlPoint } from '@asaps/core
  * - Display stage elements with actual images/content
  */
 
+/** Sprite animation definition */
+export interface SpriteAnimationConfig {
+  name: string;
+  frames: number[];
+  frameDuration: number;
+  loop: boolean;
+}
+
+/** Sprite sheet configuration for character elements */
+export interface SpriteSheetConfig {
+  frameWidth: number;
+  frameHeight: number;
+  defaultFrame?: number;
+  imageWidth?: number;
+  /** Current frame to display (overrides defaultFrame during animation) */
+  currentFrame?: number;
+  /** Available animations */
+  animations?: SpriteAnimationConfig[];
+  /** Currently playing animation name */
+  activeAnimation?: string;
+}
+
 /** Stage element to display in the animation canvas */
 export interface StageElement {
   id: string;
@@ -26,6 +48,8 @@ export interface StageElement {
   isAnimationTarget?: boolean;
   backgroundColor?: string;
   textColor?: string;
+  /** Sprite sheet configuration for sprite characters */
+  spriteSheet?: SpriteSheetConfig;
 }
 
 interface PathCanvasProps {
@@ -55,6 +79,9 @@ interface PathCanvasProps {
 
   /** ID of the element being animated (will be highlighted) */
   animationTargetId?: string;
+
+  /** Current preview position during animation playback */
+  previewPosition?: { x: number; y: number; flipX?: boolean; flipY?: boolean; scale?: number; rotation?: number; opacity?: number } | null;
 }
 
 type DragState = {
@@ -74,6 +101,7 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
   onWaypointSelect,
   stageElements = [],
   animationTargetId,
+  previewPosition,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dragState, setDragState] = useState<DragState>(null);
@@ -189,6 +217,7 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
         ctx.textBaseline = 'middle';
         ctx.fillText(String(index + 1), waypoint.x, waypoint.y);
       });
+
     }
 
     function drawControlPoint(
@@ -217,7 +246,7 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
       ctx.fillStyle = isSelected ? '#fdba74' : '#9ca3af';
       ctx.fill();
     }
-  }, [animation, width, height, selectedWaypointIndex, hoveredWaypoint]);
+  }, [animation, width, height, selectedWaypointIndex, hoveredWaypoint, previewPosition]);
 
   // Handle mouse down - start dragging or add waypoint
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -335,22 +364,99 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
     setDragState(null);
   };
 
+  // Debug: log previewPosition changes
+  useEffect(() => {
+    if (previewPosition) {
+      console.log('[PathCanvas] previewPosition updated:', previewPosition, 'targetId:', animationTargetId);
+    }
+  }, [previewPosition, animationTargetId]);
+
   // Render actual element content as HTML overlay
   const renderElementOverlay = (element: StageElement) => {
     const isTarget = element.id === animationTargetId;
+
+    // Use preview position for target element during animation playback
+    const displayX = isTarget && previewPosition ? previewPosition.x : element.x;
+    const displayY = isTarget && previewPosition ? previewPosition.y : element.y;
+
     const baseClasses = `absolute pointer-events-none overflow-hidden ${
       isTarget ? 'ring-2 ring-orange-500 ring-offset-1' : 'ring-1 ring-slate-400/50'
     }`;
 
+    // Use transform for smoother animation (GPU accelerated)
+    // Apply flip, scale, rotation, and opacity transforms when specified in previewPosition
+    const flipX = isTarget && previewPosition?.flipX;
+    const flipY = isTarget && previewPosition?.flipY;
+    const scale = (isTarget && previewPosition?.scale) || 1;
+    const rotation = (isTarget && previewPosition?.rotation) || 0;
+    const opacity = isTarget && previewPosition?.opacity !== undefined ? previewPosition.opacity : 1;
+
+    // Combine flip and scale
+    const scaleX = (flipX ? -1 : 1) * scale;
+    const scaleY = (flipY ? -1 : 1) * scale;
+
+    const positionStyle: React.CSSProperties = isTarget && previewPosition
+      ? {
+          left: 0,
+          top: 0,
+          transform: `translate(${displayX}px, ${displayY}px) scale(${scaleX}, ${scaleY}) rotate(${rotation}deg)`,
+          opacity,
+          willChange: 'transform, opacity',
+        }
+      : {
+          left: displayX,
+          top: displayY,
+        };
+
     // Render image elements (character, prop, background)
     if (element.imageUrl && (element.type === 'character' || element.type === 'prop' || element.type === 'image')) {
+      // Check if this is a sprite sheet character
+      const spriteSheet = element.spriteSheet;
+      if (spriteSheet && spriteSheet.frameWidth > 0 && spriteSheet.frameHeight > 0) {
+        // Calculate frame position for sprite
+        // Use currentFrame if set (during animation), otherwise use defaultFrame
+        const frameIndex = spriteSheet.currentFrame ?? spriteSheet.defaultFrame ?? 0;
+        const framesPerRow = spriteSheet.imageWidth
+          ? Math.floor(spriteSheet.imageWidth / spriteSheet.frameWidth)
+          : 5; // Fallback to reasonable default
+        const col = frameIndex % framesPerRow;
+        const row = Math.floor(frameIndex / framesPerRow);
+        const bgPosX = -col * spriteSheet.frameWidth;
+        const bgPosY = -row * spriteSheet.frameHeight;
+
+        return (
+          <div
+            key={element.id}
+            className={baseClasses}
+            style={{
+              ...positionStyle,
+              width: spriteSheet.frameWidth,
+              height: spriteSheet.frameHeight,
+              backgroundImage: `url(${element.imageUrl})`,
+              backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+              backgroundRepeat: 'no-repeat',
+              imageRendering: 'pixelated',
+            }}
+          >
+            {/* Element label */}
+            <div
+              className={`absolute -top-5 left-0 px-1.5 py-0.5 text-[10px] font-medium text-white rounded-t ${
+                isTarget ? 'bg-orange-500' : 'bg-slate-500'
+              }`}
+            >
+              {element.label || element.type}
+            </div>
+          </div>
+        );
+      }
+
+      // Standard image rendering (non-sprite)
       return (
         <div
           key={element.id}
           className={baseClasses}
           style={{
-            left: element.x,
-            top: element.y,
+            ...positionStyle,
             width: element.width,
             height: element.height,
           }}
@@ -381,8 +487,7 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
           key={element.id}
           className={`${baseClasses} flex items-center justify-center`}
           style={{
-            left: element.x,
-            top: element.y,
+            ...positionStyle,
             width: element.width,
             height: element.height,
             backgroundColor: element.backgroundColor || (isButton ? '#3b82f6' : 'rgba(0,0,0,0.7)'),
@@ -420,8 +525,7 @@ export const PathCanvas: React.FC<PathCanvasProps> = ({
         key={element.id}
         className={`${baseClasses} flex items-center justify-center bg-slate-200`}
         style={{
-          left: element.x,
-          top: element.y,
+          ...positionStyle,
           width: element.width,
           height: element.height,
         }}

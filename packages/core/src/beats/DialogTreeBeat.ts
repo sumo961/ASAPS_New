@@ -25,6 +25,8 @@ export class DialogTreeBeat extends Beat {
   public backgroundUrl?: string; // Direct URL for background from ASML import
   public backgroundAssetId?: string; // Asset ID for background
   public phaseOverrides?: Record<string, Record<string, PhaseOverride>>; // Per-phase visual element overrides
+  public presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble'; // Dialog presentation style
+  public showAvatars?: boolean; // Show character avatars in chat mode
   private currentNode: DialogNode | null = null;
 
   constructor(config: BeatConfig & {
@@ -38,6 +40,8 @@ export class DialogTreeBeat extends Beat {
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
     this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
+    this.presentationMode = (config.parameters?.presentationMode as 'positioned' | 'chat-scroll' | 'chat-bubble') || 'positioned';
+    this.showAvatars = config.parameters?.showAvatars ?? true;
 
     if (dialogTreeParam) {
       // Migrate old format to new format if needed
@@ -231,7 +235,9 @@ export class DialogTreeBeat extends Beat {
       markVisited: this.markVisited,
       backgroundUrl: this.backgroundUrl,
       backgroundAssetId: this.backgroundAssetId,
-      phaseOverrides: this.phaseOverrides
+      phaseOverrides: this.phaseOverrides,
+      presentationMode: this.presentationMode,
+      showAvatars: this.showAvatars
     };
   }
 
@@ -256,6 +262,8 @@ export class DialogTreeBeat extends Beat {
     if (params.backgroundUrl !== undefined) this.backgroundUrl = params.backgroundUrl;
     if (params.backgroundAssetId !== undefined) this.backgroundAssetId = params.backgroundAssetId;
     if (params.phaseOverrides !== undefined) this.phaseOverrides = params.phaseOverrides;
+    if (params.presentationMode !== undefined) this.presentationMode = params.presentationMode;
+    if (params.showAvatars !== undefined) this.showAvatars = params.showAvatars;
 
     // Sync instance properties back to dialogTree
     if (this.dialogTree && typeof this.dialogTree === 'object') {
@@ -291,6 +299,10 @@ export class DialogTreeBeat extends Beat {
 
     // Set markVisited state for renderer to use when rendering choices
     renderer.setState('markVisited', this.markVisited || false);
+
+    // Set presentation mode for chat-like dialogs
+    renderer.setState('presentationMode', this.presentationMode || 'positioned');
+    renderer.setState('showAvatars', this.showAvatars ?? true);
 
     this.currentNode = this.dialogTree;
 

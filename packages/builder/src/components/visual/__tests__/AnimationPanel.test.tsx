@@ -84,7 +84,9 @@ describe('AnimationPanel', () => {
         elementId: 'element_1',
         type: 'bezier',
         waypoints: [waypoint1, waypoint2],
-        duration: 2000,
+        // Note: Total duration is sum of waypoints EXCEPT the first one (which is just the starting position)
+        // So duration = waypoint2.duration = 1000
+        duration: 1000,
         easing: 'ease-in-out',
         loop: false,
         autoPlay: true,
@@ -388,9 +390,11 @@ describe('AnimationPanel', () => {
   });
 
   describe('Animation Validation', () => {
-    it('should validate total duration matches waypoint durations', () => {
+    it('should validate total duration matches waypoint durations (excluding first waypoint)', () => {
       const animation = mockAnimations[0];
-      const totalWaypointDuration = animation.waypoints.reduce(
+      // First waypoint is the starting position - its duration is not used
+      // Total duration is sum of durations from waypoints[1] onward
+      const totalWaypointDuration = animation.waypoints.slice(1).reduce(
         (sum, wp) => sum + wp.duration,
         0
       );

@@ -176,6 +176,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     .sort((a, b) => a.z - b.z)
     .map(el => ({
       name: el.name,
+      id: el.id,  // Include element ID for animation targeting
       kind: el.type as any,
       x: el.x,
       y: el.y,
@@ -257,9 +258,21 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
       // Resolve image URL using helper (handles stale blob URLs via assetId lookup)
       if (character) {
-        const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
-        if (resolvedUrl) {
-          el.assetUrl = resolvedUrl;
+        // For sprite characters, use spriteSheet URL
+        if (character.visual?.type === 'sprite' && character.visual.spriteSheet?.url) {
+          el.assetUrl = character.visual.spriteSheet.url;
+          // Add sprite sheet data for proper frame extraction
+          el.spriteSheet = {
+            frameWidth: character.visual.spriteSheet.frameWidth,
+            frameHeight: character.visual.spriteSheet.frameHeight,
+            defaultFrame: 0,
+          };
+        } else {
+          // Static character - resolve from state or default
+          const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
+          if (resolvedUrl) {
+            el.assetUrl = resolvedUrl;
+          }
         }
       }
     }
@@ -735,6 +748,17 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     transforms.push(`scale(${el.scale})`);
                   }
 
+                  // For sprite characters, use sprite frame dimensions
+                  let overlayWidth = el.width;
+                  let overlayHeight = el.height;
+                  if (el.type === 'character' && el.characterId) {
+                    const char = characters.find(c => c.id === el.characterId);
+                    if (char?.visual?.type === 'sprite' && char.visual.spriteSheet) {
+                      overlayWidth = char.visual.spriteSheet.frameWidth;
+                      overlayHeight = char.visual.spriteSheet.frameHeight;
+                    }
+                  }
+
                   return (
                     <div
                       key={`drag-overlay-${el.id}`}
@@ -742,8 +766,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         position: 'absolute',
                         left: `${el.x}px`,
                         top: `${el.y}px`,
-                        width: `${el.width}px`,
-                        height: `${el.height}px`,
+                        width: `${overlayWidth}px`,
+                        height: `${overlayHeight}px`,
                         zIndex: (el.z || 0) + 1000,
                         cursor: el.locked ? 'not-allowed' : 'move',
                         pointerEvents: 'auto',
@@ -786,11 +810,16 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     transforms.push(`scale(${el.scale})`);
                   }
 
-                  // For characters/props with size percentage, the width/height in the element
-                  // should already reflect the effective dimensions (updated by VisualWorkspace).
-                  // Just use el.width and el.height directly.
-                  const displayWidth = el.width;
-                  const displayHeight = el.height;
+                  // For sprite characters, use sprite frame dimensions
+                  let displayWidth = el.width;
+                  let displayHeight = el.height;
+                  if (el.type === 'character' && el.characterId) {
+                    const char = characters.find(c => c.id === el.characterId);
+                    if (char?.visual?.type === 'sprite' && char.visual.spriteSheet) {
+                      displayWidth = char.visual.spriteSheet.frameWidth;
+                      displayHeight = char.visual.spriteSheet.frameHeight;
+                    }
+                  }
 
                   return (
                     <div

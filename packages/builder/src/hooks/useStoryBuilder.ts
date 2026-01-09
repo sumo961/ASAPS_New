@@ -6,6 +6,7 @@ import {
   TitleScreenBeat,
   IntroTextBeat,
   EndScreenBeat,
+  DialogTreeBeat,
   ASMLProcessor,
   ASMLGenerator,
   ASMLParser,
@@ -13,6 +14,7 @@ import {
   ContainerBeatPosition,
   SharedVisualContent
 } from '@asaps/core';
+import type { DialogNode } from '@asaps/core';
 import { applyTreeLayoutToBeats } from '../utils/TreeLayoutAlgorithm';
 import {
   importAsmlAssets,
@@ -65,6 +67,7 @@ interface StoryBuilderActions {
   clearStory: () => void;
   updateSettings: (settings: any) => void;
   loadStoryData: (storyData: any) => void;
+  mergeDialogTrees: (beatIds: string[]) => { success: boolean; mergedBeatId?: string; error?: string };
 }
 
 /**
@@ -923,6 +926,108 @@ export function useStoryBuilder() {
     }));
   }, []);
 
+  // Merge multiple dialogTree beats into a single beat with nested dialog structure
+  const mergeDialogTrees = useCallback((beatIds: string[]): { success: boolean; mergedBeatId?: string; error?: string } => {
+    if (beatIds.length < 2) {
+      return { success: false, error: 'Need at least 2 beats to merge' };
+    }
+
+    // Get the beats in order
+    const beatsToMerge: DialogTreeBeat[] = [];
+    for (const id of beatIds) {
+      const beat = state.beats.find(b => b.id === id);
+      if (!beat) {
+        return { success: false, error: `Beat ${id} not found` };
+      }
+      if (beat.type !== 'dialogTree') {
+        return { success: false, error: `Beat ${beat.name} is not a DialogTree` };
+      }
+      beatsToMerge.push(beat as DialogTreeBeat);
+    }
+
+    console.log(`[useStoryBuilder] Merging ${beatsToMerge.length} dialogTree beats`);
+
+    // The first beat becomes the target, others get merged into it
+    const targetBeat = beatsToMerge[0];
+    const beatsToRemove = beatsToMerge.slice(1);
+
+    // Create a deep copy of the target's dialogTree
+    const targetDialogTree = targetBeat.dialogTree;
+    if (!targetDialogTree) {
+      return { success: false, error: 'Target beat has no dialog tree' };
+    }
+
+    // Build nested structure: each choice's dialogNode contains the next beat's dialog
+    // Find choices that lead to the beats being merged
+    const updateChoicesWithNesting = (choices: any[] | undefined): any[] => {
+      if (!choices) return [];
+
+      return choices.map(choice => {
+        // Check if this choice leads to one of the beats being merged
+        const targetIndex = beatsToRemove.findIndex(b => b.id === choice.target);
+        if (targetIndex !== -1) {
+          const nextBeat = beatsToRemove[targetIndex];
+          const nextDialogTree = nextBeat.dialogTree;
+
+          if (nextDialogTree) {
+            // Create nested dialogNode from the next beat
+            const nestedNode: DialogNode = {
+              id: nextDialogTree.id || `nested_${nextBeat.id}`,
+              speaker: nextDialogTree.speaker,
+              text: nextDialogTree.text,
+              emotion: nextDialogTree.emotion,
+              conditions: nextDialogTree.conditions,
+              effects: nextDialogTree.effects,
+              // Recursively process choices of the nested beat
+              choices: updateChoicesWithNesting(nextDialogTree.choices)
+            };
+
+            // Return choice with nested node, removing the target reference
+            return {
+              ...choice,
+              dialogNode: nestedNode,
+              target: undefined
+            };
+          }
+        }
+        return choice;
+      });
+    };
+
+    // Update the target beat's choices
+    if (targetDialogTree.choices) {
+      targetDialogTree.choices = updateChoicesWithNesting(targetDialogTree.choices);
+    }
+
+    // Collect all outgoing connections from beats being removed
+    const newConnections: any[] = [];
+    beatsToRemove.forEach(beat => {
+      const beatConnections = beat.getConnections();
+      beatConnections.forEach(conn => {
+        // Don't add connections that go to other beats being merged
+        if (!beatsToRemove.find(b => b.id === conn.targetId)) {
+          // These connections should now come from the target beat via nested choices
+          console.log(`[useStoryBuilder] Connection from ${beat.id} to ${conn.targetId} preserved in nested structure`);
+        }
+      });
+    });
+
+    // Update state: remove merged beats and their connections
+    const removedIds = new Set(beatsToRemove.map(b => b.id));
+
+    setState(prev => ({
+      ...prev,
+      beats: prev.beats.filter(b => !removedIds.has(b.id)),
+      connections: prev.connections.filter(
+        conn => !removedIds.has(conn.source) && !removedIds.has(conn.target)
+      ),
+    }));
+
+    console.log(`[useStoryBuilder] Merged ${beatsToRemove.length} beats into ${targetBeat.name}`);
+
+    return { success: true, mergedBeatId: targetBeat.id };
+  }, [state.beats]);
+
   const actions: StoryBuilderActions = {
     setTitle,
     setAuthor,
@@ -950,6 +1055,7 @@ export function useStoryBuilder() {
     setClusterMap,
     setClusterSound,
     setClusterSharedVisuals,
+    mergeDialogTrees,
   };
 
   return {

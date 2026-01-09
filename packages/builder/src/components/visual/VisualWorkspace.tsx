@@ -175,6 +175,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<'elements' | 'animations'>('elements');
   const [animations, setAnimations] = useState<AnimationPath[]>([]);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(320); // Default w-80 = 320px
+  const [isResizingPanel, setIsResizingPanel] = useState(false);
 
   // Phase navigation state for DialogTree beats
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
@@ -216,6 +218,28 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   useEffect(() => {
     charactersRef.current = characters;
   }, [characters]);
+
+  // Handle panel resize dragging
+  useEffect(() => {
+    if (!isResizingPanel) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.max(280, Math.min(600, e.clientX));
+      setLeftPanelWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingPanel(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingPanel]);
 
   // Asset selection modal state
   const [assetModal, setAssetModal] = useState<{
@@ -497,6 +521,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const location: any = {
         kind,
         name: el.name || el.text || '',
+        id: el.id, // Include element ID for animation targeting
         x: Math.round(el.x),
         y: Math.round(el.y),
         width: Math.round(el.width),
@@ -581,6 +606,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         const location: any = {
           kind,
           name: el.name || el.text || '',
+          id: el.id,  // Include element ID for animation targeting
           x: Math.round(el.x),
           y: Math.round(el.y),
           width: Math.round(el.width),
@@ -1253,6 +1279,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         const location: any = {
           kind,
           name: el.name || el.text || '',
+          id: el.id,  // Include element ID for animation targeting
           x: Math.round(el.x),
           y: Math.round(el.y),
           width: Math.round(el.width),
@@ -1802,6 +1829,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const location: any = {
         kind,
         name: el.name || el.text || '',
+        id: el.id,  // Include element ID for animation targeting
         x: Math.round(el.x),
         y: Math.round(el.y),
         width: Math.round(el.width),
@@ -1958,7 +1986,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     <div className="h-full flex bg-gray-100 relative">
       {/* Left Panel with Tabs */}
       {showProperties && (
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+        <div
+          className="bg-white border-r border-gray-200 flex flex-col relative"
+          style={{ width: leftPanelWidth, minWidth: 280, maxWidth: 600 }}
+        >
+          {/* Resize Handle */}
+          <div
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-400 transition-colors z-10"
+            style={{ backgroundColor: isResizingPanel ? '#3b82f6' : 'transparent' }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsResizingPanel(true);
+            }}
+          />
           {/* Cluster Info Banner */}
           {cluster && (
             <div className="p-2 bg-teal-50 border-b border-teal-200">
@@ -2401,6 +2441,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   onBeatUpdate(beat.id, { transition });
                   setHasChanges(true);
                 } : undefined}
+                presentationMode={beat.type === 'dialogTree' ? ((beat as any).presentationMode || 'positioned') : undefined}
+                onPresentationModeChange={beat.type === 'dialogTree' && onBeatUpdate ? (mode) => {
+                  (beat as any).presentationMode = mode;
+                  onBeatUpdate(beat.id, { presentationMode: mode } as any);
+                  setHasChanges(true);
+                } : undefined}
+                showAvatars={beat.type === 'dialogTree' ? ((beat as any).showAvatars ?? true) : undefined}
+                onShowAvatarsChange={beat.type === 'dialogTree' && onBeatUpdate ? (show) => {
+                  (beat as any).showAvatars = show;
+                  onBeatUpdate(beat.id, { showAvatars: show } as any);
+                  setHasChanges(true);
+                } : undefined}
               />
             )}
 
@@ -2416,6 +2468,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     ? assets.find(a => a.id === backgroundAssetId)?.url
                     : undefined) || backgroundUrl
                 }
+                characters={characters}
                 onAnimationsChange={(newAnimations) => {
                   setAnimations(newAnimations);
                   setHasChanges(true);

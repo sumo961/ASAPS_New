@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-06T15:38:25.960Z
+ * Generated: 2026-01-09T17:22:06.065Z
  */
 
 // ============================================
@@ -112,6 +112,10 @@ export interface DialogTreeParameters {
   choiceDelay?: number | undefined;
   /** Show visual indication for choices leading to already-visited beats */
   markVisited?: boolean | undefined;
+  /** Dialog presentation style: 'positioned' (traditional positioned elements), 'chat-scroll' (scrollable chat history), or 'chat-bubble' (single message bubble) */
+  presentationMode?: string | undefined;
+  /** Show character avatars in chat mode */
+  showAvatars?: boolean | undefined;
 }
 
 /**

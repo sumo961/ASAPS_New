@@ -5,6 +5,7 @@ import type { Location, AnimationPath } from '@asaps/core';
 import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
 import type { MeterCounterData, MeterFrameConfig } from '../components/CharacterMeterFrame';
+import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 
 // ============= SCALED STAGE COMPONENT =============
@@ -552,12 +553,17 @@ export class ReactRenderer extends BaseRenderer {
   private characterResolver: ((characterId: string, stateId?: string) => string | undefined) | null = null;  // NEW: Character state resolver
   private counterResolver: ((counterName: string) => { value: number; min: number; max: number } | null) | null = null;  // NEW: Counter value resolver
   private characterMeterFrameResolver: ((characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig } | null) | null = null;  // NEW: Character meter frame resolver
+  private spriteDataResolver: ((characterId: string) => { frameWidth: number; frameHeight: number; defaultFrame?: number; imageWidth?: number; animations?: Array<{ name: string; frames: number[]; frameDuration: number; loop: boolean }>; activeAnimation?: string } | null) | null = null;  // NEW: Sprite sheet data resolver
   // soundBlobResolver is inherited from BaseRenderer
   protected hideTextBoxes: boolean = false;  // NEW: Whether to hide text box backgrounds
   protected hideButtonBoxes: boolean = false;  // NEW: Whether to hide button box backgrounds
   protected theme: RenderThemeSettings | undefined = undefined;  // NEW: Theme settings for styling
   protected visitedBeats: string[] = [];  // NEW: Array of visited beat IDs for marking visited choices
-  
+  protected chatMessages: ChatMessage[] = [];  // NEW: Accumulated messages for chat mode
+  protected currentPresentationMode: 'positioned' | 'chat-scroll' | 'chat-bubble' = 'positioned';  // NEW: Current dialog presentation mode
+  protected currentShowAvatars: boolean = true;  // NEW: Whether to show avatars in chat mode
+  private characterAvatarResolver: ((characterId: string) => string | undefined) | null = null;  // NEW: Character avatar resolver
+
   private get root(): ReactDOM.Root | null {
     return this._root;
   }
@@ -665,6 +671,52 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Set the sprite data resolver function
+   * This allows the renderer to get sprite sheet data for character sprites
+   * The resolver should look up the character and return sprite sheet config if it's a sprite type
+   */
+  setSpriteDataResolver(resolver: (characterId: string) => { frameWidth: number; frameHeight: number; defaultFrame?: number; imageWidth?: number; animations?: Array<{ name: string; frames: number[]; frameDuration: number; loop: boolean }>; activeAnimation?: string } | null): void {
+    this.spriteDataResolver = resolver;
+  }
+
+  /**
+   * Set the character avatar resolver function
+   * This allows the renderer to get avatar images for chat mode dialogs
+   * The resolver should look up the character and return an avatar URL
+   */
+  setCharacterAvatarResolver(resolver: (characterId: string) => string | undefined): void {
+    this.characterAvatarResolver = resolver;
+  }
+
+  /**
+   * Set the presentation mode for dialogs
+   * 'positioned' uses traditional positioned rendering
+   * 'chat-scroll' shows scrollable chat history
+   * 'chat-bubble' shows single message bubble
+   */
+  setPresentationMode(mode: 'positioned' | 'chat-scroll' | 'chat-bubble'): void {
+    // If switching to chat mode, clear previous message history
+    if (mode !== 'positioned' && this.currentPresentationMode === 'positioned') {
+      this.chatMessages = [];
+    }
+    this.currentPresentationMode = mode;
+  }
+
+  /**
+   * Set whether to show avatars in chat mode
+   */
+  setShowAvatars(show: boolean): void {
+    this.currentShowAvatars = show;
+  }
+
+  /**
+   * Clear chat message history (call when starting a new dialog tree)
+   */
+  clearChatHistory(): void {
+    this.chatMessages = [];
+  }
+
+  /**
    * Set the sound blob resolver function
    * This allows the renderer to load sound blobs from storage for playback
    * Avoids stale blob URL issues by loading fresh blob data when needed
@@ -759,14 +811,15 @@ export class ReactRenderer extends BaseRenderer {
         resolve('');
       }
 
-      // Create element data using the shared helper, passing the asset, character, and counter resolvers
+      // Create element data using the shared helper, passing the asset, character, counter, and sprite resolvers
       const elements: PositionedElementData[] = createPositionedElementData(
         locations,
         content,
         beatType,
         this.assetResolver || undefined,
         this.characterResolver || undefined,
-        this.counterResolver || undefined
+        this.counterResolver || undefined,
+        this.spriteDataResolver || undefined
       );
 
       // Determine background - consistent for all beat types
@@ -854,9 +907,48 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
+    // Get presentation mode from renderer state (set by DialogTreeBeat)
+    const presentationMode = this.getState('presentationMode') as 'positioned' | 'chat-scroll' | 'chat-bubble' | undefined;
+    const showAvatars = this.getState('showAvatars') as boolean | undefined;
+
+    if (presentationMode) {
+      this.currentPresentationMode = presentationMode;
+    }
+    if (showAvatars !== undefined) {
+      this.currentShowAvatars = showAvatars;
+    }
+
     // Store dialog context for renderChoices to use later
     this.setState('dialogContext', { speaker, text, emotion });
 
+    // If in chat mode, add this message to the history
+    if (this.currentPresentationMode !== 'positioned') {
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+      // Get avatar URL if available
+      let avatarUrl: string | undefined;
+      if (this.characterAvatarResolver) {
+        // Try to resolve avatar using speaker name as character ID
+        avatarUrl = this.characterAvatarResolver(speaker.toLowerCase().replace(/\s+/g, '_'));
+      }
+
+      const newMessage: ChatMessage = {
+        id: messageId,
+        speaker,
+        text,
+        emotion,
+        isPlayer: false, // NPC message
+        avatarUrl,
+      };
+
+      this.chatMessages.push(newMessage);
+
+      // Render chat view immediately (without choices for now)
+      this.renderChatDialog([]);
+      return;
+    }
+
+    // Positioned mode - render as before
     // Render dialog immediately WITHOUT choices (don't wait for action)
     // This ensures the dialog text, background, and characters are visible
     // even if there's a choiceDelay before showing the choice buttons
@@ -871,6 +963,56 @@ export class ReactRenderer extends BaseRenderer {
     }
   }
 
+  /**
+   * Render the chat dialog view with current messages and optional choices
+   */
+  private renderChatDialog(choices: Array<{ id: string; text: string }>): Promise<string> {
+    return new Promise(resolve => {
+      this.resolveAction = (id: string) => {
+        // When a choice is selected, add it as a player message
+        const selectedChoice = choices.find(c => c.id === id);
+        if (selectedChoice) {
+          const playerMessageId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+          this.chatMessages.push({
+            id: playerMessageId,
+            speaker: 'You', // Player's name
+            text: selectedChoice.text,
+            isPlayer: true,
+          });
+        }
+        this.resolveAction = null;
+        resolve(id);
+      };
+
+      // Determine background
+      const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+      const backgroundColor = this.backgroundImageUrl
+        ? 'transparent'
+        : (this.theme?.backgroundColor || defaultGradient);
+
+      const stageWidth = this.context.width;
+      const stageHeight = this.context.height;
+
+      this.renderComponent(
+        <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <ChatDialogView
+            messages={this.chatMessages}
+            choices={choices}
+            mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
+            showAvatars={this.currentShowAvatars}
+            theme={this.theme}
+            backgroundUrl={this.backgroundImageUrl}
+            backgroundColor={backgroundColor}
+            onChoiceSelect={this.handleAction}
+            stageWidth={stageWidth}
+            stageHeight={stageHeight}
+            characterAvatarResolver={this.characterAvatarResolver || undefined}
+          />
+        </div>
+      );
+    });
+  }
+
   async renderChoices(choices: { id: string; text: string }[], locations?: Location[]): Promise<string> {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
@@ -881,6 +1023,11 @@ export class ReactRenderer extends BaseRenderer {
 
     // Get markVisited from renderer state (set by the beat)
     const markVisited = this.getState('markVisited') || false;
+
+    // If in chat mode, use chat rendering
+    if (this.currentPresentationMode !== 'positioned') {
+      return this.renderChatDialog(choices);
+    }
 
     // Use positioned rendering if locations are available
     if (locations && locations.length > 0) {

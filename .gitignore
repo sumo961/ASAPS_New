@@ -104,3 +104,10 @@ Cargo.lock
 *.exe
 *.exe.blockmap
 builder-debug.yml
+
+# Web service (local development only, not published to GitHub)
+apps/web-service/
+
+# Desktop app build outputs (generated during build)
+apps/builder-desktop/builder/
+apps/player-desktop/src-tauri/gen/

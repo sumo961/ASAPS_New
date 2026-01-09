@@ -282,7 +282,14 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
             return resolvedDefault;
           }
 
-          // Fall back to character's default image
+          // Fall back to character's default image (static) or spriteSheet (sprite)
+          if (character.visual.type === 'sprite' && character.visual.spriteSheet?.url) {
+            // For sprite characters, return the spriteSheet URL
+            // Note: This returns the full spritesheet; frame extraction happens in renderer
+            console.log(`[StoryPreview] Resolved sprite character ${character.name} → spriteSheet URL`);
+            return character.visual.spriteSheet.url;
+          }
+
           const resolvedCharDefault = resolveImage({
             assetId: character.visual.defaultAssetId,
             image: character.visual.defaultImage
@@ -350,6 +357,48 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
           };
         });
         console.log('[StoryPreview] Character meter frame resolver set up');
+      }
+
+      // Set up sprite data resolver to get sprite sheet config for character sprites
+      if (characters && characters.length > 0) {
+        (reactRenderer as any).setSpriteDataResolver((characterId: string) => {
+          const character = characters.find(c => c.id === characterId);
+          if (!character || character.visual.type !== 'sprite' || !character.visual.spriteSheet) {
+            return null;
+          }
+
+          const sheet = character.visual.spriteSheet;
+          // Don't set activeAnimation by default - sprites should be static until
+          // explicitly animated by a path animation (onLoad or onClick trigger)
+          // The path animation's waypoints specify which sprite animation to play
+
+          const result = {
+            frameWidth: sheet.frameWidth,
+            frameHeight: sheet.frameHeight,
+            imageWidth: sheet.imageWidth,  // Pass through for correct frame position calculation
+            defaultFrame: 0, // First frame by default - static until animation triggers
+            // Include animation data for sprite animation in preview
+            // These are available for path animations to reference, but not auto-played
+            animations: sheet.animations?.map(a => ({
+              name: a.name,
+              frames: a.frames,
+              frameDuration: a.frameDuration,
+              loop: a.loop,
+            })),
+            // No activeAnimation - sprite is static by default
+            activeAnimation: undefined,
+          };
+
+          console.log('[StoryPreview] spriteDataResolver returning:', {
+            characterId,
+            hasAnimations: !!result.animations?.length,
+            activeAnimation: result.activeAnimation,
+            animationNames: result.animations?.map(a => a.name),
+          });
+
+          return result;
+        });
+        console.log('[StoryPreview] Sprite data resolver set up');
       }
 
       // Set up sound blob resolver to load sound assets from storage

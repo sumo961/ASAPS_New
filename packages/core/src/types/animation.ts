@@ -54,6 +54,17 @@ export interface AnimationWaypoint {
 
   /** Flip vertically */
   flipY?: boolean;
+
+  // Sprite animation properties:
+
+  /** Name of a predefined sprite animation to play during movement to this waypoint */
+  spriteAnimation?: string;
+
+  /** Specific frame indices from sprite sheet to cycle through during movement */
+  spriteFrames?: number[];
+
+  /** Duration per frame in ms when cycling through spriteFrames (default: 100) */
+  spriteFrameDuration?: number;
 }
 
 /**
@@ -92,6 +103,13 @@ export interface AnimationPath {
 
   /** Trigger condition for starting animation */
   trigger?: 'onLoad' | 'onClick' | 'onVariable';
+
+  /**
+   * ID of the element that triggers this animation when clicked (for trigger='onClick').
+   * If not specified, clicking the animated element itself triggers the animation.
+   * This allows clicking element A (e.g., a door hotspot) to animate element B (e.g., avatar).
+   */
+  triggerElementId?: string;
 
   /** Variable name to monitor if trigger is 'onVariable' */
   triggerVariable?: string;
@@ -132,6 +150,12 @@ export interface AnimationState {
     opacity?: number;
     flipX?: boolean;
     flipY?: boolean;
+    /** Current sprite animation name (from waypoint) */
+    spriteAnimation?: string;
+    /** Current sprite frames to cycle (from waypoint) */
+    spriteFrames?: number[];
+    /** Frame duration in ms (from waypoint) */
+    spriteFrameDuration?: number;
   };
 }
 

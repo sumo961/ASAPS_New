@@ -223,6 +223,23 @@
           "required": false,
           "default": false,
           "description": "Show visual indication for choices leading to already-visited beats"
+        },
+        "presentationMode": {
+          "type": "string",
+          "required": false,
+          "default": "positioned",
+          "description": "Dialog presentation style: 'positioned' (traditional positioned elements), 'chat-scroll' (scrollable chat history), or 'chat-bubble' (single message bubble)",
+          "ui": {
+            "control": "select",
+            "options": ["positioned", "chat-scroll", "chat-bubble"],
+            "label": "Presentation Mode"
+          }
+        },
+        "showAvatars": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Show character avatars in chat mode"
         }
       },
       "locations": ["dialog", "choices"],

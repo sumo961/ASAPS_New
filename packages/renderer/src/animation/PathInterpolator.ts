@@ -114,6 +114,9 @@ function cubicBezierEasing(
   p2x: number,
   p2y: number
 ): number {
+  // Clamp input to [0, 1]
+  x = Math.max(0, Math.min(1, x));
+
   // For linear curves, return x
   if (p1x === p1y && p2x === p2y) {
     return x;
@@ -124,6 +127,9 @@ function cubicBezierEasing(
   let t = x;
 
   for (let i = 0; i < 8; i++) {
+    // Clamp t to [0, 1] to prevent runaway values
+    t = Math.max(0, Math.min(1, t));
+
     const xt = cubicBezier(t, 0, p1x, p2x, 1);
     const diff = xt - x;
 
@@ -144,8 +150,12 @@ function cubicBezierEasing(
     t -= diff / derivative;
   }
 
-  // Calculate y value using solved t
-  return cubicBezier(t, 0, p1y, p2y, 1);
+  // Clamp final t to [0, 1]
+  t = Math.max(0, Math.min(1, t));
+
+  // Calculate y value using solved t and clamp result
+  const y = cubicBezier(t, 0, p1y, p2y, 1);
+  return Math.max(0, Math.min(1, y));
 }
 
 /**
@@ -161,7 +171,7 @@ export function interpolateSegment(
   start: AnimationWaypoint,
   end: AnimationWaypoint,
   interpolationType: 'linear' | 'bezier'
-): { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean } {
+): { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean; spriteAnimation?: string; spriteFrames?: number[]; spriteFrameDuration?: number } {
   // Apply easing to progress
   const easedProgress = applyEasing(progress, end.easing);
 
@@ -199,7 +209,7 @@ export function interpolateSegment(
   const startOpacity = start.opacity ?? 1;
   const endOpacity = end.opacity ?? 1;
 
-  const result: { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean } = {
+  const result: { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean; spriteAnimation?: string; spriteFrames?: number[]; spriteFrameDuration?: number } = {
     x,
     y,
   };
@@ -218,14 +228,29 @@ export function interpolateSegment(
     result.opacity = lerp(easedProgress, startOpacity, endOpacity);
   }
 
-  // Flip properties are boolean - use the end waypoint value when past midpoint
-  // This creates a "snap" effect at the midpoint of the transition
+  // Flip properties are boolean - use the START waypoint's value for the entire segment
+  // The flip applies when arriving at a waypoint and stays until the next waypoint is reached
+  // This matches the AnimationPathEditor behavior and prevents mid-segment direction changes
   if (start.flipX !== undefined || end.flipX !== undefined) {
-    result.flipX = easedProgress >= 0.5 ? (end.flipX ?? false) : (start.flipX ?? false);
+    result.flipX = start.flipX ?? false;
   }
 
   if (start.flipY !== undefined || end.flipY !== undefined) {
-    result.flipY = easedProgress >= 0.5 ? (end.flipY ?? false) : (start.flipY ?? false);
+    result.flipY = start.flipY ?? false;
+  }
+
+  // Sprite animation properties - use the START waypoint's value for the entire segment
+  // This allows different animations for different path segments (e.g., walk then run)
+  if (start.spriteAnimation !== undefined) {
+    result.spriteAnimation = start.spriteAnimation;
+  }
+
+  if (start.spriteFrames !== undefined && start.spriteFrames.length > 0) {
+    result.spriteFrames = start.spriteFrames;
+  }
+
+  if (start.spriteFrameDuration !== undefined) {
+    result.spriteFrameDuration = start.spriteFrameDuration;
   }
 
   return result;
@@ -242,7 +267,7 @@ export function calculatePositionAtTime(
   waypoints: AnimationWaypoint[],
   currentTime: number,
   interpolationType: 'linear' | 'bezier'
-): { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean } | null {
+): { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean; spriteAnimation?: string; spriteFrames?: number[]; spriteFrameDuration?: number } | null {
   if (waypoints.length === 0) {
     return null;
   }
@@ -256,8 +281,14 @@ export function calculatePositionAtTime(
       opacity: waypoints[0].opacity,
       flipX: waypoints[0].flipX,
       flipY: waypoints[0].flipY,
+      spriteAnimation: waypoints[0].spriteAnimation,
+      spriteFrames: waypoints[0].spriteFrames,
+      spriteFrameDuration: waypoints[0].spriteFrameDuration,
     };
   }
+
+  // Calculate total duration to detect mismatches
+  const totalDuration = waypoints.slice(1).reduce((sum, wp) => sum + wp.duration, 0);
 
   // Find which segment we're in
   let accumulatedTime = 0;
@@ -281,7 +312,8 @@ export function calculatePositionAtTime(
     accumulatedTime += segmentDuration;
   }
 
-  // Past the end - return last waypoint
+  // Past the end - return last waypoint position but NO sprite animation
+  // When animation completes, sprite animation should stop (undefined values signal stop)
   const lastWaypoint = waypoints[waypoints.length - 1];
   return {
     x: lastWaypoint.x,
@@ -291,5 +323,9 @@ export function calculatePositionAtTime(
     opacity: lastWaypoint.opacity,
     flipX: lastWaypoint.flipX,
     flipY: lastWaypoint.flipY,
+    // Explicitly undefined to signal sprite animation should stop
+    spriteAnimation: undefined,
+    spriteFrames: undefined,
+    spriteFrameDuration: undefined,
   };
 }

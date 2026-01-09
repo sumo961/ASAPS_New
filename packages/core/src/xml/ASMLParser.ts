@@ -1,6 +1,7 @@
 import { Story } from '../engine/Story';
 import { Beat } from '../beats/Beat';
 import { BeatTypeRegistry } from '../beats/BeatRegistry';
+import { DialogTreeBeat } from '../beats/DialogTreeBeat';
 import { calculateTreeLayout, type LayoutEdge } from '../layout';
 import type {
   BeatConfig,
@@ -11,6 +12,7 @@ import type {
   Condition,
   Effect
 } from '../types';
+import type { DialogNode, DialogChoice } from '../generated/beat-types';
 
 // ============================================
 // Asset Manifest Types for ASML Import
@@ -781,7 +783,10 @@ export class ASMLParser {
       // Parse plot (beats and clusters)
       const plotElement = storyElement.querySelector('plot');
       if (plotElement) {
-        const { clusters, beats } = this.parsePlot(plotElement);
+        let { clusters, beats } = this.parsePlot(plotElement);
+
+        // Combine consecutive dialogTree beats into nested dialogs
+        beats = this.combineConsecutiveDialogTrees(beats);
 
         // Apply layout to beats before adding to story
         this.applyLayout(beats);
@@ -880,6 +885,123 @@ export class ASMLParser {
     });
 
     console.log('[ASMLParser] Layout complete');
+  }
+
+  /**
+   * Combine consecutive dialogTree beats into nested dialog structures.
+   *
+   * When beat A is a dialogTree with a single choice that leads to beat B (also a dialogTree),
+   * and beat B has no other incoming connections, merge B into A as a nested dialogNode.
+   *
+   * This reduces the number of beats in the flowchart while preserving the conversation flow.
+   */
+  private combineConsecutiveDialogTrees(beats: Beat[]): Beat[] {
+    console.log(`[ASMLParser] Starting dialog tree combination with ${beats.length} beats`);
+
+    // Build a map of beat ID to beat for quick lookup
+    const beatMap = new Map<string, Beat>();
+    beats.forEach(beat => beatMap.set(beat.id, beat));
+
+    // Build incoming connection count for each beat
+    const incomingCount = new Map<string, number>();
+    beats.forEach(beat => incomingCount.set(beat.id, 0));
+
+    beats.forEach(beat => {
+      const connections = beat.getConnections();
+      connections.forEach(conn => {
+        const currentCount = incomingCount.get(conn.targetId) || 0;
+        incomingCount.set(conn.targetId, currentCount + 1);
+      });
+    });
+
+    // Track which beats have been merged into others
+    const mergedBeats = new Set<string>();
+    let mergeCount = 0;
+
+    // Helper to check if a beat is a dialogTree
+    const isDialogTree = (beat: Beat): beat is DialogTreeBeat => {
+      return beat.type === 'dialogTree';
+    };
+
+    // Keep merging until no more merges are possible
+    let madeChange = true;
+    while (madeChange) {
+      madeChange = false;
+
+      for (const beat of beats) {
+        if (mergedBeats.has(beat.id)) continue;
+        if (!isDialogTree(beat)) continue;
+
+        const dialogBeat = beat as DialogTreeBeat;
+        const dialogTree = dialogBeat.dialogTree;
+        if (!dialogTree || !dialogTree.choices) continue;
+
+        // Check each choice for potential merge candidates
+        for (const choice of dialogTree.choices) {
+          // Skip if choice already has a nested dialogNode
+          if (choice.dialogNode) continue;
+
+          // Skip if choice has no target (ends dialog)
+          if (!choice.target) continue;
+
+          const targetBeat = beatMap.get(choice.target);
+          if (!targetBeat) continue;
+          if (mergedBeats.has(targetBeat.id)) continue;
+          if (!isDialogTree(targetBeat)) continue;
+
+          // Check if target has only one incoming connection (from this beat)
+          const targetIncoming = incomingCount.get(targetBeat.id) || 0;
+          if (targetIncoming !== 1) continue;
+
+          // Found a merge candidate!
+          // Convert target's dialogTree to be a nested dialogNode
+          const targetDialogBeat = targetBeat as DialogTreeBeat;
+          const targetDialogTree = targetDialogBeat.dialogTree;
+
+          if (targetDialogTree) {
+            console.log(`[ASMLParser] Merging beat "${targetBeat.name}" into "${beat.name}" via choice "${choice.text}"`);
+
+            // Create a copy of the target's dialogTree as the nested dialogNode
+            const nestedNode: DialogNode = {
+              id: targetDialogTree.id || `nested_${targetBeat.id}`,
+              speaker: targetDialogTree.speaker,
+              text: targetDialogTree.text,
+              emotion: targetDialogTree.emotion,
+              conditions: targetDialogTree.conditions,
+              effects: targetDialogTree.effects,
+              choices: targetDialogTree.choices.map(c => ({ ...c })) // Deep copy choices
+            };
+
+            // Set the nested node and remove the target reference
+            choice.dialogNode = nestedNode;
+            delete choice.target;
+
+            // Mark the target beat as merged
+            mergedBeats.add(targetBeat.id);
+            mergeCount++;
+            madeChange = true;
+
+            // Update incoming counts for beats that were targeted by the merged beat
+            targetDialogTree.choices.forEach(c => {
+              if (c.target) {
+                const count = incomingCount.get(c.target) || 0;
+                if (count > 0) {
+                  // Don't decrement below 0, and note that the target now has incoming from the merged structure
+                  incomingCount.set(c.target, count);
+                }
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // Filter out merged beats
+    const remainingBeats = beats.filter(beat => !mergedBeats.has(beat.id));
+
+    console.log(`[ASMLParser] Dialog tree combination complete: merged ${mergeCount} beats, ${remainingBeats.length} beats remaining`);
+
+    return remainingBeats;
   }
 
   /**

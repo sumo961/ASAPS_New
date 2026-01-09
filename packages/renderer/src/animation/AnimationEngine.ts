@@ -207,15 +207,18 @@ export class AnimationEngine {
     if (position) {
       this.animationState.currentPosition = { x: position.x, y: position.y };
 
-      if (position.scale !== undefined || position.rotation !== undefined || position.opacity !== undefined || position.flipX !== undefined || position.flipY !== undefined) {
-        this.animationState.currentTransform = {
-          scale: position.scale,
-          rotation: position.rotation,
-          opacity: position.opacity,
-          flipX: position.flipX,
-          flipY: position.flipY,
-        };
-      }
+      // Always update currentTransform to include sprite animation state
+      // This allows tracking when sprite animations should start/stop
+      this.animationState.currentTransform = {
+        scale: position.scale,
+        rotation: position.rotation,
+        opacity: position.opacity,
+        flipX: position.flipX,
+        flipY: position.flipY,
+        spriteAnimation: position.spriteAnimation,
+        spriteFrames: position.spriteFrames,
+        spriteFrameDuration: position.spriteFrameDuration,
+      };
 
       // Update current waypoint index
       this.updateWaypointIndex();
