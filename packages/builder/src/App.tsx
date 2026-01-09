@@ -19,6 +19,7 @@ import { loadProjectData } from './utils/projectDeserializer';
 import { downloadProjectAsZip, importProjectFromZip } from './utils/projectZipManager';
 import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
+import { InputModal } from './components/InputModal';
 import { getStorageAdapter } from './storage/HybridStorageAdapter';
 import { assetToStored, extractBlobFromAsset } from './storage/AssetStorageAdapter';
 import { DebugPanel } from './components/debug/DebugPanel';
@@ -73,6 +74,10 @@ function App() {
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Cluster naming modal state (replaces prompt() for Electron compatibility)
+  const [showClusterNameModal, setShowClusterNameModal] = useState(false);
+  const [clusterNameDefault, setClusterNameDefault] = useState('');
 
   // AI Debug hook - automatically runs after AI story generation
   const {
@@ -2317,6 +2322,23 @@ function App() {
     setShowSaveProjectDialog(false);
   }, []);
 
+  /**
+   * Handle cluster name modal confirmation
+   */
+  const handleClusterNameConfirm = useCallback((clusterName: string) => {
+    setShowClusterNameModal(false);
+    const newCluster = {
+      id: `cluster_${Date.now()}`,
+      name: clusterName.trim(),
+      type: 'spatial' as const,
+      containerPosition: { x: 100, y: 100 },
+      containerBounds: { width: 400, height: 300 },
+      isExpanded: true,
+    };
+    actions.addCluster(newCluster);
+    markChanged();
+  }, [actions, markChanged]);
+
   // Create a Story object for preview
   const getStoryForPreview = useCallback((): Story => {
     const story = new Story({
@@ -2908,19 +2930,9 @@ function App() {
           onClusterSelect={handleClusterSelect}
           onAddBeat={(type) => actions.addBeat(type)}
           onAddCluster={() => {
-            const clusterName = prompt('Enter cluster name:', `Cluster ${(state.clusters?.length || 0) + 1}`);
-            if (!clusterName) return; // User cancelled
-
-            const newCluster = {
-              id: `cluster_${Date.now()}`,
-              name: clusterName.trim(),
-              type: 'spatial' as const, // All clusters are spatial by default
-              containerPosition: { x: 100, y: 100 },
-              containerBounds: { width: 400, height: 300 },
-              isExpanded: true,
-            };
-            actions.addCluster(newCluster);
-            markChanged();
+            // Use custom modal instead of prompt() for Electron compatibility
+            setClusterNameDefault(`Cluster ${(state.clusters?.length || 0) + 1}`);
+            setShowClusterNameModal(true);
           }}
           onMoveBeatToCluster={(beatId, clusterId) => {
             actions.moveBeatToCluster(beatId, clusterId);
@@ -3232,6 +3244,18 @@ function App() {
         onSave={handleSaveUnsavedWork}
         onDiscard={handleDiscardUnsavedWork}
         action={pendingAction === 'newProject' ? 'creating a new project' : 'opening the project library'}
+      />
+
+      {/* Cluster Name Modal (replaces prompt() for Electron compatibility) */}
+      <InputModal
+        isOpen={showClusterNameModal}
+        title="New Cluster"
+        label="Cluster Name"
+        defaultValue={clusterNameDefault}
+        placeholder="Enter cluster name..."
+        onConfirm={handleClusterNameConfirm}
+        onCancel={() => setShowClusterNameModal(false)}
+        submitText="Create"
       />
 
       {/* AI Debug Modal */}

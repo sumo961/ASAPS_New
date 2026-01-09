@@ -188,6 +188,9 @@ export interface IRenderer {
   playClusterSound?(clusterId: string | null, sound: Sound | null): Promise<void>;
   stopBeatSound?(): void;
 
+  // Chat mode support
+  clearChatHistory?(): void;
+
   // User interaction
   waitForUserInput(): Promise<void>;
   

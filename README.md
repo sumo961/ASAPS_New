@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.2)
+## ⚠️ Development Status (v0.9.3)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -15,6 +15,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Project switching | Occasional issues; reload interface to resolve |
 | Animation system | Fully implemented with visual path editor (v0.9.1) |
 | Character meter frames | HUD overlays for counters (v0.9.2) |
+| Chat-style dialog mode | New presentation modes for DialogTree (v0.9.3) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
@@ -250,6 +251,15 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.3 (2026-01-09)
+- **Bug fixes and stability improvements**:
+  - Fixed cluster naming modal not appearing in Electron app (replaced `prompt()` with custom modal)
+  - Fixed MovementChoice/PickProp targets not being added when set after initial beat creation
+  - Fixed backgrounds persisting between beats (centralized background clearing in Beat.execute)
+  - Fixed chat dialog mode not showing NPC text after first message (proper chat history management)
+- **Centralized background handling**: Background state now managed in base Beat class, eliminating redundant code in individual beats
+- **Chat mode improvements**: Added `clearChatHistory` to IRenderer interface for proper message reset between dialogs
 
 ### v0.9.2 (2026-01-07)
 - **Character meter frame HUD**: Configurable overlay for displaying character counters (health, energy, etc.) as visual bars

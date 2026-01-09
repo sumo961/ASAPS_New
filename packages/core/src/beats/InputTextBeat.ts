@@ -149,10 +149,7 @@ export class InputTextBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
-    // Set background asset ID in renderer state so it can be resolved
-    if (this.node) {
-      renderer.setState('backgroundAssetId', this.node);
-    }
+    // Background is now handled centrally in Beat.execute()
 
     // Convert locations to array for renderer
     const locations = Array.from(this.locations.values());

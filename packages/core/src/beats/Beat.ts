@@ -169,8 +169,15 @@ export abstract class Beat {
         }
       } else {
         // No node specified, clear background
+        // CRITICAL: Clear BOTH backgroundAssetUrl AND backgroundAssetId to prevent
+        // previous beat's background from persisting
         renderer.setState('backgroundAssetUrl', null);
+        renderer.setState('backgroundAssetId', null);
       }
+
+      // Always set backgroundAssetId centrally so individual beats don't need to
+      // This ensures the background is cleared when a beat doesn't have one
+      renderer.setState('backgroundAssetId', this.node || null);
       
       const nextBeatId = await this.performAction(context, renderer);
       

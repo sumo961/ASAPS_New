@@ -292,10 +292,7 @@ export class DialogTreeBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
-    // Set background asset ID in renderer state so it can be resolved
-    if (this.node) {
-      renderer.setState('backgroundAssetId', this.node);
-    }
+    // Background is now handled centrally in Beat.execute()
 
     // Set markVisited state for renderer to use when rendering choices
     renderer.setState('markVisited', this.markVisited || false);
@@ -303,6 +300,14 @@ export class DialogTreeBeat extends Beat {
     // Set presentation mode for chat-like dialogs
     renderer.setState('presentationMode', this.presentationMode || 'positioned');
     renderer.setState('showAvatars', this.showAvatars ?? true);
+
+    // Clear chat history when starting a new dialog tree in chat mode
+    // This ensures messages from previous dialog trees don't persist
+    if (this.presentationMode && this.presentationMode !== 'positioned') {
+      if (renderer.clearChatHistory) {
+        renderer.clearChatHistory();
+      }
+    }
 
     this.currentNode = this.dialogTree;
 

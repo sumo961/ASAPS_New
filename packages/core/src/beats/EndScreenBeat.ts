@@ -61,10 +61,7 @@ export class EndScreenBeat extends Beat {
       context.reset();
     }
 
-    // Set background asset ID in renderer state so it can be resolved
-    if (this.node) {
-      renderer.setState('backgroundAssetId', this.node);
-    }
+    // Background is now handled centrally in Beat.execute()
 
     // Set button text in renderer state so it can be used by schema mapping
     // buttonText is legacy - treat it as restartText if restartText not set

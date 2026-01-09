@@ -32,7 +32,20 @@ export class PickPropBeat extends Beat {
 
   updateParameters(params: Record<string, any>): void {
     if (params.question !== undefined) this.question = params.question;
-    if (params.props !== undefined) this.props = params.props;
+    if (params.props !== undefined) {
+      this.props = params.props;
+      // CRITICAL FIX: Rebuild connections from props to ensure they're in sync
+      // This fixes the bug where targets added later weren't reflected
+      this.clearConnections();
+      for (const prop of this.props) {
+        if (prop.target) {
+          this.addConnection({
+            targetId: prop.target,
+            label: prop.name || prop.id
+          });
+        }
+      }
+    }
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
@@ -74,10 +87,7 @@ export class PickPropBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
-    // Set background asset ID in renderer state so it can be resolved
-    if (this.node) {
-      renderer.setState('backgroundAssetId', this.node);
-    }
+    // Background is now handled centrally in Beat.execute()
 
     // Set markVisited state for renderer to use when rendering choices
     renderer.setState('markVisited', this.markVisited || false);

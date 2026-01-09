@@ -54,7 +54,20 @@ export class MovementChoiceBeat extends Beat {
     });
 
     if (params.question !== undefined) this.question = params.question;
-    if (params.choices !== undefined) this.choices = params.choices;
+    if (params.choices !== undefined) {
+      this.choices = params.choices;
+      // CRITICAL FIX: Rebuild connections from choices to ensure they're in sync
+      // This fixes the long-standing bug where targets added later weren't reflected
+      this.clearConnections();
+      for (const choice of this.choices) {
+        if (choice.target) {
+          this.addConnection({
+            targetId: choice.target,
+            label: choice.text || choice.id
+          });
+        }
+      }
+    }
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
@@ -106,10 +119,7 @@ export class MovementChoiceBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
-    // Set background asset ID in renderer state so it can be resolved
-    if (this.node) {
-      renderer.setState('backgroundAssetId', this.node);
-    }
+    // Background is now handled centrally in Beat.execute()
 
     // Set markVisited state for renderer to use when rendering choices
     renderer.setState('markVisited', this.markVisited || false);
