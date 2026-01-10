@@ -39,7 +39,7 @@ export class DialogTreeBeat extends Beat {
     // CRITICAL FIX: Ensure dialogTree is ALWAYS a valid object, never undefined
     const dialogTreeParam = config.dialogTree || config.parameters?.dialogTree;
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
-    this.responseDelay = config.responseDelay || config.parameters?.responseDelay;
+    this.responseDelay = config.parameters?.responseDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
     this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
     this.presentationMode = (config.parameters?.presentationMode as 'positioned' | 'chat-scroll' | 'chat-bubble') || 'positioned';
@@ -316,13 +316,54 @@ export class DialogTreeBeat extends Beat {
 
     this.currentNode = this.dialogTree;
 
-    // Get locations array for positioned rendering
-    const locations = Array.from(this.locations.values());
+    // Get base locations array for positioned rendering (characters, props, etc.)
+    const baseLocations = Array.from(this.locations.values());
 
     // Track the exit target when user selects a choice with a beat ID target
     let exitTargetBeatId: string | null = null;
 
     while (this.currentNode) {
+      // Build phase-specific locations by merging base locations with phaseOverrides
+      // This ensures dialog/button positions from Visual Editor are respected
+      const phaseId = this.currentNode.id || 'root';
+      const phaseOverrides = this.phaseOverrides?.[phaseId];
+
+      // When phaseOverrides exist, filter out dialog/button elements from baseLocations
+      // since those will be added from phaseOverrides to avoid duplicates
+      let locations = phaseOverrides
+        ? baseLocations.filter(loc => loc.kind !== 'dialog' && loc.kind !== 'button')
+        : [...baseLocations];
+
+      if (phaseOverrides) {
+        // Add dialog element with position from phaseOverrides
+        const npcOverride = phaseOverrides['npc'];
+        if (npcOverride) {
+          locations.push({
+            kind: 'dialog' as const,
+            name: 'npc',
+            x: npcOverride.x ?? 0,
+            y: npcOverride.y ?? 0,
+            width: npcOverride.width ?? 400,
+            height: npcOverride.height ?? 100,
+          });
+        }
+
+        // Add button elements with positions from phaseOverrides
+        const choices = this.currentNode.choices || [];
+        choices.forEach((choice, idx) => {
+          const choiceOverride = phaseOverrides[`choice_${idx}`];
+          if (choiceOverride) {
+            locations.push({
+              kind: 'button' as const,
+              name: choice.text || `Choice ${idx + 1}`,
+              x: choiceOverride.x ?? 0,
+              y: choiceOverride.y ?? 0,
+              width: choiceOverride.width ?? 200,
+              height: choiceOverride.height ?? 50,
+            });
+          }
+        });
+      }
       // Check conditions on the node
       if (this.currentNode.conditions) {
         const allConditionsMet = this.currentNode.conditions.every(
