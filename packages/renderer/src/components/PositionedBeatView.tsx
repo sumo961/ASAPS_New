@@ -1446,16 +1446,19 @@ const TextElement: React.FC<{
     } else {
       setDisplayedText(content);
       setIsAnimating(false);
-      // For non-animated content, call completion immediately after a short delay
+      // For fade animation, wait for the fade duration before calling completion
+      // For 'none', complete immediately after a short delay
+      const fadeInDuration = theme.textEffects?.fadeInDuration || 500;
+      const waitDuration = animation === 'fade' ? fadeInDuration : 50;
       const timeoutId = setTimeout(() => {
         if (!animationCompletedRef.current) {
           animationCompletedRef.current = true;
           onAnimationComplete?.();
         }
-      }, animationDelay + 50);
+      }, animationDelay + waitDuration);
       return () => clearTimeout(timeoutId);
     }
-  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, onAnimationComplete, skipAnimation]);
+  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, theme.textEffects?.fadeInDuration, animationDelay, onAnimationComplete, skipAnimation]);
 
   // Use stored fontSize directly - auto-sizing happens at import time
   // Default to 16px if not set
@@ -2026,13 +2029,19 @@ const DialogElement: React.FC<{
     } else {
       setDisplayedText(content);
       setIsAnimating(false);
-      // Immediately complete for non-typewriter animations
-      if (!hasCalledCompleteRef.current && onAnimationComplete) {
-        hasCalledCompleteRef.current = true;
-        onAnimationComplete();
-      }
+      // For fade animation, wait for the fade duration before calling completion
+      // For 'none', complete immediately
+      const fadeInDuration = theme.textEffects?.fadeInDuration || 500;
+      const waitDuration = animation === 'fade' ? (animationDelay + fadeInDuration) : 0;
+      const timeoutId = setTimeout(() => {
+        if (!hasCalledCompleteRef.current && onAnimationComplete) {
+          hasCalledCompleteRef.current = true;
+          onAnimationComplete();
+        }
+      }, waitDuration);
+      return () => clearTimeout(timeoutId);
     }
-  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, skipAnimation, onAnimationComplete]);
+  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, theme.textEffects?.fadeInDuration, animationDelay, skipAnimation, onAnimationComplete]);
 
   // Calculate font size
   let computedFontSize: number;
@@ -3247,16 +3256,19 @@ const FlexTextElement: React.FC<{
       };
     } else {
       setDisplayedText(content);
-      // For non-animated content, call completion immediately after a short delay
+      // For fade animation, wait for the fade duration before calling completion
+      // For 'none', complete immediately after a short delay
+      const fadeInDuration = theme.textEffects?.fadeInDuration || 500;
+      const waitDuration = animation === 'fade' ? fadeInDuration : 50;
       const timeoutId = setTimeout(() => {
         if (!animationCompletedRef.current) {
           animationCompletedRef.current = true;
           onAnimationComplete?.();
         }
-      }, animationDelay + 50);
+      }, animationDelay + waitDuration);
       return () => clearTimeout(timeoutId);
     }
-  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, animationDelay, onAnimationComplete, skipAnimation]);
+  }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, theme.textEffects?.fadeInDuration, animationDelay, onAnimationComplete, skipAnimation]);
 
   // Calculate font size
   let computedFontSize: number;
