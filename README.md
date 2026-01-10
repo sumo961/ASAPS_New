@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.3)
+## ⚠️ Development Status (v0.9.4)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -16,6 +16,8 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Animation system | Fully implemented with visual path editor (v0.9.1) |
 | Character meter frames | HUD overlays for counters (v0.9.2) |
 | Chat-style dialog mode | New presentation modes for DialogTree (v0.9.3) |
+| DialogTree Merge Tool | Auto-detection of mergeable beats, visual merge UI (v0.9.4) |
+| Search & Replace | Project-wide search across beats, characters, assets (v0.9.4) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
@@ -251,6 +253,19 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.4 (2026-01-10)
+- **DialogTree Merge Tool**: New tool to consolidate multiple DialogTree beats into nested conversations
+  - Auto-detection of mergeable beat groups (DialogTree→DialogTree with single incoming links)
+  - Suggested merges displayed in purple-highlighted section
+  - Manual selection with drag-to-reorder and live preview
+  - Visual Editor properly updates after merge with correct phases
+- **Project-wide Search & Replace**: Find and replace text across all story content
+  - Search options: case-sensitive, whole word, regex
+  - Scope toggles: beats, characters, assets, metadata
+  - Results with context highlighting, click to navigate
+- **Chat dialog mode fix**: Fixed subsequent NPC messages not appearing after player choices
+- **Visual Editor improvements**: Beat version tracking for reliable UI updates, improved button autosizing
 
 ### v0.9.3 (2026-01-09)
 - **Bug fixes and stability improvements**:
