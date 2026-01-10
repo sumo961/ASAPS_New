@@ -996,7 +996,7 @@ export class ReactRenderer extends BaseRenderer {
       this.renderComponent(
         <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           <ChatDialogView
-            messages={this.chatMessages}
+            messages={[...this.chatMessages]}
             choices={choices}
             mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
             showAvatars={this.currentShowAvatars}
