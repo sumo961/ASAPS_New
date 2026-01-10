@@ -10,14 +10,14 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { X, GripVertical, MessageSquare, ArrowRight, AlertCircle } from 'lucide-react';
+import { X, GripVertical, MessageSquare, ArrowRight, AlertCircle, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 import { Beat, DialogTreeBeat } from '@asaps/core';
 
 interface MergeDialogTreesModalProps {
   isOpen: boolean;
   onClose: () => void;
   beats: Beat[];
-  onMerge: (beatIds: string[]) => { success: boolean; mergedBeatId?: string; error?: string };
+  onMerge: (beatIds: string[]) => { success: boolean; mergedBeatId?: string; mergedBeat?: Beat; error?: string };
   onBeatSelect?: (beat: Beat) => void;
 }
 
@@ -25,6 +25,113 @@ interface DraggableItem {
   beatId: string;
   beat: DialogTreeBeat;
   isSelected: boolean;
+}
+
+/**
+ * A group of DialogTree beats that can be safely merged
+ */
+interface MergeCandidate {
+  beats: DialogTreeBeat[];
+  reason: string;
+}
+
+/**
+ * Analyze beats to find groups that can be merged.
+ * Rules:
+ * 1. DialogTree beats that link directly to other DialogTree beats
+ * 2. Beats after the first must not have more than one incoming link
+ *    (otherwise it's a junction point and merging would break other paths)
+ */
+function findMergeCandidates(beats: Beat[]): MergeCandidate[] {
+  const dialogTreeBeats = beats.filter((b): b is DialogTreeBeat => b.type === 'dialogTree');
+  const dialogTreeIds = new Set(dialogTreeBeats.map(b => b.id));
+
+  // Build a map of incoming connections for each beat
+  const incomingConnections = new Map<string, { sourceId: string; sourceType: string }[]>();
+  beats.forEach(beat => {
+    const connections = beat.getConnections();
+    connections.forEach(conn => {
+      if (!incomingConnections.has(conn.targetId)) {
+        incomingConnections.set(conn.targetId, []);
+      }
+      incomingConnections.get(conn.targetId)!.push({
+        sourceId: beat.id,
+        sourceType: beat.type
+      });
+    });
+  });
+
+  // Find chains of DialogTree beats
+  const visited = new Set<string>();
+  const candidates: MergeCandidate[] = [];
+
+  // Helper to check if a beat can be merged (must have only one incoming link)
+  const canBeMergedAfterFirst = (beatId: string): boolean => {
+    const incoming = incomingConnections.get(beatId) || [];
+    // Beat can be merged if it has at most one incoming connection
+    // (junction points with multiple incoming links should not be merged)
+    return incoming.length <= 1;
+  };
+
+  // Helper to get DialogTree targets of a beat
+  const getDialogTreeTargets = (beat: DialogTreeBeat): string[] => {
+    const targets: string[] = [];
+    const connections = beat.getConnections();
+    connections.forEach(conn => {
+      if (dialogTreeIds.has(conn.targetId)) {
+        targets.push(conn.targetId);
+      }
+    });
+    // Also check choices for direct targets
+    beat.dialogTree?.choices?.forEach(choice => {
+      if (choice.target && dialogTreeIds.has(choice.target)) {
+        targets.push(choice.target);
+      }
+    });
+    return [...new Set(targets)];
+  };
+
+  // DFS to find chains starting from each unvisited DialogTree
+  dialogTreeBeats.forEach(startBeat => {
+    if (visited.has(startBeat.id)) return;
+
+    const chain: DialogTreeBeat[] = [startBeat];
+    visited.add(startBeat.id);
+
+    // Follow the chain
+    let current = startBeat;
+    while (true) {
+      const targets = getDialogTreeTargets(current);
+
+      // Find a valid next beat in the chain
+      let nextBeat: DialogTreeBeat | null = null;
+      for (const targetId of targets) {
+        if (visited.has(targetId)) continue;
+
+        const targetBeat = dialogTreeBeats.find(b => b.id === targetId);
+        if (targetBeat && canBeMergedAfterFirst(targetId)) {
+          nextBeat = targetBeat;
+          break;
+        }
+      }
+
+      if (!nextBeat) break;
+
+      chain.push(nextBeat);
+      visited.add(nextBeat.id);
+      current = nextBeat;
+    }
+
+    // Only suggest chains with 2+ beats
+    if (chain.length >= 2) {
+      candidates.push({
+        beats: chain,
+        reason: `${chain.length} connected DialogTree beats in sequence`
+      });
+    }
+  });
+
+  return candidates;
 }
 
 export const MergeDialogTreesModal: React.FC<MergeDialogTreesModalProps> = ({
@@ -39,10 +146,16 @@ export const MergeDialogTreesModal: React.FC<MergeDialogTreesModalProps> = ({
     return beats.filter((b): b is DialogTreeBeat => b.type === 'dialogTree');
   }, [beats]);
 
+  // Auto-detect merge candidates
+  const mergeCandidates = useMemo(() => {
+    return findMergeCandidates(beats);
+  }, [beats]);
+
   // Track selected beats and their order
   const [selectedBeatIds, setSelectedBeatIds] = useState<string[]>([]);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [suggestionsExpanded, setSuggestionsExpanded] = useState(true);
 
   // Reset state when modal opens
   React.useEffect(() => {
@@ -50,8 +163,15 @@ export const MergeDialogTreesModal: React.FC<MergeDialogTreesModalProps> = ({
       setSelectedBeatIds([]);
       setDraggedId(null);
       setError(null);
+      setSuggestionsExpanded(true);
     }
   }, [isOpen]);
+
+  // Select a suggested merge group
+  const selectSuggestion = useCallback((candidate: MergeCandidate) => {
+    setSelectedBeatIds(candidate.beats.map(b => b.id));
+    setError(null);
+  }, []);
 
   // Toggle beat selection
   const toggleBeat = useCallback((beatId: string) => {
@@ -125,17 +245,15 @@ export const MergeDialogTreesModal: React.FC<MergeDialogTreesModalProps> = ({
 
     if (result.success) {
       // If a beat select callback is provided, select the merged beat
-      if (result.mergedBeatId && onBeatSelect) {
-        const mergedBeat = beats.find((b) => b.id === result.mergedBeatId);
-        if (mergedBeat) {
-          onBeatSelect(mergedBeat);
-        }
+      // Use result.mergedBeat directly instead of finding in beats array (avoids stale state)
+      if (result.mergedBeat && onBeatSelect) {
+        onBeatSelect(result.mergedBeat);
       }
       onClose();
     } else {
       setError(result.error || 'Failed to merge beats');
     }
-  }, [selectedBeatIds, onMerge, onClose, beats, onBeatSelect]);
+  }, [selectedBeatIds, onMerge, onClose, onBeatSelect]);
 
   if (!isOpen) return null;
 
@@ -171,8 +289,59 @@ export const MergeDialogTreesModal: React.FC<MergeDialogTreesModalProps> = ({
         <div className="flex-1 overflow-hidden flex">
           {/* Left: Beat List */}
           <div className="flex-1 border-r border-gray-200 overflow-y-auto p-4">
+            {/* Suggested Merges Section */}
+            {mergeCandidates.length > 0 && (
+              <div className="mb-4">
+                <button
+                  onClick={() => setSuggestionsExpanded(!suggestionsExpanded)}
+                  className="w-full flex items-center gap-2 text-sm font-medium text-purple-700 hover:text-purple-900 mb-2"
+                >
+                  {suggestionsExpanded ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                  <Sparkles className="w-4 h-4" />
+                  <span>Suggested Merges ({mergeCandidates.length})</span>
+                </button>
+
+                {suggestionsExpanded && (
+                  <div className="space-y-2 mb-4">
+                    {mergeCandidates.map((candidate, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => selectSuggestion(candidate)}
+                        className="w-full p-3 rounded-lg border-2 border-purple-200 bg-purple-50 hover:bg-purple-100 hover:border-purple-300 transition-all text-left"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-purple-600 bg-purple-200 px-2 py-0.5 rounded">
+                            {candidate.beats.length} beats
+                          </span>
+                          <span className="text-xs text-purple-500">
+                            {candidate.reason}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-700 flex flex-wrap items-center gap-1">
+                          {candidate.beats.map((beat, i) => (
+                            <React.Fragment key={beat.id}>
+                              <span className="truncate max-w-[120px]" title={beat.name}>
+                                {beat.name}
+                              </span>
+                              {i < candidate.beats.length - 1 && (
+                                <ArrowRight className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <h3 className="text-sm font-medium text-gray-700 mb-3">
-              Available DialogTree Beats ({dialogTreeBeats.length})
+              {mergeCandidates.length > 0 ? 'Or select manually:' : 'Available DialogTree Beats'} ({dialogTreeBeats.length})
             </h3>
 
             {dialogTreeBeats.length === 0 ? (

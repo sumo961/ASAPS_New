@@ -141,8 +141,8 @@ export function calculateTextDimensions(options: TextMeasurementOptions): TextDi
 
 /**
  * Calculate dimensions for a button with text
- * Buttons prefer single line and have specific size constraints
- * Buttons have asymmetric padding: 12px horizontal, 6px vertical per side
+ * Buttons have specific size constraints but can wrap to multiple lines if needed
+ * Buttons have comfortable padding for touch/click targets
  */
 export function calculateButtonDimensions(
   text: string,
@@ -152,18 +152,29 @@ export function calculateButtonDimensions(
   // Measure text width
   const measured = measureTextCanvas(text, fontSize, fontFamily);
 
-  // Button padding matches renderer: 12px horizontal per side, 6px vertical per side
-  const horizontalPadding = 24; // 12 * 2 sides
-  const verticalPadding = 12;   // 6 * 2 sides
+  // Button padding - generous for comfortable appearance
+  const horizontalPadding = 32; // 16px per side
+  const verticalPadding = 24;   // 12px per side for comfortable height
   const borderWidth = 4;        // 2px per side × 2 to match theme.button.borderWidth
-  const lineHeight = 1.4;
+  const lineHeight = 1.5;       // Slightly more line spacing for readability
 
   const minWidth = 120;
   const maxWidth = 400;
 
   const contentWidth = measured.width + horizontalPadding + borderWidth;
   const width = Math.max(minWidth, Math.min(contentWidth, maxWidth));
-  const height = fontSize * lineHeight + verticalPadding + borderWidth;
+
+  // Calculate number of lines when text wraps
+  let numLines = 1;
+  if (contentWidth > maxWidth) {
+    // Text needs to wrap - estimate number of lines
+    const availableWidth = maxWidth - horizontalPadding - borderWidth;
+    const avgCharWidth = fontSize * 0.55; // Approximate character width
+    const charsPerLine = Math.floor(availableWidth / avgCharWidth);
+    numLines = Math.max(1, Math.ceil(text.length / charsPerLine));
+  }
+
+  const height = numLines * fontSize * lineHeight + verticalPadding + borderWidth;
 
   return {
     width: Math.round(width),

@@ -254,10 +254,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   }>({ isOpen: false });
 
   // Phase tree computation for DialogTree beats
-  // Note: We need to depend on the beat's actual dialogTree content, not just the beat reference
-  const dialogTreeParams = beat?.type === 'dialogTree'
-    ? (beat.getParameters?.() as { dialogTree?: DialogNode } | undefined)?.dialogTree
-    : null;
+  // Note: We need to depend on beat._version to detect parameter changes (e.g., after merging)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const beatVersion = (beat as any)?._version;
+
+  const dialogTreeParams = useMemo(() => {
+    if (beat?.type !== 'dialogTree') return null;
+    return (beat.getParameters?.() as { dialogTree?: DialogNode } | undefined)?.dialogTree || null;
+  }, [beat?.type, beat?.id, beatVersion]);
 
   const phaseTree = useMemo(() => {
     if (beat?.type !== 'dialogTree' || !dialogTreeParams) return null;
@@ -343,7 +347,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Gaps match preview renderer's flex layout
     const textButtonGap = 20; // Gap between text box and first button
     const buttonGap = 16; // Gap between buttons (matches preview's row gap)
-    const buttonHeight = 50;
     const startY = 50; // Match preview's starting position
 
     // Calculate text box dimensions first (same logic as preview/autoLayout)
@@ -399,30 +402,39 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const maxButtonWidth = stageWidth * 0.6;
     const choices = phase.choices || [];
 
-    // Estimate each button's natural width based on text
-    const buttonTextWidths = choices.map(choice => {
+    // Calculate dimensions for each button (including height for multi-line text)
+    const buttonDimensions = choices.map(choice => {
       const btnText = choice.text || '';
-      return btnText.length * defaultFontSize * 0.55 + 40; // Add padding for button
+      return calculateButtonDimensions(btnText, defaultFontSize, defaultFont);
     });
+
+    // Use uniform width for all buttons (max of calculated widths, capped)
     const uniformButtonWidth = Math.min(
-      Math.max(200, ...buttonTextWidths),
+      Math.max(200, ...buttonDimensions.map(d => d.width)),
       maxButtonWidth
     );
     const buttonCenterX = (stageWidth - uniformButtonWidth) / 2;
 
-    // Choice buttons - positioned immediately after text box
+    // Choice buttons - positioned with cumulative Y based on individual heights
+    let currentY = buttonStartY;
     choices.forEach((choice, idx) => {
+      // Use calculated height for this specific button
+      const buttonHeight = buttonDimensions[idx]?.height || 50;
+
       baseElements.push({
         id: `choice_${idx}`,
         kind: 'button',
         content: choice.text || '',
         x: buttonCenterX,
-        y: buttonStartY + idx * (buttonHeight + buttonGap),
+        y: currentY,
         width: uniformButtonWidth,
         height: buttonHeight,
         fontSize: defaultFontSize,
         fontFamily: defaultFont,
       });
+
+      // Move Y position for next button
+      currentY += buttonHeight + buttonGap;
     });
 
     // Apply auto-layout (mainly for collision detection and fine-tuning)

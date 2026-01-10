@@ -223,6 +223,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         ) : (
           <div className="h-full w-full">
             <VisualWorkspace
+              // Key includes _version to force re-render when beat parameters change (e.g., after merge)
+              key={`${selectedBeat?.id}-${(selectedBeat as any)?._version || 0}`}
               beat={selectedBeat}
               beats={beats}
               assets={assets}

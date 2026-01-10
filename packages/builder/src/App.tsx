@@ -1358,8 +1358,17 @@ function App() {
 
   // Handler functions
   const handleBeatSelect = useCallback((beat: Beat) => {
-    setSelectedBeat(beat);
-  }, []);
+    // If selecting the same beat but with updated _version (e.g., after merge),
+    // force re-render by clearing first, then setting in next tick
+    if (selectedBeat?.id === beat.id && (beat as any)._version !== (selectedBeat as any)?._version) {
+      console.log('[App] Beat version changed, forcing re-render:', (selectedBeat as any)?._version, '->', (beat as any)._version);
+      setSelectedBeat(null);
+      // Use setTimeout to ensure React processes the null state before setting the new beat
+      setTimeout(() => setSelectedBeat(beat), 0);
+    } else {
+      setSelectedBeat(beat);
+    }
+  }, [selectedBeat]);
 
   const handleClusterSelect = useCallback((cluster: Cluster | null) => {
     setSelectedCluster(cluster);

@@ -67,7 +67,7 @@ interface StoryBuilderActions {
   clearStory: () => void;
   updateSettings: (settings: any) => void;
   loadStoryData: (storyData: any) => void;
-  mergeDialogTrees: (beatIds: string[]) => { success: boolean; mergedBeatId?: string; error?: string };
+  mergeDialogTrees: (beatIds: string[]) => { success: boolean; mergedBeatId?: string; mergedBeat?: Beat; error?: string };
 }
 
 /**
@@ -927,7 +927,7 @@ export function useStoryBuilder() {
   }, []);
 
   // Merge multiple dialogTree beats into a single beat with nested dialog structure
-  const mergeDialogTrees = useCallback((beatIds: string[]): { success: boolean; mergedBeatId?: string; error?: string } => {
+  const mergeDialogTrees = useCallback((beatIds: string[]): { success: boolean; mergedBeatId?: string; mergedBeat?: Beat; error?: string } => {
     if (beatIds.length < 2) {
       return { success: false, error: 'Need at least 2 beats to merge' };
     }
@@ -962,36 +962,47 @@ export function useStoryBuilder() {
     const updateChoicesWithNesting = (choices: any[] | undefined): any[] => {
       if (!choices) return [];
 
-      return choices.map(choice => {
-        // Check if this choice leads to one of the beats being merged
-        const targetIndex = beatsToRemove.findIndex(b => b.id === choice.target);
-        if (targetIndex !== -1) {
-          const nextBeat = beatsToRemove[targetIndex];
-          const nextDialogTree = nextBeat.dialogTree;
+      return choices
+        .map(choice => {
+          // Check if this choice leads to one of the beats being merged
+          const targetIndex = beatsToRemove.findIndex(b => b.id === choice.target);
+          if (targetIndex !== -1) {
+            const nextBeat = beatsToRemove[targetIndex];
+            const nextDialogTree = nextBeat.dialogTree;
 
-          if (nextDialogTree) {
-            // Create nested dialogNode from the next beat
-            const nestedNode: DialogNode = {
-              id: nextDialogTree.id || `nested_${nextBeat.id}`,
-              speaker: nextDialogTree.speaker,
-              text: nextDialogTree.text,
-              emotion: nextDialogTree.emotion,
-              conditions: nextDialogTree.conditions,
-              effects: nextDialogTree.effects,
-              // Recursively process choices of the nested beat
-              choices: updateChoicesWithNesting(nextDialogTree.choices)
-            };
+            if (nextDialogTree) {
+              // Create nested dialogNode from the next beat
+              // IMPORTANT: Generate unique ID to avoid collision with other phases
+              // Use beat ID + timestamp to ensure uniqueness
+              const nestedNode: DialogNode = {
+                id: `nested_${nextBeat.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                speaker: nextDialogTree.speaker,
+                text: nextDialogTree.text,
+                emotion: nextDialogTree.emotion,
+                conditions: nextDialogTree.conditions,
+                effects: nextDialogTree.effects,
+                // Recursively process choices of the nested beat
+                choices: updateChoicesWithNesting(nextDialogTree.choices)
+              };
 
-            // Return choice with nested node, removing the target reference
-            return {
-              ...choice,
-              dialogNode: nestedNode,
-              target: undefined
-            };
+              // Return choice with nested node, removing the target reference
+              return {
+                ...choice,
+                dialogNode: nestedNode,
+                target: undefined
+              };
+            }
           }
-        }
-        return choice;
-      });
+          return choice;
+        })
+        // Filter out empty/placeholder choices that have no target and no nested content
+        .filter(choice => {
+          const hasTarget = choice.target && !beatsToRemove.find(b => b.id === choice.target);
+          const hasNestedContent = choice.dialogNode;
+          const hasRealText = choice.text && choice.text !== 'Player response...' && choice.text.trim() !== '';
+          // Keep choices that have a target to external beat, or have nested content, or have real text
+          return hasTarget || hasNestedContent || hasRealText;
+        });
     };
 
     // Update the target beat's choices with nested structure
@@ -1003,6 +1014,17 @@ export function useStoryBuilder() {
     // CRITICAL: Update the target beat's parameters with the new dialog tree
     // This persists the merged structure and allows React to detect the change
     targetBeat.updateParameters({ dialogTree: updatedDialogTree });
+
+    // Clear button locations from the target beat so auto-layout will be used
+    // The old button positions don't match the new merged choices structure
+    const locationsToRemove: string[] = [];
+    targetBeat.locations.forEach((loc, key) => {
+      if (loc.kind === 'button') {
+        locationsToRemove.push(key);
+      }
+    });
+    locationsToRemove.forEach(key => targetBeat.locations.delete(key));
+    console.log(`[useStoryBuilder] Cleared ${locationsToRemove.length} button locations for auto-layout after merge`);
 
     // Collect all outgoing connections from beats being removed
     const newConnections: any[] = [];
@@ -1034,7 +1056,8 @@ export function useStoryBuilder() {
 
     console.log(`[useStoryBuilder] Merged ${beatsToRemove.length} beats into ${targetBeat.name}`);
 
-    return { success: true, mergedBeatId: targetBeat.id };
+    // Return the actual beat object so the caller can select it directly (avoids stale state issues)
+    return { success: true, mergedBeatId: targetBeat.id, mergedBeat: targetBeat };
   }, [state.beats]);
 
   const actions: StoryBuilderActions = {
