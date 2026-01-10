@@ -276,14 +276,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   console.log('[VisualWorkspace] isDialogTreeBeat:', isDialogTreeBeat, 'phases:', flattenedPhases.length);
 
   // Get the current phase's DialogNode for phase-aware editing
+  // Must depend on dialogTreeParams to recalculate when dialog tree is modified (e.g., adding choices)
   const selectedPhase = useMemo(() => {
-    if (beat?.type !== 'dialogTree' || !selectedPhaseId) return null;
-    const params = beat.getParameters?.() as { dialogTree?: DialogNode } | undefined;
-    return findPhaseById(params?.dialogTree, selectedPhaseId);
-  }, [beat, selectedPhaseId]);
+    if (beat?.type !== 'dialogTree' || !selectedPhaseId || !dialogTreeParams) return null;
+    return findPhaseById(dialogTreeParams, selectedPhaseId);
+  }, [beat?.type, dialogTreeParams, selectedPhaseId]);
 
   // Track previous phase ID to detect phase changes for auto-save
   const prevPhaseIdRef = useRef<string | null>(null);
+  // Track previous phase choices count to detect when choices are added/removed
+  const prevChoicesCountRef = useRef<number>(0);
 
   // Reset selected phase when beat changes
   useEffect(() => {
@@ -577,7 +579,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // If beat ID is changing and we had unsaved changes, save to the PREVIOUS beat first
     if (beat?.id !== prevBeatIdRef.current && hasChangesRef.current && beatRef.current) {
       const prevBeat = beatRef.current;
-      console.log('[VisualWorkspace] Beat changing - auto-saving previous beat:', prevBeatIdRef.current, '-> new:', beat?.id);
 
       // Save using refs to get current state
       const params = prevBeat.getParameters ? prevBeat.getParameters() : {};
@@ -651,6 +652,32 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
         prevBeat.locations.set(el.name || el.id, location);
       });
+
+      // For DialogTree beats: save phase-specific element positions to phaseOverrides
+      // This preserves dialog/button positions when switching beats
+      // Use selectedPhaseId as fallback if prevPhaseIdRef.current is null (e.g., after HMR re-mount)
+      const phaseKeyToSave = prevPhaseIdRef.current || selectedPhaseId;
+      if (prevBeat.type === 'dialogTree' && phaseKeyToSave) {
+        const phaseKey = phaseKeyToSave;
+        const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number }>> = {};
+
+        visualElementsRef.current.forEach((el: VisualElement) => {
+          // Save ALL elements to phaseOverrides (dialog, buttons, and others)
+          overrides[el.id] = {
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+          };
+        });
+
+        const existingOverrides = params.phaseOverrides || {};
+        params.phaseOverrides = {
+          ...existingOverrides,
+          [phaseKey]: overrides,
+        };
+        console.log(`[VisualWorkspace] Saved phase overrides for phase: ${phaseKey} before beat change`);
+      }
 
       // Save to parameters
       prevBeat.updateParameters({
@@ -747,9 +774,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Check if beat changed - always reload when switching to a different beat
     const beatChanged = prevBeatIdRef.current !== beat.id;
 
-    // Don't reload if this is the same beat AND same phase AND we already have elements
-    if (!beatChanged && prevPhaseIdRef.current === selectedPhaseId && visualElements.length > 0) {
-      console.log(`[VisualWorkspace] Phase effect - skipping (same beat+phase, already have elements)`);
+    // Check if choices count changed - force reload when choices are added/removed
+    const currentChoicesCount = selectedPhase.choices?.length || 0;
+    const choicesChanged = prevChoicesCountRef.current !== currentChoicesCount;
+
+    // Don't reload if this is the same beat AND same phase AND same choices count AND we already have elements
+    if (!beatChanged && !choicesChanged && prevPhaseIdRef.current === selectedPhaseId && visualElements.length > 0) {
+      console.log(`[VisualWorkspace] Phase effect - skipping (same beat+phase+choices, already have elements)`);
       return;
     }
 
@@ -833,8 +864,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     setHasChanges(false);
     prevPhaseIdRef.current = selectedPhaseId;
     prevBeatIdRef.current = beat.id;
+    prevChoicesCountRef.current = currentChoicesCount;
 
-    console.log(`[VisualWorkspace] Loaded ${allElements.length} elements for phase: ${selectedPhaseId} (${persistedElements.length} persisted + ${phaseElements.length} phase)`);
+    console.log(`[VisualWorkspace] Loaded ${allElements.length} elements for phase: ${selectedPhaseId} (${persistedElements.length} persisted + ${phaseElements.length} phase, ${currentChoicesCount} choices)`);
   }, [beat, selectedPhaseId, selectedPhase, projectSettings, generatePhaseElements, characters, assets]);
 
   // Initialize from beat parameters
