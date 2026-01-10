@@ -255,6 +255,10 @@ function calculateTextBoxDimensions(
 /**
  * Adjust button positions to avoid collisions with text boxes
  * Returns adjusted elements array
+ *
+ * IMPORTANT: This function now RESPECTS user-defined positions.
+ * - Text boxes: Keep original x position, only expand width if needed
+ * - Buttons: Keep original x position and width, only adjust y if colliding
  */
 function adjustElementsForCollisions(
   elements: PositionedElementData[],
@@ -262,7 +266,6 @@ function adjustElementsForCollisions(
   theme: RenderThemeSettings
 ): PositionedElementData[] {
   const padding = theme.textBox.padding || 20;
-  const maxTextWidth = stageWidth * 0.8;
 
   // Separate text and button elements
   const textElements = elements.filter(el =>
@@ -275,89 +278,41 @@ function adjustElementsForCollisions(
     el.location.kind !== 'text' && el.location.kind !== 'dialog' && el.location.kind !== 'button'
   );
 
-  // Calculate actual dimensions for text elements
-  // Center text boxes horizontally when they need more width
+  // Calculate actual bounds for text elements
+  // RESPECT original positions - don't center text boxes
   const textBoxBounds: { bottom: number; left: number; right: number }[] = [];
   const adjustedTextElements = textElements.map(el => {
-    const fontSize = el.location.fontSize || 16;
-    const fontFamily = el.location.font || 'Arial';
-    const dims = calculateTextBoxDimensions(
-      el.content || '',
-      fontSize,
-      fontFamily,
-      el.location.width,
-      maxTextWidth,
-      padding
-    );
+    // Use the original location dimensions
+    const width = el.location.width;
+    const height = el.location.height || 50; // Default height if not specified
 
-    // If text needs more width, center it horizontally on the stage
-    const needsMoreWidth = dims.width > el.location.width;
-    const newWidth = needsMoreWidth ? dims.width : el.location.width;
-
-    // Center the text box if it needs more width, otherwise keep original position
-    // Also ensure it doesn't go off-screen
-    let newX = el.location.x;
-    if (needsMoreWidth) {
-      // Center on stage
-      newX = (stageWidth - newWidth) / 2;
-    } else {
-      // Ensure original position doesn't cause overflow
-      if (newX + newWidth > stageWidth - 20) {
-        newX = stageWidth - newWidth - 20;
-      }
-      if (newX < 20) {
-        newX = 20;
-      }
-    }
-
-    // Calculate the actual bounds of the text box
-    const bottom = el.location.y + dims.height;
-    const left = newX;
-    const right = newX + newWidth;
+    // Calculate bounds using original position
+    const bottom = el.location.y + height;
+    const left = el.location.x;
+    const right = el.location.x + width;
     textBoxBounds.push({ bottom, left, right });
 
-    // Return element with adjusted position and width
-    if (newWidth !== el.location.width || newX !== el.location.x) {
-      return {
-        ...el,
-        location: {
-          ...el.location,
-          x: newX,
-          width: newWidth
-        }
-      };
-    }
+    // Return element unchanged - respect user positions
     return el;
   });
-
-  // Adjust button positions to avoid collisions
-  // Keep original X positions but normalize widths and prevent vertical overlaps
 
   if (buttonElements.length === 0) {
     return [...otherElements, ...adjustedTextElements];
   }
 
-  // Calculate uniform button width (use max width among all buttons, capped at 60% stage)
-  const maxButtonWidth = Math.min(
-    Math.max(...buttonElements.map(el => el.location.width)),
-    stageWidth * 0.6
-  );
-
-  // Calculate common X position: average center of all buttons
-  const avgCenterX = buttonElements.reduce((sum, el) => sum + el.location.x + el.location.width / 2, 0) / buttonElements.length;
-  const commonX = Math.max(0, Math.min(avgCenterX - maxButtonWidth / 2, stageWidth - maxButtonWidth));
-
-  // Process buttons in order of their Y position (top to bottom)
+  // Process buttons - RESPECT original X positions and widths
+  // Only adjust Y position if there's a collision with text boxes
   const sortedButtons = [...buttonElements].sort((a, b) => a.location.y - b.location.y);
   const adjustedButtonElements: PositionedElementData[] = [];
   const buttonBounds: { top: number; bottom: number; left: number; right: number }[] = [];
 
   for (const el of sortedButtons) {
     let newY = el.location.y;
-    // Use common X position for all buttons (aligned)
-    const newX = commonX;
-    const buttonLeft = newX;
-    const buttonRight = newX + maxButtonWidth;
+    // KEEP original X position and width
+    const buttonX = el.location.x;
+    const buttonWidth = el.location.width;
+    const buttonLeft = buttonX;
+    const buttonRight = buttonX + buttonWidth;
     const buttonHeight = el.location.height;
 
     // Check collision with each text box
@@ -384,15 +339,18 @@ function adjustElementsForCollisions(
       right: buttonRight
     });
 
-    adjustedButtonElements.push({
-      ...el,
-      location: {
-        ...el.location,
-        x: newX,
-        y: newY,
-        width: maxButtonWidth
-      }
-    });
+    // Only create new location if Y position changed
+    if (newY !== el.location.y) {
+      adjustedButtonElements.push({
+        ...el,
+        location: {
+          ...el.location,
+          y: newY
+        }
+      });
+    } else {
+      adjustedButtonElements.push(el);
+    }
   }
 
   return [...otherElements, ...adjustedTextElements, ...adjustedButtonElements];
