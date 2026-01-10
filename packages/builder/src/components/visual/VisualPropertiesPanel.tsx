@@ -58,6 +58,8 @@ interface VisualPropertiesPanelProps {
   onPresentationModeChange?: (mode: 'positioned' | 'chat-scroll' | 'chat-bubble') => void;
   showAvatars?: boolean;
   onShowAvatarsChange?: (show: boolean) => void;
+  responseDelay?: number;
+  onResponseDelayChange?: (delay: number) => void;
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -93,6 +95,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onPresentationModeChange,
   showAvatars,
   onShowAvatarsChange,
+  responseDelay,
+  onResponseDelayChange,
 }) => {
   // Get default fonts from global settings based on element type
   // Renderer uses different fonts for text vs buttons vs titles
@@ -329,6 +333,27 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                     <label htmlFor="showAvatars" className="text-sm text-gray-700">
                       Show character avatars
                     </label>
+                  </div>
+                )}
+
+                {/* Response Delay - Only visible in chat modes */}
+                {(presentationMode === 'chat-scroll' || presentationMode === 'chat-bubble') && onResponseDelayChange && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      NPC Response Delay (seconds)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.5"
+                      value={responseDelay ?? 0}
+                      onChange={(e) => onResponseDelayChange(parseFloat(e.target.value) || 0)}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Adds a natural pause before NPC responds. Shows typing indicator during delay.
+                    </p>
                   </div>
                 )}
               </div>

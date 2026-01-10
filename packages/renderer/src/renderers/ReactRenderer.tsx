@@ -968,7 +968,10 @@ export class ReactRenderer extends BaseRenderer {
    */
   private renderChatDialog(choices: Array<{ id: string; text: string }>): Promise<string> {
     return new Promise(resolve => {
-      this.resolveAction = (id: string) => {
+      // Get response delay from renderer state (set by DialogTreeBeat)
+      const responseDelay = (this.getState('responseDelay') as number) || 0;
+
+      this.resolveAction = async (id: string) => {
         // When a choice is selected, add it as a player message
         const selectedChoice = choices.find(c => c.id === id);
         if (selectedChoice) {
@@ -979,38 +982,65 @@ export class ReactRenderer extends BaseRenderer {
             text: selectedChoice.text,
             isPlayer: true,
           });
+
+          // If there's a response delay, show player message first, then typing indicator
+          if (responseDelay > 0) {
+            // Re-render to show player's message (without choices, with typing indicator)
+            this.renderChatView([], false);
+
+            // Small delay to let player see their message
+            await new Promise(r => setTimeout(r, 300));
+
+            // Show typing indicator
+            this.renderChatView([], true);
+
+            // Wait for the response delay
+            await new Promise(r => setTimeout(r, responseDelay * 1000));
+          }
         }
         this.resolveAction = null;
         resolve(id);
       };
 
-      // Determine background
-      const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
-      const backgroundColor = this.backgroundImageUrl
-        ? 'transparent'
-        : (this.theme?.backgroundColor || defaultGradient);
-
-      const stageWidth = this.context.width;
-      const stageHeight = this.context.height;
-
-      this.renderComponent(
-        <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          <ChatDialogView
-            messages={[...this.chatMessages]}
-            choices={choices}
-            mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
-            showAvatars={this.currentShowAvatars}
-            theme={this.theme}
-            backgroundUrl={this.backgroundImageUrl}
-            backgroundColor={backgroundColor}
-            onChoiceSelect={this.handleAction}
-            stageWidth={stageWidth}
-            stageHeight={stageHeight}
-            characterAvatarResolver={this.characterAvatarResolver || undefined}
-          />
-        </div>
-      );
+      // Render initial view with choices
+      this.renderChatView(choices, false);
     });
+  }
+
+  /**
+   * Helper to render the chat view with current state
+   */
+  private renderChatView(
+    choices: Array<{ id: string; text: string }>,
+    showTypingIndicator: boolean
+  ): void {
+    // Determine background
+    const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+    const backgroundColor = this.backgroundImageUrl
+      ? 'transparent'
+      : (this.theme?.backgroundColor || defaultGradient);
+
+    const stageWidth = this.context.width;
+    const stageHeight = this.context.height;
+
+    this.renderComponent(
+      <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <ChatDialogView
+          messages={[...this.chatMessages]}
+          choices={choices}
+          mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
+          showAvatars={this.currentShowAvatars}
+          theme={this.theme}
+          backgroundUrl={this.backgroundImageUrl}
+          backgroundColor={backgroundColor}
+          onChoiceSelect={this.handleAction}
+          stageWidth={stageWidth}
+          stageHeight={stageHeight}
+          characterAvatarResolver={this.characterAvatarResolver || undefined}
+          showTypingIndicator={showTypingIndicator}
+        />
+      </div>
+    );
   }
 
   async renderChoices(choices: { id: string; text: string }[], locations?: Location[]): Promise<string> {

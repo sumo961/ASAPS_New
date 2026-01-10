@@ -21,6 +21,7 @@ export class DialogTreeBeat extends Beat {
   public text: string;
   public emotion?: string;
   public choiceDelay?: number; // Delay in seconds before showing choices
+  public responseDelay?: number; // Delay in seconds before NPC responds (for natural chat pacing)
   public markVisited?: boolean; // Show visual indication for choices leading to already-visited beats
   public backgroundUrl?: string; // Direct URL for background from ASML import
   public backgroundAssetId?: string; // Asset ID for background
@@ -38,6 +39,7 @@ export class DialogTreeBeat extends Beat {
     // CRITICAL FIX: Ensure dialogTree is ALWAYS a valid object, never undefined
     const dialogTreeParam = config.dialogTree || config.parameters?.dialogTree;
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
+    this.responseDelay = config.responseDelay || config.parameters?.responseDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
     this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
     this.presentationMode = (config.parameters?.presentationMode as 'positioned' | 'chat-scroll' | 'chat-bubble') || 'positioned';
@@ -232,6 +234,7 @@ export class DialogTreeBeat extends Beat {
       // Do NOT include speaker/text/emotion separately - they're in dialogTree
       node: this.node,
       choiceDelay: this.choiceDelay,
+      responseDelay: this.responseDelay,
       markVisited: this.markVisited,
       backgroundUrl: this.backgroundUrl,
       backgroundAssetId: this.backgroundAssetId,
@@ -258,6 +261,7 @@ export class DialogTreeBeat extends Beat {
     if (params.emotion !== undefined) this.emotion = params.emotion;
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
+    if (params.responseDelay !== undefined) this.responseDelay = params.responseDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
     if (params.backgroundUrl !== undefined) this.backgroundUrl = params.backgroundUrl;
     if (params.backgroundAssetId !== undefined) this.backgroundAssetId = params.backgroundAssetId;
@@ -300,6 +304,7 @@ export class DialogTreeBeat extends Beat {
     // Set presentation mode for chat-like dialogs
     renderer.setState('presentationMode', this.presentationMode || 'positioned');
     renderer.setState('showAvatars', this.showAvatars ?? true);
+    renderer.setState('responseDelay', this.responseDelay || 0);
 
     // Clear chat history when starting a new dialog tree in chat mode
     // This ensures messages from previous dialog trees don't persist

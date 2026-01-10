@@ -39,6 +39,8 @@ export interface ChatDialogViewProps {
   stageHeight?: number;
   /** Character avatar resolver */
   characterAvatarResolver?: (characterId: string) => string | undefined;
+  /** Show typing indicator (NPC is "thinking") */
+  showTypingIndicator?: boolean;
 }
 
 /**
@@ -59,6 +61,7 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
   onChoiceSelect,
   stageWidth = 800,
   stageHeight = 600,
+  showTypingIndicator = false,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [animatedMessages, setAnimatedMessages] = useState<Set<string>>(new Set());
@@ -276,6 +279,66 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
     ? messages.slice(-1)
     : messages;
 
+  // Render typing indicator (animated "..." dots)
+  const renderTypingIndicator = () => {
+    if (!showTypingIndicator) return null;
+
+    return (
+      <div
+        className="flex items-end gap-2 mb-3"
+        style={{ flexDirection: 'row' }}
+      >
+        {/* Avatar placeholder for NPC */}
+        {showAvatars && (
+          <div
+            className="flex-shrink-0 rounded-full overflow-hidden"
+            style={{
+              width: 40,
+              height: 40,
+              backgroundColor: textBox.backgroundColor,
+              border: `2px solid ${textBox.borderColor}`,
+            }}
+          >
+            <div className="w-full h-full flex items-center justify-center text-white text-sm font-bold">
+              ?
+            </div>
+          </div>
+        )}
+
+        {/* Typing bubble */}
+        <div
+          className="px-4 py-3"
+          style={{
+            backgroundColor: bubbleBg,
+            borderRadius: textBox.borderRadius || 16,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+          }}
+        >
+          <div className="flex gap-1">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full"
+                style={{
+                  backgroundColor: colors.textColor,
+                  opacity: 0.6,
+                  animation: 'typingDot 1.4s infinite ease-in-out',
+                  animationDelay: `${i * 0.2}s`,
+                }}
+              />
+            ))}
+          </div>
+          <style>{`
+            @keyframes typingDot {
+              0%, 60%, 100% { transform: translateY(0); opacity: 0.6; }
+              30% { transform: translateY(-4px); opacity: 1; }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       className="flex flex-col"
@@ -307,6 +370,7 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
           }}
         >
           {displayMessages.map((msg, index) => renderMessage(msg, index))}
+          {renderTypingIndicator()}
         </div>
       </div>
 

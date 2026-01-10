@@ -2453,6 +2453,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   onBeatUpdate(beat.id, { showAvatars: show } as any);
                   setHasChanges(true);
                 } : undefined}
+                responseDelay={beat.type === 'dialogTree' ? ((beat as any).responseDelay ?? 0) : undefined}
+                onResponseDelayChange={beat.type === 'dialogTree' && onBeatUpdate ? (delay) => {
+                  (beat as any).responseDelay = delay;
+                  onBeatUpdate(beat.id, { responseDelay: delay } as any);
+                  setHasChanges(true);
+                } : undefined}
               />
             )}
 
