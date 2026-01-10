@@ -10,8 +10,8 @@ This is a **beta release**. Core functionality works, but some features are inco
 
 | Feature | Status |
 |---------|--------|
-| Assets (graphics, sounds, sprite animations) | Mostly implemented, not fully tested |
-| Visual dialog editor | Only supports initial phase of dialog trees |
+| Assets (graphics, sounds, sprite animations) | Fully implemented |
+| Visual dialog editor | Supports all phases of dialog trees (v0.9.4) |
 | Project switching | Occasional issues; reload interface to resolve |
 | Animation system | Fully implemented with visual path editor (v0.9.1) |
 | Character meter frames | HUD overlays for counters (v0.9.2) |
