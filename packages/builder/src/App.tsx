@@ -29,6 +29,7 @@ import { validateAIStory, formatValidationResult } from './utils/aiStoryValidato
 import { preloadFonts } from './utils/fontRegistry';
 import { useAIDebug } from './hooks/useAIDebug';
 import { AIDebugModal } from './components/ai/AIDebugModal';
+import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
 import { getThemeService } from './services/ThemeService';
 import { themeToGlobalSettings } from './themes/migration/GlobalSettingsAdapter';
 import { BUILT_IN_THEMES } from '@asaps/core';
@@ -91,6 +92,9 @@ function App() {
   const [showImportAsmlDialog, setShowImportAsmlDialog] = useState(false);
   const [importAsmlContent, setImportAsmlContent] = useState('');
   const [importAsmlManifest, setImportAsmlManifest] = useState<AssetManifest | null>(null);
+
+  // Merge DialogTrees modal state
+  const [showMergeDialogTrees, setShowMergeDialogTrees] = useState(false);
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -2923,6 +2927,7 @@ function App() {
         isUntitledProject={isUntitledProject}
         hasUnsavedChanges={hasUnsavedChanges}
         currentProjectId={currentProject?.id}
+        onMergeDialogTrees={() => setShowMergeDialogTrees(true)}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -3268,6 +3273,15 @@ function App() {
         isOpen={showAIDebugModal}
         onClose={closeAIDebugModal}
         result={aiDebugResult}
+      />
+
+      {/* Merge DialogTrees Modal */}
+      <MergeDialogTreesModal
+        isOpen={showMergeDialogTrees}
+        onClose={() => setShowMergeDialogTrees(false)}
+        beats={state.beats}
+        onMerge={actions.mergeDialogTrees}
+        onBeatSelect={handleBeatSelect}
       />
     </div>
   );

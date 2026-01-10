@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
@@ -34,6 +34,7 @@ interface HeaderProps {
   isUntitledProject?: boolean;
   hasUnsavedChanges?: boolean;
   currentProjectId?: string;
+  onMergeDialogTrees?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -59,7 +60,8 @@ export const Header: React.FC<HeaderProps> = ({
   onRenameProject,
   isUntitledProject,
   hasUnsavedChanges,
-  currentProjectId
+  currentProjectId,
+  onMergeDialogTrees,
 }) => {
   const { status, lastSaved, error: saveError } = useSave();
   const { load } = useProject();
@@ -71,6 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showAIMenu, setShowAIMenu] = useState(false);
   const [showImportMenu, setShowImportMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
 
   const handleLoadProject = async (projectId: string) => {
     const success = await load(projectId);
@@ -276,6 +279,43 @@ export const Header: React.FC<HeaderProps> = ({
               </>
             )}
           </div>
+
+          {/* Tools Menu */}
+          {onMergeDialogTrees && (
+            <div className="relative">
+              <button
+                className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                onClick={() => setShowToolsMenu(!showToolsMenu)}
+                title="Tools"
+              >
+                <Wrench className="w-4 h-4" />
+                Tools
+                <ChevronDown className="w-3 h-3" />
+              </button>
+
+              {showToolsMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowToolsMenu(false)}
+                  />
+                  <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                    <button
+                      onClick={() => {
+                        onMergeDialogTrees();
+                        setShowToolsMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Merge multiple DialogTree beats into a nested conversation"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Merge DialogTrees
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right: Feature buttons */}
