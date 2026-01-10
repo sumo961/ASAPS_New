@@ -245,6 +245,9 @@ export class DialogTreeBeat extends Beat {
   }
 
   updateParameters(params: Record<string, any>): void {
+    // Increment version for React change detection (used by Inspector to detect parameter changes)
+    this._version++;
+
     // CRITICAL FIX: Update dialogTree first and extract properties FROM it
     // Always run migration to ensure nested dialogNodes have choices arrays
     if (params.dialogTree !== undefined) {

@@ -26,6 +26,7 @@ export abstract class Beat {
   public y?: number;
   public node?: string; // Background image/node reference
   public animations?: AnimationPath[]; // Path animations for elements
+  public _version: number = 0; // Version counter incremented on parameter updates (for React change detection)
 
   constructor(config: BeatConfig) {
     this.id = config.id;

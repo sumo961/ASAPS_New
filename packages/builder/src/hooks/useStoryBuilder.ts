@@ -994,10 +994,15 @@ export function useStoryBuilder() {
       });
     };
 
-    // Update the target beat's choices
-    if (targetDialogTree.choices) {
-      targetDialogTree.choices = updateChoicesWithNesting(targetDialogTree.choices);
-    }
+    // Update the target beat's choices with nested structure
+    const updatedDialogTree = {
+      ...targetDialogTree,
+      choices: updateChoicesWithNesting(targetDialogTree.choices),
+    };
+
+    // CRITICAL: Update the target beat's parameters with the new dialog tree
+    // This persists the merged structure and allows React to detect the change
+    targetBeat.updateParameters({ dialogTree: updatedDialogTree });
 
     // Collect all outgoing connections from beats being removed
     const newConnections: any[] = [];
@@ -1013,11 +1018,15 @@ export function useStoryBuilder() {
     });
 
     // Update state: remove merged beats and their connections
+    // Also create a new reference for the target beat to trigger React re-render
     const removedIds = new Set(beatsToRemove.map(b => b.id));
 
     setState(prev => ({
       ...prev,
-      beats: prev.beats.filter(b => !removedIds.has(b.id)),
+      // Create new array with new reference for target beat to trigger re-render
+      beats: prev.beats
+        .filter(b => !removedIds.has(b.id))
+        .map(b => b.id === targetBeat.id ? targetBeat : b),
       connections: prev.connections.filter(
         conn => !removedIds.has(conn.source) && !removedIds.has(conn.target)
       ),

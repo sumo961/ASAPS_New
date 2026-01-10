@@ -396,14 +396,16 @@ export const Inspector: React.FC<InspectorProps> = ({
       setLocalBeat(beatData);
       setHasChanges(false);
       setValidationErrors([]);
-      
-      
+
+
       // Set default tab based on beat type
       if (supportsVisualEditor(beat.type)) {
         setActiveTab('properties');
       }
     //}
-  }, [beat?.id, beat?.name]);
+  // Note: We need to re-sync when beat parameters change (e.g., after merging dialog trees).
+  // The _version field is incremented in updateParameters() to trigger re-sync.
+  }, [beat?.id, beat?.name, (beat as any)?._version]);
 
   if (!beat || !localBeat) {
     return (
