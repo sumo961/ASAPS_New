@@ -2874,7 +2874,12 @@ function App() {
     // Clone params and update the nested value
     const updatedParams = JSON.parse(JSON.stringify(params));
     if (setNestedValue(updatedParams, field, newValue)) {
-      actions.updateBeat(beatId, { parameters: updatedParams } as Partial<Beat>);
+      // CRITICAL: Call updateParameters() directly on the beat instance
+      // Using actions.updateBeat() with { parameters: ... } would use Object.assign
+      // which bypasses the beat's proper parameter handling
+      beat.updateParameters(updatedParams);
+      // Trigger a state update to force re-render (empty update just triggers React's change detection)
+      actions.updateBeat(beatId, {} as Partial<Beat>);
     }
   }, [state.beats, actions]);
 
