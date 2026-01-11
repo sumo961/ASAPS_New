@@ -9,7 +9,8 @@ import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
 import { AssetManager } from './components/assets/AssetManager';
 import { ImportAsmlDialog } from './components/ImportAsmlDialog';
-import { Story, ASMLParser, type AssetManifest } from '@asaps/core';
+import { ImportTwineDialog } from './components/ImportTwineDialog';
+import { Story, ASMLParser, type AssetManifest, type ImportResult } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { Character } from './types/character';
@@ -95,6 +96,9 @@ function App() {
 
   // Merge DialogTrees modal state
   const [showMergeDialogTrees, setShowMergeDialogTrees] = useState(false);
+
+  // Import Twine dialog state
+  const [showImportTwineDialog, setShowImportTwineDialog] = useState(false);
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -2097,6 +2101,51 @@ function App() {
     setImportAsmlManifest(null);
   }, []);
 
+  /**
+   * Open Twine import dialog
+   */
+  const handleImportTwine = useCallback(() => {
+    setShowImportTwineDialog(true);
+  }, []);
+
+  /**
+   * Handle Twine import completion
+   */
+  const handleImportTwineComplete = useCallback((result: ImportResult) => {
+    setShowImportTwineDialog(false);
+
+    try {
+      // Import beats from Twine result
+      actions.importBeats(result.beats, {
+        title: result.title,
+        author: result.author,
+        firstBeatId: result.firstBeatId,
+      });
+
+      setSelectedBeat(null);
+
+      // Show success message with stats
+      const warningCount = result.warnings.length;
+      let message = `Successfully imported "${result.title}" with ${result.beats.length} beats.`;
+      if (warningCount > 0) {
+        message += `\n\n${warningCount} warnings during import. Check console for details.`;
+        console.log('[Twine Import] Warnings:', result.warnings);
+      }
+      alert(message);
+    } catch (error) {
+      console.error('Twine import failed:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      alert(`Failed to import Twine story: ${errorMsg}`);
+    }
+  }, [actions]);
+
+  /**
+   * Handle Twine import cancellation
+   */
+  const handleImportTwineCancel = useCallback(() => {
+    setShowImportTwineDialog(false);
+  }, []);
+
   const handleExportZip = useCallback(async () => {
     if (!currentProject) {
       alert('No project loaded. Please save or create a project first.');
@@ -2921,6 +2970,7 @@ function App() {
         onExportZip={handleExportZip}
         onExportAsmlWithAssets={handleExportAsmlWithAssets}
         onImportZip={handleImportZip}
+        onImportTwine={handleImportTwine}
         onPreview={handlePreview}
         onCharacters={handleOpenCharacterManager}
         onAssets={handleOpenAssetManager}
@@ -3214,6 +3264,13 @@ function App() {
           onCancel={handleImportAsmlCancel}
         />
       )}
+
+      {/* Import Twine Dialog */}
+      <ImportTwineDialog
+        isOpen={showImportTwineDialog}
+        onImport={handleImportTwineComplete}
+        onCancel={handleImportTwineCancel}
+      />
 
       {/* Settings Modal */}
       {showSettings && (

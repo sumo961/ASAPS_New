@@ -64,6 +64,7 @@ interface StoryBuilderActions {
   setClusterSharedVisuals: (clusterId: string, sharedVisuals: SharedVisualContent | undefined) => void;
   exportStory: (assets?: any[], characters?: any[]) => string;
   importStory: (xmlContent: string, options?: ImportStoryOptions) => Promise<ImportStoryResult>;
+  importBeats: (beats: Beat[], options?: { title?: string; author?: string; firstBeatId?: string }) => void;
   clearStory: () => void;
   updateSettings: (settings: any) => void;
   loadStoryData: (storyData: any) => void;
@@ -599,6 +600,115 @@ export function useStoryBuilder() {
     };
   }, []);
 
+  /**
+   * Import beats directly (e.g., from Twine import)
+   * Simpler than importStory which parses ASML XML
+   */
+  const importBeats = useCallback((
+    beats: Beat[],
+    options?: { title?: string; author?: string; firstBeatId?: string }
+  ) => {
+    console.log('[useStoryBuilder] Importing beats directly:', beats.length);
+
+    // Extract connections from beats
+    const connections: Array<{ source: string; target: string; label?: string }> = [];
+    const seenConnections = new Set<string>();
+
+    for (const beat of beats) {
+      if (typeof beat.getConnections === 'function') {
+        const beatConnections = beat.getConnections();
+        for (const conn of beatConnections) {
+          if (conn.targetId) {
+            const key = `${beat.id}->${conn.targetId}`;
+            if (!seenConnections.has(key)) {
+              seenConnections.add(key);
+              connections.push({
+                source: beat.id,
+                target: conn.targetId,
+                label: conn.label
+              });
+            }
+          }
+        }
+      }
+
+      // Also check defaultTarget
+      if (beat.defaultTarget) {
+        const key = `${beat.id}->${beat.defaultTarget}`;
+        if (!seenConnections.has(key)) {
+          seenConnections.add(key);
+          connections.push({
+            source: beat.id,
+            target: beat.defaultTarget,
+          });
+        }
+      }
+    }
+
+    console.log('[importBeats] Extracted connections:', connections.length);
+
+    // Check if beats have positions - if not, apply auto-layout
+    const hasPositions = beats.some(b => b.x !== undefined && b.y !== undefined);
+
+    if (!hasPositions && beats.length > 0) {
+      console.log('[importBeats] No beat positions found, applying auto-layout');
+
+      // Create layout-compatible beat data
+      const layoutBeats = beats.map(b => ({
+        id: b.id,
+        type: b.type,
+        position: undefined,
+        parameters: b.getParameters()
+      }));
+
+      // Extract edges for layout
+      const edges = connections.map(c => ({
+        source: c.source,
+        target: c.target
+      }));
+
+      // Apply tree layout
+      const positions = applyTreeLayoutToBeats(layoutBeats, undefined, edges);
+
+      // Apply positions to beats
+      for (const beat of beats) {
+        const pos = positions.get(beat.id);
+        if (pos) {
+          (beat as any).x = pos.x;
+          (beat as any).y = pos.y;
+        }
+      }
+    }
+
+    // Update state
+    setState({
+      title: options?.title || 'Imported Story',
+      author: options?.author || 'Unknown Author',
+      beats: beats,
+      connections: connections,
+      story: null,
+      settings: {},
+      environment: { props: [], nodes: [] },
+      characters: [],
+      clusters: [],
+      containerBeatPositions: [],
+    });
+
+    // Reset beat counter
+    let maxBeatNumber = 0;
+    for (const beat of beats) {
+      const match = beat.id?.match(/(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxBeatNumber) {
+          maxBeatNumber = num;
+        }
+      }
+    }
+    beatCounter.current = Math.max(maxBeatNumber + 1, beats.length);
+    console.log('[importBeats] Beat counter set to:', beatCounter.current);
+  }, []);
+
   // Clear story
   const clearStory = useCallback(() => {
     setState({
@@ -1073,6 +1183,7 @@ export function useStoryBuilder() {
     disconnectBeats,
     exportStory,
     importStory,
+    importBeats,
     clearStory,
     updateSettings,
     loadStoryData,

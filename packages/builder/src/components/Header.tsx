@@ -19,6 +19,7 @@ interface HeaderProps {
   onExportZip?: () => void;
   onExportAsmlWithAssets?: () => void;
   onImportZip?: () => void;
+  onImportTwine?: () => void;
   onPreview?: () => void;
   onSettings?: () => void;
   onAssets?: () => void;
@@ -46,6 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExportZip,
   onExportAsmlWithAssets,
   onImportZip,
+  onImportTwine,
   onPreview,
   onSettings,
   onAssets,
@@ -212,6 +214,19 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                       <Upload className="w-4 h-4" />
                       Import Project (ZIP)
+                    </button>
+                  )}
+                  {onImportTwine && (
+                    <button
+                      onClick={() => {
+                        onImportTwine();
+                        setShowImportMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Import Twine 2 story (SugarCube format)"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Import Twine (HTML)
                     </button>
                   )}
                 </div>
