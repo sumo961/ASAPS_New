@@ -67,6 +67,15 @@ export interface UseAutoSaveReturn {
 
   /** Clear the pending save timer */
   cancelPending: () => void;
+
+  /** Pause auto-save (e.g., during preview) */
+  pause: () => void;
+
+  /** Resume auto-save after pausing */
+  resume: () => void;
+
+  /** Whether auto-save is currently paused */
+  isPaused: boolean;
 }
 
 /**
@@ -110,11 +119,13 @@ export function useAutoSave(
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
 
   const saveTimeoutRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
   const savedTimeoutRef = useRef<number | null>(null);
   const pendingChangesDuringSavedRef = useRef(false);
+  const isPausedRef = useRef(false);
 
   /**
    * Debug logging
@@ -232,6 +243,12 @@ export function useAutoSave(
   const markChanged = useCallback(() => {
     if (!enabled) return;
 
+    // Don't schedule saves while paused (e.g., during preview)
+    if (isPausedRef.current) {
+      log('Auto-save paused, skipping markChanged');
+      return;
+    }
+
     // Don't interrupt an active save
     if (isSavingRef.current) {
       log('Save in progress, will reschedule after completion');
@@ -299,6 +316,34 @@ export function useAutoSave(
   }, [log]);
 
   /**
+   * Pause auto-save (e.g., during preview)
+   * Cancels any pending saves and prevents new ones from being scheduled
+   */
+  const pause = useCallback(() => {
+    isPausedRef.current = true;
+    setIsPaused(true);
+    // Cancel any pending save
+    if (saveTimeoutRef.current !== null) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    // Reset status to idle since we're pausing
+    if (status === 'pending') {
+      setStatus('idle');
+    }
+    log('Auto-save paused');
+  }, [status, log]);
+
+  /**
+   * Resume auto-save after pausing
+   */
+  const resume = useCallback(() => {
+    isPausedRef.current = false;
+    setIsPaused(false);
+    log('Auto-save resumed');
+  }, [log]);
+
+  /**
    * Cleanup on unmount
    */
   useEffect(() => {
@@ -345,6 +390,9 @@ export function useAutoSave(
     saveNow,
     markChanged,
     cancelPending,
+    pause,
+    resume,
+    isPaused,
   };
 }
 

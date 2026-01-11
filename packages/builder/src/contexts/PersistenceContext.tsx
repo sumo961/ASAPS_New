@@ -43,6 +43,9 @@ export interface PersistenceContextValue {
   saveError: Error | null;
   saveNow: () => Promise<void>;
   markChanged: () => void;
+  pauseAutoSave: () => void;
+  resumeAutoSave: () => void;
+  isAutoSavePaused: boolean;
 
   // Project management
   loadProject: (projectId: string) => Promise<boolean>;
@@ -220,11 +223,19 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     saveNow,
     markChanged,
     cancelPending,
+    pause,
+    resume,
+    isPaused,
   } = useAutoSave(getProjectData, {
     enabled: autoSave && !!currentProject,
     delay: autoSaveDelay,
     debug,
   });
+
+  // Expose pause/resume for auto-save
+  const pauseAutoSave = pause;
+  const resumeAutoSave = resume;
+  const isAutoSavePaused = isPaused;
 
   /**
    * Initialize storage and load initial project
@@ -748,6 +759,9 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     saveError,
     saveNow,
     markChanged,
+    pauseAutoSave,
+    resumeAutoSave,
+    isAutoSavePaused,
     loadProject,
     createProject,
     deleteProject,

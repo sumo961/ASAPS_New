@@ -304,7 +304,7 @@ function App() {
   // Persistence hooks
   const { markChanged, saveNow } = useSave();
   const { updateStory, updateGlobalSettings, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled } = useProject();
-  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback } = usePersistence();
+  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback, pauseAutoSave, resumeAutoSave } = usePersistence();
 
   // Electron integration - set up menu event listeners
   useEffect(() => {
@@ -2229,12 +2229,16 @@ function App() {
       alert('Please add some beats to your story first!');
       return;
     }
+    // Pause auto-save while preview is open to prevent interruptions
+    pauseAutoSave();
     setShowPreview(true);
-  }, [state.beats]);
+  }, [state.beats, pauseAutoSave]);
 
   const handleClosePreview = useCallback(() => {
     setShowPreview(false);
-  }, []);
+    // Resume auto-save after preview is closed
+    resumeAutoSave();
+  }, [resumeAutoSave]);
 
   // Asset and character handlers
   const handleAssetSelect = useCallback((type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => {
