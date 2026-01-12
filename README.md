@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.4)
+## ⚠️ Development Status (v0.9.5)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -18,6 +18,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Chat-style dialog mode | New presentation modes for DialogTree (v0.9.3) |
 | DialogTree Merge Tool | Auto-detection of mergeable beats, visual merge UI (v0.9.4) |
 | Search & Replace | Project-wide search across beats, characters, assets (v0.9.4) |
+| Twine Import | Import SugarCube and Harlowe stories with automatic beat classification (v0.9.5) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
@@ -253,6 +254,17 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.5 (2026-01-12)
+- **Twine Import**: Import interactive fiction stories from Twine (SugarCube 2.x and Harlowe 3.x formats)
+  - Automatic beat type classification from passage analysis
+  - Variable conversion from Twine `$var` to ASAPS `$var$` format
+  - Conditional branching support with ConditionBeat conversion
+  - Link position detection (inline vs. end-of-passage choices)
+- **AI Documentation**: Enhanced MCP server documentation for better story generation
+  - Animation system overview, expanded beat type descriptions
+  - DialogTree presentation modes, visited beat tracking
+- **Bug fixes**: Fixed Twine import project naming, paused auto-save during preview
 
 ### v0.9.4 (2026-01-10)
 - **DialogTree Merge Tool**: New tool to consolidate multiple DialogTree beats into nested conversations
