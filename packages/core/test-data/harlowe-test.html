@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Harlowe Test Story</title>
+</head>
+<body>
+<tw-storydata name="The Principal's Office" startnode="1" creator="Twine" creator-version="2.9.2" format="Harlowe" format-version="3.3.9" ifid="test-story-uuid">
+<tw-passagedata pid="1" name="Start" tags="" position="100,100">Welcome to the story.
+
+[[Enter the office|Office]]</tw-passagedata>
+
+<tw-passagedata pid="2" name="Office" tags="" position="200,100">You enter the principal's office.
+
+[[Look at Tom]]
+[[Look at the desk]]</tw-passagedata>
+
+<tw-passagedata pid="3" name="Look at Tom" tags="" position="300,100">(set: $betrayedTom to true)Tom glares at you angrily.
+
+(if: $betrayedTom is true)[[[Tell the truth|Ending #1]]]
+(else:)[[[Lie about it|Ending #2]]]</tw-passagedata>
+
+<tw-passagedata pid="4" name="Look at the desk" tags="" position="300,200">(set: $foundEvidence to true)You find incriminating documents on the desk.
+
+[[Return to office|Office]]</tw-passagedata>
+
+<tw-passagedata pid="5" name="Ending #1" tags="ending" position="400,100">You told the truth. Tom forgives you.
+
+THE END</tw-passagedata>
+
+<tw-passagedata pid="6" name="Ending #2" tags="ending" position="400,200">You lied. Tom never trusted you again.
+
+THE END</tw-passagedata>
+
+<tw-passagedata pid="7" name="StoryInit" tags="story-init" position="0,0">(set: $betrayedTom to false)
+(set: $foundEvidence to false)</tw-passagedata>
+</tw-storydata>
+</body>
+</html>

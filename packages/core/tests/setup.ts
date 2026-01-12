@@ -1,4 +1,10 @@
 import { vi } from 'vitest';
+import { JSDOM } from 'jsdom';
+
+// Set up jsdom for DOMParser and document (needed by TwineParser)
+const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+global.DOMParser = dom.window.DOMParser;
+global.document = dom.window.document as any;
 
 // Mock IndexedDB for testing
 const mockIndexedDB = {
