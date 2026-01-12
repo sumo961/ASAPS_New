@@ -49,6 +49,8 @@ export interface Conditional {
   thenLinks: ExtractedLink[];
   /** Links in the else branch */
   elseLinks: ExtractedLink[];
+  /** Whether this is an else-if conditional (Harlowe) */
+  isElseIf?: boolean;
 }
 
 export interface ParsedContent {
@@ -353,14 +355,12 @@ export class SugarCubeParser {
       return converted;
     });
 
-    // Replace links with just the link text
-    text = text.replace(PATTERNS.LINK, (_, textOrTarget, target) => {
-      return target ? textOrTarget : textOrTarget;
-    });
+    // Remove links entirely from display text (they become choices)
+    text = text.replace(PATTERNS.LINK, '');
 
-    // Replace <<link>> macros with text
-    text = text.replace(PATTERNS.LINK_MACRO, (_, linkText) => linkText);
-    text = text.replace(PATTERNS.BUTTON_MACRO, (_, buttonText) => buttonText);
+    // Remove <<link>> and <<button>> macros (they become choices)
+    text = text.replace(PATTERNS.LINK_MACRO, '');
+    text = text.replace(PATTERNS.BUTTON_MACRO, '');
 
     // Remove <<set>> macros (they become separate beats or are processed)
     text = text.replace(PATTERNS.SET, '');

@@ -7,6 +7,9 @@
 
 import { TwinePassage } from './TwineParser';
 import { SugarCubeParser, ParsedContent, ExtractedLink, Conditional } from './SugarCubeParser';
+import { HarloweParser } from './HarloweParser';
+
+export type TwineFormat = 'sugarcube' | 'harlowe' | 'unknown';
 
 export type SuggestedBeatType =
   | 'introText'
@@ -69,14 +72,19 @@ export interface AnalysisResult {
 export class PassageAnalyzer {
   /**
    * Analyze a single passage
+   * @param passage The passage to analyze
+   * @param format The Twine format (sugarcube, harlowe, or unknown)
    */
-  static analyzePassage(passage: TwinePassage): AnalyzedPassage {
-    const parsed = SugarCubeParser.parse(passage.content);
+  static analyzePassage(passage: TwinePassage, format: TwineFormat = 'sugarcube'): AnalyzedPassage {
+    // Use the appropriate parser based on format
+    const parsed = format === 'harlowe'
+      ? HarloweParser.parse(passage.content)
+      : SugarCubeParser.parse(passage.content);
     const notes: string[] = [...parsed.warnings];
     const additionalBeats: AdditionalBeat[] = [];
 
     // Determine link positions
-    const linkPosition = this.determineLinkPosition(passage.content, parsed);
+    const linkPosition = this.determineLinkPosition(passage.content, parsed, format);
 
     // Check for conditional branching
     const hasConditionalBranching = parsed.conditionals.some(c => c.hasBranchingLinks);
@@ -108,7 +116,10 @@ export class PassageAnalyzer {
     if (hasConditionalBranching) {
       for (const conditional of parsed.conditionals) {
         if (conditional.hasBranchingLinks) {
-          const conditionData = SugarCubeParser.convertCondition(conditional.condition);
+          // Use appropriate parser for condition conversion
+          const conditionData = format === 'harlowe'
+            ? HarloweParser.convertCondition(conditional.condition)
+            : SugarCubeParser.convertCondition(conditional.condition);
           if (conditionData) {
             const thenTarget = conditional.thenLinks[0]?.target;
             const elseTarget = conditional.elseLinks[0]?.target;
@@ -152,9 +163,11 @@ export class PassageAnalyzer {
 
   /**
    * Analyze all passages in a story
+   * @param passages Array of passages to analyze
+   * @param format The Twine format (sugarcube, harlowe, or unknown)
    */
-  static analyzeAll(passages: TwinePassage[]): AnalysisResult {
-    const analyzed = passages.map(p => this.analyzePassage(p));
+  static analyzeAll(passages: TwinePassage[], format: TwineFormat = 'sugarcube'): AnalysisResult {
+    const analyzed = passages.map(p => this.analyzePassage(p, format));
 
     // Collect stats
     const stats = {
@@ -189,31 +202,38 @@ export class PassageAnalyzer {
 
   /**
    * Determine where links appear in the passage content
+   *
+   * - 'inline': Links are embedded within narrative text (use HyperText)
+   * - 'end': Links are separate choices at the end (use DialogTree)
+   * - 'mixed': Both inline and end links present
+   * - 'none': No links
    */
   private static determineLinkPosition(
     content: string,
-    parsed: ParsedContent
+    parsed: ParsedContent,
+    format: TwineFormat = 'sugarcube'
   ): LinkPosition {
     if (parsed.links.length === 0) {
       return 'none';
     }
 
     // Get text without macros for position analysis
+    // Handle both SugarCube (<<macro>>) and Harlowe ((macro:)) syntax
     const cleanContent = content
-      .replace(/<<[^>]+>>/g, '') // Remove macros
+      .replace(/<<[^>]+>>/g, '') // Remove SugarCube macros
+      .replace(/\([a-zA-Z-]+:[^)]*\)(\[[^\]]*\])?/g, '') // Remove Harlowe macros with optional hooks
       .trim();
 
     if (cleanContent.length === 0) {
       return 'end'; // Only macros/links, treat as end
     }
 
-    // Find the position of text content (excluding links)
+    // Remove all links to get pure text
     const textWithoutLinks = cleanContent.replace(/\[\[[^\]]+\]\]/g, '').trim();
-    const textEndPosition = cleanContent.lastIndexOf(textWithoutLinks) + textWithoutLinks.length;
-    const contentLength = cleanContent.length;
 
-    // Check if all links are in the last 25% of content
-    const threshold = contentLength * 0.75;
+    if (textWithoutLinks.length === 0) {
+      return 'end'; // Only links, no text
+    }
 
     let hasInlineLinks = false;
     let hasEndLinks = false;
@@ -223,18 +243,42 @@ export class PassageAnalyzer {
       const linkPos = cleanContent.indexOf(link.raw);
       if (linkPos === -1) continue;
 
-      // Check if this link is embedded in narrative text
-      // A link is "inline" if there's significant text after it
-      const textAfterLink = cleanContent.slice(linkPos + link.raw.length).trim();
-      const hasTextAfter = textAfterLink.length > 20 && !/^\[\[/.test(textAfterLink);
+      // Get text before and after the link
+      const textBefore = cleanContent.slice(0, linkPos);
+      const textAfter = cleanContent.slice(linkPos + link.raw.length);
 
-      if (hasTextAfter || linkPos < threshold) {
+      // Check what's after the link (ignoring other links and whitespace)
+      const textAfterWithoutLinks = textAfter.replace(/\[\[[^\]]+\]\]/g, '').trim();
+      const hasSubstantialTextAfter = textAfterWithoutLinks.length > 10;
+
+      // Check if the link appears to be part of a sentence (inline)
+      // Indicators of inline: preceded by lowercase letter or comma, followed by text
+      const beforeTrimmed = textBefore.trimEnd();
+      const lastCharBefore = beforeTrimmed.slice(-1);
+      const isAfterSentenceEnd = /[.!?"\n]$/.test(beforeTrimmed) || beforeTrimmed.length === 0;
+      const isOnOwnLine = /\n\s*$/.test(textBefore) || textBefore.trim().length === 0;
+
+      // A link is "inline" if it's embedded within a sentence:
+      // - Not at the start of a line
+      // - Not after sentence-ending punctuation
+      // - Has substantial narrative text after it (not just more links)
+      const isInline = !isOnOwnLine && !isAfterSentenceEnd && hasSubstantialTextAfter;
+
+      // A link is a "choice" (end) if:
+      // - It's on its own line or after sentence-ending punctuation
+      // - OR there's no substantial text after it (just more links or end of passage)
+      const isChoice = isOnOwnLine || isAfterSentenceEnd || !hasSubstantialTextAfter;
+
+      if (isInline) {
         hasInlineLinks = true;
-      } else {
+      }
+      if (isChoice) {
         hasEndLinks = true;
       }
     }
 
+    // If all links look like choices (at end, on own lines), use 'end' for DialogTree
+    // Only use 'inline' (HyperText) if links are truly embedded in narrative
     if (hasInlineLinks && hasEndLinks) {
       return 'mixed';
     } else if (hasInlineLinks) {
@@ -274,8 +318,11 @@ export class PassageAnalyzer {
     isSetVariablePassage: boolean
   ): SuggestedBeatType {
     // Check for ending tag
+    const endingKeywords = ['ending', 'end', 'finale', 'gameover', 'the end'];
     const isEnding = passage.tags.some(t =>
-      ['ending', 'end', 'finale', 'gameover'].includes(t.toLowerCase())
+      endingKeywords.includes(t.toLowerCase())
+    ) || endingKeywords.some(keyword =>
+      passage.name.toLowerCase().includes(keyword)
     );
 
     // If primarily setting variables with a single link out
@@ -283,14 +330,20 @@ export class PassageAnalyzer {
       return 'setVariable';
     }
 
+    // Ending passages become EndScreen (even if they have a restart link)
+    if (isEnding) {
+      return 'endScreen';
+    }
+
     // If has conditional branching, the passage itself might be simple
     // but we'll create additional ConditionBeat(s)
     if (hasConditionalBranching && parsed.conditionals.length > 0) {
       // The main passage content (without conditional) determines type
       const nonConditionalLinks = parsed.links.filter(link => {
-        // Check if link is inside a conditional
+        // Check if link is inside a conditional by comparing raw text
         return !parsed.conditionals.some(
-          c => c.thenLinks.includes(link) || c.elseLinks.includes(link)
+          c => c.thenLinks.some(tl => tl.raw === link.raw) ||
+               c.elseLinks.some(el => el.raw === link.raw)
         );
       });
 
@@ -302,7 +355,7 @@ export class PassageAnalyzer {
 
     // No links - terminal passage
     if (linkPosition === 'none' || parsed.links.length === 0) {
-      return isEnding ? 'endScreen' : 'introText';
+      return 'introText';
     }
 
     // Single link at end - narrative with continue
@@ -311,16 +364,28 @@ export class PassageAnalyzer {
     }
 
     // Multiple links at end (not inline) - choice-based
-    if (parsed.links.length > 1 && linkPosition === 'end') {
+    if (parsed.links.length > 1 && (linkPosition === 'end' || linkPosition === 'mixed')) {
       return 'dialogTree';
     }
 
-    // Links embedded in text - hypertext
-    if (linkPosition === 'inline' || linkPosition === 'mixed') {
+    // Links truly embedded in text - hypertext
+    // Only use hyperText if links are genuinely inline within narrative sentences
+    // AND the link text actually appears in the narrative (not just as a link destination)
+    if (linkPosition === 'inline') {
+      // For single links, verify the link text is actually embedded in the narrative
+      if (parsed.links.length === 1) {
+        const linkText = parsed.links[0].text;
+        // Check if the link text appears in the narrative text (not just as the link)
+        const textWithoutLinkMarkup = parsed.text.replace(/\[\[[^\]]+\]\]/g, '');
+        if (!textWithoutLinkMarkup.includes(linkText)) {
+          // Link text is NOT in the narrative - this should be introText with continue button
+          return 'introText';
+        }
+      }
       return 'hyperText';
     }
 
-    // Default to dialogTree for multiple links
+    // Default to dialogTree for multiple links (safer than hyperText)
     if (parsed.links.length > 1) {
       return 'dialogTree';
     }

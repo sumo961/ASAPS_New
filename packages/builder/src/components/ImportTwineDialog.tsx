@@ -1,6 +1,7 @@
 /**
- * ImportTwineDialog - Dialog for importing Twine (SugarCube) HTML files
+ * ImportTwineDialog - Dialog for importing Twine HTML files
  *
+ * Supports both SugarCube and Harlowe formats.
  * Shows a preview of the import with beat type breakdown and warnings,
  * then imports the story as ASAPS beats.
  */
@@ -181,7 +182,7 @@ export function ImportTwineDialog({
             <div className="text-center py-8">
               <div className="mb-6">
                 <p className="text-gray-600 mb-2">
-                  Import a Twine 2 story (SugarCube format)
+                  Import a Twine 2 story (SugarCube or Harlowe format)
                 </p>
                 <p className="text-sm text-gray-500">
                   Passages will be analyzed and converted to appropriate ASAPS beat types

@@ -1378,7 +1378,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     console.warn(`[VisualWorkspace] ★★★ Setting ${elements.length} elements for ${beat.type} ★★★`);
     console.warn(`[VisualWorkspace] ========== ELEMENT POSITIONS BEING SET ==========`);
     elements.forEach((e, idx) => {
-      console.warn(`[VisualWorkspace]   [${idx}] ${e.type}/${e.name}: x=${e.x}, y=${e.y}, w=${e.width}, h=${e.height}, size=${e.size}`);
+      console.warn(`[VisualWorkspace]   [${idx}] ${e.type}/${e.name}: x=${e.x}, y=${e.y}, w=${e.width}, h=${e.height}, size=${e.size}, fontSize=${e.fontSize}`);
     });
     console.warn(`[VisualWorkspace] ================================================`);
     console.log(`[VisualWorkspace] Background: bgId=${bgId?.substring?.(0, 8) || 'none'}, bgUrl=${bgUrl ? 'set' : 'none'}`);

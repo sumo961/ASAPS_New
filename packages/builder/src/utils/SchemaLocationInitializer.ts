@@ -56,7 +56,7 @@ const LOCATION_TYPE_MAP: Record<string, Partial<LocationDefinition>> = {
   'startButton': { type: 'button', defaultWidth: 180, defaultHeight: 50, fontSize: 18 },
   'continueButton': { type: 'button', defaultWidth: 180, defaultHeight: 50, fontSize: 18 },
   'submitButton': { type: 'button', defaultWidth: 180, defaultHeight: 50, fontSize: 18 },
-  'restartButton': { type: 'button', defaultWidth: 180, defaultHeight: 50, fontSize: 18 },
+  'restartButton': { type: 'button', defaultWidth: 200, defaultHeight: 60, fontSize: 16 },
   'creditsButton': { type: 'button', defaultWidth: 180, defaultHeight: 50, fontSize: 18 },
   'skipButton': { type: 'button', defaultWidth: 120, defaultHeight: 40, fontSize: 16 },
 
@@ -64,7 +64,7 @@ const LOCATION_TYPE_MAP: Record<string, Partial<LocationDefinition>> = {
   'title': { type: 'text', fontSize: 32, defaultHeight: 60 },
   'author': { type: 'text', fontSize: 20, defaultHeight: 40 },
   'text': { type: 'dialog', fontSize: 18, defaultHeight: 100 },
-  'message': { type: 'text', fontSize: 24, defaultHeight: 50 },
+  'message': { type: 'text', fontSize: 18, defaultHeight: 50 },
   'prompt': { type: 'dialog', fontSize: 18, defaultHeight: 80 },
   'question': { type: 'dialog', fontSize: 18, defaultHeight: 80 },
 
@@ -138,7 +138,8 @@ function getDefaultTextForLocation(
   // End screen
   if (beatType === 'endScreen') {
     if (nameLower.includes('message')) return params.message || 'The End';
-    if (nameLower.includes('restart')) return params.restartText || 'Restart';
+    // Support both restartText (new) and buttonText (legacy/Twine import) for restart button
+    if (nameLower.includes('restart')) return params.restartText || params.buttonText || 'Restart';
     if (nameLower.includes('credits')) return params.creditsText || 'Credits';
   }
 
@@ -243,6 +244,14 @@ export function initializeLocationsFromSchema(
       );
       width = sized.width;
       height = sized.height;
+
+      // Cap height for endScreen messages to leave room for buttons
+      if (beat.type === 'endScreen' && locationName === 'message') {
+        const maxMessageHeight = stageHeight - 250; // Leave room for button at bottom
+        if (height > maxMessageHeight) {
+          height = maxMessageHeight;
+        }
+      }
     }
 
     // Determine position
@@ -252,8 +261,11 @@ export function initializeLocationsFromSchema(
     // Special positioning for certain elements
     if (locationName.toLowerCase().includes('button')) {
       // Buttons go lower on screen
-      if (locationName.toLowerCase().includes('start') || locationName.toLowerCase().includes('continue')) {
-        y = stageHeight - 150; // Near bottom
+      const buttonNameLower = locationName.toLowerCase();
+      if (buttonNameLower.includes('start') || buttonNameLower.includes('continue') ||
+          buttonNameLower.includes('restart') || buttonNameLower.includes('credits') ||
+          buttonNameLower.includes('submit')) {
+        y = stageHeight - 150; // Near bottom for action buttons
       } else {
         y = currentY;
         currentY += height + 20; // Stack vertically
@@ -272,6 +284,10 @@ export function initializeLocationsFromSchema(
       currentY += height + 20;
     }
 
+    // Use standard font sizes - let content scroll if needed
+    const fontSize = locationDef.fontSize || 16;
+    console.log(`[SchemaLocationInitializer] ${beat.type}/${locationName}: fontSize=${fontSize}, locationDef.fontSize=${locationDef.fontSize}`);
+
     // Create element
     const element: VisualElement = {
       id: `element_${locationName}_${Date.now()}_${index}`,
@@ -288,7 +304,7 @@ export function initializeLocationsFromSchema(
       visible: true,
       locked: false,
       font: 'Arial',
-      fontSize: locationDef.fontSize || 16,
+      fontSize,
       textAlign: 'center',
     };
 

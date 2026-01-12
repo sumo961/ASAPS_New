@@ -1418,11 +1418,33 @@ const TextElement: React.FC<{
     }
   }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, theme.textEffects?.fadeInDuration, animationDelay, onAnimationComplete, skipAnimation]);
 
-  // Use stored fontSize directly - auto-sizing happens at import time
-  // Default to 16px if not set
-  const computedFontSize = location.fontSize ?? 16;
+  // Calculate font size - auto-adjust based on content length if no explicit size set
+  const contentLength = content?.length || 0;
+  const isLongContent = contentLength > 80;
+  const isVeryLongContent = contentLength > 200;
+  const isExtremelyLongContent = contentLength > 400;
 
-  const computedTextAlign = location.textAlign || 'center';
+  let computedFontSize: number;
+  if (location.fontSize !== undefined) {
+    computedFontSize = location.fontSize;
+    console.log(`[PositionedBeatView] Text "${location.name}": using stored fontSize=${computedFontSize}`);
+  } else {
+    // Auto-size based on content length for better readability
+    if (isExtremelyLongContent) {
+      computedFontSize = 11;
+    } else if (isVeryLongContent) {
+      computedFontSize = 12;
+    } else if (isLongContent) {
+      computedFontSize = 14;
+    } else if (contentLength < 30) {
+      computedFontSize = 36;
+    } else {
+      computedFontSize = 16;
+    }
+    console.log(`[PositionedBeatView] Text "${location.name}": auto-sized to fontSize=${computedFontSize} (contentLength=${contentLength})`);
+  }
+
+  const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
   // Apply font mapping: element font takes priority, falls back to theme font
   // Title/author elements use titleFont, others use textFont
   const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
@@ -1452,9 +1474,15 @@ const TextElement: React.FC<{
     ? { animation: `fadeIn ${fadeInDuration}ms ease-in` }
     : {};
 
-  // Always use auto height for text boxes to prevent content clipping
-  // minHeight ensures the box maintains a reasonable size even with short text
-  const heightStyle = { height: 'auto', minHeight: '60px' };
+  // For very long content, use the element's actual height to enable scrolling
+  // For shorter content, use auto to fit the text naturally
+  const elementHeight = style?.height;
+  // Height comes as string like "518px" - check if it's a valid pixel value
+  const hasValidHeight = elementHeight && typeof elementHeight === 'string' && elementHeight.endsWith('px');
+  const useFixedHeight = isVeryLongContent && hasValidHeight;
+  const heightStyle = useFixedHeight
+    ? { height: elementHeight, minHeight: '60px' }
+    : { height: 'auto', minHeight: '60px' };
 
   // For typewriter animation, render full text but make unrevealed characters transparent
   // This keeps text centered while characters appear one by one
@@ -1481,23 +1509,24 @@ const TextElement: React.FC<{
           borderRadius: hideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
           fontSize: `${computedFontSize}px`,
           fontFamily: computedFont,
-          fontWeight: '500',
+          fontWeight: isLongContent ? '400' : '500',
           color: textColor,
           opacity: animation === 'fade' ? undefined : textAlpha,
           boxShadow: hideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
           textAlign: computedTextAlign,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
-          overflow: 'hidden',
-          lineHeight: '1.4',
+          overflow: 'auto', // Always allow scrolling for content that exceeds element bounds
+          lineHeight: isLongContent ? '1.5' : '1.4',
           boxSizing: 'border-box',
-          display: 'table',
+          display: isVeryLongContent ? 'block' : 'table',
+          whiteSpace: 'pre-wrap', // Preserve line breaks in imported content
         }}
       >
         <span
           style={{
-            display: 'table-cell',
-            verticalAlign: 'middle',
+            display: isVeryLongContent ? 'block' : 'table-cell',
+            verticalAlign: isVeryLongContent ? undefined : 'middle',
             textAlign: computedTextAlign,
           }}
         >
@@ -1560,13 +1589,14 @@ const ButtonElement: React.FC<{
   // Use stored fontSize directly - auto-sizing happens at import time
   // Default to 16px if not set
   const computedFontSize = location.fontSize ?? 16;
+  console.log(`[PositionedBeatView] Button "${location.name}": fontSize=${computedFontSize}, location.fontSize=${location.fontSize}`);
 
   const computedTextAlign = location.textAlign || 'center';
   const computedFont = location.font || theme.fonts.buttonFont;
 
-  // Use fixed, compact padding for better appearance
-  const paddingHorizontal = 12;
-  const paddingVertical = 6;
+  // Use more generous padding for better appearance
+  const paddingHorizontal = 16;
+  const paddingVertical = 10;
 
   // Get hotspot settings from theme
   const hotspotColor = theme.hotspot?.highlightColor || '#ffff00';
@@ -3228,16 +3258,36 @@ const FlexTextElement: React.FC<{
     }
   }, [content, theme.textEffects?.animation, theme.textEffects?.typewriterSpeed, theme.textEffects?.fadeInDuration, animationDelay, onAnimationComplete, skipAnimation]);
 
-  // Calculate font size
+  // Calculate font size - auto-adjust based on content length if no explicit size set
   let computedFontSize: number;
+  const contentLength = content?.length || 0;
+  const isLongContent = contentLength > 80;
+  const isVeryLongContent = contentLength > 200;
+  const isExtremelyLongContent = contentLength > 400;
+
   if (location.fontSize !== undefined) {
     computedFontSize = location.fontSize;
   } else {
-    // Default size for flex layout
-    computedFontSize = 20;
+    // Auto-size based on content length for better readability
+    if (isExtremelyLongContent) {
+      // Very long narrative content - use compact readable size
+      computedFontSize = 11;
+    } else if (isVeryLongContent) {
+      // Long narrative content - use smaller readable size
+      computedFontSize = 12;
+    } else if (isLongContent) {
+      // Medium-length content
+      computedFontSize = 14;
+    } else if (contentLength < 30) {
+      // Short content like "The End" - use large title-like size
+      computedFontSize = 36;
+    } else {
+      // Default size for flex layout
+      computedFontSize = 16;
+    }
   }
 
-  const computedTextAlign = location.textAlign || 'center';
+  const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
   // Title/author elements use titleFont, others use textFont
   const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
   const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
@@ -3284,16 +3334,18 @@ const FlexTextElement: React.FC<{
           borderRadius: hideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
           fontSize: `${computedFontSize}px`,
           fontFamily: computedFont,
-          fontWeight: '500',
+          fontWeight: isLongContent ? '400' : '500',
           color: textColor,
           opacity: animation === 'fade' ? undefined : textAlpha,
           boxShadow: hideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
           textAlign: computedTextAlign,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
-          lineHeight: '1.4',
+          lineHeight: isLongContent ? '1.5' : '1.4',
           boxSizing: 'border-box',
           minHeight: '1.4em', // Prevent layout shift during typewriter
+          overflow: 'auto', // Always allow scrolling for content that exceeds element bounds
+          whiteSpace: 'pre-wrap', // Preserve line breaks in imported content
         }}
       >
         {hyperlinks && hyperlinks.length > 0 && onAction ? (

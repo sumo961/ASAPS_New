@@ -6,7 +6,8 @@
 
 import { TwineParser, TwineStory, TwinePassage, SPECIAL_PASSAGES } from './TwineParser';
 import { SugarCubeParser } from './SugarCubeParser';
-import { PassageAnalyzer, AnalyzedPassage, AnalysisResult, SuggestedBeatType } from './PassageAnalyzer';
+import { HarloweParser } from './HarloweParser';
+import { PassageAnalyzer, AnalyzedPassage, AnalysisResult, SuggestedBeatType, TwineFormat } from './PassageAnalyzer';
 import { BeatTypeRegistry } from '../beats/BeatRegistry';
 import { Beat } from '../beats/Beat';
 import type { BeatConfig, Connection, Condition } from '../types';
@@ -45,12 +46,30 @@ export class TwineImporter {
   private options: Required<ImportOptions>;
   private registry: BeatTypeRegistry;
   private passageNameToBeatId: Map<string, string> = new Map();
+  /** Maps passage name to the first additional beat ID (SetVariable/etc that runs before the main beat) */
+  private passageNameToFirstAdditionalBeatId: Map<string, string> = new Map();
+  /** Maps "passageName:then" or "passageName:else" to intermediate IntroText beat ID */
+  private conditionalContentBeatIds: Map<string, string> = new Map();
   private beatIdCounter: number = 0;
   private passageMap: Map<string, TwinePassage> = new Map();
+  private format: TwineFormat = 'sugarcube';
 
   constructor(options: ImportOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
     this.registry = BeatTypeRegistry.getInstance();
+  }
+
+  /**
+   * Detect the Twine format from the story
+   */
+  private detectFormat(story: TwineStory): TwineFormat {
+    if (TwineParser.isHarlowe(story)) {
+      return 'harlowe';
+    }
+    if (TwineParser.isSugarCube(story)) {
+      return 'sugarcube';
+    }
+    return 'unknown';
   }
 
   /**
@@ -59,11 +78,16 @@ export class TwineImporter {
   import(html: string): ImportResult {
     // Reset state
     this.passageNameToBeatId.clear();
+    this.passageNameToFirstAdditionalBeatId.clear();
+    this.conditionalContentBeatIds.clear();
     this.beatIdCounter = 0;
     this.passageMap.clear();
 
     // Parse Twine HTML
     const twineStory = TwineParser.parse(html);
+
+    // Detect format
+    this.format = this.detectFormat(twineStory);
 
     // Build passage map for includes
     this.passageMap = TwineParser.buildPassageMap(twineStory);
@@ -89,8 +113,8 @@ export class TwineImporter {
       this.passageNameToBeatId.set(passage.name, this.generateBeatId());
     }
 
-    // Analyze all passages
-    const analysis = PassageAnalyzer.analyzeAll(regularPassages);
+    // Analyze all passages using the detected format
+    const analysis = PassageAnalyzer.analyzeAll(regularPassages, this.format);
 
     // Create beats
     const beats: Beat[] = [];
@@ -116,12 +140,61 @@ export class TwineImporter {
       const beat = this.createBeat(analyzed);
       beats.push(beat);
 
+      // For conditionBeat, create intermediate IntroText beats for conditional content
+      if (analyzed.suggestedBeatType === 'conditionBeat') {
+        const conditionalBeats = this.createConditionalContentBeats(analyzed);
+        beats.push(...conditionalBeats);
+
+        // Update the conditionBeat's targets to point to intermediate beats if created
+        const thenContentBeatId = this.conditionalContentBeatIds.get(`${analyzed.passage.name}:then`);
+        const elseContentBeatId = this.conditionalContentBeatIds.get(`${analyzed.passage.name}:else`);
+        if (thenContentBeatId || elseContentBeatId) {
+          // Update parameters
+          const updates: Record<string, string> = {};
+          if (thenContentBeatId) {
+            updates.trueTarget = thenContentBeatId;
+          }
+          if (elseContentBeatId) {
+            updates.falseTarget = elseContentBeatId;
+          }
+          beat.updateParameters(updates);
+
+          // Also update connections array so visual editor shows correct edges
+          const connections = beat.getConnections();
+          for (const conn of connections) {
+            if (conn.condition && thenContentBeatId) {
+              // This is the conditional (true) branch - update to intermediate beat
+              conn.targetId = thenContentBeatId;
+            } else if (!conn.condition && elseContentBeatId) {
+              // This is the else (false) branch - update to intermediate beat
+              conn.targetId = elseContentBeatId;
+            }
+          }
+          beat.connections = connections;
+        }
+      }
+
       // Create additional beats (SetVariable, ConditionBeat) if needed
+      // Skip creating additional ConditionBeats if the main beat is already a conditionBeat
+      // (the connections are built directly into the main beat)
+      let firstAdditionalBeatId: string | null = null;
       for (const additional of analyzed.additionalBeats) {
+        if (additional.type === 'conditionBeat' && analyzed.suggestedBeatType === 'conditionBeat') {
+          // Skip - conditions are already in the main beat
+          continue;
+        }
         const additionalBeat = this.createAdditionalBeat(additional, analyzed);
         if (additionalBeat) {
           beats.push(additionalBeat);
+          // Track the first additional beat for this passage
+          if (firstAdditionalBeatId === null) {
+            firstAdditionalBeatId = additionalBeat.id;
+          }
         }
+      }
+      // Record the first additional beat so connections can be redirected
+      if (firstAdditionalBeatId !== null) {
+        this.passageNameToFirstAdditionalBeatId.set(analyzed.passage.name, firstAdditionalBeatId);
       }
     }
 
@@ -184,18 +257,25 @@ export class TwineImporter {
    */
   private createStoryInitBeats(storyInit: TwinePassage): Beat[] {
     const beats: Beat[] = [];
-    const parsed = SugarCubeParser.parse(storyInit.content);
+    // Use appropriate parser based on format
+    const parsed = this.format === 'harlowe'
+      ? HarloweParser.parse(storyInit.content)
+      : SugarCubeParser.parse(storyInit.content);
 
     // Create a SetVariable beat for each set operation
     for (const setOp of parsed.setOperations) {
       const beatId = this.generateBeatId();
+      // Use format-appropriate parser for value
+      const parsedValue = this.format === 'harlowe'
+        ? HarloweParser.parseValue(setOp.value)
+        : SugarCubeParser.parseValue(setOp.value);
       const config: BeatConfig = {
         id: beatId,
         name: `Init: ${setOp.variable}`,
         type: 'setVariable',
         parameters: {
           variable: setOp.variable,
-          value: SugarCubeParser.parseValue(setOp.value),
+          value: parsedValue,
           type: this.inferVariableType(setOp.value),
         },
       };
@@ -211,7 +291,10 @@ export class TwineImporter {
    * Infer variable type from value
    */
   private inferVariableType(value: string): 'variable' | 'counter' {
-    const parsed = SugarCubeParser.parseValue(value);
+    // Use appropriate parser based on format
+    const parsed = this.format === 'harlowe'
+      ? HarloweParser.parseValue(value)
+      : SugarCubeParser.parseValue(value);
     if (typeof parsed === 'number') {
       return 'counter';
     }
@@ -280,25 +363,55 @@ export class TwineImporter {
         };
 
       case 'endScreen':
+        // Extract restart button text from any link in the passage (e.g., "Try again")
+        // If no link, default to 'Play Again'
+        const restartButtonText = choices.length > 0 ? choices[0].text : 'Play Again';
         return {
-          title: 'The End',
-          text: displayText,
-          buttonText: 'Restart',
+          message: displayText, // EndScreenBeat uses 'message' not 'text'
+          showRestart: true,
+          // Set both buttonText (legacy) and restartText (new) for compatibility
+          buttonText: restartButtonText,
+          restartText: restartButtonText,
         };
 
       case 'setVariable':
         if (parsed.setOperations.length > 0) {
           const op = parsed.setOperations[0];
+          // Use format-appropriate parser for value
+          const parsedValue = this.format === 'harlowe'
+            ? HarloweParser.parseValue(op.value)
+            : SugarCubeParser.parseValue(op.value);
           return {
             variable: op.variable,
-            value: SugarCubeParser.parseValue(op.value),
+            value: parsedValue,
             type: this.inferVariableType(op.value),
           };
         }
         return {};
 
       case 'conditionBeat':
-        // ConditionBeat parameters are handled separately
+        // Extract condition from the first branching conditional (skip else-if as they're part of preceding conditional)
+        for (const conditional of parsed.conditionals) {
+          if (!conditional.hasBranchingLinks || conditional.isElseIf) continue;
+          const conditionData = this.format === 'harlowe'
+            ? HarloweParser.convertCondition(conditional.condition)
+            : SugarCubeParser.convertCondition(conditional.condition);
+
+          if (conditionData) {
+            const thenTarget = conditional.thenLinks[0]?.target || '';
+            const elseTarget = conditional.elseLinks[0]?.target;
+            const conditionType = this.inferVariableType(conditionData.value) === 'counter' ? 'counter' : 'variable';
+
+            return {
+              conditionType,
+              variableName: conditionData.variableName,
+              operator: conditionData.operator,
+              value: conditionData.value,
+              trueTarget: thenTarget,  // Passage name, resolved later (or intermediate beat ID)
+              falseTarget: elseTarget, // Passage name, resolved later (or intermediate beat ID)
+            };
+          }
+        }
         return {};
 
       default:
@@ -311,6 +424,48 @@ export class TwineImporter {
    */
   private buildConnections(analyzed: AnalyzedPassage): Connection[] {
     const connections: Connection[] = [];
+
+    // For conditionBeat, build connections from conditionals (skip else-if as they're part of preceding conditional)
+    if (analyzed.suggestedBeatType === 'conditionBeat' && analyzed.hasConditionalBranching) {
+      for (const conditional of analyzed.parsed.conditionals) {
+        if (!conditional.hasBranchingLinks || conditional.isElseIf) continue;
+        // Use appropriate parser for condition conversion
+        const conditionData = this.format === 'harlowe'
+          ? HarloweParser.convertCondition(conditional.condition)
+          : SugarCubeParser.convertCondition(conditional.condition);
+
+        // Add connection for the "then" branch (with condition)
+        if (conditional.thenLinks.length > 0) {
+          const thenTarget = conditional.thenLinks[0].target;
+          if (conditionData) {
+            const conditionObj: Condition = {
+              type: this.inferVariableType(conditionData.value) === 'counter' ? 'counter' : 'variable',
+              variableName: conditionData.variableName,
+              operator: conditionData.operator as Condition['operator'],
+              value: conditionData.value,
+            };
+            connections.push({
+              targetId: thenTarget,
+              condition: conditionObj,
+            });
+          } else {
+            // Couldn't parse condition, add without condition
+            connections.push({
+              targetId: thenTarget,
+            });
+          }
+        }
+
+        // Add connection for the "else" branch (no condition = default)
+        if (conditional.elseLinks.length > 0) {
+          const elseTarget = conditional.elseLinks[0].target;
+          connections.push({
+            targetId: elseTarget,
+          });
+        }
+      }
+      return connections;
+    }
 
     // For most beat types, connections come from choices
     for (const choice of analyzed.choices) {
@@ -335,13 +490,18 @@ export class TwineImporter {
       const beatId = this.generateBeatId();
       const op = additional.setOperations[0]; // Take first, rest will be chained
 
+      // Use format-appropriate parser for value
+      const parsedValue = this.format === 'harlowe'
+        ? HarloweParser.parseValue(op.value)
+        : SugarCubeParser.parseValue(op.value);
+
       const config: BeatConfig = {
         id: beatId,
         name: `Set: ${op.variable}`,
         type: 'setVariable',
         parameters: {
           variable: op.variable,
-          value: SugarCubeParser.parseValue(op.value),
+          value: parsedValue,
           type: this.inferVariableType(op.value),
         },
         defaultTarget: this.passageNameToBeatId.get(analyzed.passage.name),
@@ -396,16 +556,107 @@ export class TwineImporter {
   }
 
   /**
+   * Create intermediate IntroText beats for conditional content
+   * When a conditional has narrative text before a link, we need a separate beat for that text
+   */
+  private createConditionalContentBeats(analyzed: AnalyzedPassage): Beat[] {
+    const beats: Beat[] = [];
+    const linkRegex = this.format === 'harlowe'
+      ? /\[\[([^\[\]|]+?)->([^\[\]]+?)\]\]|\[\[([^\[\]|]+?)<-([^\[\]]+?)\]\]|\[\[([^\[\]|]+?)\|([^\[\]]+?)\]\]|\[\[([^\[\]|]+?)\]\]/g
+      : /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+
+    // Helper to strip links and get pure text
+    const stripLinks = (content: string): string => {
+      return (content || '').replace(linkRegex, '').trim();
+    };
+
+    // Helper to check if text is substantial (more than just whitespace or very short)
+    const isSubstantialText = (text: string): boolean => {
+      const stripped = text.replace(/\s+/g, ' ').trim();
+      return stripped.length > 10;
+    };
+
+    for (const conditional of analyzed.parsed.conditionals) {
+      if (!conditional.hasBranchingLinks) continue;
+      // Skip else-if conditionals - they're already handled as part of the preceding conditional's else branch
+      if (conditional.isElseIf) continue;
+
+      // Check "then" content for substantial text
+      const thenText = stripLinks(conditional.thenContent);
+      if (isSubstantialText(thenText) && conditional.thenLinks.length > 0) {
+        const beatId = this.generateBeatId();
+        const finalTarget = conditional.thenLinks[0].target;
+        const linkText = conditional.thenLinks[0].text;
+
+        const config: BeatConfig = {
+          id: beatId,
+          name: `${analyzed.passage.name} (True)`,
+          type: 'introText',
+          parameters: {
+            text: thenText,
+            buttonText: linkText || 'Continue', // Use link text for button
+          },
+          defaultTarget: finalTarget, // Passage name, resolved later
+        };
+
+        beats.push(this.registry.createBeat('introText', config));
+
+        // Store mapping so conditionBeat can point here instead of final target
+        this.conditionalContentBeatIds.set(`${analyzed.passage.name}:then`, beatId);
+      }
+
+      // Check "else" content for substantial text
+      const elseText = stripLinks(conditional.elseContent || '');
+      if (isSubstantialText(elseText) && conditional.elseLinks.length > 0) {
+        const beatId = this.generateBeatId();
+        const finalTarget = conditional.elseLinks[0].target;
+        const linkText = conditional.elseLinks[0].text;
+
+        const config: BeatConfig = {
+          id: beatId,
+          name: `${analyzed.passage.name} (False)`,
+          type: 'introText',
+          parameters: {
+            text: elseText,
+            buttonText: linkText || 'Continue', // Use link text for button
+          },
+          defaultTarget: finalTarget, // Passage name, resolved later
+        };
+
+        beats.push(this.registry.createBeat('introText', config));
+
+        // Store mapping so conditionBeat can point here instead of final target
+        this.conditionalContentBeatIds.set(`${analyzed.passage.name}:else`, beatId);
+      }
+    }
+
+    return beats;
+  }
+
+  /**
    * Resolve passage names to beat IDs in all connections
+   * If a passage has additional beats (SetVariable, etc.), redirect to the first additional beat
    */
   private resolveConnections(beats: Beat[]): void {
+    // Helper to resolve a passage name to the correct target beat ID
+    // If the passage has additional beats, return the first additional beat ID instead
+    const resolveTarget = (passageName: string): string | undefined => {
+      // First check if there's an additional beat that should run first
+      const firstAdditionalId = this.passageNameToFirstAdditionalBeatId.get(passageName);
+      if (firstAdditionalId) {
+        return firstAdditionalId;
+      }
+      // Otherwise return the main beat ID
+      return this.passageNameToBeatId.get(passageName);
+    };
+
     for (const beat of beats) {
       const connections = beat.getConnections();
       const resolvedConnections: Connection[] = [];
 
       for (const conn of connections) {
         // Check if targetId is a passage name
-        const beatId = this.passageNameToBeatId.get(conn.targetId);
+        const beatId = resolveTarget(conn.targetId);
         if (beatId) {
           resolvedConnections.push({
             ...conn,
@@ -428,7 +679,7 @@ export class TwineImporter {
         const dialogTree = params.dialogTree;
         if (dialogTree.choices) {
           for (const choice of dialogTree.choices) {
-            const beatId = this.passageNameToBeatId.get(choice.target);
+            const beatId = resolveTarget(choice.target);
             if (beatId) {
               choice.target = beatId;
             }
@@ -438,17 +689,35 @@ export class TwineImporter {
       } else if (beat.type === 'hyperText' && params.hyperlinks) {
         // Update HyperText links
         for (const link of params.hyperlinks) {
-          const beatId = this.passageNameToBeatId.get(link.targetBeatId);
+          const beatId = resolveTarget(link.targetBeatId);
           if (beatId) {
             link.targetBeatId = beatId;
           }
         }
         beat.updateParameters({ hyperlinks: params.hyperlinks });
+      } else if (beat.type === 'conditionBeat') {
+        // Update ConditionBeat trueTarget and falseTarget
+        const updates: Record<string, string> = {};
+        if (params.trueTarget) {
+          const beatId = resolveTarget(params.trueTarget);
+          if (beatId) {
+            updates.trueTarget = beatId;
+          }
+        }
+        if (params.falseTarget) {
+          const beatId = resolveTarget(params.falseTarget);
+          if (beatId) {
+            updates.falseTarget = beatId;
+          }
+        }
+        if (Object.keys(updates).length > 0) {
+          beat.updateParameters(updates);
+        }
       }
 
       // Update defaultTarget if it's a passage name
       if (beat.defaultTarget) {
-        const beatId = this.passageNameToBeatId.get(beat.defaultTarget);
+        const beatId = resolveTarget(beat.defaultTarget);
         if (beatId) {
           beat.defaultTarget = beatId;
         }
@@ -471,16 +740,26 @@ export class TwineImporter {
     analysis: AnalysisResult;
     title: string;
     author?: string;
+    format: TwineFormat;
   } {
     const story = TwineParser.parse(html);
     const regularPassages = TwineParser.getRegularPassages(story);
-    const analysis = PassageAnalyzer.analyzeAll(regularPassages);
+
+    // Detect format
+    const format: TwineFormat = TwineParser.isHarlowe(story)
+      ? 'harlowe'
+      : TwineParser.isSugarCube(story)
+        ? 'sugarcube'
+        : 'unknown';
+
+    const analysis = PassageAnalyzer.analyzeAll(regularPassages, format);
 
     return {
       story,
       analysis,
       title: TwineParser.getStoryTitle(story),
       author: TwineParser.getStoryAuthor(story),
+      format,
     };
   }
 }
