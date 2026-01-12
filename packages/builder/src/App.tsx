@@ -2111,7 +2111,7 @@ function App() {
   /**
    * Handle Twine import completion
    */
-  const handleImportTwineComplete = useCallback((result: ImportResult) => {
+  const handleImportTwineComplete = useCallback(async (result: ImportResult) => {
     setShowImportTwineDialog(false);
 
     try {
@@ -2124,6 +2124,21 @@ function App() {
 
       setSelectedBeat(null);
 
+      // CRITICAL: Set pending flag BEFORE saveCurrent to prevent load effect
+      // from reloading the old project during the transition
+      pendingNewProjectIdRef.current = 'pending';
+      console.log('[App] Twine import - Set pendingNewProjectIdRef to "pending"');
+
+      // Save as named project (converts from "Untitled Project" to named project)
+      const projectName = result.title || 'Imported Twine Story';
+      const newProjectId = await saveCurrent(projectName, `Imported from Twine: ${result.title}`);
+
+      // CRITICAL: Update refs to complete the transition
+      // This prevents the load effect from treating this as a project switch
+      pendingNewProjectIdRef.current = newProjectId;
+      loadedProjectIdRef.current = newProjectId;
+      console.log('[App] Twine import - Updated refs to new project ID:', newProjectId);
+
       // Show success message with stats
       const warningCount = result.warnings.length;
       let message = `Successfully imported "${result.title}" with ${result.beats.length} beats.`;
@@ -2134,10 +2149,12 @@ function App() {
       alert(message);
     } catch (error) {
       console.error('Twine import failed:', error);
+      // Clear pending flag on error
+      pendingNewProjectIdRef.current = null;
       const errorMsg = error instanceof Error ? error.message : String(error);
       alert(`Failed to import Twine story: ${errorMsg}`);
     }
-  }, [actions]);
+  }, [actions, saveCurrent]);
 
   /**
    * Handle Twine import cancellation

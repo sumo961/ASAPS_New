@@ -179,15 +179,9 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       throw new Error('Cannot auto-save untitled project');
     }
 
-    // CRITICAL FIX: Skip auto-save for default/empty projects (3 default beats only)
-    // These clutter the project library with empty projects
-    if (isDefaultProject(projectToUse)) {
-      console.log('[PersistenceContext] getProjectData - Skipping auto-save for empty default project:', projectToUse.name);
-      throw new Error('Cannot auto-save empty default project');
-    }
-
     // Sync project data before retrieving if sync callback is registered
     // This ensures current beats, characters, etc. are saved to the project story
+    // IMPORTANT: Must sync BEFORE checking isDefaultProject so we check actual beats
     if (syncCallback && debug) {
       console.log('[PersistenceContext] getProjectData - Syncing project data before save...');
     }
@@ -195,6 +189,14 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
     // After sync, get the most recent project from ref (sync updates the ref)
     const finalProject = currentProjectRef.current || projectToUse;
+
+    // CRITICAL FIX: Skip auto-save for default/empty projects (3 default beats only)
+    // These clutter the project library with empty projects
+    // NOTE: Check AFTER sync so we check the actual current beats, not stale data
+    if (isDefaultProject(finalProject)) {
+      console.log('[PersistenceContext] getProjectData - Skipping auto-save for empty default project:', finalProject.name);
+      throw new Error('Cannot auto-save empty default project');
+    }
 
     const story = (finalProject as any).story;
     const beats = story?.beats;
