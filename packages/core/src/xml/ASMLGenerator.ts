@@ -450,7 +450,12 @@ export class ASMLGenerator {
       const soundData = beat.sound || { file: params.backgroundSound };
       this.generateSound(soundData, lines, beatIndent + this.indent);
     }
-    
+
+    // Notes - author notes not shown to player
+    if (beat.notes) {
+      lines.push(`${beatIndent}${this.indent}<notes>${this.escapeXml(beat.notes)}</notes>`);
+    }
+
     // Node (background asset)
     console.log(`[ASMLGenerator.generateBeat] ${beat.type} (id: ${beat.id}) - params.node:`, params.node);
     console.log(`[ASMLGenerator.generateBeat] ${beat.type} (id: ${beat.id}) - beat.node:`, (beat as any).node);

@@ -113,7 +113,7 @@ describe('TwineImporter - Harlowe format', () => {
     expect(conditionalConn).toBeDefined();
     expect(conditionalConn!.condition!.variableName).toBe('betrayedTom');
     expect(conditionalConn!.condition!.operator).toBe('==');
-    expect(conditionalConn!.condition!.value).toBe('true');
+    expect(conditionalConn!.condition!.value).toBe(true);  // Actual boolean, not string
 
     // Should have an else connection
     const elseConn = lookAtTom!.connections.find(c => !c.condition);
@@ -124,7 +124,7 @@ describe('TwineImporter - Harlowe format', () => {
     expect(params.conditionType).toBe('variable');
     expect(params.variableName).toBe('betrayedTom');
     expect(params.operator).toBe('==');
-    expect(params.value).toBe('true');
+    expect(params.value).toBe(true);  // Actual boolean, not string
     expect(params.trueTarget).toBeDefined();
     expect(params.falseTarget).toBeDefined();
   });

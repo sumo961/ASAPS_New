@@ -177,7 +177,7 @@ export class TwineImporter {
       // Create additional beats (SetVariable, ConditionBeat) if needed
       // Skip creating additional ConditionBeats if the main beat is already a conditionBeat
       // (the connections are built directly into the main beat)
-      let firstAdditionalBeatId: string | null = null;
+      const additionalBeatsCreated: Beat[] = [];
       for (const additional of analyzed.additionalBeats) {
         if (additional.type === 'conditionBeat' && analyzed.suggestedBeatType === 'conditionBeat') {
           // Skip - conditions are already in the main beat
@@ -186,15 +186,26 @@ export class TwineImporter {
         const additionalBeat = this.createAdditionalBeat(additional, analyzed);
         if (additionalBeat) {
           beats.push(additionalBeat);
-          // Track the first additional beat for this passage
-          if (firstAdditionalBeatId === null) {
-            firstAdditionalBeatId = additionalBeat.id;
-          }
+          additionalBeatsCreated.push(additionalBeat);
         }
       }
-      // Record the first additional beat so connections can be redirected
-      if (firstAdditionalBeatId !== null) {
-        this.passageNameToFirstAdditionalBeatId.set(analyzed.passage.name, firstAdditionalBeatId);
+
+      // Chain additional beats together: first → second → ... → last → main passage
+      // Only the last additional beat should point to the main passage
+      if (additionalBeatsCreated.length > 0) {
+        const mainBeatId = this.passageNameToBeatId.get(analyzed.passage.name);
+        for (let i = 0; i < additionalBeatsCreated.length; i++) {
+          const currentBeat = additionalBeatsCreated[i];
+          if (i < additionalBeatsCreated.length - 1) {
+            // Chain to next additional beat
+            currentBeat.defaultTarget = additionalBeatsCreated[i + 1].id;
+          } else {
+            // Last additional beat chains to main passage
+            currentBeat.defaultTarget = mainBeatId;
+          }
+        }
+        // Record the first additional beat so connections can be redirected
+        this.passageNameToFirstAdditionalBeatId.set(analyzed.passage.name, additionalBeatsCreated[0].id);
       }
     }
 
@@ -221,7 +232,13 @@ export class TwineImporter {
         lastInitBeat.defaultTarget = this.passageNameToBeatId.get(startPassage.name) || '';
       }
     } else if (startPassage) {
-      firstBeatId = this.passageNameToBeatId.get(startPassage.name) || '';
+      // Check if the start passage has additional beats that should run first
+      const additionalBeatId = this.passageNameToFirstAdditionalBeatId.get(startPassage.name);
+      if (additionalBeatId) {
+        firstBeatId = additionalBeatId;
+      } else {
+        firstBeatId = this.passageNameToBeatId.get(startPassage.name) || '';
+      }
     } else if (beats.length > 0) {
       firstBeatId = beats[0].id;
     }
@@ -290,8 +307,16 @@ export class TwineImporter {
   /**
    * Infer variable type from value
    */
-  private inferVariableType(value: string): 'variable' | 'counter' {
-    // Use appropriate parser based on format
+  private inferVariableType(value: string | number | boolean): 'variable' | 'counter' {
+    // If already a number, it's a counter
+    if (typeof value === 'number') {
+      return 'counter';
+    }
+    // If already a boolean, it's a variable
+    if (typeof value === 'boolean') {
+      return 'variable';
+    }
+    // Parse string values
     const parsed = this.format === 'harlowe'
       ? HarloweParser.parseValue(value)
       : SugarCubeParser.parseValue(value);
@@ -539,13 +564,19 @@ export class TwineImporter {
         });
       }
 
+      const conditionType = this.inferVariableType(condition.value) === 'counter' ? 'counter' : 'variable';
       const config: BeatConfig = {
         id: beatId,
         name: `Condition: ${condition.variableName}`,
         type: 'conditionBeat',
         connections,
         parameters: {
-          // ConditionBeat uses connections for conditions
+          conditionType,
+          variableName: condition.variableName,
+          operator: condition.operator,
+          value: condition.value,
+          trueTarget: condition.thenTarget,
+          falseTarget: condition.elseTarget,
         },
       };
 

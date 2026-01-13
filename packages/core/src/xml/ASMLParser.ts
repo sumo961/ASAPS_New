@@ -1480,6 +1480,12 @@ export class ASMLParser {
       console.log(`[ASMLParser] Beat ${id}: NO <node> element found at beat level`);
     }
 
+    // Parse notes (author notes not shown to player)
+    const notesElement = beatElement.querySelector('notes');
+    if (notesElement && notesElement.textContent) {
+      config.notes = notesElement.textContent;
+    }
+
     // Parse locations
     const locsElement = beatElement.querySelector('locs');
     if (locsElement) {

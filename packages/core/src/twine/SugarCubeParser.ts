@@ -446,7 +446,7 @@ export class SugarCubeParser {
   static convertCondition(condition: string): {
     variableName: string;
     operator: string;
-    value: string;
+    value: string | number | boolean;
   } | null {
     // Simple patterns: $var, $var == value, $var != value, etc.
     const patterns = [
@@ -468,14 +468,15 @@ export class SugarCubeParser {
           return {
             variableName: match[1],
             operator: '!=',
-            value: 'false',
+            value: false,  // Use actual boolean
           };
         } else if (match.length === 4) {
           // Comparison: $var op value
+          const rawValue = match[3].trim().replace(/^["']|["']$/g, '');
           return {
             variableName: match[1],
             operator: match[2].replace('===', '==').replace('!==', '!='),
-            value: match[3].trim().replace(/^["']|["']$/g, ''),
+            value: this.parseConditionValue(rawValue),
           };
         }
       }
@@ -487,11 +488,28 @@ export class SugarCubeParser {
       return {
         variableName: notMatch[1],
         operator: '==',
-        value: 'false',
+        value: false,  // Use actual boolean
       };
     }
 
     return null;
+  }
+
+  /**
+   * Parse a condition value to proper type
+   */
+  private static parseConditionValue(value: string): string | number | boolean {
+    const trimmed = value.trim();
+
+    // Boolean
+    if (trimmed.toLowerCase() === 'true') return true;
+    if (trimmed.toLowerCase() === 'false') return false;
+
+    // Number
+    const num = Number(trimmed);
+    if (!isNaN(num) && trimmed !== '') return num;
+
+    return trimmed;
   }
 
   /**

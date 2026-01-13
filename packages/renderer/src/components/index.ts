@@ -19,7 +19,23 @@ export {
 } from './CharacterMeterFrame';
 
 export {
+  CharacterInventoryFrame,
+  type CharacterInventoryFrameProps,
+  type InventoryFrameConfig,
+  type InventoryFrameAnchor,
+  type InventoryFrameScreenPosition,
+  type InventoryFrameDockMode,
+  type InventoryFrameStyle,
+  type InventoryItemData
+} from './CharacterInventoryFrame';
+
+export {
   ChatDialogView,
   type ChatDialogViewProps,
   type ChatMessage
 } from './ChatDialogView';
+
+export {
+  TimerProgressBar,
+  type TimerProgressBarProps
+} from './TimerProgressBar';

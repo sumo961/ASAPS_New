@@ -27,7 +27,7 @@ import {
   ArrowUpDown,
   Hash
 } from 'lucide-react';
-import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG } from '../../types/character';
+import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG, InventoryFrameConfig, DEFAULT_INVENTORY_FRAME_CONFIG } from '../../types/character';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
 
@@ -1218,6 +1218,386 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Inventory Frame (HUD Overlay) Configuration */}
+      <div className="border-t pt-4 mt-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-medium flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            Inventory Frame (HUD Overlay)
+          </h3>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={!!editedCharacter.inventoryFrame}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setEditedCharacter({
+                    ...editedCharacter,
+                    inventoryFrame: { ...DEFAULT_INVENTORY_FRAME_CONFIG }
+                  });
+                } else {
+                  const { inventoryFrame, ...rest } = editedCharacter;
+                  setEditedCharacter(rest as Character);
+                }
+              }}
+              className="rounded border-gray-300"
+            />
+            <span className="text-gray-600">Enable</span>
+          </label>
+        </div>
+
+        {editedCharacter.inventoryFrame && (
+          <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+            {/* Dock Mode Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Dock To</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      inventoryFrame: { ...editedCharacter.inventoryFrame!, dockMode: 'character' }
+                    });
+                  }}
+                  className={`flex-1 px-3 py-2 text-sm rounded border transition-colors ${
+                    editedCharacter.inventoryFrame?.dockMode === 'character'
+                      ? 'bg-blue-500 border-blue-600 text-white'
+                      : 'bg-white border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  Character
+                </button>
+                <button
+                  onClick={() => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      inventoryFrame: { ...editedCharacter.inventoryFrame!, dockMode: 'screen' }
+                    });
+                  }}
+                  className={`flex-1 px-3 py-2 text-sm rounded border transition-colors ${
+                    (editedCharacter.inventoryFrame?.dockMode ?? 'screen') === 'screen'
+                      ? 'bg-blue-500 border-blue-600 text-white'
+                      : 'bg-white border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  Screen Corner
+                </button>
+              </div>
+            </div>
+
+            {/* Screen Corner Position (shown when dockMode is 'screen') */}
+            {(editedCharacter.inventoryFrame?.dockMode ?? 'screen') === 'screen' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Screen Corner</label>
+                <div className="grid grid-cols-2 gap-2 w-48">
+                  {([
+                    { pos: 'screen-top-left', label: 'Top Left' },
+                    { pos: 'screen-top-right', label: 'Top Right' },
+                    { pos: 'screen-bottom-left', label: 'Bottom Left' },
+                    { pos: 'screen-bottom-right', label: 'Bottom Right' }
+                  ] as const).map(({ pos, label }) => (
+                    <button
+                      key={pos}
+                      onClick={() => {
+                        setEditedCharacter({
+                          ...editedCharacter,
+                          inventoryFrame: { ...editedCharacter.inventoryFrame!, screenPosition: pos as MeterFrameScreenPosition }
+                        });
+                      }}
+                      className={`px-3 py-2 text-sm border rounded transition-colors ${
+                        (editedCharacter.inventoryFrame?.screenPosition ?? 'screen-bottom-right') === pos
+                          ? 'bg-blue-500 border-blue-600 text-white'
+                          : 'bg-white border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Character Anchor Position (shown when dockMode is 'character') */}
+            {editedCharacter.inventoryFrame?.dockMode === 'character' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Anchor Position</label>
+                <div className="grid grid-cols-3 gap-1 w-32">
+                  {(['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'] as const).map((pos) => {
+                    const isAnchor = pos !== 'center' && pos !== 'left' && pos !== 'right' ? pos : (pos === 'left' ? 'left' : (pos === 'right' ? 'right' : null));
+                    if (pos === 'center') {
+                      return <div key={pos} className="w-10 h-10 border border-dashed border-gray-300 rounded bg-gray-200" />;
+                    }
+                    return (
+                      <button
+                        key={pos}
+                        onClick={() => {
+                          if (isAnchor) {
+                            setEditedCharacter({
+                              ...editedCharacter,
+                              inventoryFrame: { ...editedCharacter.inventoryFrame!, anchor: isAnchor as MeterFrameAnchor }
+                            });
+                          }
+                        }}
+                        className={`w-10 h-10 border rounded transition-colors ${
+                          editedCharacter.inventoryFrame?.anchor === pos
+                            ? 'bg-blue-500 border-blue-600 text-white'
+                            : 'bg-white border-gray-300 hover:bg-gray-100'
+                        }`}
+                        title={pos}
+                      >
+                        <div className={`w-2 h-2 mx-auto rounded-full ${
+                          editedCharacter.inventoryFrame?.anchor === pos ? 'bg-white' : 'bg-gray-400'
+                        }`} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Offset Controls */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Offset X</label>
+                <input
+                  type="number"
+                  value={editedCharacter.inventoryFrame.offset.x}
+                  onChange={(e) => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      inventoryFrame: {
+                        ...editedCharacter.inventoryFrame!,
+                        offset: { ...editedCharacter.inventoryFrame!.offset, x: parseInt(e.target.value) || 0 }
+                      }
+                    });
+                  }}
+                  className="w-full px-2 py-1 border rounded text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Offset Y</label>
+                <input
+                  type="number"
+                  value={editedCharacter.inventoryFrame.offset.y}
+                  onChange={(e) => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      inventoryFrame: {
+                        ...editedCharacter.inventoryFrame!,
+                        offset: { ...editedCharacter.inventoryFrame!.offset, y: parseInt(e.target.value) || 0 }
+                      }
+                    });
+                  }}
+                  className="w-full px-2 py-1 border rounded text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Display Settings */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-gray-700">Display</h4>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Item Size</label>
+                  <input
+                    type="number"
+                    min="24"
+                    max="96"
+                    value={editedCharacter.inventoryFrame.itemSize}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: { ...editedCharacter.inventoryFrame!, itemSize: parseInt(e.target.value) || 48 }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Columns</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={editedCharacter.inventoryFrame.columns}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: { ...editedCharacter.inventoryFrame!, columns: parseInt(e.target.value) || 4 }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Spacing</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={editedCharacter.inventoryFrame.itemSpacing}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: { ...editedCharacter.inventoryFrame!, itemSpacing: parseInt(e.target.value) || 6 }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={editedCharacter.inventoryFrame.showLabels}
+                  onChange={(e) => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      inventoryFrame: { ...editedCharacter.inventoryFrame!, showLabels: e.target.checked }
+                    });
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-gray-600">Show Labels</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={editedCharacter.inventoryFrame.showOnDemand}
+                  onChange={(e) => {
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      inventoryFrame: { ...editedCharacter.inventoryFrame!, showOnDemand: e.target.checked }
+                    });
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-gray-600">Show on demand only (Ctrl/Cmd+I)</span>
+              </label>
+            </div>
+
+            {/* Style Settings */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-gray-700">Style</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Background</label>
+                  <input
+                    type="text"
+                    value={editedCharacter.inventoryFrame.style.backgroundColor}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: {
+                          ...editedCharacter.inventoryFrame!,
+                          style: { ...editedCharacter.inventoryFrame!.style, backgroundColor: e.target.value }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Border Color</label>
+                  <input
+                    type="color"
+                    value={editedCharacter.inventoryFrame.style.borderColor}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: {
+                          ...editedCharacter.inventoryFrame!,
+                          style: { ...editedCharacter.inventoryFrame!.style, borderColor: e.target.value }
+                        }
+                      });
+                    }}
+                    className="w-full h-8 border rounded cursor-pointer"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Border</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={editedCharacter.inventoryFrame.style.borderWidth}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: {
+                          ...editedCharacter.inventoryFrame!,
+                          style: { ...editedCharacter.inventoryFrame!.style, borderWidth: parseInt(e.target.value) || 0 }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Radius</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={editedCharacter.inventoryFrame.style.borderRadius}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: {
+                          ...editedCharacter.inventoryFrame!,
+                          style: { ...editedCharacter.inventoryFrame!.style, borderRadius: parseInt(e.target.value) || 0 }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Padding</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={editedCharacter.inventoryFrame.style.padding}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: {
+                          ...editedCharacter.inventoryFrame!,
+                          style: { ...editedCharacter.inventoryFrame!.style, padding: parseInt(e.target.value) || 0 }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Opacity</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editedCharacter.inventoryFrame.style.opacity}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: {
+                          ...editedCharacter.inventoryFrame!,
+                          style: { ...editedCharacter.inventoryFrame!.style, opacity: parseInt(e.target.value) || 0 }
+                        }
+                      });
+                    }}
+                    className="w-full px-2 py-1 border rounded text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

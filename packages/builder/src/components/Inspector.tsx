@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Beat } from '@asaps/core';
-import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box } from 'lucide-react';
+import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
 import { HyperTextEditor } from '../editors/HyperTextEditor';
@@ -58,7 +58,15 @@ interface InspectorProps {
   // For counter/variable dropdowns
   characters?: Character[];
   globalSettings?: { variables?: { name: string; type: 'string' | 'number' | 'boolean'; defaultValue?: any; description?: string }[] };
+  // Width control
+  width?: number;
+  onWidthChange?: (width: number) => void;
 }
+
+// Constants for resizable panel
+const MIN_INSPECTOR_WIDTH = 280;
+const DEFAULT_INSPECTOR_WIDTH = 320;
+const INSPECTOR_WIDTH_STORAGE_KEY = 'asaps-inspector-width';
 
 export const Inspector: React.FC<InspectorProps> = ({
   beat,
@@ -78,12 +86,64 @@ export const Inspector: React.FC<InspectorProps> = ({
   onOpenCharacterManager,
   characters = [],
   globalSettings,
+  width: externalWidth,
+  onWidthChange,
 }) => {
   const [localBeat, setLocalBeat] = useState<any>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'properties' | 'visual'>('properties');
+
+  // Resize state
+  const [internalWidth, setInternalWidth] = useState<number>(() => {
+    // Load from localStorage on initial mount
+    const stored = localStorage.getItem(INSPECTOR_WIDTH_STORAGE_KEY);
+    return stored ? parseInt(stored, 10) : DEFAULT_INSPECTOR_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeHandleRef = useRef<HTMLDivElement>(null);
+
+  // Use external width if provided, otherwise internal
+  const inspectorWidth = externalWidth ?? internalWidth;
+  const maxWidth = typeof window !== 'undefined' ? window.innerWidth * 0.5 : 600;
+
+  // Resize handlers
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = window.innerWidth - e.clientX;
+      const clampedWidth = Math.min(maxWidth, Math.max(MIN_INSPECTOR_WIDTH, newWidth));
+
+      if (onWidthChange) {
+        onWidthChange(clampedWidth);
+      } else {
+        setInternalWidth(clampedWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      // Save to localStorage
+      const currentWidth = externalWidth ?? internalWidth;
+      localStorage.setItem(INSPECTOR_WIDTH_STORAGE_KEY, String(currentWidth));
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, maxWidth, onWidthChange, externalWidth, internalWidth]);
 
   // Get available counters and variables for dropdowns
   const availableCounters = useAvailableCounters(characters);
@@ -116,8 +176,20 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   // Get available characters - NPCs who can speak
-  const getAvailableCharacters = () => {
-    return ['Old Wizard', 'Merchant', 'Guard', 'Innkeeper', 'Mysterious Stranger', 'Village Elder', 'Narrator'];
+  const getAvailableCharacters = (): string[] => {
+    // Filter to NPCs only (exclude player characters)
+    const npcCharacters = characters
+      .filter(c => c.role !== 'player')
+      .map(c => c.displayName || c.name)
+      .filter(name => name && name.trim() !== '');
+
+    // If we have NPC characters from Character Manager, use them
+    if (npcCharacters.length > 0) {
+      return npcCharacters;
+    }
+
+    // Fallback to defaults if no characters are defined
+    return ['Narrator', 'NPC'];
   };
 
   // Check if beat type supports visual editor
@@ -409,7 +481,10 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   if (!beat || !localBeat) {
     return (
-      <div className={`${expanded ? 'w-[640px]' : 'w-80'} h-full bg-white border-l border-gray-200 flex flex-col`}>
+      <div
+        className="h-full bg-white border-l border-gray-200 flex flex-col relative"
+        style={{ width: inspectorWidth }}
+      >
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center text-gray-500">
             <Info className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -499,8 +574,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     setLocalBeat(updatedBeat);
     setHasChanges(true);
 
-    // For fields that affect graph visualization, update immediately
-    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name') {
+    // For fields that affect graph visualization or need immediate persistence, update immediately
+    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes') {
       if (onUpdate && beat) {
         onUpdate(beat.id, { [field]: value });
       }
@@ -540,6 +615,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     beat.name = beatToUpdate.name;
     beat.cluster = beatToUpdate.cluster;
     beat.defaultTarget = beatToUpdate.defaultTarget || undefined;
+    beat.defaultTargetDelay = beatToUpdate.defaultTargetDelay;
+    beat.showTimer = beatToUpdate.showTimer;
     beat.transition = beatToUpdate.transition;
 
     // Convert backgroundSound from parameters to proper Sound object
@@ -699,7 +776,10 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.name = localBeat.name;
       beat.cluster = localBeat.cluster;
       beat.defaultTarget = localBeat.defaultTarget || undefined;
+      beat.defaultTargetDelay = localBeat.defaultTargetDelay;
+      beat.showTimer = localBeat.showTimer;
       beat.transition = localBeat.transition;
+      beat.notes = localBeat.notes;
 
       // Convert backgroundSound from parameters to proper Sound object
       const bgSoundId = localBeat.parameters?.backgroundSound;
@@ -861,13 +941,23 @@ export const Inspector: React.FC<InspectorProps> = ({
   const availableTargets = allBeats.filter(b => b.id !== beat.id);
   
   // Dynamic width for visual editor
-  const inspectorWidthClass = activeTab === 'visual' && supportsVisualEditor(beat.type) 
-    ? 'w-full max-w-7xl' 
-    : expanded ? 'w-[640px]' : 'w-80';
+  const useVisualEditorWidth = activeTab === 'visual' && supportsVisualEditor(beat.type);
 
   return (
     <>
-      <div className={`${inspectorWidthClass} h-full bg-white border-l border-gray-200 flex flex-col`}>
+      <div
+        className={`h-full bg-white border-l border-gray-200 flex flex-col relative ${useVisualEditorWidth ? 'w-full max-w-7xl' : ''}`}
+        style={useVisualEditorWidth ? undefined : { width: inspectorWidth }}
+      >
+        {/* Resize Handle */}
+        {!useVisualEditorWidth && (
+          <div
+            ref={resizeHandleRef}
+            onMouseDown={handleResizeStart}
+            className={`absolute left-0 top-0 w-1 h-full cursor-ew-resize hover:bg-blue-500 transition-colors ${isResizing ? 'bg-blue-500' : 'bg-transparent hover:bg-blue-400'}`}
+            style={{ zIndex: 50 }}
+          />
+        )}
         {/* Fixed Header */}
         <div className="flex-shrink-0 p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-2">
@@ -1483,7 +1573,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       onChange={handleDialogTreeChange}
                       characters={getAvailableCharacters()}
                       allBeats={availableTargets}
-                      counters={availableCounters.map(c => c.name)}
+                      counters={availableCounters.map(c => ({ name: c.name, displayName: c.displayName, characterName: c.characterName }))}
                       variables={availableVariables.map(v => v.name)}
                     />
 
@@ -2039,6 +2129,38 @@ export const Inspector: React.FC<InspectorProps> = ({
                     )}
                   </div>
                 )}
+
+                {/* Notes Section - Collapsible */}
+                <div className="border-t pt-4">
+                  <button
+                    onClick={() => setShowNotes(!showNotes)}
+                    className="w-full py-2 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-lg"
+                  >
+                    {showNotes ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    <StickyNote className="w-4 h-4" />
+                    Notes
+                    {localBeat.notes && (
+                      <span className="ml-auto text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                        Has notes
+                      </span>
+                    )}
+                  </button>
+
+                  {showNotes && (
+                    <div className="mt-2 space-y-2">
+                      <textarea
+                        value={localBeat.notes || ''}
+                        onChange={(e) => handleChange('notes', e.target.value)}
+                        placeholder="Add author notes (not shown to player)..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y min-h-[80px] max-h-[200px]"
+                        rows={3}
+                      />
+                      <p className="text-xs text-gray-500">
+                        These notes are for authors only and will not be displayed to players.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Advanced Settings Toggle */}
                 <div className="border-t pt-4">

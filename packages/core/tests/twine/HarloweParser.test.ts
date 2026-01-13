@@ -229,7 +229,7 @@ describe('HarloweParser', () => {
       expect(result).toBeDefined();
       expect(result!.variableName).toBe('hasKey');
       expect(result!.operator).toBe('==');
-      expect(result!.value).toBe('true');
+      expect(result!.value).toBe(true);  // Returns actual boolean
     });
 
     it('should convert "is" equality check', () => {
@@ -238,7 +238,7 @@ describe('HarloweParser', () => {
       expect(result).toBeDefined();
       expect(result!.variableName).toBe('gold');
       expect(result!.operator).toBe('==');
-      expect(result!.value).toBe('100');
+      expect(result!.value).toBe(100);  // Returns actual number
     });
 
     it('should convert "is not" inequality check', () => {
@@ -247,7 +247,7 @@ describe('HarloweParser', () => {
       expect(result).toBeDefined();
       expect(result!.variableName).toBe('health');
       expect(result!.operator).toBe('!=');
-      expect(result!.value).toBe('0');
+      expect(result!.value).toBe(0);  // Returns actual number
     });
 
     it('should convert comparison operators', () => {
@@ -263,7 +263,7 @@ describe('HarloweParser', () => {
       expect(result).toBeDefined();
       expect(result!.variableName).toBe('hasKey');
       expect(result!.operator).toBe('==');
-      expect(result!.value).toBe('false');
+      expect(result!.value).toBe(false);  // Returns actual boolean
     });
 
     it('should handle string values', () => {

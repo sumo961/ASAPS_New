@@ -512,6 +512,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
             );
           } else {
             // Show text input for variables
+            // Handle boolean false properly - don't treat it as empty
+            const displayValue = value !== undefined && value !== null ? String(value) : '';
             return (
               <div key={paramName}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -519,7 +521,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={value || ''}
+                  value={displayValue}
                   onChange={(e) => onParameterChange(paramName, e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   placeholder="Variable value"
@@ -530,6 +532,10 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
         }
 
         // Default: text input for any type
+        // Handle boolean false properly - don't treat it as empty
+        const defaultDisplayValue = value !== undefined && value !== null
+          ? String(value)
+          : (paramDef.default !== undefined ? String(paramDef.default) : '');
         return (
           <div key={paramName}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -537,7 +543,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
             </label>
             <input
               type="text"
-              value={value || paramDef.default || ''}
+              value={defaultDisplayValue}
               onChange={(e) => onParameterChange(paramName, e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               placeholder={paramDef.description}

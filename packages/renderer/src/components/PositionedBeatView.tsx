@@ -5,6 +5,8 @@ import { getPresetSound, isPresetSound } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
+import { CharacterInventoryFrame, type InventoryFrameConfig, type InventoryItemData } from './CharacterInventoryFrame';
+import { TimerProgressBar } from './TimerProgressBar';
 
 /**
  * Font name to CSS font-family mapping
@@ -189,6 +191,22 @@ export interface PositionedBeatViewProps {
     counters: MeterCounterData[];
     config: MeterFrameConfig;
   } | null;
+  /** Resolver function to get inventory data for a character (for HUD display) */
+  characterInventoryResolver?: (characterId: string) => {
+    items: InventoryItemData[];
+    config: InventoryFrameConfig;
+  } | null;
+  /** Whether inventory display is visible (controlled by Ctrl/Cmd+I) */
+  inventoryVisible?: boolean;
+  /** Timer state for default target countdown display */
+  timerState?: {
+    totalTime: number;
+    remainingTime: number;
+    visible: boolean;
+    label?: string;
+  };
+  /** Subscribe to timer state updates for real-time progress bar */
+  onSubscribeTimerState?: (listener: (state: PositionedBeatViewProps['timerState']) => void) => () => void;
 }
 
 /**
@@ -413,9 +431,23 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   animations = [],
   counterResolver,
   characterMeterFrameResolver,
+  characterInventoryResolver,
+  inventoryVisible = false,
+  timerState: initialTimerState,
+  onSubscribeTimerState,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
+
+  // State for timer - subscribes to updates for real-time progress bar animation
+  const [timerState, setTimerState] = React.useState(initialTimerState);
+
+  React.useEffect(() => {
+    if (onSubscribeTimerState) {
+      const unsubscribe = onSubscribeTimerState(setTimerState);
+      return unsubscribe;
+    }
+  }, [onSubscribeTimerState]);
 
   // Animation state for button fade-in after text animation completes
   const [animationsComplete, setAnimationsComplete] = React.useState(false);
@@ -792,6 +824,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             onTriggerClickAnimation={() => triggerClickAnimation(element.location.id || element.location.name, element.location.name)}
             hasPendingClickAnimation={hasPendingClickAnimation(element.location.id || element.location.name, element.location.name)}
             characterMeterFrameResolver={characterMeterFrameResolver}
+            characterInventoryResolver={characterInventoryResolver}
+            inventoryVisible={inventoryVisible}
             containerDimensions={{ width: stageWidth, height: stageHeight }}
           />
         ))}
@@ -922,6 +956,15 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       style={containerStyle}
       onClick={!effectiveAnimationsComplete && animation === 'typewriter' ? handleSkipAnimations : undefined}
     >
+      {/* Timer progress bar for default target countdown */}
+      {timerState && timerState.visible && (
+        <TimerProgressBar
+          totalTime={timerState.totalTime}
+          remainingTime={timerState.remainingTime}
+          visible={timerState.visible}
+          label={timerState.label}
+        />
+      )}
       {adjustedElements.map((element, index) => (
         <PositionedElement
           key={`element-${index}-${element.location.name}`}
@@ -946,6 +989,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           onTriggerClickAnimation={() => triggerClickAnimation(element.location.id || element.location.name, element.location.name)}
           hasPendingClickAnimation={hasPendingClickAnimation(element.location.id || element.location.name, element.location.name)}
           characterMeterFrameResolver={characterMeterFrameResolver}
+          characterInventoryResolver={characterInventoryResolver}
+          inventoryVisible={inventoryVisible}
           containerDimensions={{ width: stageWidth, height: stageHeight }}
         />
       ))}
@@ -985,6 +1030,13 @@ interface PositionedElementProps {
     counters: MeterCounterData[];
     config: MeterFrameConfig;
   } | null;
+  /** Resolver function to get inventory data for a character (for HUD display) */
+  characterInventoryResolver?: (characterId: string) => {
+    items: InventoryItemData[];
+    config: InventoryFrameConfig;
+  } | null;
+  /** Whether inventory display is visible (controlled by Ctrl/Cmd+I) */
+  inventoryVisible?: boolean;
   /** Container dimensions for screen-docked meter frames */
   containerDimensions?: { width: number; height: number };
 }
@@ -1011,6 +1063,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   onTriggerClickAnimation,
   hasPendingClickAnimation,
   characterMeterFrameResolver,
+  characterInventoryResolver,
+  inventoryVisible = false,
   containerDimensions,
 }) => {
   const { location, content, assetUrl, hyperlinks } = element;
@@ -1217,6 +1271,14 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         ? characterMeterFrameResolver(location.characterId)
         : null;
 
+      // Get inventory data if character has one configured
+      const inventoryData = location.characterId && characterInventoryResolver
+        ? characterInventoryResolver(location.characterId)
+        : null;
+
+      // Determine if inventory should be visible (controlled by Ctrl/Cmd+I toggle)
+      const shouldShowInventory = inventoryData && inventoryData.items.length > 0 && inventoryVisible;
+
       // Merge sprite animation from path animation into spriteSheet
       // When animatedPosition has sprite animation info and isAnimating is true, use it
       let effectiveSpriteSheet = element.spriteSheet;
@@ -1286,6 +1348,16 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
               characterPosition={{ x: effectiveX, y: effectiveY }}
               characterDimensions={{ width: location.width, height: location.height }}
               containerDimensions={containerDimensions}
+            />
+          )}
+          {shouldShowInventory && inventoryData && (
+            <CharacterInventoryFrame
+              items={inventoryData.items}
+              config={inventoryData.config}
+              characterPosition={{ x: effectiveX, y: effectiveY }}
+              characterDimensions={{ width: location.width, height: location.height }}
+              containerDimensions={containerDimensions}
+              isVisible={true}
             />
           )}
         </>
@@ -2856,10 +2928,20 @@ export function createPositionedElementData(
           }
         }
       }
-      // Fallback: use first choice for any button
+      // Better fallback: use the button's position among all buttons to find the choice
       if (!choice && location.kind === 'button' && content.choices.length > 0) {
-        choice = content.choices[0];
-        console.log(`[createPositionedElementData] DialogTree: using first choice as fallback`);
+        // Count how many buttons we've seen so far to determine this button's index
+        const buttonIndex = locations
+          .slice(0, locations.indexOf(location))
+          .filter(loc => loc.kind === 'button').length;
+        if (buttonIndex >= 0 && buttonIndex < content.choices.length) {
+          choice = content.choices[buttonIndex];
+          console.log(`[createPositionedElementData] DialogTree: matched by button position ${buttonIndex}`);
+        } else {
+          // Last resort: use first choice (shouldn't happen often)
+          choice = content.choices[0];
+          console.log(`[createPositionedElementData] DialogTree: using first choice as last resort fallback`);
+        }
       }
       if (choice) {
         actionId = choice.id;

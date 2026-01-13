@@ -5,6 +5,7 @@ import type { Location, AnimationPath } from '@asaps/core';
 import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
 import type { MeterCounterData, MeterFrameConfig } from '../components/CharacterMeterFrame';
+import type { InventoryItemData, InventoryFrameConfig } from '../components/CharacterInventoryFrame';
 import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 
@@ -553,6 +554,8 @@ export class ReactRenderer extends BaseRenderer {
   private characterResolver: ((characterId: string, stateId?: string) => string | undefined) | null = null;  // NEW: Character state resolver
   private counterResolver: ((counterName: string) => { value: number; min: number; max: number } | null) | null = null;  // NEW: Counter value resolver
   private characterMeterFrameResolver: ((characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig } | null) | null = null;  // NEW: Character meter frame resolver
+  private characterInventoryResolver: ((characterId: string) => { items: InventoryItemData[]; config: InventoryFrameConfig } | null) | null = null;  // NEW: Character inventory resolver
+  protected inventoryVisible: boolean = false;  // NEW: Whether inventory is currently visible (controlled by Ctrl/Cmd+I)
   private spriteDataResolver: ((characterId: string) => { frameWidth: number; frameHeight: number; defaultFrame?: number; imageWidth?: number; animations?: Array<{ name: string; frames: number[]; frameDuration: number; loop: boolean }>; activeAnimation?: string } | null) | null = null;  // NEW: Sprite sheet data resolver
   // soundBlobResolver is inherited from BaseRenderer
   protected hideTextBoxes: boolean = false;  // NEW: Whether to hide text box backgrounds
@@ -563,6 +566,8 @@ export class ReactRenderer extends BaseRenderer {
   protected currentPresentationMode: 'positioned' | 'chat-scroll' | 'chat-bubble' = 'positioned';  // NEW: Current dialog presentation mode
   protected currentShowAvatars: boolean = true;  // NEW: Whether to show avatars in chat mode
   private characterAvatarResolver: ((characterId: string) => string | undefined) | null = null;  // NEW: Character avatar resolver
+  protected timerState: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined;  // NEW: Timer state for progress bar
+  private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
 
   private get root(): ReactDOM.Root | null {
     return this._root;
@@ -671,6 +676,29 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Set the character inventory resolver function
+   * This allows the renderer to get inventory data for character HUD overlays
+   * The resolver should look up the character and return { items, config }
+   */
+  setCharacterInventoryResolver(resolver: (characterId: string) => { items: InventoryItemData[]; config: InventoryFrameConfig } | null): void {
+    this.characterInventoryResolver = resolver;
+  }
+
+  /**
+   * Set inventory visibility (for Ctrl/Cmd+I toggle)
+   */
+  setInventoryVisible(visible: boolean): void {
+    this.inventoryVisible = visible;
+  }
+
+  /**
+   * Get current inventory visibility
+   */
+  getInventoryVisible(): boolean {
+    return this.inventoryVisible;
+  }
+
+  /**
    * Set the sprite data resolver function
    * This allows the renderer to get sprite sheet data for character sprites
    * The resolver should look up the character and return sprite sheet config if it's a sprite type
@@ -774,6 +802,27 @@ export class ReactRenderer extends BaseRenderer {
     this.visitedBeats = visitedBeats;
   }
 
+  /**
+   * Set the timer state for the progress bar display
+   * Used when a beat has showTimer: true and a defaultTargetDelay
+   */
+  setTimerState(state: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined): void {
+    this.timerState = state;
+    // Notify all listeners of the change
+    this.timerStateListeners.forEach(listener => listener(state));
+  }
+
+  /**
+   * Subscribe to timer state changes
+   * Returns an unsubscribe function
+   */
+  subscribeToTimerState(listener: (state: typeof this.timerState) => void): () => void {
+    this.timerStateListeners.add(listener);
+    // Immediately call with current state
+    listener(this.timerState);
+    return () => this.timerStateListeners.delete(listener);
+  }
+
   // ============= UNIFIED POSITIONED RENDERING SYSTEM =============
   
   /**
@@ -863,6 +912,10 @@ export class ReactRenderer extends BaseRenderer {
               soundBlobResolver={this.soundBlobResolver || undefined}
               animations={effectiveAnimations}
               characterMeterFrameResolver={this.characterMeterFrameResolver || undefined}
+              characterInventoryResolver={this.characterInventoryResolver || undefined}
+              inventoryVisible={this.inventoryVisible}
+              timerState={this.timerState}
+              onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
             />
           </ScaledStage>
         </div>

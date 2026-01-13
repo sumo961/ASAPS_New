@@ -3,6 +3,7 @@ import { EventEmitter } from 'eventemitter3';
 export interface ActiveTimer {
   name: string;
   remainingTime: number;
+  totalTime: number;  // Original duration for progress bar calculation
   targetBeat?: string;
   intervalId?: number;
 }
@@ -23,6 +24,7 @@ export class TimerManager extends EventEmitter {
     const timer: ActiveTimer = {
       name,
       remainingTime: duration,
+      totalTime: duration,
       targetBeat,
     };
 

@@ -484,7 +484,7 @@ export class HarloweParser {
   static convertCondition(condition: string): {
     variableName: string;
     operator: string;
-    value: string;
+    value: string | number | boolean;
   } | null {
     // Harlowe patterns:
     // $var is value
@@ -547,7 +547,7 @@ export class HarloweParser {
       return {
         variableName: match[1],
         operator: '==',
-        value: 'true',
+        value: true,  // Use actual boolean, not string
       };
     }
 
@@ -557,7 +557,7 @@ export class HarloweParser {
       return {
         variableName: match[1],
         operator: '==',
-        value: 'false',
+        value: false,  // Use actual boolean, not string
       };
     }
 
@@ -565,14 +565,19 @@ export class HarloweParser {
   }
 
   /**
-   * Parse a condition value (strip quotes, handle booleans)
+   * Parse a condition value (strip quotes, handle booleans/numbers)
+   * Returns the same types as parseValue for consistent comparisons
    */
-  private static parseConditionValue(value: string): string {
+  private static parseConditionValue(value: string): string | number | boolean {
     const trimmed = value.trim();
 
-    // Boolean
-    if (trimmed.toLowerCase() === 'true') return 'true';
-    if (trimmed.toLowerCase() === 'false') return 'false';
+    // Boolean - return actual booleans, not strings
+    if (trimmed.toLowerCase() === 'true') return true;
+    if (trimmed.toLowerCase() === 'false') return false;
+
+    // Number
+    const num = Number(trimmed);
+    if (!isNaN(num) && trimmed !== '') return num;
 
     // Remove quotes
     if (/^["'].*["']$/.test(trimmed)) {

@@ -52,7 +52,7 @@ export interface AdditionalBeat {
   condition?: {
     variableName: string;
     operator: string;
-    value: string;
+    value: string | number | boolean;
     thenTarget: string;
     elseTarget?: string;
   };
@@ -102,14 +102,17 @@ export class PassageAnalyzer {
     );
 
     // Handle set operations - create additional SetVariable beats if needed
+    // Create one entry per set operation so each gets its own beat
     if (parsed.setOperations.length > 0 && suggestedBeatType !== 'setVariable') {
-      additionalBeats.push({
-        type: 'setVariable',
-        setOperations: parsed.setOperations.map(op => ({
-          variable: op.variable,
-          value: op.value,
-        })),
-      });
+      for (const op of parsed.setOperations) {
+        additionalBeats.push({
+          type: 'setVariable',
+          setOperations: [{
+            variable: op.variable,
+            value: op.value,
+          }],
+        });
+      }
     }
 
     // Handle conditional branching - may need ConditionBeat

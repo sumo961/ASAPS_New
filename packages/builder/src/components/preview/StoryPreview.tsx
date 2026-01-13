@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
-import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database, ZoomIn, ZoomOut, Maximize2, Volume2, VolumeX, Type, Zap, List } from 'lucide-react';
+import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database, ZoomIn, ZoomOut, Maximize2, Volume2, VolumeX, Type, Zap, List, Package } from 'lucide-react';
 import { Story, StoryEngine, Beat } from '@asaps/core';
 import type { StatePreset } from '@asaps/core';
 import { ReactRenderer, getAudioManager } from '@asaps/renderer';
@@ -69,6 +69,15 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   const [selectedPreset, setSelectedPreset] = useState<StatePreset | null>(null);
   const [editingPreset, setEditingPreset] = useState<StatePreset | null | undefined>(undefined);
   const [showPresetEditor, setShowPresetEditor] = useState(false);
+  // Inventory visibility - initialize based on first player character's showOnDemand setting
+  const getInitialInventoryVisible = () => {
+    const playerChar = characters?.find(c => c.role === 'player' && c.inventoryFrame);
+    if (playerChar?.inventoryFrame) {
+      return !playerChar.inventoryFrame.showOnDemand; // visible if NOT showOnDemand
+    }
+    return false; // default to hidden if no inventory frame configured
+  };
+  const [inventoryVisible, setInventoryVisible] = useState(getInitialInventoryVisible);
 
   // Load presets from localStorage
   useEffect(() => {
@@ -359,6 +368,111 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         console.log('[StoryPreview] Character meter frame resolver set up');
       }
 
+      // Set up character inventory resolver for HUD overlays
+      if (characters && characters.length > 0) {
+        // Build a map of prop names to their asset URLs from PickProp beats
+        // This allows inventory items to display the prop's graphic
+        const propAssetMap = new Map<string, string>();
+        const allBeats = story.getAllBeats();
+        for (const beat of allBeats) {
+          if (beat.type === 'pickProp') {
+            const props = (beat as any).props || [];
+            for (const prop of props) {
+              if (prop.name && prop.assetId) {
+                // Resolve assetId to URL using assets array
+                const asset = assets?.find(a => a.id === prop.assetId);
+                if (asset?.url) {
+                  propAssetMap.set(prop.name, asset.url);
+                  propAssetMap.set(prop.name.toLowerCase(), asset.url);
+                }
+              }
+            }
+            // Also check beat locations for prop graphics
+            const locations = Array.from(beat.locations?.values?.() || []);
+            for (const loc of locations) {
+              if (loc.kind === 'prop' && loc.name && loc.assetId) {
+                const asset = assets?.find(a => a.id === loc.assetId);
+                if (asset?.url) {
+                  propAssetMap.set(loc.name, asset.url);
+                  propAssetMap.set(loc.name.toLowerCase(), asset.url);
+                }
+              }
+            }
+          }
+        }
+        console.log('[StoryPreview] Built prop asset map with', propAssetMap.size, 'entries:', Array.from(propAssetMap.keys()));
+
+        (reactRenderer as any).setCharacterInventoryResolver((characterId: string) => {
+          console.log('[StoryPreview] Inventory resolver called for character:', characterId);
+          const character = characters.find(c => c.id === characterId);
+          console.log('[StoryPreview] Found character:', character?.name, 'has inventoryFrame:', !!character?.inventoryFrame);
+
+          if (!character || !character.inventoryFrame) {
+            console.log('[StoryPreview] No character or no inventoryFrame, returning null');
+            return null;
+          }
+
+          // Get current inventory from runtime context
+          // For player character, use main inventory; for others, use character-specific
+          const ctx = engineRef.current?.getContext();
+          if (!ctx) {
+            console.log('[StoryPreview] No context available yet');
+            return null;
+          }
+
+          const isPlayer = character.role === 'player';
+          const runtimeInventory = isPlayer
+            ? ctx.getInventory()  // Main player inventory
+            : (ctx.getState().characterInventories[character.name] || []);
+
+          console.log('[StoryPreview] Runtime inventory for', character.name, ':', runtimeInventory);
+
+          if (runtimeInventory.length === 0) {
+            console.log('[StoryPreview] No items in runtime inventory, returning null');
+            return null;
+          }
+
+          // Build item data - look up details from character definition if available
+          const itemDefinitions = character.inventory || [];
+          const itemData = runtimeInventory.map((itemName: string) => {
+            // Try to find item definition in character's inventory
+            const definition = itemDefinitions.find(def => def.name === itemName);
+            if (definition) {
+              // For defined items, also try to resolve icon from prop assets if not set
+              const icon = definition.icon || propAssetMap.get(itemName) || propAssetMap.get(itemName.toLowerCase()) || '';
+              return {
+                id: definition.id,
+                name: definition.name,
+                displayName: definition.displayName,
+                description: definition.description || '',
+                icon,
+                quantity: definition.quantity,
+                category: definition.category || '',
+              };
+            }
+            // No definition found - try to get icon from prop assets
+            const propIcon = propAssetMap.get(itemName) || propAssetMap.get(itemName.toLowerCase()) || '';
+            console.log('[StoryPreview] Item', itemName, 'icon from prop map:', propIcon ? 'found' : 'not found');
+            return {
+              id: itemName,
+              name: itemName,
+              displayName: itemName,
+              description: '',
+              icon: propIcon,
+              quantity: 1,
+              category: '',
+            };
+          });
+
+          console.log('[StoryPreview] Returning inventory data:', itemData.length, 'items');
+          return {
+            items: itemData,
+            config: character.inventoryFrame,
+          };
+        });
+        console.log('[StoryPreview] Character inventory resolver set up');
+      }
+
       // Set up sprite data resolver to get sprite sheet config for character sprites
       if (characters && characters.length > 0) {
         (reactRenderer as any).setSpriteDataResolver((characterId: string) => {
@@ -477,6 +591,33 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
       console.log('[StoryPreview] Updated visitedBeats:', debugInfo.visitedBeats.length, 'beats');
     }
   }, [debugInfo.visitedBeats]);
+
+  // Update renderer inventory visibility when toggled
+  useEffect(() => {
+    if (rendererRef.current && 'setInventoryVisible' in rendererRef.current) {
+      (rendererRef.current as any).setInventoryVisible(inventoryVisible);
+    }
+  }, [inventoryVisible]);
+
+  // Keyboard handler for Ctrl/Cmd+I to toggle inventory display
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+I (Windows/Linux) or Cmd+I (Mac) to toggle inventory
+      // Check for both lowercase 'i' and uppercase 'I' since key value varies
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'i' || e.key === 'I')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[StoryPreview] Ctrl/Cmd+I pressed, toggling inventory visibility');
+        setInventoryVisible(prev => {
+          console.log('[StoryPreview] Inventory visibility:', !prev);
+          return !prev;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true); // Use capture phase
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, []);
 
   const startPreview = useCallback(async () => {
     if (!engineRef.current || !rendererRef.current) return;
@@ -660,7 +801,35 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
       const timerManager = context.getTimerManager();
 
       const updateTimers = () => {
-        setActiveTimers(timerManager.getActiveTimers());
+        const timers = timerManager.getActiveTimers();
+        setActiveTimers(timers);
+
+        // Update renderer's timer state for progress bar
+        if (rendererRef.current) {
+          // Find default target timer (created by Beat.execute when showTimer is true)
+          const defaultTargetTimer = timers.find((t: any) => t.name?.startsWith('defaultTarget_'));
+
+          if (defaultTargetTimer) {
+            // Extract beatId from timer name: defaultTarget_<beatId>
+            const beatId = defaultTargetTimer.name.replace('defaultTarget_', '');
+            const beat = story.getBeat(beatId);
+
+            // Only show progress bar if beat has showTimer: true
+            if (beat?.showTimer) {
+              rendererRef.current.setTimerState({
+                totalTime: defaultTargetTimer.totalTime || defaultTargetTimer.remainingTime + 1,
+                remainingTime: defaultTargetTimer.remainingTime,
+                visible: true,
+                label: undefined, // Could use beat name if desired
+              });
+            } else {
+              rendererRef.current.setTimerState(undefined);
+            }
+          } else {
+            // No active default target timer
+            rendererRef.current.setTimerState(undefined);
+          }
+        }
       };
 
       timerManager.on('timerStarted', updateTimers);
@@ -1113,6 +1282,16 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
                       ) : (
                         <VolumeX className="w-4 h-4" />
                       )}
+                    </button>
+                    {/* Inventory Toggle */}
+                    <button
+                      onClick={() => setInventoryVisible(prev => !prev)}
+                      className={`p-1.5 rounded transition-colors flex items-center gap-1 text-sm ${
+                        inventoryVisible ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-300'
+                      }`}
+                      title={inventoryVisible ? 'Hide Inventory (Ctrl/Cmd+I)' : 'Show Inventory (Ctrl/Cmd+I)'}
+                    >
+                      <Package className="w-4 h-4" />
                     </button>
                     <div className="w-px h-5 bg-gray-400 mx-1" />
                     <div className="text-xs text-gray-500">

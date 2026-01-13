@@ -26,6 +26,7 @@ export abstract class Beat {
   public y?: number;
   public node?: string; // Background image/node reference
   public animations?: AnimationPath[]; // Path animations for elements
+  public notes?: string; // Author notes (not shown to player)
   public _version: number = 0; // Version counter incremented on parameter updates (for React change detection)
 
   constructor(config: BeatConfig) {
@@ -40,6 +41,7 @@ export abstract class Beat {
     this.showTimer = (config as any).showTimer || (config.parameters as any)?.showTimer;
     this.node = (config as any).node || (config.parameters as any)?.node;
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
+    this.notes = config.notes || (config.parameters as any)?.notes;
     this.x = config.x;
     this.y = config.y;
 
@@ -284,18 +286,27 @@ export abstract class Beat {
   }
 
   getNextBeat(context: StoryContext): string | null {
+    // First check conditional connections
     for (const connection of this.connections) {
       if (connection.condition && context.checkCondition(connection.condition)) {
         return connection.targetId;
       }
     }
 
+    // Then check unconditional connections (user button clicks should use these)
+    const unconditional = this.connections.find(c => !c.condition);
+    if (unconditional) {
+      return unconditional.targetId;
+    }
+
+    // Only use defaultTarget as fallback when there are NO connections
+    // Note: Timer expiry handles defaultTarget directly via timerExpired event,
+    // so this is mainly for beats with no explicit connections
     if (this.defaultTarget) {
       return this.defaultTarget;
     }
 
-    const unconditional = this.connections.find(c => !c.condition);
-    return unconditional?.targetId || null;
+    return null;
   }
 
   /**
@@ -357,6 +368,7 @@ export abstract class Beat {
       x: this.x,
       y: this.y,
       node: this.node,
+      notes: this.notes,
       parameters: parameters
     };
     return json;

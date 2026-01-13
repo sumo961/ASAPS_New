@@ -62,12 +62,18 @@ interface Effect {
   operation?: 'add' | 'subtract' | 'set';
 }
 
+interface CounterOption {
+  name: string;
+  displayName: string;  // Counter display name like "Health"
+  characterName: string;  // Character name like "Red" or "Wolf"
+}
+
 interface DialogTreeEditorProps {
   dialogTree: DialogNode;
   onChange: (tree: DialogNode) => void;
   characters?: string[];
   variables?: string[];
-  counters?: string[];
+  counters?: (string | CounterOption)[];  // Can be string (backward compat) or object
   allBeats?: Beat[];
   expanded?: boolean;
 }
@@ -99,12 +105,14 @@ const getSpeakerColor = (speaker: string): typeof SPEAKER_COLORS[0] => {
 export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   dialogTree,
   onChange,
-  characters = ['Old Wizard', 'Merchant', 'Guard', 'Innkeeper', 'Mysterious Stranger', 'Village Elder', 'Narrator'],
+  characters = ['Narrator', 'NPC'],
   variables = [],
   counters = [],
   allBeats = [],
   expanded = false
 }) => {
+  // Custom speaker input state
+  const [customSpeakerValue, setCustomSpeakerValue] = useState<string>('');
   // AI hook
   const { isConfigured, isGenerating, error: aiError, generateDialog, clearError } = useAI();
 
@@ -124,8 +132,22 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   const [aiGoal, setAiGoal] = useState('');
   const [aiBranchingFactor, setAiBranchingFactor] = useState(2);
 
-  // Get available counters from characters or use defaults
-  const availableCounters = counters.length > 0 ? counters : ['health', 'courage', 'gold', 'experience', 'reputation'];
+  // Normalize counters to CounterOption format for consistent handling
+  const availableCounters: CounterOption[] = counters.length > 0
+    ? counters.map(c => typeof c === 'string'
+        ? { name: c, displayName: c, characterName: '' }
+        : c)
+    : [];
+
+  // Group counters by character for the dropdown
+  const countersByCharacter = availableCounters.reduce((acc, counter) => {
+    const charName = counter.characterName || 'Other';
+    if (!acc[charName]) {
+      acc[charName] = [];
+    }
+    acc[charName].push(counter);
+    return acc;
+  }, {} as Record<string, CounterOption[]>);
 
   // Deep clone helper
   const cloneNode = (node: DialogNode): DialogNode => {
@@ -539,7 +561,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                         <div className="flex flex-wrap gap-1.5 items-center">
                           <span className="text-xs text-gray-600 flex-shrink-0">Counter:</span>
                           {/* Check if current value is custom (not in availableCounters list) */}
-                          {choice.counter && !availableCounters.includes(choice.counter) ? (
+                          {choice.counter && !availableCounters.some(c => c.name === choice.counter) ? (
                             // Show text input for custom counter with option to switch back
                             <div className="flex-1 flex gap-1 items-center min-w-[120px]">
                               <input
@@ -590,10 +612,16 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                               className="flex-1 min-w-[100px] max-w-full px-2 py-1 text-xs border rounded bg-white"
                             >
                               <option value="">No counter effect</option>
-                              {availableCounters.map(counter => (
-                                <option key={counter} value={counter}>{counter}</option>
+                              <option value="__custom__">+ New counter...</option>
+                              {Object.entries(countersByCharacter).map(([charName, charCounters]) => (
+                                <optgroup key={charName} label={charName}>
+                                  {charCounters.map(counter => (
+                                    <option key={counter.name} value={counter.name}>
+                                      {counter.displayName}
+                                    </option>
+                                  ))}
+                                </optgroup>
                               ))}
-                              <option value="__custom__">+ Custom counter...</option>
                             </select>
                           )}
                         </div>
@@ -714,18 +742,53 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             {/* Speaker */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">NPC Speaker</label>
-              <select
-                value={node.speaker}
-                onChange={(e) => {
-                  const updated = { ...node, speaker: e.target.value };
-                  setEditingNode({ node: updated, path });
-                }}
-                className="w-full px-2 py-1 border rounded text-sm"
-              >
-                {characters.map(char => (
-                  <option key={char} value={char}>{char}</option>
-                ))}
-              </select>
+              {/* Check if current speaker is not in the list (custom value) */}
+              {!characters.includes(node.speaker) && node.speaker !== '__custom__' ? (
+                /* Show input for existing custom value */
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={node.speaker}
+                    onChange={(e) => {
+                      const updated = { ...node, speaker: e.target.value };
+                      setEditingNode({ node: updated, path });
+                    }}
+                    className="flex-1 px-2 py-1 border rounded text-sm"
+                    placeholder="Enter speaker name..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = { ...node, speaker: characters[0] || 'Narrator' };
+                      setEditingNode({ node: updated, path });
+                    }}
+                    className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
+                    title="Switch to dropdown"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                /* Show select dropdown */
+                <select
+                  value={characters.includes(node.speaker) ? node.speaker : '__custom__'}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') {
+                      const updated = { ...node, speaker: customSpeakerValue || 'New Character' };
+                      setEditingNode({ node: updated, path });
+                    } else {
+                      const updated = { ...node, speaker: e.target.value };
+                      setEditingNode({ node: updated, path });
+                    }
+                  }}
+                  className="w-full px-2 py-1 border rounded text-sm"
+                >
+                  {characters.map(char => (
+                    <option key={char} value={char}>{char}</option>
+                  ))}
+                  <option value="__custom__">Custom...</option>
+                </select>
+              )}
             </div>
             
             {/* Text */}

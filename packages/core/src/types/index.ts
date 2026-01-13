@@ -105,6 +105,7 @@ export interface BeatConfig {
   parameters?: Record<string, any>;
   x?: number;
   y?: number;
+  notes?: string; // Author notes (not shown to player)
 }
 
 export interface StoryMetadata {

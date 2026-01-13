@@ -238,7 +238,7 @@ describe('SugarCubeParser', () => {
       expect(result).toBeDefined();
       expect(result!.variableName).toBe('hasKey');
       expect(result!.operator).toBe('!=');
-      expect(result!.value).toBe('false');
+      expect(result!.value).toBe(false);  // Returns actual boolean
     });
 
     it('should convert equality check', () => {
@@ -247,7 +247,7 @@ describe('SugarCubeParser', () => {
       expect(result).toBeDefined();
       expect(result!.variableName).toBe('gold');
       expect(result!.operator).toBe('==');
-      expect(result!.value).toBe('100');
+      expect(result!.value).toBe(100);  // Returns actual number
     });
 
     it('should convert inequality check', () => {
@@ -272,7 +272,7 @@ describe('SugarCubeParser', () => {
       // Note: Current implementation returns != false for "not $var" pattern
       // This is because the pattern matches in the loop as a truthy check
       expect(result!.operator).toBe('!=');
-      expect(result!.value).toBe('false');
+      expect(result!.value).toBe(false);  // Returns actual boolean
     });
 
     it('should convert ! prefix negation', () => {
@@ -282,7 +282,7 @@ describe('SugarCubeParser', () => {
       expect(result!.variableName).toBe('hasKey');
       // Note: Current implementation returns != false for "!$var" pattern
       expect(result!.operator).toBe('!=');
-      expect(result!.value).toBe('false');
+      expect(result!.value).toBe(false);  // Returns actual boolean
     });
 
     it('should normalize === to ==', () => {

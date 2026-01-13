@@ -11,12 +11,10 @@ export class ConditionBeat extends Beat {
   public falseTarget?: string;
 
   // Store all possible condition parameters
-  public left?: string;
-  public variableName?: string;  // New canonical name for variable/counter name
+  public variableName?: string;  // Canonical name for variable/counter name
   public operator?: string;
   public val?: any;
-  public value?: any;  // New canonical name for comparison value
-  public right?: any;
+  public value?: any;  // Canonical name for comparison value
   public counter1?: string;
   public counter2?: string;
   public timer?: string;
@@ -60,13 +58,10 @@ export class ConditionBeat extends Beat {
 
     // Store individual condition parameters
     // Priority: conditionObj (from ASML) > params (direct) > config
-    // Support both new (variableName/value) and legacy (left/right) field names
     this.variableName = conditionObj.variableName || params.variableName || (config as any).variableName;
-    this.left = conditionObj.left || params.left || (config as any).left;
     this.operator = conditionObj.operator || params.operator || (config as any).operator || '==';
     this.val = conditionObj.val ?? params.val ?? (config as any).val;
     this.value = conditionObj.value ?? params.value ?? (config as any).value;
-    this.right = conditionObj.right ?? params.right ?? (config as any).right;
     this.counter1 = conditionObj.counter1 || params.counter1 || (config as any).counter1;
     this.counter2 = conditionObj.counter2 || params.counter2 || (config as any).counter2;
     this.timer = conditionObj.timer || params.timer || (config as any).timer;
@@ -91,8 +86,8 @@ export class ConditionBeat extends Beat {
 
     switch (this.conditionType) {
       case 'counter':
-        condition.variableName = this.variableName || this.variable || this.left;
-        condition.value = this.value ?? this.val ?? this.right;
+        condition.variableName = this.variableName || this.variable;
+        condition.value = this.value ?? this.val;
         break;
       case 'counterCompare':
         condition.counter1 = this.counter1;
@@ -100,7 +95,7 @@ export class ConditionBeat extends Beat {
         break;
       case 'timer':
         condition.timer = this.timer;
-        condition.value = this.value ?? this.val ?? this.right;
+        condition.value = this.value ?? this.val;
         break;
       case 'inventory':
         condition.item = this.item;
@@ -108,15 +103,15 @@ export class ConditionBeat extends Beat {
         condition.checkType = this.checkType || 'has';
         break;
       case 'variable':
-        condition.variableName = this.variableName || this.variable || this.left;
-        condition.value = this.value ?? this.val ?? this.right;
+        condition.variableName = this.variableName || this.variable;
+        condition.value = this.value ?? this.val;
         break;
       case 'visitedBeat':
-        condition.beatId = this.beatId || this.variableName || this.left;
+        condition.beatId = this.beatId || this.variableName;
         break;
       default:
-        condition.variableName = this.variableName || this.variable || this.left;
-        condition.value = this.value ?? this.val ?? this.right;
+        condition.variableName = this.variableName || this.variable;
+        condition.value = this.value ?? this.val;
     }
 
     return condition;
@@ -128,14 +123,11 @@ export class ConditionBeat extends Beat {
       condition: this.condition,
       trueTarget: this.trueTarget,
       falseTarget: this.falseTarget,
-      // New canonical field names
+      // Canonical field names
       variableName: this.variableName,
       value: this.value,
-      // Legacy field names for backwards compatibility
-      left: this.left,
       operator: this.operator,
       val: this.val,
-      right: this.right,
       counter1: this.counter1,
       counter2: this.counter2,
       timer: this.timer,
@@ -185,14 +177,11 @@ export class ConditionBeat extends Beat {
     if (params.conditionType !== undefined) this.conditionType = params.conditionType;
     if (params.trueTarget !== undefined) this.trueTarget = params.trueTarget;
     if (params.falseTarget !== undefined) this.falseTarget = params.falseTarget;
-    // New canonical field names
+    // Canonical field names
     if (params.variableName !== undefined) this.variableName = params.variableName;
     if (params.value !== undefined) this.value = params.value;
-    // Legacy field names
-    if (params.left !== undefined) this.left = params.left;
     if (params.operator !== undefined) this.operator = params.operator;
     if (params.val !== undefined) this.val = params.val;
-    if (params.right !== undefined) this.right = params.right;
     if (params.counter1 !== undefined) this.counter1 = params.counter1;
     if (params.counter2 !== undefined) this.counter2 = params.counter2;
     if (params.timer !== undefined) this.timer = params.timer;
@@ -230,15 +219,14 @@ export class ConditionBeat extends Beat {
         isValidCondition = !!(this.item);
         break;
       case 'variable':
-        isValidCondition = !!(this.variable || this.variableName || this.left);
+        isValidCondition = !!(this.variable || this.variableName);
         break;
       case 'visitedBeat':
-        isValidCondition = !!(this.beatId || this.left);
+        isValidCondition = !!(this.beatId || this.variableName);
         break;
       case 'counter':
       default:
-        // Support both new (variableName) and legacy (left) field names
-        isValidCondition = !!(this.variableName || this.left);
+        isValidCondition = !!(this.variableName || this.variable);
     }
     
     if (!isValidCondition || this.trueTarget === '') {
@@ -250,14 +238,16 @@ export class ConditionBeat extends Beat {
       const conditionResult = context.checkCondition(this.condition);
       
       // Log condition evaluation based on type
+      const varName = this.variableName || this.variable;
+      const compareValue = this.value ?? this.val;
       if (this.conditionType === 'counterCompare') {
         console.log(`ConditionBeat ${this.id}: ${this.counter1} ${this.operator} ${this.counter2} = ${conditionResult}`);
       } else if (this.conditionType === 'timer') {
-        console.log(`ConditionBeat ${this.id}: timer ${this.timer} ${this.operator} ${this.val} = ${conditionResult}`);
+        console.log(`ConditionBeat ${this.id}: timer ${this.timer} ${this.operator} ${compareValue} = ${conditionResult}`);
       } else if (this.conditionType === 'visitedBeat') {
-        console.log(`ConditionBeat ${this.id}: visitedBeat ${this.beatId || this.left} = ${conditionResult}`);
+        console.log(`ConditionBeat ${this.id}: visitedBeat ${this.beatId || varName} = ${conditionResult}`);
       } else {
-        console.log(`ConditionBeat ${this.id}: ${this.left} ${this.operator} ${this.val || this.right} = ${conditionResult}`);
+        console.log(`ConditionBeat ${this.id}: ${varName} ${this.operator} ${compareValue} = ${conditionResult}`);
       }
       
       if (conditionResult) {

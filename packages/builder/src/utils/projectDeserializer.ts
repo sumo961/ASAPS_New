@@ -424,6 +424,7 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         showTimer: beatData.showTimer,
         transition: beatData.transition,
         sound: beatData.sound,
+        notes: beatData.notes,
         parameters: beatData.parameters || {}
       };
 

@@ -42,6 +42,10 @@ export interface Character {
   // Meter Frame Configuration
   /** Configuration for grouped meter display (HUD overlay) */
   meterFrame?: MeterFrameConfig;
+
+  // Inventory Frame Configuration
+  /** Configuration for inventory display (HUD overlay) */
+  inventoryFrame?: InventoryFrameConfig;
 }
 
 export interface CharacterState {
@@ -157,6 +161,66 @@ export const DEFAULT_METER_FRAME_CONFIG: MeterFrameConfig = {
   meterSpacing: 6,
   showLabels: true,
   meterWidth: 100,
+};
+
+// ============================================
+// Inventory Frame Types
+// ============================================
+
+/**
+ * Configuration for the inventory frame that displays character items
+ */
+export interface InventoryFrameConfig {
+  /** Dock mode: 'character' follows the character, 'screen' is fixed to a corner */
+  dockMode: MeterFrameDockMode;
+  /** Anchor position relative to character (used when dockMode is 'character') */
+  anchor: MeterFrameAnchor;
+  /** Screen corner position (used when dockMode is 'screen') */
+  screenPosition: MeterFrameScreenPosition;
+  /** Offset from anchor/corner position in pixels */
+  offset: { x: number; y: number };
+  /** Visual style settings */
+  style: {
+    backgroundColor: string;
+    borderColor: string;
+    borderWidth: number;
+    borderRadius: number;
+    padding: number;
+    opacity: number;  // 0-100
+  };
+  /** Size of each item icon in pixels */
+  itemSize: number;
+  /** Number of columns in grid */
+  columns: number;
+  /** Gap between items in pixels */
+  itemSpacing: number;
+  /** Show item name labels below icons */
+  showLabels: boolean;
+  /** If true, inventory is hidden until Ctrl/Cmd+I is pressed */
+  showOnDemand: boolean;
+}
+
+/**
+ * Default configuration for inventory frames
+ */
+export const DEFAULT_INVENTORY_FRAME_CONFIG: InventoryFrameConfig = {
+  dockMode: 'screen',
+  anchor: 'bottom-right',
+  screenPosition: 'screen-bottom-right',
+  offset: { x: 0, y: 0 },
+  style: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderColor: '#6366f1',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    opacity: 95,
+  },
+  itemSize: 48,
+  columns: 4,
+  itemSpacing: 6,
+  showLabels: false,
+  showOnDemand: false,  // Show by default; can enable for Ctrl/Cmd+I toggle
 };
 
 export interface InventoryItem {
