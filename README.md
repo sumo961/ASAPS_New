@@ -21,6 +21,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Twine Import | Import SugarCube and Harlowe stories with proper boolean handling (v0.9.6) |
 | Beat Notes | Author annotations for beats (not shown to players) (v0.9.6) |
 | Timer Progress Bar | Visual timer for default target delays (v0.9.6) |
+| Visual Inventory System | Interactor-facing inventory display with configurable HUD overlay (v0.9.6) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
@@ -256,6 +257,24 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.6 (2026-01-13)
+- **Visual Inventory System**: Implemented interactor-facing inventory display with configurable HUD overlay
+  - Grid layout with item icons, names, and quantity badges
+  - Configurable positioning (dock to character or screen anchor)
+  - Style options: background, border, opacity, item size
+- **Beat Notes**: Author annotations for any beat (not shown to players)
+  - Collapsible section at bottom of Inspector
+  - Persists with beat and exports to ASML
+- **Timer Progress Bar**: Visual progress indicator for default target delays
+  - Horizontal bar at top of preview stage
+  - Color gradient from green to red as time expires
+- **Twine Import Fixes**: Critical bug fixes for variable handling
+  - Fixed boolean type consistency between set and check operations
+  - Fixed empty parameters in additional beats (ConditionBeat)
+  - Fixed boolean `false` display in SetVariable inspector
+- **ConditionBeat Cleanup**: Removed deprecated `left`/`right` properties (use `variableName`/`value`)
+- **Test Coverage**: Added comprehensive tests for ConditionBeat, SetVariableBeat, SetTimerBeat, AddRemoveInventoryBeat, MovementChoiceBeat, RandomTargetBeat, StoryContext, BackwardAnalyzer
 
 ### v0.9.5 (2026-01-12)
 - **Twine Import**: Import interactive fiction stories from Twine (SugarCube 2.x and Harlowe 3.x formats)
