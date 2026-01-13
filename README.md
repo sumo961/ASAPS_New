@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.5)
+## ⚠️ Development Status (v0.9.6)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -18,7 +18,9 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Chat-style dialog mode | New presentation modes for DialogTree (v0.9.3) |
 | DialogTree Merge Tool | Auto-detection of mergeable beats, visual merge UI (v0.9.4) |
 | Search & Replace | Project-wide search across beats, characters, assets (v0.9.4) |
-| Twine Import | Import SugarCube and Harlowe stories with automatic beat classification (v0.9.5) |
+| Twine Import | Import SugarCube and Harlowe stories with proper boolean handling (v0.9.6) |
+| Beat Notes | Author annotations for beats (not shown to players) (v0.9.6) |
+| Timer Progress Bar | Visual timer for default target delays (v0.9.6) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
