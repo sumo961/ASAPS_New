@@ -22,9 +22,12 @@
  * DEFAULT TARGET (Timed Auto-Advance):
  * Most visible beats (EXCEPT durScreen) can have an OPTIONAL defaultTarget parameter with a timeout.
  * This auto-advances to a different beat if the interactor doesn't act within the specified time.
- * - Set via parameters: defaultTarget (beat ID) and defaultTargetTimeout (milliseconds)
- * - Example: { defaultTarget: "beat_timeout", defaultTargetTimeout: 30000 } = auto-advance after 30 seconds
- * - Useful for: creating urgency, handling inactive users, timed puzzles
+ * - Set via parameters: defaultTarget (beat ID) and defaultTargetDelay (SECONDS, e.g., 30 = 30 seconds)
+ * - showTimer: boolean - if true, displays a visual countdown bar at the top of the stage
+ *   - The bar changes color as time runs out: green → yellow → red
+ *   - Creates visible urgency for the player
+ * - Example: { defaultTarget: "timeout", defaultTargetDelay: 30, showTimer: true }
+ * - Useful for: creating urgency, time pressure, timed puzzles with visual feedback
  * - NOT available on durScreen (which already auto-advances by design)
  *
  * CLUSTERS (Organizational Containers):
@@ -60,13 +63,14 @@
  * - "responseDelay": number (seconds) - Delay before NPC responds, shows "typing..." indicator
  * Example: { "presentationMode": "chat-scroll", "showAvatars": true, "responseDelay": 1.5 }
  *
- * COUNTER OPERATIONS IN DIALOGTREE:
- * DialogTree choices can modify counters directly (in addition to effects[] array):
- * - "counter": counter name (any arbitrary name, e.g., "trust", "fear", "relationship")
+ * COUNTER OPERATIONS IN CHOICES (dialogTree, movementChoice, pickProp):
+ * All choice-type beats can modify counters directly:
+ * - "counter": counter name (should match a counter defined on a character, e.g., "trust", "courage")
  * - "counterOperation": "set" (replace value) or "change" (increment/decrement)
  * - "counterValue": numeric value to set or add
- * - Example: { "counter": "trust", "counterOperation": "change", "counterValue": 1 }
- * - This allows tracking relationship values, skill points, or any numeric state
+ * - Example: { "text": "Help the merchant", "target": "helped", "counter": "trust", "counterOperation": "change", "counterValue": 1 }
+ * - Best practice: Define counters on characters first (e.g., Player.courage, NPC.trust), then reference them in choices
+ * - This allows tracking relationship values, skill points, or any numeric state throughout the story
  *
  * COUNTER COMPARISON CONDITIONS:
  * The "counterCompare" condition type compares two counters against each other:
@@ -100,6 +104,21 @@
  * - Character meter frames (HUD counters) are configured through the UI
  * - Story content works with any theme - visual styling is separate from narrative content
  *
+ * BEAT NOTES (Author Annotations):
+ * All beats support an optional "notes" field for author comments:
+ * - Notes are NOT shown to players - internal documentation only
+ * - Useful for: explaining beat purpose, marking TODOs, story structure notes
+ * - Example: { "notes": "This is the climax - review dialogue pacing" }
+ * - AI should use notes to document intent or flag areas needing human attention
+ *
+ * CHARACTER COUNTERS (Centralized System):
+ * Counters should be defined on characters, then referenced consistently in choices:
+ * - Define counters in the characters array: { "counters": [{ "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 }] }
+ * - These counters become available in ALL choice-type beats (dialogTree, movementChoice, pickProp)
+ * - Example character: { "id": "player", "name": "Hero", "counters": [{ "name": "courage", ... }, { "name": "health", ... }] }
+ * - Example choice with counter effect: { "text": "Stand your ground", "target": "fight", "counter": "courage", "counterOperation": "change", "counterValue": 10 }
+ * - Best practice: Define all counters you plan to use on relevant characters first
+ *
  * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from introText!
  */
 export const BEAT_TYPES = {
@@ -122,7 +141,7 @@ export const BEAT_TYPES = {
   // Logic beats (invisible - no defaultTarget needed)
   conditionBeat: 'Conditional branching. TWO TARGETS: uses trueTarget and falseTarget parameters, NOT connections array. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat.',
   setVariable: 'Set ONE variable/counter per beat. Operations: set (replace), change (add/subtract), multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.',
-  addRemoveInventory: 'Modify inventory. Actions: add, remove, or transfer (move item between characters). SINGLE CONNECTION: executes then continues to one target.',
+  addRemoveInventory: 'Modify inventory. Actions: add, remove, or transfer (move between characters). Use "character" parameter to specify which character\'s inventory (defaults to player). Examples: { "action": "add", "item": "key", "character": "merchant" }, { "action": "transfer", "item": "sword", "fromCharacter": "player", "toCharacter": "companion" }. SINGLE CONNECTION: executes then continues to one target.',
   randomTarget: 'Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.',
   setTimer: 'Set/check timers. Beat continues immediately to SINGLE CONNECTION target while timer runs in background. Optional timerTarget parameter: where story jumps when timer expires.',
 } as const;
@@ -289,6 +308,23 @@ MOVEMENT CHOICE OPTIONS:
 CONTENT GUIDELINES:
 - Content should work with any visual theme - avoid hardcoding colors or fonts in narrative text
 - Write content that adapts to different presentation styles (Visual Novel, Twine, Point-and-Click)
+
+BEAT NOTES:
+- All beats support optional "notes" field for author annotations
+- Notes are NOT shown to players - internal documentation only
+- Use to explain beat purpose or flag areas for human review
+- Example: { "notes": "TODO: Add character sprite here" }
+
+TIMER VISUALIZATION:
+- When using defaultTarget with defaultTargetDelay, add "showTimer": true
+- This displays a countdown bar to give players visual time pressure
+- Example: { "defaultTarget": "fail", "defaultTargetDelay": 10, "showTimer": true }
+
+CHARACTER COUNTERS:
+- Define counters on characters first, then reference them in choices
+- Counter effects work on dialogTree, movementChoice, AND pickProp
+- Example character: { "counters": [{ "name": "trust", "displayName": "Trust", "value": 50, "min": 0, "max": 100 }] }
+- Example choice: { "text": "Be friendly", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
 
 Important:
 - Use descriptive labels for beats

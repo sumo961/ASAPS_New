@@ -123,6 +123,8 @@ const BEAT_TYPE_GUIDE = `
   - text: What the player sees (e.g., "Go to the Library")
   - target: Beat ID to navigate to
 - Connections: Multiple → one per choice
+- COUNTER EFFECTS: Choices can modify counters (same as dialogTree)
+  { "id": "c1", "text": "Take the dangerous path", "target": "beat_danger", "counter": "courage", "counterOperation": "change", "counterValue": 5 }
 - Example: "Where to go?" → [Library | Kitchen | Garden] → 3 different beats
 
 **pickProp** - Object/item selection (NOT for action choices!)
@@ -132,6 +134,8 @@ const BEAT_TYPE_GUIDE = `
   - ⚠️ NOT action descriptions like "Take the key" or "Continue searching"
 - Connections: Multiple → one per prop
 - Combine with: addRemoveInventory (invisible beat after)
+- COUNTER EFFECTS: Props can modify counters when selected
+  { "id": "sword", "name": "Rusty Sword", "target": "beat_armed", "counter": "confidence", "counterOperation": "change", "counterValue": 3 }
 - ⚠️ For action choices, use movementChoice instead!
 - CORRECT: props: [{ "id": "key", "name": "Silver Key", "target": "beat_take_key" }]
 - WRONG: props: [{ "id": "key", "name": "Take the silver key", "target": "..." }]
@@ -256,11 +260,18 @@ Inventory condition example (check if player has lantern):
 - ⚠️ WRONG for inventory: { "variableName": "lantern" } - use "item" instead!
 
 **addRemoveInventory** - Inventory manipulation
-- Use: Pick up items, lose items, check what player has
-- Parameters: propId, action (add|remove)
+- Use: Pick up items, lose items, transfer between characters
+- Parameters:
+  - propId: item identifier
+  - action: add | remove | transfer
+  - character: which character's inventory (defaults to "player")
+  - fromCharacter/toCharacter: for transfer action
 - Connections: Single → next beat
 - Pattern: After pickProp or as consequence of actions
-- Example: Player chose "Take key" → addRemoveInventory(key, add) → continue
+- Examples:
+  - Add to player: { "propId": "key", "action": "add" }
+  - Add to NPC: { "propId": "key", "action": "add", "character": "merchant" }
+  - Transfer: { "propId": "sword", "action": "transfer", "fromCharacter": "player", "toCharacter": "companion" }
 
 **randomTarget** - Random path selection
 - Use: Randomness, procedural elements, replayability
@@ -275,6 +286,65 @@ Inventory condition example (check if player has lantern):
 - Connections: Single → continues immediately, timer runs in background
 - Combine with: conditionBeat checking timer expired
 - Example: "Bomb planted" → setTimer(bombTimer, 300) → player has 5 min → check later
+
+## Beat Notes (Author Annotations)
+
+All beats can include a "notes" field for author documentation:
+- Notes are NOT shown to players - purely for author reference
+- Useful for: explaining beat purpose, marking areas for review, planning notes
+- AI should use notes to document narrative intent or flag areas needing human attention
+- Example beat with notes:
+  {
+    "id": "beat_climax",
+    "name": "Final Confrontation",
+    "type": "dialogTree",
+    "notes": "CRITICAL: This is the story climax. Review dialogue pacing and emotional beats.",
+    "parameters": { ... }
+  }
+
+## Timer Visualization (showTimer)
+
+When using defaultTarget with defaultTargetDelay, you can add visual feedback:
+- "showTimer": true displays a countdown bar at the top of the stage
+- The bar changes color as time runs out (green → yellow → red)
+- Creates visible urgency for time-pressure scenarios
+- Example:
+  {
+    "id": "beat_bomb",
+    "name": "Defuse the Bomb",
+    "type": "movementChoice",
+    "parameters": {
+      "question": "The bomb is ticking! What do you do?",
+      "choices": [...]
+    },
+    "defaultTarget": "beat_explosion",
+    "defaultTargetDelay": 30,
+    "showTimer": true
+  }
+- Useful for: escape sequences, timed puzzles, urgent decisions
+- Note: defaultTargetDelay is in SECONDS
+
+## Character Counters (Centralized System)
+
+Counters should be defined on characters, then referenced consistently in choices:
+- Define counters in the characters array with meaningful names and limits
+- These counters become available in ALL choice-type beats (dialogTree, movementChoice, pickProp)
+- Counter properties on choices:
+  - "counter": name of the counter to modify
+  - "counterOperation": "change" (add/subtract) or "set" (replace)
+  - "counterValue": numeric value
+- Example character with counters:
+  {
+    "id": "char_player",
+    "name": "Hero",
+    "counters": [
+      { "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 },
+      { "name": "health", "displayName": "Health", "value": 100, "min": 0, "max": 100 }
+    ]
+  }
+- Example choice with counter effect:
+  { "id": "c1", "text": "Stand your ground", "target": "beat_fight", "counter": "courage", "counterOperation": "change", "counterValue": 10 }
+- Best practice: Define all counters you plan to use on relevant characters first, then reference them in choices
 
 ## Advanced Branching Patterns
 
@@ -557,6 +627,7 @@ Generate complete, sophisticated interactive story structures that:
       "name": "Descriptive name",
       "type": "beatType",
       "position": { "x": 100, "y": 200 },
+      "notes": "Optional author notes (not shown to player)",
       "parameters": { /* type-specific, see schema */ },
       "connections": [
         {
@@ -578,9 +649,21 @@ Generate complete, sophisticated interactive story structures that:
   ],
   "characters": [
     {
-      "id": "char_1",
-      "name": "Character Name",
-      "description": "Brief description"
+      "id": "char_player",
+      "name": "Hero",
+      "description": "The protagonist",
+      "counters": [
+        { "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 },
+        { "name": "health", "displayName": "Health", "value": 100, "min": 0, "max": 100 }
+      ]
+    },
+    {
+      "id": "char_npc",
+      "name": "Merchant",
+      "description": "A traveling merchant",
+      "counters": [
+        { "name": "trust", "displayName": "Trust", "value": 0, "min": -100, "max": 100 }
+      ]
     }
   ],
   "reasoning": "Explain story structure, branching strategy, and how beat types work together"
