@@ -46,6 +46,7 @@ declare global {
       onMenuNewProject: (callback: () => void) => () => void;
       onMenuSave: (callback: () => void) => () => void;
       onMenuExport: (callback: () => void) => () => void;
+      onMenuAutoArrange: (callback: () => void) => () => void;
       onProjectOpen: (callback: (path: string) => void) => () => void;
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
       isElectron: boolean;
@@ -1848,6 +1849,18 @@ function App() {
 
     markChanged();
   }, [state.beats, state.clusters, actions, markChanged]);
+
+  // Electron integration - View > Auto-arrange Beats menu item
+  useEffect(() => {
+    if (!isElectron() || !window.electronAPI?.onMenuAutoArrange) {
+      return;
+    }
+    const unsubscribe = window.electronAPI.onMenuAutoArrange(() => {
+      console.log('[Electron] Auto-arrange requested from menu');
+      handleAutoLayout();
+    });
+    return unsubscribe;
+  }, [handleAutoLayout]);
 
   const handleExport = useCallback(async () => {
     try {

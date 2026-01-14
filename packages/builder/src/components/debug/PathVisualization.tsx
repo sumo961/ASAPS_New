@@ -109,7 +109,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
     }
   };
 
-  // Backward: Handle path click - highlight decision point beats
+  // Backward: Handle path click - highlight ALL beats on the path
   const handleBackwardPathClick = (index: number, req: PathRequirement) => {
     const isDeselecting = expandedBackwardPath === index;
     setExpandedBackwardPath(isDeselecting ? null : index);
@@ -117,10 +117,10 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
     if (isDeselecting) {
       onHighlightPath?.([]);
     } else {
-      // Highlight all decision point beats
-      const beatIds = req.decisionPoints.map(dp => dp.beatId);
-      // Add the target beat
-      if (selectedBackwardBeat) {
+      // Highlight ALL beats on the path (pathBeats includes all beats, not just decision points)
+      const beatIds = req.pathBeats?.map(pb => pb.beatId) || req.decisionPoints.map(dp => dp.beatId);
+      // Ensure target beat is included
+      if (selectedBackwardBeat && !beatIds.includes(selectedBackwardBeat)) {
         beatIds.push(selectedBackwardBeat);
       }
       onHighlightPath?.(beatIds);

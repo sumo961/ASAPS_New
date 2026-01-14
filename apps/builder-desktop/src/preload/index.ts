@@ -57,6 +57,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('project:save-as', handler);
     return () => ipcRenderer.removeListener('project:save-as', handler);
   },
+  onMenuAutoArrange: (callback: () => void) => {
+    ipcRenderer.on('menu:auto-arrange', callback);
+    return () => ipcRenderer.removeListener('menu:auto-arrange', callback);
+  },
 
   // Platform info
   platform: process.platform,
@@ -89,6 +93,7 @@ declare global {
       onMenuNewProject: (callback: () => void) => () => void;
       onMenuSave: (callback: () => void) => () => void;
       onMenuExport: (callback: () => void) => () => void;
+      onMenuAutoArrange: (callback: () => void) => () => void;
       onProjectOpen: (callback: (path: string) => void) => () => void;
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
       platform: NodeJS.Platform;

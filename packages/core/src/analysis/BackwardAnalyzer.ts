@@ -45,6 +45,9 @@ export interface PathRequirement {
   // Key decision points (choices/conditions that determine the path)
   decisionPoints: DecisionPoint[];
 
+  // ALL beats on this path (for highlighting)
+  pathBeats: Array<{ beatId: string; beatName: string; beatType: string }>;
+
   // Path length
   pathLength: number;
 
@@ -220,6 +223,7 @@ export class BackwardAnalyzer {
       beatId: string;
       constraints: ConstraintSet;
       decisionPoints: DecisionPoint[];
+      pathBeats: Array<{ beatId: string; beatName: string; beatType: string }>;
       pathLength: number;
     }
 
@@ -227,6 +231,7 @@ export class BackwardAnalyzer {
       beatId: targetBeatId,
       constraints: createEmptyConstraintSet(),
       decisionPoints: [],
+      pathBeats: [{ beatId: targetBeat.id, beatName: targetBeat.name, beatType: targetBeat.type }],
       pathLength: 0,
     }];
 
@@ -241,14 +246,15 @@ export class BackwardAnalyzer {
         const pathLength = current.pathLength + 1;
         minimumSteps = Math.min(minimumSteps, pathLength);
 
-        // Count beat occurrences for this path
-        for (const dp of current.decisionPoints) {
-          beatOccurrences.set(dp.beatId, (beatOccurrences.get(dp.beatId) || 0) + 1);
+        // Count beat occurrences for this path (use all pathBeats, not just decision points)
+        for (const pb of current.pathBeats) {
+          beatOccurrences.set(pb.beatId, (beatOccurrences.get(pb.beatId) || 0) + 1);
         }
 
         requirements.push({
           constraints: current.constraints,
           decisionPoints: current.decisionPoints.reverse(),
+          pathBeats: current.pathBeats.reverse(),
           pathLength,
           summary: this.generateSummary(current.constraints, current.decisionPoints),
         });
@@ -273,6 +279,8 @@ export class BackwardAnalyzer {
 
         let newConstraints = cloneConstraintSet(current.constraints);
         let newDecisionPoints = [...current.decisionPoints];
+        // Track ALL beats in the path
+        let newPathBeats = [...current.pathBeats, { beatId: fromBeat.id, beatName: fromBeat.name, beatType: fromBeat.type }];
 
         // Apply constraint from condition
         if (edge.conditionForThis) {
@@ -317,6 +325,7 @@ export class BackwardAnalyzer {
           beatId: edge.fromBeatId,
           constraints: newConstraints,
           decisionPoints: newDecisionPoints,
+          pathBeats: newPathBeats,
           pathLength: current.pathLength + 1,
         });
       }

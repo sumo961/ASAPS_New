@@ -148,6 +148,12 @@ function createMenu(): void {
         { role: 'zoomIn' },
         { role: 'zoomOut' },
         { type: 'separator' },
+        {
+          label: 'Auto-arrange Beats',
+          accelerator: 'CmdOrCtrl+Shift+A',
+          click: () => mainWindow?.webContents.send('menu:auto-arrange'),
+        },
+        { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
     },
