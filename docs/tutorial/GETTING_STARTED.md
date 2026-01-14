@@ -9,10 +9,10 @@ Welcome to ASAPS Modern, the Advanced Story Authoring and Presentation System. T
 3. [Your First Story](#your-first-story)
 4. [Working with Beats](#working-with-beats)
 5. [The Visual Editor](#the-visual-editor)
-6. [Animations](#animations)
-7. [Managing Assets](#managing-assets)
-8. [Previewing Your Story](#previewing-your-story)
-9. [Characters and Variables](#characters-and-variables)
+6. [Managing Assets](#managing-assets)
+7. [Characters and Variables](#characters-and-variables)
+8. [Animations](#animations)
+9. [Previewing Your Story](#previewing-your-story)
 10. [Settings](#settings)
 11. [Saving and Exporting](#saving-and-exporting)
 12. [Next Steps](#next-steps)
@@ -280,55 +280,6 @@ When in Visual Editor mode:
 
 ---
 
-## Animations
-
-![Animation Editor](08-animations-panel.png)
-
-The Animation system lets you bring your scenes to life with movement and transitions.
-
-### Accessing the Animation Editor
-
-1. Select an element on the Visual Editor stage
-2. Click the "Animations" tab in the properties panel
-3. The animation editor opens with timeline and path controls
-
-### Animation Types
-
-**Waypoint Animations:**
-- Create movement paths for characters and props
-- Add multiple waypoints by clicking on the stage
-- Bezier curve handles for smooth, natural motion
-- Preview the path in real-time
-
-**Transform Animations:**
-- Scale: Grow or shrink elements over time
-- Rotation: Spin elements
-- Opacity: Fade in/out effects
-- Position: Move elements without waypoints
-
-**Sprite Animations:**
-- Cycle through multiple images (sprite sheets)
-- Control frame rate and looping
-- Great for character expressions or effects
-
-### Creating a Waypoint Animation
-
-1. Select an element (character or prop)
-2. In the Animations tab, click "Add Waypoint"
-3. Click on the stage to place waypoints
-4. Drag the bezier handles to curve the path
-5. Set duration and easing for each segment
-6. Toggle "Preview" to see the animation play
-
-### Animation Properties
-
-- **Duration**: How long the animation takes (milliseconds)
-- **Easing**: Acceleration curve (linear, ease-in, ease-out, bounce)
-- **Loop**: Whether the animation repeats
-- **Auto-start**: Begin when beat loads vs. triggered by action
-
----
-
 ## Managing Assets
 
 ![Asset Manager](05-assets-panel.png)
@@ -385,45 +336,6 @@ Click "Assets" in the header bar to open the Asset Manager panel.
 
 ---
 
-## Previewing Your Story
-
-![Preview Mode](04-preview-mode.png)
-
-### Starting Preview
-
-1. Click "Preview" button in the header
-2. The Preview panel opens
-3. Click "Start Preview" to begin
-
-### Preview Controls
-
-- **Start from...**: Choose which beat to start from (useful for testing specific sections)
-- **Stop**: End the preview
-- **Zoom**: Adjust preview size
-- **Fit**: Auto-fit to window
-- **Text Animation**: Toggle text reveal animation
-- **Mute Sound**: Silence audio
-- **Show Inventory**: Display character inventory (Ctrl/Cmd+I)
-
-### Debug Info
-
-While previewing, the Debug Info panel shows:
-
-- Current beat name and ID
-- Variables and their values
-- Counters and their values
-- Navigation history
-
-### State Presets
-
-Save and load story states to test specific scenarios:
-
-1. Click "State Presets"
-2. Set variables to specific values
-3. Start preview with those conditions
-
----
-
 ## Characters and Variables
 
 ![Character Manager](06-characters-panel.png)
@@ -468,6 +380,94 @@ Access via the "Characters" button in the header.
 - Example: `gold`, `health`, `reputation`
 - Increment, decrement, or set specific values
 - Can be displayed as character meters
+
+---
+
+## Animations
+
+![Animation Editor](08-animations-panel.png)
+
+The Animation system lets you bring your scenes to life with movement and transitions.
+
+### Accessing the Animation Editor
+
+1. Select an element on the Visual Editor stage
+2. Click the "Animations" tab in the properties panel
+3. The animation editor opens with timeline and path controls
+
+### Animation Types
+
+**Waypoint Animations:**
+- Create movement paths for characters and props
+- Add multiple waypoints by clicking on the stage
+- Bezier curve handles for smooth, natural motion
+- Preview the path in real-time
+
+**Transform Animations:**
+- Scale: Grow or shrink elements over time
+- Rotation: Spin elements
+- Opacity: Fade in/out effects
+- Position: Move elements without waypoints
+
+**Sprite Animations:**
+- Cycle through multiple images (sprite sheets)
+- Control frame rate and looping
+- Great for character expressions or effects
+
+### Creating a Waypoint Animation
+
+1. Select an element (character or prop)
+2. In the Animations tab, click "Add Waypoint"
+3. Click on the stage to place waypoints
+4. Drag the bezier handles to curve the path
+5. Set duration and easing for each segment
+6. Toggle "Preview" to see the animation play
+
+### Animation Properties
+
+- **Duration**: How long the animation takes (milliseconds)
+- **Easing**: Acceleration curve (linear, ease-in, ease-out, bounce)
+- **Loop**: Whether the animation repeats
+- **Auto-start**: Begin when beat loads vs. triggered by action
+
+---
+
+## Previewing Your Story
+
+![Preview Mode](04-preview-mode.png)
+
+### Starting Preview
+
+1. Click "Preview" button in the header
+2. The Preview panel opens
+3. Click "Start Preview" to begin
+
+### Preview Controls
+
+- **Start from...**: Choose which beat to start from (useful for testing specific sections)
+- **Stop**: End the preview
+- **Zoom**: Adjust preview size
+- **Fit**: Auto-fit to window
+- **Text Animation**: Toggle text reveal animation
+- **Mute Sound**: Silence audio
+- **Show Inventory**: Display character inventory (Ctrl/Cmd+I)
+
+### Debug Info
+
+While previewing, the Debug Info panel shows:
+
+- Current beat name and ID
+- Variables and their values
+- Counters and their values
+- Navigation history
+
+### State Presets
+
+Save and load story states to test specific scenarios:
+
+1. Click "State Presets"
+2. Set variables to specific values
+3. Start preview with those conditions
 
 ---
 
