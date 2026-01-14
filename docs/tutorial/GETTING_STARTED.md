@@ -6,8 +6,8 @@ Welcome to ASAPS Modern, the Advanced Story Authoring and Presentation System. T
 
 1. [Overview](#overview)
 2. [Understanding the Interface](#understanding-the-interface)
-3. [Settings](#settings)
-4. [Your First Story](#your-first-story)
+3. [Your First Story](#your-first-story)
+4. [Settings](#settings)
 5. [Working with Beats](#working-with-beats)
 6. [The Visual Editor](#the-visual-editor)
 7. [Managing Assets](#managing-assets)
@@ -101,48 +101,6 @@ Drag beat types from here onto the flowchart to add new scenes:
 
 ---
 
-## Settings
-
-![Settings Panel](07-settings-panel.png)
-
-Access global story settings via the "Settings" button in the header.
-
-### Stage Settings
-
-- **Stage Size**: Set the presentation dimensions (default: 1024 x 768)
-- **Aspect Ratio Presets**: 4:3, 16:9, 16:10, or custom
-- **Background Color**: Default stage background when no image is set
-
-### Typography
-
-- **Default Font**: Primary font for all text
-- **Title Font**: Font for headings and titles
-- **Font Size**: Base text size
-- **Line Height**: Spacing between lines
-
-### Audio Settings
-
-- **Master Volume**: Overall audio level
-- **Music Volume**: Background music level
-- **SFX Volume**: Sound effects level
-- **Auto-play Audio**: Start sounds automatically
-
-### Display Options
-
-- **Text Animation**: Typewriter effect speed
-- **Transition Duration**: Default beat transition time
-- **Show Timer Bar**: Display countdown for timed beats
-- **Inventory Shortcut**: Ctrl/Cmd+I to show inventory
-
-### Project Metadata
-
-- **Story Title**: Displayed in title bar
-- **Author**: Creator credit
-- **Description**: Story summary
-- **Version**: Project version number
-
----
-
 ## Your First Story
 
 When you launch ASAPS Modern, a basic story template is created with three beats:
@@ -212,6 +170,48 @@ Now let's add a choice for the reader:
    - "Follow the light" → Light Ending
 
 4. Edit each ending's text to complete the story
+
+---
+
+## Settings
+
+![Settings Panel](07-settings-panel.png)
+
+Access global story settings via the "Settings" button in the header.
+
+### Stage Settings
+
+- **Stage Size**: Set the presentation dimensions (default: 1024 x 768)
+- **Aspect Ratio Presets**: 4:3, 16:9, 16:10, or custom
+- **Background Color**: Default stage background when no image is set
+
+### Typography
+
+- **Default Font**: Primary font for all text
+- **Title Font**: Font for headings and titles
+- **Font Size**: Base text size
+- **Line Height**: Spacing between lines
+
+### Audio Settings
+
+- **Master Volume**: Overall audio level
+- **Music Volume**: Background music level
+- **SFX Volume**: Sound effects level
+- **Auto-play Audio**: Start sounds automatically
+
+### Display Options
+
+- **Text Animation**: Typewriter effect speed
+- **Transition Duration**: Default beat transition time
+- **Show Timer Bar**: Display countdown for timed beats
+- **Inventory Shortcut**: Ctrl/Cmd+I to show inventory
+
+### Project Metadata
+
+- **Story Title**: Displayed in title bar
+- **Author**: Creator credit
+- **Description**: Story summary
+- **Version**: Project version number
 
 ---
 
