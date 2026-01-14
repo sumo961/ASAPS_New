@@ -88,8 +88,6 @@ npm run dev
 
 For a comprehensive guide to using ASPAS Modern, see the **[Getting Started Tutorial](docs/tutorial/GETTING_STARTED.md)**.
 
-Or view the self-contained HTML version with embedded screenshots: **[GETTING_STARTED.html](docs/tutorial/GETTING_STARTED.html)**
-
 ## 📦 Project Structure
 
 ```

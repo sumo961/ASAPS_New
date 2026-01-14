@@ -9,10 +9,13 @@ Welcome to ASAPS Modern, the Advanced Story Authoring and Presentation System. T
 3. [Your First Story](#your-first-story)
 4. [Working with Beats](#working-with-beats)
 5. [The Visual Editor](#the-visual-editor)
-6. [Previewing Your Story](#previewing-your-story)
-7. [Characters and Variables](#characters-and-variables)
-8. [Saving and Exporting](#saving-and-exporting)
-9. [Next Steps](#next-steps)
+6. [Animations](#animations)
+7. [Managing Assets](#managing-assets)
+8. [Previewing Your Story](#previewing-your-story)
+9. [Characters and Variables](#characters-and-variables)
+10. [Settings](#settings)
+11. [Saving and Exporting](#saving-and-exporting)
+12. [Next Steps](#next-steps)
 
 ---
 
@@ -277,6 +280,111 @@ When in Visual Editor mode:
 
 ---
 
+## Animations
+
+![Animation Editor](08-animations-panel.png)
+
+The Animation system lets you bring your scenes to life with movement and transitions.
+
+### Accessing the Animation Editor
+
+1. Select an element on the Visual Editor stage
+2. Click the "Animations" tab in the properties panel
+3. The animation editor opens with timeline and path controls
+
+### Animation Types
+
+**Waypoint Animations:**
+- Create movement paths for characters and props
+- Add multiple waypoints by clicking on the stage
+- Bezier curve handles for smooth, natural motion
+- Preview the path in real-time
+
+**Transform Animations:**
+- Scale: Grow or shrink elements over time
+- Rotation: Spin elements
+- Opacity: Fade in/out effects
+- Position: Move elements without waypoints
+
+**Sprite Animations:**
+- Cycle through multiple images (sprite sheets)
+- Control frame rate and looping
+- Great for character expressions or effects
+
+### Creating a Waypoint Animation
+
+1. Select an element (character or prop)
+2. In the Animations tab, click "Add Waypoint"
+3. Click on the stage to place waypoints
+4. Drag the bezier handles to curve the path
+5. Set duration and easing for each segment
+6. Toggle "Preview" to see the animation play
+
+### Animation Properties
+
+- **Duration**: How long the animation takes (milliseconds)
+- **Easing**: Acceleration curve (linear, ease-in, ease-out, bounce)
+- **Loop**: Whether the animation repeats
+- **Auto-start**: Begin when beat loads vs. triggered by action
+
+---
+
+## Managing Assets
+
+![Asset Manager](05-assets-panel.png)
+
+Assets are the media files that bring your story to life - images, sounds, videos, and fonts.
+
+### Opening the Asset Manager
+
+Click "Assets" in the header bar to open the Asset Manager panel.
+
+### Asset Categories
+
+**Images:**
+- Backgrounds, character sprites, props, UI elements
+- Supported formats: PNG, JPG, GIF, SVG, WebP
+- Thumbnails show preview of each image
+
+**Audio:**
+- Background music, sound effects, voice-over
+- Supported formats: MP3, WAV, OGG
+- Preview playback in the manager
+
+**Videos:**
+- Cutscenes, tutorials, animated backgrounds
+- Supported formats: MP4, WebM
+- Used with Video beats
+
+**Fonts:**
+- Custom typography for your story
+- TTF and WOFF formats
+- Apply in Settings or per-element
+
+### Adding Assets
+
+1. Click the "Upload" button (or drag files into the panel)
+2. Select files from your computer
+3. Assets are automatically categorized by type
+4. Rename assets by clicking their name
+
+### Using Assets
+
+- **Backgrounds**: Select in Visual Properties panel
+- **Characters**: Upload appearances in Character Manager
+- **Props**: Add via Visual Editor toolbar
+- **Sounds**: Assign to beats as background audio
+- **Fonts**: Configure in global Settings
+
+### Asset Organization
+
+- Search bar filters assets by name
+- Sort by name, date, or type
+- Delete unused assets to reduce project size
+- Assets are embedded when exporting projects
+
+---
+
 ## Previewing Your Story
 
 ![Preview Mode](04-preview-mode.png)
@@ -318,6 +426,8 @@ Save and load story states to test specific scenarios:
 
 ## Characters and Variables
 
+![Character Manager](06-characters-panel.png)
+
 ### Character Manager
 
 Access via the "Characters" button in the header.
@@ -358,6 +468,48 @@ Access via the "Characters" button in the header.
 - Example: `gold`, `health`, `reputation`
 - Increment, decrement, or set specific values
 - Can be displayed as character meters
+
+---
+
+## Settings
+
+![Settings Panel](07-settings-panel.png)
+
+Access global story settings via the "Settings" button in the header.
+
+### Stage Settings
+
+- **Stage Size**: Set the presentation dimensions (default: 1024 x 768)
+- **Aspect Ratio Presets**: 4:3, 16:9, 16:10, or custom
+- **Background Color**: Default stage background when no image is set
+
+### Typography
+
+- **Default Font**: Primary font for all text
+- **Title Font**: Font for headings and titles
+- **Font Size**: Base text size
+- **Line Height**: Spacing between lines
+
+### Audio Settings
+
+- **Master Volume**: Overall audio level
+- **Music Volume**: Background music level
+- **SFX Volume**: Sound effects level
+- **Auto-play Audio**: Start sounds automatically
+
+### Display Options
+
+- **Text Animation**: Typewriter effect speed
+- **Transition Duration**: Default beat transition time
+- **Show Timer Bar**: Display countdown for timed beats
+- **Inventory Shortcut**: Ctrl/Cmd+I to show inventory
+
+### Project Metadata
+
+- **Story Title**: Displayed in title bar
+- **Author**: Creator credit
+- **Description**: Story summary
+- **Version**: Project version number
 
 ---
 
