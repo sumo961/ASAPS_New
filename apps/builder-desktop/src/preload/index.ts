@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getPath: (name: string) => ipcRenderer.invoke('app:get-path', name),
   },
 
+  // API server operations
+  apiServer: {
+    getStatus: () => ipcRenderer.invoke('api-server:status'),
+  },
+
   // Menu events
   onMenuNewProject: (callback: () => void) => {
     ipcRenderer.on('menu:new-project', callback);
@@ -89,6 +94,9 @@ declare global {
       };
       app: {
         getPath: (name: string) => Promise<string>;
+      };
+      apiServer: {
+        getStatus: () => Promise<{ running: boolean; port: number; host: string }>;
       };
       onMenuNewProject: (callback: () => void) => () => void;
       onMenuSave: (callback: () => void) => () => void;

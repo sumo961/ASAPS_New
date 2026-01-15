@@ -1,6 +1,10 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
 import { join } from 'path';
 import * as fs from 'fs/promises';
+import { getEmbeddedAPIServer } from './api-server';
+
+// Get the API server instance
+const apiServer = getEmbeddedAPIServer({ port: 3001, host: 'localhost' });
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling
 try {
@@ -275,8 +279,22 @@ ipcMain.handle('app:get-path', async (_, name: string) => {
   return app.getPath(name as any);
 });
 
+// API server status
+ipcMain.handle('api-server:status', async () => {
+  return apiServer.getStatus();
+});
+
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Start the embedded API server for AI proxy functionality
+  try {
+    await apiServer.start();
+    console.log('[Main] API server started:', apiServer.getStatus());
+  } catch (error) {
+    console.error('[Main] Failed to start API server:', error);
+    // Continue anyway - the app can work without the proxy server
+  }
+
   createMenu();
   createWindow();
 
@@ -290,6 +308,16 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+// Clean up API server before quitting
+app.on('before-quit', async () => {
+  try {
+    await apiServer.stop();
+    console.log('[Main] API server stopped');
+  } catch (error) {
+    console.error('[Main] Error stopping API server:', error);
   }
 });
 
