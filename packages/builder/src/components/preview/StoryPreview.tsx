@@ -6,6 +6,7 @@ import { ReactRenderer, getAudioManager } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import type { Asset } from '../assets/AssetManager';
 import type { Character } from '../../types/character';
+import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import { StatePresetManager } from '../debug/StatePresetManager';
 import { StatePresetEditor } from '../debug/StatePresetEditor';
 import { initializeBeatLocations } from '../../utils/SchemaLocationInitializer';
@@ -19,11 +20,12 @@ interface StoryPreviewProps {
   settings?: any;
   assets?: Asset[];
   characters?: Character[];
+  themeAssets?: ThemeAssetUrls | null;
   onClose: () => void;
   loadAssetBlob?: (assetId: string) => Promise<Blob | null>;
 }
 
-export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, assets = [], characters = [], onClose, loadAssetBlob }) => {
+export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, assets = [], characters = [], themeAssets, onClose, loadAssetBlob }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
@@ -576,12 +578,22 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
           animation: 'none' as const,
         },
       };
+
+      // Add theme asset URLs if available (e.g., textbox frame, button graphics from Ren'Py import)
+      const themeWithAssets = {
+        ...theme,
+        textboxFrameUrl: themeAssets?.textboxFrame,
+        buttonNormalUrl: themeAssets?.buttonNormal,
+        buttonHoverUrl: themeAssets?.buttonHover,
+        buttonLayout: themeAssets?.buttonLayout,
+      };
+
       if ('setTheme' in rendererRef.current) {
-        (rendererRef.current as any).setTheme(theme);
+        (rendererRef.current as any).setTheme(themeWithAssets);
       }
-      console.log('[StoryPreview] Updated theme:', { ...theme, animationEnabled });
+      console.log('[StoryPreview] Updated theme:', { ...themeWithAssets, animationEnabled, hasTextboxFrame: !!themeAssets?.textboxFrame, hasButtonGraphics: !!(themeAssets?.buttonNormal || themeAssets?.buttonHover), buttonLayout: themeAssets?.buttonLayout });
     }
-  }, [settings, animationEnabled]);
+  }, [settings, animationEnabled, themeAssets]);
 
   // Update renderer visited beats when debug info changes
   // This enables the "mark already visited choices" feature
@@ -636,8 +648,18 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
             animation: 'none' as const,
           },
         };
+
+        // Add theme asset URLs if available (e.g., textbox frame from Ren'Py import)
+        const themeWithAssets = {
+          ...theme,
+          textboxFrameUrl: themeAssets?.textboxFrame,
+          buttonNormalUrl: themeAssets?.buttonNormal,
+          buttonHoverUrl: themeAssets?.buttonHover,
+          buttonLayout: themeAssets?.buttonLayout,
+        };
+
         if ('setTheme' in rendererRef.current) {
-          (rendererRef.current as any).setTheme(theme);
+          (rendererRef.current as any).setTheme(themeWithAssets);
         }
       }
 

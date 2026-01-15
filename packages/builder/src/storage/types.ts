@@ -49,6 +49,7 @@ export interface GlobalSettings {
     opacity: number;        // Background opacity
     position: 'bottom' | 'top' | 'center';
     boxVisibility: 'all' | 'hideText' | 'hideAll';  // Box visibility mode for editor
+    hideTitleTextBox?: boolean;  // Hide text box background for title/author elements (VN style)
   };
   textEffects: {
     animation: 'none' | 'typewriter' | 'fade';

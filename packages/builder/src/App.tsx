@@ -28,6 +28,7 @@ import { SearchPanel } from './components/search';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
 import { preloadFonts } from './utils/fontRegistry';
+import { useThemes, type ThemeAssetUrls } from './hooks/useThemes';
 import { useAIDebug } from './hooks/useAIDebug';
 import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
@@ -104,6 +105,32 @@ function App() {
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
+
+  // Theme state - track current theme ID for asset loading
+  const [currentThemeId, setCurrentThemeId] = useState<string | undefined>(undefined);
+
+  // Theme management hook - provides theme assets (fonts, graphics)
+  const { loadThemeAssets, themeAssets } = useThemes(currentThemeId);
+
+  // Load theme assets when theme changes
+  useEffect(() => {
+    console.log('[App] Theme effect triggered - currentThemeId:', currentThemeId);
+    if (currentThemeId) {
+      console.log('[App] Loading theme assets for:', currentThemeId);
+      loadThemeAssets(currentThemeId).then(assets => {
+        console.log('[App] Theme assets loaded:', {
+          hasAssets: !!assets,
+          buttonNormal: !!assets?.buttonNormal,
+          buttonHover: !!assets?.buttonHover,
+          textboxFrame: !!assets?.textboxFrame,
+        });
+      });
+    }
+  }, [currentThemeId, loadThemeAssets]);
+
+  // Save theme ID to project when it changes (accessed after useProject hook is called)
+  const currentThemeIdRef = useRef<string | undefined>(currentThemeId);
+  currentThemeIdRef.current = currentThemeId;
 
   // CRITICAL: Refs to hold current state values for sync operations
   // These avoid stale closures when syncProjectData is called inside setTimeout
@@ -498,6 +525,18 @@ function App() {
       unregisterSyncCallback();
     };
   }, [syncProjectData, registerSyncCallback, unregisterSyncCallback]);
+
+  /**
+   * Save theme ID to project when it changes
+   * This ensures the theme persists when the project is reloaded
+   */
+  useEffect(() => {
+    // Only update if we have a project and the theme has actually changed
+    if (currentProject && currentThemeId !== undefined && currentProject.themeId !== currentThemeId) {
+      console.log('[App] Saving themeId to project:', currentThemeId);
+      updateMetadata({ themeId: currentThemeId });
+    }
+  }, [currentThemeId, currentProject, updateMetadata]);
 
   /**
    * WebSocket connection to API server for external story injection
@@ -1192,6 +1231,12 @@ function App() {
           setGlobalSettings(currentProject.globalSettings);
         }
 
+        // Restore theme ID from project (if saved) - triggers theme asset loading
+        if (currentProject.themeId) {
+          console.log('[App] >>> Restoring themeId from project:', currentProject.themeId);
+          setCurrentThemeId(currentProject.themeId);
+        }
+
         setIsUntitledProject(currentProject.name === 'Untitled Project');
         loadedProjectIdRef.current = currentProject.id;
         console.log('[App] >>> Project switch complete');
@@ -1346,6 +1391,12 @@ function App() {
         if (currentProject.globalSettings) {
           console.log('[App] >>> Restoring globalSettings from project');
           setGlobalSettings(currentProject.globalSettings);
+        }
+
+        // Restore theme ID from project (if saved) - triggers theme asset loading
+        if (currentProject.themeId) {
+          console.log('[App] >>> Restoring themeId from project:', currentProject.themeId);
+          setCurrentThemeId(currentProject.themeId);
         }
 
         setIsUntitledProject(false);
@@ -3164,6 +3215,7 @@ function App() {
               }
             }}
             characters={characters}
+            themeAssets={themeAssets}
             onBeatDuplicate={handleBeatDuplicate}
             onBeatDelete={handleBeatDelete}
             onBeatCopy={handleBeatCopy}
@@ -3197,6 +3249,7 @@ function App() {
           assets={assets}
           characters={characters}
           settings={globalSettings}
+          themeAssets={themeAssets}
           onClose={handleClosePreview}
           loadAssetBlob={async (assetIdOrUrl: string) => {
             // Skip invalid asset IDs
@@ -3313,6 +3366,8 @@ function App() {
           onUpdate={(newSettings) => setGlobalSettings(newSettings)}
           onClose={handleCloseSettings}
           assets={assets}
+          themeId={currentThemeId}
+          onThemeChange={setCurrentThemeId}
         />
       )}
 

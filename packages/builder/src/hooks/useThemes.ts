@@ -11,6 +11,7 @@ import { BUILT_IN_THEMES } from '@asaps/core';
 import { getThemeService } from '../services/ThemeService';
 import { globalSettingsToTheme, themeToGlobalSettings } from '../themes/migration/GlobalSettingsAdapter';
 import type { GlobalSettings } from '../storage/types';
+import { loadThemeFont, isThemeFontLoaded } from '../utils/fontRegistry';
 
 // ============================================================================
 // Types
@@ -25,6 +26,22 @@ export interface ThemeInfo {
   previewImage?: string;
 }
 
+/** Loaded theme asset URLs (for use in components) */
+export interface ThemeAssetUrls {
+  fonts: Map<string, string>; // role -> fontFamily
+  graphics: Map<string, string>; // role -> objectURL
+  textboxFrame?: string; // objectURL for textbox frame
+  buttonNormal?: string; // objectURL for button normal state background
+  buttonHover?: string; // objectURL for button hover state background
+  /** Button layout positioning (from Ren'Py theme import) */
+  buttonLayout?: {
+    yAlign?: number;
+    spacing?: number;
+    width?: number;
+    height?: number;
+  };
+}
+
 export interface UseThemesResult {
   /** All available themes */
   themes: ThemeInfo[];
@@ -37,6 +54,9 @@ export interface UseThemesResult {
 
   /** Error state */
   error: string | null;
+
+  /** Loaded theme asset URLs */
+  themeAssets: ThemeAssetUrls | null;
 
   /** Select a theme by ID */
   selectTheme: (themeId: string) => Promise<ThemeDefinition | null>;
@@ -55,6 +75,9 @@ export interface UseThemesResult {
 
   /** Check if a theme is built-in */
   isBuiltIn: (themeId: string) => boolean;
+
+  /** Load theme assets (fonts and graphics) */
+  loadThemeAssets: (themeId: string) => Promise<ThemeAssetUrls | null>;
 }
 
 // ============================================================================
@@ -67,6 +90,7 @@ export function useThemes(initialThemeId?: string): UseThemesResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [themeAssets, setThemeAssets] = useState<ThemeAssetUrls | null>(null);
 
   // Initialize themes on mount
   useEffect(() => {
@@ -218,17 +242,121 @@ export function useThemes(initialThemeId?: string): UseThemesResult {
     return themeId.startsWith('builtin-');
   }, []);
 
+  // Load theme assets (fonts and graphics)
+  const loadThemeAssets = useCallback(async (themeId: string): Promise<ThemeAssetUrls | null> => {
+    try {
+      const service = getThemeService();
+      const theme = await service.getResolvedTheme(themeId);
+
+      if (!theme) {
+        console.warn('[useThemes] Theme not found for asset loading:', themeId);
+        return null;
+      }
+
+      const assets: ThemeAssetUrls = {
+        fonts: new Map(),
+        graphics: new Map(),
+      };
+
+      // Load font assets
+      if (theme.assets?.fonts) {
+        for (const fontRef of theme.assets.fonts) {
+          const blob = await service.loadThemeAsset(fontRef.id);
+          if (blob && fontRef.fontFamily) {
+            // Load into CSS if not already loaded
+            if (!isThemeFontLoaded(fontRef.fontFamily)) {
+              loadThemeFont(fontRef.fontFamily, blob, fontRef.filename);
+            }
+            assets.fonts.set(fontRef.role, fontRef.fontFamily);
+          }
+        }
+      }
+
+      // Load UI graphic assets
+      if (theme.assets?.uiGraphics) {
+        for (const graphicRef of theme.assets.uiGraphics) {
+          const blob = await service.loadThemeAsset(graphicRef.id);
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            assets.graphics.set(graphicRef.role, url);
+
+            // Set textbox frame URL if this is the frame asset
+            if (graphicRef.role === 'textbox-frame') {
+              assets.textboxFrame = url;
+            }
+            // Set button graphics URLs
+            if (graphicRef.role === 'button-normal') {
+              assets.buttonNormal = url;
+            }
+            if (graphicRef.role === 'button-hover') {
+              assets.buttonHover = url;
+            }
+          }
+        }
+      }
+
+      // Also check for frameAssetId directly on textBox
+      if (theme.textBox.frameAssetId && !assets.textboxFrame) {
+        const blob = await service.loadThemeAsset(theme.textBox.frameAssetId);
+        if (blob) {
+          assets.textboxFrame = URL.createObjectURL(blob);
+        }
+      }
+
+      // Also check for button graphics directly on button config
+      if (theme.button.backgroundImageId && !assets.buttonNormal) {
+        const blob = await service.loadThemeAsset(theme.button.backgroundImageId);
+        if (blob) {
+          assets.buttonNormal = URL.createObjectURL(blob);
+        }
+      }
+      if (theme.button.hoverBackgroundImageId && !assets.buttonHover) {
+        const blob = await service.loadThemeAsset(theme.button.hoverBackgroundImageId);
+        if (blob) {
+          assets.buttonHover = URL.createObjectURL(blob);
+        }
+      }
+
+      // Extract button layout positioning if available
+      if (theme.button.layout) {
+        assets.buttonLayout = {
+          yAlign: theme.button.layout.yAlign,
+          spacing: theme.button.layout.spacing,
+          width: theme.button.layout.width,
+          height: theme.button.layout.height,
+        };
+      }
+
+      setThemeAssets(assets);
+      console.log('[useThemes] Loaded theme assets:', {
+        fonts: assets.fonts.size,
+        graphics: assets.graphics.size,
+        hasTextboxFrame: !!assets.textboxFrame,
+        hasButtonNormal: !!assets.buttonNormal,
+        hasButtonHover: !!assets.buttonHover,
+        buttonLayout: assets.buttonLayout,
+      });
+
+      return assets;
+    } catch (err) {
+      console.error('[useThemes] Failed to load theme assets:', err);
+      return null;
+    }
+  }, []);
+
   return {
     themes,
     selectedThemeId,
     loading,
     error,
+    themeAssets,
     selectTheme,
     getTheme,
     applyThemeToSettings,
     saveAsTheme,
     refresh,
     isBuiltIn,
+    loadThemeAssets,
   };
 }
 

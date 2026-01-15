@@ -17,6 +17,7 @@ import type { DialogNode } from '@asaps/core';
 
 import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
 import type { Character } from '../../types/character';
+import type { ThemeAssetUrls } from '../../hooks/useThemes';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -145,6 +146,7 @@ interface VisualWorkspaceProps {
   };
   globalSettings?: GlobalSettings;
   characters?: Character[];
+  themeAssets?: ThemeAssetUrls | null;
   // Cluster containing this beat (for shared visuals)
   cluster?: Cluster | null;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: SharedVisualContent | undefined) => void;
@@ -163,6 +165,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   projectSettings,
   globalSettings,
   characters = [],
+  themeAssets,
   cluster,
   onSetClusterSharedVisuals,
 }) => {
@@ -2559,6 +2562,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           onSelectElement={setSelectedElementId}
           projectSettings={projectSettings}
           globalSettings={globalSettings}
+          themeAssets={themeAssets}
         />
       </div>
 

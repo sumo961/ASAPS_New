@@ -28,10 +28,22 @@ const FONT_FAMILIES: Record<string, string> = {
 };
 
 /**
- * Convert font name to CSS font-family value
+ * Convert font name to CSS font-family value.
+ * Ensures font names with spaces are properly quoted for CSS.
  */
 function getFontFamily(fontName: string): string {
-  return FONT_FAMILIES[fontName] || fontName;
+  // Check if it's a built-in font first
+  if (FONT_FAMILIES[fontName]) {
+    return FONT_FAMILIES[fontName];
+  }
+
+  // For custom fonts, ensure names with spaces are quoted
+  // CSS requires quotes around font-family names that contain spaces
+  if (fontName.includes(' ') && !fontName.startsWith("'") && !fontName.startsWith('"')) {
+    return `'${fontName}', sans-serif`;
+  }
+
+  return fontName;
 }
 
 /**
@@ -100,6 +112,13 @@ function getContrastColor(hexColor: string): string {
  * @returns Theme settings for the renderer
  */
 export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSettings {
+  // Debug: Log font values being converted
+  console.log('[themeConverter] Input fonts:', {
+    titleFont: settings.fonts.titleFont,
+    textFont: settings.fonts.textFont,
+    btnFont: settings.fonts.btnFont,
+  });
+
   // Calculate text colors: use explicit color if set, otherwise auto-calculate from background
   const buttonTextColor = settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor);
   const npcTextColor = settings.colors.nonptextcolor || getContrastColor(settings.colors.nonpcolor);
@@ -115,6 +134,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       borderRadius: settings.textbox.radius,
       padding: settings.textbox.padding,
       opacity: normalizeOpacity(settings.textbox.opacity),
+      hideTitleTextBox: settings.textbox.hideTitleTextBox,
     },
     button: {
       // Button/choice uses pcolor for background
@@ -133,7 +153,16 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       titleFont: getFontFamily(settings.fonts.titleFont),
       textFont: getFontFamily(settings.fonts.textFont),
       buttonFont: getFontFamily(settings.fonts.btnFont),
+      titleFontSize: settings.fonts.fontSize?.title,
+      textFontSize: settings.fonts.fontSize?.text,
+      buttonFontSize: settings.fonts.fontSize?.button,
     },
+    // Debug: Log converted font families
+    ...(console.log('[themeConverter] Output fonts:', {
+      titleFont: getFontFamily(settings.fonts.titleFont),
+      textFont: getFontFamily(settings.fonts.textFont),
+      buttonFont: getFontFamily(settings.fonts.btnFont),
+    }), {}),
     textEffects: {
       animation: settings.textEffects.animation,
       typewriterSpeed: settings.textEffects.typewriterSpeed,

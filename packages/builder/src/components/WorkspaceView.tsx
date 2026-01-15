@@ -5,6 +5,7 @@ import { VisualWorkspace } from './visual/VisualWorkspace';
 import { Map, Palette } from 'lucide-react';
 import type { Character } from '../types/character';
 import type { GlobalSettings } from './settings/GlobalSettingsInspector';
+import type { ThemeAssetUrls } from '../hooks/useThemes';
 
 interface WorkspaceViewProps {
   beats: Beat[];
@@ -49,6 +50,7 @@ interface WorkspaceViewProps {
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
   characters?: Character[];
+  themeAssets?: ThemeAssetUrls | null;
   // Beat context menu actions
   onBeatDuplicate?: (beatId: string) => void;
   onBeatDelete?: (beatId: string) => void;
@@ -94,6 +96,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onSetClusterSound,
   onSetClusterSharedVisuals,
   characters = [],
+  themeAssets,
   // Beat context menu actions
   onBeatDuplicate,
   onBeatDelete,
@@ -237,6 +240,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               projectSettings={projectSettings}
               globalSettings={globalSettings}
               characters={characters}
+              themeAssets={themeAssets}
               cluster={selectedBeatCluster}
               onSetClusterSharedVisuals={onSetClusterSharedVisuals}
             />

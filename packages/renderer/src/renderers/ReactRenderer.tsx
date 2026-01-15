@@ -202,6 +202,9 @@ const DialogWithChoicesDisplay: React.FC<{
     ? `rgba(${parseInt(textBox.backgroundColor.slice(1,3), 16)}, ${parseInt(textBox.backgroundColor.slice(3,5), 16)}, ${parseInt(textBox.backgroundColor.slice(5,7), 16)}, ${bgOpacity})`
     : textBox.backgroundColor;
 
+  // Use textbox frame image if available (from theme assets, e.g., Ren'Py import)
+  const hasFrameImage = !!theme?.textboxFrameUrl;
+
   return (
     <div
       className="flex flex-col items-center justify-center h-screen p-8"
@@ -216,9 +219,17 @@ const DialogWithChoicesDisplay: React.FC<{
         <div
           className="shadow-lg mb-4"
           style={{
-            backgroundColor: textBoxBg,
-            border: `${textBox.borderWidth}px solid ${textBox.borderColor}`,
-            borderRadius: `${textBox.borderRadius}px`,
+            // Use frame image if available, otherwise use solid background
+            ...(hasFrameImage ? {
+              backgroundImage: `url(${theme!.textboxFrameUrl})`,
+              backgroundSize: '100% 100%',
+              backgroundRepeat: 'no-repeat',
+              backgroundColor: 'transparent',
+            } : {
+              backgroundColor: textBoxBg,
+            }),
+            border: hasFrameImage ? 'none' : `${textBox.borderWidth}px solid ${textBox.borderColor}`,
+            borderRadius: hasFrameImage ? '0' : `${textBox.borderRadius}px`,
             padding: `${textBox.padding}px`,
           }}
         >

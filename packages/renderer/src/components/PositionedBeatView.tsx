@@ -36,6 +36,15 @@ function getFontFamily(fontName: string): string {
 }
 
 /**
+ * Check if a font is a built-in font (not a custom theme font)
+ * Used to determine if theme fonts should override location fonts
+ */
+function isBuiltInFont(fontName: string | undefined): boolean {
+  if (!fontName) return true;
+  return fontName in FONT_FAMILIES;
+}
+
+/**
  * PositionedBeatView - React component for rendering positioned beat elements
  * 
  * This is the core rendering component used by BOTH:
@@ -116,7 +125,11 @@ export interface RenderThemeSettings {
     borderRadius: number;
     padding: number;
     opacity: number;  // 0-100
+    /** Hide text box background for title/author elements (VN style) */
+    hideTitleTextBox?: boolean;
   };
+  /** Optional textbox frame image URL (from theme assets, e.g., Ren'Py import) */
+  textboxFrameUrl?: string;
   /** Button styling */
   button: {
     backgroundColor: string;
@@ -125,6 +138,21 @@ export interface RenderThemeSettings {
     borderColor: string;
     borderWidth: number;
     borderRadius: number;
+  };
+  /** Optional button background image URL for normal state (from theme assets, e.g., Ren'Py import) */
+  buttonNormalUrl?: string;
+  /** Optional button background image URL for hover state (from theme assets, e.g., Ren'Py import) */
+  buttonHoverUrl?: string;
+  /** Optional button layout positioning (from Ren'Py theme import) */
+  buttonLayout?: {
+    /** Vertical position as fraction (0=top, 0.5=center, 1=bottom) */
+    yAlign?: number;
+    /** Spacing between buttons in pixels */
+    spacing?: number;
+    /** Fixed button width (optional) */
+    width?: number;
+    /** Fixed button height (optional) */
+    height?: number;
   };
   /** Text colors */
   colors: {
@@ -136,6 +164,10 @@ export interface RenderThemeSettings {
     titleFont: string;
     textFont: string;
     buttonFont: string;
+    /** Font sizes from theme (optional, elements may override) */
+    titleFontSize?: number;
+    textFontSize?: number;
+    buttonFontSize?: number;
   };
   /** Text effects (animations) */
   textEffects?: {
@@ -383,6 +415,7 @@ const DEFAULT_THEME: RenderThemeSettings = {
     borderRadius: 8,
     padding: 20,
     opacity: 90,
+    hideTitleTextBox: false,     // Default: show text boxes for title/author
   },
   button: {
     backgroundColor: '#0f3460',       // Dark blue button
@@ -400,6 +433,9 @@ const DEFAULT_THEME: RenderThemeSettings = {
     titleFont: 'serif',
     textFont: 'sans-serif',
     buttonFont: 'sans-serif',
+    titleFontSize: 48,
+    textFontSize: 18,
+    buttonFontSize: 18,
   },
   hotspot: {
     highlightColor: '#ffff00',  // Yellow highlight color (default)
@@ -869,7 +905,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
               display: 'flex',
               flexDirection: 'row',
               flexWrap: 'wrap',
-              gap: '16px',
+              gap: theme.buttonLayout?.spacing !== undefined ? `${theme.buttonLayout.spacing}px` : '16px',
               justifyContent: 'center',
               width: '100%',
               opacity: shouldShowButtons ? 1 : 0,
@@ -1496,10 +1532,21 @@ const TextElement: React.FC<{
   const isVeryLongContent = contentLength > 200;
   const isExtremelyLongContent = contentLength > 400;
 
+  // Determine if this is a title/author element (for theme font styling)
+  const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
+
   let computedFontSize: number;
   if (location.fontSize !== undefined) {
     computedFontSize = location.fontSize;
     console.log(`[PositionedBeatView] Text "${location.name}": using stored fontSize=${computedFontSize}`);
+  } else if (isTitleElement && theme.fonts.titleFontSize) {
+    // Use theme title font size for title/author elements
+    computedFontSize = theme.fonts.titleFontSize;
+    console.log(`[PositionedBeatView] Text "${location.name}": using theme titleFontSize=${computedFontSize}`);
+  } else if (!isTitleElement && theme.fonts.textFontSize) {
+    // Use theme text font size for regular text
+    computedFontSize = theme.fonts.textFontSize;
+    console.log(`[PositionedBeatView] Text "${location.name}": using theme textFontSize=${computedFontSize}`);
   } else {
     // Auto-size based on content length for better readability
     if (isExtremelyLongContent) {
@@ -1517,11 +1564,11 @@ const TextElement: React.FC<{
   }
 
   const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
-  // Apply font mapping: element font takes priority, falls back to theme font
+  // Apply font mapping: theme font takes priority, unless element has a custom (non-built-in) font
   // Title/author elements use titleFont, others use textFont
-  const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
   const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
-  const computedFont = location.font ? getFontFamily(location.font) : defaultFont;
+  // Use theme font unless location has a custom (non-built-in) font explicitly set
+  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : defaultFont;
 
   // Use theme padding or calculate based on box size
   const padding = theme.textBox.padding;
@@ -1529,9 +1576,12 @@ const TextElement: React.FC<{
   // Convert opacity from 0-100 to 0-1
   const opacityValue = theme.textBox.opacity / 100;
 
+  // For title/author elements, check theme setting for hiding text boxes (VN style)
+  const shouldHideTextBox = hideTextBox || (isTitleElement && theme.textBox.hideTitleTextBox);
+
   // Parse background color and add opacity
-  const bgColor = hideTextBox ? 'transparent' : (theme.textBox?.backgroundColor || '#000000');
-  const bgWithOpacity = hideTextBox ? 'transparent' :
+  const bgColor = shouldHideTextBox ? 'transparent' : (theme.textBox?.backgroundColor || '#000000');
+  const bgWithOpacity = shouldHideTextBox ? 'transparent' :
     (bgColor?.startsWith?.('#') ? `${bgColor}${Math.round(opacityValue * 255).toString(16).padStart(2, '0')}` : bgColor);
 
   // Parse text color and add opacity
@@ -1576,15 +1626,15 @@ const TextElement: React.FC<{
           ...animationStyle,
           ...heightStyle,
           backgroundColor: bgWithOpacity,
-          padding: hideTextBox ? '0' : `${padding}px`,
-          border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
-          borderRadius: hideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
+          padding: shouldHideTextBox ? '0' : `${padding}px`,
+          border: shouldHideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
+          borderRadius: shouldHideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
           fontSize: `${computedFontSize}px`,
           fontFamily: computedFont,
           fontWeight: isLongContent ? '400' : '500',
           color: textColor,
           opacity: animation === 'fade' ? undefined : textAlpha,
-          boxShadow: hideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
+          boxShadow: shouldHideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
           textAlign: computedTextAlign,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
@@ -1658,13 +1708,13 @@ const ButtonElement: React.FC<{
   const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
   const buttonRef = React.useRef<HTMLButtonElement>(null);
 
-  // Use stored fontSize directly - auto-sizing happens at import time
-  // Default to 16px if not set
-  const computedFontSize = location.fontSize ?? 16;
-  console.log(`[PositionedBeatView] Button "${location.name}": fontSize=${computedFontSize}, location.fontSize=${location.fontSize}`);
+  // Use stored fontSize, then theme button font size, then default to 16px
+  const computedFontSize = location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
+  console.log(`[PositionedBeatView] Button "${location.name}": fontSize=${computedFontSize}, location.fontSize=${location.fontSize}, theme.buttonFontSize=${theme.fonts.buttonFontSize}`);
 
   const computedTextAlign = location.textAlign || 'center';
-  const computedFont = location.font || theme.fonts.buttonFont;
+  // Use theme font unless location has a custom (non-built-in) font explicitly set
+  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : theme.fonts.buttonFont;
 
   // Use more generous padding for better appearance
   const paddingHorizontal = 16;
@@ -1730,20 +1780,35 @@ const ButtonElement: React.FC<{
   // For regular buttons: always show text
   const shouldShowText = !hideButtonBox || !isPreviewMode;
 
+  // Determine if we should use button background images (from Ren'Py theme import)
+  const useButtonImage = !hideButtonBox && !isVisited && theme.buttonNormalUrl;
+  const buttonImageUrl = useButtonImage
+    ? (isHovered && theme.buttonHoverUrl ? theme.buttonHoverUrl : theme.buttonNormalUrl)
+    : undefined;
+
   const buttonStyle: React.CSSProperties = {
     ...style,
-    backgroundColor,
+    // Use background image if available, otherwise use solid color
+    ...(buttonImageUrl ? {
+      backgroundImage: `url(${buttonImageUrl})`,
+      backgroundSize: '100% 100%',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'center',
+      backgroundColor: 'transparent',
+    } : {
+      backgroundColor,
+    }),
     color: hideButtonBox ? theme.colors.textColor : (isVisited ? '#666666' : theme.button.textColor),
-    border: borderStyle,
+    border: buttonImageUrl ? 'none' : borderStyle,
     opacity: isVisited ? 0.7 : 1,
-    borderRadius: hideButtonBox ? '4px' : `${theme.button.borderRadius}px`,
+    borderRadius: hideButtonBox ? '4px' : (buttonImageUrl ? '0' : `${theme.button.borderRadius}px`),
     padding: hideButtonBox ? '8px 12px' : `${paddingVertical}px ${paddingHorizontal}px`,
     fontSize: `${computedFontSize}px`,
     fontFamily: computedFont,
     fontWeight: '600',
     textAlign: computedTextAlign,
     transition: 'all 0.2s',
-    boxShadow: hideButtonBox ? 'none' : (isHovered ? '0 4px 8px rgba(0,0,0,0.12)' : '0 2px 4px rgba(0,0,0,0.08)'),
+    boxShadow: hideButtonBox || buttonImageUrl ? 'none' : (isHovered ? '0 4px 8px rgba(0,0,0,0.12)' : '0 2px 4px rgba(0,0,0,0.08)'),
     transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
     cursor: interactive ? 'pointer' : 'default',
     wordWrap: 'break-word',
@@ -1892,7 +1957,8 @@ const InputFieldElement: React.FC<{
   }
 
   const computedTextAlign = location.textAlign || 'left';
-  const computedFont = location.font || 'Arial';
+  // Use theme font unless location has a custom (non-built-in) font explicitly set
+  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : theme.fonts.textFont;
 
   // Calculate padding as percentage of box size
   const paddingHorizontal = Math.max(Math.floor(location.width * 0.03), 12);
@@ -2115,7 +2181,8 @@ const DialogElement: React.FC<{
 
   const animation = theme.textEffects?.animation || 'none';
   const computedTextAlign = location.textAlign || 'left';
-  const computedFont = location.font || 'Arial';
+  // Use theme font unless location has a custom (non-built-in) font explicitly set
+  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : theme.fonts.textFont;
 
   // Calculate padding as percentage of box size
   const paddingHorizontal = Math.max(Math.floor(location.width * 0.04), 12);
@@ -2132,6 +2199,9 @@ const DialogElement: React.FC<{
     ? `rgba(${parseInt(bgColor.slice(1,3), 16)}, ${parseInt(bgColor.slice(3,5), 16)}, ${parseInt(bgColor.slice(5,7), 16)}, ${opacityValue})`
     : bgColor;
 
+  // Use textbox frame image if available (from theme assets, e.g., Ren'Py import)
+  const hasFrameImage = !hideTextBox && theme.textboxFrameUrl;
+
   // For typewriter animation, render full text but make unrevealed characters transparent
   const revealedLength = displayedText.length;
 
@@ -2140,9 +2210,17 @@ const DialogElement: React.FC<{
       style={{
         ...style,
         ...heightStyle,
-        backgroundColor: bgColorWithOpacity,
-        border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
-        borderRadius: hideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
+        // Use frame image if available, otherwise use solid background
+        ...(hasFrameImage ? {
+          backgroundImage: `url(${theme.textboxFrameUrl})`,
+          backgroundSize: '100% 100%',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: 'transparent',
+        } : {
+          backgroundColor: bgColorWithOpacity,
+        }),
+        border: hideTextBox || hasFrameImage ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
+        borderRadius: hideTextBox || hasFrameImage ? '0' : `${theme.textBox.borderRadius}px`,
         padding: hideTextBox ? '0' : `${paddingVertical}px ${paddingHorizontal}px`,
         fontSize: `${computedFontSize}px`,
         fontFamily: computedFont,
@@ -3347,8 +3425,17 @@ const FlexTextElement: React.FC<{
   const isVeryLongContent = contentLength > 200;
   const isExtremelyLongContent = contentLength > 400;
 
+  // Title/author elements use titleFont, others use textFont
+  const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
+
   if (location.fontSize !== undefined) {
     computedFontSize = location.fontSize;
+  } else if (isTitleElement && theme.fonts.titleFontSize) {
+    // Use theme title font size for title/author elements
+    computedFontSize = theme.fonts.titleFontSize;
+  } else if (!isTitleElement && theme.fonts.textFontSize) {
+    // Use theme text font size for regular text
+    computedFontSize = theme.fonts.textFontSize;
   } else {
     // Auto-size based on content length for better readability
     if (isExtremelyLongContent) {
@@ -3370,10 +3457,9 @@ const FlexTextElement: React.FC<{
   }
 
   const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
-  // Title/author elements use titleFont, others use textFont
-  const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
   const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
-  const computedFont = location.font || defaultFont;
+  // Use theme font unless location has a custom (non-built-in) font explicitly set
+  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : defaultFont;
   const padding = theme.textBox.padding;
 
   // Convert opacity from 0-100 to 0-1
@@ -3381,6 +3467,9 @@ const FlexTextElement: React.FC<{
   const bgColor = hideTextBox ? 'transparent' : theme.textBox.backgroundColor;
   const bgWithOpacity = hideTextBox ? 'transparent' :
     (bgColor.startsWith('#') ? `${bgColor}${Math.round(opacityValue * 255).toString(16).padStart(2, '0')}` : bgColor);
+
+  // Use textbox frame image if available (from theme assets, e.g., Ren'Py import)
+  const hasFrameImage = !hideTextBox && theme.textboxFrameUrl;
 
   const textColor = theme.colors.textColor;
   const textAlpha = theme.colors.textAlpha / 100;
@@ -3410,10 +3499,18 @@ const FlexTextElement: React.FC<{
       <div
         style={{
           ...animationStyle,
-          backgroundColor: bgWithOpacity,
+          // Use frame image if available, otherwise use solid background
+          ...(hasFrameImage ? {
+            backgroundImage: `url(${theme.textboxFrameUrl})`,
+            backgroundSize: '100% 100%',
+            backgroundRepeat: 'no-repeat',
+            backgroundColor: 'transparent',
+          } : {
+            backgroundColor: bgWithOpacity,
+          }),
           padding: hideTextBox ? '0' : `${padding}px`,
-          border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
-          borderRadius: hideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
+          border: hideTextBox || hasFrameImage ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
+          borderRadius: hideTextBox || hasFrameImage ? '0' : `${theme.textBox.borderRadius}px`,
           fontSize: `${computedFontSize}px`,
           fontFamily: computedFont,
           fontWeight: isLongContent ? '400' : '500',
@@ -3459,16 +3556,19 @@ const FlexButtonElement: React.FC<{
   const { location, content, actionId } = element;
   const [isHovered, setIsHovered] = React.useState(false);
 
-  // Calculate font size
+  // Calculate font size: use location fontSize, then theme button font size, then default
   let computedFontSize: number;
   if (location.fontSize !== undefined) {
     computedFontSize = location.fontSize;
+  } else if (theme.fonts.buttonFontSize) {
+    computedFontSize = theme.fonts.buttonFontSize;
   } else {
     computedFontSize = 18;
   }
 
   const computedTextAlign = location.textAlign || 'center';
-  const computedFont = location.font || theme.fonts.buttonFont;
+  // Use theme font unless location has a custom (non-built-in) font explicitly set
+  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : theme.fonts.buttonFont;
 
   // Determine background color based on visited state
   let backgroundColor: string;
@@ -3482,6 +3582,12 @@ const FlexButtonElement: React.FC<{
 
   // Determine border color based on visited state
   const borderColor = isVisited && !hideButtonBox ? '#999999' : theme.button.borderColor;
+
+  // Determine if we should use button background images (from Ren'Py theme import)
+  const useButtonImage = !hideButtonBox && !isVisited && theme.buttonNormalUrl;
+  const buttonImageUrl = useButtonImage
+    ? (isHovered && theme.buttonHoverUrl ? theme.buttonHoverUrl : theme.buttonNormalUrl)
+    : undefined;
 
   const handleClick = async () => {
     console.log(`[FlexButtonElement] handleClick called, interactive=${interactive}, hasOnAction=${!!onAction}, actionId="${actionId}", location.name="${location.name}"`);
@@ -3539,16 +3645,25 @@ const FlexButtonElement: React.FC<{
       style={{
         minWidth: `${Math.min(location.width, 200)}px`,
         padding: hideButtonBox ? '0' : '12px 24px',
-        backgroundColor,
+        // Use background image if available, otherwise use solid color
+        ...(buttonImageUrl ? {
+          backgroundImage: `url(${buttonImageUrl})`,
+          backgroundSize: '100% 100%',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundColor: 'transparent',
+        } : {
+          backgroundColor,
+        }),
         color: hideButtonBox ? theme.colors.textColor : (isVisited ? '#666666' : theme.button.textColor),
-        border: hideButtonBox ? 'none' : `${theme.button.borderWidth}px solid ${borderColor}`,
-        borderRadius: hideButtonBox ? '4px' : `${theme.button.borderRadius}px`,
+        border: buttonImageUrl ? 'none' : (hideButtonBox ? 'none' : `${theme.button.borderWidth}px solid ${borderColor}`),
+        borderRadius: hideButtonBox ? '4px' : (buttonImageUrl ? '0' : `${theme.button.borderRadius}px`),
         fontSize: `${computedFontSize}px`,
         fontFamily: computedFont,
         fontWeight: '600',
         textAlign: computedTextAlign,
         transition: 'all 0.2s',
-        boxShadow: hideButtonBox ? 'none' : (isHovered ? '0 6px 12px rgba(0,0,0,0.15)' : '0 4px 6px rgba(0,0,0,0.1)'),
+        boxShadow: hideButtonBox || buttonImageUrl ? 'none' : (isHovered ? '0 6px 12px rgba(0,0,0,0.15)' : '0 4px 6px rgba(0,0,0,0.1)'),
         transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
         cursor: interactive ? 'pointer' : 'default',
         opacity: isVisited ? 0.7 : 1,

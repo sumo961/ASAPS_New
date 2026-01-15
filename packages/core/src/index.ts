@@ -10,6 +10,7 @@ export * from './analysis';
 export * from './themes/presets';
 export * from './layout';
 export * from './twine';
+export * from './renpy';
 
 // Package info
 export const version = '2.0.0';

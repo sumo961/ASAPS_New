@@ -144,6 +144,7 @@ function convertTextBox(
     padding: textbox.padding,
     opacity: textbox.opacity / 100, // Convert 0-100 to 0-1
     position: textbox.position,
+    hideTitleTextBox: textbox.hideTitleTextBox,
   };
 }
 
@@ -217,12 +218,16 @@ export function themeToGlobalSettings(
       scalingMode: 'fit',
     },
     colors: {
-      pcolor: theme.colors.primary.hex,
-      palpha: Math.round((theme.colors.primary.alpha ?? 1) * 100), // Convert 0-1 to 0-100
-      ptextcolor: theme.colors.buttonText?.hex || '',
+      // Button background: use buttonNormal color (from Ren'Py button config), not primary (text color)
+      pcolor: theme.colors.buttonNormal?.hex || theme.button.background.hex,
+      palpha: Math.round((theme.colors.buttonNormal?.alpha ?? theme.button.background.alpha ?? 1) * 100),
+      // Button text color
+      ptextcolor: theme.colors.buttonText?.hex || theme.button.textColor.hex,
+      // Text box background: use secondary color (typically darker/contrasting)
       nonpcolor: theme.colors.secondary.hex,
-      nonpalpha: Math.round((theme.colors.secondary.alpha ?? 1) * 100), // Convert 0-1 to 0-100
-      nonptextcolor: '', // Auto-calculate from nonpcolor
+      nonpalpha: Math.round((theme.colors.secondary.alpha ?? 1) * 100),
+      // Text box text color: use primary (the actual text color from Ren'Py's gui.text_color)
+      nonptextcolor: theme.colors.primary.hex,
       bgColor: theme.colors.background.hex,
       textBoxBorder: theme.colors.border.hex,
     },
@@ -243,6 +248,7 @@ export function themeToGlobalSettings(
       opacity: Math.round(theme.textBox.opacity * 100), // Convert 0-1 to 0-100
       position: theme.textBox.position === 'custom' ? 'bottom' : theme.textBox.position,
       boxVisibility: existingSettings?.textbox?.boxVisibility || 'all',
+      hideTitleTextBox: theme.textBox.hideTitleTextBox,
     },
     textEffects: {
       animation: theme.effects.textAnimation,

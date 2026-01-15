@@ -172,3 +172,48 @@ export function clearCustomFonts(): void {
   }
   loadedFonts.clear();
 }
+
+/**
+ * Load a theme font from a Blob
+ * Used for fonts imported with themes (e.g., from Ren'Py)
+ *
+ * @param fontFamily - The CSS font-family name to use
+ * @param blob - The font file blob
+ * @param filename - Original filename (to detect format)
+ */
+export function loadThemeFont(fontFamily: string, blob: Blob, filename: string): void {
+  const fontId = `theme-${fontFamily}`;
+  if (loadedFonts.has(fontId)) return;
+
+  // Create object URL for the blob
+  const url = URL.createObjectURL(blob);
+
+  // Determine font format from filename
+  let format = 'truetype';
+  const lowerFilename = filename.toLowerCase();
+  if (lowerFilename.endsWith('.woff2')) format = 'woff2';
+  else if (lowerFilename.endsWith('.woff')) format = 'woff';
+  else if (lowerFilename.endsWith('.otf')) format = 'opentype';
+
+  const styleEl = getFontStyleElement();
+  const fontFace = `
+    @font-face {
+      font-family: '${fontFamily}';
+      src: url('${url}') format('${format}');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+  `;
+
+  styleEl.textContent += fontFace;
+  loadedFonts.add(fontId);
+  console.log(`[FontRegistry] Loaded theme font: ${fontFamily}`);
+}
+
+/**
+ * Check if a theme font is loaded
+ */
+export function isThemeFontLoaded(fontFamily: string): boolean {
+  return loadedFonts.has(`theme-${fontFamily}`);
+}

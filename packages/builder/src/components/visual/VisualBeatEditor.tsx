@@ -16,6 +16,7 @@ import type { Asset } from '../assets/AssetManager';
 import type { Location } from '@asaps/core';
 import type { Character } from '../../types/character';
 import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
+import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import {
   PositionedBeatView,
   createPositionedElementData,
@@ -123,6 +124,7 @@ interface VisualBeatEditorProps {
   };
   boxVisibility?: 'all' | 'hideText' | 'hideAll';
   globalSettings?: GlobalSettings;
+  themeAssets?: ThemeAssetUrls | null;
 }
 
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
@@ -142,6 +144,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   projectSettings,
   boxVisibility,
   globalSettings,
+  themeAssets,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedElement, setDraggedElement] = useState<string | null>(null);
@@ -169,6 +172,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
   // Debug logging for background
   console.log(`[VisualBeatEditor] backgroundAssetId="${backgroundAssetId}", found=${!!backgroundAsset}, url="${resolvedBackgroundUrl?.substring(0, 80) || 'none'}", assets.length=${assets.length}`);
+
+  // Debug logging for theme assets
+  console.log(`[VisualBeatEditor] themeAssets: buttonNormal=${!!themeAssets?.buttonNormal}, buttonHover=${!!themeAssets?.buttonHover}, textboxFrame=${!!themeAssets?.textboxFrame}`);
 
   // Convert VisualElements to Location objects for the renderer
   const locationsForRenderer: Location[] = elements
@@ -731,6 +737,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                       typewriterSpeed: baseTheme.textEffects?.typewriterSpeed ?? 30,
                       fadeInDuration: baseTheme.textEffects?.fadeInDuration ?? 500,
                     },
+                    // Add theme asset URLs for button/textbox graphics
+                    textboxFrameUrl: themeAssets?.textboxFrame,
+                    buttonNormalUrl: themeAssets?.buttonNormal,
+                    buttonHoverUrl: themeAssets?.buttonHover,
+                    buttonLayout: themeAssets?.buttonLayout,
                   };
                 })() : undefined}
               />

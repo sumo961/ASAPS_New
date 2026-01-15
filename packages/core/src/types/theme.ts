@@ -228,6 +228,9 @@ export interface ThemeTextBox {
 
   /** Optional frame image asset reference */
   frameAssetId?: string;
+
+  /** Hide text box background for title/author elements (VN style) */
+  hideTitleTextBox?: boolean;
 }
 
 // ============================================================================
@@ -270,6 +273,24 @@ export interface ThemeButton {
 
   /** Transition duration in milliseconds */
   transitionDuration?: number;
+
+  /** Optional background image asset ID for normal state (e.g., from Ren'Py choice/idle_background.png) */
+  backgroundImageId?: string;
+
+  /** Optional background image asset ID for hover state (e.g., from Ren'Py choice/hover_background.png) */
+  hoverBackgroundImageId?: string;
+
+  /** Optional button layout positioning (for Ren'Py-style themes) */
+  layout?: {
+    /** Vertical position as fraction (0=top, 0.5=center, 1=bottom) */
+    yAlign?: number;
+    /** Spacing between buttons in pixels */
+    spacing?: number;
+    /** Fixed button width (optional) */
+    width?: number;
+    /** Fixed button height (optional) */
+    height?: number;
+  };
 }
 
 // ============================================================================

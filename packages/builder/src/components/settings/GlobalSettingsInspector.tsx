@@ -1,8 +1,11 @@
-import React, { useState, useCallback } from 'react';
-import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
+import RenpyThemeImporter from './RenpyThemeImporter';
+import type { RenpyConversionResult } from '@asaps/core';
+import { getThemeService } from '../../services/ThemeService';
 
 interface GlobalSettings {
   project: {
@@ -38,6 +41,7 @@ interface GlobalSettings {
     opacity: number;        // Background opacity
     position: 'bottom' | 'top' | 'center';
     boxVisibility: 'all' | 'hideText' | 'hideAll';  // Box visibility mode for editor
+    hideTitleTextBox?: boolean;  // Hide text box background for title/author elements (VN style)
   };
   textEffects: {
     animation: 'none' | 'typewriter' | 'fade';
@@ -103,6 +107,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
   const [newThemeName, setNewThemeName] = useState('');
   const [showSoundPicker, setShowSoundPicker] = useState(false);
+  const [showRenpyImporter, setShowRenpyImporter] = useState(false);
 
   // Filter audio assets for background music selection
   const audioAssets = assets.filter(a => a.type === 'audio');
@@ -130,7 +135,17 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     applyThemeToSettings,
     saveAsTheme,
     isBuiltIn,
+    refresh,
+    loadThemeAssets,
+    themeAssets,
   } = useThemes(initialThemeId);
+
+  // Load theme assets when initially opening with a theme
+  useEffect(() => {
+    if (initialThemeId && !themesLoading) {
+      loadThemeAssets(initialThemeId);
+    }
+  }, [initialThemeId, themesLoading, loadThemeAssets]);
 
   // Handle theme selection
   const handleThemeSelect = useCallback(async (newThemeId: string) => {
@@ -139,9 +154,11 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
       setSettings(newSettings);
       setHasChanges(true);
       onThemeChange?.(newThemeId);
+      // Load theme assets (fonts, graphics)
+      await loadThemeAssets(newThemeId);
     }
     setShowThemeDropdown(false);
-  }, [applyThemeToSettings, settings, onThemeChange]);
+  }, [applyThemeToSettings, settings, onThemeChange, loadThemeAssets]);
 
   // Handle saving current settings as a theme
   const handleSaveAsTheme = useCallback(async () => {
@@ -155,6 +172,95 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
       console.error('[GlobalSettings] Failed to save theme:', err);
     }
   }, [saveAsTheme, settings, newThemeName]);
+
+  // Handle Ren'Py theme import
+  const handleRenpyImport = useCallback(async (result: RenpyConversionResult) => {
+    const service = getThemeService();
+    await service.initialize();
+
+    // Get the theme ID from the result
+    const themeId = result.theme.meta.id;
+
+    // Save font assets first and build mapping of old ID -> new stored ID
+    const fontIdMap = new Map<string, string>();
+    for (const font of result.fontAssets) {
+      const storedId = await service.saveThemeAsset(
+        themeId,
+        font.asset.data,
+        font.asset.filename,
+        font.role,
+        'font'
+      );
+      fontIdMap.set(font.id, storedId);
+    }
+
+    // Save graphic assets and build mapping
+    const graphicIdMap = new Map<string, string>();
+    for (const graphic of result.graphicAssets) {
+      const storedId = await service.saveThemeAsset(
+        themeId,
+        graphic.asset.data,
+        graphic.asset.filename,
+        graphic.role,
+        'image'
+      );
+      graphicIdMap.set(graphic.id, storedId);
+    }
+
+    // Update theme definition with correct asset IDs
+    const updatedTheme = { ...result.theme };
+    if (updatedTheme.assets) {
+      if (updatedTheme.assets.fonts) {
+        updatedTheme.assets.fonts = updatedTheme.assets.fonts.map(f => ({
+          ...f,
+          id: fontIdMap.get(f.id) || f.id,
+        }));
+      }
+      if (updatedTheme.assets.uiGraphics) {
+        updatedTheme.assets.uiGraphics = updatedTheme.assets.uiGraphics.map(g => ({
+          ...g,
+          id: graphicIdMap.get(g.id) || g.id,
+        }));
+      }
+    }
+
+    // Update textBox.frameAssetId if it references a graphic
+    if (updatedTheme.textBox.frameAssetId) {
+      updatedTheme.textBox.frameAssetId =
+        graphicIdMap.get(updatedTheme.textBox.frameAssetId) || updatedTheme.textBox.frameAssetId;
+    }
+
+    // Update button.backgroundImageId if it references a graphic
+    if (updatedTheme.button.backgroundImageId) {
+      updatedTheme.button.backgroundImageId =
+        graphicIdMap.get(updatedTheme.button.backgroundImageId) || updatedTheme.button.backgroundImageId;
+    }
+    if (updatedTheme.button.hoverBackgroundImageId) {
+      updatedTheme.button.hoverBackgroundImageId =
+        graphicIdMap.get(updatedTheme.button.hoverBackgroundImageId) || updatedTheme.button.hoverBackgroundImageId;
+    }
+
+    // Create the theme with corrected asset references
+    await service.createTheme(updatedTheme, 'imported');
+
+    console.log('[GlobalSettings] Imported Ren\'Py theme:', updatedTheme.meta.name, themeId);
+    console.log('[GlobalSettings] Fonts:', fontIdMap.size, 'Graphics:', graphicIdMap.size);
+
+    // Refresh themes list
+    await refresh();
+
+    // Load theme assets FIRST (fonts into CSS @font-face, graphics as object URLs)
+    // This must happen BEFORE applyThemeToSettings so fonts render correctly
+    await loadThemeAssets(themeId);
+
+    // Now apply theme to settings - fonts will be available for rendering
+    const newSettings = await applyThemeToSettings(themeId, settings);
+    if (newSettings) {
+      setSettings(newSettings);
+      setHasChanges(true);
+      onThemeChange?.(themeId);
+    }
+  }, [refresh, applyThemeToSettings, settings, onThemeChange, loadThemeAssets]);
 
   // Get current theme name
   const currentThemeName = themes.find(t => t.id === selectedThemeId)?.name || 'Custom';
@@ -364,6 +470,34 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Save as Theme
           </button>
 
+          {/* Import Ren'Py Theme Button */}
+          <button
+            onClick={() => setShowRenpyImporter(true)}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-md"
+            title="Import a Ren'Py visual novel theme"
+          >
+            <FileArchive className="w-4 h-4" />
+            Import Ren'Py
+          </button>
+
+          {/* Theme Assets Info */}
+          {themeAssets && (themeAssets.fonts.size > 0 || themeAssets.graphics.size > 0) && (
+            <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
+              {themeAssets.fonts.size > 0 && (
+                <span className="flex items-center gap-1">
+                  <Type className="w-3 h-3" />
+                  {themeAssets.fonts.size} font{themeAssets.fonts.size !== 1 ? 's' : ''}
+                </span>
+              )}
+              {themeAssets.graphics.size > 0 && (
+                <span className="flex items-center gap-1">
+                  <Image className="w-3 h-3" />
+                  {themeAssets.graphics.size} graphic{themeAssets.graphics.size !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Current theme indicator */}
           {selectedThemeId && isBuiltIn(selectedThemeId) && hasChanges && (
             <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
@@ -408,6 +542,15 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               </div>
             </div>
           </div>
+        )}
+
+        {/* Ren'Py Theme Importer Dialog */}
+        {showRenpyImporter && (
+          <RenpyThemeImporter
+            onImport={handleRenpyImport}
+            onClose={() => setShowRenpyImporter(false)}
+            projectResolution={{ width: settings.project.width, height: settings.project.height }}
+          />
         )}
 
         {/* Tabs */}
@@ -918,6 +1061,12 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     onChange={(e) => handleChange('fonts', 'titleFont', e.target.value)}
                     className="w-full px-3 py-2 border rounded"
                   >
+                    {/* Theme font (from imported theme) - show first if it's a custom font not in the list */}
+                    {settings.fonts.titleFont && !fonts.some(f => f.displayName === settings.fonts.titleFont) && (
+                      <optgroup label="Theme Font">
+                        <option value={settings.fonts.titleFont}>{settings.fonts.titleFont}</option>
+                      </optgroup>
+                    )}
                     {fonts.filter(f => f.type === 'builtin').map(font => (
                       <option key={font.id} value={font.displayName}>{font.displayName}</option>
                     ))}
@@ -954,6 +1103,12 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     onChange={(e) => handleChange('fonts', 'textFont', e.target.value)}
                     className="w-full px-3 py-2 border rounded"
                   >
+                    {/* Theme font (from imported theme) - show first if it's a custom font not in the list */}
+                    {settings.fonts.textFont && !fonts.some(f => f.displayName === settings.fonts.textFont) && (
+                      <optgroup label="Theme Font">
+                        <option value={settings.fonts.textFont}>{settings.fonts.textFont}</option>
+                      </optgroup>
+                    )}
                     {fonts.filter(f => f.type === 'builtin').map(font => (
                       <option key={font.id} value={font.displayName}>{font.displayName}</option>
                     ))}
@@ -990,6 +1145,12 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     onChange={(e) => handleChange('fonts', 'btnFont', e.target.value)}
                     className="w-full px-3 py-2 border rounded"
                   >
+                    {/* Theme font (from imported theme) - show first if it's a custom font not in the list */}
+                    {settings.fonts.btnFont && !fonts.some(f => f.displayName === settings.fonts.btnFont) && (
+                      <optgroup label="Theme Font">
+                        <option value={settings.fonts.btnFont}>{settings.fonts.btnFont}</option>
+                      </optgroup>
+                    )}
                     {fonts.filter(f => f.type === 'builtin').map(font => (
                       <option key={font.id} value={font.displayName}>{font.displayName}</option>
                     ))}
@@ -1171,24 +1332,35 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
                 {/* Enhanced Text Box Preview */}
                 <div className="mt-6 p-4 bg-gray-100 rounded">
-                  <div className="text-sm font-medium text-gray-600 mb-2">Preview</div>
-                  <div 
+                  <div className="text-sm font-medium text-gray-600 mb-2">
+                    Preview
+                    {themeAssets?.textboxFrame && (
+                      <span className="text-xs text-purple-600 ml-2">(using theme frame)</span>
+                    )}
+                  </div>
+                  <div
                     className="p-4 relative"
                     style={{
                       backgroundColor: settings.colors.bgColor,
                       minHeight: '200px',
                       display: 'flex',
-                      alignItems: settings.textbox.position === 'top' ? 'flex-start' : 
+                      alignItems: settings.textbox.position === 'top' ? 'flex-start' :
                                   settings.textbox.position === 'bottom' ? 'flex-end' : 'center',
                     }}
                   >
                     <div
                       style={{
-                        backgroundColor: settings.colors.nonpcolor,
-                        opacity: settings.colors.nonpalpha / 100,
-                        borderRadius: `${settings.textbox.radius}px`,
+                        ...(themeAssets?.textboxFrame ? {
+                          backgroundImage: `url(${themeAssets.textboxFrame})`,
+                          backgroundSize: '100% 100%',
+                          backgroundRepeat: 'no-repeat',
+                        } : {
+                          backgroundColor: settings.colors.nonpcolor,
+                          opacity: settings.colors.nonpalpha / 100,
+                          border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
+                        }),
+                        borderRadius: themeAssets?.textboxFrame ? 0 : `${settings.textbox.radius}px`,
                         padding: `${settings.textbox.padding}px`,
-                        border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
                         width: '100%',
                       }}
                     >
