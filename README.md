@@ -47,6 +47,10 @@ Each release includes:
 
 Download the latest release to get started without building from source.
 
+### 📖 Tutorial
+
+For a comprehensive guide to using ASPAS Modern, see the **[Getting Started Tutorial](docs/tutorial/GETTING_STARTED.md)**.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -93,10 +97,6 @@ Remove-Item -Recurse -Force node_modules
 npm install
 npm run dev
 ```
-
-### 📖 Tutorial
-
-For a comprehensive guide to using ASPAS Modern, see the **[Getting Started Tutorial](docs/tutorial/GETTING_STARTED.md)**.
 
 ## 📦 Project Structure
 
