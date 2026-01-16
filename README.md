@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASPAS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.6)
+## ⚠️ Development Status (v0.9.7)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -261,6 +261,23 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.7 (2026-01-16)
+- **AI Provider Improvements**: Fixed external AI providers (OpenAI, Claude, Kimi) in desktop app
+  - Proxy now works for default OpenAI endpoint (not just custom URLs)
+  - Added default base URLs for OpenAI and Claude APIs
+  - GPT-5 reasoning models: increased token limit to 32000 for output
+  - Added 5-minute timeout for slow AI responses
+- **MCP Integration Toggle**: New app settings option to enable/disable MCP WebSocket
+  - Disabled by default to reduce console noise
+  - Access via app menu (macOS) or Settings menu (Windows/Linux)
+  - Setting persists across app restarts
+- **Ren'Py Theme Import (Initial)**: Early support for importing Ren'Py visual novel themes
+  - Parse gui.rpy for colors, fonts, and textbox positioning
+  - Extract and apply textbox.png frame graphics
+  - Map Ren'Py color variables to ASAPS theme system
+- **AI Config Dialog**: Fixed scrolling on smaller screens
+- **Example Stories**: Removed from git tracking (will be re-added with project storage integration)
 
 ### v0.9.6 (2026-01-13)
 - **Visual Inventory System**: Implemented interactor-facing inventory display with configurable HUD overlay

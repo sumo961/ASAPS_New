@@ -51,7 +51,6 @@ CLAUDE.md
 .claude/
 
 # Local documentation (not for GitHub)
-Progress.md
 AI DialogTree concept.md
 
 # Scripts and temporary files (local only)
