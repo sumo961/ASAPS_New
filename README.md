@@ -1,8 +1,8 @@
-# ASPAS Modern - Advanced Story Authoring and Presentation System
+# ASAPS Modern - Advanced Stories Authoring and Presentation System
 
-A modern TypeScript implementation of the Advanced Stories Authoring and Presentation System (ASPAS) by Hartmut Koenitz, based on his original ActionScript version (2005-2017) started at Georgia Tech. This modernization brings the powerful ASML (Advanced Stories Markup Language, also created by Hartmut Koenitz) XML-based narrative system to the web with enhanced features, a visual story builder, and AI-assisted content generation.
+A modern TypeScript implementation of the Advanced Stories Authoring and Presentation System (ASAPS) by Hartmut Koenitz, based on his original ActionScript version (2005-2017) started at Georgia Tech. This modernization brings the powerful ASML (Advanced Stories Markup Language, also created by Hartmut Koenitz) XML-based narrative system to the web with enhanced features, a visual story builder, and AI-assisted content generation.
 
-![ASPAS Modern Screenshot](assets/screenshot.png)
+![ASAPS Modern Screenshot](assets/screenshot.png)
 
 ## ⚠️ Development Status (v0.9.7)
 
@@ -49,7 +49,7 @@ Download the latest release to get started without building from source.
 
 ### 📖 Tutorial
 
-For a comprehensive guide to using ASPAS Modern, see the **[Getting Started Tutorial](docs/tutorial/GETTING_STARTED.md)**.
+For a comprehensive guide to using ASAPS Modern, see the **[Getting Started Tutorial](docs/tutorial/GETTING_STARTED.md)**.
 
 ## 🚀 Quick Start
 
@@ -252,7 +252,7 @@ The system uses a modular architecture with three main packages:
 
 ## 🤖 AI Integration
 
-ASPAS Modern includes AI-powered features to assist with story creation:
+ASAPS Modern includes AI-powered features to assist with story creation:
 
 ### AI-Assisted Content Generation
 - **Complete Story Generation**: Create entire interactive stories from prompts, both within the ASAPS builder UI and via MCP server
