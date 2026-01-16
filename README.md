@@ -37,6 +37,17 @@ This is a **beta release**. Core functionality works, but some features are inco
 - **AI-Assisted Generation**: Generate dialog trees and story content with AI
 - **MCP Server Integration**: Model Context Protocol support for AI tool integration
 
+## 📥 Releases
+
+Pre-built desktop applications are available for macOS, Windows, and Linux on the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
+
+Each release includes:
+- **macOS**: Universal binary (.dmg) supporting both Intel and Apple Silicon
+- **Windows**: Installer (.exe) and portable version
+- **Linux**: AppImage for broad distribution compatibility
+
+Download the latest release to get started without building from source.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
