@@ -42,12 +42,21 @@ declare global {
     electronAPI?: {
       fs: {
         readFile: (path: string) => Promise<ArrayBuffer>;
-        writeFile: (path: string, data: ArrayBuffer | string) => Promise<void>;
+        writeFile: (path: string, data: ArrayBuffer | Uint8Array | string) => Promise<void>;
+      };
+      dialog?: {
+        save: (options: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePath?: string }>;
+        open: (options: { properties?: string[]; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePaths: string[] }>;
+      };
+      settings?: {
+        getMcpEnabled: () => Promise<boolean>;
+        setMcpEnabled: (enabled: boolean) => Promise<boolean>;
       };
       onMenuNewProject: (callback: () => void) => () => void;
       onMenuSave: (callback: () => void) => () => void;
       onMenuExport: (callback: () => void) => () => void;
       onMenuAutoArrange: (callback: () => void) => () => void;
+      onMcpSettingChanged?: (callback: (enabled: boolean) => void) => () => void;
       onProjectOpen: (callback: (path: string) => void) => () => void;
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
       isElectron: boolean;
@@ -306,7 +315,8 @@ function App() {
       labels: true,
       highlightColor: '#ffff00',
       opacity: 30,
-      showInPreview: 'visible'
+      showInPreview: 'visible',
+      labelDisplay: 'hover'
     },
     sound: {
       backgroundMusic: '',
@@ -910,18 +920,21 @@ function App() {
   }, [actions, markChanged, saveCurrent, syncProjectData]);
 
   useEffect(() => {
-    // Unique ID for this WebSocket connection instance (for debugging duplicates)
-    const wsInstanceId = `ws_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    // Flag to prevent reconnection after cleanup (important for HMR)
+    // MCP WebSocket integration is disabled by default to reduce noise
+    // In Electron: Enable via app menu "Enable MCP Integration"
+    // In web: Enable via localStorage.setItem('asaps_mcp_enabled', 'true')
+
+    // Shared state for cleanup and connection control
     let isCleanedUp = false;
-    // Track if we've logged connection failure (to reduce spam)
+    let mcpShouldBeEnabled = false; // Tracks current MCP setting state
     let hasLoggedFailure = false;
     let connectionAttempts = 0;
+    const wsInstanceId = `ws_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
     // Connect to WebSocket server
     const connectWebSocket = () => {
-      // Don't reconnect if we've been cleaned up (HMR or unmount)
-      if (isCleanedUp) {
+      // Don't reconnect if we've been cleaned up or MCP is disabled
+      if (isCleanedUp || !mcpShouldBeEnabled) {
         return;
       }
 
@@ -977,8 +990,8 @@ function App() {
 
         ws.onclose = () => {
           wsRef.current = null;
-          // Only reconnect if we haven't been cleaned up, with longer interval
-          if (!isCleanedUp) {
+          // Only reconnect if we haven't been cleaned up AND MCP is still enabled
+          if (!isCleanedUp && mcpShouldBeEnabled) {
             setTimeout(connectWebSocket, 10000); // 10 seconds instead of 3
           }
         };
@@ -996,20 +1009,73 @@ function App() {
           console.log('[App] WebSocket connection failed - MCP server not running');
           hasLoggedFailure = true;
         }
-        // Only retry if we haven't been cleaned up
-        if (!isCleanedUp) {
+        // Only retry if we haven't been cleaned up AND MCP is still enabled
+        if (!isCleanedUp && mcpShouldBeEnabled) {
           setTimeout(connectWebSocket, 10000);
         }
       }
     };
 
-    connectWebSocket();
+    // Initialize MCP connection based on settings
+    const initMcpConnection = async () => {
+      // Check if we're in Electron with the settings API
+      if (window.electronAPI?.settings?.getMcpEnabled) {
+        try {
+          mcpShouldBeEnabled = await window.electronAPI.settings.getMcpEnabled();
+        } catch (err) {
+          console.log('[App] Failed to get MCP setting from Electron:', err);
+          mcpShouldBeEnabled = false;
+        }
+      } else {
+        // Fallback to localStorage for web mode
+        mcpShouldBeEnabled = localStorage.getItem('asaps_mcp_enabled') === 'true';
+      }
+
+      if (!mcpShouldBeEnabled || isCleanedUp) {
+        // MCP integration disabled - skip WebSocket connection
+        console.log('[App] MCP integration disabled - WebSocket connection skipped');
+        return;
+      }
+
+      console.log('[App] MCP integration enabled - connecting to WebSocket server');
+      connectWebSocket();
+    };
+
+    // Listen for setting changes from Electron menu
+    let unsubscribeMcpSetting: (() => void) | undefined;
+    if (window.electronAPI?.onMcpSettingChanged) {
+      unsubscribeMcpSetting = window.electronAPI.onMcpSettingChanged((enabled) => {
+        console.log('[App] MCP setting changed:', enabled);
+        mcpShouldBeEnabled = enabled; // Update the flag so retry loops stop
+
+        if (enabled && !wsRef.current) {
+          // Setting enabled, start connection
+          hasLoggedFailure = false; // Reset so we log on new connection attempts
+          connectionAttempts = 0;
+          connectWebSocket();
+        } else if (!enabled) {
+          // Setting disabled, close connection and stop retries
+          console.log('[App] MCP disabled - closing WebSocket and stopping retries');
+          if (wsRef.current) {
+            wsRef.current.close();
+            wsRef.current = null;
+          }
+        }
+      });
+    }
+
+    // Start initialization
+    initMcpConnection();
 
     return () => {
       isCleanedUp = true;
+      mcpShouldBeEnabled = false; // Ensure retries stop on cleanup
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
+      }
+      if (unsubscribeMcpSetting) {
+        unsubscribeMcpSetting();
       }
     };
   }, []); // Only run once on mount
@@ -1231,11 +1297,9 @@ function App() {
           setGlobalSettings(currentProject.globalSettings);
         }
 
-        // Restore theme ID from project (if saved) - triggers theme asset loading
-        if (currentProject.themeId) {
-          console.log('[App] >>> Restoring themeId from project:', currentProject.themeId);
-          setCurrentThemeId(currentProject.themeId);
-        }
+        // ALWAYS set theme ID from project (clear if undefined to prevent bleed between projects)
+        console.log('[App] >>> Setting themeId from project:', currentProject.themeId || '(none)');
+        setCurrentThemeId(currentProject.themeId);
 
         setIsUntitledProject(currentProject.name === 'Untitled Project');
         loadedProjectIdRef.current = currentProject.id;
@@ -1393,11 +1457,9 @@ function App() {
           setGlobalSettings(currentProject.globalSettings);
         }
 
-        // Restore theme ID from project (if saved) - triggers theme asset loading
-        if (currentProject.themeId) {
-          console.log('[App] >>> Restoring themeId from project:', currentProject.themeId);
-          setCurrentThemeId(currentProject.themeId);
-        }
+        // ALWAYS set theme ID from project (clear if undefined to prevent bleed between projects)
+        console.log('[App] >>> Setting themeId from project:', currentProject.themeId || '(none)');
+        setCurrentThemeId(currentProject.themeId);
 
         setIsUntitledProject(false);
         loadedProjectIdRef.current = currentProject.id;

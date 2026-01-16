@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import * as fs from 'fs/promises';
 import { getEmbeddedAPIServer } from './api-server';
@@ -14,6 +15,44 @@ try {
 } catch {
   // electron-squirrel-startup not installed, ignore (only needed for Windows installers)
 }
+
+// App settings management
+interface AppSettings {
+  mcpEnabled: boolean;
+}
+
+const defaultSettings: AppSettings = {
+  mcpEnabled: false,
+};
+
+function getSettingsPath(): string {
+  return join(app.getPath('userData'), 'app-settings.json');
+}
+
+function loadAppSettings(): AppSettings {
+  try {
+    const settingsPath = getSettingsPath();
+    if (existsSync(settingsPath)) {
+      const data = readFileSync(settingsPath, 'utf-8');
+      return { ...defaultSettings, ...JSON.parse(data) };
+    }
+  } catch (error) {
+    console.error('[Main] Failed to load app settings:', error);
+  }
+  return { ...defaultSettings };
+}
+
+function saveAppSettings(settings: AppSettings): void {
+  try {
+    const settingsPath = getSettingsPath();
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    console.log('[Main] App settings saved:', settings);
+  } catch (error) {
+    console.error('[Main] Failed to save app settings:', error);
+  }
+}
+
+let appSettings = loadAppSettings();
 
 let mainWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
@@ -76,6 +115,18 @@ function createMenu(): void {
             submenu: [
               { role: 'about' as const },
               { type: 'separator' as const },
+              {
+                id: 'mcp-toggle',
+                label: 'Enable MCP Integration',
+                type: 'checkbox' as const,
+                checked: appSettings.mcpEnabled,
+                click: (menuItem: Electron.MenuItem) => {
+                  appSettings.mcpEnabled = menuItem.checked;
+                  saveAppSettings(appSettings);
+                  mainWindow?.webContents.send('settings:mcp-changed', appSettings.mcpEnabled);
+                },
+              },
+              { type: 'separator' as const },
               { role: 'services' as const },
               { type: 'separator' as const },
               { role: 'hide' as const },
@@ -86,7 +137,25 @@ function createMenu(): void {
             ],
           },
         ]
-      : []),
+      : [
+          // Settings menu for Windows/Linux
+          {
+            label: 'Settings',
+            submenu: [
+              {
+                id: 'mcp-toggle',
+                label: 'Enable MCP Integration',
+                type: 'checkbox' as const,
+                checked: appSettings.mcpEnabled,
+                click: (menuItem: Electron.MenuItem) => {
+                  appSettings.mcpEnabled = menuItem.checked;
+                  saveAppSettings(appSettings);
+                  mainWindow?.webContents.send('settings:mcp-changed', appSettings.mcpEnabled);
+                },
+              },
+            ],
+          },
+        ]),
 
     // File menu
     {
@@ -282,6 +351,25 @@ ipcMain.handle('app:get-path', async (_, name: string) => {
 // API server status
 ipcMain.handle('api-server:status', async () => {
   return apiServer.getStatus();
+});
+
+// App settings
+ipcMain.handle('settings:get-mcp-enabled', async () => {
+  return appSettings.mcpEnabled;
+});
+
+ipcMain.handle('settings:set-mcp-enabled', async (_, enabled: boolean) => {
+  appSettings.mcpEnabled = enabled;
+  saveAppSettings(appSettings);
+  // Update menu checkbox state
+  const menu = Menu.getApplicationMenu();
+  if (menu) {
+    const mcpItem = menu.getMenuItemById('mcp-toggle');
+    if (mcpItem) {
+      mcpItem.checked = enabled;
+    }
+  }
+  return appSettings.mcpEnabled;
 });
 
 // App lifecycle

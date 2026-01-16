@@ -186,6 +186,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
     >
       <div
         className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6"
+        style={{ maxHeight: '90vh', overflowY: 'auto' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

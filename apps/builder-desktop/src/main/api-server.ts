@@ -10,6 +10,9 @@
 
 import { createServer, Server as HTTPServer, IncomingMessage, ServerResponse } from 'http';
 import { parse as parseUrl } from 'url';
+import { join, dirname } from 'path';
+import { readFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
 
 export interface EmbeddedAPIServerConfig {
   port?: number;
@@ -24,6 +27,7 @@ export class EmbeddedAPIServer {
   private server: HTTPServer | null = null;
   private config: Required<EmbeddedAPIServerConfig>;
   private isRunning = false;
+  private beatSchemaCache: any = null;
 
   constructor(config: EmbeddedAPIServerConfig = {}) {
     this.config = {
@@ -131,6 +135,8 @@ export class EmbeddedAPIServer {
       // Route handling
       if (path === '/health') {
         this.sendJson(res, 200, { status: 'ok', timestamp: new Date().toISOString() });
+      } else if (path === '/api/schema/beats' && req.method === 'GET') {
+        this.handleGetBeatSchema(res);
       } else if (path === '/api/ai/claude' && req.method === 'POST') {
         await this.handleClaudeProxy(req, res);
       } else if (path === '/api/ai/openai' && req.method === 'POST') {
@@ -154,15 +160,18 @@ export class EmbeddedAPIServer {
     const body = await this.readBody(req);
     const { baseUrl, apiKey, ...requestBody } = JSON.parse(body);
 
-    if (!baseUrl || !apiKey) {
-      this.sendJson(res, 400, { error: 'Missing required parameters: baseUrl and apiKey' });
+    if (!apiKey) {
+      this.sendJson(res, 400, { error: 'Missing required parameter: apiKey' });
       return;
     }
 
+    // Use default Anthropic URL if not provided
+    const effectiveBaseUrl = baseUrl || 'https://api.anthropic.com';
+
     // Determine endpoint URL
-    let endpoint = baseUrl;
-    if (!baseUrl.includes('/messages')) {
-      endpoint = `${baseUrl.replace(/\/$/, '')}/v1/messages`;
+    let endpoint = effectiveBaseUrl;
+    if (!effectiveBaseUrl.includes('/messages')) {
+      endpoint = `${effectiveBaseUrl.replace(/\/$/, '')}/v1/messages`;
     }
 
     console.log(`[API Server] Claude proxy to: ${endpoint}`);
@@ -215,18 +224,26 @@ export class EmbeddedAPIServer {
     const body = await this.readBody(req);
     const { baseUrl, apiKey, ...requestBody } = JSON.parse(body);
 
-    if (!baseUrl || !apiKey) {
-      this.sendJson(res, 400, { error: 'Missing required parameters: baseUrl and apiKey' });
+    if (!apiKey) {
+      this.sendJson(res, 400, { error: 'Missing required parameter: apiKey' });
       return;
     }
 
+    // Use default OpenAI URL if not provided
+    const effectiveBaseUrl = baseUrl || 'https://api.openai.com/v1';
+
     // Determine endpoint URL
-    let endpoint = baseUrl;
-    if (!baseUrl.includes('/completions')) {
-      endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+    let endpoint = effectiveBaseUrl;
+    if (!effectiveBaseUrl.includes('/completions')) {
+      endpoint = `${effectiveBaseUrl.replace(/\/$/, '')}/chat/completions`;
     }
 
     console.log(`[API Server] OpenAI proxy to: ${endpoint}`);
+    console.log(`[API Server] Making request (5 minute timeout)...`);
+
+    // Create abort controller with 5 minute timeout for long AI requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
     try {
       const response = await fetch(endpoint, {
@@ -236,11 +253,16 @@ export class EmbeddedAPIServer {
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify(requestBody),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
+      console.log(`[API Server] Response status: ${response.status}`);
       const text = await response.text();
+      console.log(`[API Server] Response length: ${text.length} chars`);
 
       if (!response.ok) {
+        console.log(`[API Server] Error response: ${text.substring(0, 500)}`);
         try {
           const errorData = JSON.parse(text);
           this.sendJson(res, response.status, errorData);
@@ -252,6 +274,7 @@ export class EmbeddedAPIServer {
 
       try {
         const data = JSON.parse(text);
+        console.log(`[API Server] Success - sending response`);
         this.sendJson(res, 200, data);
       } catch {
         this.sendJson(res, 500, {
@@ -260,12 +283,117 @@ export class EmbeddedAPIServer {
         });
       }
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('[API Server] OpenAI proxy error:', error);
       this.sendJson(res, 500, {
         error: 'Proxy request failed',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }
+  }
+
+  /**
+   * Handle GET /api/schema/beats - return beat definitions
+   */
+  private handleGetBeatSchema(res: ServerResponse): void {
+    const schema = this.loadBeatSchema();
+    this.sendJson(res, 200, schema);
+  }
+
+  /**
+   * Load beat schema from core-beats.json
+   */
+  private loadBeatSchema(): any {
+    if (this.beatSchemaCache) {
+      return this.beatSchemaCache;
+    }
+
+    try {
+      // Get the directory where this file is located
+      const currentDir = __dirname;
+
+      // Try multiple paths to find the schema file
+      const possiblePaths = [
+        // Production: relative to dist-electron/main
+        join(currentDir, '../../builder/beat-definitions/core-beats.json'),
+        // Alternative paths
+        join(currentDir, '../../../builder/beat-definitions/core-beats.json'),
+        join(currentDir, '../../../../beat-definitions/core-beats.json'),
+        // Development: relative to project root
+        join(process.cwd(), 'beat-definitions/core-beats.json'),
+        join(process.cwd(), 'builder/beat-definitions/core-beats.json'),
+      ];
+
+      let rawSchema: any = null;
+      let foundPath = '';
+
+      for (const schemaPath of possiblePaths) {
+        if (existsSync(schemaPath)) {
+          const content = readFileSync(schemaPath, 'utf-8');
+          rawSchema = JSON.parse(content);
+          foundPath = schemaPath;
+          console.log(`[API Server] Loaded beat schema from: ${schemaPath}`);
+          break;
+        }
+      }
+
+      if (!rawSchema) {
+        console.error('[API Server] Could not find beat-definitions/core-beats.json');
+        console.error('[API Server] Tried paths:', possiblePaths);
+        return this.getFallbackSchema();
+      }
+
+      // Transform and cache the schema
+      this.beatSchemaCache = this.transformSchemaForAPI(rawSchema, foundPath);
+      return this.beatSchemaCache;
+
+    } catch (error) {
+      console.error('[API Server] Failed to load beat schema:', error);
+      return this.getFallbackSchema();
+    }
+  }
+
+  /**
+   * Transform the raw beat schema into the API format
+   */
+  private transformSchemaForAPI(rawSchema: any, sourcePath: string): any {
+    const beatTypes: Record<string, any> = {};
+
+    // Transform each beat type from the schema
+    for (const [beatType, beatDef] of Object.entries(rawSchema.beatTypes || {})) {
+      const def = beatDef as any;
+      beatTypes[beatType] = {
+        category: def.category || 'visible',
+        description: def.description || '',
+        connectionType: def.connectionType || 'single',
+        parameters: def.parameters || {},
+      };
+
+      if (def.example) {
+        beatTypes[beatType].example = def.example;
+      }
+    }
+
+    return {
+      version: rawSchema.schema || '2.2.0',
+      description: 'ASAPS Beat Types - Use these to create interactive narratives',
+      source: 'Loaded from beat-definitions/core-beats.json',
+      loadedFrom: sourcePath,
+      beatTypes,
+      customTypes: rawSchema.customTypes || {},
+    };
+  }
+
+  /**
+   * Fallback schema when file cannot be loaded
+   */
+  private getFallbackSchema(): any {
+    return {
+      version: '2.2.0',
+      description: 'ASAPS Beat Types (fallback - could not load from file)',
+      error: 'Could not load beat-definitions/core-beats.json',
+      beatTypes: {},
+    };
   }
 
   /**

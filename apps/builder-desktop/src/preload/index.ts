@@ -39,6 +39,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStatus: () => ipcRenderer.invoke('api-server:status'),
   },
 
+  // Settings operations
+  settings: {
+    getMcpEnabled: () => ipcRenderer.invoke('settings:get-mcp-enabled'),
+    setMcpEnabled: (enabled: boolean) => ipcRenderer.invoke('settings:set-mcp-enabled', enabled),
+  },
+  onMcpSettingChanged: (callback: (enabled: boolean) => void) => {
+    const handler = (_: unknown, enabled: boolean) => callback(enabled);
+    ipcRenderer.on('settings:mcp-changed', handler);
+    return () => ipcRenderer.removeListener('settings:mcp-changed', handler);
+  },
+
   // Menu events
   onMenuNewProject: (callback: () => void) => {
     ipcRenderer.on('menu:new-project', callback);
@@ -98,6 +109,11 @@ declare global {
       apiServer: {
         getStatus: () => Promise<{ running: boolean; port: number; host: string }>;
       };
+      settings: {
+        getMcpEnabled: () => Promise<boolean>;
+        setMcpEnabled: (enabled: boolean) => Promise<boolean>;
+      };
+      onMcpSettingChanged: (callback: (enabled: boolean) => void) => () => void;
       onMenuNewProject: (callback: () => void) => () => void;
       onMenuSave: (callback: () => void) => () => void;
       onMenuExport: (callback: () => void) => () => void;
