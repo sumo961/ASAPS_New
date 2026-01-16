@@ -111,3 +111,4 @@ apps/web-service/
 apps/builder-desktop/builder/
 apps/player-desktop/src-tauri/gen/
 test-data/
+Progress.md
