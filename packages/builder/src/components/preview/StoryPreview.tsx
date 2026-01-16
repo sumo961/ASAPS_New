@@ -580,12 +580,16 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
       };
 
       // Add theme asset URLs if available (e.g., textbox frame, button graphics from Ren'Py import)
+      // Don't use button graphics if custom button colors are set (buttonBg/buttonBgColor)
+      // This allows projects to override theme button styling with solid colors
+      const hasCustomButtonColors = !!(settings.colors.buttonBg || settings.colors.buttonBgColor);
+      const useButtonGraphics = settings.colors.useThemeButtonGraphics !== false && !hasCustomButtonColors;
       const themeWithAssets = {
         ...theme,
         textboxFrameUrl: themeAssets?.textboxFrame,
-        buttonNormalUrl: themeAssets?.buttonNormal,
-        buttonHoverUrl: themeAssets?.buttonHover,
-        buttonLayout: themeAssets?.buttonLayout,
+        buttonNormalUrl: useButtonGraphics ? themeAssets?.buttonNormal : undefined,
+        buttonHoverUrl: useButtonGraphics ? themeAssets?.buttonHover : undefined,
+        buttonLayout: useButtonGraphics ? themeAssets?.buttonLayout : undefined,
       };
 
       if ('setTheme' in rendererRef.current) {
@@ -650,12 +654,15 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
         };
 
         // Add theme asset URLs if available (e.g., textbox frame from Ren'Py import)
+        // Don't use button graphics if custom button colors are set (buttonBg/buttonBgColor)
+        const hasCustomButtonColors = !!(settings.colors.buttonBg || settings.colors.buttonBgColor);
+        const useButtonGraphics = settings.colors.useThemeButtonGraphics !== false && !hasCustomButtonColors;
         const themeWithAssets = {
           ...theme,
           textboxFrameUrl: themeAssets?.textboxFrame,
-          buttonNormalUrl: themeAssets?.buttonNormal,
-          buttonHoverUrl: themeAssets?.buttonHover,
-          buttonLayout: themeAssets?.buttonLayout,
+          buttonNormalUrl: useButtonGraphics ? themeAssets?.buttonNormal : undefined,
+          buttonHoverUrl: useButtonGraphics ? themeAssets?.buttonHover : undefined,
+          buttonLayout: useButtonGraphics ? themeAssets?.buttonLayout : undefined,
         };
 
         if ('setTheme' in rendererRef.current) {

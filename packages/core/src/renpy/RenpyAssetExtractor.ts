@@ -286,6 +286,7 @@ export async function extractRenpyAssets(zipFile: File | Blob): Promise<RenpyAss
   let guiData: RenpyGuiData = {
     colors: {},
     fonts: {},
+    title: {},
     textbox: {},
     namebox: {},
     button: {},
@@ -439,6 +440,7 @@ export async function extractRenpyAssetsPartial(
   let guiData: RenpyGuiData = {
     colors: {},
     fonts: {},
+    title: {},
     textbox: {},
     namebox: {},
     button: {},

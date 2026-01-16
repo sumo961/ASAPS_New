@@ -137,9 +137,9 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       hideTitleTextBox: settings.textbox.hideTitleTextBox,
     },
     button: {
-      // Button/choice uses pcolor for background
-      backgroundColor: settings.colors.pcolor,
-      hoverBackgroundColor: lightenColor(settings.colors.pcolor, 0.15),
+      // Button/choice uses buttonBg/buttonBgColor if available, otherwise pcolor
+      backgroundColor: settings.colors.buttonBg || settings.colors.buttonBgColor || settings.colors.pcolor,
+      hoverBackgroundColor: lightenColor(settings.colors.buttonBg || settings.colors.buttonBgColor || settings.colors.pcolor, 0.15),
       textColor: buttonTextColor,
       borderColor: settings.colors.textBoxBorder,
       borderWidth: settings.textbox.borderWidth,
@@ -152,7 +152,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
     fonts: {
       titleFont: getFontFamily(settings.fonts.titleFont),
       textFont: getFontFamily(settings.fonts.textFont),
-      buttonFont: getFontFamily(settings.fonts.btnFont),
+      buttonFont: getFontFamily(settings.fonts.btnFont || settings.fonts.buttonFont || 'Arial'),
       titleFontSize: settings.fonts.fontSize?.title,
       textFontSize: settings.fonts.fontSize?.text,
       buttonFontSize: settings.fonts.fontSize?.button,
@@ -161,7 +161,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
     ...(console.log('[themeConverter] Output fonts:', {
       titleFont: getFontFamily(settings.fonts.titleFont),
       textFont: getFontFamily(settings.fonts.textFont),
-      buttonFont: getFontFamily(settings.fonts.btnFont),
+      buttonFont: getFontFamily(settings.fonts.btnFont || settings.fonts.buttonFont || 'Arial'),
     }), {}),
     textEffects: {
       animation: settings.textEffects.animation,
@@ -174,6 +174,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       showLabels: settings.hotspots.labels ?? true,
       opacity: (settings.hotspots.opacity ?? 30) / 100,  // Normalize to 0-1
       showInPreview: settings.hotspots.showInPreview ?? 'visible',
+      labelDisplay: settings.hotspots.labelDisplay ?? 'hover',
     },
   };
 }

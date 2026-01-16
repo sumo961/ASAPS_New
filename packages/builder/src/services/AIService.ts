@@ -257,6 +257,13 @@ export class AIService {
     if (beat.type === 'inputText') {
       const params = transformed.parameters;
 
+      // Map variableName → variable (common AI variation)
+      if (params.variableName && !params.variable) {
+        params.variable = params.variableName;
+        delete params.variableName;
+        console.log(`[AIService] Normalized: variableName → variable "${params.variable}" for beat ${beat.id}`);
+      }
+
       // Default saveToType to "variable" if not specified
       if (!params.saveToType) {
         params.saveToType = 'variable';
@@ -601,6 +608,111 @@ export class AIService {
       }
     }
 
+    // Normalize addRemoveInventory - fix parameter names
+    // AI often uses "propId" but schema requires "item" and "character"
+    if (beat.type === 'addRemoveInventory') {
+      const params = transformed.parameters;
+
+      // Map propId → item (common AI variation)
+      if (params.propId && !params.item) {
+        params.item = params.propId;
+        delete params.propId;
+        console.log(`[AIService] Normalized: propId → item "${params.item}" for beat ${beat.id}`);
+      }
+
+      // Default character to "player" if missing
+      if (!params.character) {
+        params.character = 'player';
+        console.log(`[AIService] Defaulted character="player" for addRemoveInventory beat ${beat.id}`);
+      }
+
+      // Default action to "add" if missing
+      if (!params.action) {
+        params.action = 'add';
+        console.log(`[AIService] Defaulted action="add" for addRemoveInventory beat ${beat.id}`);
+      }
+
+      // Normalize fromCharacter/toCharacter variations
+      if (params.fromCharacter && !params.fromChar) {
+        params.fromChar = params.fromCharacter;
+        delete params.fromCharacter;
+        console.log(`[AIService] Normalized: fromCharacter → fromChar for beat ${beat.id}`);
+      }
+      if (params.toCharacter && !params.toChar) {
+        params.toChar = params.toCharacter;
+        delete params.toCharacter;
+        console.log(`[AIService] Normalized: toCharacter → toChar for beat ${beat.id}`);
+      }
+    }
+
+    // Normalize setTimer - fix parameter names
+    // AI often uses "timerName" and "duration" but schema requires "name", "value", "timerTarget"
+    if (beat.type === 'setTimer') {
+      const params = transformed.parameters;
+
+      // Map timerName → name (common AI variation)
+      if (params.timerName && !params.name) {
+        params.name = params.timerName;
+        delete params.timerName;
+        console.log(`[AIService] Normalized: timerName → name "${params.name}" for beat ${beat.id}`);
+      }
+
+      // Map duration → value (common AI variation)
+      if (params.duration !== undefined && params.value === undefined) {
+        params.value = params.duration;
+        delete params.duration;
+        console.log(`[AIService] Normalized: duration → value ${params.value} for beat ${beat.id}`);
+      }
+
+      // Try to set timerTarget from connection if missing
+      if (!params.timerTarget && params.connection?.target) {
+        // Use the same target as the connection if no timerTarget specified
+        // This is a fallback - AI should specify timerTarget explicitly
+        console.warn(`[AIService] Beat ${beat.id} missing timerTarget, using connection.target as fallback`);
+        params.timerTarget = params.connection.target;
+      }
+
+      // Warn if still missing required parameters
+      if (!params.name) {
+        console.warn(`[AIService] Beat ${beat.id} missing required 'name' parameter for setTimer`);
+      }
+      if (params.value === undefined) {
+        console.warn(`[AIService] Beat ${beat.id} missing required 'value' parameter for setTimer`);
+      }
+      if (!params.timerTarget) {
+        console.warn(`[AIService] Beat ${beat.id} missing required 'timerTarget' parameter for setTimer`);
+      }
+    }
+
+    // Normalize videoBeat - fix parameter names
+    // AI often uses "videoAssetId" but schema requires "videoFile"
+    if (beat.type === 'videoBeat') {
+      const params = transformed.parameters;
+
+      // Map videoAssetId → videoFile (common AI variation)
+      if (params.videoAssetId && !params.videoFile) {
+        params.videoFile = params.videoAssetId;
+        delete params.videoAssetId;
+        console.log(`[AIService] Normalized: videoAssetId → videoFile "${params.videoFile}" for beat ${beat.id}`);
+      }
+
+      // Also handle variations like videoSrc, videoUrl, src, url
+      const videoAliases = ['videoSrc', 'videoUrl', 'src', 'url', 'video'];
+      for (const alias of videoAliases) {
+        if (params[alias] && !params.videoFile) {
+          params.videoFile = params[alias];
+          delete params[alias];
+          console.log(`[AIService] Normalized: ${alias} → videoFile "${params.videoFile}" for beat ${beat.id}`);
+          break;
+        }
+      }
+
+      // Warn if still missing required parameter
+      if (!params.videoFile) {
+        console.warn(`[AIService] Beat ${beat.id} missing required 'videoFile' parameter for videoBeat`);
+      }
+    }
+
     // Normalize MovementChoice - ensure choices have id fields
     if (beat.type === 'movementChoice') {
       const params = transformed.parameters;
@@ -681,6 +793,149 @@ export class AIService {
   }
 
   /**
+   * Clean up redundant parameters that AI models often add despite prompts
+   * This runs AFTER transformation to catch parameters added during normalization
+   */
+  private cleanupRedundantParameters(response: StoryGenerationResponse): void {
+    if (!response.beats || !Array.isArray(response.beats)) return;
+
+    // Beat types that should NOT have a "connection" parameter
+    // (they define targets in their choices/props/hyperlinks instead)
+    const multiConnectionTypes = new Set([
+      'movementChoice',
+      'pickProp',
+      'dialogTree',
+      'hyperText',
+      'conditionBeat'
+    ]);
+
+    // Flat conditionBeat parameters that should be removed if nested format exists
+    // These are flattened during transformation but the schema doesn't have them at top level
+    const forbiddenConditionParams = new Set([
+      'conditionType',
+      'variableName',
+      'trueTarget',
+      'falseTarget',
+      'operator',  // Schema only has this inside condition object
+      'value'      // Schema only has this inside condition object
+    ]);
+
+    let cleanupCount = 0;
+
+    for (const beat of response.beats) {
+      if (!beat.parameters) continue;
+
+      // Remove "connection" from multi-connection beat types
+      if (multiConnectionTypes.has(beat.type) && 'connection' in beat.parameters) {
+        delete beat.parameters.connection;
+        cleanupCount++;
+      }
+
+      // Remove redundant flat conditionBeat parameters if nested format exists
+      if (beat.type === 'conditionBeat' && beat.parameters.condition) {
+        for (const param of forbiddenConditionParams) {
+          if (param in beat.parameters) {
+            delete beat.parameters[param];
+            cleanupCount++;
+          }
+        }
+      }
+
+      // Clean up inputText parameters not in schema
+      if (beat.type === 'inputText') {
+        // AI often uses variableName instead of variable - copy then delete
+        if ('variableName' in beat.parameters) {
+          if (!beat.parameters.variable) {
+            beat.parameters.variable = beat.parameters.variableName;
+          }
+          delete beat.parameters.variableName;
+          cleanupCount++;
+          console.log(`[AIService] Cleanup: variableName → variable for beat ${beat.id}`);
+        }
+        // submitButtonText is not in schema
+        if ('submitButtonText' in beat.parameters) {
+          delete beat.parameters.submitButtonText;
+          cleanupCount++;
+          console.log(`[AIService] Cleanup: Removed submitButtonText from beat ${beat.id}`);
+        }
+      }
+
+      // Clean up setTimer parameters - safety net for transformation
+      if (beat.type === 'setTimer') {
+        // timerName → name
+        if ('timerName' in beat.parameters && !beat.parameters.name) {
+          beat.parameters.name = beat.parameters.timerName;
+          delete beat.parameters.timerName;
+          cleanupCount++;
+          console.log(`[AIService] Cleanup: timerName → name for beat ${beat.id}`);
+        }
+        // duration → value
+        if ('duration' in beat.parameters && beat.parameters.value === undefined) {
+          beat.parameters.value = beat.parameters.duration;
+          delete beat.parameters.duration;
+          cleanupCount++;
+          console.log(`[AIService] Cleanup: duration → value for beat ${beat.id}`);
+        }
+        // Set timerTarget from connection if missing
+        if (!beat.parameters.timerTarget && beat.parameters.connection?.target) {
+          beat.parameters.timerTarget = beat.parameters.connection.target;
+          cleanupCount++;
+          console.log(`[AIService] Cleanup: Set timerTarget from connection for beat ${beat.id}`);
+        }
+      }
+
+      // Clean up addRemoveInventory parameters
+      if (beat.type === 'addRemoveInventory') {
+        // propId → item
+        if ('propId' in beat.parameters && !beat.parameters.item) {
+          beat.parameters.item = beat.parameters.propId;
+          delete beat.parameters.propId;
+          cleanupCount++;
+          console.log(`[AIService] Cleanup: propId → item for beat ${beat.id}`);
+        }
+        // Default character to "player" if missing
+        if (!beat.parameters.character) {
+          beat.parameters.character = 'player';
+          cleanupCount++;
+          console.log(`[AIService] Cleanup: Defaulted character="player" for beat ${beat.id}`);
+        }
+        // Default action to "add" if missing
+        if (!beat.parameters.action) {
+          beat.parameters.action = 'add';
+          cleanupCount++;
+          console.log(`[AIService] Cleanup: Defaulted action="add" for beat ${beat.id}`);
+        }
+      }
+
+      // Clean up videoBeat parameters
+      if (beat.type === 'videoBeat') {
+        // videoAssetId → videoFile
+        if ('videoAssetId' in beat.parameters && !beat.parameters.videoFile) {
+          beat.parameters.videoFile = beat.parameters.videoAssetId;
+          delete beat.parameters.videoAssetId;
+          cleanupCount++;
+          console.log(`[AIService] Cleanup: videoAssetId → videoFile for beat ${beat.id}`);
+        }
+        // Handle other variations
+        const videoAliases = ['videoSrc', 'videoUrl', 'src', 'url', 'video'];
+        for (const alias of videoAliases) {
+          if (alias in beat.parameters && !beat.parameters.videoFile) {
+            beat.parameters.videoFile = beat.parameters[alias];
+            delete beat.parameters[alias];
+            cleanupCount++;
+            console.log(`[AIService] Cleanup: ${alias} → videoFile for beat ${beat.id}`);
+            break;
+          }
+        }
+      }
+    }
+
+    if (cleanupCount > 0) {
+      console.log(`[AIService] Cleaned up ${cleanupCount} redundant parameters after transformation`);
+    }
+  }
+
+  /**
    * Generate complete story with automatic repair for fixable issues
    */
   async generateStory(request: StoryGenerationRequest): Promise<StoryGenerationResponse> {
@@ -698,6 +953,9 @@ export class AIService {
       response = this.transformStoryResponse(response);
       console.log('[AIService] Transformed beat format for schema compatibility');
 
+      // Clean up redundant parameters that AI models often add
+      this.cleanupRedundantParameters(response);
+
       // Validate if enabled
       let validationErrors: any[] = [];
       let validationWarnings: any[] = [];
@@ -706,6 +964,19 @@ export class AIService {
         const validation = await this.validator.validateStoryGeneration(response);
         validationErrors = validation.errors || [];
         validationWarnings = validation.warnings || [];
+
+        // Filter out known harmless warnings - these parameters work via fallback logic
+        // Only suppress warnings where the code ACTUALLY handles both parameter names
+        const harmlessWarningPatterns = [
+          /Parameter 'variableName' not defined.*inputText/,  // code reads variable OR variableName
+          /Parameter 'submitButtonText' not defined.*inputText/,  // cosmetic, optional
+          /Parameter 'operator' not defined.*conditionBeat/,  // code reads from nested condition
+          /Parameter 'value' not defined.*conditionBeat/,  // code reads from nested condition
+        ];
+
+        validationWarnings = validationWarnings.filter(warning =>
+          !harmlessWarningPatterns.some(pattern => pattern.test(warning))
+        );
 
         if (!validation.valid) {
           console.error('[AIService] Story validation failed:', validationErrors);

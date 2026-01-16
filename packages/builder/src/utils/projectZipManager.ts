@@ -368,18 +368,39 @@ export async function importProjectFromZip(
 export async function downloadProjectAsZip(projectId: string, projectName: string): Promise<void> {
   try {
     const blob = await exportProjectAsZip(projectId);
+    const filename = `${projectName.replace(/[^a-z0-9]/gi, '_')}.asaps.zip`;
 
-    // Create download link
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}.asaps.zip`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Check if we're in Electron
+    if (window.electronAPI?.dialog?.save) {
+      // Use Electron's native save dialog
+      const result = await window.electronAPI.dialog.save({
+        defaultPath: filename,
+        filters: [
+          { name: 'ASAPS Project', extensions: ['asaps.zip'] },
+        ],
+      });
 
-    console.log('[downloadProjectAsZip] Download initiated');
+      if (result.canceled || !result.filePath) {
+        console.log('[downloadProjectAsZip] User cancelled save dialog');
+        return;
+      }
+
+      // Write file to selected path - convert to Uint8Array for Electron IPC
+      const arrayBuffer = await blob.arrayBuffer();
+      await window.electronAPI.fs.writeFile(result.filePath, new Uint8Array(arrayBuffer));
+      console.log('[downloadProjectAsZip] File saved to:', result.filePath);
+    } else {
+      // Browser fallback: use programmatic download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      console.log('[downloadProjectAsZip] Download initiated');
+    }
   } catch (error) {
     console.error('[downloadProjectAsZip] Download failed:', error);
     throw error;
@@ -427,18 +448,39 @@ export async function downloadAsmlWithAssets(
 ): Promise<void> {
   try {
     const blob = await exportAsmlWithAssets(projectName, asmlXml, assets);
+    const filename = `${projectName.replace(/[^a-z0-9]/gi, '_')}_with_assets.zip`;
 
-    // Create download link
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_with_assets.zip`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Check if we're in Electron
+    if (window.electronAPI?.dialog?.save) {
+      // Use Electron's native save dialog
+      const result = await window.electronAPI.dialog.save({
+        defaultPath: filename,
+        filters: [
+          { name: 'ASML with Assets', extensions: ['zip'] },
+        ],
+      });
 
-    console.log('[downloadAsmlWithAssets] Download initiated');
+      if (result.canceled || !result.filePath) {
+        console.log('[downloadAsmlWithAssets] User cancelled save dialog');
+        return;
+      }
+
+      // Write file to selected path - convert to Uint8Array for Electron IPC
+      const arrayBuffer = await blob.arrayBuffer();
+      await window.electronAPI.fs.writeFile(result.filePath, new Uint8Array(arrayBuffer));
+      console.log('[downloadAsmlWithAssets] File saved to:', result.filePath);
+    } else {
+      // Browser fallback: use programmatic download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      console.log('[downloadAsmlWithAssets] Download initiated');
+    }
   } catch (error) {
     console.error('[downloadAsmlWithAssets] Download failed:', error);
     throw error;

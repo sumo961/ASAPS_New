@@ -240,9 +240,6 @@ const VARIABLE_MAPPINGS: Record<string, VariableMapping> = {
   'gui.notify_text_size': { path: ['fonts', 'notifyTextSize'], parser: 'number' },
   'gui.title_text_size': { path: ['fonts', 'titleTextSize'], parser: 'number' },
 
-  // Title screen
-  'gui.title_text_size': { path: ['title', 'textSize'], parser: 'number' },
-
   // Textbox
   'gui.textbox_height': { path: ['textbox', 'height'], parser: 'number' },
   'gui.textbox_yalign': { path: ['textbox', 'yalign'], parser: 'number' },

@@ -313,8 +313,11 @@ export interface ThemeHotspot {
   /** Whether to show labels/tooltips */
   showLabels: boolean;
 
-  /** Preview mode visibility behavior */
+  /** Preview mode visibility behavior for hotspot area */
   showInPreview: 'visible' | 'onHover' | 'invisible';
+
+  /** Label display mode - none, hover (tooltip), or always (permanent) */
+  labelDisplay?: 'none' | 'hover' | 'always';
 
   /** Cursor style on hover */
   cursor?: string;

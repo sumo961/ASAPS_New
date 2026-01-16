@@ -16,7 +16,7 @@
  *   - movementChoice: targets defined in choices[].target
  *   - pickProp: targets defined in props[].target
  *   - hyperText: targets defined in hyperlinks[].targetBeatId
- *   - conditionBeat: uses trueTarget and falseTarget parameters
+ *   - conditionBeat: uses condition, trueConnection, falseConnection parameters (nested format only!)
  *   - randomTarget: targets defined in choices[].target
  *
  * DEFAULT TARGET (Timed Auto-Advance):
@@ -129,8 +129,8 @@ export const BEAT_TYPES = {
 
   // Interactive content - MULTIPLE CONNECTIONS via parameters
   dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean). Choices can modify counters via counter/counterOperation/counterValue properties.',
-  movementChoice: 'Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).',
-  pickProp: 'Interactive prop selection. MULTIPLE TARGETS: define targets in props[].target parameter. Supports: choiceDelay (seconds), markVisited (boolean).',
+  movementChoice: 'Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. IMPORTANT: Each choice needs { id, text, location, target } - always set "location" to same value as "text" for hover labels! Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).',
+  pickProp: 'Interactive prop/item selection. MULTIPLE TARGETS: define targets in props[].target parameter. IMPORTANT: prop "name" should be ITEM NAMES ONLY (e.g., "Silver Key", "Lantern"), NOT action descriptions (e.g., "Take the key" is WRONG). For actions, use movementChoice instead. Supports: choiceDelay (seconds), markVisited (boolean).',
   hyperText: 'Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Links can have custom styling (color, underline, bold). Supports optional defaultTarget for timed auto-advance.',
   inputText: 'Player text input. Save to: variable (default), characterName (update display name), or counter (numeric). Validation: none, numeric, email, alphanumeric. Properties: minLength, maxLength, required. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance.',
 
@@ -139,7 +139,7 @@ export const BEAT_TYPES = {
   videoBeat: 'Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.',
 
   // Logic beats (invisible - no defaultTarget needed)
-  conditionBeat: 'Conditional branching. TWO TARGETS: uses trueTarget and falseTarget parameters, NOT connections array. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat.',
+  conditionBeat: 'Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat.',
   setVariable: 'Set ONE variable/counter per beat. Operations: set (replace), change (add/subtract), multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.',
   addRemoveInventory: 'Modify inventory. Actions: add, remove, or transfer (move between characters). Use "character" parameter to specify which character\'s inventory (defaults to player). Examples: { "action": "add", "item": "key", "character": "merchant" }, { "action": "transfer", "item": "sword", "fromCharacter": "player", "toCharacter": "companion" }. SINGLE CONNECTION: executes then continues to one target.',
   randomTarget: 'Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.',
@@ -255,7 +255,16 @@ Return a JSON object with this structure:
 CRITICAL CONNECTION RULES:
 - SINGLE CONNECTION beats (titleScreen, introText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
 - MULTIPLE CONNECTION beats (dialogTree, movementChoice, pickProp, hyperText, randomTarget): Define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.
-- conditionBeat: Uses trueTarget and falseTarget PARAMETERS, not connections array.
+  🚫 FORBIDDEN: Do NOT add a "connection" parameter to these beats - it triggers validation errors!
+- conditionBeat: EXACTLY 3 parameters allowed: "condition", "trueConnection", "falseConnection"
+  🚫 FORBIDDEN parameters that trigger validation errors:
+  - "connection" ❌
+  - "conditionType" ❌
+  - "variableName" ❌
+  - "operator" (at top level) ❌
+  - "value" (at top level) ❌
+  - "trueTarget" ❌
+  - "falseTarget" ❌
 
 CRITICAL setVariable LIMITATION:
 - setVariable beats can ONLY modify ONE variable/counter per beat!

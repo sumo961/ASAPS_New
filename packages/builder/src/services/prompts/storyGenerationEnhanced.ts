@@ -118,10 +118,13 @@ const BEAT_TYPE_GUIDE = `
 
 **movementChoice** - Location/direction selection
 - Use: Exploration, navigation, choosing paths
-- Parameters: question, choices (array of {id, text, target})
+- Parameters: question, choices (array of {id, text, location, target})
   - id: Unique identifier for the choice (e.g., "choice_library", "c1")
   - text: What the player sees (e.g., "Go to the Library")
+  - location: Hover/tooltip text - ALWAYS set this to same value as text!
   - target: Beat ID to navigate to
+- ⚠️ IMPORTANT: Always include "location" field - copy the "text" value to it!
+  Example: { "id": "c1", "text": "Go to the Library", "location": "Go to the Library", "target": "beat_3" }
 - Connections: Multiple → one per choice
 - COUNTER EFFECTS: Choices can modify counters (same as dialogTree)
   { "id": "c1", "text": "Take the dangerous path", "target": "beat_danger", "counter": "courage", "counterOperation": "change", "counterValue": 5 }
@@ -130,16 +133,25 @@ const BEAT_TYPE_GUIDE = `
 **pickProp** - Object/item selection (NOT for action choices!)
 - Use: Selecting physical ITEMS/OBJECTS, NOT for navigation or actions
 - Parameters: question, props (array of {id, name, target})
-  - name: The ITEM NAME (e.g., "Silver Key", "Book", "Lantern")
-  - ⚠️ NOT action descriptions like "Take the key" or "Continue searching"
+  - name: The ITEM NAME ONLY - just the object name, no verbs!
+  - ⚠️ WRONG names that start with verbs:
+    - "Take the key" ❌
+    - "Pick up the sword" ❌
+    - "Leave the room" ❌
+    - "Continue searching" ❌
+    - "Examine the desk" ❌
+  - ✓ CORRECT names (noun phrases only):
+    - "Silver Key" ✓
+    - "Rusty Sword" ✓
+    - "Old Book" ✓
+    - "Mysterious Letter" ✓
 - Connections: Multiple → one per prop
 - Combine with: addRemoveInventory (invisible beat after)
 - COUNTER EFFECTS: Props can modify counters when selected
   { "id": "sword", "name": "Rusty Sword", "target": "beat_armed", "counter": "confidence", "counterOperation": "change", "counterValue": 3 }
-- ⚠️ For action choices, use movementChoice instead!
-- CORRECT: props: [{ "id": "key", "name": "Silver Key", "target": "beat_take_key" }]
-- WRONG: props: [{ "id": "key", "name": "Take the silver key", "target": "..." }]
-- Example: "What do you pick up?" → [Silver Key | Old Book | Nothing] → each leads to different beat
+- ⚠️ For action choices (verbs), use movementChoice instead!
+- ⚠️ For leaving/continuing without picking anything, use a separate connection or movementChoice
+- Example: "What do you pick up?" → [Silver Key | Old Book | Lantern] → each leads to different beat
 
 **hyperText** - Clickable word/phrase branching
 - Use: Subtle choices, memory/knowledge checks, exploring details in text
@@ -164,16 +176,26 @@ const BEAT_TYPE_GUIDE = `
 
 **videoBeat** - Video playback
 - Use: Cutscenes, instructions, dramatic moments
-- Parameters: videoAssetId, skipButton (boolean)
-- Connections: Single → after video or skip
-- Example: Opening cutscene → titleScreen
+- Parameters:
+  - videoFile: Path/identifier of the video file (REQUIRED - use "videoFile" NOT "videoAssetId")
+  - autoplay: boolean (default: true)
+  - controls: boolean (default: true)
+  - skipButton: boolean (default: true)
+- ⚠️ CRITICAL: Use "videoFile" parameter, NOT "videoAssetId"!
+- Connections: Single → after video ends or skip
+- Example: { "videoFile": "intro_cutscene.mp4", "skipButton": true }
 
 **inputText** - Text input from player
 - Use: Name entry, password/code input, creative input
-- Parameters: prompt, variableName (where to store input), submitButtonText
-- Connections: Single → stores input in variable
+- Parameters:
+  - prompt: Text asking the player for input (REQUIRED)
+  - variable: Variable name to store the input (REQUIRED - use "variable" NOT "variableName"!)
+  - saveToType: "variable" (REQUIRED - always set to "variable")
+  - submitButtonText: Text for submit button (optional, default: "Submit")
+- ⚠️ CRITICAL: Use "variable" parameter, NOT "variableName"!
+- Connections: Single → stores input in variable, then proceeds
 - Combine with: conditionBeat to check input
-- Example: "Enter password" → store in 'userPassword' → conditionBeat checks if correct
+- Example: { "prompt": "Enter the password:", "variable": "userPassword", "saveToType": "variable" }
 
 **endScreen** - Story conclusion
 - Use: Ending (victory, defeat, various endings)
@@ -227,51 +249,55 @@ const BEAT_TYPE_GUIDE = `
 
 **conditionBeat** - State-based branching
 - Use: Check variables, counters, inventory, create conditional paths
-- Condition types and their parameters:
-  - **counter**: { type: "counter", variable: "counterName", operator, value }
-  - **variable**: { type: "variable", variable: "varName", operator, value }
+- ⚠️ CRITICAL: Use ONLY these 3 parameters - NO extras!
+  - condition: { type, variable/item/timer, operator, value, ... }
+  - trueConnection: { target: "beat_id", label: "optional" }
+  - falseConnection: { target: "beat_id", label: "optional" }
+- ❌ NEVER use these flat parameters (they will be rejected):
+  - conditionType ❌
+  - variableName ❌
+  - operator (at top level) ❌
+  - value (at top level) ❌
+  - trueTarget ❌
+  - falseTarget ❌
+- Condition types inside the "condition" object:
+  - **counter**: { type: "counter", variable: "counterName", operator: ">=", value: 3 }
+  - **variable**: { type: "variable", variable: "varName", operator: "==", value: true }
   - **inventory**: { type: "inventory", item: "itemName", character: "player", checkType: "has"|"lacks" }
-  - **timer**: { type: "timer", timer: "timerName", operator, value }
-- ⚠️ CRITICAL PARAMETER NAMES BY CONDITION TYPE:
-  - For counter/variable checks: use "variable" (NOT "variableName")
-  - For inventory checks: use "item" (NOT "variable" or "variableName")
-  - For timer checks: use "timer"
-- Branch destinations:
-  - trueTarget: "beat_id" OR trueConnection: { target: "beat_id" }
-  - falseTarget: "beat_id" OR falseConnection: { target: "beat_id" }
+  - **timer**: { type: "timer", timer: "timerName", operator: ">", value: 0 }
 - Connections: Two → one if true, one if false
 - Pattern: Reconvergence - multiple paths lead here, then branch based on accumulated state
 
-Counter condition example:
+Counter condition example (CORRECT format):
   {
-    "conditionType": "counter",
     "condition": { "type": "counter", "variable": "cluesFound", "operator": ">=", "value": 3 },
-    "trueTarget": "beat_success",
-    "falseTarget": "beat_hub"
+    "trueConnection": { "target": "beat_success", "label": "Enough clues" },
+    "falseConnection": { "target": "beat_hub", "label": "Need more clues" }
   }
 
-Inventory condition example (check if player has lantern):
+Inventory condition example (CORRECT format):
   {
-    "conditionType": "inventory",
     "condition": { "type": "inventory", "item": "lantern", "character": "player", "checkType": "has" },
-    "trueTarget": "beat_has_light",
-    "falseTarget": "beat_dark"
+    "trueConnection": { "target": "beat_has_light", "label": "Has lantern" },
+    "falseConnection": { "target": "beat_dark", "label": "No lantern" }
   }
-- ⚠️ WRONG for inventory: { "variableName": "lantern" } - use "item" instead!
+- ⚠️ WRONG for inventory: { "variableName": "lantern" } - use "item" inside condition!
 
 **addRemoveInventory** - Inventory manipulation
 - Use: Pick up items, lose items, transfer between characters
-- Parameters:
-  - propId: item identifier
-  - action: add | remove | transfer
-  - character: which character's inventory (defaults to "player")
-  - fromCharacter/toCharacter: for transfer action
+- Parameters (ALL are REQUIRED):
+  - item: Item name/identifier (REQUIRED - use "item" NOT "propId"!)
+  - action: "add" | "remove" | "transfer" (REQUIRED)
+  - character: Character whose inventory is modified (REQUIRED - use "player" for player character)
+  - fromChar/toChar: For transfer action only
+- ⚠️ CRITICAL: Use "item" parameter, NOT "propId"!
+- ⚠️ CRITICAL: Always include "character" parameter (usually "player")!
 - Connections: Single → next beat
 - Pattern: After pickProp or as consequence of actions
 - Examples:
-  - Add to player: { "propId": "key", "action": "add" }
-  - Add to NPC: { "propId": "key", "action": "add", "character": "merchant" }
-  - Transfer: { "propId": "sword", "action": "transfer", "fromCharacter": "player", "toCharacter": "companion" }
+  - Add to player: { "item": "key", "action": "add", "character": "player" }
+  - Add to NPC: { "item": "key", "action": "add", "character": "merchant" }
+  - Transfer: { "item": "sword", "action": "transfer", "fromChar": "player", "toChar": "companion", "character": "player" }
 
 **randomTarget** - Random path selection
 - Use: Randomness, procedural elements, replayability
@@ -282,10 +308,17 @@ Inventory condition example (check if player has lantern):
 
 **setTimer** - Background countdown
 - Use: Time pressure, timed events, deadlines
-- Parameters: timerName, duration (seconds)
+- Parameters (ALL are REQUIRED):
+  - name: Timer identifier (REQUIRED - use "name" NOT "timerName"!)
+  - value: Duration in seconds (REQUIRED - use "value" NOT "duration"!)
+  - timerTarget: Beat ID to jump to when timer expires (REQUIRED)
+- ⚠️ CRITICAL parameter names:
+  - Use "name" NOT "timerName"
+  - Use "value" NOT "duration"
+  - "timerTarget" is REQUIRED - the beat to jump to when time runs out!
 - Connections: Single → continues immediately, timer runs in background
 - Combine with: conditionBeat checking timer expired
-- Example: "Bomb planted" → setTimer(bombTimer, 300) → player has 5 min → check later
+- Example: { "name": "bombTimer", "value": 300, "timerTarget": "beat_explosion" }
 
 ## Beat Notes (Author Annotations)
 
@@ -734,19 +767,48 @@ Generate complete, sophisticated interactive story structures that:
 ]
 \`\`\`
 
-### 3. conditionBeat - Use ONLY nested format
-❌ WRONG (mixing nested and flat):
+### 3. Multi-connection beats - NO "connection" parameter
+⚠️ VALIDATION ERROR: Adding "connection" to multi-connection beats triggers warnings!
+
+These beat types define targets in their choices/props/hyperlinks - NEVER add a separate "connection" parameter:
+- dialogTree → targets in dialogTree.choices[].target
+- movementChoice → targets in choices[].target
+- pickProp → targets in props[].target
+- hyperText → targets in hyperlinks[].targetBeatId
+- conditionBeat → targets in trueConnection/falseConnection
+
+✓ CORRECT (NO connection parameter):
 \`\`\`json
-"parameters": {
-  "condition": { "variable": "hasKey", "operator": "==", "value": true },
-  "variableName": "hasKey",      // ❌ WRONG - don't duplicate
-  "operator": "==",              // ❌ WRONG - don't duplicate
-  "value": true,                 // ❌ WRONG - don't duplicate
-  "trueTarget": "beat_5",        // ❌ WRONG - use trueConnection
-  "falseTarget": "beat_6"        // ❌ WRONG - use falseConnection
+{
+  "type": "movementChoice",
+  "parameters": {
+    "question": "Where to?",
+    "choices": [
+      { "id": "c1", "text": "Library", "location": "Library", "target": "beat_3" },
+      { "id": "c2", "text": "Kitchen", "location": "Kitchen", "target": "beat_4" }
+    ]
+  }
 }
 \`\`\`
-✓ CORRECT (nested format only):
+
+### 4. conditionBeat - ONLY 3 parameters allowed
+⚠️ VALIDATION ERROR: Any extra parameters trigger warnings and may break functionality!
+
+conditionBeat parameters MUST contain EXACTLY these 3 fields (no more, no less):
+1. "condition" - the condition object
+2. "trueConnection" - where to go if true
+3. "falseConnection" - where to go if false
+
+🚫 FORBIDDEN parameters (will cause validation errors):
+- "connection" ❌
+- "conditionType" ❌
+- "variableName" ❌
+- "operator" (at top level) ❌
+- "value" (at top level) ❌
+- "trueTarget" ❌
+- "falseTarget" ❌
+
+✓ CORRECT (exactly 3 parameters):
 \`\`\`json
 "parameters": {
   "condition": { "type": "variable", "variable": "hasKey", "operator": "==", "value": true },
@@ -755,13 +817,13 @@ Generate complete, sophisticated interactive story structures that:
 }
 \`\`\`
 
-### 4. NEVER generate internal fields
+### 5. NEVER generate internal fields
 These are internal editor fields - NEVER include them:
 - ❌ \`_rawHyperlinks\`
 - ❌ \`locs\`
 - ❌ \`locations\`
 
-### 5. Avoid infinite loops without exit
+### 6. Avoid infinite loops without exit
 ❌ WRONG (trap loop with no progression):
 \`\`\`
 beat_4 (library) → beat_8 (study book) → beat_13 (learn ritual) → beat_4 (library)
@@ -816,8 +878,8 @@ beat_4 now checks variable and shows new option to progress
   "parameters": {
     "question": "Where do you go?",
     "choices": [
-      { "id": "c1", "text": "Go left", "target": "beat_3" },
-      { "id": "c2", "text": "Go right", "target": "beat_4" }
+      { "id": "c1", "text": "Go left", "location": "Go left", "target": "beat_3" },
+      { "id": "c2", "text": "Go right", "location": "Go right", "target": "beat_4" }
     ]
   },
   "connections": [

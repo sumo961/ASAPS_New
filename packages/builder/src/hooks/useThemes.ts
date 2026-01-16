@@ -78,6 +78,9 @@ export interface UseThemesResult {
 
   /** Load theme assets (fonts and graphics) */
   loadThemeAssets: (themeId: string) => Promise<ThemeAssetUrls | null>;
+
+  /** Clear theme selection and assets */
+  clearSelection: () => void;
 }
 
 // ============================================================================
@@ -129,6 +132,21 @@ export function useThemes(initialThemeId?: string): UseThemesResult {
 
     initThemes();
   }, []);
+
+  // Respond to changes in initialThemeId prop (e.g., when switching projects)
+  // This clears theme assets when the theme changes to prevent bleed between projects
+  useEffect(() => {
+    if (initialThemeId === undefined) {
+      // Clear theme assets when project has no theme
+      console.log('[useThemes] Clearing theme assets (no theme for this project)');
+      setThemeAssets(null);
+      setSelectedThemeId(null);
+    } else if (initialThemeId !== selectedThemeId) {
+      // Theme changed - update selection (assets will be loaded via loadThemeAssets)
+      console.log('[useThemes] Theme changed to:', initialThemeId);
+      setSelectedThemeId(initialThemeId);
+    }
+  }, [initialThemeId]); // Don't include selectedThemeId to avoid loops
 
   // Refresh themes list
   const refresh = useCallback(async () => {
@@ -344,6 +362,13 @@ export function useThemes(initialThemeId?: string): UseThemesResult {
     }
   }, []);
 
+  // Clear theme selection and assets
+  const clearSelection = useCallback(() => {
+    console.log('[useThemes] Clearing theme selection and assets');
+    setSelectedThemeId(null);
+    setThemeAssets(null);
+  }, []);
+
   return {
     themes,
     selectedThemeId,
@@ -357,6 +382,7 @@ export function useThemes(initialThemeId?: string): UseThemesResult {
     refresh,
     isBuiltIn,
     loadThemeAssets,
+    clearSelection,
   };
 }
 

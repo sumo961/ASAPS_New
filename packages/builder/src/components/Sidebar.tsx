@@ -277,10 +277,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Beat List */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-hidden flex flex-col p-4">
         {searchTerm ? (
-          // Show filtered beats
-          <div className="space-y-1">
+          // Show filtered beats - scrollable
+          <div className="flex-1 overflow-y-auto space-y-1">
             {filteredBeats.length > 0 ? (
               filteredBeats.map(beat => (
                 <button
@@ -314,12 +314,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
         ) : (
-          // Show beats organized by clusters
-          <div className="space-y-2">
-            {/* Clusters Section - Show as folders */}
+          // Show beats organized by clusters - each section scrolls independently
+          <div className="flex-1 flex flex-col overflow-hidden space-y-2">
+            {/* Clusters Section - Show as folders, max 50% height */}
             {clusters.length > 0 && (
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-col min-h-0 flex-shrink-0" style={{ maxHeight: '50%' }}>
+                <div className="flex items-center justify-between mb-2 flex-shrink-0">
                   <h4 className="text-xs font-semibold text-gray-500 uppercase">Clusters</h4>
                   {onAddCluster && (
                     <button
@@ -332,93 +332,96 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                 </div>
 
-                {clusters.map(cluster => {
-                  const isExpanded = expandedClusters.has(cluster.id);
-                  const beatsInCluster = clusteredBeats.get(cluster.id) || [];
+                {/* Scrollable cluster list - auto-adjusts height */}
+                <div className="overflow-y-auto min-h-0">
+                  {clusters.map(cluster => {
+                    const isExpanded = expandedClusters.has(cluster.id);
+                    const beatsInCluster = clusteredBeats.get(cluster.id) || [];
 
-                  return (
-                    <div key={cluster.id} className="mb-1">
-                      {/* Cluster Header - Folder-like with triangle */}
-                      <div
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDropOnCluster(e, cluster.id)}
-                        className={`flex items-center gap-1 px-2 py-1.5 text-sm rounded-lg transition-colors ${
-                          selectedCluster?.id === cluster.id
-                            ? 'bg-purple-100 border-purple-500 border'
-                            : 'hover:bg-gray-50'
-                        }`}
-                        title={`Drop beats here to add them to ${cluster.name}`}
-                      >
-                        {/* Expand/Collapse Triangle */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedClusters(prev => {
-                              const newSet = new Set(prev);
-                              if (newSet.has(cluster.id)) {
-                                newSet.delete(cluster.id);
-                              } else {
-                                newSet.add(cluster.id);
-                              }
-                              return newSet;
-                            });
-                          }}
-                          className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+                    return (
+                      <div key={cluster.id} className="mb-1">
+                        {/* Cluster Header - Folder-like with triangle */}
+                        <div
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDropOnCluster(e, cluster.id)}
+                          className={`flex items-center gap-1 px-2 py-1.5 text-sm rounded-lg transition-colors ${
+                            selectedCluster?.id === cluster.id
+                              ? 'bg-purple-100 border-purple-500 border'
+                              : 'hover:bg-gray-50'
+                          }`}
+                          title={`Drop beats here to add them to ${cluster.name}`}
                         >
-                          {isExpanded ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-                          )}
-                        </button>
+                          {/* Expand/Collapse Triangle */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedClusters(prev => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(cluster.id)) {
+                                  newSet.delete(cluster.id);
+                                } else {
+                                  newSet.add(cluster.id);
+                                }
+                                return newSet;
+                              });
+                            }}
+                            className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+                            )}
+                          </button>
 
-                        {/* Folder icon and name - clickable to select */}
-                        <button
-                          onClick={() => onClusterSelect(cluster)}
-                          className="flex items-center gap-2 flex-1 min-w-0"
-                        >
-                          <Folder className="w-4 h-4 text-purple-500 flex-shrink-0" />
-                          <EditableClusterName cluster={cluster} />
-                        </button>
+                          {/* Folder icon and name - clickable to select */}
+                          <button
+                            onClick={() => onClusterSelect(cluster)}
+                            className="flex items-center gap-2 flex-1 min-w-0"
+                          >
+                            <Folder className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                            <EditableClusterName cluster={cluster} />
+                          </button>
 
-                        {/* Beat count */}
-                        <span className="text-xs text-gray-400 flex-shrink-0">{beatsInCluster.length}</span>
-                      </div>
-
-                      {/* Cluster beats - only shown when expanded */}
-                      {isExpanded && beatsInCluster.length > 0 && (
-                        <div className="pl-6 mt-1 space-y-0.5">
-                          {beatsInCluster.map(beat => (
-                            <button
-                              key={beat.id}
-                              onClick={() => onBeatSelect(beat)}
-                              draggable
-                              onDragStart={(e) => handleDragStart(e, beat)}
-                              className={`w-full text-left px-2 py-1.5 rounded-lg text-sm transition-colors ${
-                                selectedBeat?.id === beat.id
-                                  ? 'bg-blue-100 border-blue-500 border'
-                                  : 'hover:bg-gray-100'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="text-base">{beatTypeIcons[beat.type] || '📄'}</span>
-                                <span className="truncate">{beat.name}</span>
-                              </div>
-                            </button>
-                          ))}
+                          {/* Beat count */}
+                          <span className="text-xs text-gray-400 flex-shrink-0">{beatsInCluster.length}</span>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+
+                        {/* Cluster beats - scrollable container when expanded */}
+                        {isExpanded && beatsInCluster.length > 0 && (
+                          <div className="pl-6 mt-1 space-y-0.5 max-h-48 overflow-y-auto border-l-2 border-purple-200 ml-2">
+                            {beatsInCluster.map(beat => (
+                              <button
+                                key={beat.id}
+                                onClick={() => onBeatSelect(beat)}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, beat)}
+                                className={`w-full text-left px-2 py-1.5 rounded-lg text-sm transition-colors ${
+                                  selectedBeat?.id === beat.id
+                                    ? 'bg-blue-100 border-blue-500 border'
+                                    : 'hover:bg-gray-100'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base">{beatTypeIcons[beat.type] || '📄'}</span>
+                                  <span className="truncate">{beat.name}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
-            {/* Unclustered Beats Section */}
+            {/* Unclustered Beats Section - takes remaining space */}
             {unclusteredBeats.length > 0 && (
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Draggable to Clusters</h4>
-                <div className="space-y-1">
+              <div className="flex flex-col min-h-0 flex-1 border-t border-gray-200 pt-2 overflow-hidden">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 flex-shrink-0">Unclustered Beats</h4>
+                <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
                   {unclusteredBeats.map(beat => (
                     <button
                       key={beat.id}

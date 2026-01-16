@@ -1131,14 +1131,49 @@ export class ReactRenderer extends BaseRenderer {
         buttonLocations.some(loc => loc.name === choice.text)
       );
 
-      if (choicesMatchLocations || buttonLocations.length === 0) {
-        // Root level dialog or no button locations - use positioned rendering as-is
+      if (choicesMatchLocations) {
+        // Choices match button locations - use positioned rendering as-is
         const content: Record<string, any> = {
           text: dialogContext.text || '',
           choices,
           markVisited
         };
         return this.renderPositionedBeat('dialogTree', content, locations, true);
+      }
+
+      // No button locations but we have choices - need to generate buttons
+      if (buttonLocations.length === 0 && choices.length > 0) {
+        // Keep existing non-button locations and add generated button locations
+        const nonButtonLocations = [...locations];
+        const stageWidth = this.context.width || 1024;
+        const stageHeight = this.context.height || 768;
+        const buttonWidth = 300;
+        const buttonHeight = 50;
+        const buttonSpacing = 15;
+        const centerX = stageWidth / 2;
+        // Position buttons in lower portion of screen
+        let buttonY = stageHeight - 200 - (choices.length * (buttonHeight + buttonSpacing));
+
+        const generatedLocations: Location[] = [...nonButtonLocations];
+        choices.forEach((choice, index) => {
+          generatedLocations.push({
+            kind: 'button',
+            name: choice.text,
+            x: Math.round(centerX - buttonWidth / 2),
+            y: Math.round(buttonY),
+            width: buttonWidth,
+            height: buttonHeight,
+            zIndex: 10 + index,
+          });
+          buttonY += buttonHeight + buttonSpacing;
+        });
+
+        const content: Record<string, any> = {
+          text: dialogContext.text || '',
+          choices,
+          markVisited
+        };
+        return this.renderPositionedBeat('dialogTree', content, generatedLocations, true);
       }
 
       // Choice text doesn't match button names - map choices to buttons by index

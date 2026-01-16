@@ -181,7 +181,8 @@ export interface RenderThemeSettings {
     visible: boolean;        // Whether hotspots are visible at all
     showLabels: boolean;     // Whether to show text labels on hotspots
     opacity: number;         // Base opacity 0-1 (default 0.3)
-    showInPreview: 'visible' | 'onHover' | 'invisible';  // Preview mode visibility
+    showInPreview: 'visible' | 'onHover' | 'invisible';  // Hotspot area visibility
+    labelDisplay: 'none' | 'hover' | 'always';  // Label display mode
   };
 }
 
@@ -442,7 +443,8 @@ const DEFAULT_THEME: RenderThemeSettings = {
     visible: true,
     showLabels: true,
     opacity: 0.3,  // Default 30% opacity (normalized 0-1)
-    showInPreview: 'visible',  // Default: always show hotspots
+    showInPreview: 'visible',  // Default: always show hotspot area
+    labelDisplay: 'hover',  // Default: show labels as tooltips on hover
   },
 };
 
@@ -1187,10 +1189,16 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   // Render based on element kind
   switch (location.kind) {
     case 'text': {
-      // Use stored dimensions directly - auto-sizing happens at import time
+      // Text elements use auto height to expand for long content
+      // The defined height becomes minHeight to maintain layout for short text
+      const textStyle = {
+        ...baseStyle,
+        height: 'auto',
+        minHeight: `${location.height}px`,
+      };
       return (
         <TextElement
-          style={baseStyle}
+          style={textStyle}
           content={content}
           location={location}
           hideTextBox={hideTextBoxes}
@@ -1596,15 +1604,13 @@ const TextElement: React.FC<{
     ? { animation: `fadeIn ${fadeInDuration}ms ease-in` }
     : {};
 
-  // For very long content, use the element's actual height to enable scrolling
-  // For shorter content, use auto to fit the text naturally
+  // Always use auto height for text elements to fit content
+  // This ensures long text expands properly instead of being clipped
+  // The element's defined height is used as minHeight to maintain layout when text is short
   const elementHeight = style?.height;
-  // Height comes as string like "518px" - check if it's a valid pixel value
   const hasValidHeight = elementHeight && typeof elementHeight === 'string' && elementHeight.endsWith('px');
-  const useFixedHeight = isVeryLongContent && hasValidHeight;
-  const heightStyle = useFixedHeight
-    ? { height: elementHeight, minHeight: '60px' }
-    : { height: 'auto', minHeight: '60px' };
+  const minHeight = hasValidHeight ? elementHeight : '60px';
+  const heightStyle = { height: 'auto', minHeight };
 
   // For typewriter animation, render full text but make unrevealed characters transparent
   // This keeps text centered while characters appear one by one
@@ -1725,6 +1731,7 @@ const ButtonElement: React.FC<{
   const hotspotOpacity = theme.hotspot?.opacity ?? 0.3;  // 0-1 normalized
   const showInPreview = theme.hotspot?.showInPreview ?? 'visible';
   const hotspotVisible = theme.hotspot?.visible ?? true;  // "Show hotspots" checkbox
+  const labelDisplay = theme.hotspot?.labelDisplay ?? 'hover';  // Label display mode
 
   // Determine if this is preview mode (interactive but not in editor)
   const isPreviewMode = interactive && !editorMode;
@@ -1775,10 +1782,13 @@ const ButtonElement: React.FC<{
   }
 
   // Determine if text should be visible inside the button
-  // For hotspots in PREVIEW mode (interactive, not editorMode): hide text, use tooltip instead
+  // For hotspots in PREVIEW mode (interactive, not editorMode):
+  //   - hide text if labelDisplay is 'hover' (use tooltip instead)
+  //   - show text if labelDisplay is 'always' (permanent label)
+  //   - hide text if labelDisplay is 'none' (no label at all)
   // For hotspots in EDITOR mode: show text inside so users can see/edit labels
   // For regular buttons: always show text
-  const shouldShowText = !hideButtonBox || !isPreviewMode;
+  const shouldShowText = !hideButtonBox || !isPreviewMode || labelDisplay === 'always';
 
   // Determine if we should use button background images (from Ren'Py theme import)
   const useButtonImage = !hideButtonBox && !isVisited && theme.buttonNormalUrl;
@@ -1878,10 +1888,10 @@ const ButtonElement: React.FC<{
     }
   };
 
-  // Show custom tooltip in PREVIEW mode for hotspots (not in editor mode)
-  // Don't show tooltip in invisible mode or when labels are disabled
+  // Show custom tooltip in PREVIEW mode for hotspots when labelDisplay is 'hover'
+  // Don't show tooltip when labelDisplay is 'none' or 'always' (always shows text inside)
   const showLabels = theme.hotspot?.showLabels ?? true;
-  const showTooltip = hideButtonBox && isPreviewMode && showInPreview !== 'invisible' && showLabels && content && content.length > 0 && isHovered;
+  const showTooltip = hideButtonBox && isPreviewMode && labelDisplay === 'hover' && showLabels && content && content.length > 0 && isHovered;
 
   // Handle mouse move to track cursor position for tooltip
   const handleMouseMove = (e: React.MouseEvent) => {

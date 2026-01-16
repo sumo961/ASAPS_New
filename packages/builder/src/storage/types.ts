@@ -31,11 +31,15 @@ export interface GlobalSettings {
     nonptextcolor: string;  // NPC/narrator text color
     bgColor: string;        // Stage background color
     textBoxBorder: string;  // Text box/button border color
+    buttonBg?: string;      // Optional explicit button background color
+    buttonBgColor?: string; // Alternative button background color field
+    useThemeButtonGraphics?: boolean; // Whether to use button graphics from theme (default: true)
   };
   fonts: {
     titleFont: string;
     textFont: string;
     btnFont: string;
+    buttonFont?: string;    // Alternative button font field (may override btnFont)
     fontSize: {
       title: number;
       text: number;
@@ -61,7 +65,8 @@ export interface GlobalSettings {
     labels: boolean;
     highlightColor: string;
     opacity: number;  // 0-100 percentage
-    showInPreview: 'visible' | 'onHover' | 'invisible';  // Preview mode visibility
+    showInPreview: 'visible' | 'onHover' | 'invisible';  // Hotspot area visibility in preview
+    labelDisplay: 'none' | 'hover' | 'always';  // Label/description display mode in preview
   };
   sound: {
     backgroundMusic: string;    // Background music file

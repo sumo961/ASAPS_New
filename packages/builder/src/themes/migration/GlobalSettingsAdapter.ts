@@ -179,6 +179,7 @@ function convertHotspot(hotspots: GlobalSettings['hotspots']): ThemeHotspot {
     visible: hotspots.visible,
     showLabels: hotspots.labels,
     showInPreview: hotspots.showInPreview,
+    labelDisplay: hotspots.labelDisplay ?? 'hover',
   };
 }
 
@@ -261,6 +262,7 @@ export function themeToGlobalSettings(
       highlightColor: theme.hotspot.highlightColor,
       opacity: Math.round(theme.hotspot.opacity * 100), // Convert 0-1 to 0-100
       showInPreview: theme.hotspot.showInPreview,
+      labelDisplay: theme.hotspot.labelDisplay ?? 'hover',
     },
     sound: existingSettings?.sound || {
       backgroundMusic: '',
@@ -450,7 +452,8 @@ function diffHotspot(base: ThemeHotspot, current: ThemeHotspot): ThemeHotspot | 
     base.opacity !== current.opacity ||
     base.visible !== current.visible ||
     base.showLabels !== current.showLabels ||
-    base.showInPreview !== current.showInPreview
+    base.showInPreview !== current.showInPreview ||
+    base.labelDisplay !== current.labelDisplay
   ) {
     return current;
   }

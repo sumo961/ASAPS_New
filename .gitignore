@@ -111,3 +111,4 @@ apps/web-service/
 # Desktop app build outputs (generated during build)
 apps/builder-desktop/builder/
 apps/player-desktop/src-tauri/gen/
+test-data/

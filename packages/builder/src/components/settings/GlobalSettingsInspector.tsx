@@ -23,11 +23,15 @@ interface GlobalSettings {
     nonptextcolor: string;  // NPC/narrator text color
     bgColor: string;        // Stage background color
     textBoxBorder: string;  // Text box/button border color
+    buttonBg?: string;      // Optional explicit button background color
+    buttonBgColor?: string; // Alternative button background color field
+    useThemeButtonGraphics?: boolean; // Whether to use button graphics from theme (default: true)
   };
   fonts: {
     titleFont: string;
     textFont: string;
     btnFont: string;
+    buttonFont?: string;    // Alternative button font field (may override btnFont)
     fontSize: {
       title: number;
       text: number;
@@ -53,7 +57,8 @@ interface GlobalSettings {
     labels: boolean;
     highlightColor: string;
     opacity: number;  // 0-100 percentage
-    showInPreview: 'visible' | 'onHover' | 'invisible';  // Preview mode visibility
+    showInPreview: 'visible' | 'onHover' | 'invisible';  // Hotspot area visibility in preview
+    labelDisplay: 'none' | 'hover' | 'always';  // Label display mode in preview
   };
   sound: {
     backgroundMusic: string;       // Background music file/URL
@@ -138,6 +143,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     refresh,
     loadThemeAssets,
     themeAssets,
+    clearSelection,
   } = useThemes(initialThemeId);
 
   // Load theme assets when initially opening with a theme
@@ -159,6 +165,14 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     }
     setShowThemeDropdown(false);
   }, [applyThemeToSettings, settings, onThemeChange, loadThemeAssets]);
+
+  // Handle clearing theme (use custom settings without a base theme)
+  const handleClearTheme = useCallback(() => {
+    // Clear theme selection - keep current settings but disassociate from theme
+    clearSelection(); // Clear local hook state (selectedThemeId, themeAssets)
+    onThemeChange?.(undefined); // Update parent state
+    setShowThemeDropdown(false);
+  }, [clearSelection, onThemeChange]);
 
   // Handle saving current settings as a theme
   const handleSaveAsTheme = useCallback(async () => {
@@ -351,6 +365,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
         highlightColor: '#ffff00',
         opacity: 30,
         showInPreview: 'visible',
+        labelDisplay: 'hover',
       },
       sound: {
         backgroundMusic: '',
@@ -413,6 +428,20 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
             {showThemeDropdown && (
               <div className="absolute top-full left-0 mt-1 w-64 bg-white border rounded-md shadow-lg z-50 max-h-64 overflow-auto">
+                {/* Clear Theme Option */}
+                <button
+                  onClick={handleClearTheme}
+                  className="w-full px-3 py-2 text-left hover:bg-gray-100 flex items-center gap-2 border-b"
+                >
+                  {!selectedThemeId && (
+                    <Check className="w-4 h-4 text-blue-500" />
+                  )}
+                  <div className={!selectedThemeId ? 'font-medium' : ''}>
+                    <div className="text-sm text-gray-600">Custom (No Theme)</div>
+                    <div className="text-xs text-gray-400">Use current settings without a base theme</div>
+                  </div>
+                </button>
+
                 {/* Built-in Themes */}
                 <div className="px-2 py-1 text-xs text-gray-500 font-medium bg-gray-50">
                   Built-in Themes
@@ -1436,26 +1465,6 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   <h4 className="font-medium text-gray-700 mb-3">Hotspot Settings</h4>
 
                   <div className="space-y-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={settings.hotspots.visible}
-                        onChange={(e) => handleChange('hotspots', 'visible', e.target.checked)}
-                        className="rounded"
-                      />
-                      <span className="text-sm">Show hotspots</span>
-                    </label>
-
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={settings.hotspots.labels}
-                        onChange={(e) => handleChange('hotspots', 'labels', e.target.checked)}
-                        className="rounded"
-                      />
-                      <span className="text-sm">Show hotspot labels</span>
-                    </label>
-
                     <div>
                       <label className="block text-sm font-medium text-gray-600 mb-1">
                         Hotspot Opacity
@@ -1473,19 +1482,37 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
                     <div>
                       <label className="block text-sm font-medium text-gray-600 mb-1">
-                        Preview Mode Visibility
+                        Hotspot Area Visibility
                       </label>
                       <select
                         value={settings.hotspots.showInPreview ?? 'visible'}
                         onChange={(e) => handleChange('hotspots', 'showInPreview', e.target.value)}
                         className="w-full px-3 py-2 border rounded"
                       >
-                        <option value="visible">Visible (always show colored area)</option>
-                        <option value="onHover">On Hover (only show color when hovering)</option>
-                        <option value="invisible">Invisible (no visual feedback - user must find them)</option>
+                        <option value="visible">Always visible (show colored area)</option>
+                        <option value="onHover">On hover (show area when hovering)</option>
+                        <option value="invisible">Invisible (no visual feedback)</option>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">
-                        Controls how hotspots appear during story preview
+                        Controls visibility of the clickable hotspot area
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Label Display
+                      </label>
+                      <select
+                        value={settings.hotspots.labelDisplay ?? 'hover'}
+                        onChange={(e) => handleChange('hotspots', 'labelDisplay', e.target.value)}
+                        className="w-full px-3 py-2 border rounded"
+                      >
+                        <option value="none">None (no labels)</option>
+                        <option value="hover">On hover (tooltip)</option>
+                        <option value="always">Always (permanent label)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Controls how location descriptions appear
                       </p>
                     </div>
                   </div>
@@ -1526,9 +1553,15 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                             {settings.hotspots.labels ? 'Hovered' : ''}
                           </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          Mode: {(settings.hotspots.showInPreview ?? 'visible') === 'visible' ? 'Always visible' :
-                                 (settings.hotspots.showInPreview ?? 'visible') === 'onHover' ? 'Only on hover' : 'Invisible (no feedback)'}
+                        <div className="text-xs text-gray-500 space-y-1">
+                          <div>
+                            Hotspot: {(settings.hotspots.showInPreview ?? 'visible') === 'visible' ? 'Always visible' :
+                                   (settings.hotspots.showInPreview ?? 'visible') === 'onHover' ? 'On hover' : 'Invisible'}
+                          </div>
+                          <div>
+                            Labels: {(settings.hotspots.labelDisplay ?? 'hover') === 'none' ? 'Hidden' :
+                                   (settings.hotspots.labelDisplay ?? 'hover') === 'hover' ? 'On hover (tooltip)' : 'Always visible'}
+                          </div>
                         </div>
                       </div>
                     )}
