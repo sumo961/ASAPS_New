@@ -281,6 +281,27 @@ OUTPUT THE SUMMARY NOW (just the text, nothing else):`;
       cleanedResponse = cleanedResponse.replace(pattern, '');
     }
 
+    // Remove likely hallucinations - phrases that indicate the AI is inventing content
+    // These patterns often appear when AI sees beat names and invents discussions about them
+    const hallucinationPatterns = [
+      /\s*(?:and\s+)?(?:later\s+)?(?:an?\s+)?AI\s+(?:car|vehicle|transport|discussion|conversation)[^.]*[.,]/gi,
+      /\s*(?:explored|discussed|engaged in)\s+(?:questions?\s+)?(?:around|about)\s+(?:car ownership\s+and\s+)?(?:the\s+)?role\s+of\s+AI[^.]*[.,]/gi,
+      /\s*(?:the\s+)?(?:role\s+of\s+)?AI\s+in\s+(?:cars|vehicles|transportation)[^.]*[.,]/gi,
+      /\s*questions?\s+around\s+car\s+ownership\s+and\s+(?:the\s+)?role\s+of\s+AI[^.]*[.,]/gi,
+    ];
+
+    for (const pattern of hallucinationPatterns) {
+      cleanedResponse = cleanedResponse.replace(pattern, ',');
+    }
+
+    // Clean up any double commas or awkward punctuation from removals
+    cleanedResponse = cleanedResponse
+      .replace(/,\s*,/g, ',')
+      .replace(/\.\s*,/g, '.')
+      .replace(/,\s*\./g, '.')
+      .replace(/\s+,/g, ',')
+      .replace(/,\s+\./g, '.');
+
     // If the response has duplicate content (AI repeated itself), take just the first occurrence
     const lines = cleanedResponse.split('\n').filter((line: string) => line.trim());
     if (lines.length > 1) {

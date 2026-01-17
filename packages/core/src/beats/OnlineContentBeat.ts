@@ -389,6 +389,29 @@ Start directly with the interesting information - no preamble:`,
     // Clean up any unwanted patterns that might slip through
     let cleaned = result;
 
+    // Remove Kimi/thinking model's reasoning process
+    // These models often output their thinking before the actual response
+    const thinkingPatterns = [
+      /^.*?(?:The user is asking|Let me search|I need to find|Let me think|I'll search|I should|Let me structure|Word count target|I'll write)[^]*?(?:---+|Let me write:?|Here's my response:?|Final response:?)\s*/i,
+      /^.*?(?:For \w+ (?:rates?|data|info|statistics):)[^]*?(?:---+|Let me write|Here's my response)\s*/i,
+    ];
+
+    for (const pattern of thinkingPatterns) {
+      const match = cleaned.match(pattern);
+      if (match) {
+        cleaned = cleaned.slice(match[0].length).trim();
+        console.log(`[OnlineContentBeat] Removed thinking process (${match[0].length} chars)`);
+      }
+    }
+
+    // Also check for thinking that ends with "---" separator
+    const separatorMatch = cleaned.match(/^[^]*?---+\s*/);
+    if (separatorMatch && separatorMatch[0].length < cleaned.length * 0.8) {
+      // Only remove if separator is in first 80% (not at the very end)
+      cleaned = cleaned.slice(separatorMatch[0].length).trim();
+      console.log(`[OnlineContentBeat] Removed content before separator`);
+    }
+
     // Remove echoed query from the beginning - AI sometimes repeats the question
     // Check if the response starts with text similar to the query
     const queryWords = processedQuery.toLowerCase().split(/\s+/).slice(0, 8);

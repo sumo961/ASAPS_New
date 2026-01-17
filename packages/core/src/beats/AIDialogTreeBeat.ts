@@ -77,6 +77,7 @@ export class AIDialogTreeBeat extends Beat {
 
   private generatedTree: DialogNode | null = null;
   private currentNode: DialogNode | null = null;
+  private lastContextHash: string | null = null; // Track context to detect changes
 
   constructor(config: BeatConfig & {
     parameters?: Partial<AIDialogTreeBeatParams>;
@@ -193,8 +194,16 @@ export class AIDialogTreeBeat extends Beat {
     }
 
     try {
-      // Generate dialog tree if not already generated
-      if (!this.generatedTree) {
+      // Create a hash of key context to detect if we need to regenerate
+      const contextHash = this.createContextHash(context);
+      const needsRegeneration = !this.generatedTree || this.lastContextHash !== contextHash;
+
+      // Generate dialog tree if not already generated OR if context has changed
+      if (needsRegeneration) {
+        // Clear any existing tree from previous playthrough
+        this.generatedTree = null;
+        this.currentNode = null;
+
         // Show loading indicator while generating dialog tree
         if (renderer.renderLoading) {
           const npcName = this.npcName || 'the character';
@@ -212,6 +221,7 @@ export class AIDialogTreeBeat extends Beat {
         }
 
         this.generatedTree = await this.generateDialogTree(context, aiService);
+        this.lastContextHash = contextHash;
       }
 
       // Execute the dialog tree
@@ -226,6 +236,29 @@ export class AIDialogTreeBeat extends Beat {
       );
       return this.exitTargets[0]?.id || this.getNextBeat(context);
     }
+  }
+
+  /**
+   * Create a hash of key context values to detect if we need to regenerate
+   * This ensures we regenerate when player name, location, or key variables change
+   */
+  private createContextHash(context: StoryContext): string {
+    const variables = context.getVariables();
+    const counters = context.getCounters();
+
+    // Key values that should trigger regeneration if changed
+    const keyValues = [
+      variables.playerName || variables.name || '',
+      variables.location || variables.city || '',
+      variables.gender || '',
+      variables.profession || variables.role || '',
+      // Include any variables specified in includeVariables
+      ...(this.includeVariables || []).map(v => String(variables[v] || '')),
+      // Include counter values as they may affect dialog
+      ...Object.entries(counters).map(([k, v]) => `${k}:${v}`),
+    ];
+
+    return keyValues.join('|');
   }
 
   /**
@@ -303,7 +336,22 @@ Return a JSON object with this structure:
       // Try to extract JSON from the response
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        dialogTree = JSON.parse(jsonMatch[0]);
+        let jsonStr = jsonMatch[0];
+
+        // Try to repair common JSON issues from AI models
+        try {
+          dialogTree = JSON.parse(jsonStr);
+        } catch (parseError) {
+          console.log(`[AIDialogTreeBeat] Initial JSON parse failed, attempting repair...`);
+          jsonStr = this.repairJSON(jsonStr);
+          try {
+            dialogTree = JSON.parse(jsonStr);
+            console.log(`[AIDialogTreeBeat] JSON repair successful`);
+          } catch (repairError) {
+            console.error(`[AIDialogTreeBeat] JSON repair failed:`, repairError);
+            throw new Error(`Could not parse AI response as JSON: ${(parseError as Error).message}`);
+          }
+        }
       } else {
         throw new Error('Could not parse AI response as JSON');
       }
@@ -313,6 +361,81 @@ Return a JSON object with this structure:
 
     // Validate and fix the dialog tree
     return this.validateDialogTree(dialogTree);
+  }
+
+  /**
+   * Attempt to repair common JSON issues from AI-generated content
+   */
+  private repairJSON(jsonStr: string): string {
+    let repaired = jsonStr;
+
+    // Remove any thinking/reasoning that might be before the JSON
+    const jsonStart = repaired.indexOf('{');
+    if (jsonStart > 0) {
+      repaired = repaired.slice(jsonStart);
+    }
+
+    // Remove trailing content after the JSON
+    let braceCount = 0;
+    let inString = false;
+    let escaped = false;
+    let jsonEnd = repaired.length;
+
+    for (let i = 0; i < repaired.length; i++) {
+      const char = repaired[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (!inString) {
+        if (char === '{') braceCount++;
+        if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            jsonEnd = i + 1;
+            break;
+          }
+        }
+      }
+    }
+
+    repaired = repaired.slice(0, jsonEnd);
+
+    // Fix trailing commas before ] or }
+    repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+
+    // Fix missing commas between array elements (common issue)
+    // Look for patterns like: } { or } " or " { without commas
+    repaired = repaired.replace(/}(\s*){/g, '},$1{');
+    repaired = repaired.replace(/}(\s*)"/g, '},$1"');
+    repaired = repaired.replace(/"(\s*){/g, '",$1{');
+
+    // Fix unescaped newlines in strings (replace with space)
+    repaired = repaired.replace(/("(?:[^"\\]|\\.)*")/g, (match) => {
+      return match.replace(/[\n\r]/g, ' ');
+    });
+
+    // Remove any control characters
+    repaired = repaired.replace(/[\x00-\x1F\x7F]/g, (char) => {
+      if (char === '\n' || char === '\r' || char === '\t') {
+        return char; // Keep these for structure
+      }
+      return ' '; // Replace others with space
+    });
+
+    return repaired;
   }
 
   /**
