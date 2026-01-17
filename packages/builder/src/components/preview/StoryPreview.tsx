@@ -20,6 +20,79 @@ const CLAUDE_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/claude';
 const OPENAI_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/openai';
 
 /**
+ * Strip thinking/reasoning blocks from AI responses.
+ * Some models (like Kimi, DeepSeek) include <think>...</think> or similar blocks
+ * that contain internal reasoning which should not be shown to users.
+ * Also handles plain-text thinking that some models output without XML tags.
+ */
+function stripThinkingBlocks(text: string): string {
+  let result = text;
+
+  // Remove <think>...</think> blocks (Kimi, DeepSeek, etc.)
+  result = result.replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+  // Remove <thinking>...</thinking> blocks
+  result = result.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+
+  // Remove <reasoning>...</reasoning> blocks
+  result = result.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '');
+
+  // Handle plain-text thinking that some models output without XML tags
+  // These patterns look for common thinking preambles and remove everything up to the actual content
+
+  // Pattern: "The user wants me to..." followed by analysis - remove until actual content
+  // This happens when Kimi outputs its entire thinking process as plain text
+  const thinkingPatterns = [
+    // Match "The user wants..." through lists/requirements to find where actual content starts
+    /^The user wants[^]*?(?=\n\n[A-Z][a-z])/i,
+    // Match "Let me analyze/think/consider..." sections
+    /^Let me (?:analyze|think|consider|carefully)[^]*?(?=\n\n[A-Z][a-z])/i,
+    // Match "I need to..." planning sections
+    /^I need to[^]*?(?=\n\n[A-Z][a-z])/i,
+    // Match markdown-style thinking with **bold** headers like "**Key data points:**"
+    /^\*\*[^*]+\*\*[^]*?(?=\n\n[A-Z][a-z])/,
+  ];
+
+  for (const pattern of thinkingPatterns) {
+    const match = result.match(pattern);
+    if (match && match[0].length < result.length * 0.9) {
+      // Only remove if it's not the entire response (safety check)
+      result = result.replace(pattern, '');
+    }
+  }
+
+  // If the response still starts with thinking patterns, try a simpler approach:
+  // Look for a clear separator like double newline followed by capitalized text
+  if (/^(The user wants|Let me|I need to|I'll|I will|First,)/i.test(result)) {
+    // Find the last occurrence of common "end of thinking" markers
+    const endMarkers = [
+      /\n\n(?=[A-Z][a-z]{2,}[^*\n:]*[.!])/g,  // Double newline before a sentence
+      /(?:Here'?s|Here is) (?:the|your|a) (?:summary|response|answer)[:\s]*/gi,
+      /(?:Output|Summary|Response)[:\s]*\n/gi,
+    ];
+
+    for (const marker of endMarkers) {
+      const matches = [...result.matchAll(marker)];
+      if (matches.length > 0) {
+        const lastMatch = matches[matches.length - 1];
+        const afterMatch = result.substring(lastMatch.index! + lastMatch[0].length);
+        // Only use this if there's substantial content after the marker
+        if (afterMatch.trim().length > 50) {
+          result = afterMatch;
+          break;
+        }
+      }
+    }
+  }
+
+  // Clean up any leading/trailing whitespace and multiple newlines
+  result = result.replace(/^\s+/, '').replace(/\s+$/, '');
+  result = result.replace(/\n{3,}/g, '\n\n');
+
+  return result;
+}
+
+/**
  * Make a proxied request to avoid CORS issues with custom API endpoints
  */
 async function makeProxyRequest(
@@ -78,7 +151,7 @@ function createAIServiceAdapter(): IAIService | null {
 
     return {
       async generateContent(prompt: string, options?: { maxTokens?: number; enableWebSearch?: boolean }): Promise<string> {
-        console.log('[AIServiceAdapter] generateContent called');
+        console.log(`[AIServiceAdapter] generateContent called (provider: claude, model: ${model})`);
 
         const requestBody = {
           model,
@@ -102,7 +175,7 @@ function createAIServiceAdapter(): IAIService | null {
       },
 
       async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
-        console.log('[AIServiceAdapter] generateDialog called');
+        console.log(`[AIServiceAdapter] generateDialog called (provider: claude, model: ${model})`);
         const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format with the following structure:
 {
   "id": "unique_id",
@@ -148,7 +221,7 @@ function createAIServiceAdapter(): IAIService | null {
       },
 
       async classifyContent(prompt: string, categories: string[]): Promise<string> {
-        console.log('[AIServiceAdapter] classifyContent called with categories:', categories);
+        console.log(`[AIServiceAdapter] classifyContent called (provider: claude, model: ${model}) with categories:`, categories);
         const systemPrompt = `You are a classifier. Given a prompt, classify it into exactly ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name, nothing else.`;
 
         const requestBody = {
@@ -189,7 +262,7 @@ function createAIServiceAdapter(): IAIService | null {
 
     return {
       async generateContent(prompt: string, options?: { maxTokens?: number; enableWebSearch?: boolean }): Promise<string> {
-        console.log('[AIServiceAdapter] generateContent called (OpenAI)');
+        console.log(`[AIServiceAdapter] generateContent called (provider: openai-compatible, model: ${model}, baseUrl: ${savedConfig.baseUrl || 'default'})`);
 
         // Use shared utility to build request with correct token parameter
         const requestBody = buildChatRequestBody(
@@ -198,18 +271,22 @@ function createAIServiceAdapter(): IAIService | null {
           options?.maxTokens || 4096
         );
 
+        let content: string;
         if (useProxy) {
           const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
-          return response.choices?.[0]?.message?.content || '';
+          content = response.choices?.[0]?.message?.content || '';
         } else {
           // Cast needed because buildChatRequestBody returns Record<string, any> for flexibility
           const response = await client!.chat.completions.create(requestBody as any);
-          return response.choices[0]?.message?.content || '';
+          content = response.choices[0]?.message?.content || '';
         }
+
+        // Strip thinking blocks from models like Kimi, DeepSeek that include <think> tags
+        return stripThinkingBlocks(content);
       },
 
       async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
-        console.log('[AIServiceAdapter] generateDialog called (OpenAI)');
+        console.log(`[AIServiceAdapter] generateDialog called (provider: openai-compatible, model: ${model})`);
         const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format with the following structure:
 {
   "id": "unique_id",
@@ -244,6 +321,9 @@ function createAIServiceAdapter(): IAIService | null {
           content = response.choices[0]?.message?.content || '';
         }
 
+        // Strip thinking blocks before extracting JSON
+        content = stripThinkingBlocks(content);
+
         // Extract JSON from response
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
@@ -254,7 +334,7 @@ function createAIServiceAdapter(): IAIService | null {
       },
 
       async classifyContent(prompt: string, categories: string[]): Promise<string> {
-        console.log('[AIServiceAdapter] classifyContent called (OpenAI) with categories:', categories);
+        console.log(`[AIServiceAdapter] classifyContent called (provider: openai-compatible, model: ${model}) with categories:`, categories);
         const systemPrompt = `You are a classifier. Given a prompt, classify it into exactly ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name, nothing else.`;
 
         // Use shared utility to build request with correct token parameter
@@ -275,6 +355,9 @@ function createAIServiceAdapter(): IAIService | null {
           const response = await client!.chat.completions.create(requestBody as any);
           result = (response.choices[0]?.message?.content || '').trim();
         }
+
+        // Strip thinking blocks before matching category
+        result = stripThinkingBlocks(result);
 
         // Find matching category (case-insensitive)
         const match = categories.find(c => c.toLowerCase() === result.toLowerCase());
