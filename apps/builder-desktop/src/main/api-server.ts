@@ -10,9 +10,17 @@
 
 import { createServer, Server as HTTPServer, IncomingMessage, ServerResponse } from 'http';
 import { parse as parseUrl } from 'url';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
-import { fileURLToPath } from 'url';
+import {
+  resolveClaudeEndpoint,
+  resolveOpenAIEndpoint,
+  buildClaudeHeaders,
+  buildOpenAIHeaders,
+  CORS_HEADERS,
+  DEFAULT_PROXY_PORT,
+  DEFAULT_AI_TIMEOUT_MS,
+} from '@asaps/core';
 
 export interface EmbeddedAPIServerConfig {
   port?: number;
@@ -31,7 +39,7 @@ export class EmbeddedAPIServer {
 
   constructor(config: EmbeddedAPIServerConfig = {}) {
     this.config = {
-      port: config.port ?? 3001,
+      port: config.port ?? DEFAULT_PROXY_PORT,
       host: config.host ?? 'localhost',
     };
   }
@@ -114,10 +122,10 @@ export class EmbeddedAPIServer {
    * Handle incoming requests
    */
   private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, anthropic-version');
+    // Enable CORS using shared headers
+    Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
 
     // Handle preflight
     if (req.method === 'OPTIONS') {
@@ -165,25 +173,18 @@ export class EmbeddedAPIServer {
       return;
     }
 
-    // Use default Anthropic URL if not provided
-    const effectiveBaseUrl = baseUrl || 'https://api.anthropic.com';
-
-    // Determine endpoint URL
-    let endpoint = effectiveBaseUrl;
-    if (!effectiveBaseUrl.includes('/messages')) {
-      endpoint = `${effectiveBaseUrl.replace(/\/$/, '')}/v1/messages`;
-    }
+    // Use shared endpoint resolution (handles Moonshot /anthropic case)
+    const endpoint = resolveClaudeEndpoint(baseUrl);
 
     console.log(`[API Server] Claude proxy to: ${endpoint}`);
 
     try {
+      // Use shared header construction
+      const headers = buildClaudeHeaders(apiKey);
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
+        headers,
         body: JSON.stringify(requestBody),
       });
 
@@ -229,29 +230,23 @@ export class EmbeddedAPIServer {
       return;
     }
 
-    // Use default OpenAI URL if not provided
-    const effectiveBaseUrl = baseUrl || 'https://api.openai.com/v1';
-
-    // Determine endpoint URL
-    let endpoint = effectiveBaseUrl;
-    if (!effectiveBaseUrl.includes('/completions')) {
-      endpoint = `${effectiveBaseUrl.replace(/\/$/, '')}/chat/completions`;
-    }
+    // Use shared endpoint resolution
+    const endpoint = resolveOpenAIEndpoint(baseUrl);
 
     console.log(`[API Server] OpenAI proxy to: ${endpoint}`);
-    console.log(`[API Server] Making request (5 minute timeout)...`);
+    console.log(`[API Server] Making request (${DEFAULT_AI_TIMEOUT_MS / 1000}s timeout)...`);
 
-    // Create abort controller with 5 minute timeout for long AI requests
+    // Create abort controller with shared timeout for long AI requests (e.g., thinking models)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+    const timeoutId = setTimeout(() => controller.abort(), DEFAULT_AI_TIMEOUT_MS);
 
     try {
+      // Use shared header construction
+      const headers = buildOpenAIHeaders(apiKey);
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
+        headers,
         body: JSON.stringify(requestBody),
         signal: controller.signal,
       });

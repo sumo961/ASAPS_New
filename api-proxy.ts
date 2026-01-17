@@ -1,25 +1,36 @@
 /**
  * Simple API proxy server to handle CORS for AI provider requests
- * Run with: node api-proxy.js
+ * Run with: npx tsx api-proxy.ts
+ *
+ * Uses shared AIProxyHandlers from @asaps/core for endpoint resolution
+ * and header construction.
  */
 
-const http = require('http');
-const https = require('https');
-const url = require('url');
-const fs = require('fs');
-const path = require('path');
+import http from 'http';
+import https from 'https';
+import { URL, fileURLToPath } from 'url';
+import fs from 'fs';
+import path from 'path';
+import {
+  resolveClaudeEndpoint,
+  resolveOpenAIEndpoint,
+  buildClaudeHeaders,
+  buildOpenAIHeaders,
+  CORS_HEADERS,
+  DEFAULT_PROXY_PORT,
+} from '@asaps/core';
 
-const PORT = 3001;
+const PORT = DEFAULT_PROXY_PORT;
 
 // Parse JSON body from request
-function parseBody(req) {
+function parseBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    req.on('data', (chunk: Buffer) => (body += chunk.toString()));
     req.on('end', () => {
       try {
         resolve(body ? JSON.parse(body) : {});
-      } catch (e) {
+      } catch {
         reject(new Error('Invalid JSON body'));
       }
     });
@@ -28,26 +39,41 @@ function parseBody(req) {
 }
 
 // Make HTTP/HTTPS request
-function makeRequest(targetUrl, options, body) {
+interface RequestOptions {
+  method?: string;
+  headers?: Record<string, string>;
+}
+
+interface ProxyResponse {
+  status: number;
+  headers: http.IncomingHttpHeaders;
+  body: string;
+}
+
+function makeRequest(
+  targetUrl: string,
+  options: RequestOptions,
+  body?: string
+): Promise<ProxyResponse> {
   return new Promise((resolve, reject) => {
-    const parsed = url.parse(targetUrl);
+    const parsed = new URL(targetUrl);
     const isHttps = parsed.protocol === 'https:';
     const lib = isHttps ? https : http;
 
-    const reqOptions = {
+    const reqOptions: http.RequestOptions = {
       hostname: parsed.hostname,
       port: parsed.port || (isHttps ? 443 : 80),
-      path: parsed.path,
+      path: parsed.pathname + parsed.search,
       method: options.method || 'POST',
       headers: options.headers || {},
     };
 
     const req = lib.request(reqOptions, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', (chunk: Buffer) => (data += chunk.toString()));
       res.on('end', () => {
         resolve({
-          status: res.statusCode,
+          status: res.statusCode || 500,
           headers: res.headers,
           body: data,
         });
@@ -64,10 +90,10 @@ function makeRequest(targetUrl, options, body) {
 }
 
 const server = http.createServer(async (req, res) => {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // CORS headers from shared module
+  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -76,7 +102,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const pathname = url.parse(req.url).pathname;
+  const pathname = new URL(req.url || '', `http://localhost:${PORT}`).pathname;
 
   try {
     // OpenAI-compatible proxy (for Moonshot, DeepSeek, etc.)
@@ -84,19 +110,22 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const { baseUrl, apiKey, ...requestBody } = body;
 
-      // Determine endpoint
-      const targetBaseUrl = baseUrl || 'https://api.openai.com/v1';
-      const targetUrl = `${targetBaseUrl}/chat/completions`;
+      // Use shared endpoint resolution
+      const targetUrl = resolveOpenAIEndpoint(baseUrl as string | undefined);
 
       console.log(`[Proxy] OpenAI request to: ${targetUrl}`);
 
-      const response = await makeRequest(targetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+      // Use shared header construction
+      const headers = buildOpenAIHeaders(apiKey as string);
+
+      const response = await makeRequest(
+        targetUrl,
+        {
+          method: 'POST',
+          headers,
         },
-      }, JSON.stringify(requestBody));
+        JSON.stringify(requestBody)
+      );
 
       res.writeHead(response.status, { 'Content-Type': 'application/json' });
       res.end(response.body);
@@ -108,25 +137,22 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const { baseUrl, apiKey, ...requestBody } = body;
 
-      const targetBaseUrl = baseUrl || 'https://api.anthropic.com';
-
-      // Determine endpoint URL - append /v1/messages if not already present
-      let targetUrl = targetBaseUrl;
-      if (!targetBaseUrl.includes('/messages')) {
-        targetUrl = `${targetBaseUrl.replace(/\/$/, '')}/v1/messages`;
-      }
+      // Use shared endpoint resolution (handles Moonshot /anthropic case)
+      const targetUrl = resolveClaudeEndpoint(baseUrl as string | undefined);
 
       console.log(`[Proxy] Claude request to: ${targetUrl}`);
 
-      const response = await makeRequest(targetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
+      // Use shared header construction
+      const headers = buildClaudeHeaders(apiKey as string);
+
+      const response = await makeRequest(
+        targetUrl,
+        {
+          method: 'POST',
+          headers,
         },
-      }, JSON.stringify(requestBody));
+        JSON.stringify(requestBody)
+      );
 
       res.writeHead(response.status, { 'Content-Type': 'application/json' });
       res.end(response.body);
@@ -135,6 +161,7 @@ const server = http.createServer(async (req, res) => {
 
     // Beat schema endpoint
     if (pathname === '/api/schema/beats') {
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
       const schemaPath = path.join(__dirname, 'beat-definitions', 'core-beats.json');
       if (fs.existsSync(schemaPath)) {
         const schema = fs.readFileSync(schemaPath, 'utf-8');
@@ -147,11 +174,10 @@ const server = http.createServer(async (req, res) => {
     // 404 for unknown routes
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
-
   } catch (error) {
-    console.error('[Proxy] Error:', error.message);
+    console.error('[Proxy] Error:', (error as Error).message);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: error.message }));
+    res.end(JSON.stringify({ error: (error as Error).message }));
   }
 });
 

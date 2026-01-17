@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-16T20:13:21.864Z
+ * Generated: 2026-01-17T03:36:06.163Z
  */
 
 // ============================================
@@ -352,7 +352,7 @@ export interface OnlineContentParameters {
   apiParams?: object | undefined;
   /** JSONPath to extract data (e.g., $.current.temp_c) */
   jsonPath?: string | undefined;
-  /** Query for AI to search and summarize */
+  /** Query for AI to search and summarize (supports ${variable} interpolation) */
   query?: string | undefined;
   /** Title displayed above the content (auto-derived from query if not set) */
   title?: string | undefined;
@@ -412,8 +412,6 @@ export interface AiDialogTreeParameters {
   includeVisitedBeats?: boolean | undefined;
   /** Maximum conversation turns */
   maxTurns?: number | undefined;
-  /** Dialog presentation style */
-  presentationMode?: string | undefined;
   /** Exit targets: { id: beatId, description: whenToUse } */
   exitTargets: object[];
   /** Delay before showing choices */

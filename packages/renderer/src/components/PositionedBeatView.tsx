@@ -369,8 +369,8 @@ function adjustElementsForCollisions(
     // Check collision with each text box
     for (const bounds of textBoxBounds) {
       const horizontalOverlap = buttonLeft < bounds.right && buttonRight > bounds.left;
-      if (horizontalOverlap && newY < bounds.bottom + 15) {
-        newY = Math.max(newY, bounds.bottom + 15);
+      if (horizontalOverlap && newY < bounds.bottom + 35) {
+        newY = Math.max(newY, bounds.bottom + 35);
       }
     }
 

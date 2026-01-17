@@ -448,12 +448,9 @@ Start directly with the interesting information - no preamble:`,
       .replace(/\*([^*]+)\*/g, '$1')      // *italic* -> italic
       .replace(/__([^_]+)__/g, '$1')      // __bold__ -> bold
       .replace(/_([^_]+)_/g, '$1')        // _italic_ -> italic
-      // Remove common AI preambles at the start
-      .replace(/^(Based on|According to|From|My research|I found|Looking at|When examining)[^.]*\.\s*/gi, '')
-      .replace(/^(Here's|Here is|Here are)[^:]*:\s*/gi, '')
-      // Remove sentences containing "Based on" or "According to" anywhere
-      .replace(/[^.]*Based on[^.]*\.\s*/gi, '')
-      .replace(/[^.]*According to[^.]*\.\s*/gi, '')
+      // Remove common AI preambles at the start only (handle both period and colon endings)
+      .replace(/^(Based on|According to|From|My research|I found|Looking at|When examining)[^.:]*[.:]\s*/i, '')
+      .replace(/^(Here's|Here is|Here are)[^:]*:\s*/i, '')
       .trim();
 
     // Ensure content starts with a capital letter
