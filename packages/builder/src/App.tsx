@@ -361,17 +361,38 @@ function App() {
         const fileName = filePath.split('/').pop() || 'project.zip';
         const file = new File([blob], fileName, { type: 'application/zip' });
 
-        // Import the project using the same logic as handleImportZip
-        const result = await importProjectFromZip(file, {
-          generateNewId: false
-        });
+        // Helper function to handle import with conflict resolution
+        const doImport = async (options: { overwrite?: boolean; generateNewId?: boolean; newName?: string } = {}): Promise<void> => {
+          const result = await importProjectFromZip(file, options);
 
-        if (result.success && result.projectId) {
-          await loadProject(result.projectId);
-          console.log('[Electron] Project loaded successfully');
-        } else {
-          throw new Error(result.error || 'Import failed');
-        }
+          if (result.conflict) {
+            // Show simple dialog for conflict resolution
+            const incomingName = result.conflict.incomingProjectName || 'Imported Project';
+
+            const newName = window.prompt(
+              `Project already exists. Enter a new name to import:`,
+              incomingName + ' (Copy)'
+            );
+
+            if (newName === null) {
+              return; // User cancelled
+            } else if (newName.trim()) {
+              return doImport({ generateNewId: true, newName: newName.trim() });
+            } else {
+              alert('Please enter a valid name');
+              return;
+            }
+          }
+
+          if (result.success && result.projectId) {
+            await loadProject(result.projectId);
+            console.log('[Electron] Project loaded successfully');
+          } else if (result.error) {
+            throw new Error(result.error);
+          }
+        };
+
+        await doImport({ generateNewId: false });
       } catch (error) {
         console.error('[Electron] Failed to open project:', error);
         alert(`Failed to open project: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -506,9 +527,23 @@ function App() {
       containerBeatPositions: currentContainerBeatPositions,
     };
 
+    // Debug: Log AI beats specifically
+    const aiBeatTypes = ['onlineContent', 'aiCondition', 'aiDialogTree', 'aiSummary'];
+    const aiBeats = storyData.beats.filter((b: any) => aiBeatTypes.includes(b.type));
+    if (aiBeats.length > 0) {
+      console.log('[App] AI beats being saved:', aiBeats.map((b: any) => ({
+        id: b.id,
+        type: b.type,
+        name: b.name,
+        hasParameters: !!b.parameters,
+        parameterKeys: b.parameters ? Object.keys(b.parameters) : []
+      })));
+    }
+
     console.log('[App] storyData being passed to updateStory:', {
       beatsCount: storyData.beats.length,
-      beatIds: storyData.beats.map((b: any) => b.id)
+      beatIds: storyData.beats.map((b: any) => b.id),
+      beatTypes: storyData.beats.map((b: any) => b.type)
     });
 
     updateStory(storyData);
@@ -605,8 +640,9 @@ function App() {
             target: conn.targetId || conn.target,
           }))
         : [];
+      const firstBeatId = story.metadata?.firstBeatId || story.firstBeatId || (story.beats?.[0]?.id);
       const adjustedPositions = story.beats && Array.isArray(story.beats)
-        ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections)
+        ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections, firstBeatId)
         : new Map();
 
       // Create all beats without adding to state (batch preparation)
@@ -1938,7 +1974,9 @@ function App() {
       });
     } else {
       // No clusters - use standard layout
-      const newPositions = applyTreeLayoutToBeats(beatsForLayout, undefined, externalEdges);
+      // Use first beat as start beat to ensure it's positioned at top
+      const startBeatId = state.beats[0]?.id;
+      const newPositions = applyTreeLayoutToBeats(beatsForLayout, undefined, externalEdges, startBeatId);
 
       // Resolve overlapping beats using collision detection
       const { resolvedBeats } = resolveCollisions(
@@ -2345,19 +2383,52 @@ function App() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      try {
-        const result = await importProjectFromZip(file, {
-          generateNewId: false // Keep original IDs for simpler import
-        });
+      const doImport = async (options: { overwrite?: boolean; generateNewId?: boolean; newName?: string } = {}) => {
+        const result = await importProjectFromZip(file, options);
+
+        if (result.conflict) {
+          // Show dialog with options for handling the conflict
+          const existingName = result.conflict.existingProjectName || 'Unknown';
+          const incomingName = result.conflict.incomingProjectName || 'Unknown';
+
+          const choice = window.prompt(
+            `A project with this ID already exists!\n\n` +
+            `Existing: "${existingName}"\n` +
+            `Importing: "${incomingName}"\n\n` +
+            `Choose an option:\n` +
+            `1. Type a new name to import as a copy\n` +
+            `2. Type "OVERWRITE" to replace the existing project\n` +
+            `3. Press Cancel to abort\n\n` +
+            `Enter new name or "OVERWRITE":`,
+            incomingName + ' (Copy)'
+          );
+
+          if (choice === null) {
+            // User cancelled
+            return;
+          } else if (choice.toUpperCase() === 'OVERWRITE') {
+            // Overwrite existing
+            return doImport({ overwrite: true });
+          } else if (choice.trim()) {
+            // Import with new ID and name
+            return doImport({ generateNewId: true, newName: choice.trim() });
+          } else {
+            alert('Please enter a valid name or "OVERWRITE"');
+            return;
+          }
+        }
 
         if (result.success && result.projectId) {
           // Load the imported project
           await loadProject(result.projectId);
-
           alert('Project imported successfully!');
-        } else {
-          throw new Error(result.error || 'Import failed');
+        } else if (result.error) {
+          throw new Error(result.error);
         }
+      };
+
+      try {
+        await doImport({ generateNewId: false });
       } catch (error) {
         console.error('ZIP import failed:', error);
         alert(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -2777,8 +2848,9 @@ function App() {
           target: conn.targetId || conn.target,
         }))
       : [];
+    const firstBeatIdForLayout = story.metadata?.firstBeatId || story.firstBeatId || (story.beats?.[0]?.id);
     const adjustedPositions = story.beats && Array.isArray(story.beats)
-      ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections)
+      ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections, firstBeatIdForLayout)
       : new Map();
 
     // Add all generated beats, preserving AI-generated IDs with adjusted positions

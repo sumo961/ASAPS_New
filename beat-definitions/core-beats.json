@@ -928,18 +928,50 @@
         "prompt": {
           "type": "string",
           "required": true,
-          "description": "Prompt describing what the AI should evaluate"
+          "description": "Prompt describing what the AI should evaluate",
+          "ui": {
+            "control": "textarea",
+            "rows": 3,
+            "label": "Evaluation Prompt"
+          }
         },
         "categories": {
           "type": "array<object>",
           "required": true,
           "minItems": 2,
-          "description": "Categories for AI to choose from: { name, description, targetId }"
+          "description": "Categories for AI to choose from",
+          "ui": {
+            "label": "Categories",
+            "addLabel": "Add Category",
+            "itemLabel": "Category"
+          },
+          "itemSchema": {
+            "name": {
+              "type": "string",
+              "required": true,
+              "description": "Category name (returned by AI)",
+              "ui": { "label": "Name" }
+            },
+            "description": {
+              "type": "string",
+              "required": true,
+              "description": "When this category applies",
+              "ui": { "control": "textarea", "rows": 2, "label": "Description" }
+            },
+            "targetId": {
+              "type": "string",
+              "required": true,
+              "targetField": true,
+              "description": "Beat to navigate to",
+              "ui": { "label": "Target Beat" }
+            }
+          }
         },
         "evaluateVariables": {
-          "type": "array<string>",
+          "type": "boolean",
           "required": false,
-          "description": "Variables to include in evaluation (empty = all)"
+          "default": true,
+          "description": "Include player variables in evaluation"
         },
         "evaluateInventory": {
           "type": "boolean",
@@ -959,10 +991,14 @@
           "default": true,
           "description": "Include counters in evaluation"
         },
-        "defaultTarget": {
+        "fallbackTarget": {
           "type": "string",
           "required": false,
-          "description": "Fallback target if AI can't decide"
+          "targetField": true,
+          "description": "Fallback target if AI can't decide (used when no category matches)",
+          "ui": {
+            "label": "Fallback Target"
+          }
         },
         "timeout": {
           "type": "number",
@@ -1040,7 +1076,27 @@
           "type": "array<object>",
           "required": true,
           "minItems": 1,
-          "description": "Exit targets: { id: beatId, description: whenToUse }"
+          "description": "Exit targets for conversation outcomes",
+          "ui": {
+            "label": "Exit Targets",
+            "addLabel": "Add Exit",
+            "itemLabel": "Exit"
+          },
+          "itemSchema": {
+            "id": {
+              "type": "string",
+              "required": true,
+              "targetField": true,
+              "description": "Target beat ID",
+              "ui": { "label": "Target Beat" }
+            },
+            "description": {
+              "type": "string",
+              "required": true,
+              "description": "When to use this exit (for AI)",
+              "ui": { "control": "textarea", "rows": 2, "label": "When to Use" }
+            }
+          }
         },
         "choiceDelay": {
           "type": "number",

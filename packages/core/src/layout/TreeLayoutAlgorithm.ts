@@ -41,11 +41,11 @@ export interface LayoutResult {
 
 const DEFAULT_OPTIONS: Required<LayoutOptions> = {
   nodeSpacingX: 200,
-  nodeSpacingY: 150,
+  nodeSpacingY: 120,
   startX: 100,
   startY: 50,
   direction: 'TB',
-  nodeWidth: 180,
+  nodeWidth: 160,
 };
 
 /**
@@ -99,6 +99,8 @@ export function calculateTreeLayout(
 
   // Find root nodes (nodes with no incoming edges)
   const roots: string[] = [];
+  const firstNodeId = nodes.length > 0 ? nodes[0].id : null;
+
   nodeSet.forEach((nodeId) => {
     if ((incoming.get(nodeId)?.length || 0) === 0) {
       roots.push(nodeId);
@@ -110,17 +112,35 @@ export function calculateTreeLayout(
     roots.push(nodes[0].id);
   }
 
+  // Ensure the first node (start beat) is always first in roots array
+  // This guarantees it gets positioned at the top-left
+  if (firstNodeId && roots.includes(firstNodeId)) {
+    const idx = roots.indexOf(firstNodeId);
+    if (idx > 0) {
+      roots.splice(idx, 1);
+      roots.unshift(firstNodeId);
+    }
+  } else if (firstNodeId && !roots.includes(firstNodeId)) {
+    // If first node has incoming edges but should still be treated as start,
+    // add it as first root (this handles edge cases where start beat has back-edges)
+    roots.unshift(firstNodeId);
+  }
+
   // Assign layers using BFS from roots, ensuring proper depth for branching
   const layers = new Map<string, number>();
   const visited = new Set<string>();
 
-  // Use iterative BFS with proper handling of multiple paths
+  // Assign layers using a two-pass approach for DAGs:
+  // Pass 1: BFS to find minimum possible layer for each node
+  // Pass 2: Adjust convergence nodes to be closer to their parents
   const assignLayers = () => {
     const queue: Array<{ id: string; layer: number }> = [];
+    const nodeDepths = new Map<string, number[]>(); // Track all depths a node is reachable at
 
     roots.forEach((rootId) => {
       queue.push({ id: rootId, layer: 0 });
       layers.set(rootId, 0);
+      nodeDepths.set(rootId, [0]);
     });
 
     while (queue.length > 0) {
@@ -134,17 +154,37 @@ export function calculateTreeLayout(
       // Process all children
       const children = outgoing.get(id) || [];
       children.forEach((childId) => {
-        const currentChildLayer = layers.get(childId);
+        // CRITICAL: Skip already-visited nodes to prevent back-edges from
+        // corrupting layer assignments. This handles cases like restart loops
+        // (e.g., AI Summary -> Title Screen) where we don't want to push
+        // the start beat to a deeper layer.
+        if (visited.has(childId)) {
+          return;
+        }
+
         const newLayer = layer + 1;
 
-        // Always use the deepest layer for proper vertical distribution
-        if (currentChildLayer === undefined || newLayer > currentChildLayer) {
-          layers.set(childId, newLayer);
+        // Track all layers this node is reachable at
+        const depths = nodeDepths.get(childId) || [];
+        depths.push(newLayer);
+        nodeDepths.set(childId, depths);
+
+        // For convergence nodes (multiple parents), use minimum layer + 1
+        // This creates more compact layouts for DAGs
+        const parentCount = (incoming.get(childId) || []).length;
+        if (parentCount > 1) {
+          // Use minimum depth for convergence nodes (more compact)
+          const minDepth = Math.min(...depths);
+          layers.set(childId, minDepth);
+        } else {
+          // Regular node: just use the new layer
+          const currentChildLayer = layers.get(childId);
+          if (currentChildLayer === undefined || newLayer > currentChildLayer) {
+            layers.set(childId, newLayer);
+          }
         }
 
-        if (!visited.has(childId)) {
-          queue.push({ id: childId, layer: newLayer });
-        }
+        queue.push({ id: childId, layer: newLayer });
       });
     }
   };
@@ -323,6 +363,18 @@ export function calculateTreeLayout(
       orphanX += opts.nodeSpacingX;
     }
   });
+
+  // Post-process: Shift all positions so the first root is at startX
+  // This ensures the first beat is at the expected starting position
+  if (roots.length > 0 && firstNodeId) {
+    const firstNodePos = positions.get(firstNodeId);
+    if (firstNodePos && firstNodePos.x !== opts.startX) {
+      const shiftX = opts.startX - firstNodePos.x;
+      positions.forEach((pos, nodeId) => {
+        positions.set(nodeId, { x: pos.x + shiftX, y: pos.y });
+      });
+    }
+  }
 
   return { positions, layers };
 }

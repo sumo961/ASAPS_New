@@ -139,6 +139,20 @@ export async function exportProjectAsZip(projectId: string): Promise<Blob> {
 }
 
 /**
+ * Result of import operation
+ */
+export interface ImportResult {
+  success: boolean;
+  projectId?: string;
+  error?: string;
+  conflict?: {
+    existingProjectId: string;
+    existingProjectName?: string;
+    incomingProjectName?: string;
+  };
+}
+
+/**
  * Import project from ZIP file
  * Extracts and restores a project and all its assets to IndexedDB
  */
@@ -147,8 +161,9 @@ export async function importProjectFromZip(
   options: {
     overwrite?: boolean;
     generateNewId?: boolean;
+    newName?: string; // Optional new name for the project
   } = {}
-): Promise<{ success: boolean; projectId?: string; error?: string }> {
+): Promise<ImportResult> {
   const storage = getStorageManager();
 
   try {
@@ -181,9 +196,21 @@ export async function importProjectFromZip(
     // Check if project already exists
     const exists = await storage.projectExists(projectId);
     if (exists && !options.overwrite) {
-      throw new Error(
-        'Project already exists. Use overwrite option or import with new ID.'
-      );
+      // Return conflict info instead of throwing - let caller handle it
+      const existingProject = await storage.getProject(projectId);
+      return {
+        success: false,
+        conflict: {
+          existingProjectId: projectId,
+          existingProjectName: existingProject?.name,
+          incomingProjectName: projectData.project.name,
+        }
+      };
+    }
+
+    // Apply new name if provided
+    if (options.newName) {
+      projectData.project.name = options.newName;
     }
 
     // Import assets first

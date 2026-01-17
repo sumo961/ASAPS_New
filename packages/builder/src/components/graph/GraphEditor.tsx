@@ -149,6 +149,9 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // DEBUG: Track initial mounting
   const mountRef = useRef(false);
 
+  // Track pending fitView request (for callback-based auto-fit after project load)
+  const pendingFitViewRef = useRef(false);
+
   // Watch ReactFlow initialization with enhanced debugging
   // ReactFlow instance is available for manual controls
   // Removed automatic fitView/zoom debugging code
@@ -709,23 +712,33 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
 
     setNodes(nodes);
 
-    // If beats count changed significantly (likely project load), trigger fitView after a delay
-    // This ensures all nodes are visible after the graph updates
+    // If beats count changed (likely project load or import), mark that we need fitView
     const beatsCountChanged = Math.abs(beats.length - prevBeatsLengthRef.current) > 0;
-    if (beatsCountChanged && reactFlowInstance && beats.length > 0) {
-      // Small delay to let ReactFlow process the node updates
-      setTimeout(() => {
-        console.log('[GraphEditor] Triggering fitView after beat count change');
-        reactFlowInstance.fitView({ padding: 0.2, maxZoom: 1, duration: 200 });
-      }, 100);
+    const isProjectLoad = beatsCountChanged && beats.length > 1;
+
+    if (isProjectLoad) {
+      pendingFitViewRef.current = true;
     }
     prevBeatsLengthRef.current = beats.length;
-  }, [nodes, setNodes, beats.length, clusters.length, reactFlowInstance]);
+  }, [nodes, setNodes, beats.length, clusters.length]);
 
   // Update edges when beats change
   useEffect(() => {
     setEdges(edges);
   }, [edges, setEdges]);
+
+  // Callback-based fitView: triggers when nodes are ready and a project was loaded
+  // This avoids timing-based solutions by waiting for actual render completion
+  useEffect(() => {
+    if (pendingFitViewRef.current && reactFlowInstance && nodesState.length > 0) {
+      // Use requestAnimationFrame to ensure DOM has been painted
+      requestAnimationFrame(() => {
+        reactFlowInstance.fitView({ padding: 0.2, maxZoom: 1, duration: 300 });
+        pendingFitViewRef.current = false;
+        console.log('[GraphEditor] Auto fitView completed after project load');
+      });
+    }
+  }, [nodesState.length, reactFlowInstance]);
 
   // Efficiently update node highlighting without full rebuild
   // This effect updates both beat nodes and cluster nodes when highlightedBeatIdsSet changes

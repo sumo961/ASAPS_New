@@ -297,12 +297,27 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
 
   console.log('[deserializeBeats] Starting to deserialize', beatsData.length, 'beats');
 
+  // Log AI beat types specifically for debugging
+  const aiBeatTypes = ['onlineContent', 'aiCondition', 'aiDialogTree', 'aiSummary'];
+  const aiBeatsFound = beatsData.filter((b: any) => aiBeatTypes.includes(b.type));
+  if (aiBeatsFound.length > 0) {
+    console.log('[deserializeBeats] Found AI beats:', aiBeatsFound.map((b: any) => ({ id: b.id, type: b.type, name: b.name })));
+  }
+
   for (const beatData of beatsData) {
     try {
       // Ensure we have the required fields
       if (!beatData.type || !beatData.id) {
         console.warn('[deserializeBeats] Beat missing type or id:', beatData);
         continue;
+      }
+
+      // Extra logging for AI beats
+      if (aiBeatTypes.includes(beatData.type)) {
+        console.log(`[deserializeBeats] Processing AI beat: ${beatData.type} - ${beatData.id}`, {
+          hasParameters: !!beatData.parameters,
+          parameterKeys: beatData.parameters ? Object.keys(beatData.parameters) : []
+        });
       }
 
       // Normalize beat type aliases to canonical names

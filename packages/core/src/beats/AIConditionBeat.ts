@@ -20,8 +20,8 @@ export interface AIConditionBeatParams {
   /** Categories for the AI to choose from */
   categories: AIConditionCategory[];
 
-  /** Variables to include in evaluation context */
-  evaluateVariables?: string[];
+  /** Include player variables in evaluation */
+  evaluateVariables?: boolean;
 
   /** Include player inventory in evaluation */
   evaluateInventory?: boolean;
@@ -32,8 +32,8 @@ export interface AIConditionBeatParams {
   /** Include counters in evaluation */
   evaluateCounters?: boolean;
 
-  /** Default target if AI can't decide */
-  defaultTarget?: string;
+  /** Fallback target if AI can't decide (separate from base Beat's defaultTarget) */
+  fallbackTarget?: string;
 
   /** Maximum response time in ms before falling back to default */
   timeout?: number;
@@ -54,7 +54,7 @@ export interface AIConditionBeatParams {
 export class AIConditionBeat extends Beat {
   public prompt: string;
   public categories: AIConditionCategory[];
-  public evaluateVariables?: string[];
+  public evaluateVariables: boolean;
   public evaluateInventory: boolean;
   public evaluateHistory: boolean;
   public evaluateCounters: boolean;
@@ -69,11 +69,11 @@ export class AIConditionBeat extends Beat {
 
     this.prompt = params.prompt || config.prompt || '';
     this.categories = params.categories || config.categories || [];
-    this.evaluateVariables = params.evaluateVariables || config.evaluateVariables;
+    this.evaluateVariables = params.evaluateVariables ?? config.evaluateVariables ?? true;
     this.evaluateInventory = params.evaluateInventory ?? config.evaluateInventory ?? true;
     this.evaluateHistory = params.evaluateHistory ?? config.evaluateHistory ?? true;
     this.evaluateCounters = params.evaluateCounters ?? config.evaluateCounters ?? true;
-    this.aiDefaultTarget = params.defaultTarget || config.defaultTarget;
+    this.aiDefaultTarget = params.fallbackTarget || config.fallbackTarget || params.defaultTarget || config.defaultTarget;
     this.timeout = params.timeout || config.timeout || 30000;
   }
 
@@ -85,7 +85,7 @@ export class AIConditionBeat extends Beat {
       evaluateInventory: this.evaluateInventory,
       evaluateHistory: this.evaluateHistory,
       evaluateCounters: this.evaluateCounters,
-      defaultTarget: this.aiDefaultTarget,
+      fallbackTarget: this.aiDefaultTarget,
       timeout: this.timeout,
     };
   }
@@ -97,7 +97,7 @@ export class AIConditionBeat extends Beat {
     if (params.evaluateInventory !== undefined) this.evaluateInventory = params.evaluateInventory;
     if (params.evaluateHistory !== undefined) this.evaluateHistory = params.evaluateHistory;
     if (params.evaluateCounters !== undefined) this.evaluateCounters = params.evaluateCounters;
-    if (params.defaultTarget !== undefined) this.aiDefaultTarget = params.defaultTarget;
+    if (params.fallbackTarget !== undefined) this.aiDefaultTarget = params.fallbackTarget;
     if (params.timeout !== undefined) this.timeout = params.timeout;
   }
 
@@ -117,11 +117,11 @@ export class AIConditionBeat extends Beat {
       }
     }
 
-    // Add default target if present
+    // Add fallback target if present
     if (this.aiDefaultTarget) {
       connections.push({
         targetId: this.aiDefaultTarget,
-        label: 'default',
+        label: 'Fallback',
       });
     }
 
@@ -158,7 +158,7 @@ export class AIConditionBeat extends Beat {
       const story = context.getStory();
       const contextBuilder = new PlayerContextBuilder(context, story);
       const playerContext = contextBuilder.buildPromptContext({
-        variables: this.evaluateVariables,
+        includeVariables: this.evaluateVariables,
         includeInventory: this.evaluateInventory,
         includeHistory: this.evaluateHistory,
         includeCounters: this.evaluateCounters,

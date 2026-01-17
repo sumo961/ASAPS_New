@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-17T03:36:06.163Z
+ * Generated: 2026-01-17T16:12:02.355Z
  */
 
 // ============================================
@@ -376,18 +376,18 @@ export interface OnlineContentParameters {
 export interface AiConditionParameters {
   /** Prompt describing what the AI should evaluate */
   prompt: string;
-  /** Categories for AI to choose from: { name, description, targetId } */
+  /** Categories for AI to choose from */
   categories: object[];
-  /** Variables to include in evaluation (empty = all) */
-  evaluateVariables?: string[] | undefined;
+  /** Include player variables in evaluation */
+  evaluateVariables?: boolean | undefined;
   /** Include player inventory in evaluation */
   evaluateInventory?: boolean | undefined;
   /** Include beat history in evaluation */
   evaluateHistory?: boolean | undefined;
   /** Include counters in evaluation */
   evaluateCounters?: boolean | undefined;
-  /** Fallback target if AI can't decide */
-  defaultTarget?: string | undefined;
+  /** Fallback target if AI can't decide (used when no category matches) */
+  fallbackTarget?: string | undefined;
   /** Maximum response time in ms */
   timeout?: number | undefined;
 }
@@ -412,7 +412,7 @@ export interface AiDialogTreeParameters {
   includeVisitedBeats?: boolean | undefined;
   /** Maximum conversation turns */
   maxTurns?: number | undefined;
-  /** Exit targets: { id: beatId, description: whenToUse } */
+  /** Exit targets for conversation outcomes */
   exitTargets: object[];
   /** Delay before showing choices */
   choiceDelay?: number | undefined;

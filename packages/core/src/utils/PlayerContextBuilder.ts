@@ -4,6 +4,8 @@ import type { Story } from '../engine/Story';
 export interface PlayerContextOptions {
   /** Specific variable names to include (if empty, includes all) */
   variables?: string[];
+  /** Include player variables (if false, no variables are included) */
+  includeVariables?: boolean;
   /** Include player inventory */
   includeInventory?: boolean;
   /** Include visited beats history */
@@ -43,6 +45,7 @@ export class PlayerContextBuilder {
   buildContext(options: PlayerContextOptions = {}): PlayerContextData {
     const {
       variables = [],
+      includeVariables = true,
       includeInventory = true,
       includeHistory = false,
       includeCounters = true,
@@ -55,14 +58,16 @@ export class PlayerContextBuilder {
     const allVariables = this.context.getVariables();
     const selectedVariables: Record<string, any> = {};
 
-    if (variables.length === 0) {
-      // Include all variables
-      Object.assign(selectedVariables, allVariables);
-    } else {
-      // Include only specified variables
-      for (const varName of variables) {
-        if (varName in allVariables) {
-          selectedVariables[varName] = allVariables[varName];
+    if (includeVariables) {
+      if (variables.length === 0) {
+        // Include all variables
+        Object.assign(selectedVariables, allVariables);
+      } else {
+        // Include only specified variables
+        for (const varName of variables) {
+          if (varName in allVariables) {
+            selectedVariables[varName] = allVariables[varName];
+          }
         }
       }
     }

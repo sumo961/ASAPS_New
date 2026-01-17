@@ -27,6 +27,17 @@ const beatTypeIcons: Record<string, string> = {
   SWFBeat: '📽️',
 };
 
+// Fixed node dimensions for consistent layout
+const NODE_WIDTH = 160;
+const MAX_TITLE_LENGTH = 18;
+
+// Truncate title and return truncated version
+const truncateTitle = (title: string, maxLength: number = MAX_TITLE_LENGTH): string => {
+  if (!title) return 'Unnamed Beat';
+  if (title.length <= maxLength) return title;
+  return title.substring(0, maxLength - 1) + '…';
+};
+
 export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
   // Safety checks - handle missing or invalid data
   if (!data) {
@@ -54,10 +65,13 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
   // Determine if this node is truly selected (either ReactFlow selected or data.selected)
   const isSelected = selected || data.selected;
 
+  const fullLabel = data.label || 'Unnamed Beat';
+  const displayLabel = truncateTitle(fullLabel);
+
   return (
     <div
       className={`
-        px-4 py-3 rounded-lg border-2 shadow-lg
+        px-3 py-2.5 rounded-lg border-2 shadow-lg
         transition-all duration-200 cursor-pointer
         ${isSelected && !data.highlighted ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
         ${data.highlighted ? 'ring-4 ring-yellow-400 ring-opacity-70 border-yellow-500 bg-yellow-50' : ''}
@@ -66,9 +80,10 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
       `}
       style={{
         borderColor: data.highlighted ? '#eab308' : (isSelected ? '#06b6d4' : '#d1d5db'),
-        minWidth: '150px',
+        width: `${NODE_WIDTH}px`,
         backgroundColor: data.highlighted ? '#fef9c3' : (isSelected ? '#ecfeff' : 'white'),
       }}
+      title={fullLabel}
     >
       <Handle
         type="target"
@@ -83,10 +98,10 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
       />
 
       <div className="flex items-center gap-2">
-        <span className="text-2xl" title={data.type}>{icon}</span>
-        <div className="flex-1">
-          <div className="font-semibold text-sm text-gray-800">
-            {data.label || 'Unnamed Beat'}
+        <span className="text-lg" title={data.type}>{icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-sm text-gray-800 truncate">
+            {displayLabel}
           </div>
           <div className="text-xs text-gray-500">
             {data.type || 'unknown'}

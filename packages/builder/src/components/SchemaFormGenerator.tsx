@@ -1,5 +1,5 @@
 import React from 'react';
-import { Variable, Box, Timer, User, ChevronDown } from 'lucide-react';
+import { Variable, Box, Timer, User, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import type { Beat } from '@asaps/core';
 import type { AvailableCounter, AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
 
@@ -10,6 +10,10 @@ interface ParameterDefinition {
   default?: any;
   description?: string;
   minItems?: number;
+  // For array<object> types - defines the schema for each item
+  itemSchema?: Record<string, ParameterDefinition>;
+  // For fields that reference beats (target selectors)
+  targetField?: boolean;
   ui?: {
     control?: 'text' | 'textarea' | 'select' | 'number';
     options?: string[];
@@ -18,6 +22,10 @@ interface ParameterDefinition {
     max?: number;
     step?: number;
     rows?: number;
+    // For arrays - label for add button
+    addLabel?: string;
+    // For arrays - label for each item
+    itemLabel?: string;
   };
 }
 
@@ -98,6 +106,32 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
     // Determine field type based on parameter type
     switch (paramDef.type) {
       case 'string':
+        // Check for targetField - show beat selector
+        if (paramDef.targetField) {
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {paramDef.ui?.label || label} {isRequired && <span className="text-red-500">*</span>}
+              </label>
+              <select
+                value={value || ''}
+                onChange={(e) => onParameterChange(paramName, e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="">-- Select target (optional) --</option>
+                {availableTargets.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.name || target.id}
+                  </option>
+                ))}
+              </select>
+              {paramDef.description && (
+                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+              )}
+            </div>
+          );
+        }
+
         // Check for explicit textarea control or known multi-line fields
         const isTextarea = paramDef.ui?.control === 'textarea' ||
           paramName === 'text' || paramName === 'message' || paramName === 'prompt';
@@ -588,7 +622,257 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
         );
 
       default:
-        // For unknown types, render nothing (they'll be handled by custom renderers)
+        // Handle array types (array<string>, array<object>)
+        if (paramDef.type.startsWith('array<')) {
+          const itemType = paramDef.type.slice(6, -1); // Extract type from array<...>
+          const items = (value as any[]) || [];
+          const addLabel = paramDef.ui?.addLabel || `Add ${label.replace(/s$/, '')}`;
+          const itemLabel = paramDef.ui?.itemLabel || label.replace(/s$/, '');
+
+          // For array<object> with itemSchema
+          if (itemType === 'object' && paramDef.itemSchema) {
+            return (
+              <div key={paramName} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700">
+                    {paramDef.ui?.label || label}
+                    {paramDef.required && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Create new item with defaults from itemSchema
+                      const newItem: Record<string, any> = {};
+                      Object.entries(paramDef.itemSchema!).forEach(([key, def]) => {
+                        if (def.default !== undefined) {
+                          newItem[key] = def.default;
+                        } else if (def.type === 'string') {
+                          newItem[key] = '';
+                        } else if (def.type === 'boolean') {
+                          newItem[key] = false;
+                        }
+                      });
+                      onParameterChange(paramName, [...items, newItem]);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    <Plus className="w-3 h-3" />
+                    {addLabel}
+                  </button>
+                </div>
+
+                {paramDef.description && (
+                  <p className="text-xs text-gray-500">{paramDef.description}</p>
+                )}
+
+                {items.length === 0 && (
+                  <p className="text-xs text-gray-400 italic py-2">
+                    No {label.toLowerCase()} defined. Click "{addLabel}" to add one.
+                  </p>
+                )}
+
+                {items.map((item, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-600">
+                        {itemLabel} {index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newItems = items.filter((_, i) => i !== index);
+                          onParameterChange(paramName, newItems);
+                        }}
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="Remove"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {Object.entries(paramDef.itemSchema!).map(([fieldName, fieldDef]) => {
+                      const fieldValue = item[fieldName];
+                      const fieldLabel = fieldDef.ui?.label ||
+                        fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/([A-Z])/g, ' $1');
+
+                      // Handle targetField - show beat selector
+                      if (fieldDef.targetField) {
+                        return (
+                          <div key={fieldName}>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              {fieldLabel}
+                              {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            <select
+                              value={fieldValue || ''}
+                              onChange={(e) => {
+                                const newItems = [...items];
+                                newItems[index] = { ...item, [fieldName]: e.target.value };
+                                onParameterChange(paramName, newItems);
+                              }}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="">Select target...</option>
+                              {availableTargets.map((target) => (
+                                <option key={target.id} value={target.id}>
+                                  {target.name || target.id}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      }
+
+                      // Handle select control
+                      if (fieldDef.ui?.control === 'select' && fieldDef.ui.options) {
+                        return (
+                          <div key={fieldName}>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              {fieldLabel}
+                            </label>
+                            <select
+                              value={fieldValue || fieldDef.default || ''}
+                              onChange={(e) => {
+                                const newItems = [...items];
+                                newItems[index] = { ...item, [fieldName]: e.target.value };
+                                onParameterChange(paramName, newItems);
+                              }}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                            >
+                              {fieldDef.ui.options.map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      }
+
+                      // Handle textarea control
+                      if (fieldDef.ui?.control === 'textarea') {
+                        return (
+                          <div key={fieldName}>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              {fieldLabel}
+                              {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            <textarea
+                              value={fieldValue || ''}
+                              onChange={(e) => {
+                                const newItems = [...items];
+                                newItems[index] = { ...item, [fieldName]: e.target.value };
+                                onParameterChange(paramName, newItems);
+                              }}
+                              rows={fieldDef.ui?.rows || 2}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                              placeholder={fieldDef.description}
+                            />
+                          </div>
+                        );
+                      }
+
+                      // Handle boolean
+                      if (fieldDef.type === 'boolean') {
+                        return (
+                          <label key={fieldName} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={fieldValue ?? fieldDef.default ?? false}
+                              onChange={(e) => {
+                                const newItems = [...items];
+                                newItems[index] = { ...item, [fieldName]: e.target.checked };
+                                onParameterChange(paramName, newItems);
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-xs text-gray-600">{fieldLabel}</span>
+                          </label>
+                        );
+                      }
+
+                      // Default: text input
+                      return (
+                        <div key={fieldName}>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            {fieldLabel}
+                            {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                          </label>
+                          <input
+                            type={fieldDef.type === 'number' ? 'number' : 'text'}
+                            value={fieldValue ?? fieldDef.default ?? ''}
+                            onChange={(e) => {
+                              const newItems = [...items];
+                              const newValue = fieldDef.type === 'number'
+                                ? parseFloat(e.target.value)
+                                : e.target.value;
+                              newItems[index] = { ...item, [fieldName]: newValue };
+                              onParameterChange(paramName, newItems);
+                            }}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                            placeholder={fieldDef.description}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+
+                {paramDef.minItems && items.length < paramDef.minItems && (
+                  <p className="text-xs text-amber-600">
+                    Minimum {paramDef.minItems} {label.toLowerCase()} required
+                  </p>
+                )}
+              </div>
+            );
+          }
+
+          // For array<string> - simple list of strings
+          if (itemType === 'string') {
+            return (
+              <div key={paramName} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700">
+                    {paramDef.ui?.label || label}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => onParameterChange(paramName, [...items, ''])}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add
+                  </button>
+                </div>
+                {items.map((item, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={item || ''}
+                      onChange={(e) => {
+                        const newItems = [...items];
+                        newItems[index] = e.target.value;
+                        onParameterChange(paramName, newItems);
+                      }}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                      placeholder={`${itemLabel} ${index + 1}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newItems = items.filter((_, i) => i !== index);
+                        onParameterChange(paramName, newItems);
+                      }}
+                      className="text-red-500 hover:text-red-700 p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+        }
+
+        // For truly unknown types, render nothing (they'll be handled by custom renderers)
         return null;
     }
   };

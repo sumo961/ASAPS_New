@@ -182,6 +182,7 @@ export function extractConnectionsFromBeats(
  * @param beats - Array of story beats with positions
  * @param options - Layout options
  * @param externalEdges - Optional external edges to include (from beat.getConnections())
+ * @param startBeatId - Optional ID of the start beat (will be positioned first/at top)
  * @returns Map of beat id to new position
  */
 export function applyTreeLayoutToBeats(
@@ -192,7 +193,8 @@ export function applyTreeLayoutToBeats(
     parameters?: Record<string, any>;
   }>,
   options?: { nodeSpacingX?: number; nodeSpacingY?: number; startX?: number; startY?: number },
-  externalEdges?: Array<{ source: string; target: string }>
+  externalEdges?: Array<{ source: string; target: string }>,
+  startBeatId?: string
 ): Map<string, { x: number; y: number }> {
   // Extract edges from beat parameters (for multi-target beats like dialogTree, movementChoice)
   const parameterEdges = extractConnectionsFromBeats(beats);
@@ -210,7 +212,20 @@ export function applyTreeLayoutToBeats(
     });
   }
 
-  const nodes = beats.map((b) => ({ id: b.id, position: b.position }));
+  // Reorder beats to ensure startBeatId is first (will be positioned at top)
+  let orderedBeats = beats;
+  if (startBeatId) {
+    const startIndex = beats.findIndex(b => b.id === startBeatId);
+    if (startIndex > 0) {
+      orderedBeats = [
+        beats[startIndex],
+        ...beats.slice(0, startIndex),
+        ...beats.slice(startIndex + 1)
+      ];
+    }
+  }
+
+  const nodes = orderedBeats.map((b) => ({ id: b.id, position: b.position }));
   const { positions } = calculateTreeLayout(nodes, allEdges, options);
   return positions;
 }

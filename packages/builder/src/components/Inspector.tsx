@@ -701,6 +701,37 @@ export const Inspector: React.FC<InspectorProps> = ({
       );
       uniqueConns.forEach(conn => beat.addConnection(conn));
 
+    } else if (beat.type === 'aiDialogTree') {
+      // AI Dialog Tree connections from exitTargets
+      const exitTargets = beatToUpdate.parameters?.exitTargets || [];
+      exitTargets.forEach((target: any) => {
+        if (target.id) {
+          beat.addConnection({
+            targetId: target.id,
+            label: target.description ? target.description.substring(0, 30) + (target.description.length > 30 ? '...' : '') : 'Exit'
+          });
+        }
+      });
+
+    } else if (beat.type === 'aiCondition') {
+      // AI Condition connections from categories + fallback
+      const categories = beatToUpdate.parameters?.categories || [];
+      categories.forEach((category: any) => {
+        if (category.targetId) {
+          beat.addConnection({
+            targetId: category.targetId,
+            label: category.name || 'Category'
+          });
+        }
+      });
+      // Add fallback target
+      if (beatToUpdate.parameters?.fallbackTarget) {
+        beat.addConnection({
+          targetId: beatToUpdate.parameters.fallbackTarget,
+          label: 'Fallback'
+        });
+      }
+
     } else if (beat.type === 'setTimer') {
       // Timer target connection (from parameters)
       if (beatToUpdate.parameters?.target) {
@@ -870,7 +901,38 @@ export const Inspector: React.FC<InspectorProps> = ({
           new Map(dialogConnections.map(c => [`${c.targetId}-${c.label}`, c])).values()
         );
         uniqueConns.forEach(conn => beat.addConnection(conn));
-        
+
+      } else if (beat.type === 'aiDialogTree') {
+        // AI Dialog Tree connections from exitTargets
+        const exitTargets = localBeat.parameters?.exitTargets || [];
+        exitTargets.forEach((target: any) => {
+          if (target.id) {
+            beat.addConnection({
+              targetId: target.id,
+              label: target.description ? target.description.substring(0, 30) + (target.description.length > 30 ? '...' : '') : 'Exit'
+            });
+          }
+        });
+
+      } else if (beat.type === 'aiCondition') {
+        // AI Condition connections from categories + fallback
+        const categories = localBeat.parameters?.categories || [];
+        categories.forEach((category: any) => {
+          if (category.targetId) {
+            beat.addConnection({
+              targetId: category.targetId,
+              label: category.name || 'Category'
+            });
+          }
+        });
+        // Add fallback target
+        if (localBeat.parameters?.fallbackTarget) {
+          beat.addConnection({
+            targetId: localBeat.parameters.fallbackTarget,
+            label: 'Fallback'
+          });
+        }
+
       } else if (beat.type === 'setTimer') {
         // Timer target connection (from parameters)
         if (localBeat.parameters?.target) {

@@ -223,6 +223,17 @@ export function useStoryBuilder() {
             console.log(`[updateBeat] Converted ${locationsArray.length} locations from array to Map for beat ${beatId}`);
           }
 
+          // CRITICAL: Special handling for parameters - must call updateParameters()
+          // Object.assign would just set beat.parameters but not update internal state
+          // This is especially important for AI beats and other complex beat types
+          if ((updates as any).parameters && typeof beat.updateParameters === 'function') {
+            const params = (updates as any).parameters;
+            delete (updates as any).parameters; // Remove from updates to prevent Object.assign from overwriting
+
+            beat.updateParameters(params);
+            console.log(`[updateBeat] Called updateParameters for beat ${beatId}:`, Object.keys(params));
+          }
+
           // Update beat properties while maintaining the Beat instance
           Object.assign(beat, updates);
           return beat;
@@ -544,8 +555,9 @@ export function useStoryBuilder() {
         target: c.target
       }));
 
-      // Apply tree layout
-      const positions = applyTreeLayoutToBeats(layoutBeats, undefined, edges);
+      // Apply tree layout - use firstBeatId to ensure it's positioned at top
+      const startBeatId = metadata?.firstBeatId || beats[0]?.id;
+      const positions = applyTreeLayoutToBeats(layoutBeats, undefined, edges, startBeatId);
 
       // Apply positions to beats
       for (const beat of beats) {
@@ -667,8 +679,9 @@ export function useStoryBuilder() {
         target: c.target
       }));
 
-      // Apply tree layout
-      const positions = applyTreeLayoutToBeats(layoutBeats, undefined, edges);
+      // Apply tree layout - use first beat as start beat
+      const startBeatId = options?.firstBeatId || beats[0]?.id;
+      const positions = applyTreeLayoutToBeats(layoutBeats, undefined, edges, startBeatId);
 
       // Apply positions to beats
       for (const beat of beats) {
