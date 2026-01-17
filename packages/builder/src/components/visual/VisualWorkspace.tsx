@@ -1795,6 +1795,27 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           videoFile: params.videoFile || '',
           skipButton: params.skipButton !== false
         };
+      case 'onlineContent':
+        return {
+          text: params.query
+            ? `[AI will search: "${params.query.substring(0, 50)}${params.query.length > 50 ? '...' : ''}"]`
+            : '[Online content will appear here]',
+          buttonText: params.buttonText || 'Continue'
+        };
+      case 'aiDialogTree':
+        return {
+          text: `[${params.npcName || 'Character'} will respond based on scenario]`,
+          choices: []
+        };
+      case 'aiSummary':
+        return {
+          title: params.title || 'Your Journey',
+          summary: '[AI-generated summary will appear here]',
+          showRestart: params.showRestart !== false,
+          showCredits: params.showCredits || false,
+          restartText: params.restartText || 'Play Again',
+          creditsText: params.creditsText || 'Credits'
+        };
       default:
         return params;
     }
@@ -2488,20 +2509,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   onBeatUpdate(beat.id, { transition });
                   setHasChanges(true);
                 } : undefined}
-                presentationMode={beat.type === 'dialogTree' ? ((beat as any).presentationMode || 'positioned') : undefined}
-                onPresentationModeChange={beat.type === 'dialogTree' && onBeatUpdate ? (mode) => {
+                presentationMode={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).presentationMode || 'positioned') : undefined}
+                onPresentationModeChange={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') && onBeatUpdate ? (mode) => {
                   (beat as any).presentationMode = mode;
                   onBeatUpdate(beat.id, { presentationMode: mode } as any);
                   setHasChanges(true);
                 } : undefined}
-                showAvatars={beat.type === 'dialogTree' ? ((beat as any).showAvatars ?? true) : undefined}
-                onShowAvatarsChange={beat.type === 'dialogTree' && onBeatUpdate ? (show) => {
+                showAvatars={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).showAvatars ?? true) : undefined}
+                onShowAvatarsChange={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') && onBeatUpdate ? (show) => {
                   (beat as any).showAvatars = show;
                   onBeatUpdate(beat.id, { showAvatars: show } as any);
                   setHasChanges(true);
                 } : undefined}
-                responseDelay={beat.type === 'dialogTree' ? ((beat as any).responseDelay ?? 0) : undefined}
-                onResponseDelayChange={beat.type === 'dialogTree' && onBeatUpdate ? (delay) => {
+                responseDelay={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).responseDelay ?? 1.5) : undefined}
+                onResponseDelayChange={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') && onBeatUpdate ? (delay) => {
                   (beat as any).responseDelay = delay;
                   onBeatUpdate(beat.id, { responseDelay: delay } as any);
                   setHasChanges(true);

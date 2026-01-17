@@ -15,6 +15,7 @@ const LOCATION_TYPE_MAP: Record<string, { kind: 'text' | 'button' | 'dialog' | '
   'title': { kind: 'text', fontSize: 32 },
   'author': { kind: 'text', fontSize: 20 },
   'text': { kind: 'dialog', fontSize: 18 },
+  'summary': { kind: 'dialog', fontSize: 16 },  // For AI Summary beat
   'message': { kind: 'text', fontSize: 24 },
   'prompt': { kind: 'dialog', fontSize: 18 },
   'question': { kind: 'dialog', fontSize: 18 },
@@ -28,6 +29,7 @@ const LOCATION_TYPE_MAP: Record<string, { kind: 'text' | 'button' | 'dialog' | '
   'restartButton': { kind: 'button', fontSize: 18 },
   'creditsButton': { kind: 'button', fontSize: 18 },
   'skipButton': { kind: 'button', fontSize: 16 },
+  'buttons': { kind: 'button', fontSize: 18 },  // Generic buttons container
 
   // Input/hotspots
   'inputField': { kind: 'hotspot' },
@@ -80,15 +82,26 @@ export function generateDefaultLocations(
 
     // Special positioning for specific elements
     if (locationName === 'title') {
-      y = 80;
+      y = 60;
       currentY = y + height + 30;
     } else if (locationName === 'author') {
       y = currentY;
+      currentY = y + height + 40;
+    } else if (locationName === 'summary') {
+      // Summary gets more vertical space and larger height for content
+      // Add significant gap after title
+      y = currentY + 20; // Extra gap before summary
+      height = 350; // Taller for AI-generated summaries
+      width = Math.min(800, stageWidth - 100); // Wider for better readability
+      x = centerX - width / 2;
       currentY = y + height + 40;
     } else if (locationName.toLowerCase().includes('button')) {
       if (locationName === 'startButton' || locationName === 'continueButton' || locationName === 'submitButton') {
         // Start/continue buttons at bottom
         y = stageHeight - 150;
+      } else if (locationName === 'restartButton') {
+        // Restart button at bottom for aiSummary/endScreen
+        y = stageHeight - 120;
       } else {
         // Other buttons stack
         y = currentY;

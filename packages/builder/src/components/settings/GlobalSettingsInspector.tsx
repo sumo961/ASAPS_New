@@ -355,7 +355,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
         boxVisibility: 'all',
       },
       textEffects: {
-        animation: 'typewriter',
+        animation: 'none',
         typewriterSpeed: 30,
         fadeInDuration: 500,
       },

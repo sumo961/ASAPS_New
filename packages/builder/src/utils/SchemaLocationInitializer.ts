@@ -64,6 +64,7 @@ const LOCATION_TYPE_MAP: Record<string, Partial<LocationDefinition>> = {
   'title': { type: 'text', fontSize: 32, defaultHeight: 60 },
   'author': { type: 'text', fontSize: 20, defaultHeight: 40 },
   'text': { type: 'dialog', fontSize: 18, defaultHeight: 100 },
+  'summary': { type: 'dialog', fontSize: 16, defaultHeight: 300, defaultWidth: 800 },  // AI Summary
   'message': { type: 'text', fontSize: 18, defaultHeight: 50 },
   'prompt': { type: 'dialog', fontSize: 18, defaultHeight: 80 },
   'question': { type: 'dialog', fontSize: 18, defaultHeight: 80 },
@@ -143,6 +144,44 @@ function getDefaultTextForLocation(
     if (nameLower.includes('credits')) return params.creditsText || 'Credits';
   }
 
+  // AI Summary
+  if (beatType === 'aiSummary') {
+    if (nameLower.includes('title')) return params.title || 'Your Journey';
+    if (nameLower.includes('summary')) return '[AI-generated summary will appear here]';
+    if (nameLower.includes('restart')) return params.restartText || 'Play Again';
+    if (nameLower.includes('credits')) return params.creditsText || 'Credits';
+  }
+
+  // Online Content
+  if (beatType === 'onlineContent') {
+    if (nameLower === 'title') {
+      // If title is provided, use it; otherwise show placeholder for auto-derived title
+      if (params.title) return params.title;
+      if (params.query) {
+        // Show what the auto-derived title might look like
+        return `[Title derived from: "${params.query.substring(0, 30)}${params.query.length > 30 ? '...' : ''}"]`;
+      }
+      return '[Title will be auto-derived]';
+    }
+    if (nameLower.includes('text')) {
+      // Show sample content based on source type
+      if (params.sourceType === 'ai-query' && params.query) {
+        return `[AI will search: "${params.query.substring(0, 50)}${params.query.length > 50 ? '...' : ''}"]`;
+      }
+      return params.displayTemplate || '[Online content will appear here]';
+    }
+    if (nameLower.includes('continue')) return params.buttonText || 'Continue';
+  }
+
+  // AI Dialog Tree
+  if (beatType === 'aiDialogTree') {
+    if (nameLower.includes('dialog')) {
+      const npcName = params.npcName || 'Character';
+      return `[${npcName} will respond based on: "${(params.scenario || 'scenario').substring(0, 40)}..."]`;
+    }
+    if (nameLower.includes('choice')) return '[AI-generated choices will appear here]';
+  }
+
   // Input text
   if (beatType === 'inputText') {
     if (nameLower.includes('prompt')) return params.prompt || 'Please enter your response:';
@@ -201,7 +240,7 @@ export function initializeLocationsFromSchema(
   // Process each location from schema
   beatDef.locations.forEach((locationName: string, index: number) => {
     // Skip conditional elements based on beat parameters
-    if (beat.type === 'endScreen') {
+    if (beat.type === 'endScreen' || beat.type === 'aiSummary') {
       if (locationName === 'restartButton' && params.showRestart === false) {
         return; // Skip restart button if showRestart is false
       }
@@ -272,12 +311,16 @@ export function initializeLocationsFromSchema(
       }
     } else if (locationName === 'title') {
       // Title at top
-      y = 80;
-      currentY = y + height + 30;
+      y = 60;
+      currentY = y + height + 40; // Space after title
     } else if (locationName === 'author') {
       // Author below title
       y = currentY;
       currentY = y + height + 40;
+    } else if (locationName === 'summary') {
+      // Summary gets extra gap from title and more height
+      y = currentY + 20; // Extra gap before summary
+      currentY = y + height + 30;
     } else {
       // Stack other elements
       y = currentY;

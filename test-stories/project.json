@@ -1,0 +1,607 @@
+{
+  "metadata": {
+    "exportVersion": "1.1.0",
+    "exportedAt": "2026-01-16T15:44:26.026Z",
+    "exportedBy": "ASAPS Builder",
+    "projectId": "env-choices-test-v2",
+    "projectName": "Environmental Choices"
+  },
+  "project": {
+    "id": "env-choices-test-v2",
+    "name": "Environmental Choices",
+    "description": "Test story for AI beats",
+    "createdAt": "2026-01-16T15:44:26.026Z",
+    "modifiedAt": "2026-01-16T15:44:26.026Z",
+    "version": "1.0.0",
+    "settings": {},
+    "story": {
+      "metadata": {
+        "title": "Environmental Choices",
+        "author": "ASAPS Builder",
+        "version": "1.0.0",
+        "created": "2026-01-16T00:00:00.000Z",
+        "modified": "2026-01-16T00:00:00.000Z",
+        "firstBeatId": "title"
+      },
+      "beats": [
+        {
+          "id": "title",
+          "name": "Title Screen",
+          "type": "titleScreen",
+          "x": 100,
+          "y": 100,
+          "connections": [
+            {
+              "targetId": "ask_name",
+              "label": "Begin"
+            }
+          ],
+          "parameters": {
+            "title": "Environmental Choices",
+            "author": "An Interactive Experience",
+            "buttonText": "Begin",
+            "connection": {
+              "targetId": "ask_name"
+            }
+          }
+        },
+        {
+          "id": "ask_name",
+          "name": "Ask Name",
+          "type": "inputText",
+          "x": 100,
+          "y": 250,
+          "connections": [
+            {
+              "targetId": "ask_gender",
+              "label": "Continue"
+            }
+          ],
+          "parameters": {
+            "prompt": "Welcome! Let's start by getting to know you.\n\nWhat is your name?",
+            "saveToType": "variable",
+            "variable": "playerName",
+            "placeholder": "Enter your name",
+            "buttonText": "Continue",
+            "required": true,
+            "connection": {
+              "targetId": "ask_gender"
+            }
+          }
+        },
+        {
+          "id": "ask_gender",
+          "name": "Ask Gender",
+          "type": "inputText",
+          "x": 100,
+          "y": 400,
+          "connections": [
+            {
+              "targetId": "ask_profession",
+              "label": "Continue"
+            }
+          ],
+          "parameters": {
+            "prompt": "Nice to meet you, ${playerName}!\n\nHow do you identify?",
+            "saveToType": "variable",
+            "variable": "playerGender",
+            "placeholder": "e.g., man, woman, non-binary",
+            "buttonText": "Continue",
+            "required": true,
+            "connection": {
+              "targetId": "ask_profession"
+            }
+          }
+        },
+        {
+          "id": "ask_profession",
+          "name": "Ask Profession",
+          "type": "inputText",
+          "x": 100,
+          "y": 550,
+          "connections": [
+            {
+              "targetId": "ask_location",
+              "label": "Continue"
+            }
+          ],
+          "parameters": {
+            "prompt": "What is your profession or occupation?",
+            "saveToType": "variable",
+            "variable": "playerProfession",
+            "placeholder": "e.g., teacher, engineer, artist",
+            "buttonText": "Continue",
+            "required": true,
+            "connection": {
+              "targetId": "ask_location"
+            }
+          }
+        },
+        {
+          "id": "ask_location",
+          "name": "Ask Location",
+          "type": "inputText",
+          "x": 100,
+          "y": 700,
+          "connections": [
+            {
+              "targetId": "environmental_intro",
+              "label": "Continue"
+            }
+          ],
+          "parameters": {
+            "prompt": "Where do you live? (City, State/Country)",
+            "saveToType": "variable",
+            "variable": "playerLocation",
+            "placeholder": "e.g., Atlanta, Georgia, USA",
+            "buttonText": "Continue",
+            "required": true,
+            "connection": {
+              "targetId": "environmental_intro"
+            }
+          }
+        },
+        {
+          "id": "environmental_intro",
+          "name": "Environmental Introduction",
+          "type": "introText",
+          "x": 100,
+          "y": 850,
+          "connections": [
+            {
+              "targetId": "env_dialog",
+              "label": "Continue"
+            }
+          ],
+          "parameters": {
+            "text": "Thank you, ${playerName}!\n\nAs a ${playerProfession} living in ${playerLocation}, you make choices every day that impact the environment.\n\nLet's explore some of those choices together.",
+            "buttonText": "Continue",
+            "connection": {
+              "targetId": "env_dialog"
+            }
+          }
+        },
+        {
+          "id": "env_dialog",
+          "name": "Environmental Views Dialog",
+          "type": "dialogTree",
+          "x": 100,
+          "y": 1000,
+          "connections": [
+            {
+              "targetId": "transport_choice",
+              "label": "To Transport"
+            }
+          ],
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Environmental Guide",
+              "text": "I'd like to understand your perspective on environmental issues. First, how would you describe your relationship with nature?",
+              "choices": [
+                {
+                  "id": "c1",
+                  "text": "I love spending time outdoors and feel deeply connected to nature",
+                  "effects": [
+                    {
+                      "type": "setVariable",
+                      "target": "natureConnection",
+                      "value": "strong"
+                    }
+                  ],
+                  "dialogNode": {
+                    "id": "nature_strong",
+                    "speaker": "Environmental Guide",
+                    "text": "That's wonderful! People with a strong connection to nature often become advocates for environmental protection. What's your view on climate change?",
+                    "choices": [
+                      {
+                        "id": "cc1",
+                        "text": "It's a critical issue that requires immediate action",
+                        "effects": [
+                          {
+                            "type": "setVariable",
+                            "target": "climateView",
+                            "value": "urgent"
+                          }
+                        ],
+                        "target": "transport_choice"
+                      },
+                      {
+                        "id": "cc2",
+                        "text": "It's important but we need balanced solutions",
+                        "effects": [
+                          {
+                            "type": "setVariable",
+                            "target": "climateView",
+                            "value": "moderate"
+                          }
+                        ],
+                        "target": "transport_choice"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "c2",
+                  "text": "I appreciate nature but prefer city life and modern conveniences",
+                  "effects": [
+                    {
+                      "type": "setVariable",
+                      "target": "natureConnection",
+                      "value": "moderate"
+                    }
+                  ],
+                  "dialogNode": {
+                    "id": "nature_moderate",
+                    "speaker": "Environmental Guide",
+                    "text": "That's a common perspective. Many environmentally-conscious choices can be made even in urban settings. What's your view on climate change?",
+                    "choices": [
+                      {
+                        "id": "cc3",
+                        "text": "It's a critical issue that requires immediate action",
+                        "effects": [
+                          {
+                            "type": "setVariable",
+                            "target": "climateView",
+                            "value": "urgent"
+                          }
+                        ],
+                        "target": "transport_choice"
+                      },
+                      {
+                        "id": "cc4",
+                        "text": "The economy should come first, environment second",
+                        "effects": [
+                          {
+                            "type": "setVariable",
+                            "target": "climateView",
+                            "value": "economic"
+                          }
+                        ],
+                        "target": "transport_choice"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "c3",
+                  "text": "I don't think much about environmental issues",
+                  "effects": [
+                    {
+                      "type": "setVariable",
+                      "target": "natureConnection",
+                      "value": "weak"
+                    }
+                  ],
+                  "dialogNode": {
+                    "id": "nature_weak",
+                    "speaker": "Environmental Guide",
+                    "text": "I understand. Many people are focused on daily life challenges. Still, environmental decisions affect everyone. What matters most to you?",
+                    "choices": [
+                      {
+                        "id": "cc5",
+                        "text": "My family's health and wellbeing",
+                        "effects": [
+                          {
+                            "type": "setVariable",
+                            "target": "climateView",
+                            "value": "health"
+                          }
+                        ],
+                        "target": "transport_choice"
+                      },
+                      {
+                        "id": "cc6",
+                        "text": "Economic stability and job security",
+                        "effects": [
+                          {
+                            "type": "setVariable",
+                            "target": "climateView",
+                            "value": "economic"
+                          }
+                        ],
+                        "target": "transport_choice"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "presentationMode": "chat-scroll"
+          }
+        },
+        {
+          "id": "transport_choice",
+          "name": "Transportation Choice",
+          "type": "movementChoice",
+          "x": 400,
+          "y": 1000,
+          "connections": [
+            {
+              "targetId": "car_selected",
+              "label": "Car"
+            },
+            {
+              "targetId": "transit_selected",
+              "label": "Transit"
+            },
+            {
+              "targetId": "active_selected",
+              "label": "Bike/Walk"
+            },
+            {
+              "targetId": "mixed_selected",
+              "label": "Mixed"
+            }
+          ],
+          "parameters": {
+            "question": "Now let's think about transportation. How do you prefer to get around in your daily life?",
+            "choices": [
+              {
+                "id": "m1",
+                "text": "Drive my own car",
+                "location": "Personal Vehicle",
+                "target": "car_selected",
+                "effects": [
+                  {
+                    "type": "setVariable",
+                    "target": "transportChoice",
+                    "value": "car"
+                  }
+                ]
+              },
+              {
+                "id": "m2",
+                "text": "Use public transportation",
+                "location": "Public Transit",
+                "target": "transit_selected",
+                "effects": [
+                  {
+                    "type": "setVariable",
+                    "target": "transportChoice",
+                    "value": "transit"
+                  }
+                ]
+              },
+              {
+                "id": "m3",
+                "text": "Bike or walk",
+                "location": "Active Transport",
+                "target": "active_selected",
+                "effects": [
+                  {
+                    "type": "setVariable",
+                    "target": "transportChoice",
+                    "value": "active"
+                  }
+                ]
+              },
+              {
+                "id": "m4",
+                "text": "Mix of options",
+                "location": "Multimodal",
+                "target": "mixed_selected",
+                "effects": [
+                  {
+                    "type": "setVariable",
+                    "target": "transportChoice",
+                    "value": "mixed"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "car_selected",
+          "name": "Car Selected",
+          "type": "setVariable",
+          "x": 700,
+          "y": 850,
+          "connections": [
+            {
+              "targetId": "car_data",
+              "label": "Next"
+            }
+          ],
+          "parameters": {
+            "type": "variable",
+            "name": "transportReason",
+            "value": "convenience and independence",
+            "connection": {
+              "targetId": "car_data"
+            }
+          }
+        },
+        {
+          "id": "transit_selected",
+          "name": "Transit Selected",
+          "type": "setVariable",
+          "x": 700,
+          "y": 950,
+          "connections": [
+            {
+              "targetId": "car_data",
+              "label": "Next"
+            }
+          ],
+          "parameters": {
+            "type": "variable",
+            "name": "transportReason",
+            "value": "cost savings and reduced emissions",
+            "connection": {
+              "targetId": "car_data"
+            }
+          }
+        },
+        {
+          "id": "active_selected",
+          "name": "Active Selected",
+          "type": "setVariable",
+          "x": 700,
+          "y": 1050,
+          "connections": [
+            {
+              "targetId": "car_data",
+              "label": "Next"
+            }
+          ],
+          "parameters": {
+            "type": "variable",
+            "name": "transportReason",
+            "value": "health benefits and zero emissions",
+            "connection": {
+              "targetId": "car_data"
+            }
+          }
+        },
+        {
+          "id": "mixed_selected",
+          "name": "Mixed Selected",
+          "type": "setVariable",
+          "x": 700,
+          "y": 1150,
+          "connections": [
+            {
+              "targetId": "car_data",
+              "label": "Next"
+            }
+          ],
+          "parameters": {
+            "type": "variable",
+            "name": "transportReason",
+            "value": "flexibility depending on the situation",
+            "connection": {
+              "targetId": "car_data"
+            }
+          }
+        },
+        {
+          "id": "car_data",
+          "name": "Car Ownership Data",
+          "type": "onlineContent",
+          "x": 1000,
+          "y": 1000,
+          "connections": [
+            {
+              "targetId": "ai_dialog",
+              "label": "Learn More"
+            }
+          ],
+          "parameters": {
+            "sourceType": "ai-query",
+            "query": "What is the car ownership rate per 1000 residents in ${playerLocation}? Also include information about public transportation availability and environmental impact of transportation in that area.",
+            "displayTemplate": "Based on available data for ${playerLocation}:\n\n{{data}}\n\nThis information helps us understand the transportation landscape where you live.",
+            "buttonText": "Learn More",
+            "errorMessage": "Sorry, we couldn't retrieve data for your location. Let's continue with general information.",
+            "connection": {
+              "targetId": "ai_dialog"
+            }
+          }
+        },
+        {
+          "id": "ai_dialog",
+          "name": "AI Car Discussion",
+          "type": "aiDialogTree",
+          "x": 1300,
+          "y": 1000,
+          "connections": [
+            {
+              "targetId": "summary",
+              "label": "To Summary"
+            },
+            {
+              "targetId": "more_questions",
+              "label": "More Topics"
+            }
+          ],
+          "parameters": {
+            "scenario": "A conversation about car ownership, transportation choices, and environmental impact based on the player's earlier responses and location.",
+            "npcName": "Environmental Consultant",
+            "npcPersonality": "Knowledgeable, non-judgmental, and genuinely curious about the player's perspective. Asks thoughtful follow-up questions and provides relevant information without being preachy.",
+            "includeVariables": [
+              "playerName",
+              "playerGender",
+              "playerProfession",
+              "playerLocation",
+              "natureConnection",
+              "climateView",
+              "transportChoice",
+              "transportReason"
+            ],
+            "includeInventory": false,
+            "includeVisitedBeats": true,
+            "maxTurns": 3,
+            "presentationMode": "chat-scroll",
+            "exitTargets": [
+              {
+                "id": "summary",
+                "description": "When the conversation reaches a natural conclusion or the player indicates they're ready to move on"
+              },
+              {
+                "id": "more_questions",
+                "description": "If the player wants to explore more environmental topics"
+              }
+            ],
+            "systemInstructions": "Reference the player's earlier choices about nature connection and climate views. Discuss how their transportation choice relates to their stated values. Be informative about environmental impact without being preachy.",
+            "choiceDelay": 0.5
+          }
+        },
+        {
+          "id": "more_questions",
+          "name": "More Questions",
+          "type": "introText",
+          "x": 1600,
+          "y": 850,
+          "connections": [
+            {
+              "targetId": "summary",
+              "label": "Continue"
+            }
+          ],
+          "parameters": {
+            "text": "There's so much more we could explore about environmental choices - from diet to energy use to consumer habits.\n\nBut for now, let's reflect on what we've discussed.",
+            "buttonText": "Continue to Summary",
+            "connection": {
+              "targetId": "summary"
+            }
+          }
+        },
+        {
+          "id": "summary",
+          "name": "AI Summary",
+          "type": "aiSummary",
+          "x": 1600,
+          "y": 1000,
+          "connections": [],
+          "parameters": {
+            "prompt": "Create a personalized summary of this person's environmental journey. Reflect on their stated connection to nature, their views on climate, their transportation choice, and how these relate to their profession and location. Be encouraging and suggest one small actionable step they could take.",
+            "includeVariables": [
+              "playerName",
+              "playerGender",
+              "playerProfession",
+              "playerLocation",
+              "natureConnection",
+              "climateView",
+              "transportChoice",
+              "transportReason"
+            ],
+            "includeAllChoices": true,
+            "includeCounters": false,
+            "summaryStyle": "narrative",
+            "maxLength": "medium",
+            "title": "Your Environmental Journey",
+            "showRestart": true,
+            "showCredits": false,
+            "restartTarget": "title",
+            "resetOnRestart": true
+          }
+        }
+      ],
+      "settings": {},
+      "environment": {},
+      "characters": [],
+      "clusters": []
+    }
+  }
+}

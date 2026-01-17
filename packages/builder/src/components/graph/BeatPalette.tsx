@@ -11,7 +11,7 @@ interface BeatType {
   type: string;
   name: string;
   icon: string;
-  category: 'visible' | 'invisible';
+  category: 'visible' | 'invisible' | 'ai';
   color: string;
 }
 
@@ -27,13 +27,19 @@ const beatTypes: BeatType[] = [
   { type: 'inputText', name: 'Input Text', icon: '✏️', category: 'visible', color: '#06b6d4' },
   { type: 'hyperText', name: 'Hyper Text', icon: '🔗', category: 'visible', color: '#0ea5e9' },
   { type: 'endScreen', name: 'End Screen', icon: '🏁', category: 'visible', color: '#6366f1' },
-  
+
   // Invisible beats
   { type: 'setVariable', name: 'Set Var/Counter', icon: '🔧', category: 'invisible', color: '#64748b' },
   { type: 'conditionBeat', name: 'Condition', icon: '❓', category: 'invisible', color: '#06b6d4' },
   { type: 'randomTarget', name: 'Random Target', icon: '🎲', category: 'invisible', color: '#a855f7' },
   { type: 'setTimer', name: 'Set Timer', icon: '⏱️', category: 'invisible', color: '#f97316' },
   { type: 'addRemoveInventory', name: 'Inventory', icon: '📦', category: 'invisible', color: '#84cc16' },
+
+  // AI-powered beats
+  { type: 'onlineContent', name: 'Online Content', icon: '🌐', category: 'ai', color: '#0891b2' },
+  { type: 'aiDialogTree', name: 'AI Dialog', icon: '🤖', category: 'ai', color: '#7c3aed' },
+  { type: 'aiCondition', name: 'AI Condition', icon: '🧠', category: 'ai', color: '#c026d3' },
+  { type: 'aiSummary', name: 'AI Summary', icon: '📊', category: 'ai', color: '#059669' },
 ];
 
 export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onToggleCollapse, onAddCluster }) => {
@@ -44,6 +50,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
 
   const visibleBeats = beatTypes.filter(b => b.category === 'visible');
   const invisibleBeats = beatTypes.filter(b => b.category === 'invisible');
+  const aiBeats = beatTypes.filter(b => b.category === 'ai');
 
   // Collapsed view - just icons
   if (collapsed) {
@@ -118,6 +125,25 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
               <div
                 key={beat.type}
                 className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-move hover:bg-gray-100 transition-colors border-2 border-transparent hover:border-gray-300"
+                draggable
+                onDragStart={(e) => onDragStart(e, beat.type)}
+                style={{ borderLeftColor: beat.color, borderLeftWidth: '4px' }}
+              >
+                <span className="text-xl">{beat.icon}</span>
+                <span className="text-sm font-medium">{beat.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* AI-Powered Beats */}
+        <div>
+          <h4 className="text-sm font-medium text-gray-600 mb-2">AI Beats</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {aiBeats.map((beat) => (
+              <div
+                key={beat.type}
+                className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg cursor-move hover:bg-purple-100 transition-colors border-2 border-transparent hover:border-purple-300"
                 draggable
                 onDragStart={(e) => onDragStart(e, beat.type)}
                 style={{ borderLeftColor: beat.color, borderLeftWidth: '4px' }}

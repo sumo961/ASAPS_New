@@ -307,7 +307,15 @@ export class DialogTreeBeat extends Beat {
     // Set presentation mode for chat-like dialogs
     renderer.setState('presentationMode', this.presentationMode || 'positioned');
     renderer.setState('showAvatars', this.showAvatars ?? true);
-    renderer.setState('responseDelay', this.responseDelay || 0);
+    // Default responseDelay to 1.5s for chat modes if not explicitly set
+    const isChatMode = this.presentationMode && this.presentationMode !== 'positioned';
+    const defaultDelay = isChatMode ? 1.5 : 0;
+    renderer.setState('responseDelay', this.responseDelay ?? defaultDelay);
+
+    // Set player name for chat display (try common variable names)
+    const variables = context.getVariables();
+    const playerName = variables.playerName || variables.name || variables.player || 'You';
+    renderer.setState('playerName', playerName);
 
     // Clear chat history when starting a new dialog tree in chat mode
     // This ensures messages from previous dialog trees don't persist
@@ -414,8 +422,13 @@ export class DialogTreeBeat extends Beat {
         }
 
         // Process choice text with variable interpolation and render choices
+        // Include isExit flag to indicate if choice exits to another beat (skip typing animation)
         const choiceId = await renderer.renderChoices(
-          visibleChoices.map(c => ({ id: c.id, text: this.processText(c.text, context) })),
+          visibleChoices.map(c => ({
+            id: c.id,
+            text: this.processText(c.text, context),
+            isExit: !!c.target && !c.dialogNode, // Exit if has target but no nested dialog
+          })),
           locations
         );
 
@@ -473,7 +486,8 @@ export class DialogTreeBeat extends Beat {
 
           // New format: target is beat ID to exit, dialogNode continues conversation
           if (selectedChoice.target) {
-            // Exit to another beat
+            // Exit to another beat - add delay so user can see their choice was selected
+            await new Promise(resolve => setTimeout(resolve, 1000));
             exitTargetBeatId = selectedChoice.target;
             this.currentNode = null; // Exit the while loop
           } else if (selectedChoice.dialogNode) {

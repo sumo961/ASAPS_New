@@ -22,7 +22,8 @@
   "dependencies": {
     "@asaps/builder": "^2.0.0",
     "@asaps/core": "^2.0.0",
-    "@asaps/renderer": "^2.0.0"
+    "@asaps/renderer": "^2.0.0",
+    "electron-updater": "^6.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -44,13 +45,16 @@
       "builder/**/*",
       "dist-electron/**/*"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "sumo961",
+      "repo": "ASAPS_New"
+    },
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
-        {
-          "target": "dmg",
-          "arch": ["universal"]
-        }
+        { "target": "zip", "arch": ["universal"] },
+        { "target": "dmg", "arch": ["universal"] }
       ],
       "icon": "build/icon.png",
       "hardenedRuntime": true,

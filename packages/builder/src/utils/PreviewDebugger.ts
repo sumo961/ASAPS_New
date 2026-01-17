@@ -168,9 +168,10 @@ export class PreviewDebugger {
       }
 
       // Check for dead ends (visible beats with no outgoing connections)
-      const visibleTypes = ['titleScreen', 'introText', 'movementChoice', 'pickProp', 'dialogTree', 'videoBeat', 'durScreen'];
+      const visibleTypes = ['titleScreen', 'introText', 'movementChoice', 'pickProp', 'dialogTree', 'videoBeat', 'durScreen', 'inputText', 'hyperText', 'onlineContent', 'aiDialogTree'];
       for (const beat of beats) {
-        if (visibleTypes.includes(beat.type) && beat.type !== 'endScreen') {
+        // aiSummary is like endScreen - doesn't need outgoing connections
+        if (visibleTypes.includes(beat.type) && beat.type !== 'endScreen' && beat.type !== 'aiSummary') {
           const connections = beat.getConnections();
           if (connections.length === 0) {
             warnings.push(`Beat "${beat.name}" (${beat.id}) has no outgoing connections`);

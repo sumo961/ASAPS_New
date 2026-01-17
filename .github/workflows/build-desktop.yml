@@ -38,13 +38,18 @@ jobs:
 
       - name: Package macOS Universal
         working-directory: apps/builder-desktop
-        run: npx electron-builder@26.4.0 --mac --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder@26.4.0 --mac --publish always
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-universal
-          path: apps/builder-desktop/release/*.dmg
+          path: |
+            apps/builder-desktop/release/*.dmg
+            apps/builder-desktop/release/*.zip
+            apps/builder-desktop/release/latest-mac.yml
           if-no-files-found: error
 
   build-windows:
@@ -78,13 +83,17 @@ jobs:
 
       - name: Package Windows
         working-directory: apps/builder-desktop
-        run: npx electron-builder@26.4.0 --win --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder@26.4.0 --win --publish always
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: apps/builder-desktop/release/*.exe
+          path: |
+            apps/builder-desktop/release/*.exe
+            apps/builder-desktop/release/latest.yml
           if-no-files-found: error
 
   release:
@@ -121,7 +130,10 @@ jobs:
           draft: true
           files: |
             release/*.dmg
+            release/*.zip
             release/*.exe
+            release/latest-mac.yml
+            release/latest.yml
           body: |
             ## ASAPS Builder v${{ steps.version.outputs.version }}
 
@@ -132,6 +144,9 @@ jobs:
             ### Installation
             **macOS**: Open the DMG and drag `ASAPS Builder.app` to Applications.
             **Windows**: Run the installer and follow the prompts.
+
+            ### Auto-Update
+            The app will automatically check for updates and notify you when a new version is available.
 
             ### What's New
             <!-- Add release notes here before publishing -->

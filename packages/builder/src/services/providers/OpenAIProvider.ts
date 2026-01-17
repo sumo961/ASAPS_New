@@ -25,6 +25,7 @@ import {
   buildEnhancedUserPrompt
 } from '../prompts/storyGenerationEnhanced';
 import { getAIValidator } from '../AIValidator';
+import { requiresMaxCompletionTokens, isReasoningModel } from './openai-utils';
 
 /**
  * OpenAI Provider Implementation
@@ -120,16 +121,15 @@ export class OpenAIProvider extends BaseAIProvider {
   }
 
   /**
-   * Build a chat completion request body with GPT-5 reasoning support
+   * Build a chat completion request body with modern model support
+   * Uses shared utilities for model detection (requiresMaxCompletionTokens, isReasoningModel)
    */
   private buildChatRequest(
     messages: Array<{ role: 'system' | 'user'; content: string }>,
     defaultMaxTokens: number,
     fallbackTemperature: number
   ): ChatCompletionCreateParamsNonStreaming & Record<string, any> {
-    const isGPT5 = this.model.startsWith('gpt-5');
     const reasoningEffort = this.config?.reasoningEffort;
-    const useReasoningModel = isGPT5 || !!reasoningEffort;
     const maxTokens = this.config?.maxTokens ?? defaultMaxTokens;
 
     const requestBody: ChatCompletionCreateParamsNonStreaming & Record<string, any> = {
@@ -137,7 +137,8 @@ export class OpenAIProvider extends BaseAIProvider {
       messages,
     };
 
-    if (useReasoningModel) {
+    // Use shared utility to determine correct token parameter
+    if (requiresMaxCompletionTokens(this.model) || !!reasoningEffort) {
       requestBody.max_completion_tokens = maxTokens;
     } else {
       requestBody.max_tokens = maxTokens;
@@ -152,8 +153,8 @@ export class OpenAIProvider extends BaseAIProvider {
       requestBody.reasoning_effort = reasoningEffort as any;
     }
 
-    // Temperature is not supported by reasoning models; apply only when allowed
-    if (!useReasoningModel) {
+    // Use shared utility to check if model supports temperature
+    if (!isReasoningModel(this.model, reasoningEffort)) {
       requestBody.temperature = this.config?.temperature ?? fallbackTemperature;
     }
 

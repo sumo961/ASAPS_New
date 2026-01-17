@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-15T08:41:29.383Z
+ * Generated: 2026-01-16T20:13:21.864Z
  */
 
 // ============================================
@@ -338,6 +338,118 @@ export interface HyperTextParameters {
   hoverColor?: string | undefined;
 }
 
+/**
+ * Online Content - Fetch and display real-time data from web APIs or AI queries
+ * Category: visible
+ * Connection Type: single
+ */
+export interface OnlineContentParameters {
+  /** Data source type: 'api' for direct API calls, 'ai-query' for AI-powered search */
+  sourceType: string;
+  /** API URL to fetch (supports ${variable} interpolation) */
+  apiUrl?: string | undefined;
+  /** Query parameters for the API */
+  apiParams?: object | undefined;
+  /** JSONPath to extract data (e.g., $.current.temp_c) */
+  jsonPath?: string | undefined;
+  /** Query for AI to search and summarize */
+  query?: string | undefined;
+  /** Title displayed above the content (auto-derived from query if not set) */
+  title?: string | undefined;
+  /** Maximum word count for AI-generated content */
+  maxWords?: number | undefined;
+  /** Template for displaying result (use {{data}} placeholder) */
+  displayTemplate?: string | undefined;
+  /** Continue button text */
+  buttonText?: string | undefined;
+  /** Message to show if fetch fails */
+  errorMessage?: string | undefined;
+  /** Target beat when button is clicked */
+  connection: Connection;
+}
+
+/**
+ * AI Condition - AI-driven branching that analyzes player state to determine path
+ * Category: invisible
+ * Connection Type: multiple
+ */
+export interface AiConditionParameters {
+  /** Prompt describing what the AI should evaluate */
+  prompt: string;
+  /** Categories for AI to choose from: { name, description, targetId } */
+  categories: object[];
+  /** Variables to include in evaluation (empty = all) */
+  evaluateVariables?: string[] | undefined;
+  /** Include player inventory in evaluation */
+  evaluateInventory?: boolean | undefined;
+  /** Include beat history in evaluation */
+  evaluateHistory?: boolean | undefined;
+  /** Include counters in evaluation */
+  evaluateCounters?: boolean | undefined;
+  /** Fallback target if AI can't decide */
+  defaultTarget?: string | undefined;
+  /** Maximum response time in ms */
+  timeout?: number | undefined;
+}
+
+/**
+ * AI Dialog Tree - Generate personalized dialog trees at runtime using AI
+ * Category: visible
+ * Connection Type: multiple
+ */
+export interface AiDialogTreeParameters {
+  /** Scene description for context */
+  scenario: string;
+  /** NPC name the player is talking to */
+  npcName: string;
+  /** NPC personality traits */
+  npcPersonality?: string | undefined;
+  /** Variables to include in prompt (empty = all) */
+  includeVariables?: string[] | undefined;
+  /** Include player inventory in context */
+  includeInventory?: boolean | undefined;
+  /** Include visited beats in context */
+  includeVisitedBeats?: boolean | undefined;
+  /** Maximum conversation turns */
+  maxTurns?: number | undefined;
+  /** Dialog presentation style */
+  presentationMode?: string | undefined;
+  /** Exit targets: { id: beatId, description: whenToUse } */
+  exitTargets: object[];
+  /** Delay before showing choices */
+  choiceDelay?: number | undefined;
+}
+
+/**
+ * AI Summary - Generate a narrative summary of the player's journey
+ * Category: visible
+ * Connection Type: single
+ */
+export interface AiSummaryParameters {
+  /** Custom instructions for summary style */
+  prompt?: string | undefined;
+  /** Variables to include (empty = all) */
+  includeVariables?: string[] | undefined;
+  /** Include full choice history */
+  includeAllChoices?: boolean | undefined;
+  /** Include final counter values */
+  includeCounters?: boolean | undefined;
+  /** Summary style */
+  summaryStyle?: string | undefined;
+  /** Summary length */
+  maxLength?: string | undefined;
+  /** Title above summary */
+  title?: string | undefined;
+  /** Show restart button */
+  showRestart?: boolean | undefined;
+  /** Show credits button */
+  showCredits?: boolean | undefined;
+  /** Beat to restart to */
+  restartTarget?: string | undefined;
+  /** Reset state on restart */
+  resetOnRestart?: boolean | undefined;
+}
+
 // ============================================
 // Beat Type Union and Maps
 // ============================================
@@ -360,7 +472,11 @@ export type BeatType =
   | 'setTimer'
   | 'addRemoveInventory'
   | 'inputText'
-  | 'hyperText';
+  | 'hyperText'
+  | 'onlineContent'
+  | 'aiCondition'
+  | 'aiDialogTree'
+  | 'aiSummary';
 
 /**
  * Map of beat type name to its parameter interface
@@ -381,6 +497,10 @@ export interface BeatParameterMap {
   'addRemoveInventory': AddRemoveInventoryParameters;
   'inputText': InputTextParameters;
   'hyperText': HyperTextParameters;
+  'onlineContent': OnlineContentParameters;
+  'aiCondition': AiConditionParameters;
+  'aiDialogTree': AiDialogTreeParameters;
+  'aiSummary': AiSummaryParameters;
 }
 
 // ============================================

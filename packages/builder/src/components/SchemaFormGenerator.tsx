@@ -10,6 +10,15 @@ interface ParameterDefinition {
   default?: any;
   description?: string;
   minItems?: number;
+  ui?: {
+    control?: 'text' | 'textarea' | 'select' | 'number';
+    options?: string[];
+    label?: string;
+    min?: number;
+    max?: number;
+    step?: number;
+    rows?: number;
+  };
 }
 
 interface BeatDefinition {
@@ -89,20 +98,47 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
     // Determine field type based on parameter type
     switch (paramDef.type) {
       case 'string':
-        // Check if it's a multi-line text field
-        if (paramName === 'text' || paramName === 'message' || paramName === 'prompt') {
+        // Check for explicit textarea control or known multi-line fields
+        const isTextarea = paramDef.ui?.control === 'textarea' ||
+          paramName === 'text' || paramName === 'message' || paramName === 'prompt';
+
+        if (isTextarea) {
+          const rows = paramDef.ui?.rows || (paramName === 'message' ? 2 : 4);
           return (
             <div key={paramName}>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {label} {isRequired && <span className="text-red-500">*</span>}
+                {paramDef.ui?.label || label} {isRequired && <span className="text-red-500">*</span>}
               </label>
               <textarea
                 value={value || paramDef.default || ''}
                 onChange={(e) => onParameterChange(paramName, e.target.value)}
-                rows={paramName === 'message' ? 2 : 4}
+                rows={rows}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 placeholder={paramDef.description || `Enter ${paramName}`}
               />
+              {paramDef.description && (
+                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+              )}
+            </div>
+          );
+        }
+
+        // Check for explicit select control
+        if (paramDef.ui?.control === 'select' && paramDef.ui.options) {
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {paramDef.ui.label || label} {isRequired && <span className="text-red-500">*</span>}
+              </label>
+              <select
+                value={value || paramDef.default || ''}
+                onChange={(e) => onParameterChange(paramName, e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                {paramDef.ui.options.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
               {paramDef.description && (
                 <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
               )}

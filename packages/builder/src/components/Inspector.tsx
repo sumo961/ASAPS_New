@@ -202,7 +202,12 @@ export const Inspector: React.FC<InspectorProps> = ({
       'movementChoice',
       'dialogTree',
       'endScreen',
-      'videoBeat'
+      'videoBeat',
+      'inputText',
+      'hyperText',
+      'onlineContent',
+      'aiDialogTree',
+      'aiSummary'
     ];
     return visualBeatTypes.includes(beatType);
   };

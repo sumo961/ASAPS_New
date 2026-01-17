@@ -11,6 +11,7 @@ export * from './themes/presets';
 export * from './layout';
 export * from './twine';
 export * from './renpy';
+export * from './utils';
 
 // Package info
 export const version = '2.0.0';

@@ -19,3 +19,9 @@ export { SWFBeat } from './SWFBeat';
 export { InputTextBeat } from './InputTextBeat';
 export { HyperTextBeat } from './HyperTextBeat';
 export { BeatTypeRegistry } from './BeatRegistry';
+
+// AI-powered beats
+export { OnlineContentBeat, type OnlineContentBeatParams } from './OnlineContentBeat';
+export { AIConditionBeat, type AIConditionCategory, type AIConditionBeatParams } from './AIConditionBeat';
+export { AIDialogTreeBeat, type AIDialogExitTarget, type AIDialogTreeBeatParams } from './AIDialogTreeBeat';
+export { AISummaryBeat, type AISummaryBeatParams } from './AISummaryBeat';

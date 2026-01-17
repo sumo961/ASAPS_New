@@ -554,6 +554,175 @@ const HyperText: React.FC<{
   );
 };
 
+// Loading Display Component for AI-powered beats
+// Uses theme styling for consistent look with the rest of the story
+const LoadingDisplay: React.FC<{
+  message: string;
+  subMessage?: string;
+  spinnerType?: 'spinner' | 'dots' | 'pulse';
+  backgroundUrl?: string | null;
+  theme?: RenderThemeSettings;
+}> = ({ message, subMessage, spinnerType = 'spinner', backgroundUrl, theme }) => {
+  // Animation states for dots
+  const [dotCount, setDotCount] = React.useState(1);
+
+  React.useEffect(() => {
+    if (spinnerType === 'dots') {
+      const interval = setInterval(() => {
+        setDotCount(prev => (prev % 3) + 1);
+      }, 400);
+      return () => clearInterval(interval);
+    }
+  }, [spinnerType]);
+
+  // Get theme values with defaults
+  const textBox = theme?.textBox || {
+    backgroundColor: '#16213e',
+    borderColor: '#4a90d9',
+    borderWidth: 2,
+    borderRadius: 8,
+    padding: 24,
+    opacity: 90,
+  };
+  const colors = theme?.colors || {
+    textColor: '#ffffff',
+    textAlpha: 100,
+  };
+  const fonts = theme?.fonts || {
+    textFont: 'sans-serif',
+    textFontSize: 18,
+  };
+
+  // Convert textBox opacity (0-100) to CSS value
+  const bgOpacity = (textBox.opacity || 90) / 100;
+
+  // Parse background color and apply opacity
+  const textBoxBg = textBox.backgroundColor?.startsWith('#')
+    ? `rgba(${parseInt(textBox.backgroundColor.slice(1,3), 16)}, ${parseInt(textBox.backgroundColor.slice(3,5), 16)}, ${parseInt(textBox.backgroundColor.slice(5,7), 16)}, ${bgOpacity})`
+    : (textBox.backgroundColor || 'rgba(22, 33, 62, 0.9)');
+
+  const textColor = colors.textColor || '#ffffff';
+  const textAlpha = (colors.textAlpha || 100) / 100;
+
+  const renderSpinner = () => {
+    switch (spinnerType) {
+      case 'dots':
+        return (
+          <div className="flex items-center justify-center space-x-3 mb-4">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="w-3 h-3 rounded-full transition-all duration-300"
+                style={{
+                  backgroundColor: i < dotCount ? textColor : `${textColor}33`,
+                  transform: i < dotCount ? 'scale(1.3)' : 'scale(1)',
+                  opacity: i < dotCount ? textAlpha : textAlpha * 0.3,
+                }}
+              />
+            ))}
+          </div>
+        );
+      case 'pulse':
+        return (
+          <div className="mb-4 flex justify-center">
+            <div
+              className="w-12 h-12 rounded-full animate-pulse"
+              style={{
+                backgroundColor: theme?.button?.backgroundColor || textBox.borderColor || '#4a90d9',
+                boxShadow: `0 0 15px ${theme?.button?.backgroundColor || textBox.borderColor || '#4a90d9'}`,
+              }}
+            />
+          </div>
+        );
+      case 'spinner':
+      default:
+        return (
+          <div className="mb-4 flex justify-center">
+            <div
+              className="w-10 h-10 border-3 rounded-full animate-spin"
+              style={{
+                borderWidth: '3px',
+                borderColor: `${textColor}33`,
+                borderTopColor: textColor,
+              }}
+            />
+          </div>
+        );
+    }
+  };
+
+  // Determine page background
+  const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+  const pageBackground = backgroundUrl
+    ? 'transparent'
+    : (theme?.backgroundColor || defaultGradient);
+
+  return (
+    <div
+      className="flex flex-col items-center justify-center h-screen"
+      style={{
+        backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundColor: backgroundUrl ? 'transparent' : undefined,
+        background: !backgroundUrl ? pageBackground : undefined,
+      }}
+    >
+      {/* Semi-transparent overlay for readability when there's a background image */}
+      {backgroundUrl && (
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          }}
+        />
+      )}
+
+      {/* Content box using theme textbox styling */}
+      <div
+        className="relative z-10 flex flex-col items-center text-center"
+        style={{
+          backgroundColor: textBoxBg,
+          border: `${textBox.borderWidth || 2}px solid ${textBox.borderColor || '#4a90d9'}`,
+          borderRadius: `${textBox.borderRadius || 8}px`,
+          padding: `${(textBox.padding || 24) + 8}px ${(textBox.padding || 24) + 16}px`,
+          minWidth: '300px',
+          maxWidth: '500px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+        }}
+      >
+        {renderSpinner()}
+        <h2
+          style={{
+            color: textColor,
+            opacity: textAlpha,
+            fontFamily: fonts.textFont || 'sans-serif',
+            fontSize: `${(fonts.textFontSize || 18) + 2}px`,
+            fontWeight: 500,
+            marginBottom: subMessage ? '8px' : '0',
+            lineHeight: 1.4,
+          }}
+        >
+          {message}
+        </h2>
+        {subMessage && (
+          <p
+            style={{
+              color: textColor,
+              opacity: textAlpha * 0.7,
+              fontFamily: fonts.textFont || 'sans-serif',
+              fontSize: `${(fonts.textFontSize || 18) - 2}px`,
+              margin: 0,
+            }}
+          >
+            {subMessage}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ============= REACT RENDERER CLASS =============
 
 export class ReactRenderer extends BaseRenderer {
@@ -1029,8 +1198,9 @@ export class ReactRenderer extends BaseRenderer {
 
   /**
    * Render the chat dialog view with current messages and optional choices
+   * Choices can include an isExit flag to indicate the choice exits to another beat
    */
-  private renderChatDialog(choices: Array<{ id: string; text: string }>): Promise<string> {
+  private renderChatDialog(choices: Array<{ id: string; text: string; isExit?: boolean }>): Promise<string> {
     return new Promise(resolve => {
       // Get response delay from renderer state (set by DialogTreeBeat)
       const responseDelay = (this.getState('responseDelay') as number) || 0;
@@ -1039,22 +1209,32 @@ export class ReactRenderer extends BaseRenderer {
         // When a choice is selected, add it as a player message
         const selectedChoice = choices.find(c => c.id === id);
         if (selectedChoice) {
+          // Get player name from state (set by beat from context), default to "You"
+          const playerName = (this.getState('playerName') as string) || 'You';
+          // Use first name or initial if full name is too long
+          const displayName = playerName.length > 12
+            ? (playerName.split(' ')[0] || playerName.charAt(0))
+            : playerName;
+
           const playerMessageId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
           this.chatMessages.push({
             id: playerMessageId,
-            speaker: 'You', // Player's name
+            speaker: displayName,
             text: selectedChoice.text,
             isPlayer: true,
           });
 
-          // If there's a response delay, show player message first, then typing indicator
-          if (responseDelay > 0) {
-            // Re-render to show player's message (without choices, with typing indicator)
-            this.renderChatView([], false);
+          // Always show player's message briefly before transitioning
+          // Re-render to show player's choice (without choices available)
+          this.renderChatView([], false);
 
-            // Small delay to let player see their message
-            await new Promise(r => setTimeout(r, 300));
+          // Brief delay to let player see their selection (minimum 500ms)
+          await new Promise(r => setTimeout(r, 500));
 
+          // If there's a response delay AND this choice continues the dialog (not an exit),
+          // show typing indicator for NPC follow-up
+          const isExitChoice = (selectedChoice as any).isExit === true;
+          if (responseDelay > 0 && !isExitChoice) {
             // Show typing indicator
             this.renderChatView([], true);
 
@@ -1310,6 +1490,34 @@ export class ReactRenderer extends BaseRenderer {
     return this.renderPositionedBeat('endScreen', content, effectiveLocations);
   }
 
+  async renderAISummary(data: {
+    title: string;
+    summary: string;
+    showRestart: boolean;
+    showCredits: boolean;
+    restartText?: string;
+    creditsText?: string;
+  }, locations?: Location[]): Promise<string> {
+    const backgroundAssetId = this.getState('backgroundAssetId');
+    this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+
+    // Build content with separate title and summary
+    const content = {
+      title: data.title,
+      summary: data.summary,
+      showRestart: data.showRestart,
+      showCredits: data.showCredits,
+      restartText: data.restartText || 'Play Again',
+      creditsText: data.creditsText || 'Credits',
+    };
+
+    // Use provided locations or generate default locations from schema
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('aiSummary', content);
+
+    // Return the user's action (e.g., 'restart', 'credits')
+    return this.renderPositionedBeat('aiSummary', content, effectiveLocations);
+  }
+
   async renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
@@ -1444,6 +1652,41 @@ export class ReactRenderer extends BaseRenderer {
 
       this.renderComponent(<ChoicesDisplayWithFade />);
     });
+  }
+
+  /**
+   * Show a loading indicator for AI-powered beats
+   * @param message Main message to display (e.g., "Searching the internet...")
+   * @param options Additional options (subMessage, spinnerType)
+   */
+  renderLoading(message: string, options?: {
+    subMessage?: string;
+    spinnerType?: 'spinner' | 'dots' | 'pulse';
+  }): void {
+    // Get background
+    const backgroundAssetId = this.getState('backgroundAssetId');
+    this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+
+    this.renderComponent(
+      <LoadingDisplay
+        message={message}
+        subMessage={options?.subMessage}
+        spinnerType={options?.spinnerType}
+        backgroundUrl={this.backgroundImageUrl}
+        theme={this.theme}
+      />
+    );
+  }
+
+  /**
+   * Hide the loading indicator
+   * Note: Usually not needed as the next render call will replace it
+   */
+  hideLoading(): void {
+    // Simply render empty - next render will replace
+    if (this.root) {
+      this.root.render(<></>);
+    }
   }
 
   clear(): void {

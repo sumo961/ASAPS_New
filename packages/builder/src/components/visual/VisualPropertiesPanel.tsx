@@ -279,8 +279,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           </div>
         )}
 
-        {/* Dialog Settings Section - Only for dialogTree beats */}
-        {beatType === 'dialogTree' && onPresentationModeChange && (
+        {/* Dialog Settings Section - For dialogTree and aiDialogTree beats */}
+        {(beatType === 'dialogTree' || beatType === 'aiDialogTree') && onPresentationModeChange && (
           <div className="border-b border-gray-200">
             <button
               onClick={() => toggleSection('dialogSettings')}

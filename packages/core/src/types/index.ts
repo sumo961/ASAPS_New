@@ -141,8 +141,38 @@ export interface StatePreset {
 }
 
 /**
+ * AI Service interface for dynamic AI-powered beats
+ * Used by OnlineContentBeat, AIConditionBeat, AIDialogTreeBeat, AISummaryBeat
+ */
+export interface IAIService {
+  /** Generate text content from a prompt */
+  generateContent(prompt: string, options?: {
+    maxTokens?: number;
+    enableWebSearch?: boolean;
+  }): Promise<string>;
+
+  /** Generate a dialog tree structure */
+  generateDialog(request: {
+    prompt: string;
+    format: 'dialogTree';
+    maxTurns?: number;
+  }): Promise<any>;
+
+  /** Classify content into one of the provided categories */
+  classifyContent(prompt: string, categories: string[]): Promise<string>;
+}
+
+/**
  * IRenderer interface defines the contract for all renderers
  * Moved to core package to avoid circular dependencies
+ *
+ * AI Service Integration:
+ * AI-powered beats access the AI service via renderer state:
+ * - renderer.getState('aiService') returns the IAIService instance
+ * - renderer.setState('aiService', service) sets the service
+ *
+ * Builder Preview: Pass the AIService from useAI() hook
+ * Player App: Configure AI settings and set the service on the renderer
  */
 export interface IRenderer {
   // Core rendering methods (with optional locations for positioned rendering)
@@ -154,6 +184,14 @@ export interface IRenderer {
   renderPropSelection(question: string, props: { id: string; name: string; description: string }[], locations?: Location[]): Promise<string>;
   renderVideo(videoFile: string, autoplay: boolean, controls: boolean): Promise<void>;
   renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<string>;
+  renderAISummary?(data: {
+    title: string;
+    summary: string;
+    showRestart: boolean;
+    showCredits: boolean;
+    restartText?: string;
+    creditsText?: string;
+  }, locations?: Location[]): Promise<string>;
   renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void>;
 
   // Show choices with optional fade-in animation
@@ -191,6 +229,13 @@ export interface IRenderer {
 
   // Chat mode support
   clearChatHistory?(): void;
+
+  // Loading indicator for AI-powered beats
+  renderLoading?(message: string, options?: {
+    subMessage?: string;
+    spinnerType?: 'spinner' | 'dots' | 'pulse';
+  }): void;
+  hideLoading?(): void;
 
   // User interaction
   waitForUserInput(): Promise<void>;

@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import * as fs from 'fs/promises';
 import { getEmbeddedAPIServer } from './api-server';
+import { autoUpdater, type UpdateInfo } from 'electron-updater';
 
 // Get the API server instance
 const apiServer = getEmbeddedAPIServer({ port: 3001, host: 'localhost' });
@@ -19,10 +20,12 @@ try {
 // App settings management
 interface AppSettings {
   mcpEnabled: boolean;
+  autoUpdateEnabled: boolean;
 }
 
 const defaultSettings: AppSettings = {
   mcpEnabled: false,
+  autoUpdateEnabled: true,  // Enabled by default
 };
 
 function getSettingsPath(): string {
@@ -53,6 +56,111 @@ function saveAppSettings(settings: AppSettings): void {
 }
 
 let appSettings = loadAppSettings();
+
+// Auto-updater setup
+function setupAutoUpdater(): void {
+  // Don't check for updates in dev mode
+  if (!app.isPackaged) {
+    console.log('[AutoUpdater] Skipping - not packaged (dev mode)');
+    return;
+  }
+
+  // Configure auto-updater
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  // Event: Update available
+  autoUpdater.on('update-available', (info: UpdateInfo) => {
+    console.log('[AutoUpdater] Update available:', info.version);
+    dialog.showMessageBox(mainWindow!, {
+      type: 'info',
+      title: 'Update Available',
+      message: `A new version (${info.version}) is available!`,
+      detail: 'Would you like to download it now?',
+      buttons: ['Download Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.downloadUpdate();
+      }
+    });
+  });
+
+  // Event: Update not available
+  autoUpdater.on('update-not-available', (info: UpdateInfo) => {
+    console.log('[AutoUpdater] No update available, current version is latest:', info.version);
+  });
+
+  // Event: Download progress
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`[AutoUpdater] Download progress: ${Math.round(progress.percent)}%`);
+    mainWindow?.webContents.send('update:download-progress', progress);
+  });
+
+  // Event: Update downloaded
+  autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+    console.log('[AutoUpdater] Update downloaded:', info.version);
+    dialog.showMessageBox(mainWindow!, {
+      type: 'info',
+      title: 'Update Ready',
+      message: 'Update downloaded successfully!',
+      detail: 'The update will be installed when you restart the app. Would you like to restart now?',
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  // Event: Error
+  autoUpdater.on('error', (error) => {
+    console.error('[AutoUpdater] Error:', error);
+  });
+
+  // Delay initial check by 5 seconds to not slow startup
+  if (appSettings.autoUpdateEnabled) {
+    setTimeout(() => {
+      console.log('[AutoUpdater] Checking for updates...');
+      autoUpdater.checkForUpdates().catch((err) => {
+        console.error('[AutoUpdater] Check failed:', err);
+      });
+    }, 5000);
+  }
+}
+
+// Manual update check
+function checkForUpdatesManually(): void {
+  if (!app.isPackaged) {
+    dialog.showMessageBox(mainWindow!, {
+      type: 'info',
+      title: 'Update Check',
+      message: 'Updates are not available in development mode.',
+    });
+    return;
+  }
+
+  autoUpdater.checkForUpdates().then((result) => {
+    if (!result || !result.updateInfo) {
+      dialog.showMessageBox(mainWindow!, {
+        type: 'info',
+        title: 'No Updates',
+        message: 'You are already running the latest version.',
+      });
+    }
+  }).catch((err) => {
+    console.error('[AutoUpdater] Manual check failed:', err);
+    dialog.showMessageBox(mainWindow!, {
+      type: 'error',
+      title: 'Update Check Failed',
+      message: 'Failed to check for updates. Please try again later.',
+      detail: err.message,
+    });
+  });
+}
 
 let mainWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
@@ -126,6 +234,16 @@ function createMenu(): void {
                   mainWindow?.webContents.send('settings:mcp-changed', appSettings.mcpEnabled);
                 },
               },
+              {
+                id: 'auto-update-toggle',
+                label: 'Check for Updates Automatically',
+                type: 'checkbox' as const,
+                checked: appSettings.autoUpdateEnabled,
+                click: (menuItem: Electron.MenuItem) => {
+                  appSettings.autoUpdateEnabled = menuItem.checked;
+                  saveAppSettings(appSettings);
+                },
+              },
               { type: 'separator' as const },
               { role: 'services' as const },
               { type: 'separator' as const },
@@ -151,6 +269,16 @@ function createMenu(): void {
                   appSettings.mcpEnabled = menuItem.checked;
                   saveAppSettings(appSettings);
                   mainWindow?.webContents.send('settings:mcp-changed', appSettings.mcpEnabled);
+                },
+              },
+              {
+                id: 'auto-update-toggle',
+                label: 'Check for Updates Automatically',
+                type: 'checkbox' as const,
+                checked: appSettings.autoUpdateEnabled,
+                click: (menuItem: Electron.MenuItem) => {
+                  appSettings.autoUpdateEnabled = menuItem.checked;
+                  saveAppSettings(appSettings);
                 },
               },
             ],
@@ -250,6 +378,11 @@ function createMenu(): void {
     {
       label: 'Help',
       submenu: [
+        {
+          label: 'Check for Updates...',
+          click: () => checkForUpdatesManually(),
+        },
+        { type: 'separator' },
         {
           label: 'Documentation',
           click: () => shell.openExternal('https://asaps.example.com/docs'),
@@ -385,6 +518,9 @@ app.whenReady().then(async () => {
 
   createMenu();
   createWindow();
+
+  // Setup auto-updater after window is created
+  setupAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

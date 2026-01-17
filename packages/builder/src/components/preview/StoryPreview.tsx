@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { X, Play, RotateCcw, ChevronRight, Info, Eye, EyeOff, ChevronDown, Database, ZoomIn, ZoomOut, Maximize2, Volume2, VolumeX, Type, Zap, List, Package } from 'lucide-react';
 import { Story, StoryEngine, Beat } from '@asaps/core';
-import type { StatePreset } from '@asaps/core';
+import type { StatePreset, IAIService } from '@asaps/core';
 import { ReactRenderer, getAudioManager } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import type { Asset } from '../assets/AssetManager';
@@ -10,6 +10,279 @@ import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import { StatePresetManager } from '../debug/StatePresetManager';
 import { StatePresetEditor } from '../debug/StatePresetEditor';
 import { initializeBeatLocations } from '../../utils/SchemaLocationInitializer';
+import { getSavedAIConfig } from '../../hooks/useAI';
+import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
+import { buildChatRequestBody } from '../../services/providers/openai-utils';
+
+// Proxy endpoint for CORS-blocked requests (custom baseUrls)
+const CLAUDE_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/claude';
+const OPENAI_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/openai';
+
+/**
+ * Make a proxied request to avoid CORS issues with custom API endpoints
+ */
+async function makeProxyRequest(
+  endpoint: string,
+  baseUrl: string,
+  apiKey: string,
+  requestBody: any
+): Promise<any> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      baseUrl,
+      apiKey,
+      ...requestBody,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Proxy request failed' }));
+    throw new Error(error.message || 'Proxy request failed');
+  }
+
+  return response.json();
+}
+
+/**
+ * Create an AI service adapter that implements IAIService interface
+ * This wraps the builder's AI configuration to provide runtime AI capabilities for AI beats
+ */
+function createAIServiceAdapter(): IAIService | null {
+  const savedConfig = getSavedAIConfig();
+  if (!savedConfig || !savedConfig.apiKey) {
+    console.log('[StoryPreview] No AI configuration found');
+    return null;
+  }
+
+  console.log('[StoryPreview] Creating AI service adapter for provider:', savedConfig.provider);
+
+  // Use proxy when custom baseUrl is set (to avoid CORS)
+  const useProxy = !!savedConfig.baseUrl;
+  if (useProxy) {
+    console.log('[StoryPreview] Using proxy for custom baseUrl:', savedConfig.baseUrl);
+  }
+
+  if (savedConfig.provider === 'claude') {
+    const model = savedConfig.model || 'claude-sonnet-4-20250514';
+
+    // Only create direct client if not using proxy
+    const client = !useProxy ? new Anthropic({
+      apiKey: savedConfig.apiKey,
+      dangerouslyAllowBrowser: true,
+    }) : null;
+
+    return {
+      async generateContent(prompt: string, options?: { maxTokens?: number; enableWebSearch?: boolean }): Promise<string> {
+        console.log('[AIServiceAdapter] generateContent called');
+
+        const requestBody = {
+          model,
+          max_tokens: options?.maxTokens || 4096,
+          messages: [{ role: 'user' as const, content: prompt }],
+        };
+
+        let response;
+        if (useProxy) {
+          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+        } else {
+          const apiResponse = await client!.messages.create(requestBody);
+          response = { content: apiResponse.content };
+        }
+
+        const content = response.content[0];
+        if (content.type === 'text') {
+          return content.text;
+        }
+        throw new Error('Unexpected response type from Claude');
+      },
+
+      async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
+        console.log('[AIServiceAdapter] generateDialog called');
+        const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format with the following structure:
+{
+  "id": "unique_id",
+  "speaker": "Character Name",
+  "text": "What the character says",
+  "choices": [
+    {
+      "id": "choice_id",
+      "text": "Player's choice text",
+      "dialogNode": { ... nested dialog node ... } OR
+      "target": "exit_target_id"
+    }
+  ]
+}`;
+
+        const requestBody = {
+          model,
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user' as const, content: request.prompt }],
+        };
+
+        let response;
+        if (useProxy) {
+          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+        } else {
+          const apiResponse = await client!.messages.create(requestBody as any);
+          response = { content: apiResponse.content };
+        }
+
+        const content = response.content[0];
+        if (content.type !== 'text') {
+          throw new Error('Unexpected response type from Claude');
+        }
+
+        // Extract JSON from response
+        const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('Could not extract JSON from response');
+        }
+
+        return JSON.parse(jsonMatch[0]);
+      },
+
+      async classifyContent(prompt: string, categories: string[]): Promise<string> {
+        console.log('[AIServiceAdapter] classifyContent called with categories:', categories);
+        const systemPrompt = `You are a classifier. Given a prompt, classify it into exactly ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name, nothing else.`;
+
+        const requestBody = {
+          model,
+          max_tokens: 100,
+          system: systemPrompt,
+          messages: [{ role: 'user' as const, content: prompt }],
+        };
+
+        let response;
+        if (useProxy) {
+          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+        } else {
+          const apiResponse = await client!.messages.create(requestBody as any);
+          response = { content: apiResponse.content };
+        }
+
+        const content = response.content[0];
+        if (content.type === 'text') {
+          // Clean up response to get just the category
+          const result = content.text.trim();
+          // Find matching category (case-insensitive)
+          const match = categories.find(c => c.toLowerCase() === result.toLowerCase());
+          return match || categories[0];
+        }
+        return categories[0];
+      },
+    };
+  } else {
+    // OpenAI provider (also used for local/compatible APIs)
+    const model = savedConfig.model || 'gpt-4';
+
+    // Only create direct client if not using proxy
+    const client = !useProxy ? new OpenAI({
+      apiKey: savedConfig.apiKey,
+      dangerouslyAllowBrowser: true,
+    }) : null;
+
+    return {
+      async generateContent(prompt: string, options?: { maxTokens?: number; enableWebSearch?: boolean }): Promise<string> {
+        console.log('[AIServiceAdapter] generateContent called (OpenAI)');
+
+        // Use shared utility to build request with correct token parameter
+        const requestBody = buildChatRequestBody(
+          model,
+          [{ role: 'user' as const, content: prompt }],
+          options?.maxTokens || 4096
+        );
+
+        if (useProxy) {
+          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+          return response.choices?.[0]?.message?.content || '';
+        } else {
+          // Cast needed because buildChatRequestBody returns Record<string, any> for flexibility
+          const response = await client!.chat.completions.create(requestBody as any);
+          return response.choices[0]?.message?.content || '';
+        }
+      },
+
+      async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
+        console.log('[AIServiceAdapter] generateDialog called (OpenAI)');
+        const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format with the following structure:
+{
+  "id": "unique_id",
+  "speaker": "Character Name",
+  "text": "What the character says",
+  "choices": [
+    {
+      "id": "choice_id",
+      "text": "Player's choice text",
+      "dialogNode": { ... nested dialog node ... } OR
+      "target": "exit_target_id"
+    }
+  ]
+}`;
+
+        // Use shared utility to build request with correct token parameter
+        const requestBody = buildChatRequestBody(
+          model,
+          [
+            { role: 'system' as const, content: systemPrompt },
+            { role: 'user' as const, content: request.prompt },
+          ],
+          4096
+        );
+
+        let content: string;
+        if (useProxy) {
+          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+          content = response.choices?.[0]?.message?.content || '';
+        } else {
+          const response = await client!.chat.completions.create(requestBody as any);
+          content = response.choices[0]?.message?.content || '';
+        }
+
+        // Extract JSON from response
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('Could not extract JSON from response');
+        }
+
+        return JSON.parse(jsonMatch[0]);
+      },
+
+      async classifyContent(prompt: string, categories: string[]): Promise<string> {
+        console.log('[AIServiceAdapter] classifyContent called (OpenAI) with categories:', categories);
+        const systemPrompt = `You are a classifier. Given a prompt, classify it into exactly ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name, nothing else.`;
+
+        // Use shared utility to build request with correct token parameter
+        const requestBody = buildChatRequestBody(
+          model,
+          [
+            { role: 'system' as const, content: systemPrompt },
+            { role: 'user' as const, content: prompt },
+          ],
+          100
+        );
+
+        let result: string;
+        if (useProxy) {
+          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+          result = (response.choices?.[0]?.message?.content || '').trim();
+        } else {
+          const response = await client!.chat.completions.create(requestBody as any);
+          result = (response.choices[0]?.message?.content || '').trim();
+        }
+
+        // Find matching category (case-insensitive)
+        const match = categories.find(c => c.toLowerCase() === result.toLowerCase());
+        return match || categories[0];
+      },
+    };
+  }
+}
 
 // Stage dimensions
 const STAGE_WIDTH = 1024;
@@ -529,6 +802,15 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
 
       rendererRef.current = reactRenderer;
       engineRef.current = engine;
+
+      // Set up AI service for AI-powered beats (OnlineContent, AIDialogTree, AICondition, AISummary)
+      const aiServiceAdapter = createAIServiceAdapter();
+      if (aiServiceAdapter) {
+        reactRenderer.setState('aiService', aiServiceAdapter);
+        console.log('[StoryPreview] AI service adapter configured for runtime AI beats');
+      } else {
+        console.log('[StoryPreview] No AI configuration found - AI beats will show fallback messages');
+      }
 
       console.log('[StoryPreview] Renderer and engine created');
     } else {

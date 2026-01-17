@@ -477,6 +477,17 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
 
+  // Reset inputValue when the beat changes or input element's content (prompt) changes
+  // This ensures consecutive inputText beats show empty input with placeholder
+  // Detection matches render logic: name contains 'input' (not kind === 'input')
+  const inputElement = elements.find(el => el.location.name.toLowerCase().includes('input'));
+  const inputPrompt = inputElement?.content;
+  // Create a unique key from elements to detect beat changes (even if prompt is the same)
+  const inputResetKey = elements.map(el => `${el.location.name}:${el.content?.substring(0, 20)}`).join('|');
+  React.useEffect(() => {
+    setInputValue('');
+  }, [inputPrompt, inputResetKey]);
+
   // State for timer - subscribes to updates for real-time progress bar animation
   const [timerState, setTimerState] = React.useState(initialTimerState);
 
@@ -881,11 +892,19 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           padding: '0 20px',
         }}>
           {/* Text elements with sequenced animation */}
-          {sortedTextElements.map((element, index) => (
+          {sortedTextElements.map((element, index) => {
+            // For long content (like AI-generated text), use wider width
+            const contentLength = element.content?.length || 0;
+            const isLongContent = contentLength > 150;
+            const isVeryLongContent = contentLength > 300;
+            // Use 90% width for very long content, 80% for long, otherwise use location width
+            const effectiveWidth = isVeryLongContent ? '90%' : isLongContent ? '80%' : `${Math.min(element.location.width, stageWidth * 0.9)}px`;
+
+            return (
             <div
               key={`text-${index}-${element.location.name}`}
               style={{
-                width: `${element.location.width}px`,
+                width: effectiveWidth,
                 maxWidth: '90%',
               }}
             >
@@ -899,7 +918,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                 skipAnimation={effectiveSkipAnimation}
               />
             </div>
-          ))}
+            );
+          })}
 
           {/* Buttons in a row - fade in after animation completes */}
           {buttonElements.length > 0 && (
@@ -1191,8 +1211,42 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
     case 'text': {
       // Text elements use auto height to expand for long content
       // The defined height becomes minHeight to maintain layout for short text
+
+      // For long content (like AI-generated text), expand width to use more screen space
+      // This ensures AI content isn't constrained to narrow visual editor widths
+      const contentLength = content?.length || 0;
+      const isLongContent = contentLength > 150;
+      const isVeryLongContent = contentLength > 300;
+
+      // Calculate expanded width for long content, centered in container
+      let effectiveWidth = location.width;
+      let effectiveLeft = effectiveX;
+
+      if (containerDimensions) {
+        const containerWidth = containerDimensions.width;
+        const narrowThreshold = containerWidth * 0.5;
+
+        // Expand width for long content
+        if (isLongContent || isVeryLongContent) {
+          // Use 90% for very long, 80% for long content
+          const widthPercent = isVeryLongContent ? 0.9 : 0.8;
+          effectiveWidth = containerWidth * widthPercent;
+          // Center the expanded text box
+          effectiveLeft = (containerWidth - effectiveWidth) / 2;
+        }
+        // Also expand if the text box is narrower than 50% of container
+        // This handles cases where content mapping failed but the beat displays dynamic content
+        else if (location.width < narrowThreshold) {
+          // Use 80% width for narrow text boxes (likely from visual editor)
+          effectiveWidth = containerWidth * 0.8;
+          effectiveLeft = (containerWidth - effectiveWidth) / 2;
+        }
+      }
+
       const textStyle = {
         ...baseStyle,
+        left: `${effectiveLeft}px`,
+        width: `${effectiveWidth}px`,
         height: 'auto',
         minHeight: `${location.height}px`,
       };
@@ -1292,10 +1346,48 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         />
       );
 
-    case 'dialog':
+    case 'dialog': {
+      // For long content (like AI-generated text), expand width to use more screen space
+      // This ensures AI content isn't constrained to narrow visual editor widths
+      const dialogContentLength = content?.length || 0;
+      const isDialogLongContent = dialogContentLength > 150;
+      const isDialogVeryLongContent = dialogContentLength > 300;
+
+      // Calculate expanded width for long content, centered in container
+      let dialogEffectiveWidth = location.width;
+      let dialogEffectiveLeft = effectiveX;
+
+      if (containerDimensions) {
+        const containerWidth = containerDimensions.width;
+        const narrowThreshold = containerWidth * 0.5;
+
+        // Expand width for long content
+        if (isDialogLongContent || isDialogVeryLongContent) {
+          // Use 90% for very long, 80% for long content
+          const widthPercent = isDialogVeryLongContent ? 0.9 : 0.8;
+          dialogEffectiveWidth = containerWidth * widthPercent;
+          // Center the expanded text box
+          dialogEffectiveLeft = (containerWidth - dialogEffectiveWidth) / 2;
+        }
+        // Also expand if the text box is narrower than 50% of container
+        // This handles cases where content mapping failed but the beat displays dynamic content
+        else if (location.width < narrowThreshold) {
+          // Use 80% width for narrow text boxes (likely from visual editor)
+          dialogEffectiveWidth = containerWidth * 0.8;
+          dialogEffectiveLeft = (containerWidth - dialogEffectiveWidth) / 2;
+        }
+      }
+
+      const dialogStyle = {
+        ...baseStyle,
+        left: `${dialogEffectiveLeft}px`,
+        width: `${dialogEffectiveWidth}px`,
+        height: 'auto',
+        minHeight: `${location.height}px`,
+      };
       return (
         <DialogElement
-          style={baseStyle}
+          style={dialogStyle}
           content={content}
           location={location}
           hideTextBox={hideTextBoxes}
@@ -1308,6 +1400,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           skipAnimation={skipAnimation}
         />
       );
+    }
 
     case 'character': {
       // Get meter frame data if character has one configured
@@ -1604,13 +1697,29 @@ const TextElement: React.FC<{
     ? { animation: `fadeIn ${fadeInDuration}ms ease-in` }
     : {};
 
-  // Always use auto height for text elements to fit content
-  // This ensures long text expands properly instead of being clipped
-  // The element's defined height is used as minHeight to maintain layout when text is short
+  // For text elements, we need to handle height carefully:
+  // - Short content: auto height that expands to fit
+  // - Long content (200+ chars): constrained height with scrolling
+  // This ensures long AI-generated content doesn't overflow the screen
   const elementHeight = style?.height;
   const hasValidHeight = elementHeight && typeof elementHeight === 'string' && elementHeight.endsWith('px');
   const minHeight = hasValidHeight ? elementHeight : '60px';
-  const heightStyle = { height: 'auto', minHeight };
+
+  // For very long content, cap the height to a percentage of viewport and enable scrolling
+  // This creates a scrollable textbox for AI-generated content
+  const needsScrolling = isVeryLongContent; // 200+ chars
+  const maxHeight = needsScrolling ? '50vh' : undefined;
+  const heightStyle = needsScrolling
+    ? {
+        height: maxHeight,  // Fixed height to enable scrolling
+        minHeight: '100px',
+        maxHeight,
+        overflowY: 'auto' as const,
+      }
+    : {
+        height: 'auto',
+        minHeight,
+      };
 
   // For typewriter animation, render full text but make unrevealed characters transparent
   // This keeps text centered while characters appear one by one
@@ -3070,6 +3179,16 @@ export function createPositionedElementData(
       }
     }
 
+    // For aiSummary and endScreen: set actionId for buttons
+    if ((beatType === 'aiSummary' || beatType === 'endScreen') && location.kind === 'button') {
+      const nameLower = location.name?.toLowerCase() || '';
+      if (nameLower.includes('restart') || nameLower.includes('play') || nameLower.includes('again')) {
+        actionId = 'restart';
+      } else if (nameLower.includes('credits')) {
+        actionId = 'credits';
+      }
+    }
+
     // Resolve counter values for meter elements
     let counterValue: number | undefined;
     let counterMin: number | undefined;
@@ -3204,6 +3323,43 @@ function getContentForLocation(
     if (loc.kind === 'text') {
       // Any text on endScreen is likely the message
       return content.message || 'The End';
+    }
+  }
+
+  // AI Summary specific elements - separate title from summary
+  if (beatType === 'aiSummary') {
+    // Title element
+    if (nameLower.includes('title')) {
+      return content.title || 'Your Journey';
+    }
+    // Summary element
+    if (nameLower.includes('summary') || nameLower.includes('text') || nameLower.includes('message')) {
+      return content.summary || '';
+    }
+    // Restart button
+    if (nameLower.includes('restart') || nameLower.includes('play') || nameLower.includes('again')) {
+      return content.restartText || 'Play Again';
+    }
+    // Credits button
+    if (nameLower.includes('credits')) {
+      return content.creditsText || 'Credits';
+    }
+    // Generic button handling
+    if (nameLower.includes('button')) {
+      if (content.showRestart) {
+        return content.restartText || 'Play Again';
+      }
+      return content.creditsText || 'Credits';
+    }
+    // Fallback based on element kind
+    if (loc.kind === 'button') {
+      return content.restartText || 'Play Again';
+    }
+    if (loc.kind === 'text' && !nameLower.includes('title')) {
+      return content.summary || '';
+    }
+    if (loc.kind === 'dialog') {
+      return content.summary || '';
     }
   }
 

@@ -813,6 +813,346 @@
       "transitions": true,
       "sound": true,
       "renderer": "hyperText"
+    },
+
+    "onlineContent": {
+      "category": "visible",
+      "displayName": "Online Content",
+      "icon": "🌐",
+      "description": "Fetch and display real-time data from web APIs or AI queries",
+      "connectionType": "single",
+      "parameters": {
+        "sourceType": {
+          "type": "string",
+          "required": true,
+          "default": "api",
+          "description": "Data source type: 'api' for direct API calls, 'ai-query' for AI-powered search",
+          "ui": {
+            "control": "select",
+            "options": ["api", "ai-query"],
+            "label": "Source Type"
+          }
+        },
+        "apiUrl": {
+          "type": "string",
+          "required": false,
+          "description": "API URL to fetch (supports ${variable} interpolation)"
+        },
+        "apiParams": {
+          "type": "object",
+          "required": false,
+          "description": "Query parameters for the API"
+        },
+        "jsonPath": {
+          "type": "string",
+          "required": false,
+          "description": "JSONPath to extract data (e.g., $.current.temp_c)"
+        },
+        "query": {
+          "type": "string",
+          "required": false,
+          "description": "Query for AI to search and summarize (supports ${variable} interpolation)",
+          "ui": {
+            "control": "textarea",
+            "rows": 3,
+            "label": "AI Query"
+          }
+        },
+        "title": {
+          "type": "string",
+          "required": false,
+          "description": "Title displayed above the content (auto-derived from query if not set)"
+        },
+        "maxWords": {
+          "type": "number",
+          "required": false,
+          "default": 150,
+          "description": "Maximum word count for AI-generated content"
+        },
+        "displayTemplate": {
+          "type": "string",
+          "required": false,
+          "default": "{{data}}",
+          "description": "Template for displaying result (use {{data}} placeholder)",
+          "ui": {
+            "control": "textarea",
+            "rows": 3,
+            "label": "Display Template"
+          }
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Continue",
+          "description": "Continue button text"
+        },
+        "errorMessage": {
+          "type": "string",
+          "required": false,
+          "default": "Unable to fetch content.",
+          "description": "Message to show if fetch fails",
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "Error Message"
+          }
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat when button is clicked"
+        }
+      },
+      "locations": ["title", "text", "continueButton"],
+      "locationMapping": {
+        "title": "title",
+        "text": "displayTemplate",
+        "continueButton": "buttonText"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "textDisplay",
+      "aiNotes": {
+        "purpose": "Incorporate real-world dynamic data into stories",
+        "examples": ["Weather for player's city", "News headlines", "Statistics lookup"]
+      }
+    },
+
+    "aiCondition": {
+      "category": "invisible",
+      "displayName": "AI Condition",
+      "icon": "🤖",
+      "description": "AI-driven branching that analyzes player state to determine path",
+      "connectionType": "multiple",
+      "parameters": {
+        "prompt": {
+          "type": "string",
+          "required": true,
+          "description": "Prompt describing what the AI should evaluate"
+        },
+        "categories": {
+          "type": "array<object>",
+          "required": true,
+          "minItems": 2,
+          "description": "Categories for AI to choose from: { name, description, targetId }"
+        },
+        "evaluateVariables": {
+          "type": "array<string>",
+          "required": false,
+          "description": "Variables to include in evaluation (empty = all)"
+        },
+        "evaluateInventory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include player inventory in evaluation"
+        },
+        "evaluateHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include beat history in evaluation"
+        },
+        "evaluateCounters": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include counters in evaluation"
+        },
+        "defaultTarget": {
+          "type": "string",
+          "required": false,
+          "description": "Fallback target if AI can't decide"
+        },
+        "timeout": {
+          "type": "number",
+          "required": false,
+          "default": 30000,
+          "description": "Maximum response time in ms"
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "none",
+      "aiNotes": {
+        "purpose": "Dynamic branching based on player personality or accumulated state",
+        "examples": ["Personality type routing", "Difficulty adjustment", "Content matching"]
+      }
+    },
+
+    "aiDialogTree": {
+      "category": "visible",
+      "displayName": "AI Dialog Tree",
+      "icon": "🤖💬",
+      "description": "Generate personalized dialog trees at runtime using AI",
+      "connectionType": "multiple",
+      "parameters": {
+        "scenario": {
+          "type": "string",
+          "required": true,
+          "description": "Scene description for context",
+          "ui": {
+            "control": "textarea",
+            "rows": 3,
+            "label": "Scenario"
+          }
+        },
+        "npcName": {
+          "type": "string",
+          "required": true,
+          "default": "Character",
+          "description": "NPC name the player is talking to"
+        },
+        "npcPersonality": {
+          "type": "string",
+          "required": false,
+          "description": "NPC personality traits",
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "NPC Personality"
+          }
+        },
+        "includeVariables": {
+          "type": "array<string>",
+          "required": false,
+          "description": "Variables to include in prompt (empty = all)"
+        },
+        "includeInventory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include player inventory in context"
+        },
+        "includeVisitedBeats": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include visited beats in context"
+        },
+        "maxTurns": {
+          "type": "number",
+          "required": false,
+          "default": 3,
+          "description": "Maximum conversation turns"
+        },
+        "exitTargets": {
+          "type": "array<object>",
+          "required": true,
+          "minItems": 1,
+          "description": "Exit targets: { id: beatId, description: whenToUse }"
+        },
+        "choiceDelay": {
+          "type": "number",
+          "required": false,
+          "description": "Delay before showing choices"
+        }
+      },
+      "locations": ["dialog", "choices"],
+      "transitions": true,
+      "sound": true,
+      "renderer": "dialogTree",
+      "aiNotes": {
+        "purpose": "Generate personalized conversations that reference player state",
+        "examples": ["NPC reacts to player's name/profession", "References earlier choices"]
+      }
+    },
+
+    "aiSummary": {
+      "category": "visible",
+      "displayName": "AI Summary",
+      "icon": "📊",
+      "description": "Generate a narrative summary of the player's journey",
+      "connectionType": "single",
+      "parameters": {
+        "prompt": {
+          "type": "string",
+          "required": false,
+          "description": "Custom instructions for summary style"
+        },
+        "includeVariables": {
+          "type": "array<string>",
+          "required": false,
+          "description": "Variables to include (empty = all)"
+        },
+        "includeAllChoices": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include full choice history"
+        },
+        "includeCounters": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include final counter values"
+        },
+        "summaryStyle": {
+          "type": "string",
+          "required": false,
+          "default": "narrative",
+          "description": "Summary style",
+          "ui": {
+            "control": "select",
+            "options": ["narrative", "bullet-points", "reflection"]
+          }
+        },
+        "maxLength": {
+          "type": "string",
+          "required": false,
+          "default": "medium",
+          "description": "Summary length",
+          "ui": {
+            "control": "select",
+            "options": ["short", "medium", "long"]
+          }
+        },
+        "title": {
+          "type": "string",
+          "required": false,
+          "default": "Your Journey",
+          "description": "Title above summary"
+        },
+        "showRestart": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Show restart button"
+        },
+        "showCredits": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Show credits button"
+        },
+        "restartTarget": {
+          "type": "string",
+          "required": false,
+          "description": "Beat to restart to"
+        },
+        "resetOnRestart": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Reset state on restart"
+        }
+      },
+      "locations": ["title", "summary", "restartButton"],
+      "locationMapping": {
+        "title": "title",
+        "summary": "summary",
+        "restart": "restartText",
+        "play": "restartText",
+        "button": "restartText",
+        "credits": "creditsText"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "aiSummary",
+      "aiNotes": {
+        "purpose": "Personalized ending that explains how choices led to this outcome",
+        "features": ["References player name", "Explains key decisions", "Narrative epilogue"]
+      }
     }
   },
 

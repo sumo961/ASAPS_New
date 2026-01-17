@@ -16,6 +16,11 @@ import { SetTimerBeat } from './SetTimerBeat';
 import { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
 import { InputTextBeat } from './InputTextBeat';
 import { HyperTextBeat } from './HyperTextBeat';
+// AI-powered beats
+import { OnlineContentBeat } from './OnlineContentBeat';
+import { AIConditionBeat } from './AIConditionBeat';
+import { AIDialogTreeBeat } from './AIDialogTreeBeat';
+import { AISummaryBeat } from './AISummaryBeat';
 import type { BeatConfig } from '../types';
 
 type BeatConstructor = new (config: BeatConfig) => Beat;
@@ -33,6 +38,7 @@ export class BeatTypeRegistry {
     /inventory/i,      // addRemoveInventory, inventory, etc.
     /^add/i,           // addRemoveInventory, add*, etc.
     /^remove/i,        // removeInventory, etc.
+    /^aiCondition/i,   // aiCondition (AI-powered invisible beat)
   ];
 
   private constructor() {
@@ -76,6 +82,12 @@ export class BeatTypeRegistry {
     this.registerBeatType('addRemoveInventory', AddRemoveInventoryBeat);
     this.registerBeatType('addInventory', AddRemoveInventoryBeat); // Common AI variation
     this.registerBeatType('removeInventory', AddRemoveInventoryBeat); // Common AI variation
+
+    // AI-powered beats
+    this.registerBeatType('onlineContent', OnlineContentBeat);
+    this.registerBeatType('aiCondition', AIConditionBeat);
+    this.registerBeatType('aiDialogTree', AIDialogTreeBeat);
+    this.registerBeatType('aiSummary', AISummaryBeat);
   }
 
   registerBeatType(type: string, constructor: BeatConstructor): void {

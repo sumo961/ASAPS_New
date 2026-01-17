@@ -119,7 +119,10 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       'endScreen',
       'videoBeat',
       'inputText',
-      'hyperText'
+      'hyperText',
+      'onlineContent',
+      'aiDialogTree',
+      'aiSummary'
     ];
     return visualBeatTypes.includes(beat.type);
   };
