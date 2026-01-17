@@ -68,6 +68,7 @@ visual-patches/
 /*.tsx
 /*.js
 !eslint.config.js
+!api-proxy.js
 
 # Root-level temp/test files
 /*.png
