@@ -284,6 +284,7 @@ export class StoryContext extends EventEmitter {
     switch (condition.type) {
       case 'counter':
         leftValue = this.state.counters[varName] || 0;
+        console.log(`[StoryContext] Counter check: "${varName}" = ${leftValue}, comparing ${condition.operator} ${rightValue}, all counters:`, JSON.stringify(this.state.counters));
         break;
       case 'variable':
         leftValue = this.state.variables[varName];

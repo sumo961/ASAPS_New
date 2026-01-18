@@ -545,6 +545,49 @@ Clusters are containers that help organize larger projects into logical sections
 ✓ Reconvergence points need explicit connections FROM the branches
 ✓ Hub returns need the exploration beats to actually connect back
 ✓ If you plan beat_X as a reconvergence, add it as target in the branching beats
+
+## ⚠️ CRITICAL: Counter Threshold Reachability
+
+**BEFORE setting a condition threshold, calculate whether it can actually be reached!**
+
+When using conditionBeat to check if a counter reaches a threshold (e.g., cluesFound >= 3), you MUST verify:
+1. **Count all places where the counter can be increased** (setVariable with add, choice effects)
+2. **Calculate the maximum value the counter can reach** on any playthrough
+3. **Ensure the threshold is ≤ the maximum reachable value**
+
+### Example - WRONG (Unreachable Threshold)
+  Story has 2 clue locations, each adds 1 to cluesFound
+  Maximum cluesFound = 2
+  BUT condition checks: cluesFound >= 3  ❌ IMPOSSIBLE!
+
+### Example - CORRECT (Reachable Threshold)
+  Story has 4 clue locations, each adds 1 to cluesFound
+  Maximum cluesFound = 4
+  Condition checks: cluesFound >= 3  ✓ REACHABLE (need 3 of 4)
+
+### Validation Checklist
+Before creating a conditionBeat for counters:
+1. List ALL beats/choices that modify the counter (setVariable, choice effects)
+2. Sum the maximum possible increments
+3. Verify: threshold ≤ sum of increments
+4. If not reachable: either add more counter modifications OR lower the threshold
+
+### Counter Tracking Pattern
+When designing stories with state accumulation:
+  Planning:
+  - Need 3 endings: Bad (0-1 points), Normal (2 points), Good (3+ points)
+  - Therefore need AT LEAST 3 opportunities to gain points
+  - Create 4 point-gaining choices (giving player room for 1 miss)
+
+  Implementation:
+  - Choice A: +1 point
+  - Choice B: +1 point
+  - Choice C: +1 point
+  - Choice D: +1 point
+  Total possible: 4 points → threshold of 3 is REACHABLE ✓
+
+❌ **NEVER create a condition threshold higher than the sum of all possible increments**
+✓ Always add 1-2 more increment opportunities than needed for the highest threshold
 `;
 
 /**

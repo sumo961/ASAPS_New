@@ -24,7 +24,7 @@ export interface UnreachableBeat {
   beatId: string;
   beatName: string;
   beatType: string;
-  reason: 'noIncoming' | 'impossibleCondition' | 'unreachableParent' | 'orphaned';
+  reason: 'noIncoming' | 'impossibleCondition' | 'unreachableParent' | 'orphaned' | 'unreachableConditionTarget';
   details: string;
   blockingConditions?: ConditionAnalysis[];
   incomingConnections?: Array<{
@@ -33,6 +33,18 @@ export interface UnreachableBeat {
     connection: Connection;
   }>;
   suggestedFixes?: string[];
+}
+
+/**
+ * Warning about unreachable ConditionBeat targets
+ */
+export interface ConditionBeatWarning {
+  conditionBeatId: string;
+  conditionBeatName: string;
+  unreachableBranch: 'true' | 'false';
+  targetBeatId: string;
+  condition: Condition;
+  analysis: ConditionAnalysis;
 }
 
 /**
@@ -64,12 +76,14 @@ export interface ReachabilityResult {
   warnings: ReachabilityWarning[];
   orphanedBeats: string[];
   brokenConnections: BrokenConnection[];
+  conditionBeatWarnings: ConditionBeatWarning[];
   analysis: {
     totalBeats: number;
     reachableCount: number;
     unreachableCount: number;
     orphanedCount: number;
     brokenConnectionCount: number;
+    unreachableConditionTargetCount: number;
   };
 }
 
@@ -96,6 +110,7 @@ export class ReachabilityAnalyzer {
   private variableValues: Map<string, Set<any>>;
   private stateAnalyzed: boolean = false;
   private brokenConnections: BrokenConnection[] = [];
+  private conditionBeatWarnings: ConditionBeatWarning[] = [];
 
   constructor(story: Story, config: ReachabilityConfig = {}) {
     this.story = story;
@@ -122,8 +137,9 @@ export class ReachabilityAnalyzer {
       return this.createEmptyResult();
     }
 
-    // Reset broken connections for new analysis
+    // Reset for new analysis
     this.brokenConnections = [];
+    this.conditionBeatWarnings = [];
 
     // Step 1: Analyze counter and variable modifications
     if (this.config.analyzeConditions) {
@@ -141,10 +157,15 @@ export class ReachabilityAnalyzer {
       ? this.detectOrphanedBeats(allBeats)
       : [];
 
-    // Step 5: Generate warnings
+    // Step 5: Analyze ConditionBeat internal conditions for unreachable targets
+    if (this.config.analyzeConditions) {
+      this.analyzeConditionBeats(allBeats, reachableBeats);
+    }
+
+    // Step 6: Generate warnings
     const warnings = this.generateWarnings(reachableBeats);
 
-    console.log(`[ReachabilityAnalyzer] Analysis complete. ${reachableBeats.size}/${totalBeats} beats reachable, ${this.brokenConnections.length} broken connections`);
+    console.log(`[ReachabilityAnalyzer] Analysis complete. ${reachableBeats.size}/${totalBeats} beats reachable, ${this.brokenConnections.length} broken connections, ${this.conditionBeatWarnings.length} condition warnings`);
 
     return {
       reachableBeats,
@@ -152,12 +173,14 @@ export class ReachabilityAnalyzer {
       warnings,
       orphanedBeats,
       brokenConnections: this.brokenConnections,
+      conditionBeatWarnings: this.conditionBeatWarnings,
       analysis: {
         totalBeats,
         reachableCount: reachableBeats.size,
         unreachableCount: unreachableBeats.length,
         orphanedCount: orphanedBeats.length,
-        brokenConnectionCount: this.brokenConnections.length
+        brokenConnectionCount: this.brokenConnections.length,
+        unreachableConditionTargetCount: this.conditionBeatWarnings.length
       }
     };
   }
@@ -302,9 +325,12 @@ export class ReachabilityAnalyzer {
         const choices = params.choices || params.props || [];
 
         for (const choice of choices) {
-          if (choice.counterEffect) {
-            const counterName = choice.counterEffect.counter;
-            const value = choice.counterEffect.value || 0;
+          // Support both counterEffect object and direct counter/counterValue properties
+          const counterName = choice.counterEffect?.counter || choice.counter;
+          const counterValue = choice.counterEffect?.value ?? choice.counterValue;
+
+          if (counterName && counterValue !== undefined) {
+            const value = Number(counterValue) || 0;
 
             if (!this.counterModifications.has(counterName)) {
               this.counterModifications.set(counterName, { min: 0, max: 0 });
@@ -335,9 +361,12 @@ export class ReachabilityAnalyzer {
 
     if (node.choices) {
       for (const choice of node.choices) {
-        if (choice.counterEffect) {
-          const counterName = choice.counterEffect.counter;
-          const value = choice.counterEffect.value || 0;
+        // Support both counterEffect object and direct counter/counterValue properties
+        const counterName = choice.counterEffect?.counter || choice.counter;
+        const counterValue = choice.counterEffect?.value ?? choice.counterValue;
+
+        if (counterName && counterValue !== undefined) {
+          const value = Number(counterValue) || 0;
 
           if (!this.counterModifications.has(counterName)) {
             this.counterModifications.set(counterName, { min: 0, max: 0 });
@@ -751,13 +780,139 @@ export class ReachabilityAnalyzer {
       warnings: [],
       orphanedBeats: [],
       brokenConnections: [],
+      conditionBeatWarnings: [],
       analysis: {
         totalBeats: 0,
         reachableCount: 0,
         unreachableCount: 0,
         orphanedCount: 0,
-        brokenConnectionCount: 0
+        brokenConnectionCount: 0,
+        unreachableConditionTargetCount: 0
       }
     };
+  }
+
+  /**
+   * Analyze ConditionBeat internal conditions to detect unreachable targets
+   *
+   * This checks whether the true/false targets of ConditionBeats can actually
+   * be reached based on the counter/variable state that's possible in the story.
+   */
+  private analyzeConditionBeats(allBeats: Beat[], reachableBeats: Set<string>): void {
+    for (const beat of allBeats) {
+      // Only analyze ConditionBeats that are themselves reachable
+      if (beat.type !== 'conditionBeat' || !reachableBeats.has(beat.id)) {
+        continue;
+      }
+
+      const params = beat.getParameters();
+      const condition = params.condition as Condition;
+      const trueTarget = params.trueTarget as string;
+      const falseTarget = params.falseTarget as string | undefined;
+
+      if (!condition) continue;
+
+      // Normalize the condition for analysis
+      // ConditionBeat stores condition differently - extract the fields
+      // Use 'any' cast for properties that exist at runtime but aren't in the Condition interface
+      const condAny = condition as any;
+      const normalizedCondition: Condition = {
+        type: condition.type || params.conditionType || 'counter',
+        operator: condition.operator || params.operator || '==',
+        // For counter/variable types, the variable name might be in different places
+        left: condition.variableName || condAny.variable || params.variableName || params.variable,
+        right: condition.value ?? params.value ?? params.val,
+        counter1: condition.counter1 || params.counter1,
+        counter2: condition.counter2 || params.counter2,
+        beatId: condition.beatId || params.beatId
+      };
+
+      // Analyze if the condition can ever be true
+      const analysis = this.analyzeCondition(normalizedCondition);
+
+      // If the condition can NEVER be satisfied, the trueTarget is unreachable
+      if (!analysis.isSatisfiable && trueTarget) {
+        this.conditionBeatWarnings.push({
+          conditionBeatId: beat.id,
+          conditionBeatName: beat.name,
+          unreachableBranch: 'true',
+          targetBeatId: trueTarget,
+          condition: normalizedCondition,
+          analysis
+        });
+
+        console.warn(
+          `[ReachabilityAnalyzer] ConditionBeat "${beat.name}" (${beat.id}): ` +
+          `true branch to "${trueTarget}" is UNREACHABLE. ${analysis.reason}`
+        );
+      }
+
+      // Check if the condition is ALWAYS true (false branch unreachable)
+      // This is harder to detect - we need to check if the condition is always satisfied
+      if (analysis.isSatisfiable && falseTarget) {
+        const alwaysTrue = this.isConditionAlwaysTrue(normalizedCondition);
+        if (alwaysTrue) {
+          this.conditionBeatWarnings.push({
+            conditionBeatId: beat.id,
+            conditionBeatName: beat.name,
+            unreachableBranch: 'false',
+            targetBeatId: falseTarget,
+            condition: normalizedCondition,
+            analysis: {
+              condition: normalizedCondition,
+              isSatisfiable: true,
+              reason: 'Condition is always true, false branch is unreachable'
+            }
+          });
+
+          console.warn(
+            `[ReachabilityAnalyzer] ConditionBeat "${beat.name}" (${beat.id}): ` +
+            `false branch to "${falseTarget}" is UNREACHABLE. Condition is always true.`
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if a condition is always true (cannot fail)
+   */
+  private isConditionAlwaysTrue(condition: Condition): boolean {
+    const { type, operator, left, right } = condition;
+
+    // For counter conditions, check if the minimum value already satisfies the condition
+    if (type === 'counter' || type === 'variable') {
+      const varName = left;
+      if (!varName) return false;
+
+      const range = this.counterModifications.get(varName);
+      if (!range) {
+        // If the counter is never set, it defaults to 0
+        // Check if 0 satisfies the condition
+        return this.evaluateCondition(0, operator, right);
+      }
+
+      // Check if even the minimum value satisfies the condition
+      return this.evaluateCondition(range.min, operator, right);
+    }
+
+    // For other condition types, we can't easily determine if they're always true
+    return false;
+  }
+
+  /**
+   * Evaluate a simple numeric condition
+   */
+  private evaluateCondition(leftValue: number, operator: string, rightValue: any): boolean {
+    const numRight = Number(rightValue) || 0;
+    switch (operator) {
+      case '==': return leftValue === numRight;
+      case '!=': return leftValue !== numRight;
+      case '>': return leftValue > numRight;
+      case '>=': return leftValue >= numRight;
+      case '<': return leftValue < numRight;
+      case '<=': return leftValue <= numRight;
+      default: return false;
+    }
   }
 }

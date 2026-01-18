@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AlertCircle, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronRight, Search, Unlink } from 'lucide-react';
+import { AlertCircle, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronRight, Search, Unlink, GitBranch } from 'lucide-react';
 import { Story, ReachabilityAnalyzer } from '@asaps/core';
 import type { ReachabilityResult } from '@asaps/core';
 
@@ -168,6 +168,16 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
                 <div className="flex items-center gap-2 text-sm text-purple-800">
                   <Unlink className="w-4 h-4" />
                   <span className="font-medium">{analysis.brokenConnections.length} broken connection(s) - pointing to non-existent beats</span>
+                </div>
+              </div>
+            )}
+
+            {/* Unreachable condition branches alert */}
+            {analysis.conditionBeatWarnings && analysis.conditionBeatWarnings.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded p-3">
+                <div className="flex items-center gap-2 text-sm text-red-800">
+                  <GitBranch className="w-4 h-4" />
+                  <span className="font-medium">{analysis.conditionBeatWarnings.length} unreachable condition branch(es) - counter thresholds cannot be satisfied</span>
                 </div>
               </div>
             )}
@@ -465,6 +475,71 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
                         </div>
                         <div className="text-xs mt-1">{warning.message}</div>
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Condition Beat Warnings - Unreachable Thresholds */}
+      {analysis.conditionBeatWarnings && analysis.conditionBeatWarnings.length > 0 && (
+        <div className="border-b border-gray-100">
+          <button
+            onClick={() => toggleSection('conditionWarnings')}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              {expandedSections.has('conditionWarnings') ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+              <GitBranch className="w-4 h-4 text-red-600" />
+              <span className="font-medium">Unreachable Condition Branches</span>
+            </div>
+            <span className="text-sm text-red-600 font-medium">
+              {analysis.conditionBeatWarnings.length}
+            </span>
+          </button>
+
+          {expandedSections.has('conditionWarnings') && (
+            <div className="px-4 pb-3">
+              <div className="bg-red-50 border border-red-200 rounded p-2 mb-3 text-xs text-red-800">
+                These condition beats have branches that can never be reached because the counter threshold is impossible to satisfy.
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {analysis.conditionBeatWarnings.map((warning, index) => (
+                  <div
+                    key={`${warning.conditionBeatId}-${index}`}
+                    onClick={() => onHighlightBeat?.(warning.conditionBeatId)}
+                    className="p-3 bg-red-50 border border-red-200 rounded cursor-pointer hover:border-red-300"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900">
+                          {warning.conditionBeatName}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {warning.conditionBeatId}
+                        </div>
+                        <div className="text-xs text-red-700 mt-2">
+                          <span className="font-medium">{warning.unreachableBranch === 'true' ? 'True' : 'False'} branch</span> to &quot;{warning.targetBeatId}&quot; is unreachable
+                        </div>
+                        {warning.analysis?.reason && (
+                          <div className="text-xs text-red-600 mt-1">
+                            {warning.analysis.reason}
+                          </div>
+                        )}
+                        {warning.condition && (
+                          <div className="text-xs text-gray-600 mt-1 font-mono bg-gray-100 px-2 py-1 rounded">
+                            {warning.condition.left || warning.condition.variableName} {warning.condition.operator} {warning.condition.right ?? warning.condition.value}
+                          </div>
+                        )}
+                      </div>
+                      <GitBranch className="w-4 h-4 text-red-600 flex-shrink-0 ml-2" />
                     </div>
                   </div>
                 ))}

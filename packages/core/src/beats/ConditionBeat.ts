@@ -173,32 +173,114 @@ export class ConditionBeat extends Beat {
   }
 
   updateParameters(params: Record<string, any>): void {
-    // Update all parameters
-    if (params.conditionType !== undefined) this.conditionType = params.conditionType;
+    // Extract values from nested condition object if provided (used during deserialization)
+    // Priority: direct params > conditionObj (direct params are from UI edits)
+    const conditionObj = params.condition || {};
+
+    // Update conditionType
+    if (params.conditionType !== undefined) {
+      this.conditionType = params.conditionType;
+    } else if (conditionObj.type !== undefined) {
+      this.conditionType = conditionObj.type;
+    }
+
+    // Update targets
     if (params.trueTarget !== undefined) this.trueTarget = params.trueTarget;
     if (params.falseTarget !== undefined) this.falseTarget = params.falseTarget;
-    // Canonical field names
-    if (params.variableName !== undefined) this.variableName = params.variableName;
-    if (params.value !== undefined) this.value = params.value;
-    if (params.operator !== undefined) this.operator = params.operator;
-    if (params.val !== undefined) this.val = params.val;
-    if (params.counter1 !== undefined) this.counter1 = params.counter1;
-    if (params.counter2 !== undefined) this.counter2 = params.counter2;
-    if (params.timer !== undefined) this.timer = params.timer;
-    if (params.inventory !== undefined) this.inventory = params.inventory;
-    if (params.variable !== undefined) this.variable = params.variable;
-    if (params.item !== undefined) this.item = params.item;
-    if (params.character !== undefined) this.character = params.character;
-    if (params.checkType !== undefined) this.checkType = params.checkType;
-    if (params.beatId !== undefined) this.beatId = params.beatId;
 
-    // Rebuild condition object
-    this.condition = this.buildCondition();
-
-    // Also update the generic condition if provided directly
-    if (params.condition !== undefined) {
-      this.condition = { ...this.condition, ...params.condition };
+    // Handle trueConnection/falseConnection objects (AI format)
+    const trueConn = params.trueConnection;
+    const falseConn = params.falseConnection;
+    if (trueConn) {
+      this.trueTarget = typeof trueConn === 'string' ? trueConn : trueConn.target;
     }
+    if (falseConn) {
+      this.falseTarget = typeof falseConn === 'string' ? falseConn : falseConn.target;
+    }
+
+    // Canonical field names - direct params take priority over conditionObj
+    // This ensures UI edits (which set direct params) override deserialized values
+    if (params.variableName !== undefined) {
+      this.variableName = params.variableName;
+    } else if (conditionObj.variableName !== undefined) {
+      this.variableName = conditionObj.variableName;
+    }
+
+    if (params.value !== undefined) {
+      this.value = params.value;
+    } else if (conditionObj.value !== undefined) {
+      this.value = conditionObj.value;
+    }
+
+    if (params.operator !== undefined) {
+      this.operator = params.operator;
+    } else if (conditionObj.operator !== undefined) {
+      this.operator = conditionObj.operator;
+    }
+
+    if (params.val !== undefined) {
+      this.val = params.val;
+    } else if (conditionObj.val !== undefined) {
+      this.val = conditionObj.val;
+    }
+
+    if (params.counter1 !== undefined) {
+      this.counter1 = params.counter1;
+    } else if (conditionObj.counter1 !== undefined) {
+      this.counter1 = conditionObj.counter1;
+    }
+
+    if (params.counter2 !== undefined) {
+      this.counter2 = params.counter2;
+    } else if (conditionObj.counter2 !== undefined) {
+      this.counter2 = conditionObj.counter2;
+    }
+
+    if (params.timer !== undefined) {
+      this.timer = params.timer;
+    } else if (conditionObj.timer !== undefined) {
+      this.timer = conditionObj.timer;
+    }
+
+    if (params.inventory !== undefined) {
+      this.inventory = params.inventory;
+    } else if (conditionObj.inventory !== undefined) {
+      this.inventory = conditionObj.inventory;
+    }
+
+    if (params.variable !== undefined) {
+      this.variable = params.variable;
+    } else if (conditionObj.variable !== undefined) {
+      this.variable = conditionObj.variable;
+    }
+
+    if (params.item !== undefined) {
+      this.item = params.item;
+    } else if (conditionObj.item !== undefined) {
+      this.item = conditionObj.item;
+    }
+
+    if (params.character !== undefined) {
+      this.character = params.character;
+    } else if (conditionObj.character !== undefined) {
+      this.character = conditionObj.character;
+    }
+
+    if (params.checkType !== undefined) {
+      this.checkType = params.checkType;
+    } else if (conditionObj.checkType !== undefined) {
+      this.checkType = conditionObj.checkType;
+    }
+
+    if (params.beatId !== undefined) {
+      this.beatId = params.beatId;
+    } else if (conditionObj.beatId !== undefined) {
+      this.beatId = conditionObj.beatId;
+    }
+
+    // Rebuild condition object from extracted canonical values
+    // This ensures the condition object always reflects the extracted fields
+    this.condition = this.buildCondition();
   }
 
   protected async performAction(

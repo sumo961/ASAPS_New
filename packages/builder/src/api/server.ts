@@ -302,6 +302,7 @@ export class APIServer {
         'End branches with endScreen beats',
         'Position beats using x, y coordinates (grid: ~300px horizontal, ~200px vertical spacing)',
         'Use meaningful beat IDs like "beat_0", "beat_1", etc.',
+        'CRITICAL - Counter Threshold Reachability: Before using conditionBeat to check a counter threshold (e.g., score >= 3), count ALL places where that counter can be increased and ensure the threshold is reachable. If you have 2 choices that each add +1, max is 2, so >= 3 is IMPOSSIBLE. Always provide 1-2 MORE increment opportunities than the highest threshold requires.',
       ],
     };
   }

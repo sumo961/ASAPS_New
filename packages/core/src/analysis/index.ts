@@ -37,5 +37,6 @@ export type {
   ReachabilityResult,
   UnreachableBeat,
   ReachabilityWarning,
-  BrokenConnection
+  BrokenConnection,
+  ConditionBeatWarning
 } from './ReachabilityAnalyzer';

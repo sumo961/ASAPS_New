@@ -67,7 +67,8 @@ Respond with JSON in this exact structure:
 5. Position beats logically (100px spacing between beats)
 6. Create meaningful branching where story allows
 7. End with endScreen beat
-8. Use variables to track player choices and state`;
+8. Use variables to track player choices and state
+9. **CRITICAL: Counter Threshold Reachability** - Before using a conditionBeat to check if a counter reaches a threshold (e.g., score >= 3), calculate the maximum value the counter can reach. Count ALL places where the counter is incremented (setVariable beats, choice effects). The threshold MUST be ≤ the sum of all possible increments. Example: if you have 2 choices that each add +1 to a counter, the maximum is 2, so checking >= 3 is IMPOSSIBLE and will make the true branch unreachable.`;
 }
 
 /**

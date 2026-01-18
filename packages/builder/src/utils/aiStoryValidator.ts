@@ -10,11 +10,14 @@
 
 export interface ValidationIssue {
   type: 'error' | 'warning';
-  category: 'missing_beat' | 'duplicate_id' | 'orphaned_beat' | 'missing_field' | 'invalid_structure';
+  category: 'missing_beat' | 'duplicate_id' | 'orphaned_beat' | 'missing_field' | 'invalid_structure' | 'unreachable_threshold';
   message: string;
   beatId?: string;
   targetId?: string;
   field?: string;
+  counterName?: string;
+  threshold?: number;
+  maxReachable?: number;
 }
 
 export interface ValidationResult {
@@ -109,6 +112,181 @@ function extractDialogTargets(node: any, targets: string[]): void {
       }
     });
   }
+}
+
+/**
+ * Analyze counter modifications in the story to determine max reachable values
+ */
+function analyzeCounterModifications(beats: any[]): Map<string, { min: number; max: number }> {
+  const counterRanges = new Map<string, { min: number; max: number }>();
+
+  for (const beat of beats) {
+    const params = beat.parameters || {};
+
+    // SetVariable beats
+    if (beat.type === 'setVariable' || beat.type === 'variable') {
+      const varType = params.type;
+      const varName = params.name;
+      const value = Number(params.value) || 0;
+      const operation = params.operation || 'set';
+
+      if (varType === 'counter' && varName) {
+        if (!counterRanges.has(varName)) {
+          counterRanges.set(varName, { min: 0, max: 0 });
+        }
+
+        const range = counterRanges.get(varName)!;
+        if (operation === 'set') {
+          range.max = Math.max(range.max, value);
+          range.min = Math.min(range.min, value);
+        } else if (operation === 'add' || operation === 'change') {
+          if (value > 0) {
+            range.max += value;
+          } else {
+            range.min += value;
+          }
+        } else if (operation === 'subtract') {
+          range.min -= value;
+        }
+      }
+    }
+
+    // Choice-based beats with counter effects
+    const choices = params.choices || params.props || [];
+    for (const choice of choices) {
+      // Check both counterEffect object format and flat counter/counterValue format
+      const counterName = choice.counterEffect?.counter || choice.counter;
+      const counterValue = choice.counterEffect?.value || choice.counterValue;
+
+      if (counterName && counterValue !== undefined) {
+        const value = Number(counterValue) || 0;
+
+        if (!counterRanges.has(counterName)) {
+          counterRanges.set(counterName, { min: 0, max: 0 });
+        }
+
+        const range = counterRanges.get(counterName)!;
+        if (value > 0) {
+          range.max += value;
+        } else {
+          range.min += value;
+        }
+      }
+    }
+
+    // DialogTree choices
+    if (beat.type === 'dialogTree' && params.dialogTree) {
+      analyzeDialogTreeCounters(params.dialogTree, counterRanges);
+    }
+  }
+
+  return counterRanges;
+}
+
+/**
+ * Recursively analyze dialog tree for counter modifications
+ */
+function analyzeDialogTreeCounters(node: any, counterRanges: Map<string, { min: number; max: number }>): void {
+  if (!node || !node.choices) return;
+
+  for (const choice of node.choices) {
+    const counterName = choice.counterEffect?.counter || choice.counter;
+    const counterValue = choice.counterEffect?.value || choice.counterValue;
+
+    if (counterName && counterValue !== undefined) {
+      const value = Number(counterValue) || 0;
+
+      if (!counterRanges.has(counterName)) {
+        counterRanges.set(counterName, { min: 0, max: 0 });
+      }
+
+      const range = counterRanges.get(counterName)!;
+      if (value > 0) {
+        range.max += value;
+      } else {
+        range.min += value;
+      }
+    }
+
+    if (choice.dialogNode) {
+      analyzeDialogTreeCounters(choice.dialogNode, counterRanges);
+    }
+  }
+}
+
+/**
+ * Check if a counter condition threshold is reachable
+ */
+function checkCounterThresholdReachable(
+  range: { min: number; max: number },
+  operator: string,
+  threshold: number
+): boolean {
+  switch (operator) {
+    case '==': return range.min <= threshold && threshold <= range.max;
+    case '!=': return true;
+    case '>': return range.max > threshold;
+    case '>=': return range.max >= threshold;
+    case '<': return range.min < threshold;
+    case '<=': return range.min <= threshold;
+    default: return true;
+  }
+}
+
+/**
+ * Validate conditionBeat thresholds against counter modifications
+ */
+function validateConditionThresholds(
+  beats: any[],
+  counterRanges: Map<string, { min: number; max: number }>
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const beat of beats) {
+    if (beat.type !== 'conditionBeat') continue;
+
+    const params = beat.parameters || {};
+    const condition = params.condition || {};
+
+    // Only check counter-type conditions
+    if (condition.type !== 'counter') continue;
+
+    const counterName = condition.variable || condition.variableName;
+    const operator = condition.operator || '==';
+    const threshold = Number(condition.value) || 0;
+
+    if (!counterName) continue;
+
+    const range = counterRanges.get(counterName);
+
+    if (!range) {
+      // Counter is never modified - defaults to 0
+      const defaultRange = { min: 0, max: 0 };
+      if (!checkCounterThresholdReachable(defaultRange, operator, threshold)) {
+        issues.push({
+          type: 'warning',
+          category: 'unreachable_threshold',
+          message: `ConditionBeat '${beat.id}' checks counter "${counterName}" ${operator} ${threshold}, but counter is never modified (stays at 0). True branch may be unreachable.`,
+          beatId: beat.id,
+          counterName,
+          threshold,
+          maxReachable: 0
+        });
+      }
+    } else if (!checkCounterThresholdReachable(range, operator, threshold)) {
+      issues.push({
+        type: 'warning',
+        category: 'unreachable_threshold',
+        message: `ConditionBeat '${beat.id}' checks counter "${counterName}" ${operator} ${threshold}, but counter can only reach ${range.min} to ${range.max}. True branch is UNREACHABLE.`,
+        beatId: beat.id,
+        counterName,
+        threshold,
+        maxReachable: range.max
+      });
+    }
+  }
+
+  return issues;
 }
 
 /**
@@ -245,6 +423,11 @@ export function validateAIStory(story: any): ValidationResult {
       message: 'Story has no endScreen beat - story may not have a proper ending'
     });
   }
+
+  // Check for unreachable counter thresholds in conditionBeats
+  const counterRanges = analyzeCounterModifications(story.beats);
+  const thresholdIssues = validateConditionThresholds(story.beats, counterRanges);
+  warnings.push(...thresholdIssues);
 
   return {
     valid: errors.length === 0,

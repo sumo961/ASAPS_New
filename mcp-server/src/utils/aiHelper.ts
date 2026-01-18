@@ -335,6 +335,25 @@ CHARACTER COUNTERS:
 - Example character: { "counters": [{ "name": "trust", "displayName": "Trust", "value": 50, "min": 0, "max": 100 }] }
 - Example choice: { "text": "Be friendly", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
 
+COUNTER THRESHOLD REACHABILITY (CRITICAL):
+Before using a conditionBeat to check if a counter reaches a threshold (e.g., cluesFound >= 3), you MUST:
+1. Count ALL places where that counter can be increased (setVariable beats, choice effects with counterOperation)
+2. Calculate the maximum value the counter can reach on any playthrough
+3. Ensure the threshold is ≤ the maximum reachable value
+
+Example - WRONG (Unreachable):
+- Story has 2 choices that each add +1 to "cluesFound"
+- Maximum cluesFound = 2
+- Condition checks: cluesFound >= 3  ❌ IMPOSSIBLE! True branch is unreachable.
+
+Example - CORRECT (Reachable):
+- Story has 4 choices that each add +1 to "cluesFound"
+- Maximum cluesFound = 4
+- Condition checks: cluesFound >= 3  ✓ Player needs 3 of 4 opportunities
+
+Rule: NEVER create a condition threshold higher than the sum of all possible counter increments.
+Always provide 1-2 MORE increment opportunities than the highest threshold requires.
+
 Important:
 - Use descriptive labels for beats
 - Create engaging, coherent narrative flow
