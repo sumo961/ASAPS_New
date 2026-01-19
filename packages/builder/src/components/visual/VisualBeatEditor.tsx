@@ -173,9 +173,6 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Debug logging for background
   console.log(`[VisualBeatEditor] backgroundAssetId="${backgroundAssetId}", found=${!!backgroundAsset}, url="${resolvedBackgroundUrl?.substring(0, 80) || 'none'}", assets.length=${assets.length}`);
 
-  // Debug logging for theme assets
-  console.log(`[VisualBeatEditor] themeAssets: buttonNormal=${!!themeAssets?.buttonNormal}, buttonHover=${!!themeAssets?.buttonHover}, textboxFrame=${!!themeAssets?.textboxFrame}`);
-
   // Convert VisualElements to Location objects for the renderer
   const locationsForRenderer: Location[] = elements
     .filter(el => el.visible)
@@ -440,8 +437,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       stateId: type === 'character' ? characterData?.stateId : undefined,
       imageUrl: type === 'character' ? characterData?.imageUrl : undefined,
       size: type === 'character' ? (characterData?.size || 100) : undefined,
-      // Add font properties for text elements
-      font: type === 'text' ? 'Arial' : undefined,
+      // Font is left undefined to use theme default
+      font: undefined,
       fontSize: type === 'text' ? 16 : undefined,
       textAlign: type === 'text' ? 'center' : undefined,
     };

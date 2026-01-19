@@ -1219,28 +1219,18 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
       const isVeryLongContent = contentLength > 300;
 
       // Calculate expanded width for long content, centered in container
+      // Note: We only expand for genuinely long content that needs more space.
+      // User-defined dimensions from the Visual Editor are respected.
       let effectiveWidth = location.width;
       let effectiveLeft = effectiveX;
 
-      if (containerDimensions) {
+      if (containerDimensions && (isLongContent || isVeryLongContent)) {
         const containerWidth = containerDimensions.width;
-        const narrowThreshold = containerWidth * 0.5;
-
-        // Expand width for long content
-        if (isLongContent || isVeryLongContent) {
-          // Use 90% for very long, 80% for long content
-          const widthPercent = isVeryLongContent ? 0.9 : 0.8;
-          effectiveWidth = containerWidth * widthPercent;
-          // Center the expanded text box
-          effectiveLeft = (containerWidth - effectiveWidth) / 2;
-        }
-        // Also expand if the text box is narrower than 50% of container
-        // This handles cases where content mapping failed but the beat displays dynamic content
-        else if (location.width < narrowThreshold) {
-          // Use 80% width for narrow text boxes (likely from visual editor)
-          effectiveWidth = containerWidth * 0.8;
-          effectiveLeft = (containerWidth - effectiveWidth) / 2;
-        }
+        // Use 90% for very long, 80% for long content
+        const widthPercent = isVeryLongContent ? 0.9 : 0.8;
+        effectiveWidth = containerWidth * widthPercent;
+        // Center the expanded text box
+        effectiveLeft = (containerWidth - effectiveWidth) / 2;
       }
 
       const textStyle = {
@@ -1354,28 +1344,18 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
       const isDialogVeryLongContent = dialogContentLength > 300;
 
       // Calculate expanded width for long content, centered in container
+      // Note: We only expand for genuinely long content that needs more space.
+      // User-defined dimensions from the Visual Editor are respected.
       let dialogEffectiveWidth = location.width;
       let dialogEffectiveLeft = effectiveX;
 
-      if (containerDimensions) {
+      if (containerDimensions && (isDialogLongContent || isDialogVeryLongContent)) {
         const containerWidth = containerDimensions.width;
-        const narrowThreshold = containerWidth * 0.5;
-
-        // Expand width for long content
-        if (isDialogLongContent || isDialogVeryLongContent) {
-          // Use 90% for very long, 80% for long content
-          const widthPercent = isDialogVeryLongContent ? 0.9 : 0.8;
-          dialogEffectiveWidth = containerWidth * widthPercent;
-          // Center the expanded text box
-          dialogEffectiveLeft = (containerWidth - dialogEffectiveWidth) / 2;
-        }
-        // Also expand if the text box is narrower than 50% of container
-        // This handles cases where content mapping failed but the beat displays dynamic content
-        else if (location.width < narrowThreshold) {
-          // Use 80% width for narrow text boxes (likely from visual editor)
-          dialogEffectiveWidth = containerWidth * 0.8;
-          dialogEffectiveLeft = (containerWidth - dialogEffectiveWidth) / 2;
-        }
+        // Use 90% for very long, 80% for long content
+        const widthPercent = isDialogVeryLongContent ? 0.9 : 0.8;
+        dialogEffectiveWidth = containerWidth * widthPercent;
+        // Center the expanded text box
+        dialogEffectiveLeft = (containerWidth - dialogEffectiveWidth) / 2;
       }
 
       const dialogStyle = {
@@ -1665,11 +1645,11 @@ const TextElement: React.FC<{
   }
 
   const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
-  // Apply font mapping: theme font takes priority, unless element has a custom (non-built-in) font
+  // Apply font mapping: use element's font if explicitly set, otherwise use theme default
   // Title/author elements use titleFont, others use textFont
   const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
-  // Use theme font unless location has a custom (non-built-in) font explicitly set
-  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : defaultFont;
+  // Use element's font if set (user override), otherwise use theme default
+  const computedFont = location.font ? getFontFamily(location.font) : defaultFont;
 
   // Use theme padding or calculate based on box size
   const padding = theme.textBox.padding;
@@ -1828,8 +1808,8 @@ const ButtonElement: React.FC<{
   console.log(`[PositionedBeatView] Button "${location.name}": fontSize=${computedFontSize}, location.fontSize=${location.fontSize}, theme.buttonFontSize=${theme.fonts.buttonFontSize}`);
 
   const computedTextAlign = location.textAlign || 'center';
-  // Use theme font unless location has a custom (non-built-in) font explicitly set
-  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : theme.fonts.buttonFont;
+  // Use element's font if set (user override), otherwise use theme default
+  const computedFont = location.font ? getFontFamily(location.font) : theme.fonts.buttonFont;
 
   // Use more generous padding for better appearance
   const paddingHorizontal = 16;
@@ -2076,8 +2056,8 @@ const InputFieldElement: React.FC<{
   }
 
   const computedTextAlign = location.textAlign || 'left';
-  // Use theme font unless location has a custom (non-built-in) font explicitly set
-  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : theme.fonts.textFont;
+  // Use element's font if set (user override), otherwise use theme default
+  const computedFont = location.font ? getFontFamily(location.font) : theme.fonts.textFont;
 
   // Calculate padding as percentage of box size
   const paddingHorizontal = Math.max(Math.floor(location.width * 0.03), 12);
@@ -2300,8 +2280,8 @@ const DialogElement: React.FC<{
 
   const animation = theme.textEffects?.animation || 'none';
   const computedTextAlign = location.textAlign || 'left';
-  // Use theme font unless location has a custom (non-built-in) font explicitly set
-  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : theme.fonts.textFont;
+  // Use element's font if set (user override), otherwise use theme default
+  const computedFont = location.font ? getFontFamily(location.font) : theme.fonts.textFont;
 
   // Calculate padding as percentage of box size
   const paddingHorizontal = Math.max(Math.floor(location.width * 0.04), 12);
@@ -3624,8 +3604,8 @@ const FlexTextElement: React.FC<{
 
   const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
   const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
-  // Use theme font unless location has a custom (non-built-in) font explicitly set
-  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : defaultFont;
+  // Use element's font if set (user override), otherwise use theme default
+  const computedFont = location.font ? getFontFamily(location.font) : defaultFont;
   const padding = theme.textBox.padding;
 
   // Convert opacity from 0-100 to 0-1
@@ -3733,8 +3713,8 @@ const FlexButtonElement: React.FC<{
   }
 
   const computedTextAlign = location.textAlign || 'center';
-  // Use theme font unless location has a custom (non-built-in) font explicitly set
-  const computedFont = (location.font && !isBuiltInFont(location.font)) ? getFontFamily(location.font) : theme.fonts.buttonFont;
+  // Use element's font if set (user override), otherwise use theme default
+  const computedFont = location.font ? getFontFamily(location.font) : theme.fonts.buttonFont;
 
   // Determine background color based on visited state
   let backgroundColor: string;

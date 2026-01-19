@@ -1572,7 +1572,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             scale: 1,
             visible: true,
             locked: false,
-            font: 'Arial',
+            font: undefined, // Use theme default
             fontSize: 18,
             textAlign: 'center'
           });
@@ -1603,7 +1603,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             scale: 1,
             visible: true,
             locked: false,
-            font: 'Arial',
+            font: undefined, // Use theme default
             fontSize: 18,
             textAlign: 'center'
           });
@@ -2192,7 +2192,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 onBackgroundSelect={handleBackgroundSelect}
                 onElementSelect={setSelectedElementId}
                 onElementUpdate={(elementId, updates) => {
-                  setVisualElements(prev => prev.map(el => {
+                  // Calculate updated elements synchronously so we can also sync to beat.locations
+                  const updatedElements = visualElements.map(el => {
                     if (el.id === elementId) {
                       const updatedElement = { ...el, ...updates };
 
@@ -2213,13 +2214,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           newDimensions = calculateTextBoxDimensions(text, fontSize, fontFamily);
                         }
 
-                        console.log(`[VisualWorkspace] Auto-resizing ${el.type} element`, {
-                          text: text.substring(0, 30) + '...',
-                          fontSize,
-                          fontFamily,
-                          newDimensions
-                        });
-
                         let resizedElement = { ...updatedElement, width: newDimensions.width, height: newDimensions.height };
 
                         // For buttons, recalculate x position to keep them centered
@@ -2231,19 +2225,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           // Check if this is an EndScreen button (Restart or Credits)
                           if (nameLower.includes('restart') || nameLower.includes('again') || nameLower.includes('credits')) {
                             // Find if there are both Restart and Credits buttons
-                            const hasRestartButton = prev.some(e =>
+                            const hasRestartButton = visualElements.some(e =>
                               e.type === 'button' && (e.name?.toLowerCase().includes('restart') || e.name?.toLowerCase().includes('again'))
                             );
-                            const hasCreditsButton = prev.some(e =>
+                            const hasCreditsButton = visualElements.some(e =>
                               e.type === 'button' && e.name?.toLowerCase().includes('credits')
                             );
 
                             if (hasRestartButton && hasCreditsButton) {
                               // Two buttons - calculate total width and position accordingly
-                              const restartButton = prev.find(e =>
+                              const restartButton = visualElements.find(e =>
                                 e.type === 'button' && (e.name?.toLowerCase().includes('restart') || e.name?.toLowerCase().includes('again'))
                               );
-                              const creditsButton = prev.find(e =>
+                              const creditsButton = visualElements.find(e =>
                                 e.type === 'button' && e.name?.toLowerCase().includes('credits')
                               );
 
@@ -2272,8 +2266,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       return updatedElement;
                     }
                     return el;
-                  }));
+                  });
+
+                  // Update state and sync to beat.locations
+                  setVisualElements(updatedElements);
                   setHasChanges(true);
+
+                  // CRITICAL: Sync to beat.locations immediately so effects don't overwrite with stale data
+                  if (beat) {
+                    syncElementsToBeatLocations(updatedElements, beat);
+                  }
                 }}
                 onElementDelete={(elementId) => {
                   // Find the element before removing it so we can remove from beat.locations
@@ -2459,8 +2461,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     visible: true,
                     locked: false,
                     text: type === 'text' ? 'New Text' : undefined,
-                    // Add font properties for text, dialog, and button elements
-                    font: (type === 'text' || type === 'hotspot') ? 'Arial' : undefined,
+                    // Font is left undefined to use theme default
+                    font: undefined,
                     fontSize: (type === 'text' || type === 'hotspot') ? 16 : undefined,
                     textAlign: (type === 'text' || type === 'hotspot') ? 'center' : undefined,
                   };
