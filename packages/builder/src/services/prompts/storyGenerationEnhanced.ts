@@ -14,6 +14,8 @@ const THEME_GUIDE = `
 
 ASAPS includes built-in theme presets that control the visual presentation of stories. When generating a story, you should recommend the most appropriate theme based on the genre and style.
 
+**NOTE:** All themes have text effects DISABLED by default (no typewriter, no fade). This speeds up debugging. Authors can enable effects later if desired.
+
 ### Available Themes
 
 **1. builtin-visual-novel** - Visual Novel Theme
@@ -21,7 +23,6 @@ Best for: Romance, drama, character-driven stories, anime-style narratives
 Characteristics:
 - Semi-transparent text box at bottom of screen
 - Character name highlights in golden color
-- Typewriter text animation (characters appear one by one)
 - Dark overlay for backgrounds
 - Serif fonts for elegance
 - Inspired by Ren'Py and Japanese visual novels
@@ -34,7 +35,6 @@ Characteristics:
 - Blue hyperlink-style choices (like web links)
 - Serif typography (Georgia) for literary feel
 - Dark background with light text
-- Fade text animation (text fades in)
 - Centered text, lots of reading
 - Invisible hotspots (text-based interaction)
 - Inspired by Twine/SugarCube and classic interactive fiction
@@ -43,14 +43,31 @@ Use when: Story is text-heavy, literary, or where UI should not distract from na
 **3. builtin-point-and-click** - Point & Click Adventure Theme
 Best for: Adventure games, puzzle stories, exploration, mystery with locations
 Characteristics:
-- Golden text on dark blue surfaces
+- Golden text on dark blue surfaces (high contrast!)
 - Prominent hotspot indicators (always visible)
 - Sharp corners, pixelated aesthetic
-- Faster typewriter animation
 - Dissolve scene transitions
 - Inventory/exploration focus
 - Inspired by LucasArts (Monkey Island) and Sierra classics
 Use when: Story involves exploration, picking up items, location-based puzzles
+
+### ⚠️ Color Contrast Guidelines (IMPORTANT!)
+
+When describing visual elements or suggesting styling in notes, ALWAYS ensure high color contrast:
+
+❌ BAD COLOR COMBINATIONS (hard to read):
+- Yellow text on white background
+- Light gray text on white background
+- Dark blue text on black background
+- Red text on green background (colorblind unfriendly)
+
+✓ GOOD COLOR COMBINATIONS (high contrast):
+- White/light text on dark backgrounds
+- Dark text on light backgrounds
+- Golden/yellow text on dark blue (point-and-click style)
+- Blue links on dark/light neutral backgrounds
+
+Rule: Text and background should have a contrast ratio of at least 4.5:1 for readability.
 
 ### Theme Recommendation Guidelines
 
@@ -77,21 +94,32 @@ const BEAT_TYPE_GUIDE = `
 
 ### VISIBLE BEATS (Player Sees and Interacts)
 
-**titleScreen** - Story opening
-- Use: Start of every story
+🚨🚨🚨 **titleScreen** - Story opening (MANDATORY FIRST BEAT!) 🚨🚨🚨
+- Use: Start of EVERY story - this MUST be the first beat (beat_0)
 - Parameters: title, author, startButtonText
-- Connections: Single → first story beat
-- Example: "The Mystery Begins" → introText
+- Connections: Single → first story beat (usually introText)
+- ⚠️⚠️⚠️ CRITICAL: beat_0 MUST ALWAYS be type "titleScreen"!
+- ❌ WRONG: Starting with introText, dialogTree, or any other beat type
+- ✓ CORRECT: beat_0 is titleScreen → beat_1 is introText or other content
+- Example: titleScreen "The Mystery Begins" → introText "You arrive..."
 
-**introText** - Display text with continue button
+**introText** - Display text with continue button (SINGLE CONNECTION ONLY!)
 - Use: Narration, scene setting, exposition
 - Parameters: text, buttonText, backgroundAssetId
-- Connections: Single → next beat
-- Example: "You arrive at the mansion..." → movementChoice
+- Connections: Single → next beat (ONLY ONE connection allowed!)
+- ⚠️ CRITICAL: introText can ONLY connect to ONE beat!
+- ❌ WRONG: introText with 2+ connections (use movementChoice for branching!)
+- ✓ CORRECT: introText → one target beat
+- For branching choices, use movementChoice or dialogTree instead!
+- Example: "You arrive at the mansion..." → movementChoice (for choices)
 
 **durScreen** - Timed auto-advance text
 - Use: Quick transitions, atmosphere, montages
-- Parameters: text, duration (seconds), backgroundAssetId
+- Parameters: text, duration (seconds) - NO connection inside parameters!
+- ⚠️ NOTE: durScreen does NOT support backgroundAssetId - use introText if you need a background
+- ⚠️ CRITICAL: Connection goes in "connections" array at beat level, NOT inside parameters!
+- ❌ WRONG: "parameters": { "text": "...", "duration": 3, "connection": { "target": "beat_5" } }
+- ✓ CORRECT: "parameters": { "text": "...", "duration": 3 }, "connections": [{ "targetId": "beat_5" }]
 - Connections: Single → auto-advances after duration
 - Example: "Three days later..." (3s) → dialogTree
 
@@ -132,7 +160,8 @@ const BEAT_TYPE_GUIDE = `
 
 **pickProp** - Object/item selection (NOT for action choices!)
 - Use: Selecting physical ITEMS/OBJECTS, NOT for navigation or actions
-- Parameters: question, props (array of {id, name, target})
+- Parameters: question (REQUIRED!), props (array of {id, name, target})
+  - question: Text prompt asking what to pick (REQUIRED - e.g., "What do you examine?")
   - name: The ITEM NAME ONLY - just the object name, no verbs!
   - ⚠️ WRONG names that start with verbs:
     - "Take the key" ❌
@@ -183,7 +212,13 @@ const BEAT_TYPE_GUIDE = `
   - skipButton: boolean (default: true)
 - ⚠️ CRITICAL: Use "videoFile" parameter, NOT "videoAssetId"!
 - Connections: Single → after video ends or skip
-- Example: { "videoFile": "intro_cutscene.mp4", "skipButton": true }
+- videoBeat uses "connections" array at beat level (NOT inside parameters!)
+- Example:
+  {
+    "type": "videoBeat",
+    "parameters": { "videoFile": "intro_cutscene.mp4", "skipButton": true },
+    "connections": [{ "targetId": "beat_next" }]
+  }
 
 **inputText** - Text input from player
 - Use: Name entry, password/code input, creative input
@@ -192,21 +227,34 @@ const BEAT_TYPE_GUIDE = `
   - variable: Variable name to store the input (REQUIRED - use "variable" NOT "variableName"!)
   - saveToType: "variable" (REQUIRED - always set to "variable")
   - submitButtonText: Text for submit button (optional, default: "Submit")
+  - connection: { target: "beat_id" } (REQUIRED - inside parameters!)
 - ⚠️ CRITICAL: Use "variable" parameter, NOT "variableName"!
 - Connections: Single → stores input in variable, then proceeds
+- inputText uses "connection" inside parameters (NOT "connections" array!)
+- Example:
+  {
+    "type": "inputText",
+    "parameters": { "prompt": "Enter the password:", "variable": "userPassword", "saveToType": "variable", "connection": { "target": "beat_next" } }
+  }
 - Combine with: conditionBeat to check input
-- Example: { "prompt": "Enter the password:", "variable": "userPassword", "saveToType": "variable" }
 
-**endScreen** - Story conclusion
+**endScreen** - Story conclusion (ACTUAL BEATS in the beats array!)
 - Use: Ending (victory, defeat, various endings)
 - Parameters:
   - message: "Ending text"  ← NOT "endMessage" or "text"!
-  - showRestart: boolean
+  - showRestart: boolean (ALWAYS set to true so player can replay!)
   - showCredits: boolean
 - ⚠️ CRITICAL: Use "message", NOT "endMessage"!
+- ⚠️ CRITICAL: ALWAYS set "showRestart": true - player must be able to replay!
 - Connections: None (terminal beat)
 - Pattern: Multiple endScreens for different endings
-- Example: { "message": "Victory! You solved the mystery.", "showRestart": true, "showCredits": true }
+- 🚨🚨🚨 CRITICAL: endScreen must be in the main "beats" array! 🚨🚨🚨
+- ❌ WRONG: Creating a separate "endings" array (this is NOT recognized!)
+- ❌ WRONG: Referencing "beat_end_good" without creating it in the "beats" array
+- ✓ CORRECT: Put ALL endScreen beats in the main "beats" array:
+  { "id": "beat_end_good", "type": "endScreen", "parameters": { "message": "...", "showRestart": true } }
+- 🚨 NEVER create an "endings" array - it will be IGNORED! All endings go in "beats"!
+- Example: { "id": "beat_ending_good", "type": "endScreen", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true } }
 
 ### INVISIBLE BEATS (Logic/Background Operations)
 
@@ -215,7 +263,7 @@ const BEAT_TYPE_GUIDE = `
 - ⚠️ IMPORTANT: Two different "name" fields exist - don't confuse them!
   - beat.name: The beat's display name (e.g., "Increase Sanity Counter")
   - beat.parameters.name: The VARIABLE name being set (e.g., "sanityMeter")
-- Parameters (inside "parameters"):
+- Parameters (inside "parameters") - NO connection inside parameters!:
   - type: "variable" (for text/boolean/simple set) or "counter" (for numeric operations)
   - name: The VARIABLE/COUNTER name to modify (e.g., "hasKey", "sanityScore") - NOT the beat name!
   - value: The value to set or modify by
@@ -227,6 +275,7 @@ const BEAT_TYPE_GUIDE = `
     - "divide" - Divide current by value
 - ⚠️ CRITICAL: If using a math operation (add/subtract/multiply/divide), you MUST use type="counter"
 - ⚠️ DO NOT use "change" - be explicit: use "add" to increment, "subtract" to decrement
+- ⚠️ CRITICAL: Connection goes in "connections" array at beat level, NOT inside parameters!
 - Connections: Single → immediately to next beat
 - Pattern: Chain after visible beats to track state
 - Full beat example (note the two different "name" fields):
@@ -239,9 +288,10 @@ const BEAT_TYPE_GUIDE = `
       "name": "sanityMeter",              // ← Variable name being modified
       "value": 1,
       "operation": "add"
-    }
+    },
+    "connections": [{ "targetId": "beat_next" }]  // ← Connection at beat level!
   }
-- More examples (parameters only):
+- More examples (parameters only - connection at beat level):
   - Flag: { "type": "variable", "name": "hasKey", "value": true }
   - Increment by 1: { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" }
   - Decrement by 5: { "type": "counter", "name": "sanity", "value": 5, "operation": "subtract" }
@@ -280,6 +330,16 @@ Inventory condition example (CORRECT format):
     "condition": { "type": "inventory", "item": "lantern", "character": "player", "checkType": "has" },
     "trueConnection": { "target": "beat_has_light", "label": "Has lantern" },
     "falseConnection": { "target": "beat_dark", "label": "No lantern" }
+  }
+
+❌ WRONG inventory condition (duplicates fields at top level - NEVER DO THIS!):
+  {
+    "condition": { "type": "inventory", "item": "key", "character": "player", "checkType": "has" },
+    "trueConnection": { "target": "beat_5" },
+    "falseConnection": { "target": "beat_6" },
+    "item": "key",           // ❌ DELETE - already in condition!
+    "character": "player",   // ❌ DELETE - already in condition!
+    "checkType": "has"       // ❌ DELETE - already in condition!
   }
 - ⚠️ WRONG for inventory: { "variableName": "lantern" } - use "item" inside condition!
 
@@ -320,18 +380,24 @@ Inventory condition example (CORRECT format):
 - Combine with: conditionBeat checking timer expired
 - Example: { "name": "bombTimer", "value": 300, "timerTarget": "beat_explosion" }
 
-## Beat Notes (Author Annotations)
+## Beat Notes (Author Annotations) - USE LIBERALLY!
 
 All beats can include a "notes" field for author documentation:
 - Notes are NOT shown to players - purely for author reference
-- Useful for: explaining beat purpose, marking areas for review, planning notes
-- AI should use notes to document narrative intent or flag areas needing human attention
+- **AI should actively use notes to help the human author**, including:
+  - Suggested visual assets: "ASSET: Dark forest background, ominous lighting"
+  - Character art suggestions: "CHARACTER: Show detective looking suspicious"
+  - Sound/music suggestions: "AUDIO: Tense investigation music"
+  - Areas needing human review: "REVIEW: Verify this clue doesn't give away the answer too early"
+  - Narrative intent: "INTENT: This builds tension before the reveal"
+  - Design alternatives: "ALTERNATIVE: Could branch to romance path here instead"
+  - TODOs for enhancement: "TODO: Add animation of door opening"
 - Example beat with notes:
   {
     "id": "beat_climax",
     "name": "Final Confrontation",
     "type": "dialogTree",
-    "notes": "CRITICAL: This is the story climax. Review dialogue pacing and emotional beats.",
+    "notes": "ASSET: Dramatic throne room background. CHARACTER: Villain should look menacing. REVIEW: Ensure player has enough clues to make informed choice.",
     "parameters": { ... }
   }
 
@@ -546,6 +612,25 @@ Clusters are containers that help organize larger projects into logical sections
 ✓ Hub returns need the exploration beats to actually connect back
 ✓ If you plan beat_X as a reconvergence, add it as target in the branching beats
 
+❌ **DUPLICATE CONNECTIONS - targets defined twice**
+For choice-based beats (dialogTree, movementChoice, pickProp), targets are in the choices.
+DO NOT also add a "connections" array - this creates duplicates!
+✓ CORRECT: choices have "target" fields, NO "connections" array on the beat
+✗ WRONG: choices have "target" AND beat has "connections" array with same targets
+
+❌ **Using inputText to display information**
+inputText is for GETTING player input (names, passwords, answers)
+✗ WRONG: inputText with prompt "Read the note:" - player has nothing to input!
+✓ CORRECT: Use introText to DISPLAY text to the player
+✓ CORRECT: Use inputText only when you need the player to TYPE something
+
+❌ **Chains of single-item pickProps with identical content**
+pickProp with one item is fine for picking up a single object (adds to inventory).
+But NEVER chain multiple single-item pickProps with the same item!
+✗ WRONG: pickProp "Shovel" → pickProp "Shovel" → pickProp "Shovel" (pointless repetition!)
+✓ CORRECT: Single pickProp to pick up an item, then move on to different content
+✓ BETTER: pickProp with 2-4 items when player has a choice of what to examine/take
+
 ## ⚠️ CRITICAL: Counter Threshold Reachability
 
 **BEFORE setting a condition threshold, calculate whether it can actually be reached!**
@@ -565,9 +650,25 @@ When using conditionBeat to check if a counter reaches a threshold (e.g., cluesF
   Maximum cluesFound = 4
   Condition checks: cluesFound >= 3  ✓ REACHABLE (need 3 of 4)
 
+### 4 Ways to Modify Counters (MUST use at least one!)
+
+🚨 **If you create a conditionBeat checking a counter, you MUST modify that counter somewhere earlier!**
+
+1. **dialogTree choices** - Add counter effect to choice:
+   { "id": "c1", "text": "Be brave", "target": "beat_5", "counter": "courage", "counterOperation": "add", "counterValue": 10 }
+
+2. **movementChoice choices** - Same format:
+   { "id": "c1", "text": "Investigate", "location": "Lab", "target": "beat_5", "counter": "cluesFound", "counterOperation": "add", "counterValue": 1 }
+
+3. **pickProp props** - Same format:
+   { "id": "clue", "name": "Secret Letter", "target": "beat_5", "counter": "cluesFound", "counterOperation": "add", "counterValue": 1 }
+
+4. **setVariable beat** - Dedicated beat for counter modification:
+   { "type": "setVariable", "parameters": { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" }, "connections": [...] }
+
 ### Validation Checklist
 Before creating a conditionBeat for counters:
-1. List ALL beats/choices that modify the counter (setVariable, choice effects)
+1. List ALL choices/props/setVariables that modify the counter
 2. Sum the maximum possible increments
 3. Verify: threshold ≤ sum of increments
 4. If not reachable: either add more counter modifications OR lower the threshold
@@ -579,14 +680,14 @@ When designing stories with state accumulation:
   - Therefore need AT LEAST 3 opportunities to gain points
   - Create 4 point-gaining choices (giving player room for 1 miss)
 
-  Implementation:
-  - Choice A: +1 point
-  - Choice B: +1 point
-  - Choice C: +1 point
-  - Choice D: +1 point
+  Implementation (using choice effects):
+  - dialogTree choice "Be thorough": counter=cluesFound, counterOperation=add, counterValue=1
+  - pickProp "Find letter": counter=cluesFound, counterOperation=add, counterValue=1
+  - movementChoice "Search carefully": counter=cluesFound, counterOperation=add, counterValue=1
+  - dialogTree choice "Press for details": counter=cluesFound, counterOperation=add, counterValue=1
   Total possible: 4 points → threshold of 3 is REACHABLE ✓
 
-❌ **NEVER create a condition threshold higher than the sum of all possible increments**
+❌ **NEVER create a conditionBeat checking a counter without ALSO adding counter modifications to choices!**
 ✓ Always add 1-2 more increment opportunities than needed for the highest threshold
 `;
 
@@ -625,7 +726,139 @@ export function buildEnhancedStoryGenerationSystemPrompt(schema: any): string {
 
   return `You are an expert interactive narrative designer and game writer. You create sophisticated, branching stories using the ASAPS beat system with deep understanding of how different beat types work together.
 
+🚨🚨🚨 CRITICAL RULE: If you use counters, you MUST include a conditionBeat! 🚨🚨🚨
+- Every counter that gets incremented MUST be checked by a conditionBeat before endings
+- The conditionBeat determines which ending the player gets based on accumulated counter value
+- WITHOUT a conditionBeat, counters are POINTLESS - do NOT use counters if you won't check them!
+
 ${THEME_GUIDE}
+
+## 🎮 PROCEDURAL GAME ELEMENTS (REQUIRED for engaging stories!)
+
+Stories MUST include procedural/game-like mechanics, not just simple branching:
+
+### REQUIRED Elements (include at least 2-3):
+1. **Counters** - Track numeric values like clues, trust, suspicion, courage
+   - 🚨 **ADD COUNTER EFFECTS DIRECTLY TO CHOICES** - this is the preferred method!
+   - Use conditionBeat to check accumulated values and branch accordingly
+
+2. **Variables** - Track boolean/string state
+   - Use setVariable beats: { "type": "setVariable", "name": "hasKey", "value": true }
+   - Use conditionBeat to check: { "condition": { "type": "variable", "variable": "hasKey", "operator": "==" , "value": true } }
+
+3. **Inventory** - Track collected items
+   - Use addRemoveInventory beats to add/remove items
+   - Use conditionBeat with "type": "inventory" to check for items
+
+4. **Conditional Endings** - Endings should depend on ACCUMULATED state, not just the final choice
+   - Before endScreen, add conditionBeat checking counters/variables/inventory
+   - Example: "If cluesFound >= 3, good ending; else bad ending"
+
+### 🚨🚨🚨 CRITICAL: HOW TO MODIFY COUNTERS ON CHOICES 🚨🚨🚨
+
+**Every counter you check MUST be incremented somewhere! Add these 3 properties to choices:**
+
+**dialogTree choice with counter:**
+\`\`\`json
+{
+  "dialogTree": {
+    "id": "root",
+    "speaker": "NPC",
+    "text": "What do you do?",
+    "choices": [
+      {
+        "id": "c1",
+        "text": "Search thoroughly",
+        "target": "beat_5",
+        "counter": "cluesFound",
+        "counterOperation": "add",
+        "counterValue": 1
+      }
+    ]
+  }
+}
+\`\`\`
+
+**movementChoice with counter:**
+\`\`\`json
+{
+  "question": "Where to investigate?",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "Search the library",
+      "location": "Search the library",
+      "target": "beat_5",
+      "counter": "cluesFound",
+      "counterOperation": "add",
+      "counterValue": 1
+    }
+  ]
+}
+\`\`\`
+
+**pickProp with counter:**
+\`\`\`json
+{
+  "question": "What do you examine?",
+  "props": [
+    {
+      "id": "clue1",
+      "name": "Suspicious Letter",
+      "target": "beat_5",
+      "counter": "cluesFound",
+      "counterOperation": "add",
+      "counterValue": 1
+    }
+  ]
+}
+\`\`\`
+
+### Genre-Specific Requirements:
+- **Mystery/Detective**: Track clues found (counter), evidence collected (inventory), suspect trust (counter)
+- **Adventure**: Track items (inventory), locations visited (variables), puzzle progress (counters)
+- **Romance/Drama**: Track relationship values (counters), conversation choices (variables)
+- **Horror**: Track sanity/fear (counter), items (inventory), knowledge gained (variables)
+
+### Example Pattern for Mystery Story:
+1. Player investigates → **choices have counter/counterOperation/counterValue** to add to "cluesFound"
+2. Player finds items → addRemoveInventory beats add to inventory
+3. Before ending → conditionBeat checks "cluesFound >= 3"
+4. Good ending if enough clues, bad ending otherwise
+
+🚨 **IF YOU ADD counter/counterOperation/counterValue TO CHOICES, YOU MUST CREATE A conditionBeat TO CHECK IT!**
+🚨 **DO NOT increment counters without a conditionBeat that uses them to determine story outcome!**
+
+### MANDATORY: Counter + ConditionBeat Pattern
+
+If you add counter effects to choices, you MUST:
+1. Add counter modifications to multiple choices (so player can accumulate points)
+2. Create a conditionBeat BEFORE the endings that checks the counter
+3. **Route ALL paths through the conditionBeat** - the conditionBeat must be REACHABLE!
+4. Route to different endings based on the counter value
+
+❌ WRONG (counters incremented but never checked):
+\`\`\`
+choice adds cluesFound+1 → endScreen (counter ignored!)
+\`\`\`
+
+❌ WRONG (conditionBeat exists but is unreachable):
+\`\`\`
+choices → endScreen (directly)
+conditionBeat exists but nothing connects to it!
+\`\`\`
+
+✓ CORRECT (all paths go THROUGH conditionBeat to endings):
+\`\`\`
+choices add cluesFound → ... → conditionBeat (cluesFound >= 3?) → good/bad endScreen
+                                    ↑
+                            ALL paths must lead here before endings!
+\`\`\`
+
+🚨 **The conditionBeat must be a GATEWAY to the endings!**
+- Do NOT connect choices directly to endScreen
+- Connect choices to the conditionBeat instead
+- Let the conditionBeat decide which ending based on accumulated counter value
 
 CRITICAL JSON FORMAT:
 - Your response MUST be valid JSON
@@ -685,6 +918,9 @@ Generate complete, sophisticated interactive story structures that:
    - Reconvergence: Align back to center
 
 ## Output Format
+
+🚨 **IMPORTANT: ALL beats including endings go in the "beats" array! Do NOT create a separate "endings" array!**
+
 \`\`\`json
 {
   "metadata": {
@@ -708,12 +944,16 @@ Generate complete, sophisticated interactive story structures that:
       "connections": [
         {
           "targetId": "beat_1",
-          "label": "Choice text",
-          "condition": { /* optional */ },
-          "effects": [ /* optional */ ]
+          "label": "Choice text"
         }
       ],
       "cluster": "optional-cluster-name"
+    },
+    {
+      "id": "beat_end_good",
+      "name": "Good Ending",
+      "type": "endScreen",
+      "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true }
     }
   ],
   "variables": [
@@ -747,8 +987,9 @@ Generate complete, sophisticated interactive story structures that:
 \`\`\`
 
 ## Critical Requirements
-✓ Start with titleScreen (beat_0)
-✓ End with one or more endScreen beats
+🚨 **MANDATORY: beat_0 MUST be type "titleScreen"** - NEVER start with introText!
+🚨 **MANDATORY: If you use counters, you MUST have a conditionBeat to check them!**
+✓ End with one or more endScreen beats (always with showRestart: true)
 ✓ Include all required parameters for each beat type
 ✓ Use invisible beats (setVariable, conditionBeat) for logic
 ✓ Create variables for any state you want to track
@@ -758,6 +999,7 @@ Generate complete, sophisticated interactive story structures that:
 ✓ Create reconvergent paths, not just endless branching
 ✓ **EVERY beat must be reachable** - some other beat must connect TO it (except titleScreen)
 ✓ **Include suggestedTheme** with a theme ID and reason based on genre/style
+✓ **ALL endings go in the "beats" array** - NEVER create a separate "endings" array!
 
 ## ⚠️ CRITICAL: Data Format Rules (MUST FOLLOW)
 
@@ -838,18 +1080,24 @@ These beat types define targets in their choices/props/hyperlinks - NEVER add a 
 ⚠️ VALIDATION ERROR: Any extra parameters trigger warnings and may break functionality!
 
 conditionBeat parameters MUST contain EXACTLY these 3 fields (no more, no less):
-1. "condition" - the condition object
+1. "condition" - the condition object (contains type, variable, operator, value INSIDE it)
 2. "trueConnection" - where to go if true
 3. "falseConnection" - where to go if false
 
-🚫 FORBIDDEN parameters (will cause validation errors):
+🚫 FORBIDDEN parameters (will cause validation errors) - NEVER ADD THESE:
 - "connection" ❌
-- "conditionType" ❌
-- "variableName" ❌
-- "operator" (at top level) ❌
-- "value" (at top level) ❌
-- "trueTarget" ❌
-- "falseTarget" ❌
+- "conditionType" ❌ (use condition.type instead)
+- "variableName" ❌ (use condition.variable instead)
+- "operator" at top level ❌ (use condition.operator instead)
+- "value" at top level ❌ (use condition.value instead)
+- "trueTarget" ❌ (use trueConnection.target instead)
+- "falseTarget" ❌ (use falseConnection.target instead)
+- "item" at top level ❌ (use condition.item instead - for inventory checks)
+- "character" at top level ❌ (use condition.character instead - for inventory checks)
+- "checkType" at top level ❌ (use condition.checkType instead - for inventory checks)
+
+🚨 DO NOT include BOTH formats - use ONLY the nested format!
+🚨 DO NOT duplicate condition fields at the parameters level - they belong ONLY inside "condition"!
 
 ✓ CORRECT (exactly 3 parameters):
 \`\`\`json
@@ -858,6 +1106,18 @@ conditionBeat parameters MUST contain EXACTLY these 3 fields (no more, no less):
   "trueConnection": { "target": "beat_5", "label": "Has key" },
   "falseConnection": { "target": "beat_6", "label": "No key" }
 }
+\`\`\`
+
+🚨🚨🚨 **USE "target" NOT "targetId" in trueConnection/falseConnection!** 🚨🚨🚨
+
+❌ WRONG (uses "targetId"):
+\`\`\`json
+"trueConnection": { "targetId": "beat_success", "label": "Success" }
+\`\`\`
+
+✓ CORRECT (uses "target"):
+\`\`\`json
+"trueConnection": { "target": "beat_success", "label": "Success" }
 \`\`\`
 
 ### 5. NEVER generate internal fields
@@ -887,15 +1147,55 @@ beat_4 now checks variable and shows new option to progress
 - Reconvergent beats need all parallel paths connecting to them
 - The system will detect and warn about unreachable beats
 
-## ⚠️ CRITICAL: Beat ID Consistency
+## ⚠️ CRITICAL: Beat ID Consistency - GENERATE ALL BEATS!
 **EVERY target ID you reference MUST have a corresponding beat with that exact ID in your beats array.**
 - Before using a target like "beat_5_hub", make sure you create a beat with "id": "beat_5_hub"
 - Use simple IDs: beat_0, beat_1, beat_2... OR beat_intro, beat_hub, beat_ending
 - Double-check all targets in: choices[].target, connection.target, trueConnection.target, falseConnection.target
-- Common error: Referencing "beat_6_confrontation" but never creating that beat
-- The system will detect and report missing beat references
+- Common error: Referencing "beat_22" but stopping generation at beat_21
+- **NEVER stop generating beats early** - if a dialog choice targets "beat_22", you MUST include beat_22 in your output
+- Plan your beat count BEFORE generating - know exactly how many beats you need
+- The system will detect and report missing beat references as ERRORS (will cause import failure!)
 
 ## Concrete Beat Examples (Follow This Exact JSON Format)
+
+🚨🚨🚨 **CRITICAL - CONNECTIONS RULE** 🚨🚨🚨
+
+**ONLY these beat types should have a "connections" array:**
+- titleScreen, introText, durScreen, setVariable, addRemoveInventory, videoBeat
+These are single-path beats that need "connections" to specify the next beat.
+- ⚠️ Use "targetId" in connections: { "targetId": "beat_X" } NOT { "target": "beat_X" }
+
+**NEVER add "connections" array to these beat types (targets are IN the choices/props):**
+- movementChoice → targets are in choices[].target (NO connections array!)
+- dialogTree → targets are in dialogTree.choices[].target (NO connections array!)
+- pickProp → targets are in props[].target (NO connections array!)
+- hyperText → targets are in hyperlinks[].targetBeatId (NO connections array!)
+- conditionBeat → targets are in trueConnection/falseConnection (NO connections array!)
+- endScreen → terminal beat, no connections needed
+
+🚨 **VALIDATION ERROR: Adding "connections" to choice-based beats causes "Connection missing targetId" errors!**
+🚨 **The system expects "targetId" in connections, not "target"!**
+
+❌ WRONG (will cause validation errors):
+\`\`\`json
+{
+  "type": "dialogTree",
+  "parameters": { "dialogTree": { ... } },
+  "connections": [{ "target": "beat_3" }]  // ❌ WRONG - don't add this!
+}
+\`\`\`
+
+✓ CORRECT (no connections array on choice-based beats):
+\`\`\`json
+{
+  "type": "dialogTree",
+  "parameters": {
+    "dialogTree": {
+      "choices": [{ "id": "c1", "text": "...", "target": "beat_3" }]  // ✓ targets here only
+    }
+  }
+}
 
 \`\`\`json
 {
@@ -911,6 +1211,7 @@ beat_4 now checks variable and shows new option to progress
   "connections": [{ "targetId": "beat_1" }]
 }
 \`\`\`
+✓ titleScreen uses "connections" array - correct!
 
 \`\`\`json
 {
@@ -924,13 +1225,10 @@ beat_4 now checks variable and shows new option to progress
       { "id": "c1", "text": "Go left", "location": "Go left", "target": "beat_3" },
       { "id": "c2", "text": "Go right", "location": "Go right", "target": "beat_4" }
     ]
-  },
-  "connections": [
-    { "targetId": "beat_3", "label": "Left" },
-    { "targetId": "beat_4", "label": "Right" }
-  ]
+  }
 }
 \`\`\`
+✓ movementChoice has NO "connections" array - targets are in choices[].target!
 
 \`\`\`json
 {
@@ -944,13 +1242,10 @@ beat_4 now checks variable and shows new option to progress
       { "word": "the letter", "targetBeatId": "beat_6" },
       { "word": "the photograph", "targetBeatId": "beat_7" }
     ]
-  },
-  "connections": [
-    { "targetId": "beat_6", "label": "the letter" },
-    { "targetId": "beat_7", "label": "the photograph" }
-  ]
+  }
 }
-\`\`\``;
+\`\`\`
+✓ hyperText has NO "connections" array - targets are in hyperlinks[].targetBeatId!`;
 }
 
 /**
@@ -994,6 +1289,12 @@ Remember to:
 - Track important decisions in variables
 - Use appropriate beat types (dialogTree for conversations, movementChoice for exploration, etc.)
 - Design multiple endings based on accumulated state
+
+🚨 MANDATORY COUNTER RULE:
+- If you add counter effects to choices (counter/counterOperation/counterValue), you MUST create a conditionBeat
+- The conditionBeat checks the counter value and routes to different endings
+- Example: conditionBeat checks "cluesFound >= 3" → good ending vs bad ending
+- WITHOUT a conditionBeat, counters serve no purpose!
 
 CRITICAL - Beat ID Consistency:
 - Every target ID (in choices[].target, connection.target, etc.) MUST reference a beat you actually create
@@ -1060,16 +1361,11 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             question: "Where do you want to investigate?",
             choices: [
-              { id: "c1", text: "Search the Library", target: "beat_3" },
-              { id: "c2", text: "Examine the Study", target: "beat_6" },
-              { id: "c3", text: "Question the Servants", target: "beat_9" }
+              { id: "c1", text: "Search the Library", location: "Search the Library", target: "beat_3" },
+              { id: "c2", text: "Examine the Study", location: "Examine the Study", target: "beat_6" },
+              { id: "c3", text: "Question the Servants", location: "Question the Servants", target: "beat_9" }
             ]
-          },
-          connections: [
-            { targetId: "beat_3", label: "Library" },
-            { targetId: "beat_6", label: "Study" },
-            { targetId: "beat_9", label: "Servants" }
-          ]
+          }
         },
         {
           id: "beat_3",
@@ -1082,11 +1378,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
               { id: "letter", name: "Mysterious Letter", target: "beat_4" },
               { id: "nothing", name: "Nothing useful", target: "beat_5" }
             ]
-          },
-          connections: [
-            { targetId: "beat_4", label: "Letter" },
-            { targetId: "beat_5", label: "Nothing" }
-          ]
+          }
         },
         {
           id: "beat_4",
@@ -1097,8 +1389,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             type: "counter",
             name: "cluesFound",
             value: 1,
-            operation: "add",
-            connection: { target: "beat_5" }
+            operation: "add"
           },
           connections: [{ targetId: "beat_5" }]
         },
@@ -1124,11 +1415,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
               { id: "weapon", name: "The Murder Weapon", target: "beat_7" },
               { id: "nothing", name: "Nothing stands out", target: "beat_8" }
             ]
-          },
-          connections: [
-            { targetId: "beat_7", label: "Weapon" },
-            { targetId: "beat_8", label: "Nothing" }
-          ]
+          }
         },
         {
           id: "beat_7",
@@ -1139,8 +1426,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             type: "counter",
             name: "cluesFound",
             value: 1,
-            operation: "add",
-            connection: { target: "beat_8" }
+            operation: "add"
           },
           connections: [{ targetId: "beat_8" }]
         },
@@ -1179,11 +1465,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
                 }
               ]
             }
-          },
-          connections: [
-            { targetId: "beat_10", label: "Sympathetic" },
-            { targetId: "beat_11", label: "Accusatory" }
-          ]
+          }
         },
         {
           id: "beat_10",
@@ -1194,8 +1476,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             type: "counter",
             name: "cluesFound",
             value: 1,
-            operation: "add",
-            connection: { target: "beat_11" }
+            operation: "add"
           },
           connections: [{ targetId: "beat_11" }]
         },
@@ -1224,12 +1505,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             },
             trueConnection: { target: "beat_13", label: "Enough Clues (≥2)" },
             falseConnection: { target: "beat_2", label: "Need More Clues (<2)" }
-          },
-          connections: [
-            { targetId: "beat_13", label: "Enough Clues (≥2)" },
-            { targetId: "beat_2", label: "Need More Clues (<2)" }
-          ],
-          cluster: "investigation-check"
+          }
         },
         {
           id: "beat_13",
@@ -1250,16 +1526,11 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             question: "Who murdered Lord Blackwood?",
             choices: [
-              { id: "accuse_butler", text: "The Butler", target: "beat_15" },
-              { id: "accuse_maid", text: "The Maid", target: "beat_16" },
-              { id: "accuse_guest", text: "The Guest", target: "beat_17" }
+              { id: "accuse_butler", text: "The Butler", location: "The Butler", target: "beat_15" },
+              { id: "accuse_maid", text: "The Maid", location: "The Maid", target: "beat_16" },
+              { id: "accuse_guest", text: "The Guest", location: "The Guest", target: "beat_17" }
             ]
-          },
-          connections: [
-            { targetId: "beat_15", label: "Butler" },
-            { targetId: "beat_16", label: "Maid" },
-            { targetId: "beat_17", label: "Guest" }
-          ]
+          }
         },
         {
           id: "beat_15",
@@ -1287,11 +1558,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             },
             trueConnection: { target: "beat_18", label: "All Clues Found" },
             falseConnection: { target: "beat_19", label: "Missing Clues" }
-          },
-          connections: [
-            { targetId: "beat_18", label: "All Clues Found" },
-            { targetId: "beat_19", label: "Missing Clues" }
-          ]
+          }
         },
         {
           id: "beat_17",

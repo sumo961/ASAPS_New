@@ -10,28 +10,34 @@ import type { GeneratedBeat, AIValidationResult, StoryGenerationResponse, Dialog
  * Load beat definitions schema
  */
 async function loadBeatSchema(): Promise<any> {
+  // Try API server first (if running)
   try {
-    // Prefer live schema from API server (explicit URL to avoid dev-server HTML responses)
     const apiResponse = await fetch('http://localhost:3001/api/schema/beats');
     if (apiResponse.ok) {
+      console.log('[AIValidator] Schema loaded from API server');
       return await apiResponse.json();
     }
+  } catch {
+    // API server not running - this is fine, fall through to static file
+  }
 
-    // Fallback to static asset served from /public/beat-definitions/core-beats.json
+  // Fallback to static asset served from /public/beat-definitions/core-beats.json
+  try {
     const staticResponse = await fetch('/beat-definitions/core-beats.json');
     if (staticResponse.ok) {
+      console.log('[AIValidator] Schema loaded from static file');
       return await staticResponse.json();
     }
-
-    throw new Error('Failed to load beat schema from API or static asset');
   } catch (error) {
-    console.error('[AIValidator] Failed to load beat schema:', error);
-    // Return minimal schema as fallback
-    return {
-      schema: 'asaps-beat-definitions-v2.2',
-      beatTypes: {}
-    };
+    console.error('[AIValidator] Failed to load static schema:', error);
   }
+
+  // Last resort fallback
+  console.error('[AIValidator] All schema sources failed, using empty schema');
+  return {
+    schema: 'asaps-beat-definitions-v2.2',
+    beatTypes: {}
+  };
 }
 
 /**
@@ -196,18 +202,37 @@ export class AIValidator {
           severity: 'error'
         });
       } else {
-        // Check for variable name
-        if (!cond.variable && !cond.variableName && !cond.name) {
-          warnings.push('ConditionBeat missing variable name in condition');
-        }
-        // Check for operator
-        if (!cond.operator) {
-          warnings.push('ConditionBeat missing operator in condition');
+        // Inventory conditions use 'item' and 'checkType' instead of 'variable' and 'operator'
+        const isInventoryCondition = cond.type === 'inventory';
+
+        if (isInventoryCondition) {
+          // Check for item (inventory conditions)
+          if (!cond.item) {
+            warnings.push('ConditionBeat inventory condition missing item');
+          }
+          // checkType is optional (defaults to 'has'), so no warning needed
+        } else {
+          // Check for variable name (counter/variable conditions)
+          if (!cond.variable && !cond.variableName && !cond.name) {
+            warnings.push('ConditionBeat missing variable name in condition');
+          }
+          // Check for operator
+          if (!cond.operator) {
+            warnings.push('ConditionBeat missing operator in condition');
+          }
         }
       }
       // Check for connection targets
       if (!params.trueConnection && !params.trueTarget) {
         warnings.push('ConditionBeat missing trueConnection/trueTarget');
+      }
+
+      // Detect incorrectly duplicated parameters at top level (common AI generation error)
+      const forbiddenTopLevel = ['item', 'character', 'checkType', 'variable', 'variableName', 'operator', 'value', 'conditionType'];
+      for (const field of forbiddenTopLevel) {
+        if (params[field] !== undefined) {
+          warnings.push(`ConditionBeat has '${field}' at top level - should only be inside 'condition' object`);
+        }
       }
     }
 
