@@ -473,10 +473,32 @@ export class AIValidator {
     }
 
     // Check each beat (except first) is reachable
+    const unreachableBeats: string[] = [];
     for (let i = 1; i < response.beats.length; i++) {
       const beat = response.beats[i];
       if (!targetedBeatIds.has(beat.id)) {
-        warnings.push(`Beat "${beat.name || beat.id}" (${beat.type}) is unreachable - no other beat connects to it`);
+        unreachableBeats.push(`"${beat.name || beat.id}" (${beat.type})`);
+      }
+    }
+
+    // ANY unreachable beats indicate broken story flow - this is an error
+    if (unreachableBeats.length > 0) {
+      errors.push({
+        path: 'beats',
+        message: `Story has ${unreachableBeats.length} unreachable beat(s): ${unreachableBeats.slice(0, 5).join(', ')}${unreachableBeats.length > 5 ? ` and ${unreachableBeats.length - 5} more` : ''}. Every beat must be reachable from the title screen. Please add connections to these orphaned beats.`,
+        severity: 'error'
+      });
+    }
+
+    // Check for unreachable condition branches (counter thresholds that can never be satisfied)
+    const unreachableConditions = this.analyzeConditionThresholds(response.beats);
+    if (unreachableConditions.length > 0) {
+      for (const issue of unreachableConditions) {
+        errors.push({
+          path: `beats`,
+          message: `ConditionBeat "${issue.beatName}" (${issue.beatId}): ${issue.branch} branch to "${issue.targetId}" is unreachable. Counter "${issue.counterName}" cannot satisfy ${issue.operator} ${issue.requiredValue}. Possible range: ${issue.minValue} to ${issue.maxValue}. ${issue.suggestion}`,
+          severity: 'error'
+        });
       }
     }
 
@@ -485,6 +507,243 @@ export class AIValidator {
       errors,
       warnings
     };
+  }
+
+  /**
+   * Analyze counter modifications and check if conditionBeat thresholds are satisfiable
+   */
+  private analyzeConditionThresholds(beats: GeneratedBeat[]): Array<{
+    beatId: string;
+    beatName: string;
+    branch: 'true' | 'false';
+    targetId: string;
+    counterName: string;
+    operator: string;
+    requiredValue: number;
+    minValue: number;
+    maxValue: number;
+    suggestion: string;
+  }> {
+    const issues: Array<{
+      beatId: string;
+      beatName: string;
+      branch: 'true' | 'false';
+      targetId: string;
+      counterName: string;
+      operator: string;
+      requiredValue: number;
+      minValue: number;
+      maxValue: number;
+      suggestion: string;
+    }> = [];
+
+    // Step 1: Analyze all counter modifications
+    const counterRanges = this.analyzeCounterModifications(beats);
+
+    // Step 2: Check all conditionBeats
+    for (const beat of beats) {
+      if (beat.type !== 'conditionBeat') continue;
+
+      const params = beat.parameters || {};
+      const condition = params.condition as any;
+      if (!condition) continue;
+
+      // Only analyze counter-type conditions
+      const condType = condition.type || params.conditionType;
+      if (condType !== 'counter') continue;
+
+      const counterName = condition.variable || condition.variableName || params.variable;
+      const operator = condition.operator || params.operator || '>=';
+      const requiredValue = Number(condition.value ?? params.value ?? 0);
+      const trueTarget = params.trueTarget || params.trueConnection?.target;
+      const falseTarget = params.falseTarget || params.falseConnection?.target;
+
+      if (!counterName) continue;
+
+      const range = counterRanges.get(counterName) || { min: 0, max: 0 };
+
+      // Check if the condition can ever be true
+      const canBeTrue = this.checkCounterCondition(range, operator, requiredValue);
+      if (!canBeTrue && trueTarget) {
+        const needed = requiredValue - range.max;
+        issues.push({
+          beatId: beat.id,
+          beatName: beat.name || beat.id,
+          branch: 'true',
+          targetId: trueTarget,
+          counterName,
+          operator,
+          requiredValue,
+          minValue: range.min,
+          maxValue: range.max,
+          suggestion: needed > 0
+            ? `Add ${needed} more to "${counterName}" via setVariable or choice effects.`
+            : `Adjust condition threshold or add setVariable beats that modify "${counterName}".`
+        });
+      }
+
+      // Check if the condition can ever be false (for false branch)
+      const canBeFalse = this.checkCounterConditionCanBeFalse(range, operator, requiredValue);
+      if (!canBeFalse && falseTarget) {
+        issues.push({
+          beatId: beat.id,
+          beatName: beat.name || beat.id,
+          branch: 'false',
+          targetId: falseTarget,
+          counterName,
+          operator,
+          requiredValue,
+          minValue: range.min,
+          maxValue: range.max,
+          suggestion: `Condition is always true. Adjust threshold or counter modifications.`
+        });
+      }
+    }
+
+    return issues;
+  }
+
+  /**
+   * Analyze all counter modifications in the story
+   */
+  private analyzeCounterModifications(beats: GeneratedBeat[]): Map<string, { min: number; max: number }> {
+    const counterRanges = new Map<string, { min: number; max: number }>();
+
+    for (const beat of beats) {
+      const params = beat.parameters || {};
+
+      // Analyze SetVariable beats
+      if (beat.type === 'setVariable' || beat.type === 'variable') {
+        const varType = params.type;
+        const varName = params.name;
+        const varValue = Number(params.value) || 0;
+        const operation = params.operation || 'set';
+
+        if (!varName || varType !== 'counter') continue;
+
+        if (!counterRanges.has(varName)) {
+          counterRanges.set(varName, { min: 0, max: 0 });
+        }
+
+        const range = counterRanges.get(varName)!;
+        this.applyCounterOperation(range, operation, varValue);
+      }
+
+      // Analyze choice-based beats with counter effects
+      if (beat.type === 'movementChoice' || beat.type === 'pickProp') {
+        const choices = params.choices || params.props || [];
+        for (const choice of choices) {
+          const counterName = choice.counterEffect?.counter || choice.counter;
+          const counterValue = Number(choice.counterEffect?.value ?? choice.counterValue ?? 0);
+          const operation = choice.counterEffect?.operation || choice.counterOperation || 'change';
+
+          if (counterName && counterValue !== undefined) {
+            if (!counterRanges.has(counterName)) {
+              counterRanges.set(counterName, { min: 0, max: 0 });
+            }
+            const range = counterRanges.get(counterName)!;
+            this.applyCounterOperation(range, operation, counterValue);
+          }
+        }
+      }
+
+      // Analyze dialogTree choices
+      if (beat.type === 'dialogTree' && params.dialogTree) {
+        this.analyzeDialogTreeCounters(params.dialogTree, counterRanges);
+      }
+    }
+
+    return counterRanges;
+  }
+
+  /**
+   * Recursively analyze dialog tree for counter modifications
+   */
+  private analyzeDialogTreeCounters(node: any, counterRanges: Map<string, { min: number; max: number }>): void {
+    if (!node) return;
+
+    if (node.choices) {
+      for (const choice of node.choices) {
+        const counterName = choice.counterEffect?.counter || choice.counter;
+        const counterValue = Number(choice.counterEffect?.value ?? choice.counterValue ?? 0);
+        const operation = choice.counterEffect?.operation || choice.counterOperation || 'change';
+
+        if (counterName && counterValue !== undefined) {
+          if (!counterRanges.has(counterName)) {
+            counterRanges.set(counterName, { min: 0, max: 0 });
+          }
+          const range = counterRanges.get(counterName)!;
+          this.applyCounterOperation(range, operation, counterValue);
+        }
+
+        // Recursively check nested dialog nodes
+        if (choice.dialogNode) {
+          this.analyzeDialogTreeCounters(choice.dialogNode, counterRanges);
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply a counter operation to a range
+   */
+  private applyCounterOperation(range: { min: number; max: number }, operation: string, value: number): void {
+    if (operation === 'set') {
+      range.max = Math.max(range.max, value);
+      range.min = Math.min(range.min, value);
+    } else if (operation === 'change' || operation === 'add') {
+      if (value > 0) {
+        range.max += value;
+      } else {
+        range.min += value;
+      }
+    } else if (operation === 'subtract') {
+      if (value > 0) {
+        range.min -= value;
+      } else {
+        range.max -= value;
+      }
+    } else if (operation === 'multiply' && value !== 0) {
+      const newMax = Math.max(range.max * value, range.min * value);
+      const newMin = Math.min(range.max * value, range.min * value);
+      range.max = newMax;
+      range.min = newMin;
+    } else if (operation === 'divide' && value !== 0) {
+      const newMax = Math.max(range.max / value, range.min / value);
+      const newMin = Math.min(range.max / value, range.min / value);
+      range.max = newMax;
+      range.min = newMin;
+    }
+  }
+
+  /**
+   * Check if a counter condition can be satisfied
+   */
+  private checkCounterCondition(range: { min: number; max: number }, operator: string, value: number): boolean {
+    switch (operator) {
+      case '==': return range.min <= value && value <= range.max;
+      case '!=': return true; // Always possible unless range is a single point
+      case '>': return range.max > value;
+      case '>=': return range.max >= value;
+      case '<': return range.min < value;
+      case '<=': return range.min <= value;
+      default: return true;
+    }
+  }
+
+  /**
+   * Check if a counter condition can ever be false
+   */
+  private checkCounterConditionCanBeFalse(range: { min: number; max: number }, operator: string, value: number): boolean {
+    switch (operator) {
+      case '==': return range.min < value || value < range.max; // Can be != if range spans more than value
+      case '!=': return range.min <= value && value <= range.max; // Can be == if value is in range
+      case '>': return range.min <= value; // Can be <= value
+      case '>=': return range.min < value; // Can be < value
+      case '<': return range.max >= value; // Can be >= value
+      case '<=': return range.max > value; // Can be > value
+      default: return true;
+    }
   }
 
   /**

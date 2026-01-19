@@ -122,14 +122,30 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
   // Helper to determine contrasting text color based on background luminance
   const getContrastColor = (hexColor: string): string => {
+    // Handle 'transparent' or invalid colors
+    if (!hexColor || hexColor === 'transparent') return '#ffffff';
     // Remove # if present
     const hex = hexColor.replace('#', '');
+    if (hex.length < 6) return '#ffffff';
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
     // Calculate relative luminance
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return luminance > 0.5 ? '#000000' : '#ffffff';
+  };
+
+  // Helper to convert hex color to rgba with alpha (handles 'transparent')
+  const hexToRgba = (hexColor: string, alpha: number): string => {
+    if (!hexColor || hexColor === 'transparent') {
+      return `rgba(0, 0, 0, 0)`;
+    }
+    const hex = hexColor.replace('#', '');
+    if (hex.length < 6) return `rgba(0, 0, 0, ${alpha})`;
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
   // Theme management
@@ -317,8 +333,27 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     setHasChanges(false);
   };
 
-  const handleReset = () => {
-    // Reset to default settings
+  const handleReset = async () => {
+    // Reset to currently selected theme's defaults, preserving critical settings
+    const currentFirstBeat = settings.debug?.firstbeat || 'beat_0';
+    const currentShowVals = settings.debug?.showvals || false;
+
+    if (selectedThemeId) {
+      // Apply the selected theme's settings
+      const themeSettings = await applyThemeToSettings(selectedThemeId, settings);
+      if (themeSettings) {
+        // Preserve debug settings (firstbeat, showvals) - don't reset these
+        themeSettings.debug = {
+          firstbeat: currentFirstBeat,
+          showvals: currentShowVals,
+        };
+        setSettings(themeSettings);
+        setHasChanges(true);
+        return;
+      }
+    }
+
+    // Fallback to defaultSettings if provided, or use sensible defaults
     const defaults = defaultSettings || {
       project: {
         width: 1024,
@@ -327,44 +362,44 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
         scalingMode: 'fit',
       },
       colors: {
-        pcolor: '#7D8DA3',
-        palpha: 90,
-        ptextcolor: '',
-        nonpcolor: '#CCCCCC',
-        nonpalpha: 90,
-        nonptextcolor: '',
-        bgColor: '#1a1a1a',
-        textBoxBorder: '#333333',
+        pcolor: '#3d3d5c',      // Muted purple (VN style)
+        palpha: 100,
+        ptextcolor: '#ffffff',  // White text
+        nonpcolor: '#0d0d1a',   // Dark navy
+        nonpalpha: 92,
+        nonptextcolor: '#ffffff', // White text
+        bgColor: '#1a1a2e',     // Dark navy background
+        textBoxBorder: '#6666aa', // Soft purple border
       },
       fonts: {
-        titleFont: 'Gothic',
-        textFont: 'Handwriting2',
-        btnFont: 'Handwriting2',
+        titleFont: 'Noto Serif',
+        textFont: 'Noto Sans',
+        btnFont: 'Noto Sans',
         fontSize: {
-          title: 48,
-          text: 18,
-          button: 16,
+          title: 42,
+          text: 20,
+          button: 18,
         }
       },
       textbox: {
-        radius: 20,
-        padding: 20,
+        radius: 0,
+        padding: 24,
         borderWidth: 2,
-        opacity: 80,
+        opacity: 92,
         position: 'bottom',
         boxVisibility: 'all',
       },
       textEffects: {
-        animation: 'none',
-        typewriterSpeed: 30,
-        fadeInDuration: 500,
+        animation: 'none',      // No typewriter by default
+        typewriterSpeed: 40,
+        fadeInDuration: 300,
       },
       hotspots: {
         visible: true,
         labels: true,
-        highlightColor: '#ffff00',
-        opacity: 30,
-        showInPreview: 'visible',
+        highlightColor: '#ff99cc', // Soft pink
+        opacity: 25,
+        showInPreview: 'onHover',
         labelDisplay: 'hover',
       },
       sound: {
@@ -373,13 +408,13 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
         mute: false,
       },
       copyright: {
-        notice: 'Copyright © 2025 Anonymous All Rights Reserved',
+        notice: `Copyright © ${new Date().getFullYear()} All Rights Reserved`,
         year: new Date().getFullYear().toString(),
-        owner: 'Anonymous',
+        owner: '',
       },
       debug: {
-        firstbeat: '0',
-        showvals: false,
+        firstbeat: currentFirstBeat,  // Preserve current start beat
+        showvals: currentShowVals,
       }
     };
     setSettings(defaults);
@@ -1017,10 +1052,10 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       <div
                         style={{
                           border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
-                          backgroundColor: settings.colors.nonpcolor,
+                          // Use rgba so opacity only affects background, not text
+                          backgroundColor: hexToRgba(settings.colors.nonpcolor, settings.colors.nonpalpha / 100),
                           padding: `${settings.textbox.padding}px`,
                           borderRadius: `${settings.textbox.radius}px`,
-                          opacity: settings.colors.nonpalpha / 100
                         }}
                       >
                         <p style={{
@@ -1041,10 +1076,10 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         <button
                           style={{
                             border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
-                            backgroundColor: settings.colors.pcolor,
+                            // Use rgba so opacity only affects background, not text
+                            backgroundColor: hexToRgba(settings.colors.pcolor, settings.colors.palpha / 100),
                             padding: `${settings.textbox.padding}px ${settings.textbox.padding * 1.5}px`,
                             borderRadius: `${settings.textbox.radius}px`,
-                            opacity: settings.colors.palpha / 100,
                             color: settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor),
                             fontFamily: getFontFamily(settings.fonts.btnFont),
                             fontSize: `${settings.fonts.fontSize.button}px`,
@@ -1056,10 +1091,10 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         <button
                           style={{
                             border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
-                            backgroundColor: settings.colors.pcolor,
+                            // Use rgba so opacity only affects background, not text
+                            backgroundColor: hexToRgba(settings.colors.pcolor, settings.colors.palpha / 100),
                             padding: `${settings.textbox.padding}px ${settings.textbox.padding * 1.5}px`,
                             borderRadius: `${settings.textbox.radius}px`,
-                            opacity: settings.colors.palpha / 100,
                             color: settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor),
                             fontFamily: getFontFamily(settings.fonts.btnFont),
                             fontSize: `${settings.fonts.fontSize.button}px`,
@@ -1384,8 +1419,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                           backgroundSize: '100% 100%',
                           backgroundRepeat: 'no-repeat',
                         } : {
-                          backgroundColor: settings.colors.nonpcolor,
-                          opacity: settings.colors.nonpalpha / 100,
+                          // Use rgba for background so opacity doesn't affect text
+                          backgroundColor: hexToRgba(settings.colors.nonpcolor, settings.colors.nonpalpha / 100),
                           border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
                         }),
                         borderRadius: themeAssets?.textboxFrame ? 0 : `${settings.textbox.radius}px`,

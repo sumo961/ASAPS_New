@@ -37,7 +37,13 @@ function getFontFamily(fontName: string): string {
     return FONT_FAMILIES[fontName];
   }
 
-  // For custom fonts, ensure names with spaces are quoted
+  // If it already looks like a CSS font-family string (contains comma or ends with font type),
+  // return as-is - it's already a complete font stack
+  if (fontName.includes(',') || /\b(serif|sans-serif|monospace|cursive|fantasy)\s*$/.test(fontName)) {
+    return fontName;
+  }
+
+  // For custom fonts, ensure names with spaces are properly quoted
   // CSS requires quotes around font-family names that contain spaces
   if (fontName.includes(' ') && !fontName.startsWith("'") && !fontName.startsWith('"')) {
     return `'${fontName}', sans-serif`;
@@ -147,7 +153,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
     },
     colors: {
       textColor: npcTextColor, // NPC/narrator text color
-      textAlpha: normalizeOpacity(settings.colors.nonpalpha),
+      textAlpha: 100, // Text is always fully visible; nonpalpha controls text BOX background, not text
     },
     fonts: {
       titleFont: getFontFamily(settings.fonts.titleFont),

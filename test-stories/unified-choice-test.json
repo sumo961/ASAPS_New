@@ -1,0 +1,236 @@
+{
+  "id": "unified-choice-test",
+  "title": "Unified Choice/Effect Test Story",
+  "author": "Test",
+  "version": "1.0.0",
+  "description": "Tests the unified choice/effect formats: MovementChoice effects bug fix, counter fields, and sound effects",
+  "beats": [
+    {
+      "id": "start",
+      "type": "titleScreen",
+      "parameters": {
+        "title": "The Counter Quest",
+        "author": "ASAPS Test",
+        "buttonText": "Begin Adventure",
+        "connection": { "target": "intro" }
+      }
+    },
+    {
+      "id": "intro",
+      "type": "introText",
+      "parameters": {
+        "text": "Welcome, brave adventurer! Your journey will test the new unified choice/effect system.\n\nYour starting stats:\n- Courage: 0\n- Wisdom: 0\n- Gold: 0\n\nLet's see how your choices affect these counters!",
+        "buttonText": "Continue",
+        "connection": { "target": "movement_test" }
+      }
+    },
+    {
+      "id": "movement_test",
+      "type": "movementChoice",
+      "parameters": {
+        "question": "You stand at a crossroads. Where will you go?\n\n(Testing: MovementChoice with effects array AND counter fields)",
+        "choices": [
+          {
+            "id": "brave_path",
+            "text": "Take the dangerous mountain path (+5 Courage, sets 'chose_mountain' variable)",
+            "location": "Mountain Path",
+            "target": "mountain_result",
+            "effects": [
+              { "type": "setVariable", "target": "chose_mountain", "value": true }
+            ],
+            "counter": "courage",
+            "counterOperation": "change",
+            "counterValue": 5
+          },
+          {
+            "id": "wise_path",
+            "text": "Take the scholarly forest route (+3 Wisdom)",
+            "location": "Forest Path",
+            "target": "forest_result",
+            "counter": "wisdom",
+            "counterOperation": "change",
+            "counterValue": 3
+          },
+          {
+            "id": "greedy_path",
+            "text": "Search the abandoned camp (set Gold to 10)",
+            "location": "Abandoned Camp",
+            "target": "camp_result",
+            "counter": "gold",
+            "counterOperation": "set",
+            "counterValue": 10
+          }
+        ]
+      }
+    },
+    {
+      "id": "mountain_result",
+      "type": "introText",
+      "parameters": {
+        "text": "You braved the mountain path!\n\n✓ Effects array applied: 'chose_mountain' variable is now TRUE\n✓ Counter field applied: Courage increased by 5\n\nThis proves the MovementChoice effects bug is FIXED!",
+        "buttonText": "Continue to PickProp Test",
+        "connection": { "target": "pickprop_test" }
+      }
+    },
+    {
+      "id": "forest_result",
+      "type": "introText",
+      "parameters": {
+        "text": "You took the scholarly forest route!\n\n✓ Counter field applied: Wisdom increased by 3",
+        "buttonText": "Continue to PickProp Test",
+        "connection": { "target": "pickprop_test" }
+      }
+    },
+    {
+      "id": "camp_result",
+      "type": "introText",
+      "parameters": {
+        "text": "You searched the abandoned camp!\n\n✓ Counter field applied: Gold SET to 10 (not incremented)",
+        "buttonText": "Continue to PickProp Test",
+        "connection": { "target": "pickprop_test" }
+      }
+    },
+    {
+      "id": "pickprop_test",
+      "type": "pickProp",
+      "parameters": {
+        "question": "You find a treasure chest with three items. Pick one!\n\n(Testing: PickProp with counter fields - item also added to inventory)",
+        "props": [
+          {
+            "id": "sword",
+            "name": "Enchanted Sword",
+            "description": "A magical blade (+10 Courage)",
+            "target": "pickprop_result",
+            "counter": "courage",
+            "counterOperation": "change",
+            "counterValue": 10
+          },
+          {
+            "id": "book",
+            "name": "Ancient Tome",
+            "description": "Contains forbidden knowledge (+10 Wisdom)",
+            "target": "pickprop_result",
+            "counter": "wisdom",
+            "counterOperation": "change",
+            "counterValue": 10
+          },
+          {
+            "id": "coins",
+            "name": "Bag of Gold",
+            "description": "Heavy with coins (+50 Gold)",
+            "target": "pickprop_result",
+            "counter": "gold",
+            "counterOperation": "change",
+            "counterValue": 50
+          }
+        ]
+      }
+    },
+    {
+      "id": "pickprop_result",
+      "type": "introText",
+      "parameters": {
+        "text": "Excellent choice!\n\n✓ Item added to inventory (check your inventory!)\n✓ Counter increased based on your choice\n\nNow let's test the DialogTree with counter fields...",
+        "buttonText": "Continue to Dialog Test",
+        "connection": { "target": "dialog_test" }
+      }
+    },
+    {
+      "id": "dialog_test",
+      "type": "dialogTree",
+      "parameters": {
+        "dialogTree": {
+          "id": "root",
+          "speaker": "Wise Sage",
+          "text": "Greetings, traveler! I sense great potential in you. Tell me, what trait do you value most?\n\n(Testing: DialogTree with counter fields on choices)",
+          "choices": [
+            {
+              "id": "valor",
+              "text": "I value bravery above all else! (+5 Courage)",
+              "counter": "courage",
+              "counterOperation": "change",
+              "counterValue": 5,
+              "dialogNode": {
+                "id": "valor_response",
+                "speaker": "Wise Sage",
+                "text": "A noble answer! Courage will serve you well. Your courage has increased!\n\nNow, one final question...",
+                "choices": [
+                  {
+                    "id": "final_brave",
+                    "text": "I'm ready for anything!",
+                    "target": "summary"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "knowledge",
+              "text": "Knowledge is the greatest treasure. (+5 Wisdom)",
+              "counter": "wisdom",
+              "counterOperation": "change",
+              "counterValue": 5,
+              "dialogNode": {
+                "id": "knowledge_response",
+                "speaker": "Wise Sage",
+                "text": "Indeed! The pursuit of wisdom is admirable. Your wisdom has grown!\n\nNow, one final question...",
+                "choices": [
+                  {
+                    "id": "final_wise",
+                    "text": "I seek to learn more.",
+                    "target": "summary"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "wealth",
+              "text": "Gold opens all doors. (+20 Gold)",
+              "counter": "gold",
+              "counterOperation": "change",
+              "counterValue": 20,
+              "dialogNode": {
+                "id": "wealth_response",
+                "speaker": "Wise Sage",
+                "text": "Practical! Wealth has its uses. Your gold has increased!\n\nNow, one final question...",
+                "choices": [
+                  {
+                    "id": "final_rich",
+                    "text": "Time is money, let's move on.",
+                    "target": "summary"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "summary",
+      "type": "introText",
+      "parameters": {
+        "text": "=== FINAL STATS ===\n\nYour adventure has tested all the new unified choice/effect features:\n\n✓ MovementChoice effects array (BUG FIX)\n✓ MovementChoice counter fields\n✓ PickProp counter fields (with inventory add)\n✓ DialogTree counter fields\n\nCheck the browser console or debug panel to verify your final counter values!",
+        "buttonText": "End Test",
+        "connection": { "target": "end" }
+      }
+    },
+    {
+      "id": "end",
+      "type": "endScreen",
+      "parameters": {
+        "message": "Test Complete!\n\nAll unified choice/effect features have been tested.",
+        "showRestart": true,
+        "restartText": "Test Again"
+      }
+    }
+  ],
+  "counters": [
+    { "name": "courage", "initialValue": 0, "displayName": "Courage" },
+    { "name": "wisdom", "initialValue": 0, "displayName": "Wisdom" },
+    { "name": "gold", "initialValue": 0, "displayName": "Gold" }
+  ],
+  "variables": {},
+  "settings": {
+    "showCounters": true
+  }
+}

@@ -485,23 +485,30 @@ export class ThemeService {
 
   /**
    * Register built-in preset themes
+   * Always updates built-in themes with latest definitions from code
    */
   async registerBuiltInThemes(themes: ThemeDefinition[]): Promise<void> {
     const db = await this.ensureDb();
 
     for (const theme of themes) {
       const existing = await db.get('themes', theme.meta.id);
-      if (!existing) {
-        const stored: StoredTheme & { id: string } = {
-          id: theme.meta.id,
-          definition: theme,
-          assetIds: [],
-          source: 'built-in',
-          readOnly: true,
-        };
 
-        await db.put('themes', stored);
+      // Always update built-in themes with latest definition from code
+      // This ensures theme changes in presets.ts are reflected
+      const stored: StoredTheme & { id: string } = {
+        id: theme.meta.id,
+        definition: theme,
+        assetIds: existing?.assetIds || [],
+        source: 'built-in',
+        readOnly: true,
+      };
+
+      await db.put('themes', stored);
+
+      if (!existing) {
         console.log(`[ThemeService] Registered built-in theme: ${theme.meta.name}`);
+      } else {
+        console.log(`[ThemeService] Updated built-in theme: ${theme.meta.name}`);
       }
     }
   }

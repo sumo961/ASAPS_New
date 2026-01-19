@@ -936,6 +936,176 @@ export class AIService {
   }
 
   /**
+   * Auto-fix missing connections on linear beats (common smaller model issue)
+   * Linear beats like introText, durScreen, setVariable need a 'connection' parameter
+   * to specify their next beat. Smaller models often forget this.
+   */
+  private autoFixMissingConnections(response: StoryGenerationResponse): void {
+    console.log('[AIService.autoFix] Starting connection auto-fix...');
+
+    if (!response.beats || !Array.isArray(response.beats)) {
+      console.log('[AIService.autoFix] No beats array, skipping');
+      return;
+    }
+
+    console.log(`[AIService.autoFix] Processing ${response.beats.length} beats`);
+
+    // Beat types that require a single 'connection' parameter
+    const linearBeatTypes = new Set([
+      'introText',
+      'durScreen',
+      'setVariable',
+      'addRemoveInventory',
+      'videoBeat',
+      'randomTarget',
+      'setTimer',
+    ]);
+
+    // Build set of all beat IDs that are already targets
+    const targetedBeatIds = new Set<string>();
+    const beatMap = new Map<string, any>();
+
+    for (const beat of response.beats) {
+      beatMap.set(beat.id, beat);
+
+      // Check connection parameter
+      if (beat.parameters?.connection?.target) {
+        targetedBeatIds.add(beat.parameters.connection.target);
+      }
+
+      // Check choices/props/dialogTree targets
+      const choices = beat.parameters?.choices || beat.parameters?.props || [];
+      for (const choice of choices) {
+        if (choice.target) targetedBeatIds.add(choice.target);
+      }
+
+      // Check dialogTree recursively
+      if (beat.parameters?.dialogTree) {
+        this.collectDialogTreeTargets(beat.parameters.dialogTree, targetedBeatIds);
+      }
+
+      // Check conditionBeat targets
+      if (beat.type === 'conditionBeat') {
+        if (beat.parameters?.trueTarget) targetedBeatIds.add(beat.parameters.trueTarget);
+        if (beat.parameters?.falseTarget) targetedBeatIds.add(beat.parameters.falseTarget);
+        if (beat.parameters?.trueConnection?.target) targetedBeatIds.add(beat.parameters.trueConnection.target);
+        if (beat.parameters?.falseConnection?.target) targetedBeatIds.add(beat.parameters.falseConnection.target);
+      }
+
+      // Check connections array
+      if (beat.connections && Array.isArray(beat.connections)) {
+        for (const conn of beat.connections) {
+          if (conn.targetId) targetedBeatIds.add(conn.targetId);
+          if (conn.target) targetedBeatIds.add(conn.target);
+        }
+      }
+    }
+
+    // titleScreen always targets something so it's implicitly connected
+    const titleScreen = response.beats.find(b => b.type === 'titleScreen');
+    if (titleScreen) {
+      targetedBeatIds.add(titleScreen.id);
+    }
+
+    console.log(`[AIService.autoFix] Targeted beats: ${[...targetedBeatIds].join(', ')}`);
+
+    // Find orphaned beats (not targeted by anything)
+    const orphanedBeatIds = response.beats
+      .filter(b => !targetedBeatIds.has(b.id))
+      .map(b => b.id);
+
+    console.log(`[AIService.autoFix] Orphaned beats: ${orphanedBeatIds.join(', ') || 'none'}`);
+
+    // List linear beats and their connection status
+    const linearBeats = response.beats.filter(b => linearBeatTypes.has(b.type));
+    console.log(`[AIService.autoFix] Linear beats to check: ${linearBeats.map(b => `${b.id}(${b.type})`).join(', ')}`);
+    for (const lb of linearBeats) {
+      console.log(`[AIService.autoFix]   - ${lb.id}: connection=${lb.parameters?.connection?.target || 'MISSING'}`);
+    }
+
+    let fixCount = 0;
+
+    // Fix linear beats missing connections
+    for (let i = 0; i < response.beats.length; i++) {
+      const beat = response.beats[i];
+
+      if (!linearBeatTypes.has(beat.type)) continue;
+
+      if (beat.parameters?.connection?.target) {
+        console.log(`[AIService.autoFix] Beat ${beat.id} already has connection → ${beat.parameters.connection.target}`);
+        continue;
+      }
+
+      console.log(`[AIService.autoFix] Beat ${beat.id} (${beat.type}) at index ${i} needs connection`);
+
+      // Find the next orphaned beat that should be connected
+      // Strategy: look for the next orphaned beat in array order after this one
+      let targetId: string | null = null;
+
+      // First, try to find an orphaned beat that comes after this beat
+      for (let j = i + 1; j < response.beats.length; j++) {
+        const nextBeat = response.beats[j];
+        const isOrphaned = orphanedBeatIds.includes(nextBeat.id);
+        const isEndScreen = nextBeat.type === 'endScreen';
+
+        if (isOrphaned && !isEndScreen) {
+          console.log(`[AIService.autoFix]   Found orphaned target: ${nextBeat.id} (${nextBeat.type}) at index ${j}`);
+          targetId = nextBeat.id;
+          // Remove from orphaned list since we're connecting to it
+          const idx = orphanedBeatIds.indexOf(targetId);
+          if (idx !== -1) orphanedBeatIds.splice(idx, 1);
+          break;
+        }
+      }
+
+      // If no orphaned beat found, try the next beat in sequence (it might be intentional)
+      if (!targetId && i + 1 < response.beats.length) {
+        const nextBeat = response.beats[i + 1];
+        if (nextBeat.type !== 'endScreen') {
+          console.log(`[AIService.autoFix]   No orphan found, using next sequential beat: ${nextBeat.id}`);
+          targetId = nextBeat.id;
+        }
+      }
+
+      if (targetId) {
+        if (!beat.parameters) beat.parameters = {};
+        beat.parameters.connection = { target: targetId };
+
+        // Also add to connections array for consistency
+        if (!beat.connections) beat.connections = [];
+        beat.connections.push({ targetId: targetId });
+
+        console.log(`[AIService.autoFix] ✓ Fixed: ${beat.id} (${beat.type}) → ${targetId}`);
+        fixCount++;
+      } else {
+        console.log(`[AIService.autoFix] ✗ Could not find target for ${beat.id}`);
+      }
+    }
+
+    if (fixCount > 0) {
+      console.log(`[AIService.autoFix] Auto-fixed ${fixCount} missing connections on linear beats`);
+    } else {
+      console.log(`[AIService.autoFix] No fixes needed`);
+    }
+  }
+
+  /**
+   * Helper to collect all targets from a dialogTree recursively
+   */
+  private collectDialogTreeTargets(node: any, targets: Set<string>): void {
+    if (!node) return;
+
+    if (node.choices && Array.isArray(node.choices)) {
+      for (const choice of node.choices) {
+        if (choice.target) targets.add(choice.target);
+        if (choice.dialogNode) {
+          this.collectDialogTreeTargets(choice.dialogNode, targets);
+        }
+      }
+    }
+  }
+
+  /**
    * Generate complete story with automatic repair for fixable issues
    */
   async generateStory(request: StoryGenerationRequest): Promise<StoryGenerationResponse> {
@@ -955,6 +1125,9 @@ export class AIService {
 
       // Clean up redundant parameters that AI models often add
       this.cleanupRedundantParameters(response);
+
+      // Auto-fix missing connections on linear beats (common smaller model issue)
+      this.autoFixMissingConnections(response);
 
       // Validate if enabled
       let validationErrors: any[] = [];
@@ -979,9 +1152,68 @@ export class AIService {
         );
 
         if (!validation.valid) {
-          console.error('[AIService] Story validation failed:', validationErrors);
-          this.exportStoryDebug(response, validationErrors, validationWarnings, 'failed');
-          throw new Error(`Story validation failed: ${validationErrors.map(e => e.message).join(', ')}`);
+          // Check if errors are repairable (counter threshold issues or unreachable beats)
+          const repairableErrors = validationErrors.filter((e: any) => {
+            const msg = e.message || e;
+            return msg.includes('cannot satisfy') ||
+              msg.includes('Possible range') ||
+              msg.includes('unreachable');  // Include all unreachable errors (beats may be orphaned due to threshold issues)
+          });
+
+          if (repairableErrors.length > 0) {
+            // Attempt repair with AI feedback for repairable errors
+            console.log(`[AIService] Found ${repairableErrors.length} repairable errors (of ${validationErrors.length} total), attempting AI repair...`);
+
+            for (let attempt = 1; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
+              console.log(`[AIService] Story repair attempt ${attempt}/${MAX_REPAIR_ATTEMPTS}`);
+
+              const repairedResponse = await this.attemptStoryRepair(
+                response,
+                repairableErrors,
+                request
+              );
+
+              if (repairedResponse) {
+                // Re-validate the repaired response
+                const revalidation = await this.validator.validateStoryGeneration(repairedResponse);
+                const newRepairableErrors = (revalidation.errors || []).filter((e: any) => {
+                  const msg = e.message || e;
+                  return msg.includes('cannot satisfy') ||
+                    msg.includes('Possible range') ||
+                    msg.includes('unreachable');
+                });
+
+                if (revalidation.valid || newRepairableErrors.length < repairableErrors.length) {
+                  console.log(`[AIService] Repair reduced errors from ${repairableErrors.length} to ${newRepairableErrors.length}`);
+                  response = repairedResponse;
+                  validationErrors = revalidation.errors || [];
+                  validationWarnings = revalidation.warnings || [];
+
+                  if (revalidation.valid) {
+                    console.log('[AIService] All repairable errors resolved!');
+                    break;
+                  }
+                } else {
+                  console.log('[AIService] Repair did not improve errors, trying again...');
+                }
+              } else {
+                console.log('[AIService] Repair attempt failed');
+              }
+            }
+
+            // Check if we still have errors after repair attempts
+            const finalValidation = await this.validator.validateStoryGeneration(response);
+            if (!finalValidation.valid) {
+              console.error('[AIService] Story validation still failed after repair attempts:', finalValidation.errors);
+              this.exportStoryDebug(response, finalValidation.errors || [], finalValidation.warnings || [], 'failed');
+              throw new Error(`Story validation failed: ${(finalValidation.errors || []).map((e: any) => e.message || e).join(', ')}`);
+            }
+          } else {
+            // Non-repairable errors - fail immediately
+            console.error('[AIService] Story validation failed:', validationErrors);
+            this.exportStoryDebug(response, validationErrors, validationWarnings, 'failed');
+            throw new Error(`Story validation failed: ${validationErrors.map((e: any) => e.message || e).join(', ')}`);
+          }
         }
 
         // Attempt to repair fixable warnings (like unreachable beats)
@@ -1108,6 +1340,96 @@ Return ONLY the corrected JSON, no explanation needed.
       }
 
       console.log('[AIService] Repair completed, verifying...');
+      return repairedResponse;
+
+    } catch (error) {
+      console.error('[AIService] Story repair failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Attempt to repair story issues (counter thresholds, unreachable beats) by asking the AI
+   */
+  private async attemptStoryRepair(
+    story: StoryGenerationResponse,
+    issues: any[],
+    originalRequest: StoryGenerationRequest
+  ): Promise<StoryGenerationResponse | null> {
+    try {
+      const issueList = issues.map((issue, i) => {
+        const msg = issue.message || issue;
+        return `${i + 1}. ${msg}`;
+      }).join('\n');
+
+      const repairPrompt = `
+STORY REPAIR REQUEST: The generated story has validation issues that need fixing.
+
+## Issues Found:
+${issueList}
+
+## Common Fixes:
+
+### Counter Threshold Issues (cannot satisfy condition):
+The condition checks require counter values that cannot be reached.
+- Add more setVariable beats with operation="add" for the counter
+- Or increase the counterValue on existing choice effects
+- Place counter increments BEFORE condition checks
+- A condition "counter >= 3" needs at least 3 increments reachable before it
+
+### Unreachable Beat Issues:
+Some beats cannot be reached from the title screen.
+- Add missing connections to orphaned beats
+- Or connect them to an existing beat in the story flow
+- Ensure every beat has at least one incoming connection (except title screen)
+
+## Current Story JSON:
+${JSON.stringify(story, null, 2)}
+
+## Instructions:
+1. Analyze each issue and determine the appropriate fix
+2. For counter issues: Add setVariable beats or choice counter effects
+3. For unreachable beats: Add connections from existing beats to orphaned ones
+4. Preserve ALL existing content - only ADD beats/connections or MODIFY values
+5. Do NOT remove any beats or break existing connections
+
+## Important:
+- Use setVariable beats with type="counter", operation="add" for counter increments
+- Or add counter/counterOperation/counterValue to existing choices
+- For unreachable beats, find logical places to add connections to them
+- Every beat must be reachable from the title screen through some path
+
+Return ONLY the corrected JSON, no explanation needed.
+`;
+
+      // Create a repair request
+      const repairRequest: StoryGenerationRequest = {
+        ...originalRequest,
+        prompt: repairPrompt,
+      };
+
+      console.log('[AIService] Sending story repair request to AI...');
+      let repairedResponse = await this.currentProvider!.generateStory(repairRequest);
+
+      // Transform the repaired response
+      repairedResponse = this.transformStoryResponse(repairedResponse);
+
+      // Clean up redundant parameters
+      this.cleanupRedundantParameters(repairedResponse);
+
+      // Verify the repair didn't break the story
+      if (!repairedResponse.beats || repairedResponse.beats.length === 0) {
+        console.warn('[AIService] Story repair produced invalid response (no beats)');
+        return null;
+      }
+
+      // Check that we didn't lose beats
+      if (repairedResponse.beats.length < story.beats.length) {
+        console.warn('[AIService] Story repair removed beats, rejecting');
+        return null;
+      }
+
+      console.log('[AIService] Story repair completed, verifying...');
       return repairedResponse;
 
     } catch (error) {

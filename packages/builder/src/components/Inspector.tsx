@@ -23,6 +23,7 @@ interface ChoiceWithCounter {
   counter?: string;
   counterOperation?: string;
   counterValue?: number;
+  soundEffect?: string;
 }
 
 interface PropWithEffect {
@@ -33,6 +34,7 @@ interface PropWithEffect {
   counter?: string;
   counterOperation?: string;
   counterValue?: number;
+  soundEffect?: string;
   effect?: {
     type: string;
     name: string;
@@ -1831,6 +1833,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                                   Use negative values to decrease
                                 </div>
                               )}
+                              <div className="mt-2 pt-2 border-t border-blue-200">
+                                <div className="text-xs font-medium text-blue-700 mb-1">Sound Effect (Optional)</div>
+                                <input
+                                  type="text"
+                                  value={choice.soundEffect || ''}
+                                  onChange={(e) => handleUpdateChoice(index, 'soundEffect', e.target.value)}
+                                  placeholder="Sound file (e.g., click.mp3)"
+                                  className="w-full px-2 py-1 text-xs border rounded"
+                                />
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1992,10 +2004,20 @@ export const Inspector: React.FC<InspectorProps> = ({
                                     Use negative values to decrease
                                   </div>
                                 )}
+                                <div className="mt-2 pt-2 border-t border-blue-200">
+                                  <div className="text-xs font-medium text-blue-700 mb-1">Sound Effect (Optional)</div>
+                                  <input
+                                    type="text"
+                                    value={prop.soundEffect || ''}
+                                    onChange={(e) => handleUpdateProp(index, 'soundEffect', e.target.value)}
+                                    placeholder="Sound file (e.g., pickup.mp3)"
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  />
+                                </div>
                               </>
                             )}
                           </div>
-                          
+
                           {/* Note: Picking a prop automatically adds it to inventory */}
                         </div>
                       ))}

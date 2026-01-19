@@ -46,6 +46,7 @@ interface DialogChoice {
   counter?: string;
   counterOperation?: 'change' | 'set';
   counterValue?: number;
+  soundEffect?: string;  // Sound to play when choice is selected
 }
 
 interface Condition {
@@ -648,6 +649,20 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                             />
                           </div>
                         )}
+                      </div>
+
+                      {/* Sound effect control */}
+                      <div className="mt-2 flex gap-1.5 items-center">
+                        <span className="text-xs text-gray-600 flex-shrink-0">🔊</span>
+                        <input
+                          type="text"
+                          value={choice.soundEffect || ''}
+                          onChange={(e) => updateChoiceAtPath(path, index, {
+                            soundEffect: e.target.value || undefined
+                          })}
+                          placeholder="Sound file (optional)"
+                          className="flex-1 min-w-0 px-2 py-1 text-xs border rounded"
+                        />
                       </div>
 
                       {/* Target selection - show for choices without nested dialog OR collapsible patterns */}

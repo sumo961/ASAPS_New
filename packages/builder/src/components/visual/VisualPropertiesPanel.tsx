@@ -98,11 +98,38 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   responseDelay,
   onResponseDelayChange,
 }) => {
+  // Get available fonts (built-in + custom from assets)
+  const { fonts } = useFonts(assets);
+
+  // Helper to extract display name from a CSS font-family string
+  // e.g., '"Courier New", Courier, monospace' -> 'Courier New'
+  const extractFontDisplayName = (fontFamily: string): string => {
+    if (!fontFamily) return 'Arial';
+
+    // Extract the first font name from the CSS font-family string
+    // Handle quoted names: "Courier New" or 'Courier New'
+    const quotedMatch = fontFamily.match(/^["']([^"']+)["']/);
+    if (quotedMatch) {
+      // Check if this matches a known font displayName
+      const matchedFont = fonts.find(f => f.displayName === quotedMatch[1]);
+      if (matchedFont) return matchedFont.displayName;
+    }
+
+    // Handle unquoted names: Arial, sans-serif
+    const firstFont = fontFamily.split(',')[0].trim().replace(/["']/g, '');
+    const matchedFont = fonts.find(f => f.displayName === firstFont);
+    if (matchedFont) return matchedFont.displayName;
+
+    // Fallback: return the extracted name or Arial
+    return firstFont || 'Arial';
+  };
+
   // Get default fonts from global settings based on element type
   // Renderer uses different fonts for text vs buttons vs titles
-  const defaultTitleFont = globalSettings?.fonts?.titleFont || 'Arial';
-  const defaultTextFont = globalSettings?.fonts?.textFont || 'Arial';
-  const defaultButtonFont = globalSettings?.fonts?.btnFont || 'Arial';
+  const defaultTitleFont = extractFontDisplayName(globalSettings?.fonts?.titleFont || 'Arial');
+  const defaultTextFont = extractFontDisplayName(globalSettings?.fonts?.textFont || 'Arial');
+  const defaultButtonFont = extractFontDisplayName(globalSettings?.fonts?.btnFont || 'Arial');
+
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     background: true,
     dialogSettings: true,  // Show Dialog Settings expanded by default
@@ -111,9 +138,6 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   });
   const [soundTab, setSoundTab] = useState<'presets' | 'custom'>('presets');
   const [playingSound, setPlayingSound] = useState<string | null>(null);
-
-  // Get available fonts (built-in + custom from assets)
-  const { fonts } = useFonts(assets);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({

@@ -141,6 +141,10 @@ const BEAT_TYPE_GUIDE = `
 - target (string): Beat ID to exit dialog
 - dialogNode (nested): NPC responds, conversation continues
 - Connections: Multiple → based on dialog choices leading to beat targets
+- COUNTER EFFECTS: Choices can modify counters
+  { "id": "c1", "text": "I'll help you!", "target": "beat_5", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
+- SOUND EFFECTS: Choices can play a sound when selected
+  { "id": "c1", "text": "I accept your offer.", "target": "beat_5", "soundEffect": "handshake.mp3" }
 - IMPORTANT: Choice text IS what the player says. Never use "[Continue]" - use actual dialogue.
 - Example: NPC asks question → [Player response A | Player response B] → NPC responds
 
@@ -156,13 +160,21 @@ const BEAT_TYPE_GUIDE = `
 - Connections: Multiple → one per choice
 - COUNTER EFFECTS: Choices can modify counters (same as dialogTree)
   { "id": "c1", "text": "Take the dangerous path", "target": "beat_danger", "counter": "courage", "counterOperation": "change", "counterValue": 5 }
+- SOUND EFFECTS: Choices can play a sound when selected
+  { "id": "c1", "text": "Enter the cave", "target": "beat_cave", "soundEffect": "cave_echo.mp3" }
 - Example: "Where to go?" → [Library | Kitchen | Garden] → 3 different beats
 
 **pickProp** - Object/item selection (NOT for action choices!)
 - Use: Selecting physical ITEMS/OBJECTS, NOT for navigation or actions
-- Parameters: question (REQUIRED!), props (array of {id, name, target})
+- 🚨 **AUTO-INVENTORY**: pickProp AUTOMATICALLY adds the selected prop's "name" to player inventory!
+  - DO NOT follow pickProp with addRemoveInventory - this creates DUPLICATE inventory items!
+  - The player will see both "Silver Key" (from pickProp) and "silver_key" (from addRemoveInventory)
+  - ✓ CORRECT: pickProp → introText describing what you found
+  - ✗ WRONG: pickProp → addRemoveInventory (creates duplicates!)
+- Parameters: question (REQUIRED!), props (array of {id, name, description, target})
   - question: Text prompt asking what to pick (REQUIRED - e.g., "What do you examine?")
   - name: The ITEM NAME ONLY - just the object name, no verbs!
+  - description: RECOMMENDED - Brief description of the item (shown to player when selecting)
   - ⚠️ WRONG names that start with verbs:
     - "Take the key" ❌
     - "Pick up the sword" ❌
@@ -175,12 +187,14 @@ const BEAT_TYPE_GUIDE = `
     - "Old Book" ✓
     - "Mysterious Letter" ✓
 - Connections: Multiple → one per prop
-- Combine with: addRemoveInventory (invisible beat after)
 - COUNTER EFFECTS: Props can modify counters when selected
-  { "id": "sword", "name": "Rusty Sword", "target": "beat_armed", "counter": "confidence", "counterOperation": "change", "counterValue": 3 }
+  { "id": "sword", "name": "Rusty Sword", "description": "A weathered blade with strange markings", "target": "beat_armed", "counter": "confidence", "counterOperation": "change", "counterValue": 3 }
+- SOUND EFFECTS: Props can play a sound when selected
+  { "id": "coins", "name": "Gold Coins", "description": "A heavy pouch of gold coins", "target": "beat_rich", "soundEffect": "coin_pickup.mp3" }
 - ⚠️ For action choices (verbs), use movementChoice instead!
 - ⚠️ For leaving/continuing without picking anything, use a separate connection or movementChoice
 - Example: "What do you pick up?" → [Silver Key | Old Book | Lantern] → each leads to different beat
+- 🚨 After pickProp, use introText to describe the item in narrative form (NOT addRemoveInventory!)
 
 **hyperText** - Clickable word/phrase branching
 - Use: Subtle choices, memory/knowledge checks, exploring details in text
@@ -344,7 +358,9 @@ Inventory condition example (CORRECT format):
 - ⚠️ WRONG for inventory: { "variableName": "lantern" } - use "item" inside condition!
 
 **addRemoveInventory** - Inventory manipulation
-- Use: Pick up items, lose items, transfer between characters
+- Use: REMOVE items, transfer between characters, or add items from NON-pickProp sources
+- 🚨 **DO NOT USE AFTER pickProp** - pickProp already adds items to inventory automatically!
+  - Using addRemoveInventory after pickProp creates DUPLICATE inventory entries
 - Parameters (ALL are REQUIRED):
   - item: Item name/identifier (REQUIRED - use "item" NOT "propId"!)
   - action: "add" | "remove" | "transfer" (REQUIRED)
@@ -353,10 +369,14 @@ Inventory condition example (CORRECT format):
 - ⚠️ CRITICAL: Use "item" parameter, NOT "propId"!
 - ⚠️ CRITICAL: Always include "character" parameter (usually "player")!
 - Connections: Single → next beat
-- Pattern: After pickProp or as consequence of actions
+- Valid patterns:
+  - Remove item after use: action="remove" (player uses a key, loses it)
+  - Give/receive from NPC: action="add" or "transfer" during dialogue
+  - Lose item in story event: action="remove" (item stolen, broken, etc.)
+- ✗ WRONG pattern: pickProp → addRemoveInventory with action="add" (DUPLICATES!)
 - Examples:
-  - Add to player: { "item": "key", "action": "add", "character": "player" }
-  - Add to NPC: { "item": "key", "action": "add", "character": "merchant" }
+  - Remove from player: { "item": "key", "action": "remove", "character": "player" }
+  - Add from NPC gift: { "item": "reward_coin", "action": "add", "character": "player" }
   - Transfer: { "item": "sword", "action": "transfer", "fromChar": "player", "toChar": "companion", "character": "player" }
 
 **randomTarget** - Random path selection
@@ -432,6 +452,8 @@ Counters should be defined on characters, then referenced consistently in choice
   - "counter": name of the counter to modify
   - "counterOperation": "change" (add/subtract) or "set" (replace)
   - "counterValue": numeric value
+- Sound effect property on choices:
+  - "soundEffect": filename of sound to play when choice is selected (e.g., "click.mp3", "success.wav")
 - Example character with counters:
   {
     "id": "char_player",
@@ -631,6 +653,19 @@ But NEVER chain multiple single-item pickProps with the same item!
 ✓ CORRECT: Single pickProp to pick up an item, then move on to different content
 ✓ BETTER: pickProp with 2-4 items when player has a choice of what to examine/take
 
+❌ **pickProp followed by addRemoveInventory (DUPLICATE ITEMS!)**
+pickProp AUTOMATICALLY adds the selected item's "name" to player inventory.
+DO NOT follow pickProp with addRemoveInventory action="add" - this creates DUPLICATE entries!
+✗ WRONG: pickProp "Golden Key" → addRemoveInventory item="golden_key" action="add"
+  Result: Player sees BOTH "Golden Key" AND "golden_key" in inventory!
+✓ CORRECT: pickProp "Golden Key" → introText "You pick up the golden key and examine it closely..."
+✓ CORRECT: Use addRemoveInventory ONLY to REMOVE items or add items from non-pickProp sources (NPC gifts, story events)
+
+❌ **pickProp props without descriptions**
+Always include descriptions for pickProp items to help players make informed choices.
+✗ WRONG: { "id": "letter", "name": "Mysterious Letter", "target": "beat_4" }
+✓ CORRECT: { "id": "letter", "name": "Mysterious Letter", "description": "A sealed envelope with a wax seal", "target": "beat_4" }
+
 ## ⚠️ CRITICAL: Counter Threshold Reachability
 
 **BEFORE setting a condition threshold, calculate whether it can actually be reached!**
@@ -797,7 +832,7 @@ Stories MUST include procedural/game-like mechanics, not just simple branching:
 }
 \`\`\`
 
-**pickProp with counter:**
+**pickProp with counter (auto-adds to inventory!):**
 \`\`\`json
 {
   "question": "What do you examine?",
@@ -805,6 +840,7 @@ Stories MUST include procedural/game-like mechanics, not just simple branching:
     {
       "id": "clue1",
       "name": "Suspicious Letter",
+      "description": "A crumpled letter with hasty handwriting",
       "target": "beat_5",
       "counter": "cluesFound",
       "counterOperation": "add",
@@ -813,6 +849,7 @@ Stories MUST include procedural/game-like mechanics, not just simple branching:
   ]
 }
 \`\`\`
+Note: pickProp automatically adds "Suspicious Letter" to inventory - do NOT follow with addRemoveInventory!
 
 ### Genre-Specific Requirements:
 - **Mystery/Detective**: Track clues found (counter), evidence collected (inventory), suspect trust (counter)
@@ -1375,8 +1412,8 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             question: "You search the library carefully. What catches your attention?",
             props: [
-              { id: "letter", name: "Mysterious Letter", target: "beat_4" },
-              { id: "nothing", name: "Nothing useful", target: "beat_5" }
+              { id: "letter", name: "Mysterious Letter", description: "A folded letter hidden between two books", target: "beat_4" },
+              { id: "nothing", name: "Nothing useful", description: "The shelves seem ordinary", target: "beat_5" }
             ]
           }
         },
@@ -1412,8 +1449,8 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
           parameters: {
             question: "The study is in disarray. What do you examine?",
             props: [
-              { id: "weapon", name: "The Murder Weapon", target: "beat_7" },
-              { id: "nothing", name: "Nothing stands out", target: "beat_8" }
+              { id: "weapon", name: "The Murder Weapon", description: "A bloodstained letter opener on the desk", target: "beat_7" },
+              { id: "nothing", name: "Nothing stands out", description: "Just scattered papers and books", target: "beat_8" }
             ]
           }
         },

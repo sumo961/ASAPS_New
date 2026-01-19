@@ -103,6 +103,9 @@ export class DialogTreeBeat extends Beat {
         if (choice.counterOperation) (migratedChoice as any).counterOperation = choice.counterOperation;
         if (choice.counterValue !== undefined) (migratedChoice as any).counterValue = choice.counterValue;
 
+        // Preserve sound effect
+        if (choice.soundEffect) (migratedChoice as any).soundEffect = choice.soundEffect;
+
         // Old format: target was either string (beat ID) or object (nested DialogNode)
         // New format: target is string only, dialogNode is nested node
         if (typeof choice.target === 'string') {
@@ -482,6 +485,11 @@ export class DialogTreeBeat extends Beat {
                 context.incrementCounter(counterName, value);
                 break;
             }
+          }
+
+          // Play sound effect (new feature)
+          if (choiceWithCounter.soundEffect && renderer.playSound) {
+            await renderer.playSound({ file: choiceWithCounter.soundEffect });
           }
 
           // New format: target is beat ID to exit, dialogNode continues conversation

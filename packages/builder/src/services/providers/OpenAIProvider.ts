@@ -93,17 +93,31 @@ export class OpenAIProvider extends BaseAIProvider {
   private async makeProxyRequest(requestBody: any): Promise<any> {
     console.log('[OpenAIProvider] makeProxyRequest called, endpoint:', this.proxyEndpoint);
     console.log('[OpenAIProvider] baseUrl:', this.config?.baseUrl || '(none - using default)');
-    const response = await fetch(this.proxyEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        baseUrl: this.config?.baseUrl,
-        apiKey: this.config?.apiKey,
-        ...requestBody,
-      }),
-    });
+
+    let response;
+    try {
+      response = await fetch(this.proxyEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          baseUrl: this.config?.baseUrl,
+          apiKey: this.config?.apiKey,
+          ...requestBody,
+        }),
+      });
+    } catch (error) {
+      // Connection refused - proxy server not running
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error(
+          'API proxy server is not running. External AI providers (OpenAI, Claude, etc.) require the proxy server.\n\n' +
+          'Start it with: npm run dev:api\n\n' +
+          'Or use a local AI provider (Ollama) which connects directly.'
+        );
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -118,6 +132,21 @@ export class OpenAIProvider extends BaseAIProvider {
     }
 
     return response.json();
+  }
+
+  /**
+   * Check if we're connecting to Ollama (localhost with typical Ollama port)
+   */
+  private isOllamaConnection(): boolean {
+    const baseUrl = this.config?.baseUrl;
+    if (!baseUrl) return false;
+    try {
+      const parsed = new URL(baseUrl);
+      return (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') &&
+             (parsed.port === '11434' || baseUrl.includes('ollama'));
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -158,92 +187,432 @@ export class OpenAIProvider extends BaseAIProvider {
       requestBody.temperature = this.config?.temperature ?? fallbackTemperature;
     }
 
+    // For Ollama connections, add Ollama-specific options
+    // Ollama's OpenAI-compatible API accepts these in the request body
+    if (this.isOllamaConnection()) {
+      // Set num_ctx (context window) - Ollama defaults to 2048 which is too small
+      // Most modern models support 32k-128k+ context
+      requestBody.options = {
+        num_ctx: 32768,  // 32k context window
+        num_predict: maxTokens,  // Max tokens to generate
+      };
+      console.log('[OpenAIProvider] Added Ollama options: num_ctx=32768, num_predict=' + maxTokens);
+    }
+
     return requestBody;
   }
 
   /**
-   * Try to repair truncated JSON by closing open brackets/braces
+   * Try to repair malformed JSON from LLM output
+   * Handles: unquoted keys, single quotes, trailing commas, truncation, control chars
    */
   private tryRepairJson(json: string): string | null {
-    // Count open brackets/braces and track string state
+    let repaired = json;
+    const repairs: string[] = [];
+
+    // Step 1: Escape unescaped control characters inside JSON strings
+    // This handles newlines, tabs, etc. that smaller models write literally inside string values
+    {
+      let result = '';
+      let inString = false;
+      let i = 0;
+
+      while (i < repaired.length) {
+        const char = repaired[i];
+        const charCode = char.charCodeAt(0);
+
+        // Handle escape sequences
+        if (char === '\\' && i + 1 < repaired.length) {
+          result += char + repaired[i + 1];
+          i += 2;
+          continue;
+        }
+
+        // Track string boundaries
+        if (char === '"') {
+          inString = !inString;
+          result += char;
+          i++;
+          continue;
+        }
+
+        // Inside a string, escape control characters
+        if (inString && charCode < 32) {
+          // Map common control characters to their escape sequences
+          switch (charCode) {
+            case 9:  result += '\\t'; break;  // Tab
+            case 10: result += '\\n'; break;  // Newline
+            case 13: result += '\\r'; break;  // Carriage return
+            case 8:  result += '\\b'; break;  // Backspace
+            case 12: result += '\\f'; break;  // Form feed
+            default: result += `\\u${charCode.toString(16).padStart(4, '0')}`; // Other control chars
+          }
+          i++;
+          continue;
+        }
+
+        // Outside strings, remove harmful control characters (but keep newlines for structure)
+        if (!inString && charCode < 32 && charCode !== 10 && charCode !== 13 && charCode !== 9) {
+          i++;
+          continue;
+        }
+
+        result += char;
+        i++;
+      }
+
+      if (result !== repaired) {
+        const escapeCount = result.length - repaired.length + (repaired.match(/[\x00-\x1f]/g) || []).length;
+        repairs.push(`escaped ${escapeCount} control characters in strings`);
+        repaired = result;
+      }
+    }
+
+    // Step 1b: Remove JavaScript-style comments (// and /* */) that smaller models add
+    // Must be done carefully to not remove // inside string values
+    {
+      let result = '';
+      let inString = false;
+      let i = 0;
+
+      while (i < repaired.length) {
+        const char = repaired[i];
+
+        // Handle escape sequences inside strings
+        if (char === '\\' && inString && i + 1 < repaired.length) {
+          result += char + repaired[i + 1];
+          i += 2;
+          continue;
+        }
+
+        // Track string boundaries
+        if (char === '"') {
+          inString = !inString;
+          result += char;
+          i++;
+          continue;
+        }
+
+        // Outside strings, check for comments
+        if (!inString) {
+          // Single-line comment: // until end of line
+          if (char === '/' && i + 1 < repaired.length && repaired[i + 1] === '/') {
+            // Skip until newline
+            while (i < repaired.length && repaired[i] !== '\n') {
+              i++;
+            }
+            continue;
+          }
+
+          // Multi-line comment: /* ... */
+          if (char === '/' && i + 1 < repaired.length && repaired[i + 1] === '*') {
+            i += 2; // Skip /*
+            while (i + 1 < repaired.length && !(repaired[i] === '*' && repaired[i + 1] === '/')) {
+              i++;
+            }
+            i += 2; // Skip */
+            continue;
+          }
+        }
+
+        result += char;
+        i++;
+      }
+
+      if (result !== repaired) {
+        repairs.push('removed JavaScript comments');
+        repaired = result;
+      }
+    }
+
+    // Step 2: Fix unquoted property names (common LLM error)
+    // Match: { key: or , key: where key is not quoted
+    // Be careful not to match inside strings
+    const unquotedKeyPattern = /([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g;
+    let hasUnquotedKeys = false;
+
+    // First pass: check if we have unquoted keys (outside of strings)
+    let testStr = repaired;
+    let inStr = false;
+    let escaped = false;
+    let cleanedForTest = '';
+    for (let i = 0; i < testStr.length; i++) {
+      const c = testStr[i];
+      if (escaped) { escaped = false; cleanedForTest += '_'; continue; }
+      if (c === '\\') { escaped = true; cleanedForTest += '_'; continue; }
+      if (c === '"') { inStr = !inStr; cleanedForTest += c; continue; }
+      cleanedForTest += inStr ? '_' : c;
+    }
+
+    if (unquotedKeyPattern.test(cleanedForTest)) {
+      hasUnquotedKeys = true;
+    }
+
+    if (hasUnquotedKeys) {
+      // Replace unquoted keys with quoted ones, being careful about string context
+      let result = '';
+      let inString = false;
+      let escape = false;
+      let i = 0;
+
+      while (i < repaired.length) {
+        const char = repaired[i];
+
+        if (escape) {
+          result += char;
+          escape = false;
+          i++;
+          continue;
+        }
+
+        if (char === '\\') {
+          result += char;
+          escape = true;
+          i++;
+          continue;
+        }
+
+        if (char === '"') {
+          inString = !inString;
+          result += char;
+          i++;
+          continue;
+        }
+
+        if (inString) {
+          result += char;
+          i++;
+          continue;
+        }
+
+        // Outside string - check for unquoted key
+        if ((char === '{' || char === ',')) {
+          const rest = repaired.slice(i);
+          const match = rest.match(/^([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/);
+          if (match) {
+            result += match[1] + '"' + match[2] + '":';
+            i += match[0].length;
+            continue;
+          }
+        }
+
+        result += char;
+        i++;
+      }
+
+      repaired = result;
+      repairs.push('quoted unquoted property names');
+    }
+
+    // Step 3: Convert single quotes to double quotes (outside of double-quoted strings)
+    let hasSingleQuotes = false;
+    inStr = false;
+    escaped = false;
+    for (const c of repaired) {
+      if (escaped) { escaped = false; continue; }
+      if (c === '\\') { escaped = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (!inStr && c === "'") { hasSingleQuotes = true; break; }
+    }
+
+    if (hasSingleQuotes) {
+      let result = '';
+      let inDoubleString = false;
+      let inSingleString = false;
+      let escape = false;
+
+      for (let i = 0; i < repaired.length; i++) {
+        const char = repaired[i];
+
+        if (escape) {
+          result += char;
+          escape = false;
+          continue;
+        }
+
+        if (char === '\\') {
+          result += char;
+          escape = true;
+          continue;
+        }
+
+        if (char === '"' && !inSingleString) {
+          inDoubleString = !inDoubleString;
+          result += char;
+          continue;
+        }
+
+        if (char === "'" && !inDoubleString) {
+          inSingleString = !inSingleString;
+          result += '"'; // Convert to double quote
+          continue;
+        }
+
+        result += char;
+      }
+
+      repaired = result;
+      repairs.push('converted single quotes to double quotes');
+    }
+
+    // Step 4: Fix trailing commas before } or ]
+    const beforeTrailing = repaired;
+    repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+    if (repaired !== beforeTrailing) {
+      repairs.push('removed trailing commas');
+    }
+
+    // Step 5: Fix missing commas between properties/elements
+    // Pattern: "value" "key" should be "value", "key"
+    const beforeMissingComma = repaired;
+    repaired = repaired.replace(/("\s*)(")(?=\s*"[^"]*"\s*:)/g, '$1,$2');
+    // Pattern: } { or ] [ without comma
+    repaired = repaired.replace(/(\})\s*(\{)/g, '$1,$2');
+    repaired = repaired.replace(/(\])\s*(\[)/g, '$1,$2');
+    // Pattern: "value" { or number {
+    repaired = repaired.replace(/("|\d)\s*(\{)/g, '$1,$2');
+    if (repaired !== beforeMissingComma) {
+      repairs.push('added missing commas');
+    }
+
+    // Step 5b: Fix missing closing brace before next beat in array
+    // Pattern: ], { "id": ... means beat object wasn't closed before next beat
+    // Should be: ]}, { "id": ...
+    const beforeMissingBrace = repaired;
+    // Look for connections array ending with ],{ followed by "id" - missing } to close beat
+    repaired = repaired.replace(/(\],)\s*(\{\s*"id"\s*:)/g, ']},\n    $2');
+    if (repaired !== beforeMissingBrace) {
+      repairs.push('added missing closing brace between beats');
+    }
+
+    // Step 6: Handle truncation - close open structures
     let openBraces = 0;
     let openBrackets = 0;
     let inString = false;
     let escape = false;
-    let lastStructuralIndex = 0; // Track last valid structural position
 
-    for (let i = 0; i < json.length; i++) {
-      const char = json[i];
-
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      if (char === '\\') {
-        escape = true;
-        continue;
-      }
-      if (char === '"') {
-        inString = !inString;
-        if (!inString) {
-          lastStructuralIndex = i;
-        }
-        continue;
-      }
+    for (let i = 0; i < repaired.length; i++) {
+      const char = repaired[i];
+      if (escape) { escape = false; continue; }
+      if (char === '\\') { escape = true; continue; }
+      if (char === '"') { inString = !inString; continue; }
       if (inString) continue;
-
-      if (char === '{') { openBraces++; lastStructuralIndex = i; }
-      else if (char === '}') { openBraces--; lastStructuralIndex = i; }
-      else if (char === '[') { openBrackets++; lastStructuralIndex = i; }
-      else if (char === ']') { openBrackets--; lastStructuralIndex = i; }
-      else if (char === ',' || char === ':') { lastStructuralIndex = i; }
+      if (char === '{') openBraces++;
+      else if (char === '}') openBraces--;
+      else if (char === '[') openBrackets++;
+      else if (char === ']') openBrackets--;
     }
 
-    let repaired = json;
-
-    // If we're in a string, try to find a good truncation point
+    // If in string, close it
     if (inString) {
-      // Find the last complete property value by looking for patterns like: "key": "value
-      // Truncate at the last complete value if possible
-      const lastCompleteMatch = json.match(/^([\s\S]*"[^"]*":\s*(?:"[^"]*"|[\d.]+|true|false|null|\{[\s\S]*?\}|\[[\s\S]*?\]))\s*,?\s*"[^"]*$/);
-      if (lastCompleteMatch) {
-        repaired = lastCompleteMatch[1];
-        // Recount after truncation
-        inString = false;
-        openBraces = 0;
-        openBrackets = 0;
-        for (const char of repaired) {
-          if (escape) { escape = false; continue; }
-          if (char === '\\') { escape = true; continue; }
-          if (char === '"') { inString = !inString; continue; }
-          if (inString) continue;
-          if (char === '{') openBraces++;
-          else if (char === '}') openBraces--;
-          else if (char === '[') openBrackets++;
-          else if (char === ']') openBrackets--;
-        }
-      } else {
-        // Simple fix: close the string
-        repaired += '"';
-        inString = false;
-      }
+      repaired += '"';
+      repairs.push('closed unclosed string');
     }
 
-    // Remove trailing incomplete properties (e.g., "key":  or "key": "incomplete)
+    // Remove trailing incomplete content
     repaired = repaired.replace(/,\s*"[^"]*":\s*$/, '');
+    repaired = repaired.replace(/,\s*"[^"]*$/, '');
     repaired = repaired.replace(/,\s*$/, '');
 
-    // Close open brackets/braces in correct order
-    // We need to close in reverse order of opening (last opened = first closed)
-    for (let i = 0; i < openBrackets; i++) {
-      repaired += ']';
-    }
-    for (let i = 0; i < openBraces; i++) {
-      repaired += '}';
+    // Recount after cleanup
+    openBraces = 0;
+    openBrackets = 0;
+    inString = false;
+    escape = false;
+    for (const char of repaired) {
+      if (escape) { escape = false; continue; }
+      if (char === '\\') { escape = true; continue; }
+      if (char === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (char === '{') openBraces++;
+      else if (char === '}') openBraces--;
+      else if (char === '[') openBrackets++;
+      else if (char === ']') openBrackets--;
     }
 
-    console.log(`[OpenAIProvider] JSON repair: closed ${openBrackets} brackets, ${openBraces} braces`);
+    // Close open structures (add missing closing brackets/braces)
+    if (openBrackets > 0 || openBraces > 0) {
+      for (let i = 0; i < openBrackets; i++) repaired += ']';
+      for (let i = 0; i < openBraces; i++) repaired += '}';
+      repairs.push(`closed ${openBrackets} brackets, ${openBraces} braces`);
+    }
+
+    // Remove extra closing braces (common smaller model error)
+    // Pattern: `] }` where the } is spurious (e.g., after beats array closes)
+    if (openBraces < 0) {
+      const extraBraces = Math.abs(openBraces);
+      // Find and remove extra } that appear after ] (array end followed by spurious brace)
+      // Common pattern: `]\n  }` or `]\n}\n,`
+      let removed = 0;
+      // Look for pattern: ] followed by whitespace and } followed by whitespace and , or "
+      // This catches the specific error where model adds extra } after array closes
+      const extraBracePattern = /(\])\s*(\})\s*(,|")/g;
+      const beforeRemove = repaired;
+      while (removed < extraBraces) {
+        const match = repaired.match(extraBracePattern);
+        if (match) {
+          repaired = repaired.replace(extraBracePattern, '$1$3');
+          removed++;
+        } else {
+          break;
+        }
+      }
+      // If pattern didn't catch all, try removing lone } before , (outside strings)
+      if (removed < extraBraces) {
+        // More aggressive: find any } that's followed by , and preceded by ] (possibly with whitespace)
+        const loneExtraBrace = /(\][\s\n]*)\}([\s\n]*,)/g;
+        while (removed < extraBraces && loneExtraBrace.test(repaired)) {
+          repaired = repaired.replace(loneExtraBrace, '$1$2');
+          removed++;
+        }
+      }
+      if (repaired !== beforeRemove) {
+        repairs.push(`removed ${removed} extra closing brace(s)`);
+      }
+    }
+
+    // Remove extra closing brackets
+    if (openBrackets < 0) {
+      const extraBrackets = Math.abs(openBrackets);
+      let removed = 0;
+      // Look for pattern: } followed by whitespace and ] followed by whitespace and , or "
+      const extraBracketPattern = /(\})\s*(\])\s*(,|")/g;
+      const beforeRemove = repaired;
+      while (removed < extraBrackets) {
+        const match = repaired.match(extraBracketPattern);
+        if (match) {
+          repaired = repaired.replace(extraBracketPattern, '$1$3');
+          removed++;
+        } else {
+          break;
+        }
+      }
+      if (repaired !== beforeRemove) {
+        repairs.push(`removed ${removed} extra closing bracket(s)`);
+      }
+    }
+
+    if (repairs.length > 0) {
+      console.log(`[OpenAIProvider] JSON repairs applied: ${repairs.join('; ')}`);
+    }
+
     return repaired;
+  }
+
+  /**
+   * Helper to collect all targets from a dialogTree recursively
+   */
+  private collectDialogTreeTargets(node: any, targets: string[]): void {
+    if (!node) return;
+
+    if (node.choices && Array.isArray(node.choices)) {
+      for (const choice of node.choices) {
+        if (choice.target) targets.push(choice.target);
+        if (choice.dialogNode) {
+          this.collectDialogTreeTargets(choice.dialogNode, targets);
+        }
+      }
+    }
   }
 
   /**
@@ -327,6 +696,50 @@ export class OpenAIProvider extends BaseAIProvider {
         cleanupDetails.push(`${beat.id}: removed 'connection' from ${beat.type}`);
       }
 
+      // Rebuild connections array from actual targets for multi-connection types
+      // Models often generate inconsistent connections arrays that don't match choice targets
+      if (isMultiConn && beat.type !== 'conditionBeat') {
+        const actualTargets: string[] = [];
+
+        // Collect targets from choices (movementChoice, dialogTree)
+        if (beat.parameters.choices && Array.isArray(beat.parameters.choices)) {
+          for (const choice of beat.parameters.choices) {
+            if (choice.target) actualTargets.push(choice.target);
+          }
+        }
+
+        // Collect targets from props (pickProp)
+        if (beat.parameters.props && Array.isArray(beat.parameters.props)) {
+          for (const prop of beat.parameters.props) {
+            if (prop.target) actualTargets.push(prop.target);
+          }
+        }
+
+        // Collect targets from hyperlinks (hyperText)
+        if (beat.parameters.hyperlinks && Array.isArray(beat.parameters.hyperlinks)) {
+          for (const link of beat.parameters.hyperlinks) {
+            if (link.targetBeatId) actualTargets.push(link.targetBeatId);
+            else if (link.target) actualTargets.push(link.target);
+          }
+        }
+
+        // Collect targets from dialogTree recursively
+        if (beat.parameters.dialogTree) {
+          this.collectDialogTreeTargets(beat.parameters.dialogTree, actualTargets);
+        }
+
+        // Rebuild connections array from actual targets
+        if (actualTargets.length > 0) {
+          const oldConnections = beat.connections ? JSON.stringify(beat.connections) : 'none';
+          beat.connections = [...new Set(actualTargets)].map(t => ({ targetId: t }));
+          const newConnections = JSON.stringify(beat.connections);
+          if (oldConnections !== newConnections) {
+            cleanupCount++;
+            cleanupDetails.push(`${beat.id}: rebuilt connections from ${actualTargets.length} targets`);
+          }
+        }
+      }
+
       // Remove flat conditionBeat parameters if nested format exists
       if (beat.type === 'conditionBeat' && beat.parameters.condition) {
         for (const param of forbiddenConditionParams) {
@@ -379,9 +792,10 @@ export class OpenAIProvider extends BaseAIProvider {
       // GPT-5 reasoning models need much higher max_completion_tokens because reasoning tokens
       // are counted within this limit. 8000 tokens can be entirely consumed by reasoning,
       // leaving nothing for actual output. Use 32000 to allow room for both.
-      const isGPT5 = this.model.startsWith('gpt-5');
-      const isCustomEndpoint = !!this.config?.baseUrl;
-      const defaultMaxTokens = isGPT5 ? 32000 : (isCustomEndpoint ? 16000 : 8000);
+      // All modern models (GPT-5, Claude, Gemma 3, Mistral 3, DeepSeek, Kimi K2) have
+      // 128k+ context windows, so we use 32000 as the baseline for story generation.
+      // User can override via config.maxTokens.
+      const defaultMaxTokens = 32000;
 
       const requestBody = this.buildChatRequest(
         [
@@ -430,15 +844,40 @@ export class OpenAIProvider extends BaseAIProvider {
         storyData = JSON.parse(jsonString);
       } catch (parseError) {
         console.error('[OpenAIProvider] JSON parse error:', parseError);
-        console.error('[OpenAIProvider] Attempted to parse:', jsonString.substring(0, 500));
+        console.error('[OpenAIProvider] First 500 chars:', jsonString.substring(0, 500));
 
-        // Try to repair truncated JSON by closing open brackets/braces
+        // Extract error position if available and log context around it
+        const errorMsg = parseError instanceof Error ? parseError.message : '';
+        const posMatch = errorMsg.match(/position (\d+)/);
+        if (posMatch) {
+          const pos = parseInt(posMatch[1], 10);
+          const start = Math.max(0, pos - 100);
+          const end = Math.min(jsonString.length, pos + 100);
+          console.error(`[OpenAIProvider] Context around error position ${pos}:`);
+          console.error('[OpenAIProvider] ---START---');
+          console.error(jsonString.substring(start, pos) + '>>>ERROR HERE<<<' + jsonString.substring(pos, end));
+          console.error('[OpenAIProvider] ---END---');
+        }
+
+        // Try to repair malformed JSON
         const repaired = this.tryRepairJson(jsonString);
         if (repaired) {
           try {
             storyData = JSON.parse(repaired);
-            console.log('[OpenAIProvider] Successfully repaired truncated JSON');
-          } catch {
+            console.log('[OpenAIProvider] Successfully repaired JSON');
+          } catch (repairError) {
+            // Log context around repair error too
+            const repairMsg = repairError instanceof Error ? repairError.message : '';
+            const repairPosMatch = repairMsg.match(/position (\d+)/);
+            if (repairPosMatch) {
+              const pos = parseInt(repairPosMatch[1], 10);
+              const start = Math.max(0, pos - 100);
+              const end = Math.min(repaired.length, pos + 100);
+              console.error(`[OpenAIProvider] Repaired JSON still failed at position ${pos}:`);
+              console.error('[OpenAIProvider] ---START---');
+              console.error(repaired.substring(start, pos) + '>>>ERROR HERE<<<' + repaired.substring(pos, end));
+              console.error('[OpenAIProvider] ---END---');
+            }
             throw new Error(`Invalid JSON in response (repair failed): ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. The model may have hit token limits.`);
           }
         } else {

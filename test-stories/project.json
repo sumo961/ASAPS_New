@@ -491,7 +491,7 @@
           "parameters": {
             "sourceType": "ai-query",
             "query": "What is the car ownership rate per 1000 residents in ${playerLocation}? Also include information about public transportation availability and environmental impact of transportation in that area.",
-            "displayTemplate": "Based on available data for ${playerLocation}:\n\n{{data}}\n\nThis information helps us understand the transportation landscape where you live.",
+            "displayTemplate": "{{data}}",
             "buttonText": "Learn More",
             "errorMessage": "Sorry, we couldn't retrieve data for your location. Let's continue with general information.",
             "connection": {

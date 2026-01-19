@@ -309,12 +309,41 @@ export class ReachabilityAnalyzer {
           if (operation === 'set') {
             range.max = Math.max(range.max, value);
             range.min = Math.min(range.min, value);
-          } else if (operation === 'change') {
-            // 'change' operation adds to current value
+          } else if (operation === 'change' || operation === 'add') {
+            // 'change' or 'add' operation adds to current value
             if (value > 0) {
               range.max += value;
             } else {
               range.min += value;
+            }
+          } else if (operation === 'subtract') {
+            // 'subtract' operation subtracts from current value
+            if (value > 0) {
+              range.min -= value;
+            } else {
+              range.max -= value;
+            }
+          } else if (operation === 'multiply') {
+            // 'multiply' operation - conservative estimate
+            if (value > 0) {
+              const newMax = Math.max(range.max * value, range.min * value);
+              const newMin = Math.min(range.max * value, range.min * value);
+              range.max = newMax;
+              range.min = newMin;
+            } else if (value < 0) {
+              // Negative multiplier inverts the range
+              const newMax = Math.max(range.max * value, range.min * value);
+              const newMin = Math.min(range.max * value, range.min * value);
+              range.max = newMax;
+              range.min = newMin;
+            }
+          } else if (operation === 'divide') {
+            // 'divide' operation - conservative estimate
+            if (value !== 0) {
+              const newMax = Math.max(range.max / value, range.min / value);
+              const newMin = Math.min(range.max / value, range.min / value);
+              range.max = newMax;
+              range.min = newMin;
             }
           }
         }

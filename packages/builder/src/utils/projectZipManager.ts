@@ -202,7 +202,7 @@ export async function importProjectFromZip(
         success: false,
         conflict: {
           existingProjectId: projectId,
-          existingProjectName: existingProject?.name,
+          existingProjectName: existingProject?.data?.name,
           incomingProjectName: projectData.project.name,
         }
       };

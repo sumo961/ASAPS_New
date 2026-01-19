@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-17T16:12:02.355Z
+ * Generated: 2026-01-19T04:50:13.640Z
  */
 
 // ============================================
@@ -39,6 +39,7 @@ export interface DialogChoice {
   counter?: string;
   counterOperation?: 'set' | 'change';
   counterValue?: number;
+  soundEffect?: string;
 }
 
 /**
@@ -51,6 +52,10 @@ export interface MovementOption {
   target: string;
   conditions?: Condition[];
   effects?: Effect[];
+  counter?: string;
+  counterOperation?: 'set' | 'change';
+  counterValue?: number;
+  soundEffect?: string;
 }
 
 /**
@@ -64,6 +69,10 @@ export interface PropOption {
   target: string;
   conditions?: Condition[];
   effects?: Effect[];
+  counter?: string;
+  counterOperation?: 'set' | 'change';
+  counterValue?: number;
+  soundEffect?: string;
 }
 
 // ============================================

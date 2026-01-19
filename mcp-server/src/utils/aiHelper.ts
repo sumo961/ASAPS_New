@@ -104,12 +104,16 @@
  * - Character meter frames (HUD counters) are configured through the UI
  * - Story content works with any theme - visual styling is separate from narrative content
  *
- * BEAT NOTES (Author Annotations):
+ * BEAT NOTES (Author Annotations) - USE LIBERALLY!
  * All beats support an optional "notes" field for author comments:
  * - Notes are NOT shown to players - internal documentation only
- * - Useful for: explaining beat purpose, marking TODOs, story structure notes
- * - Example: { "notes": "This is the climax - review dialogue pacing" }
- * - AI should use notes to document intent or flag areas needing human attention
+ * - AI should actively use notes to help the human author, including:
+ *   - Asset suggestions: "ASSET: Dark forest background, ominous lighting"
+ *   - Character art: "CHARACTER: Show detective looking suspicious"
+ *   - Audio: "AUDIO: Tense investigation music"
+ *   - Review flags: "REVIEW: Verify clue doesn't reveal answer too early"
+ *   - Design alternatives: "ALTERNATIVE: Could branch to romance path here"
+ * - Example: { "notes": "ASSET: Throne room. CHARACTER: Villain menacing. REVIEW: Player needs enough clues here." }
  *
  * CHARACTER COUNTERS (Centralized System):
  * Counters should be defined on characters, then referenced consistently in choices:
@@ -123,9 +127,10 @@
  */
 export const BEAT_TYPES = {
   // Story structure - SINGLE CONNECTION (one Continue button)
-  titleScreen: 'Start screen with title and author. SINGLE CONNECTION: only one target via connections array. Supports optional defaultTarget for timed auto-advance.',
-  introText: 'Narrative text with Continue button. SINGLE CONNECTION: only one target via connections array. For branching, use movementChoice or dialogTree instead. Supports optional defaultTarget for timed auto-advance.',
-  endScreen: 'End screen with message. SINGLE CONNECTION or no connections (story ends here). Supports optional defaultTarget for timed auto-advance.',
+  // 🚨🚨🚨 MANDATORY: beat_0 MUST be titleScreen - NEVER start with introText! 🚨🚨🚨
+  titleScreen: '🚨 MANDATORY FIRST BEAT (beat_0)! Start screen with title and author. SINGLE CONNECTION: only one target via connections array.',
+  introText: 'Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: introText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead.',
+  endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true } }',
 
   // Interactive content - MULTIPLE CONNECTIONS via parameters
   dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean). Choices can modify counters via counter/counterOperation/counterValue properties.',
@@ -135,7 +140,7 @@ export const BEAT_TYPES = {
   inputText: 'Player text input. Save to: variable (default), characterName (update display name), or counter (numeric). Validation: none, numeric, email, alphanumeric. Properties: minLength, maxLength, required. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance.',
 
   // Timed content - SINGLE CONNECTION (NO defaultTarget - already timed by design)
-  durScreen: 'Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target. NO defaultTarget (already auto-advances by design).',
+  durScreen: 'Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target via connections array at beat level. ❌ WRONG: connection inside parameters. ✓ CORRECT: "connections": [{ "targetId": "beat_5" }] at beat level.',
   videoBeat: 'Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.',
 
   // Logic beats (invisible - no defaultTarget needed)
@@ -241,7 +246,7 @@ Return a JSON object with this structure:
   "beats": [
     {
       "id": "beat-0",
-      "type": "titleScreen",
+      "type": "titleScreen",  // 🚨 MANDATORY: First beat MUST be titleScreen, NEVER introText!
       "label": "Title",
       "parameters": { "title": "...", "subtitle": "...", "buttonText": "Begin" }
     }
@@ -265,6 +270,10 @@ CRITICAL CONNECTION RULES:
   - "value" (at top level) ❌
   - "trueTarget" ❌
   - "falseTarget" ❌
+
+  🚨🚨🚨 USE "target" NOT "targetId" in trueConnection/falseConnection! 🚨🚨🚨
+  ❌ WRONG: "trueConnection": { "targetId": "beat_5", "label": "Yes" }
+  ✓ CORRECT: "trueConnection": { "target": "beat_5", "label": "Yes" }
 
 CRITICAL setVariable LIMITATION:
 - setVariable beats can ONLY modify ONE variable/counter per beat!
@@ -318,11 +327,11 @@ CONTENT GUIDELINES:
 - Content should work with any visual theme - avoid hardcoding colors or fonts in narrative text
 - Write content that adapts to different presentation styles (Visual Novel, Twine, Point-and-Click)
 
-BEAT NOTES:
+BEAT NOTES - USE LIBERALLY:
 - All beats support optional "notes" field for author annotations
 - Notes are NOT shown to players - internal documentation only
-- Use to explain beat purpose or flag areas for human review
-- Example: { "notes": "TODO: Add character sprite here" }
+- Use notes actively to help the human author: suggest assets, flag review areas, explain intent, propose alternatives
+- Example: { "notes": "ASSET: Spooky library background. AUDIO: Creaking sounds. REVIEW: Pacing might feel slow here." }
 
 TIMER VISUALIZATION:
 - When using defaultTarget with defaultTargetDelay, add "showTimer": true
@@ -336,32 +345,65 @@ CHARACTER COUNTERS:
 - Example choice: { "text": "Be friendly", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
 
 COUNTER THRESHOLD REACHABILITY (CRITICAL):
+🚨 If you create a conditionBeat checking a counter, you MUST modify that counter somewhere earlier!
+
+4 WAYS TO MODIFY COUNTERS:
+1. dialogTree choices: { "text": "Be brave", "target": "beat_5", "counter": "courage", "counterOperation": "add", "counterValue": 10 }
+2. movementChoice choices: { "text": "Search", "location": "Lab", "target": "beat_5", "counter": "cluesFound", "counterOperation": "add", "counterValue": 1 }
+3. pickProp props: { "name": "Letter", "target": "beat_5", "counter": "cluesFound", "counterOperation": "add", "counterValue": 1 }
+4. setVariable beat: { "type": "setVariable", "parameters": { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" } }
+
 Before using a conditionBeat to check if a counter reaches a threshold (e.g., cluesFound >= 3), you MUST:
-1. Count ALL places where that counter can be increased (setVariable beats, choice effects with counterOperation)
+1. Count ALL places where that counter can be increased (choices with counter effects, setVariable beats)
 2. Calculate the maximum value the counter can reach on any playthrough
 3. Ensure the threshold is ≤ the maximum reachable value
 
 Example - WRONG (Unreachable):
-- Story has 2 choices that each add +1 to "cluesFound"
-- Maximum cluesFound = 2
-- Condition checks: cluesFound >= 3  ❌ IMPOSSIBLE! True branch is unreachable.
+- Story has NO choices with counter effects and NO setVariable beats
+- Maximum cluesFound = 0
+- Condition checks: cluesFound >= 3  ❌ IMPOSSIBLE! Counter is never modified!
 
 Example - CORRECT (Reachable):
-- Story has 4 choices that each add +1 to "cluesFound"
+- Story has 4 dialogTree/pickProp choices with counter: "cluesFound", counterOperation: "add", counterValue: 1
 - Maximum cluesFound = 4
 - Condition checks: cluesFound >= 3  ✓ Player needs 3 of 4 opportunities
 
-Rule: NEVER create a condition threshold higher than the sum of all possible counter increments.
+Rule: NEVER create a conditionBeat checking a counter without ALSO adding counter modifications to choices!
 Always provide 1-2 MORE increment opportunities than the highest threshold requires.
+
+CRITICAL ANTI-PATTERNS TO AVOID:
+
+1. DUPLICATE CONNECTIONS - DO NOT define targets twice!
+   For dialogTree, movementChoice, pickProp - targets are ONLY in the choices/props.
+   ❌ WRONG: choices have "target" AND beat has "connections" array (duplicates!)
+   ✓ CORRECT: choices have "target", NO "connections" array on the beat
+
+2. inputText MISUSE - inputText is for GETTING player input only!
+   ❌ WRONG: inputText with "Read the note:" - nothing for player to type!
+   ✓ CORRECT: Use introText to DISPLAY text
+   ✓ CORRECT: Use inputText only when player must TYPE something (names, passwords)
+
+3. Chains of identical single-item pickProps - avoid repetitive patterns!
+   ❌ WRONG: pickProp "Shovel" → pickProp "Shovel" → pickProp "Shovel" (pointless chain!)
+   ✓ CORRECT: Single pickProp to pick up item, then move on to different content
+   ✓ BETTER: pickProp with 2-4 items when player has a choice of what to take
+
+4. MISSING BEAT REFERENCES - EVERY target must have a corresponding beat!
+   ❌ WRONG: Dialog choice targets "beat_22" but you stopped generating at beat_21
+   ✓ CORRECT: If any target references "beat_22", you MUST include beat_22 in your output
+   - Plan your beat count BEFORE generating
+   - NEVER stop generating early - complete ALL referenced beats
+   - Missing beat references cause import FAILURE!
 
 Important:
 - Use descriptive labels for beats
 - Create engaging, coherent narrative flow
 - Use appropriate beat types for each story moment
 - NEVER put multiple connections from introText - use movementChoice or dialogTree for branching
-- For dialogTree beats, targets go in dialogTree.choices[].target parameter
-- For movementChoice beats, targets go in choices[].target parameter
-- For pickProp beats, targets go in props[].target parameter
+- For dialogTree beats, targets go in dialogTree.choices[].target parameter - NO connections array!
+- For movementChoice beats, targets go in choices[].target parameter - NO connections array!
+- For pickProp beats, targets go in props[].target parameter - NO connections array!
+- Only titleScreen and introText need a "connections" array (single target beats)
 - Ensure all beat IDs are unique and all connections reference valid beat IDs`;
 
   const userPrompt = `Create an interactive story with these requirements:
@@ -383,7 +425,7 @@ Generate a complete, engaging interactive story structure.`;
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      max_tokens: 32000, // Modern models have 128k+ context - allow room for complex stories
       system: systemPrompt,
       messages: [{
         role: 'user',

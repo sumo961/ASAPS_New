@@ -39,9 +39,10 @@
         "visible": "boolean?",
         "counter": "string?",
         "counterOperation": "'set' | 'change'?",
-        "counterValue": "number?"
+        "counterValue": "number?",
+        "soundEffect": "string?"
       },
-      "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both. Counter fields allow direct counter modification (any counter name) in addition to effects[]."
+      "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both. Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected."
     },
     "movementOption": {
       "description": "A movement choice",
@@ -51,8 +52,13 @@
         "location": "string",
         "target": "string",
         "conditions": "condition[]?",
-        "effects": "effect[]?"
-      }
+        "effects": "effect[]?",
+        "counter": "string?",
+        "counterOperation": "'set' | 'change'?",
+        "counterValue": "number?",
+        "soundEffect": "string?"
+      },
+      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected."
     },
     "propOption": {
       "description": "A prop interaction choice",
@@ -63,9 +69,13 @@
         "assetId": "string?",
         "target": "string",
         "conditions": "condition[]?",
-        "effects": "effect[]?"
+        "effects": "effect[]?",
+        "counter": "string?",
+        "counterOperation": "'set' | 'change'?",
+        "counterValue": "number?",
+        "soundEffect": "string?"
       },
-      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button."
+      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. Prop name is always added to inventory regardless of effects."
     },
     "condition": {
       "description": "Condition for beat logic",

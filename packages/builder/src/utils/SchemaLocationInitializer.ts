@@ -346,7 +346,7 @@ export function initializeLocationsFromSchema(
       scale: 1,
       visible: true,
       locked: false,
-      font: 'Arial',
+      font: undefined, // Use theme default
       fontSize,
       textAlign: 'center',
     };
@@ -395,7 +395,7 @@ export function initializeLocationsFromSchema(
           scale: 1,
           visible: true,
           locked: false,
-          font: 'Arial',
+          font: undefined, // Use theme default
           fontSize: 16,
           textAlign: 'center',
         });
@@ -437,7 +437,7 @@ export function initializeLocationsFromSchema(
         scale: 1,
         visible: true,
         locked: false,
-        font: 'Arial',
+        font: undefined, // Use theme default
         fontSize: 16,
         textAlign: 'center',
       });
@@ -496,7 +496,7 @@ export function initializeLocationsFromSchema(
           scale: 1,
           visible: true,
           locked: false,
-          font: 'Arial',
+          font: undefined, // Use theme default
           fontSize: 14,
           textAlign: 'center',
         });
@@ -649,7 +649,7 @@ export function regenerateChoiceElements(
         scale: 1,
         visible: true,
         locked: false,
-        font: 'Arial',
+        font: undefined, // Use theme default
         fontSize: 16,
         textAlign: 'center',
       });
@@ -711,7 +711,7 @@ export function regenerateChoiceElements(
           scale: 1,
           visible: true,
           locked: false,
-          font: 'Arial',
+          font: undefined, // Use theme default
           fontSize: 14,
           textAlign: 'center',
         });

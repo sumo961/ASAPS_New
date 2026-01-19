@@ -176,6 +176,28 @@ export class MovementChoiceBeat extends Beat {
       if (selectedChoice.location) {
         context.setVariable('currentLocation', selectedChoice.location);
       }
+
+      // BUG FIX: Apply effects from choice (was missing!)
+      if (selectedChoice.effects) {
+        selectedChoice.effects.forEach(effect => context.applyEffect(effect));
+      }
+
+      // Apply direct counter fields (new feature)
+      if (selectedChoice.counter) {
+        const operation = selectedChoice.counterOperation || 'change';
+        const value = selectedChoice.counterValue ?? 1;
+        if (operation === 'set') {
+          context.setCounter(selectedChoice.counter, value);
+        } else {
+          context.incrementCounter(selectedChoice.counter, value);
+        }
+      }
+
+      // Play sound effect (new feature)
+      if (selectedChoice.soundEffect && renderer.playSound) {
+        await renderer.playSound({ file: selectedChoice.soundEffect });
+      }
+
       return selectedChoice.target;
     }
 

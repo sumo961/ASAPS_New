@@ -292,17 +292,22 @@ export class APIServer {
       },
 
       tips: [
-        'Start with a titleScreen beat',
+        'CRITICAL: Start with a titleScreen beat as beat_0 - NEVER start with introText!',
         'Use introText for narration and scene-setting (single connection only!)',
         'Use dialogTree for character conversations with choices',
         'dialogTree, movementChoice, and pickProp support "choiceDelay" parameter (seconds before showing choices)',
         'DialogTree choices can modify counters directly with counter/counterOperation/counterValue',
         'Use movementChoice for exploration/navigation branching',
         'IMPORTANT: For branching story points, use dialogTree or movementChoice - NEVER multiple connections from introText',
-        'End branches with endScreen beats',
+        'End branches with endScreen beats - ALWAYS set showRestart: true so player can replay!',
         'Position beats using x, y coordinates (grid: ~300px horizontal, ~200px vertical spacing)',
         'Use meaningful beat IDs like "beat_0", "beat_1", etc.',
         'CRITICAL - Counter Threshold Reachability: Before using conditionBeat to check a counter threshold (e.g., score >= 3), count ALL places where that counter can be increased and ensure the threshold is reachable. If you have 2 choices that each add +1, max is 2, so >= 3 is IMPOSSIBLE. Always provide 1-2 MORE increment opportunities than the highest threshold requires.',
+        'CRITICAL - NO DUPLICATE CONNECTIONS: For dialogTree, movementChoice, pickProp - targets are ONLY in choices[].target or props[].target. Do NOT also add a "connections" array - that creates duplicates!',
+        'CRITICAL - inputText is for GETTING player input (names, passwords). To DISPLAY text, use introText instead!',
+        'CRITICAL - Never chain identical single-item pickProps (e.g., Shovel → Shovel → Shovel). One pickProp to pick up an item is fine, then move to different content.',
+        'CRITICAL - GENERATE ALL BEATS: Every target ID you reference MUST have a beat with that ID. If a choice targets "beat_22", you MUST include beat_22. Never stop generating early!',
+        'All beats support an optional "notes" field for author annotations (not shown to players). Use notes to: suggest visual assets, mark areas needing review, explain narrative intent, or flag TODOs for the human author.',
       ],
     };
   }
@@ -743,13 +748,16 @@ export class APIServer {
     // Proxy for Claude/Anthropic-compatible APIs
     router.post('/claude', async (req: Request, res: Response) => {
       try {
-        const { baseUrl, apiKey, ...requestBody } = req.body;
+        const { baseUrl: providedBaseUrl, apiKey, ...requestBody } = req.body;
 
-        if (!baseUrl || !apiKey) {
+        if (!apiKey) {
           return res.status(400).json({
-            error: 'Missing required parameters: baseUrl and apiKey'
+            error: 'Missing required parameter: apiKey'
           });
         }
+
+        // Use default Anthropic URL if not provided
+        const baseUrl = providedBaseUrl || 'https://api.anthropic.com';
 
         // Determine the full endpoint URL
         // If baseUrl already contains '/messages', use it as-is
@@ -820,13 +828,16 @@ export class APIServer {
     // Proxy for OpenAI-compatible APIs
     router.post('/openai', async (req: Request, res: Response) => {
       try {
-        const { baseUrl, apiKey, ...requestBody } = req.body;
+        const { baseUrl: providedBaseUrl, apiKey, ...requestBody } = req.body;
 
-        if (!baseUrl || !apiKey) {
+        if (!apiKey) {
           return res.status(400).json({
-            error: 'Missing required parameters: baseUrl and apiKey'
+            error: 'Missing required parameter: apiKey'
           });
         }
+
+        // Use default OpenAI URL if not provided
+        const baseUrl = providedBaseUrl || 'https://api.openai.com/v1';
 
         // Determine the full endpoint URL
         // If baseUrl already contains '/completions', use it as-is

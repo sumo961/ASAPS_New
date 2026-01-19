@@ -383,7 +383,7 @@ Write a brief, engaging response that:
 - Is approximately ${this.maxWords} words (${Math.round(this.maxWords * 0.8)}-${Math.round(this.maxWords * 1.2)} words acceptable)
 
 Start directly with the interesting information - no preamble:`,
-      { enableWebSearch: true, maxTokens: Math.max(400, this.maxWords * 3) }
+      { enableWebSearch: true, maxTokens: Math.max(1000, this.maxWords * 4) }
     );
 
     // Clean up any unwanted patterns that might slip through

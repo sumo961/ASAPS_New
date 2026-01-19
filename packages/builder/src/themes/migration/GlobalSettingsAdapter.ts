@@ -211,6 +211,14 @@ export function themeToGlobalSettings(
   theme: ThemeDefinition,
   existingSettings?: Partial<GlobalSettings>
 ): GlobalSettings {
+  // Determine text box background color and alpha
+  // Priority: textBox.background > colors.surface > colors.secondary (fallback)
+  const textBoxBgHex = theme.textBox.background?.hex || theme.colors.surface?.hex || theme.colors.secondary.hex;
+  const textBoxBgAlpha = theme.textBox.background?.alpha ?? theme.colors.surface?.alpha ?? theme.colors.secondary.alpha ?? 1;
+
+  // Use textBox.opacity if explicitly set (0-1 range), otherwise use background alpha
+  const textBoxOpacity = theme.textBox.opacity !== undefined ? theme.textBox.opacity : textBoxBgAlpha;
+
   return {
     project: existingSettings?.project || {
       width: 1024,
@@ -224,13 +232,13 @@ export function themeToGlobalSettings(
       palpha: Math.round((theme.colors.buttonNormal?.alpha ?? theme.button.background.alpha ?? 1) * 100),
       // Button text color
       ptextcolor: theme.colors.buttonText?.hex || theme.button.textColor.hex,
-      // Text box background: use secondary color (typically darker/contrasting)
-      nonpcolor: theme.colors.secondary.hex,
-      nonpalpha: Math.round((theme.colors.secondary.alpha ?? 1) * 100),
+      // Text box background: use textBox.background or surface color
+      nonpcolor: textBoxBgHex,
+      nonpalpha: Math.round(textBoxOpacity * 100),
       // Text box text color: use primary (the actual text color from Ren'Py's gui.text_color)
       nonptextcolor: theme.colors.primary.hex,
       bgColor: theme.colors.background.hex,
-      textBoxBorder: theme.colors.border.hex,
+      textBoxBorder: theme.textBox.borderColor?.hex || theme.colors.border.hex,
     },
     fonts: {
       titleFont: theme.fonts.title.family,

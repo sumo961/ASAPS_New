@@ -145,6 +145,22 @@ export class PickPropBeat extends Beat {
       // Add prop to inventory by default
       context.addToInventory(selectedProp.name);
 
+      // Apply direct counter fields (new feature)
+      if (selectedProp.counter) {
+        const operation = selectedProp.counterOperation || 'change';
+        const value = selectedProp.counterValue ?? 1;
+        if (operation === 'set') {
+          context.setCounter(selectedProp.counter, value);
+        } else {
+          context.incrementCounter(selectedProp.counter, value);
+        }
+      }
+
+      // Play sound effect (new feature)
+      if (selectedProp.soundEffect && renderer.playSound) {
+        await renderer.playSound({ file: selectedProp.soundEffect });
+      }
+
       return selectedProp.target;
     }
 

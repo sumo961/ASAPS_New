@@ -263,7 +263,7 @@ OUTPUT THE SUMMARY NOW (just the text, nothing else):`;
     console.log(`[AISummaryBeat ${this.id}] Generating summary (max ${maxWords} words)...`);
 
     const response = await aiService.generateContent(prompt, {
-      maxTokens: maxWords * 2,
+      maxTokens: Math.max(500, maxWords * 3), // Extra headroom for complete responses
     });
 
     // Post-process to remove any reasoning/meta-commentary that slipped through

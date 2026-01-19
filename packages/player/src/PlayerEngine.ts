@@ -166,7 +166,7 @@ function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSett
     },
     colors: {
       textColor: npcTextColor, // NPC/narrator text color
-      textAlpha: normalizeOpacity(settings.colors.nonpalpha),
+      textAlpha: 100, // Text is always fully visible; nonpalpha controls text BOX background, not text
     },
     fonts: {
       titleFont: getFontFamily(settings.fonts.titleFont),
