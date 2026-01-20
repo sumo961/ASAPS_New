@@ -10,7 +10,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 
 | Feature | Status |
 |---------|--------|
-| **AI-Based Beats** | **NEW in v0.9.8**: AI Summary, AI Condition, AI Dialog Tree beats for dynamic content |
+| **AI-Based Beats** | **NEW in v0.9.8**: AI Summary, Online Content, AI Condition, AI Dialog Tree beats for dynamic content |
 | Assets (graphics, sounds, sprite animations) | Fully implemented |
 | Visual dialog editor | Supports all phases of dialog trees (v0.9.4) |
 | Project switching | Occasional issues; reload interface to resolve |
@@ -32,6 +32,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 AI beats enable dynamic, personalized story experiences that respond to player choices in real-time:
 
 - **AI Summary Beat**: Generates a narrative summary of the player's journey at story end
+- **Online Content Beat**: Fetches and displays real-time information from the web (weather, news, facts)
 - **AI Condition Beat**: Uses AI to evaluate complex conditions based on story context
 - **AI Dialog Tree Beat**: Dynamically generates dialog choices and responses
 
