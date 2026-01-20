@@ -4,12 +4,13 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASAPS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.7)
+## ⚠️ Development Status (v0.9.8)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **AI-Based Beats** | **NEW in v0.9.8**: AI Summary, AI Condition, AI Dialog Tree beats for dynamic content |
 | Assets (graphics, sounds, sprite animations) | Fully implemented |
 | Visual dialog editor | Supports all phases of dialog trees (v0.9.4) |
 | Project switching | Occasional issues; reload interface to resolve |
@@ -22,8 +23,25 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Beat Notes | Author annotations for beats (not shown to players) (v0.9.6) |
 | Timer Progress Bar | Visual timer for default target delays (v0.9.6) |
 | Visual Inventory System | Interactor-facing inventory display with configurable HUD overlay (v0.9.6) |
+| Path Analysis | Work in progress - may show extra paths for complex branching stories |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
+
+### 🤖 AI-Based Beats (v0.9.8)
+
+AI beats enable dynamic, personalized story experiences that respond to player choices in real-time:
+
+- **AI Summary Beat**: Generates a narrative summary of the player's journey at story end
+- **AI Condition Beat**: Uses AI to evaluate complex conditions based on story context
+- **AI Dialog Tree Beat**: Dynamically generates dialog choices and responses
+
+**AI Provider Recommendations**:
+| Use Case | Recommended Models |
+|----------|-------------------|
+| AI beats during playback | **Gemma 3 4B** via Ollama (fast, local, capable) |
+| Story generation | **Claude**, **GPT**, or **Kimi K2** (superior creative writing) |
+
+Configure AI providers in **Settings → AI Configuration**. Local models via Ollama are recommended for playback to ensure fast response times.
 
 ## 🎯 Features
 

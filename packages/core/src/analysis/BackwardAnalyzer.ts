@@ -118,7 +118,6 @@ export class BackwardAnalyzer {
    * Build map of which beats set which variables
    */
   private buildVariableSetterMap(): void {
-    console.log('[BackwardAnalyzer] Building variable setter map...');
     for (const beat of this.story.getAllBeats()) {
       // setVariable, setCounter, setGlobal beats set variables
       if (['setVariable', 'setCounter', 'setGlobal', 'counter', 'variable'].includes(beat.type)) {
@@ -177,12 +176,6 @@ export class BackwardAnalyzer {
       }
     }
 
-    // Log what we found
-    console.log('[BackwardAnalyzer] Variable setters found:', this.variableSetters.size, 'variables');
-    for (const [varName, setters] of this.variableSetters) {
-      const setterDetails = setters.map(s => `${s.beatName}(${s.operation}:${s.value})`).join(', ');
-      console.log(`  - ${varName}: ${setters.length} setters [${setterDetails}]`);
-    }
   }
 
   /**
@@ -400,18 +393,10 @@ export class BackwardAnalyzer {
         const pathBeatIds = new Set(current.pathBeats.map(pb => pb.beatId));
         const validation = this.pathCanSatisfyConstraints(pathBeatIds, current.constraints);
 
-        console.log('[BackwardAnalyzer] Path validation:', {
-          pathLength: current.pathLength,
-          constraintCount: current.constraints.variables.size,
-          valid: validation.valid,
-          missingVariables: validation.missingVariables,
-        });
-
         if (!validation.valid) {
           // Path cannot satisfy its constraints - it's invalid
           // This happens when the path goes through condition TRUE branches
           // without including the beats that set the required variables
-          console.log('[BackwardAnalyzer] Rejecting invalid path - missing setters for:', validation.missingVariables);
           continue;
         }
 
