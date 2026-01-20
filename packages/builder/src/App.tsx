@@ -93,6 +93,12 @@ function App() {
   const [showClusterNameModal, setShowClusterNameModal] = useState(false);
   const [clusterNameDefault, setClusterNameDefault] = useState('');
 
+  // Import conflict modal state (replaces prompt() for Electron compatibility)
+  const [showImportConflictModal, setShowImportConflictModal] = useState(false);
+  const [importConflictDefault, setImportConflictDefault] = useState('');
+  const [importConflictLabel, setImportConflictLabel] = useState('');
+  const importConflictResolverRef = useRef<((value: string | null) => void) | null>(null);
+
   // AI Debug hook - automatically runs after AI story generation
   const {
     result: aiDebugResult,
@@ -367,16 +373,19 @@ function App() {
           const result = await importProjectFromZip(file, options);
 
           if (result.conflict) {
-            // Show simple dialog for conflict resolution
+            // Show modal dialog for conflict resolution (Electron compatible)
             const incomingName = result.conflict.incomingProjectName || 'Imported Project';
+            const existingName = result.conflict.existingProjectName || 'Unknown';
 
-            const newName = window.prompt(
-              `Project already exists. Enter a new name to import:`,
+            const newName = await showImportConflictPrompt(
+              `A project with this ID already exists!\n\nExisting: "${existingName}"\nImporting: "${incomingName}"\n\nEnter a new name or type "OVERWRITE" to replace:`,
               incomingName + ' (Copy)'
             );
 
             if (newName === null) {
               return; // User cancelled
+            } else if (newName.toUpperCase() === 'OVERWRITE') {
+              return doImport({ overwrite: true });
             } else if (newName.trim()) {
               return doImport({ generateNewId: true, newName: newName.trim() });
             } else {
@@ -2388,19 +2397,12 @@ function App() {
         const result = await importProjectFromZip(file, options);
 
         if (result.conflict) {
-          // Show dialog with options for handling the conflict
+          // Show modal dialog for conflict resolution (Electron compatible)
           const existingName = result.conflict.existingProjectName || 'Unknown';
           const incomingName = result.conflict.incomingProjectName || 'Unknown';
 
-          const choice = window.prompt(
-            `A project with this ID already exists!\n\n` +
-            `Existing: "${existingName}"\n` +
-            `Importing: "${incomingName}"\n\n` +
-            `Choose an option:\n` +
-            `1. Type a new name to import as a copy\n` +
-            `2. Type "OVERWRITE" to replace the existing project\n` +
-            `3. Press Cancel to abort\n\n` +
-            `Enter new name or "OVERWRITE":`,
+          const choice = await showImportConflictPrompt(
+            `A project with this ID already exists!\n\nExisting: "${existingName}"\nImporting: "${incomingName}"\n\nEnter a new name or type "OVERWRITE" to replace:`,
             incomingName + ' (Copy)'
           );
 
@@ -2601,6 +2603,40 @@ function App() {
    */
   const handleCloseSaveProjectDialog = useCallback(() => {
     setShowSaveProjectDialog(false);
+  }, []);
+
+  /**
+   * Show import conflict modal and wait for user response (replaces window.prompt())
+   */
+  const showImportConflictPrompt = useCallback((label: string, defaultValue: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      setImportConflictLabel(label);
+      setImportConflictDefault(defaultValue);
+      importConflictResolverRef.current = resolve;
+      setShowImportConflictModal(true);
+    });
+  }, []);
+
+  /**
+   * Handle import conflict modal confirmation
+   */
+  const handleImportConflictConfirm = useCallback((value: string) => {
+    setShowImportConflictModal(false);
+    if (importConflictResolverRef.current) {
+      importConflictResolverRef.current(value);
+      importConflictResolverRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Handle import conflict modal cancellation
+   */
+  const handleImportConflictCancel = useCallback(() => {
+    setShowImportConflictModal(false);
+    if (importConflictResolverRef.current) {
+      importConflictResolverRef.current(null);
+      importConflictResolverRef.current = null;
+    }
   }, []);
 
   /**
@@ -3571,6 +3607,18 @@ function App() {
         onConfirm={handleClusterNameConfirm}
         onCancel={() => setShowClusterNameModal(false)}
         submitText="Create"
+      />
+
+      {/* Import Conflict Modal (replaces prompt() for Electron compatibility) */}
+      <InputModal
+        isOpen={showImportConflictModal}
+        title="Import Conflict"
+        label={importConflictLabel}
+        defaultValue={importConflictDefault}
+        placeholder="Enter new name or OVERWRITE..."
+        onConfirm={handleImportConflictConfirm}
+        onCancel={handleImportConflictCancel}
+        submitText="Import"
       />
 
       {/* AI Debug Modal */}
