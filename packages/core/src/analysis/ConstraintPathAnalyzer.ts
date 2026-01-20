@@ -137,8 +137,14 @@ export class ConstraintPathAnalyzer {
       return;
     }
 
-    // Check if we've already explored this state (beat + constraints)
-    const stateHash = `${beat.id}#${hashConstraintSet(state.constraints)}`;
+    // Check if we've already explored this state (beat + constraints + PLAYER CHOICES)
+    // Only include player choices (decisionMade), not condition results (conditionResult)
+    // Condition results are determined by game state, not player decisions
+    const choiceHistory = state.path
+      .filter(step => step.decisionMade) // Only player choices, not condition results
+      .map(step => `${step.beatId}:${step.decisionMade}`)
+      .join('|');
+    const stateHash = `${beat.id}#${hashConstraintSet(state.constraints)}#${choiceHistory}`;
     if (this.exploredStates.has(stateHash)) {
       return;  // Already explored this path class
     }
@@ -159,8 +165,8 @@ export class ConstraintPathAnalyzer {
     const newVisitCounts = new Map(state.visitCounts);
     newVisitCounts.set(beat.id, visitCount + 1);
 
-    // Check if this is an ending beat
-    if (beat.type === 'endScreen') {
+    // Check if this is an ending beat (endScreen or aiSummary)
+    if (beat.type === 'endScreen' || beat.type === 'aiSummary') {
       this.recordOutcome(beat, {
         ...state,
         path: newPath,
@@ -243,11 +249,14 @@ export class ConstraintPathAnalyzer {
       if (constraintsIfTrue !== null) {
         const targetBeat = this.story.getBeat(trueTarget);
         if (targetBeat) {
-          const pathStep = state.path[state.path.length - 1];
-          if (pathStep) pathStep.conditionResult = true;
+          // Create a new path with the condition result recorded (don't mutate shared path)
+          const newPath = state.path.length > 0
+            ? [...state.path.slice(0, -1), { ...state.path[state.path.length - 1], conditionResult: true }]
+            : state.path;
 
           this.explore(targetBeat, {
             ...state,
+            path: newPath,
             constraints: constraintsIfTrue,
           });
         }
@@ -260,11 +269,14 @@ export class ConstraintPathAnalyzer {
       if (constraintsIfFalse !== null) {
         const targetBeat = this.story.getBeat(falseTarget);
         if (targetBeat) {
-          const pathStep = state.path[state.path.length - 1];
-          if (pathStep) pathStep.conditionResult = false;
+          // Create a new path with the condition result recorded (don't mutate shared path)
+          const newPath = state.path.length > 0
+            ? [...state.path.slice(0, -1), { ...state.path[state.path.length - 1], conditionResult: false }]
+            : state.path;
 
           this.explore(targetBeat, {
             ...state,
+            path: newPath,
             constraints: constraintsIfFalse,
           });
         }
@@ -309,11 +321,15 @@ export class ConstraintPathAnalyzer {
 
       const targetBeat = this.story.getBeat(targetId);
       if (targetBeat) {
-        const pathStep = state.path[state.path.length - 1];
-        if (pathStep) pathStep.decisionMade = choice.text || choice.label || `Choice ${i + 1}`;
+        // Create a new path with the decision recorded (don't mutate shared path)
+        const decisionText = choice.text || choice.label || `Choice ${i + 1}`;
+        const newPath = state.path.length > 0
+          ? [...state.path.slice(0, -1), { ...state.path[state.path.length - 1], decisionMade: decisionText }]
+          : state.path;
 
         this.explore(targetBeat, {
           ...state,
+          path: newPath,
           constraints: constraintsForChoice,
         });
       }

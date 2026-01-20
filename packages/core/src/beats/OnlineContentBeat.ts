@@ -205,7 +205,8 @@ export class OnlineContentBeat extends Beat {
   private deriveTitle(query: string): string {
     // First, try to find a proper location name (Capitalized words, often with comma like "City, Country")
     // Match patterns like "in Marsaskala, Malta" or "for Berlin, Germany"
-    const properLocationMatch = query.match(/\s+(?:in|for)\s+([A-Z][a-zA-Z]+(?:,\s*[A-Z][a-zA-Z]+)?)/);
+    // Use \p{L} to match any Unicode letter (supports international characters like ö, ä, ü, etc.)
+    const properLocationMatch = query.match(/\s+(?:in|for)\s+([\p{Lu}][\p{L}]+(?:,\s*[\p{Lu}][\p{L}]+)?)/u);
     let location = '';
 
     if (properLocationMatch) {

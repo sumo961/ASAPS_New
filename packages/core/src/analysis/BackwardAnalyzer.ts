@@ -88,16 +88,168 @@ interface BackwardNode {
 }
 
 /**
+ * Information about a beat that sets a variable
+ */
+interface VariableSetter {
+  beatId: string;
+  beatName: string;
+  operation: 'set' | 'change' | 'increment';
+  value: number;
+}
+
+/**
  * BackwardAnalyzer
  */
 export class BackwardAnalyzer {
   private story: Story;
   private reverseGraph: Map<string, BackwardNode>;
+  // Map of variable name -> beats that set it
+  private variableSetters: Map<string, VariableSetter[]>;
 
   constructor(story: Story) {
     this.story = story;
     this.reverseGraph = new Map();
+    this.variableSetters = new Map();
     this.buildReverseGraph();
+    this.buildVariableSetterMap();
+  }
+
+  /**
+   * Build map of which beats set which variables
+   */
+  private buildVariableSetterMap(): void {
+    console.log('[BackwardAnalyzer] Building variable setter map...');
+    for (const beat of this.story.getAllBeats()) {
+      // setVariable, setCounter, setGlobal beats set variables
+      if (['setVariable', 'setCounter', 'setGlobal', 'counter', 'variable'].includes(beat.type)) {
+        const params = beat.getParameters();
+        const varName = params.variableName || params.variable || params.counterName || params.name;
+        const operation = params.operation || 'set';
+        const value = params.value ?? params.val ?? 1;
+
+        if (varName) {
+          if (!this.variableSetters.has(varName)) {
+            this.variableSetters.set(varName, []);
+          }
+          this.variableSetters.get(varName)!.push({
+            beatId: beat.id,
+            beatName: beat.name,
+            operation: operation as 'set' | 'change' | 'increment',
+            value: typeof value === 'number' ? value : 1,
+          });
+        }
+      }
+
+      // Also check for effects on choices that set variables
+      const params = beat.getParameters();
+      const choices = params.choices || params.options || params.props || [];
+      for (const choice of choices) {
+        if (choice.effects) {
+          for (const effect of choice.effects) {
+            if (effect.type === 'setVariable' || effect.type === 'counter') {
+              const varName = effect.variable || effect.variableName || effect.counterName;
+              if (varName) {
+                if (!this.variableSetters.has(varName)) {
+                  this.variableSetters.set(varName, []);
+                }
+                this.variableSetters.get(varName)!.push({
+                  beatId: beat.id,
+                  beatName: beat.name,
+                  operation: effect.operation || 'change',
+                  value: effect.value ?? 1,
+                });
+              }
+            }
+          }
+        }
+        // Direct counter fields on choices
+        if (choice.counter) {
+          if (!this.variableSetters.has(choice.counter)) {
+            this.variableSetters.set(choice.counter, []);
+          }
+          this.variableSetters.get(choice.counter)!.push({
+            beatId: beat.id,
+            beatName: beat.name,
+            operation: choice.counterOperation || 'change',
+            value: choice.counterValue ?? 1,
+          });
+        }
+      }
+    }
+
+    // Log what we found
+    console.log('[BackwardAnalyzer] Variable setters found:', this.variableSetters.size, 'variables');
+    for (const [varName, setters] of this.variableSetters) {
+      const setterDetails = setters.map(s => `${s.beatName}(${s.operation}:${s.value})`).join(', ');
+      console.log(`  - ${varName}: ${setters.length} setters [${setterDetails}]`);
+    }
+  }
+
+  /**
+   * Check if a path includes beats that can satisfy its constraints
+   */
+  private pathCanSatisfyConstraints(
+    pathBeatIds: Set<string>,
+    constraints: ConstraintSet
+  ): { valid: boolean; missingVariables: string[] } {
+    const missingVariables: string[] = [];
+
+    // Check each variable constraint
+    for (const [varName, constraint] of constraints.variables) {
+      // Skip 'visited beat' constraints - these are tracking constraints, not game state
+      if (varName.startsWith('visited ')) continue;
+
+      // Find beats that set this variable
+      const setters = this.variableSetters.get(varName) || [];
+
+      // Check if any setter on the path can SATISFY the constraint (not just set it)
+      // For numeric constraints like >= 1, we need a setter that provides value >= 1
+      // Initialize beats typically set to 0, which doesn't satisfy >= 1
+      let constraintSatisfied = false;
+
+      if (constraint.type === 'numeric') {
+        const minRequired = constraint.min ?? -Infinity;
+
+        for (const setter of setters) {
+          if (!pathBeatIds.has(setter.beatId)) continue;
+
+          // Check if this setter can satisfy the constraint
+          // 'set' operation: value must be >= minRequired
+          // 'change'/'increment' operation: adds to existing value, assume it helps
+          if (setter.operation === 'set') {
+            if (setter.value >= minRequired) {
+              constraintSatisfied = true;
+              break;
+            }
+          } else if (setter.operation === 'change' || setter.operation === 'increment') {
+            // Increment operations with positive values can satisfy >= constraints
+            if (setter.value > 0 && minRequired > 0) {
+              constraintSatisfied = true;
+              break;
+            }
+          }
+        }
+      } else {
+        // For non-numeric constraints, just check if any setter is on the path
+        constraintSatisfied = setters.some(s => pathBeatIds.has(s.beatId));
+      }
+
+      if (!constraintSatisfied && setters.length > 0) {
+        missingVariables.push(varName);
+      }
+    }
+
+    return {
+      valid: missingVariables.length === 0,
+      missingVariables,
+    };
+  }
+
+  /**
+   * Get beats that must be visited to satisfy a constraint
+   */
+  private getBeatsForConstraint(varName: string): VariableSetter[] {
+    return this.variableSetters.get(varName) || [];
   }
 
   /**
@@ -243,6 +395,26 @@ export class BackwardAnalyzer {
 
       // Check if we've reached the start
       if (current.beatId === firstBeatId) {
+        // Validate that the path can satisfy its constraints
+        // A path that requires expert_visited >= 1 must include a beat that sets expert_visited
+        const pathBeatIds = new Set(current.pathBeats.map(pb => pb.beatId));
+        const validation = this.pathCanSatisfyConstraints(pathBeatIds, current.constraints);
+
+        console.log('[BackwardAnalyzer] Path validation:', {
+          pathLength: current.pathLength,
+          constraintCount: current.constraints.variables.size,
+          valid: validation.valid,
+          missingVariables: validation.missingVariables,
+        });
+
+        if (!validation.valid) {
+          // Path cannot satisfy its constraints - it's invalid
+          // This happens when the path goes through condition TRUE branches
+          // without including the beats that set the required variables
+          console.log('[BackwardAnalyzer] Rejecting invalid path - missing setters for:', validation.missingVariables);
+          continue;
+        }
+
         const pathLength = current.pathLength + 1;
         minimumSteps = Math.min(minimumSteps, pathLength);
 
@@ -261,8 +433,14 @@ export class BackwardAnalyzer {
         continue;
       }
 
-      // Avoid infinite loops
-      const stateHash = `${current.beatId}#${hashConstraintSet(current.constraints)}`;
+      // Avoid infinite loops - include PLAYER CHOICES (not condition results) in hash
+      // Condition results are determined by game state, not player decisions, so they shouldn't differentiate paths
+      // Only actual choices (dialogTree, movementChoice, etc.) should create distinct paths
+      const choiceHash = current.decisionPoints
+        .filter(dp => dp.requiredChoice) // Only player choices, not condition results
+        .map(dp => `${dp.beatId}:${dp.requiredChoice}`)
+        .join('|');
+      const stateHash = `${current.beatId}#${hashConstraintSet(current.constraints)}#${choiceHash}`;
       if (visited.has(stateHash)) continue;
       visited.add(stateHash);
 
@@ -452,7 +630,8 @@ export class BackwardAnalyzer {
     const endings: Array<{ beatId: string; beatName: string }> = [];
 
     for (const beat of this.story.getAllBeats()) {
-      if (beat.type === 'endScreen') {
+      // endScreen and aiSummary are both considered ending beats
+      if (beat.type === 'endScreen' || beat.type === 'aiSummary') {
         endings.push({ beatId: beat.id, beatName: beat.name });
       }
     }
