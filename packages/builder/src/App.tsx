@@ -27,6 +27,7 @@ import { DebugPanel } from './components/debug/DebugPanel';
 import { SearchPanel } from './components/search';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
+import { validateStoryLogic, formatLogicValidationResult } from './utils/storyLogicValidator';
 import { preloadFonts } from './utils/fontRegistry';
 import { useThemes, type ThemeAssetUrls } from './hooks/useThemes';
 import { useAIDebug } from './hooks/useAIDebug';
@@ -2805,6 +2806,21 @@ function App() {
     if (validation.warnings.length > 0) {
       console.warn('[App] AI story warnings:');
       validation.warnings.forEach(w => console.warn('  -', w.message));
+    }
+
+    // Validate narrative logic (hub beats, state assumptions, undescribed items)
+    const logicValidation = validateStoryLogic(story);
+    console.log('[App] Story Logic Validation:\n' + formatLogicValidationResult(logicValidation));
+
+    if (logicValidation.issues.length > 0) {
+      console.warn('[App] Story logic issues detected:');
+      logicValidation.issues.forEach(issue => {
+        const icon = issue.type === 'warning' ? '⚠️' : 'ℹ️';
+        console.warn(`  ${icon} [${issue.beatId}] ${issue.message}`);
+        if (issue.suggestedFix) {
+          console.warn(`     Fix: ${issue.suggestedFix}`);
+        }
+      });
     }
 
     // Clear existing beats and connections

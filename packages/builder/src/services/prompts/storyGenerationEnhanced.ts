@@ -194,7 +194,43 @@ const BEAT_TYPE_GUIDE = `
 - ⚠️ For action choices (verbs), use movementChoice instead!
 - ⚠️ For leaving/continuing without picking anything, use a separate connection or movementChoice
 - Example: "What do you pick up?" → [Silver Key | Old Book | Lantern] → each leads to different beat
-- 🚨 After pickProp, use introText to describe the item in narrative form (NOT addRemoveInventory!)
+
+🚨🚨🚨 **MANDATORY: DESCRIBE ITEMS AFTER PICKUP!** 🚨🚨🚨
+Every pickProp choice MUST lead to an introText that describes what the player learns from the item!
+Players need narrative payoff - don't just silently add items to inventory!
+
+❌ WRONG (item picked but never described):
+  pickProp "Old Photograph" → movementChoice "Where next?"
+  Problem: Player has no idea what the photograph shows!
+
+✓ CORRECT (item described after pickup):
+  pickProp "Old Photograph" → introText "The photograph shows a young girl standing in front of a farmhouse. In the distance, snow-capped mountains loom. On the back, someone has written 'Blackwood Estate, 1923' in faded ink." → movementChoice
+
+### Item Description Pattern (REQUIRED for every pickProp choice):
+\`\`\`
+pickProp beat:
+  - "Old Photograph" → beat_photo_desc
+  - "Dusty Letter" → beat_letter_desc
+  - "Strange Key" → beat_key_desc
+
+beat_photo_desc (introText):
+  text: "The photograph shows a family portrait - but one face has been scratched out violently. The date on the back reads 1952."
+  → continues to next beat
+
+beat_letter_desc (introText):
+  text: "The letter is addressed to 'My Dearest E.' and speaks of a secret meeting at midnight. The handwriting is elegant but hurried."
+  → continues to next beat
+
+beat_key_desc (introText):
+  text: "The key is ornate, with a strange symbol etched into the handle - the same symbol you saw above the basement door."
+  → continues to next beat
+\`\`\`
+
+Good item descriptions should:
+- Reveal story details (names, dates, places, relationships)
+- Hint at mysteries or connections to other elements
+- Give the player information they can use later
+- Create atmosphere and immersion
 
 **hyperText** - Clickable word/phrase branching
 - Use: Subtle choices, memory/knowledge checks, exploring details in text
@@ -250,7 +286,10 @@ const BEAT_TYPE_GUIDE = `
     "type": "inputText",
     "parameters": { "prompt": "Enter the password:", "variable": "userPassword", "saveToType": "variable", "connection": { "target": "beat_next" } }
   }
-- Combine with: conditionBeat to check input
+- 🚨 FOR CODE/PASSWORD PUZZLES: inputText MUST connect TO a conditionBeat!
+  - inputText stores player input → connection points to conditionBeat
+  - conditionBeat checks if input matches correct answer
+  - See Pattern 8: Code/Password Puzzle for complete example
 
 **endScreen** - Story conclusion (ACTUAL BEATS in the beats array!)
 - Use: Ending (victory, defeat, various endings)
@@ -540,7 +579,33 @@ Player must explore to find tool first
 Creates backtracking and exploration incentive
 \`\`\`
 
-### Pattern 8: Reputation/Relationship System
+### Pattern 8: Code/Password Puzzle (inputText → conditionBeat)
+\`\`\`
+🚨 CRITICAL: inputText MUST connect TO conditionBeat!
+
+Flow: introText("Enter the code") → inputText → conditionBeat → success/failure
+
+Step 1: Clue beat reveals the code (e.g., "The combination is 8192")
+Step 2: Puzzle beat asks for input:
+  inputText: {
+    prompt: "Enter the vault combination:",
+    variable: "enteredCode",        // Stores player's input
+    connection: { target: "beat_check_code" }  // ← MUST connect to conditionBeat!
+  }
+Step 3: Verification beat checks the input:
+  conditionBeat (id: "beat_check_code"): {
+    condition: { type: "variable", variable: "enteredCode", operator: "==", value: "8192" },
+    trueConnection: { target: "beat_vault_opens" },
+    falseConnection: { target: "beat_wrong_code" }
+  }
+Step 4a: Success path (correct code)
+Step 4b: Failure path (wrong code) → can loop back to inputText for retry
+
+🚨 Common mistake: Creating conditionBeat but forgetting to connect inputText TO it!
+The inputText's connection.target MUST point to the conditionBeat's ID!
+\`\`\`
+
+### Pattern 9: Reputation/Relationship System
 \`\`\`
 Multiple interactions with character
 Each choice → setVariable(relationshipScore, +1 or -1)
@@ -628,6 +693,32 @@ Clusters are containers that help organize larger projects into logical sections
 ❌ Using endScreen before story develops
 ✓ Build narrative arc: setup → complications → climax → resolution
 
+❌ **Hub beats with state-dependent text (NARRATIVE LOGIC ERROR!)**
+Hub beats (reachable from multiple paths) should NOT have text that assumes player state!
+✗ WRONG: Hub beat text says "You have enough clues to solve the mystery" without checking cluesFound
+✗ WRONG: Hub beat says "With the evidence you gathered..." when player may have gathered nothing
+✗ WRONG: Convergence point assumes player has items/knowledge they may not have
+✓ CORRECT: Use generic text at hub beats: "What would you like to do next?"
+✓ CORRECT: Add conditionBeat BEFORE the hub to show different text based on state
+✓ CORRECT: If text must reference state, gate it with a conditionBeat first
+
+### Pattern: State-Aware Hub Beats
+\`\`\`
+WRONG (narrative assumes state):
+  multiple paths → Hub with text "You've gathered the clues needed..."
+  Problem: Player may have taken a path with no clues!
+
+CORRECT (generic hub + conditional branching):
+  multiple paths → Hub with generic text "What's next?" → conditionBeat checks state → different outcomes
+  OR
+  multiple paths → conditionBeat first → state-specific hub beat texts
+
+CORRECT (conditional text before hub):
+  path A → conditionBeat (clues >= 3?) → "You have enough evidence" (introText) → Hub
+  path B → conditionBeat (clues >= 3?) → "You need more clues" (introText) → Hub
+  Hub has generic text: "Where would you like to go?"
+\`\`\`
+
 ❌ **Creating "orphan" beats that nothing connects to**
 ✓ For EVERY beat you create, verify another beat targets it
 ✓ Reconvergence points need explicit connections FROM the branches
@@ -665,6 +756,13 @@ DO NOT follow pickProp with addRemoveInventory action="add" - this creates DUPLI
 Always include descriptions for pickProp items to help players make informed choices.
 ✗ WRONG: { "id": "letter", "name": "Mysterious Letter", "target": "beat_4" }
 ✓ CORRECT: { "id": "letter", "name": "Mysterious Letter", "description": "A sealed envelope with a wax seal", "target": "beat_4" }
+
+❌ **pickProp items that are never described after pickup**
+When player picks up an item, they MUST learn something about it in the very next beat!
+✗ WRONG: pickProp "Old Photo" → movementChoice (photo never explained!)
+✗ WRONG: pickProp "Secret Letter" → dialogTree with NPC (letter content never revealed!)
+✓ CORRECT: pickProp "Old Photo" → introText describing what the photo shows → next beat
+✓ CORRECT: pickProp "Secret Letter" → introText revealing letter contents → dialogTree
 
 ## ⚠️ CRITICAL: Counter Threshold Reachability
 
@@ -1282,7 +1380,49 @@ These are single-path beats that need "connections" to specify the next beat.
   }
 }
 \`\`\`
-✓ hyperText has NO "connections" array - targets are in hyperlinks[].targetBeatId!`;
+✓ hyperText has NO "connections" array - targets are in hyperlinks[].targetBeatId!
+
+## Code/Password Puzzle - Complete JSON Example
+
+🚨 **inputText MUST connect TO conditionBeat for puzzles!**
+
+\`\`\`json
+{
+  "id": "beat_10",
+  "name": "Enter Vault Code",
+  "type": "inputText",
+  "position": { "x": 1300, "y": 300 },
+  "parameters": {
+    "prompt": "The vault requires a 4-digit code. What do you enter?",
+    "variable": "vaultCode",
+    "saveToType": "variable",
+    "submitButtonText": "Enter Code",
+    "connection": { "target": "beat_11_check" }
+  }
+}
+\`\`\`
+✓ inputText uses connection INSIDE parameters pointing to conditionBeat!
+
+\`\`\`json
+{
+  "id": "beat_11_check",
+  "name": "Check Vault Code",
+  "type": "conditionBeat",
+  "position": { "x": 1600, "y": 300 },
+  "parameters": {
+    "condition": {
+      "type": "variable",
+      "variable": "vaultCode",
+      "operator": "==",
+      "value": "8192"
+    },
+    "trueConnection": { "target": "beat_12_success", "label": "Correct!" },
+    "falseConnection": { "target": "beat_13_wrong", "label": "Wrong code" }
+  }
+}
+\`\`\`
+✓ conditionBeat checks the variable set by inputText!
+✓ trueConnection/falseConnection provide paths for correct/incorrect answers!`;
 }
 
 /**
@@ -1326,6 +1466,7 @@ Remember to:
 - Track important decisions in variables
 - Use appropriate beat types (dialogTree for conversations, movementChoice for exploration, etc.)
 - Design multiple endings based on accumulated state
+- For puzzles/codes: inputText → conditionBeat (inputText stores answer, conditionBeat checks it!)
 
 🚨 MANDATORY COUNTER RULE:
 - If you add counter effects to choices (counter/counterOperation/counterValue), you MUST create a conditionBeat

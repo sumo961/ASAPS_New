@@ -816,8 +816,11 @@ export class AIService {
       'variableName',
       'trueTarget',
       'falseTarget',
-      'operator',  // Schema only has this inside condition object
-      'value'      // Schema only has this inside condition object
+      'operator',   // Schema only has this inside condition object
+      'value',      // Schema only has this inside condition object
+      'item',       // Inventory condition field - should be inside condition object
+      'character',  // Inventory condition field - should be inside condition object
+      'checkType'   // Inventory condition field - should be inside condition object
     ]);
 
     let cleanupCount = 0;
@@ -1064,6 +1067,30 @@ export class AIService {
         if (nextBeat.type !== 'endScreen') {
           console.log(`[AIService.autoFix]   No orphan found, using next sequential beat: ${nextBeat.id}`);
           targetId = nextBeat.id;
+        }
+      }
+
+      // If still no target (last beat), look for existing endScreen or convert to endScreen
+      if (!targetId) {
+        const existingEndScreen = response.beats.find(b => b.type === 'endScreen');
+        if (existingEndScreen) {
+          console.log(`[AIService.autoFix]   No next beat, connecting to existing endScreen: ${existingEndScreen.id}`);
+          targetId = existingEndScreen.id;
+        } else if (beat.type === 'introText') {
+          // Convert terminal introText to endScreen
+          console.log(`[AIService.autoFix]   Converting terminal introText ${beat.id} to endScreen`);
+          beat.type = 'endScreen';
+          // Transform parameters: introText has text/buttonText, endScreen has message/showRestart
+          const message = beat.parameters?.text || 'The End';
+          beat.parameters = {
+            message: message,
+            showRestart: true,
+            showCredits: false,
+          };
+          // No connection needed for endScreen
+          beat.connections = [];
+          fixCount++;
+          continue; // Skip the connection fix since we converted to endScreen
         }
       }
 

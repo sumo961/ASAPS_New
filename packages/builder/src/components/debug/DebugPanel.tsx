@@ -1,8 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Bug, GitBranch, AlertCircle, GripHorizontal } from 'lucide-react';
+import { X, Bug, GitBranch, AlertCircle, GripHorizontal, FileText } from 'lucide-react';
 import type { Story } from '@asaps/core';
 import { ReachabilityReport } from './ReachabilityReport';
 import { PathVisualization } from './PathVisualization';
+import { LogicValidationReport } from './LogicValidationReport';
 
 interface DebugPanelProps {
   story: Story;
@@ -17,7 +18,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
   onHighlightBeat,
   onHighlightPath
 }) => {
-  const [activeTab, setActiveTab] = useState<'reachability' | 'paths'>('reachability');
+  const [activeTab, setActiveTab] = useState<'reachability' | 'paths' | 'logic'>('reachability');
 
   // Draggable state
   const [position, setPosition] = useState({ x: 50, y: 50 });
@@ -171,19 +172,37 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
           <GitBranch className="w-4 h-4" />
           Path Analysis
         </button>
+        <button
+          onClick={() => setActiveTab('logic')}
+          className={`px-4 py-3 font-medium transition-colors border-b-2 flex items-center gap-2 ${
+            activeTab === 'logic'
+              ? 'text-blue-600 border-blue-600'
+              : 'text-gray-600 border-transparent hover:text-gray-800'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Story Logic
+        </button>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {activeTab === 'reachability' ? (
+        {activeTab === 'reachability' && (
           <ReachabilityReport
             story={story}
             onHighlightBeat={onHighlightBeat}
           />
-        ) : (
+        )}
+        {activeTab === 'paths' && (
           <PathVisualization
             story={story}
             onHighlightPath={onHighlightPath}
+          />
+        )}
+        {activeTab === 'logic' && (
+          <LogicValidationReport
+            story={story}
+            onHighlightBeat={onHighlightBeat}
           />
         )}
       </div>
