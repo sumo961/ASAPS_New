@@ -1269,20 +1269,22 @@ export class ReactRenderer extends BaseRenderer {
 
     this.renderComponent(
       <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        <ChatDialogView
-          messages={[...this.chatMessages]}
-          choices={choices}
-          mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
-          showAvatars={this.currentShowAvatars}
-          theme={this.theme}
-          backgroundUrl={this.backgroundImageUrl}
-          backgroundColor={backgroundColor}
-          onChoiceSelect={this.handleAction}
-          stageWidth={stageWidth}
-          stageHeight={stageHeight}
-          characterAvatarResolver={this.characterAvatarResolver || undefined}
-          showTypingIndicator={showTypingIndicator}
-        />
+        <ScaledStage width={stageWidth} height={stageHeight}>
+          <ChatDialogView
+            messages={[...this.chatMessages]}
+            choices={choices}
+            mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
+            showAvatars={this.currentShowAvatars}
+            theme={this.theme}
+            backgroundUrl={this.backgroundImageUrl}
+            backgroundColor={backgroundColor}
+            onChoiceSelect={this.handleAction}
+            stageWidth={stageWidth}
+            stageHeight={stageHeight}
+            characterAvatarResolver={this.characterAvatarResolver || undefined}
+            showTypingIndicator={showTypingIndicator}
+          />
+        </ScaledStage>
       </div>
     );
   }

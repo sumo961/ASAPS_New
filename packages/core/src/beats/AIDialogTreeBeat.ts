@@ -303,20 +303,40 @@ REQUIREMENTS:
 5. Personalize the dialog based on player variables (e.g., use their name, reference their profession)
 6. Make the conversation feel natural and engaging
 
+CRITICAL STRUCTURE RULES:
+- The "text" field contains EVERYTHING the NPC says, including greetings AND follow-up questions
+- The "choices" array contains ONLY what the PLAYER would say in response
+- If the NPC asks a question, put the question IN THE TEXT FIELD, then put possible player ANSWERS in choices
+
+WRONG EXAMPLE (NPC question in choices):
+{
+  "text": "Hello! Nice to meet you.",
+  "choices": [{ "text": "What brings you here today?" }]  // WRONG! This is NPC asking, not player!
+}
+
+CORRECT EXAMPLE (NPC question in text, player answers in choices):
+{
+  "text": "Hello! Nice to meet you. What brings you here today?",
+  "choices": [
+    { "text": "I'm looking for information about transportation." },  // Player's answer
+    { "text": "Just browsing, thanks." }  // Player's answer
+  ]
+}
+
 Return a JSON object with this structure:
 {
   "id": "root",
   "speaker": "NPC Name",
-  "text": "NPC's opening line",
+  "text": "NPC's complete speech including any questions they ask",
   "choices": [
     {
       "id": "c1",
-      "text": "Player's response option",
-      "dialogNode": { /* nested dialog node */ }
+      "text": "What the PLAYER says in response",
+      "dialogNode": { /* nested dialog node with NPC's next speech */ }
     },
     {
       "id": "c2",
-      "text": "Another response",
+      "text": "Alternative PLAYER response",
       "target": "exit_target_id"
     }
   ]

@@ -996,7 +996,7 @@ export class AIService {
       if (beat.connections && Array.isArray(beat.connections)) {
         for (const conn of beat.connections) {
           if (conn.targetId) targetedBeatIds.add(conn.targetId);
-          if (conn.target) targetedBeatIds.add(conn.target);
+          if ((conn as any).target) targetedBeatIds.add((conn as any).target);
         }
       }
     }
@@ -1275,76 +1275,6 @@ export class AIService {
     } catch (error) {
       console.error('[AIService] Story generation failed:', error);
       throw error;
-    }
-  }
-
-  /**
-   * Attempt to repair a story by asking the AI to fix specific issues
-   */
-  private async attemptStoryRepair(
-    story: StoryGenerationResponse,
-    issues: string[],
-    originalRequest: StoryGenerationRequest
-  ): Promise<StoryGenerationResponse | null> {
-    try {
-      const issueList = issues.map((issue, i) => `${i + 1}. ${issue}`).join('\n');
-
-      const repairPrompt = `
-REPAIR REQUEST: Fix the following issues in this story.
-
-## Issues to Fix:
-${issueList}
-
-## Current Story JSON:
-${JSON.stringify(story, null, 2)}
-
-## Instructions:
-1. Analyze each issue listed above
-2. For "unreachable" beats: Add a connection FROM another beat TO the unreachable beat
-   - Look for logical places where the story should branch to that beat
-   - Add the target to a movementChoice, dialogTree choice, conditionBeat, or other appropriate beat
-3. Preserve ALL existing content - only ADD or MODIFY connections
-4. Return the COMPLETE corrected story JSON in the same format
-
-## Important:
-- Do NOT remove any beats
-- Do NOT change beat IDs
-- ONLY add/fix connections to make all beats reachable
-- Keep the same story structure and narrative
-
-Return ONLY the corrected JSON, no explanation needed.
-`;
-
-      // Create a repair request
-      const repairRequest: StoryGenerationRequest = {
-        ...originalRequest,
-        prompt: repairPrompt,
-      };
-
-      console.log('[AIService] Sending repair request to AI...');
-      let repairedResponse = await this.currentProvider!.generateStory(repairRequest);
-
-      // Transform the repaired response
-      repairedResponse = this.transformStoryResponse(repairedResponse);
-
-      // Verify the repair didn't break the story
-      if (!repairedResponse.beats || repairedResponse.beats.length === 0) {
-        console.warn('[AIService] Repair produced invalid response (no beats)');
-        return null;
-      }
-
-      // Check that we didn't lose beats
-      if (repairedResponse.beats.length < story.beats.length) {
-        console.warn('[AIService] Repair removed beats, rejecting');
-        return null;
-      }
-
-      console.log('[AIService] Repair completed, verifying...');
-      return repairedResponse;
-
-    } catch (error) {
-      console.error('[AIService] Story repair failed:', error);
-      return null;
     }
   }
 
