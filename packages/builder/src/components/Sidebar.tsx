@@ -180,6 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const beatTypeIcons: Record<string, string> = {
+    // Visible beats
     titleScreen: '🎬',
     introText: '📝',
     dialogTree: '🌳',
@@ -188,12 +189,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     pickProp: '🎒',
     durScreen: '⏳',
     videoBeat: '🎥',
+    inputText: '✏️',
+    hyperText: '🔗',
     endScreen: '🏁',
+    // Logic beats
     setVariable: '🔧',
     conditionBeat: '❓',
+    condition: '❓',
     randomTarget: '🎲',
     setTimer: '⏱️',
     addRemoveInventory: '📦',
+    // AI beats
+    onlineContent: '🌐',
+    aiDialogTree: '🤖',
+    aiCondition: '🧠',
+    aiSummary: '📊',
   };
 
   // Collapsed view
@@ -259,6 +269,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             placeholder="Search beats..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onInput={(e) => setSearchTerm((e.target as HTMLInputElement).value)}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

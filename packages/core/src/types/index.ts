@@ -224,7 +224,8 @@ export interface IRenderer {
   }, locations?: Location[]): Promise<string>;
   
   // Transition and effects
-  applyTransition(transition: Transition): Promise<void>;
+  prepareTransition?(transition: Transition): void;  // Set up initial hidden state before rendering
+  applyTransition(transition: Transition): Promise<void>;  // Animate to visible after rendering
   playSound(sound: Sound): Promise<void>;
 
   // Cluster and beat sound lifecycle

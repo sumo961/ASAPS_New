@@ -769,15 +769,15 @@ export class ReactRenderer extends BaseRenderer {
     if (!this.context.container) {
       throw new Error('ReactRenderer requires a container element');
     }
-    
+
     if (this.root) {
       console.log(`[ReactRenderer ${this.instanceId}] Root already exists for this instance`);
       return;
     }
-    
+
     const containerAny = this.context.container as any;
     console.log(`[ReactRenderer ${this.instanceId}] Checking for existing root on container`);
-    
+
     if (containerAny.__reactRoot) {
       console.log(`[ReactRenderer ${this.instanceId}] Reusing existing root from container`);
       this.root = containerAny.__reactRoot;
@@ -789,29 +789,122 @@ export class ReactRenderer extends BaseRenderer {
     }
   }
 
-  protected renderComponent(component: React.ReactElement): void {  // Changed to protected
-    console.log(`[ReactRenderer ${this.instanceId}] renderComponent called, root exists:`, !!this.root);
-    
+  // Store pending transition type for coordinating prepare/apply
+  private pendingTransitionType: string | null = null;
+
+  // Prepare transition - set initial hidden state BEFORE rendering
+  prepareTransition(transition: { type: string; duration: number }): void {
+    if (!this.context.container || transition.type === 'none') return;
+
+    const container = this.context.container;
+    this.pendingTransitionType = transition.type;
+    this.pendingTransitionDuration = transition.duration || 500;
+    this.transitionStartedByRender = false;
+
+    // Set initial hidden state based on transition type
+    switch (transition.type) {
+      case 'fade':
+      case 'dissolve':
+        container.style.opacity = '0';
+        break;
+      case 'slide':
+        container.style.transform = 'translateX(100%)';
+        container.style.opacity = '0';
+        break;
+      case 'zoom':
+        container.style.transform = 'scale(0.8)';
+        container.style.opacity = '0';
+        break;
+    }
+  }
+
+  // Override transition methods - return immediately, animation is triggered by renderComponent
+  protected async fadeTransition(duration: number, direction?: 'in' | 'out' | 'both'): Promise<void> {
+    return Promise.resolve();
+  }
+
+  protected async dissolveTransition(duration: number): Promise<void> {
+    // Dissolve uses fade effect
+    return this.fadeTransition(duration, 'in');
+  }
+
+  protected async slideTransition(duration: number, direction?: 'in' | 'out' | 'both'): Promise<void> {
+    // Return immediately - animation is triggered by renderComponent
+    return Promise.resolve();
+  }
+
+  protected async zoomTransition(duration: number, direction?: 'in' | 'out' | 'both'): Promise<void> {
+    // Return immediately - animation is triggered by renderComponent
+    return Promise.resolve();
+  }
+
+  protected renderComponent(component: React.ReactElement): void {
     if (!this.root) {
-      console.warn(`[ReactRenderer ${this.instanceId}] No root available, attempting to reinitialize`);
+      console.warn(`[ReactRenderer] No root available, attempting to reinitialize`);
       try {
         this.initialize();
         if (!this.root) {
-          console.error(`[ReactRenderer ${this.instanceId}] Reinitialization failed!`);
+          console.error(`[ReactRenderer] Reinitialization failed!`);
           return;
         }
-        console.log(`[ReactRenderer ${this.instanceId}] Successfully reinitialized root`);
       } catch (error) {
-        console.error(`[ReactRenderer ${this.instanceId}] Failed to reinitialize:`, error);
+        console.error(`[ReactRenderer] Failed to reinitialize:`, error);
         return;
       }
     }
-    
+
     this.root.render(component);
+
+    // If there's a pending transition, apply it now that content is rendered
+    if (this.pendingTransitionType && this.context.container) {
+      this.applyPendingTransition();
+    }
   }
 
-  protected handleAction = (id: string): void => {  // Changed to protected
-    console.log(`[ReactRenderer ${this.instanceId}] handleAction called with id="${id}", hasResolveAction=${!!this.resolveAction}`);
+  /**
+   * Apply the pending transition after content has been rendered
+   * This is called from renderComponent to trigger the fade-in animation
+   */
+  private applyPendingTransition(): void {
+    if (!this.pendingTransitionType || !this.context.container) return;
+
+    const container = this.context.container;
+    const transitionType = this.pendingTransitionType;
+    const duration = this.pendingTransitionDuration || 500;
+
+    // Clear pending state immediately to prevent re-triggering
+    this.pendingTransitionType = null;
+
+    // Force reflow to ensure browser recognizes the initial state
+    void container.offsetHeight;
+
+    // Set up transition
+    container.style.transition = `opacity ${duration}ms ease-in-out, transform ${duration}ms ease-out`;
+
+    // Use double requestAnimationFrame for reliable CSS transitions
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        container.style.opacity = '1';
+        if (transitionType === 'slide') {
+          container.style.transform = 'translateX(0)';
+        } else if (transitionType === 'zoom') {
+          container.style.transform = 'scale(1)';
+        }
+
+        // Clean up after animation completes
+        setTimeout(() => {
+          container.style.transition = '';
+          container.style.transform = '';
+        }, duration);
+      });
+    });
+  }
+
+  // Track if transition was already started by renderComponent
+  private transitionStartedByRender: boolean = false;
+  private pendingTransitionDuration: number = 500;
+
+  protected handleAction = (id: string): void => {
     if (this.resolveAction) {
       this.resolveAction(id);
       this.resolveAction = null;

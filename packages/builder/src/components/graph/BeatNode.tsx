@@ -13,6 +13,7 @@ interface BeatNodeData {
 
 // Beat type icons
 const beatTypeIcons: Record<string, string> = {
+  // Visible beats
   titleScreen: '🎬',
   introText: '📝',
   dialogTree: '🌳',
@@ -20,11 +21,23 @@ const beatTypeIcons: Record<string, string> = {
   movementChoice: '🚶',
   pickProp: '🎒',
   videoBeat: '🎥',
+  durScreen: '⏳',
+  inputText: '✏️',
+  hyperText: '🔗',
   endScreen: '🏁',
+  SWFBeat: '📽️',
+  // Logic beats
   setVariable: '🔧',
   conditionBeat: '❓',
-  durScreen: '⏳',
-  SWFBeat: '📽️',
+  condition: '❓',
+  randomTarget: '🎲',
+  setTimer: '⏱️',
+  addRemoveInventory: '📦',
+  // AI beats
+  onlineContent: '🌐',
+  aiDialogTree: '🤖',
+  aiCondition: '🧠',
+  aiSummary: '📊',
 };
 
 // Fixed node dimensions for consistent layout

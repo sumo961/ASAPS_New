@@ -78,8 +78,14 @@ export abstract class Beat {
         renderer.setState('animations', undefined);
       }
 
+      // Prepare transition (set hidden state) BEFORE rendering
+      if (this.transition && renderer.prepareTransition) {
+        renderer.prepareTransition(this.transition);
+      }
+
       await this.onEnter(context, renderer);
 
+      // Apply transition (animate to visible) AFTER rendering
       if (this.transition) {
         await renderer.applyTransition(this.transition);
       }

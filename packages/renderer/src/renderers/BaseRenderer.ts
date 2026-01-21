@@ -62,12 +62,20 @@ export abstract class BaseRenderer implements IRenderer {
     allowMultiple: boolean;
   }): Promise<string>;
 
-  // Shared transition implementation
+  // Prepare transition - set initial hidden state before rendering
+  // This should be called BEFORE the beat content is rendered
+  prepareTransition(transition: Transition): void {
+    if (!this.options.animations || transition.type === 'none') return;
+    // Default implementation does nothing - subclasses override to set hidden state
+  }
+
+  // Shared transition implementation - animate to visible after rendering
+  // This should be called AFTER the beat content is rendered
   async applyTransition(transition: Transition): Promise<void> {
     if (!this.options.animations) return;
 
     const duration = transition.duration || 500;
-    
+
     switch (transition.type) {
       case 'fade':
         await this.fadeTransition(duration, transition.direction);

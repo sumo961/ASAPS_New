@@ -250,10 +250,14 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   </label>
                   <select
                     value={beatTransition?.type || 'none'}
-                    onChange={(e) => onBeatTransitionChange({
-                      type: e.target.value as TransitionType,
-                      duration: beatTransition?.duration || 500
-                    })}
+                    onChange={(e) => {
+                      if (onBeatTransitionChange) {
+                        onBeatTransitionChange({
+                          type: e.target.value as TransitionType,
+                          duration: beatTransition?.duration || 500
+                        });
+                      }
+                    }}
                     className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                   >
                     <option value="none">None</option>
