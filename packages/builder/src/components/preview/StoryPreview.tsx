@@ -779,8 +779,9 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
           }
 
           const isPlayer = character.role === 'player';
+          // Get inventory entries with quantities
           const runtimeInventory = isPlayer
-            ? ctx.getInventory()  // Main player inventory
+            ? ctx.getInventoryEntries()  // Main player inventory with quantities
             : (ctx.getState().characterInventories[character.name] || []);
 
           console.log('[StoryPreview] Runtime inventory for', character.name, ':', runtimeInventory);
@@ -792,7 +793,9 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
 
           // Build item data - look up details from character definition if available
           const itemDefinitions = character.inventory || [];
-          const itemData = runtimeInventory.map((itemName: string) => {
+          const itemData = runtimeInventory.map((entry: { name: string; quantity: number }) => {
+            const itemName = entry.name;
+            const itemQty = entry.quantity;
             // Try to find item definition in character's inventory
             const definition = itemDefinitions.find(def => def.name === itemName);
             if (definition) {
@@ -804,7 +807,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
                 displayName: definition.displayName,
                 description: definition.description || '',
                 icon,
-                quantity: definition.quantity,
+                quantity: itemQty,  // Use runtime quantity
                 category: definition.category || '',
               };
             }
@@ -817,7 +820,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
               displayName: itemName,
               description: '',
               icon: propIcon,
-              quantity: 1,
+              quantity: itemQty,  // Use runtime quantity
               category: '',
             };
           });
@@ -1155,7 +1158,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
               visitedBeats: context.getVisitedBeats(),
               variables: context.getVariables(),
               counters: context.getCounters(),
-              inventory: context.getInventory(),
+              inventory: context.getInventoryEntries(),
               timers: context.getTimers(),
             });
           }
@@ -1172,18 +1175,18 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
           visitedBeats: context.getVisitedBeats(),
           variables: context.getVariables(),
           counters: context.getCounters(),
-          inventory: context.getInventory(),
+          inventory: context.getInventoryEntries(),
           timers: context.getTimers(),
         }));
       };
-      
+
       // Listen for state changes to update debug info in real-time
       const updateDebugState = () => {
         setDebugInfo((prev: any) => ({
           ...prev,
           variables: context.getVariables(),
           counters: context.getCounters(),
-          inventory: context.getInventory(),
+          inventory: context.getInventoryEntries(),
           timers: context.getTimers(),
         }));
       };
@@ -1794,9 +1797,10 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
                   <div className="bg-white p-3 rounded-lg">
                     <div className="text-sm font-medium text-gray-600 mb-2">Inventory</div>
                     <div className="space-y-1">
-                      {debugInfo.inventory.map((item: string) => (
-                        <div key={item} className="text-xs text-gray-600">
-                          • {item}
+                      {debugInfo.inventory.map((item: { name: string; quantity: number }) => (
+                        <div key={item.name} className="text-xs text-gray-600 flex justify-between">
+                          <span>• {item.name}</span>
+                          <span className="font-mono text-gray-500">×{item.quantity}</span>
                         </div>
                       ))}
                     </div>

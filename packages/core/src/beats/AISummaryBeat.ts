@@ -8,8 +8,8 @@ export interface AISummaryBeatParams {
   /** Custom instructions for the summary style */
   prompt?: string;
 
-  /** Variables to include in the summary */
-  includeVariables?: string[];
+  /** Include player variables in summary */
+  includeVariables?: boolean;
 
   /** Include full choice history */
   includeAllChoices?: boolean;
@@ -56,7 +56,7 @@ export interface AISummaryBeatParams {
  */
 export class AISummaryBeat extends Beat {
   public prompt?: string;
-  public includeVariables?: string[];
+  public includeVariables: boolean;
   public includeAllChoices: boolean;
   public includeCounters: boolean;
   public summaryStyle: 'narrative' | 'bullet-points' | 'reflection';
@@ -78,7 +78,7 @@ export class AISummaryBeat extends Beat {
     const params = config.parameters || {};
 
     this.prompt = params.prompt || config.prompt;
-    this.includeVariables = params.includeVariables || config.includeVariables;
+    this.includeVariables = params.includeVariables ?? config.includeVariables ?? true;
     this.includeAllChoices = params.includeAllChoices ?? config.includeAllChoices ?? true;
     this.includeCounters = params.includeCounters ?? config.includeCounters ?? true;
     this.summaryStyle = params.summaryStyle || config.summaryStyle || 'narrative';
@@ -217,7 +217,10 @@ export class AISummaryBeat extends Beat {
     // Build comprehensive journey data
     const story = context.getStory();
     const contextBuilder = new PlayerContextBuilder(context, story);
-    const journeySummary = contextBuilder.buildJourneySummary();
+    const journeySummary = contextBuilder.buildJourneySummary({
+      includeVariables: this.includeVariables,
+      includeCounters: this.includeCounters,
+    });
 
     // Determine strict word limits (500 max for long, much less for shorter)
     const wordLimits = {

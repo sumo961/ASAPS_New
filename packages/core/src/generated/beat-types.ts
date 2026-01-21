@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-20T14:35:46.053Z
+ * Generated: 2026-01-21T04:17:54.793Z
  */
 
 // ============================================
@@ -276,7 +276,7 @@ export interface SetTimerParameters {
 }
 
 /**
- * Inventory Management - Add, remove, or transfer inventory items
+ * Inventory Management - Add, remove, or transfer inventory items with optional quantity
  * Category: invisible
  * Connection Type: single
  */
@@ -285,6 +285,8 @@ export interface AddRemoveInventoryParameters {
   action: string;
   /** Item name */
   item: string;
+  /** Number of items to add/remove/transfer. Can be a number or variable name (e.g., $goldAmount) */
+  quantity?: string | undefined;
   /** Character name (for add/remove) */
   character: string;
   /** Source character (for transfer) */
@@ -413,8 +415,8 @@ export interface AiDialogTreeParameters {
   npcName: string;
   /** NPC personality traits */
   npcPersonality?: string | undefined;
-  /** Variables to include in prompt (empty = all) */
-  includeVariables?: string[] | undefined;
+  /** Include player variables in context */
+  includeVariables?: boolean | undefined;
   /** Include player inventory in context */
   includeInventory?: boolean | undefined;
   /** Include visited beats in context */
@@ -435,8 +437,8 @@ export interface AiDialogTreeParameters {
 export interface AiSummaryParameters {
   /** Custom instructions for summary style */
   prompt?: string | undefined;
-  /** Variables to include (empty = all) */
-  includeVariables?: string[] | undefined;
+  /** Include player variables in summary */
+  includeVariables?: boolean | undefined;
   /** Include full choice history */
   includeAllChoices?: boolean | undefined;
   /** Include final counter values */

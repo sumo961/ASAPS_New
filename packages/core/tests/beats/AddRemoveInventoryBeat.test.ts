@@ -133,10 +133,25 @@ describe('AddRemoveInventoryBeat', () => {
       expect(beat.getParameters()).toEqual({
         action: 'add',
         item: 'potion',
+        quantity: 1,  // Default quantity
         character: 'wizard',
         fromChar: 'from',
         toChar: 'to',
       });
+    });
+
+    it('should return custom quantity', () => {
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Test',
+        type: 'addRemoveInventory',
+        action: 'add',
+        item: 'gold',
+        quantity: 50,
+        character: 'player',
+      });
+
+      expect(beat.getParameters().quantity).toBe(50);
     });
   });
 
@@ -421,6 +436,183 @@ describe('AddRemoveInventoryBeat', () => {
       );
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('quantity operations', () => {
+    it('should add multiple items with quantity', async () => {
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Add Gold',
+        type: 'addRemoveInventory',
+        action: 'add',
+        item: 'gold',
+        quantity: 100,
+        character: 'player',
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(context.hasInInventory('gold')).toBe(true);
+      expect(context.getInventoryQuantity('gold')).toBe(100);
+    });
+
+    it('should add to existing quantity', async () => {
+      // Add initial gold
+      context.addToInventory('gold', 50);
+      expect(context.getInventoryQuantity('gold')).toBe(50);
+
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Add More Gold',
+        type: 'addRemoveInventory',
+        action: 'add',
+        item: 'gold',
+        quantity: 30,
+        character: 'player',
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(context.getInventoryQuantity('gold')).toBe(80);
+    });
+
+    it('should remove partial quantity', async () => {
+      context.addToInventory('gold', 100);
+
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Spend Gold',
+        type: 'addRemoveInventory',
+        action: 'remove',
+        item: 'gold',
+        quantity: 40,
+        character: 'player',
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(context.hasInInventory('gold')).toBe(true);
+      expect(context.getInventoryQuantity('gold')).toBe(60);
+    });
+
+    it('should remove item completely when quantity reaches zero', async () => {
+      context.addToInventory('gold', 50);
+
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Spend All Gold',
+        type: 'addRemoveInventory',
+        action: 'remove',
+        item: 'gold',
+        quantity: 50,
+        character: 'player',
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(context.hasInInventory('gold')).toBe(false);
+      expect(context.getInventoryQuantity('gold')).toBe(0);
+    });
+
+    it('should use quantity from variable reference', async () => {
+      context.setVariable('goldAmount', 75);
+
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Add Variable Gold',
+        type: 'addRemoveInventory',
+        action: 'add',
+        item: 'gold',
+        quantity: '$goldAmount',
+        character: 'player',
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(context.getInventoryQuantity('gold')).toBe(75);
+    });
+
+    it('should remove quantity using variable reference', async () => {
+      context.addToInventory('gold', 100);
+      context.setVariable('payment', 35);
+
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Remove Variable Gold',
+        type: 'addRemoveInventory',
+        action: 'remove',
+        item: 'gold',
+        quantity: '$payment',
+        character: 'player',
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(context.getInventoryQuantity('gold')).toBe(65);
+    });
+
+    it('should handle string quantity from input', async () => {
+      context.setVariable('userInput', '50');
+
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Add String Quantity',
+        type: 'addRemoveInventory',
+        action: 'add',
+        item: 'gold',
+        quantity: '$userInput',
+        character: 'player',
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(context.getInventoryQuantity('gold')).toBe(50);
+    });
+
+    it('should transfer quantity between characters', async () => {
+      context.addToInventory('gold', 100);
+
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Pay Merchant',
+        type: 'addRemoveInventory',
+        action: 'transfer',
+        item: 'gold',
+        quantity: 30,
+        fromChar: 'player',
+        toChar: 'merchant',
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(context.getInventoryQuantity('gold')).toBe(70);
+      expect(context.getCharacterInventoryQuantity('merchant', 'gold')).toBe(30);
+    });
+
+    it('should handle quantity as string number', async () => {
+      const beat = new AddRemoveInventoryBeat({
+        id: 'inv1',
+        name: 'Add Gold String',
+        type: 'addRemoveInventory',
+        action: 'add',
+        item: 'gold',
+        quantity: '25',
+        character: 'player',
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(context.getInventoryQuantity('gold')).toBe(25);
     });
   });
 

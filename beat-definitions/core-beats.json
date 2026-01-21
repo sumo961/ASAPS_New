@@ -646,7 +646,7 @@
       "category": "invisible",
       "displayName": "Inventory Management",
       "icon": "📦",
-      "description": "Add, remove, or transfer inventory items",
+      "description": "Add, remove, or transfer inventory items with optional quantity",
       "connectionType": "single",
       "parameters": {
         "action": {
@@ -659,6 +659,18 @@
           "type": "string",
           "required": true,
           "description": "Item name"
+        },
+        "quantity": {
+          "type": "string",
+          "required": false,
+          "default": "1",
+          "description": "Number of items to add/remove/transfer. Can be a number or variable name (e.g., $goldAmount)",
+          "ui": {
+            "control": "text",
+            "label": "Quantity",
+            "placeholder": "1 or $variableName",
+            "help": "Use a number or $variableName to reference a variable value"
+          }
         },
         "character": {
           "type": "string",
@@ -1060,9 +1072,10 @@
           }
         },
         "includeVariables": {
-          "type": "array<string>",
+          "type": "boolean",
           "required": false,
-          "description": "Variables to include in prompt (empty = all)"
+          "default": true,
+          "description": "Include player variables in context"
         },
         "includeInventory": {
           "type": "boolean",
@@ -1137,9 +1150,10 @@
           "description": "Custom instructions for summary style"
         },
         "includeVariables": {
-          "type": "array<string>",
+          "type": "boolean",
           "required": false,
-          "description": "Variables to include (empty = all)"
+          "default": true,
+          "description": "Include player variables in summary"
         },
         "includeAllChoices": {
           "type": "boolean",

@@ -177,6 +177,11 @@ export const Inspector: React.FC<InspectorProps> = ({
     return beatDef as BeatDefinition;
   };
 
+  // Get the canonical beat type (resolving aliases)
+  const getCanonicalBeatType = (beatType: string): string => {
+    return BEAT_TYPE_ALIASES[beatType] || beatType;
+  };
+
   // Get available characters - NPCs who can speak
   const getAvailableCharacters = (): string[] => {
     // Filter to NPCs only (exclude player characters)
@@ -542,6 +547,8 @@ export const Inspector: React.FC<InspectorProps> = ({
         }
         break;
       case 'conditionBeat':
+      case 'condition':
+      case 'conditionCheck':
         if (!localBeat.parameters?.conditionType) errors.push('Condition type is required');
         
         // Check required fields based on condition type
@@ -1119,7 +1126,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 {/* Schema-driven simple parameters */}
                 {/* Exclude beat types that have custom hardcoded editors */}
                 {beat.type !== 'dialogTree' && beat.type !== 'movementChoice' &&
-                 beat.type !== 'pickProp' && beat.type !== 'conditionBeat' &&
+                 beat.type !== 'pickProp' && getCanonicalBeatType(beat.type) !== 'conditionBeat' &&
                  beat.type !== 'setTimer' && beat.type !== 'randomTarget' &&
                  beat.type !== 'hyperText' && (
                   <SchemaFormGenerator
@@ -1135,7 +1142,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 )}
 
                 {/* Condition Beat */}
-                {beat.type === 'conditionBeat' && (
+                {getCanonicalBeatType(beat.type) === 'conditionBeat' && (
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1370,8 +1377,53 @@ export const Inspector: React.FC<InspectorProps> = ({
                           >
                             <option value="has">Has Item</option>
                             <option value="notHas">Does Not Have Item</option>
+                            <option value="quantity">Check Quantity</option>
                           </select>
                         </div>
+                        {/* Quantity check fields - shown when checkType is 'quantity' */}
+                        {localBeat.parameters?.checkType === 'quantity' && (
+                          <>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Quantity Comparison
+                              </label>
+                              <select
+                                value={localBeat.parameters?.quantityOperator || '>='}
+                                onChange={(e) => handleParameterChange('quantityOperator', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              >
+                                <option value=">=">At Least (≥)</option>
+                                <option value=">">More Than (&gt;)</option>
+                                <option value="==">Exactly (=)</option>
+                                <option value="<">Less Than (&lt;)</option>
+                                <option value="<=">At Most (≤)</option>
+                                <option value="!=">Not Equal (≠)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Quantity Value
+                                <span className="text-xs text-gray-500 block">
+                                  Number or $variableName
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                value={localBeat.parameters?.quantityValue ?? '1'}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  // If it's a pure number, convert it
+                                  const numVal = parseFloat(val);
+                                  handleParameterChange('quantityValue',
+                                    !isNaN(numVal) && !val.startsWith('$') ? numVal : val
+                                  );
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                placeholder="e.g., 50 or $goldAmount"
+                              />
+                            </div>
+                          </>
+                        )}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Character <span className="text-red-500">*</span>
@@ -2070,7 +2122,7 @@ export const Inspector: React.FC<InspectorProps> = ({
 
                     {/* Conditional Connection Beats */}
                     {/* ConditionBeat stores targets in parameters (trueTarget/falseTarget), not in connections array */}
-                    {connectionType === 'conditional' && beat.type === 'conditionBeat' && (
+                    {connectionType === 'conditional' && getCanonicalBeatType(beat.type) === 'conditionBeat' && (
                       <div className="space-y-3">
                         <div>
                           <label className="block text-xs text-gray-600 mb-1">

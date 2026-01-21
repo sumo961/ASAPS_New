@@ -487,6 +487,230 @@ describe('ConditionBeat', () => {
     });
   });
 
+  describe('performAction - inventory quantity conditions', () => {
+    it('should check if player has >= quantity', async () => {
+      context.addInventoryItem('player', 'gold', 100);
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Gold Check',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'gold',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '>=',
+        quantityValue: 50,
+        trueTarget: 'has_enough',
+        falseTarget: 'not_enough',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('has_enough');
+    });
+
+    it('should return false when quantity is insufficient', async () => {
+      context.addInventoryItem('player', 'gold', 30);
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Gold Check',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'gold',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '>=',
+        quantityValue: 50,
+        trueTarget: 'has_enough',
+        falseTarget: 'not_enough',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('not_enough');
+    });
+
+    it('should check exact quantity with == operator', async () => {
+      context.addInventoryItem('player', 'arrows', 10);
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Arrow Count',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'arrows',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '==',
+        quantityValue: 10,
+        trueTarget: 'exact_count',
+        falseTarget: 'different_count',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('exact_count');
+    });
+
+    it('should check quantity with < operator', async () => {
+      context.addInventoryItem('player', 'health_potions', 2);
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Low Potions',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'health_potions',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '<',
+        quantityValue: 5,
+        trueTarget: 'low_stock',
+        falseTarget: 'enough_stock',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('low_stock');
+    });
+
+    it('should check quantity with != operator', async () => {
+      context.addInventoryItem('player', 'keys', 3);
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Not Zero Keys',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'keys',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '!=',
+        quantityValue: 0,
+        trueTarget: 'has_keys',
+        falseTarget: 'no_keys',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('has_keys');
+    });
+
+    it('should use variable reference for quantity check', async () => {
+      context.addInventoryItem('player', 'gold', 100);
+      context.setVariable('requiredGold', 75);
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Variable Gold Check',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'gold',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '>=',
+        quantityValue: '$requiredGold',
+        trueTarget: 'can_afford',
+        falseTarget: 'cannot_afford',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('can_afford');
+    });
+
+    it('should handle string quantity value from user input', async () => {
+      context.addInventoryItem('player', 'gold', 50);
+      context.setVariable('userOffer', '60');
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'User Offer Check',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'gold',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '>=',
+        quantityValue: '$userOffer',
+        trueTarget: 'can_pay',
+        falseTarget: 'insufficient_funds',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('insufficient_funds');
+    });
+
+    it('should handle missing item as quantity 0', async () => {
+      // Player has no gold
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'No Gold Check',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'gold',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '==',
+        quantityValue: 0,
+        trueTarget: 'broke',
+        falseTarget: 'has_gold',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('broke');
+    });
+
+    it('should check > operator with quantity', async () => {
+      context.addInventoryItem('player', 'swords', 5);
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Stock Check',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'swords',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '>',
+        quantityValue: 0,
+        trueTarget: 'in_stock',
+        falseTarget: 'out_of_stock',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('in_stock');
+    });
+
+    it('should check <= operator with quantity', async () => {
+      context.addInventoryItem('player', 'arrows', 3);
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Low Arrows Check',
+        type: 'conditionBeat',
+        conditionType: 'inventory',
+        item: 'arrows',
+        character: 'player',
+        checkType: 'quantity',
+        quantityOperator: '<=',
+        quantityValue: 5,
+        trueTarget: 'low_arrows',
+        falseTarget: 'plenty_arrows',
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('low_arrows');
+    });
+  });
+
   describe('performAction - visitedBeat conditions', () => {
     it('should check if beat was visited', async () => {
       context.markBeatVisited('secret_room');

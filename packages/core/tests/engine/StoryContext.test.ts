@@ -35,7 +35,7 @@ describe('StoryContext', () => {
         currentBeatId: 'start',
         variables: { name: 'Hero' },
         counters: { score: 100 },
-        inventory: ['sword'],
+        inventory: [{ name: 'sword', quantity: 1 }],
         visitedBeats: new Set(['intro']),
       });
 
@@ -150,10 +150,13 @@ describe('StoryContext', () => {
       expect(context.hasInInventory('sword')).toBe(true);
     });
 
-    it('should not add duplicate items', () => {
+    it('should stack duplicate items', () => {
       context.addToInventory('key');
       context.addToInventory('key');
+      // Now items stack - getInventory returns item names, not duplicated
       expect(context.getInventory()).toEqual(['key']);
+      // But the quantity should be 2
+      expect(context.getInventoryQuantity('key')).toBe(2);
     });
 
     it('should remove items from inventory', () => {
@@ -172,7 +175,7 @@ describe('StoryContext', () => {
 
       context.addToInventory('shield');
 
-      expect(listener).toHaveBeenCalledWith({ action: 'add', item: 'shield' });
+      expect(listener).toHaveBeenCalledWith({ action: 'add', item: 'shield', quantity: 1, newTotal: 1 });
     });
 
     it('should emit inventoryChanged on remove', () => {
@@ -182,17 +185,18 @@ describe('StoryContext', () => {
 
       context.removeFromInventory('shield');
 
-      expect(listener).toHaveBeenCalledWith({ action: 'remove', item: 'shield' });
+      expect(listener).toHaveBeenCalledWith({ action: 'remove', item: 'shield', quantity: 1, newTotal: 0 });
     });
 
-    it('should not emit event when adding duplicate', () => {
+    it('should emit event when adding duplicate (quantity increase)', () => {
       context.addToInventory('item');
       const listener = vi.fn();
       context.on('inventoryChanged', listener);
 
       context.addToInventory('item');
 
-      expect(listener).not.toHaveBeenCalled();
+      // Now duplicates increase quantity, so event is emitted
+      expect(listener).toHaveBeenCalledWith({ action: 'add', item: 'item', quantity: 1, newTotal: 2 });
     });
 
     it('should return copy of inventory', () => {
@@ -612,7 +616,8 @@ describe('StoryContext', () => {
       expect(serialized.currentBeatId).toBe('chapter1');
       expect(serialized.variables.name).toBe('Player');
       expect(serialized.counters.score).toBe(100);
-      expect(serialized.inventory).toContain('sword');
+      // Inventory now stores InventoryEntry objects
+      expect(serialized.inventory).toContainEqual({ name: 'sword', quantity: 1 });
       expect(serialized.visitedBeats).toContain('intro');
     });
 
@@ -631,7 +636,7 @@ describe('StoryContext', () => {
         currentBeatId: 'savedBeat',
         variables: { savedVar: 'value' },
         counters: { savedCounter: 50 },
-        inventory: ['savedItem'],
+        inventory: [{ name: 'savedItem', quantity: 3 }],  // New format with quantity
         characterInventories: {},
         visitedBeats: ['visited1', 'visited2'],
         timers: {},
@@ -644,8 +649,30 @@ describe('StoryContext', () => {
       expect(context.getVariable('savedVar')).toBe('value');
       expect(context.getCounter('savedCounter')).toBe(50);
       expect(context.hasInInventory('savedItem')).toBe(true);
+      expect(context.getInventoryQuantity('savedItem')).toBe(3);
       expect(context.getVisitedBeats()).toContain('visited1');
       expect(context.getHistory()).toEqual(['beat1', 'savedBeat']);
+    });
+
+    it('should migrate old format inventory when loading', () => {
+      // Old format used string[] for inventory
+      const serialized = {
+        currentBeatId: 'oldSave',
+        variables: {},
+        counters: {},
+        inventory: ['sword', 'shield'] as any,  // Old string[] format
+        characterInventories: {},
+        visitedBeats: [],
+        timers: {},
+        history: [],
+      };
+
+      context.loadFromSerialized(serialized);
+
+      expect(context.hasInInventory('sword')).toBe(true);
+      expect(context.hasInInventory('shield')).toBe(true);
+      // Migrated items have quantity 1
+      expect(context.getInventoryQuantity('sword')).toBe(1);
     });
 
     it('should emit stateLoaded event', () => {

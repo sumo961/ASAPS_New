@@ -22,8 +22,8 @@ export interface AIDialogTreeBeatParams {
   /** NPC personality traits (optional) */
   npcPersonality?: string;
 
-  /** Variables to include in the prompt (empty = all) */
-  includeVariables?: string[];
+  /** Include player variables in context */
+  includeVariables?: boolean;
 
   /** Include player inventory in context */
   includeInventory?: boolean;
@@ -65,7 +65,7 @@ export class AIDialogTreeBeat extends Beat {
   public scenario: string;
   public npcName: string;
   public npcPersonality?: string;
-  public includeVariables?: string[];
+  public includeVariables: boolean;
   public includeInventory: boolean;
   public includeVisitedBeats: boolean;
   public maxTurns: number;
@@ -88,7 +88,7 @@ export class AIDialogTreeBeat extends Beat {
     this.scenario = params.scenario || config.scenario || '';
     this.npcName = params.npcName || config.npcName || 'Character';
     this.npcPersonality = params.npcPersonality || config.npcPersonality;
-    this.includeVariables = params.includeVariables || config.includeVariables;
+    this.includeVariables = params.includeVariables ?? config.includeVariables ?? true;
     this.includeInventory = params.includeInventory ?? config.includeInventory ?? true;
     this.includeVisitedBeats = params.includeVisitedBeats ?? config.includeVisitedBeats ?? true;
     this.maxTurns = params.maxTurns || config.maxTurns || 3;
@@ -252,8 +252,10 @@ export class AIDialogTreeBeat extends Beat {
       variables.location || variables.city || '',
       variables.gender || '',
       variables.profession || variables.role || '',
-      // Include any variables specified in includeVariables
-      ...(this.includeVariables || []).map(v => String(variables[v] || '')),
+      // Include all variable values when includeVariables is true
+      ...(this.includeVariables
+        ? Object.entries(variables).map(([k, v]) => `${k}:${String(v)}`)
+        : []),
       // Include counter values as they may affect dialog
       ...Object.entries(counters).map(([k, v]) => `${k}:${v}`),
     ];
@@ -269,7 +271,7 @@ export class AIDialogTreeBeat extends Beat {
     const story = context.getStory();
     const contextBuilder = new PlayerContextBuilder(context, story);
     const playerContext = contextBuilder.buildPromptContext({
-      variables: this.includeVariables,
+      includeVariables: this.includeVariables,
       includeInventory: this.includeInventory,
       includeHistory: this.includeVisitedBeats,
     });

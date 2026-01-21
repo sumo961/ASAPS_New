@@ -23,8 +23,10 @@ export interface PlayerContextOptions {
 export interface PlayerContextData {
   variables: Record<string, any>;
   counters: Record<string, number>;
-  inventory: string[];
+  inventory: string[];  // Item names (quantities are in inventoryWithQuantities)
+  inventoryWithQuantities?: Array<{ name: string; quantity: number }>;
   characterInventories?: Record<string, string[]>;
+  characterInventoriesWithQuantities?: Record<string, Array<{ name: string; quantity: number }>>;
   visitedBeats: string[];
   history: string[];
 }
@@ -92,6 +94,9 @@ export class PlayerContextBuilder {
 
     // Get inventory
     const inventory = includeInventory ? this.context.getInventory() : [];
+    const inventoryWithQuantities = includeInventory
+      ? this.context.getInventoryEntries()
+      : undefined;
 
     // Get visited beats
     const visitedBeats = this.context.getVisitedBeats();
@@ -104,15 +109,32 @@ export class PlayerContextBuilder {
 
     // Get character inventories
     const state = this.context.getState();
+    // Extract character inventory names for backward compatibility
     const characterInventories = includeCharacterInventories
-      ? { ...state.characterInventories }
+      ? Object.fromEntries(
+          Object.entries(state.characterInventories).map(([char, entries]) => [
+            char,
+            entries.map(e => e.name)
+          ])
+        )
+      : undefined;
+    // Also provide full entries with quantities
+    const characterInventoriesWithQuantities = includeCharacterInventories
+      ? Object.fromEntries(
+          Object.entries(state.characterInventories).map(([char, entries]) => [
+            char,
+            entries.map(e => ({ ...e }))
+          ])
+        )
       : undefined;
 
     return {
       variables: selectedVariables,
       counters: selectedCounters,
       inventory,
+      inventoryWithQuantities,
       characterInventories,
+      characterInventoriesWithQuantities,
       visitedBeats,
       history,
     };
@@ -139,13 +161,31 @@ export class PlayerContextBuilder {
       sections.push(`Counters:\n${counterLines.join('\n')}`);
     }
 
-    // Inventory section
-    if (data.inventory.length > 0) {
+    // Inventory section (with quantities when > 1)
+    if (data.inventoryWithQuantities && data.inventoryWithQuantities.length > 0) {
+      const inventoryFormatted = data.inventoryWithQuantities.map(item =>
+        item.quantity > 1 ? `${item.name} (x${item.quantity})` : item.name
+      );
+      sections.push(`Player Inventory: ${inventoryFormatted.join(', ')}`);
+    } else if (data.inventory.length > 0) {
       sections.push(`Player Inventory: ${data.inventory.join(', ')}`);
     }
 
-    // Character inventories section
-    if (data.characterInventories) {
+    // Character inventories section (with quantities when > 1)
+    if (data.characterInventoriesWithQuantities) {
+      const charInvLines: string[] = [];
+      for (const [char, items] of Object.entries(data.characterInventoriesWithQuantities)) {
+        if (items.length > 0) {
+          const itemsFormatted = items.map(item =>
+            item.quantity > 1 ? `${item.name} (x${item.quantity})` : item.name
+          );
+          charInvLines.push(`  - ${char}: ${itemsFormatted.join(', ')}`);
+        }
+      }
+      if (charInvLines.length > 0) {
+        sections.push(`Character Inventories:\n${charInvLines.join('\n')}`);
+      }
+    } else if (data.characterInventories) {
       const charInvLines: string[] = [];
       for (const [char, items] of Object.entries(data.characterInventories)) {
         if (items.length > 0) {
@@ -178,11 +218,21 @@ export class PlayerContextBuilder {
   /**
    * Build a summary of the player's journey for AI summary generation
    */
-  buildJourneySummary(): string {
+  buildJourneySummary(options: {
+    includeVariables?: boolean;
+    includeCounters?: boolean;
+    includeInventory?: boolean;
+  } = {}): string {
+    const {
+      includeVariables = true,
+      includeCounters = true,
+      includeInventory = true,
+    } = options;
+
     const history = this.context.getHistory();
     const variables = this.context.getVariables();
     const counters = this.context.getCounters();
-    const inventory = this.context.getInventory();
+    const inventoryEntries = this.context.getInventoryEntries();
     const visitedBeats = this.context.getVisitedBeats();
 
     const sections: string[] = [];
@@ -192,40 +242,47 @@ export class PlayerContextBuilder {
 - Total beats visited: ${history.length}
 - Unique beats visited: ${visitedBeats.length}`);
 
-    // Player profile from variables
-    const profileVars = ['name', 'playerName', 'gender', 'profession', 'role'];
-    const profile: string[] = [];
-    for (const varName of profileVars) {
-      if (varName in variables && variables[varName]) {
-        profile.push(`${varName}: ${variables[varName]}`);
+    if (includeVariables) {
+      // Player profile from variables
+      const profileVars = ['name', 'playerName', 'gender', 'profession', 'role'];
+      const profile: string[] = [];
+      for (const varName of profileVars) {
+        if (varName in variables && variables[varName]) {
+          profile.push(`${varName}: ${variables[varName]}`);
+        }
       }
-    }
-    if (profile.length > 0) {
-      sections.push(`## Player Profile
+      if (profile.length > 0) {
+        sections.push(`## Player Profile
 ${profile.join('\n')}`);
-    }
+      }
 
-    // Other variables (excluding profile)
-    const otherVars = Object.entries(variables)
-      .filter(([k]) => !profileVars.includes(k))
-      .map(([k, v]) => `- ${k}: ${JSON.stringify(v)}`);
-    if (otherVars.length > 0) {
-      sections.push(`## Story Variables
+      // Other variables (excluding profile)
+      const otherVars = Object.entries(variables)
+        .filter(([k]) => !profileVars.includes(k))
+        .map(([k, v]) => `- ${k}: ${JSON.stringify(v)}`);
+      if (otherVars.length > 0) {
+        sections.push(`## Story Variables
 ${otherVars.join('\n')}`);
+      }
     }
 
     // Counters
-    const counterLines = Object.entries(counters)
-      .map(([k, v]) => `- ${k}: ${v}`);
-    if (counterLines.length > 0) {
-      sections.push(`## Final Counters
+    if (includeCounters) {
+      const counterLines = Object.entries(counters)
+        .map(([k, v]) => `- ${k}: ${v}`);
+      if (counterLines.length > 0) {
+        sections.push(`## Final Counters
 ${counterLines.join('\n')}`);
+      }
     }
 
-    // Inventory
-    if (inventory.length > 0) {
+    // Inventory (with quantities when > 1)
+    if (includeInventory && inventoryEntries.length > 0) {
+      const inventoryFormatted = inventoryEntries.map(item =>
+        item.quantity > 1 ? `${item.name} (x${item.quantity})` : item.name
+      );
       sections.push(`## Final Inventory
-${inventory.join(', ')}`);
+${inventoryFormatted.join(', ')}`);
     }
 
     // Full journey path with beat type context

@@ -83,6 +83,10 @@ export interface Condition {
   counter2?: string;
   // For visitedBeat type
   beatId?: string;
+  // For inventory quantity check
+  quantityCheck?: boolean;         // Whether to check quantity (vs just existence)
+  quantityOperator?: '==' | '!=' | '>' | '<' | '>=' | '<=';
+  quantityValue?: number | string; // Number or variable name (prefixed with $)
 }
 
 export interface Effect {

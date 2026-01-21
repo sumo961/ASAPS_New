@@ -24,6 +24,10 @@ export class ConditionBeat extends Beat {
   public item?: string;
   public character?: string;
   public checkType?: string;
+  // Inventory quantity check parameters
+  public quantityCheck?: boolean;
+  public quantityOperator?: string;
+  public quantityValue?: number | string;
   // VisitedBeat-specific parameter
   public beatId?: string;
 
@@ -71,6 +75,10 @@ export class ConditionBeat extends Beat {
     this.item = conditionObj.item || params.item || (config as any).item;
     this.character = conditionObj.character || params.character || (config as any).character || (this.conditionType === 'inventory' ? 'player' : undefined);
     this.checkType = conditionObj.checkType || params.checkType || (config as any).checkType || (this.conditionType === 'inventory' ? 'has' : undefined);
+    // Inventory quantity check parameters
+    this.quantityCheck = this.checkType === 'quantity';
+    this.quantityOperator = conditionObj.quantityOperator || params.quantityOperator || (config as any).quantityOperator;
+    this.quantityValue = conditionObj.quantityValue ?? params.quantityValue ?? (config as any).quantityValue;
     // VisitedBeat-specific parameter
     this.beatId = conditionObj.beatId || params.beatId || (config as any).beatId;
 
@@ -101,6 +109,12 @@ export class ConditionBeat extends Beat {
         condition.item = this.item;
         condition.character = this.character || 'player';
         condition.checkType = this.checkType || 'has';
+        // Add quantity check fields if checkType is 'quantity'
+        if (this.checkType === 'quantity') {
+          condition.quantityCheck = true;
+          condition.quantityOperator = this.quantityOperator || '>=';
+          condition.quantityValue = this.quantityValue ?? 1;
+        }
         break;
       case 'variable':
         condition.variableName = this.variableName || this.variable;
@@ -136,6 +150,10 @@ export class ConditionBeat extends Beat {
       item: this.item,
       character: this.character,
       checkType: this.checkType,
+      // Quantity check fields
+      quantityCheck: this.quantityCheck,
+      quantityOperator: this.quantityOperator,
+      quantityValue: this.quantityValue,
       beatId: this.beatId
     };
   }
@@ -268,8 +286,23 @@ export class ConditionBeat extends Beat {
 
     if (params.checkType !== undefined) {
       this.checkType = params.checkType;
+      // Update quantityCheck based on checkType
+      this.quantityCheck = params.checkType === 'quantity';
     } else if (conditionObj.checkType !== undefined) {
       this.checkType = conditionObj.checkType;
+      this.quantityCheck = conditionObj.checkType === 'quantity';
+    }
+
+    if (params.quantityOperator !== undefined) {
+      this.quantityOperator = params.quantityOperator;
+    } else if (conditionObj.quantityOperator !== undefined) {
+      this.quantityOperator = conditionObj.quantityOperator;
+    }
+
+    if (params.quantityValue !== undefined) {
+      this.quantityValue = params.quantityValue;
+    } else if (conditionObj.quantityValue !== undefined) {
+      this.quantityValue = conditionObj.quantityValue;
     }
 
     if (params.beatId !== undefined) {

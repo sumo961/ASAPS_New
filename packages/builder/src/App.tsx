@@ -237,9 +237,16 @@ function App() {
         const registry = BeatTypeRegistry.getInstance();
 
         const createdBeats = debugData.story.beats.map((beatData: any) => {
+          // Pass connections to the beat constructor so they're properly initialized
           const beat = registry.createBeat(beatData.type, {
             ...beatData,
-            parameters: beatData.parameters || {}
+            parameters: beatData.parameters || {},
+            // Pass connections in the format the Beat class expects
+            connections: beatData.connections?.map((conn: any) => ({
+              targetId: conn.target || conn.targetId,
+              label: conn.label,
+              condition: conn.condition
+            })) || []
           });
           // Set position
           if (beatData.position) {
@@ -249,14 +256,30 @@ function App() {
           return beat;
         });
 
-        console.log('[Debug] Created', createdBeats.length, 'beats');
+        // Build connections array for ReactFlow edges from the beat objects
+        const connections: Array<{ id: string; source: string; target: string; label?: string }> = [];
+        createdBeats.forEach((beat: any) => {
+          const beatConnections = beat.getConnections();
+          beatConnections.forEach((conn: any, idx: number) => {
+            if (conn.targetId) {
+              connections.push({
+                id: `${beat.id}-${conn.targetId}-${idx}`,
+                source: beat.id,
+                target: conn.targetId,
+                label: conn.label
+              });
+            }
+          });
+        });
+
+        console.log('[Debug] Created', createdBeats.length, 'beats and', connections.length, 'connections');
 
         // Load into the app
         actions.loadStoryData({
           title: debugData.story.metadata?.title || debugData.title || 'Debug Story',
           author: debugData.story.metadata?.author || 'Debug',
           beats: createdBeats,
-          connections: [],
+          connections: connections,
           settings: {},
           characters: [],
           clusters: []

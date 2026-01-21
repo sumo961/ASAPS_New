@@ -3,12 +3,20 @@ import type { Condition, Effect } from '../types';
 import type { Story } from './Story';
 import { TimerManager } from './TimerManager';
 
+/**
+ * Inventory entry with quantity support
+ */
+export interface InventoryEntry {
+  name: string;
+  quantity: number;
+}
+
 interface StoryState {
   currentBeatId: string;
   variables: Record<string, any>;
   counters: Record<string, number>;
-  inventory: string[];
-  characterInventories: Record<string, string[]>; // Character-specific inventories
+  inventory: InventoryEntry[];
+  characterInventories: Record<string, InventoryEntry[]>; // Character-specific inventories
   visitedBeats: Set<string>;
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
 }
@@ -21,8 +29,8 @@ export interface SerializedStoryState {
   currentBeatId: string;
   variables: Record<string, any>;
   counters: Record<string, number>;
-  inventory: string[];
-  characterInventories: Record<string, string[]>;
+  inventory: InventoryEntry[];  // Now stores entries with quantities
+  characterInventories: Record<string, InventoryEntry[]>;
   visitedBeats: string[]; // Array instead of Set for JSON serialization
   timers: Record<string, { value: number; target?: string }>;
   history: string[]; // Include beat history for proper restoration
@@ -120,52 +128,80 @@ export class StoryContext extends EventEmitter {
     this.emit('counterChanged', { name, value: this.state.counters[name] });
   }
 
-  addToInventory(item: string): void {
-    if (!this.state.inventory.includes(item)) {
-      this.state.inventory.push(item);
-      this.emit('inventoryChanged', { action: 'add', item });
+  addToInventory(item: string, quantity: number = 1): void {
+    const existing = this.state.inventory.find(entry => entry.name === item);
+    if (existing) {
+      existing.quantity += quantity;
+      this.emit('inventoryChanged', { action: 'add', item, quantity, newTotal: existing.quantity });
+    } else {
+      this.state.inventory.push({ name: item, quantity });
+      this.emit('inventoryChanged', { action: 'add', item, quantity, newTotal: quantity });
     }
   }
 
-  removeFromInventory(item: string): void {
-    const index = this.state.inventory.indexOf(item);
-    if (index >= 0) {
-      this.state.inventory.splice(index, 1);
-      this.emit('inventoryChanged', { action: 'remove', item });
+  removeFromInventory(item: string, quantity: number = 1): void {
+    const existing = this.state.inventory.find(entry => entry.name === item);
+    if (existing) {
+      existing.quantity -= quantity;
+      if (existing.quantity <= 0) {
+        // Remove the item entirely
+        const index = this.state.inventory.findIndex(entry => entry.name === item);
+        this.state.inventory.splice(index, 1);
+        this.emit('inventoryChanged', { action: 'remove', item, quantity, newTotal: 0 });
+      } else {
+        this.emit('inventoryChanged', { action: 'remove', item, quantity, newTotal: existing.quantity });
+      }
     }
   }
 
   hasInInventory(item: string): boolean {
-    return this.state.inventory.includes(item);
+    const existing = this.state.inventory.find(entry => entry.name === item);
+    return existing !== undefined && existing.quantity > 0;
+  }
+
+  getInventoryQuantity(item: string): number {
+    const existing = this.state.inventory.find(entry => entry.name === item);
+    return existing?.quantity ?? 0;
   }
 
   // Character-specific inventory methods
-  addInventoryItem(character: string, item: string): void {
+  addInventoryItem(character: string, item: string, quantity: number = 1): void {
     // Use main inventory for 'player' or initialize character inventory
     if (character === 'player' || !character) {
-      this.addToInventory(item);
+      this.addToInventory(item, quantity);
     } else {
       if (!this.state.characterInventories[character]) {
         this.state.characterInventories[character] = [];
       }
-      if (!this.state.characterInventories[character].includes(item)) {
-        this.state.characterInventories[character].push(item);
-        this.emit('inventoryChanged', { action: 'add', character, item });
+      const charInventory = this.state.characterInventories[character];
+      const existing = charInventory.find(entry => entry.name === item);
+      if (existing) {
+        existing.quantity += quantity;
+        this.emit('inventoryChanged', { action: 'add', character, item, quantity, newTotal: existing.quantity });
+      } else {
+        charInventory.push({ name: item, quantity });
+        this.emit('inventoryChanged', { action: 'add', character, item, quantity, newTotal: quantity });
       }
     }
   }
 
-  removeInventoryItem(character: string, item: string): void {
+  removeInventoryItem(character: string, item: string, quantity: number = 1): void {
     // Use main inventory for 'player' or character-specific inventory
     if (character === 'player' || !character) {
-      this.removeFromInventory(item);
+      this.removeFromInventory(item, quantity);
     } else {
       const charInventory = this.state.characterInventories[character];
       if (charInventory) {
-        const index = charInventory.indexOf(item);
-        if (index >= 0) {
-          charInventory.splice(index, 1);
-          this.emit('inventoryChanged', { action: 'remove', character, item });
+        const existing = charInventory.find(entry => entry.name === item);
+        if (existing) {
+          existing.quantity -= quantity;
+          if (existing.quantity <= 0) {
+            const index = charInventory.findIndex(entry => entry.name === item);
+            charInventory.splice(index, 1);
+            this.emit('inventoryChanged', { action: 'remove', character, item, quantity, newTotal: 0 });
+          } else {
+            this.emit('inventoryChanged', { action: 'remove', character, item, quantity, newTotal: existing.quantity });
+          }
         }
       }
     }
@@ -176,7 +212,19 @@ export class StoryContext extends EventEmitter {
       return this.hasInInventory(item);
     }
     const charInventory = this.state.characterInventories[character];
-    return charInventory ? charInventory.includes(item) : false;
+    if (!charInventory) return false;
+    const existing = charInventory.find(entry => entry.name === item);
+    return existing !== undefined && existing.quantity > 0;
+  }
+
+  getCharacterInventoryQuantity(character: string, item: string): number {
+    if (character === 'player' || !character) {
+      return this.getInventoryQuantity(item);
+    }
+    const charInventory = this.state.characterInventories[character];
+    if (!charInventory) return 0;
+    const existing = charInventory.find(entry => entry.name === item);
+    return existing?.quantity ?? 0;
   }
 
   // Timer methods
@@ -257,8 +305,40 @@ export class StoryContext extends EventEmitter {
         return false;
       }
 
-      const hasItem = this.state.inventory.includes(itemToCheck);
-      console.log(`[StoryContext] Inventory check: "${itemToCheck}" in [${this.state.inventory.join(', ')}] = ${hasItem}`);
+      const entry = this.state.inventory.find(e => e.name === itemToCheck);
+      const itemQuantity = entry?.quantity ?? 0;
+      const hasItem = itemQuantity > 0;
+      const itemNames = this.state.inventory.map(e => `${e.name}(x${e.quantity})`);
+
+      // Check if this is a quantity comparison (vs just existence check)
+      if (condition.quantityCheck && condition.quantityOperator) {
+        // Resolve quantityValue - can be a number or a variable name (prefixed with $)
+        let compareValue: number;
+        if (typeof condition.quantityValue === 'string') {
+          // Variable reference - strip $ prefix if present
+          const varName = condition.quantityValue.startsWith('$')
+            ? condition.quantityValue.substring(1)
+            : condition.quantityValue;
+          const resolved = this.getVariable(varName) ?? this.state.counters[varName] ?? 0;
+          compareValue = typeof resolved === 'number' ? resolved : parseInt(resolved) || 0;
+        } else {
+          compareValue = condition.quantityValue ?? 0;
+        }
+
+        console.log(`[StoryContext] Inventory quantity check: "${itemToCheck}" qty=${itemQuantity} ${condition.quantityOperator} ${compareValue}`);
+
+        switch (condition.quantityOperator) {
+          case '==': return itemQuantity === compareValue;
+          case '!=': return itemQuantity !== compareValue;
+          case '>': return itemQuantity > compareValue;
+          case '<': return itemQuantity < compareValue;
+          case '>=': return itemQuantity >= compareValue;
+          case '<=': return itemQuantity <= compareValue;
+          default: return false;
+        }
+      }
+
+      console.log(`[StoryContext] Inventory check: "${itemToCheck}" in [${itemNames.join(', ')}] = ${hasItem}`);
 
       // Support negation operators
       if (condition.operator === '!=' || condition.operator === 'not') {
@@ -337,7 +417,7 @@ export class StoryContext extends EventEmitter {
     if (!ref) {
       return undefined;
     }
-    
+
     if (ref.startsWith('var:')) {
       return this.getVariable(ref.substring(4));
     }
@@ -345,7 +425,8 @@ export class StoryContext extends EventEmitter {
       return this.state.counters[ref.substring(8)] || 0;
     }
     if (ref === 'inventory') {
-      return this.state.inventory;
+      // Return item names for backward compatibility
+      return this.state.inventory.map(entry => entry.name);
     }
     return ref;
   }
@@ -366,8 +447,19 @@ export class StoryContext extends EventEmitter {
     return { ...this.state.counters };
   }
 
+  /**
+   * Get inventory as array of item names (backward compatible)
+   * Each item appears once regardless of quantity
+   */
   getInventory(): string[] {
-    return [...this.state.inventory];
+    return this.state.inventory.map(entry => entry.name);
+  }
+
+  /**
+   * Get full inventory entries with quantities
+   */
+  getInventoryEntries(): InventoryEntry[] {
+    return this.state.inventory.map(entry => ({ ...entry }));
   }
 
   getTimers(): Record<string, { value: number; target?: string }> {
@@ -617,9 +709,9 @@ export class StoryContext extends EventEmitter {
       currentBeatId: this.state.currentBeatId,
       variables: { ...this.state.variables },
       counters: { ...this.state.counters },
-      inventory: [...this.state.inventory],
+      inventory: this.state.inventory.map(entry => ({ ...entry })),
       characterInventories: Object.fromEntries(
-        Object.entries(this.state.characterInventories).map(([k, v]) => [k, [...v]])
+        Object.entries(this.state.characterInventories).map(([k, v]) => [k, v.map(entry => ({ ...entry }))])
       ),
       visitedBeats: Array.from(this.state.visitedBeats),
       timers: { ...this.state.timers },
@@ -630,19 +722,32 @@ export class StoryContext extends EventEmitter {
   /**
    * Load state from a serialized save
    * Restores the context to the saved state
+   * Handles both old format (string[]) and new format (InventoryEntry[])
    */
   loadFromSerialized(serialized: SerializedStoryState): void {
     // Stop any active timers before restoring state
     this.timerManager.stopAllTimers();
+
+    // Helper to migrate old string[] format to InventoryEntry[]
+    const migrateInventory = (inv: any[]): InventoryEntry[] => {
+      if (!inv || inv.length === 0) return [];
+      // Check if it's old format (string[]) or new format (InventoryEntry[])
+      if (typeof inv[0] === 'string') {
+        // Old format - convert to new format with quantity 1
+        return inv.map((name: string) => ({ name, quantity: 1 }));
+      }
+      // New format - clone entries
+      return inv.map((entry: InventoryEntry) => ({ ...entry }));
+    };
 
     // Restore state
     this.state = {
       currentBeatId: serialized.currentBeatId,
       variables: { ...serialized.variables },
       counters: { ...serialized.counters },
-      inventory: [...serialized.inventory],
+      inventory: migrateInventory(serialized.inventory),
       characterInventories: Object.fromEntries(
-        Object.entries(serialized.characterInventories || {}).map(([k, v]) => [k, [...v]])
+        Object.entries(serialized.characterInventories || {}).map(([k, v]) => [k, migrateInventory(v)])
       ),
       visitedBeats: new Set(serialized.visitedBeats),
       timers: { ...serialized.timers }

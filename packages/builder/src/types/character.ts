@@ -228,7 +228,8 @@ export interface InventoryItem {
   name: string;
   displayName: string;
   description: string;
-  icon: string;
+  icon: string;           // URL for display (blob URL)
+  assetId?: string;       // Asset ID for persistence (resolves to URL after reload)
   quantity: number;
   stackable: boolean;
   category: string;
