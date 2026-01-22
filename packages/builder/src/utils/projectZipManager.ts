@@ -255,29 +255,51 @@ export async function importProjectFromZip(
         // Get filename from path - may be in format "assetId_originalFilename" or just "originalFilename"
         const fullFilename = filePath.split('/').pop() || 'unknown';
 
-        // Try to extract asset ID from filename prefix (new format: uuid_filename.ext)
-        // UUID format: 8-4-4-4-12 characters = 36 characters + underscore = 37
+        // Try to extract asset ID from filename prefix
+        // Supports two formats:
+        // 1. UUID format: 550e8400-e29b-41d4-a716-446655440000_filename.ext
+        // 2. Timestamp format: asset_1234567890123_50_filename.ext
         let extractedId: string | null = null;
         let originalFilename = fullFilename;
 
+        // Try UUID pattern first
         const uuidPattern = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_(.+)$/i;
-        const match = fullFilename.match(uuidPattern);
-        if (match) {
-          extractedId = match[1];
-          originalFilename = match[2];
-          console.log(`[importProjectFromZip] Extracted ID from filename: ${extractedId} -> ${originalFilename}`);
+        const uuidMatch = fullFilename.match(uuidPattern);
+        if (uuidMatch) {
+          extractedId = uuidMatch[1];
+          originalFilename = uuidMatch[2];
+          console.log(`[importProjectFromZip] Extracted UUID from filename: ${extractedId} -> ${originalFilename}`);
+        } else {
+          // Try timestamp-based asset ID pattern: asset_TIMESTAMP_INDEX_filename.ext
+          const timestampPattern = /^(asset_\d+_\d+)_(.+)$/;
+          const timestampMatch = fullFilename.match(timestampPattern);
+          if (timestampMatch) {
+            extractedId = timestampMatch[1];
+            originalFilename = timestampMatch[2];
+            console.log(`[importProjectFromZip] Extracted timestamp ID from filename: ${extractedId} -> ${originalFilename}`);
+          }
         }
 
         // Look up metadata by ID (from filename prefix or from metadata file)
         const assetMetadata = extractedId ? metadataById.get(extractedId) : null;
 
         // Fallback: try to find metadata by original filename (for legacy ZIP format)
+        // Also check if ZIP filename ends with metadata filename (handles ID prefix case)
         let fallbackMetadata: any = null;
         if (!assetMetadata) {
           for (const [id, meta] of metadataById) {
+            // Exact match
             if (meta.filename === fullFilename || meta.filename === originalFilename) {
               fallbackMetadata = meta;
+              extractedId = extractedId || id; // Use metadata ID if we don't have one
               console.log(`[importProjectFromZip] Found metadata by filename fallback: ${meta.filename} (id: ${id})`);
+              break;
+            }
+            // Check if ZIP filename ends with metadata filename (handles unknown ID prefix formats)
+            if (fullFilename.endsWith('_' + meta.filename)) {
+              fallbackMetadata = meta;
+              extractedId = extractedId || id;
+              console.log(`[importProjectFromZip] Found metadata by filename suffix: ${meta.filename} (id: ${id})`);
               break;
             }
           }
