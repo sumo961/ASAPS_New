@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { CommandManager, type CommandManagerOptions } from '../commands/CommandManager';
+import { CommandManager, type CommandManagerOptions, getCommandManager } from '../commands/CommandManager';
 import { Command } from '../commands/Command';
 
 /**
@@ -80,11 +80,13 @@ export function useCommandManager(
   options?: CommandManagerOptions,
   enableKeyboardShortcuts: boolean = true
 ): UseCommandManagerReturn {
-  // Create manager instance (persists across re-renders)
+  // Use the singleton command manager so history persists across components
+  // This ensures that commands executed in one component (like HelperCommandInput)
+  // can be undone from anywhere in the app
   const managerRef = useRef<CommandManager | null>(null);
 
   if (!managerRef.current) {
-    managerRef.current = new CommandManager(options);
+    managerRef.current = getCommandManager(options);
   }
 
   const manager = managerRef.current;
@@ -135,12 +137,8 @@ export function useCommandManager(
     };
   }, [manager, enableKeyboardShortcuts]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      manager.dispose();
-    };
-  }, [manager]);
+  // Note: We don't dispose the singleton manager on unmount
+  // The singleton persists for the lifetime of the app
 
   // Command execution
   const execute = useCallback(

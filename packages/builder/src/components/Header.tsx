@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2 } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
@@ -36,6 +36,7 @@ interface HeaderProps {
   hasUnsavedChanges?: boolean;
   currentProjectId?: string;
   onMergeDialogTrees?: () => void;
+  onHelperCommands?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -64,6 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
   hasUnsavedChanges,
   currentProjectId,
   onMergeDialogTrees,
+  onHelperCommands,
 }) => {
   const { status, lastSaved, error: saveError } = useSave();
   const { load } = useProject();
@@ -296,7 +298,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Tools Menu */}
-          {onMergeDialogTrees && (
+          {(onMergeDialogTrees || onHelperCommands) && (
             <div className="relative">
               <button
                 className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
@@ -315,17 +317,32 @@ export const Header: React.FC<HeaderProps> = ({
                     onClick={() => setShowToolsMenu(false)}
                   />
                   <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                    <button
-                      onClick={() => {
-                        onMergeDialogTrees();
-                        setShowToolsMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Merge multiple DialogTree beats into a nested conversation"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      Merge DialogTrees
-                    </button>
+                    {onHelperCommands && (
+                      <button
+                        onClick={() => {
+                          onHelperCommands();
+                          setShowToolsMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                        title="AI-powered bulk operations (Ctrl+Shift+K)"
+                      >
+                        <Wand2 className="w-4 h-4" />
+                        Helper Commands
+                      </button>
+                    )}
+                    {onMergeDialogTrees && (
+                      <button
+                        onClick={() => {
+                          onMergeDialogTrees();
+                          setShowToolsMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                        title="Merge multiple DialogTree beats into a nested conversation"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        Merge DialogTrees
+                      </button>
+                    )}
                   </div>
                 </>
               )}

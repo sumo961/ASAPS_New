@@ -25,12 +25,14 @@ import { getStorageAdapter } from './storage/HybridStorageAdapter';
 import { assetToStored, extractBlobFromAsset } from './storage/AssetStorageAdapter';
 import { DebugPanel } from './components/debug/DebugPanel';
 import { SearchPanel } from './components/search';
+import { HelperCommandInput } from './components/ai/HelperCommandInput';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
 import { validateStoryLogic, formatLogicValidationResult } from './utils/storyLogicValidator';
 import { preloadFonts } from './utils/fontRegistry';
 import { useThemes, type ThemeAssetUrls } from './hooks/useThemes';
 import { useAIDebug } from './hooks/useAIDebug';
+import { useCommandManager } from './hooks/useCommandManager';
 import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
 import { getThemeService } from './services/ThemeService';
@@ -86,6 +88,7 @@ function App() {
   const [pendingAction, setPendingAction] = useState<string>('');
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
+  const [showHelperCommands, setShowHelperCommands] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -106,6 +109,10 @@ function App() {
     runDebug: runAIDebug,
     closeModal: closeAIDebugModal,
   } = useAIDebug({ checkUI: true, checkConsole: true, delay: 1500 });
+
+  // Command manager hook - provides global Ctrl+Z/Ctrl+Shift+Z keyboard shortcuts for undo/redo
+  // This ensures undo/redo works even after modal dialogs (like HelperCommandInput) close
+  useCommandManager();
 
   // Import ASML dialog state
   const [showImportAsmlDialog, setShowImportAsmlDialog] = useState(false);
@@ -189,6 +196,11 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setShowSearchPanel(prev => !prev);
+      }
+      // Ctrl/Cmd+Shift+K: Toggle AI Helper Commands
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'k') {
+        e.preventDefault();
+        setShowHelperCommands(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -3281,6 +3293,7 @@ function App() {
         hasUnsavedChanges={hasUnsavedChanges}
         currentProjectId={currentProject?.id}
         onMergeDialogTrees={() => setShowMergeDialogTrees(true)}
+        onHelperCommands={() => setShowHelperCommands(true)}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -3601,6 +3614,19 @@ function App() {
         onNavigateToBeat={handleNavigateToBeat}
         onNavigateToCharacter={handleNavigateToCharacter}
         onReplaceInBeat={handleReplaceInBeat}
+      />
+
+      {/* AI Helper Commands Panel */}
+      <HelperCommandInput
+        isOpen={showHelperCommands}
+        onClose={() => setShowHelperCommands(false)}
+        beats={state.beats}
+        clusters={state.clusters}
+        containerBeatPositions={state.containerBeatPositions}
+        assets={assets.map(a => ({ id: a.id, name: a.name, type: a.type }))}
+        characterNames={characters.map(c => c.name)}
+        onUpdateBeat={actions.updateBeat}
+        onDeleteBeat={actions.deleteBeat}
       />
 
       {/* Save Project Dialog */}

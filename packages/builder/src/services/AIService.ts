@@ -15,8 +15,15 @@ import type {
   BeatSuggestionRequest,
   BeatSuggestionResponse,
   NaturalLanguageBeatRequest,
-  NaturalLanguageBeatResponse
+  NaturalLanguageBeatResponse,
+  TextTransformationRequest,
+  TextTransformationResponse,
 } from '../types/ai';
+import type {
+  HelperCommandRequest,
+  HelperCommandResponse,
+  StructuredAction,
+} from '../types/helperCommand';
 import { getAIValidator } from './AIValidator';
 
 /**
@@ -1494,6 +1501,385 @@ Return ONLY the corrected JSON, no explanation needed.
     } catch (error) {
       console.error('[AIService] Natural language beat creation failed:', error);
       throw error;
+    }
+  }
+
+  // ============================================================================
+  // Helper Command Methods
+  // ============================================================================
+
+  /**
+   * Interpret a natural language helper command
+   */
+  async interpretHelperCommand(request: HelperCommandRequest): Promise<HelperCommandResponse> {
+    this.ensureReady();
+
+    console.log('[AIService] Interpreting helper command:', request.command);
+
+    const systemPrompt = this.buildHelperCommandSystemPrompt(request.storyContext);
+    const userPrompt = `Interpret this helper command: "${request.command}"
+
+Return a JSON object with this structure:
+{
+  "action": {
+    "actionType": "setProperty" | "addElement" | "removeElement" | "moveElement" | "transformText",
+    "targetSelector": {
+      "targetType": "beat" | "location" | "cluster" | "text",
+      "filters": {
+        "beatTypes": ["type1", "type2"],
+        "clusterName": "optional cluster name",
+        "locationKind": ["button", "character", "prop"],
+        "locationNamePattern": "optional pattern"
+      }
+    },
+    "modification": {
+      "type": "set" | "add" | "remove" | "transform",
+      "property": "property name",
+      "value": "value to set",
+      "textTransform": {
+        "findPattern": "primary text to find",
+        "replacement": "primary text to replace with",
+        "additionalReplacements": [
+          {"find": "second term to find", "replace": "replacement for second term"},
+          {"find": "third term", "replace": "replacement for third"}
+        ],
+        "adjustPronouns": false,
+        "adaptContext": false,
+        "scope": "all"
+      }
+    },
+    "exclusionSelector": null,
+    "confidence": 0.95,
+    "interpretation": "Human-readable interpretation",
+    "reasoning": "Why this interpretation"
+  },
+  "fullyUnderstood": true,
+  "suggestions": [],
+  "clarificationQuestions": []
+}
+
+IMPORTANT: When the user requests multiple text replacements (e.g., "change X to Y AND Z to W"), include ALL replacements:
+- Put the first replacement in findPattern/replacement
+- Put all subsequent replacements in the additionalReplacements array
+- The interpretation should mention ALL the replacements being made`;
+
+    try {
+      const response = await this.makeDirectAICall(systemPrompt, userPrompt);
+      const parsed = this.parseJsonResponse(response);
+
+      return {
+        action: parsed.action as StructuredAction,
+        fullyUnderstood: parsed.fullyUnderstood ?? true,
+        suggestions: parsed.suggestions,
+        clarificationQuestions: parsed.clarificationQuestions,
+      };
+    } catch (error) {
+      console.error('[AIService] Helper command interpretation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Transform text using AI for complex transformations
+   */
+  async transformText(request: TextTransformationRequest): Promise<TextTransformationResponse> {
+    this.ensureReady();
+
+    console.log('[AIService] Transforming text with AI, adaptContext:', request.transform.adaptContext);
+
+    // Build system prompt based on what's needed
+    let systemPrompt = `You are a text transformation assistant. Your task is to transform text according to the given instructions while preserving the overall narrative voice and style.
+
+IMPORTANT RULES:
+1. PRESERVE the capitalization pattern of words being replaced:
+   - "Blacksmith" (capitalized) → "Jeweler" (capitalized)
+   - "blacksmith" (lowercase) → "jeweler" (lowercase)
+   - "BLACKSMITH" (all caps) → "JEWELER" (all caps)
+
+2. Preserve these exactly as-is:
+   - Variable placeholders like $playerName$ or \${variable}
+   - Special formatting and line breaks
+   - Punctuation and sentence structure (unless adaptation requires changes)
+`;
+
+    if (request.transform.adjustPronouns) {
+      systemPrompt += `
+3. When adjusting pronouns for gender changes:
+   - he → she, him → her, his → her, himself → herself
+   - she → he, her → him, hers → his, herself → himself
+   - Also adjust gendered titles: prince → princess, king → queen, lord → lady, etc.
+`;
+    }
+
+    if (request.transform.adaptContext) {
+      systemPrompt += `
+3. CONTEXTUAL ADAPTATION: Adapt related terms to fit the new subject/theme.
+
+   IMPORTANT CONSTRAINTS:
+   - ONLY change words/phrases that are directly related to the original term
+   - Keep the SAME LENGTH and structure - don't expand short text into long descriptions
+   - For short text like button labels, titles: ONLY do direct word replacement, no rewriting
+   - NEVER change author names - they are metadata, not story content
+   - NEVER turn a single word into a sentence or paragraph
+
+   Examples of CORRECT contextual changes in narrative text:
+   - "The blacksmith hammered the sword" → "The jeweler polished the ring"
+   - "forge" → "workshop", "anvil" → "workbench", "molten iron" → "precious gems"
+
+   Examples of what NOT to do:
+   - Button "Begin" → KEEP AS "Begin" (don't change to a description)
+   - Title "The Blacksmith" → "The Jeweler" (simple replacement only)
+   - Author "John Smith" → KEEP AS "John Smith" (never change)
+   - Short text "Enter shop" → "Enter shop" (no blacksmith reference, don't change)
+`;
+    }
+
+    systemPrompt += `
+Return your response as JSON with this structure:
+{
+  "transformedText": "the transformed text",
+  "changes": [
+    {"original": "old text", "replacement": "new text", "reason": "why this change"}
+  ]
+}`;
+
+    // Build user prompt with all replacements
+    let userPrompt = `Transform this text by making the following replacements:
+1. "${request.transform.find}" → "${request.transform.replace}"`;
+
+    // Add additional replacements if any
+    if (request.transform.additionalReplacements && request.transform.additionalReplacements.length > 0) {
+      for (let i = 0; i < request.transform.additionalReplacements.length; i++) {
+        const r = request.transform.additionalReplacements[i];
+        userPrompt += `\n${i + 2}. "${r.find}" → "${r.replace}"`;
+      }
+    }
+
+    if (request.transform.adjustPronouns) {
+      userPrompt += '\n\nAlso adjust pronouns accordingly.';
+    }
+
+    if (request.transform.adaptContext) {
+      userPrompt += '\n\nAlso adapt surrounding context/vocabulary to fit the new subject (change related terms like tools, objects, settings that are associated with the original subject).';
+    }
+
+    if (request.context) {
+      userPrompt += `\n\nContext: This is ${request.context.textType} text${request.context.speaker ? ` spoken by ${request.context.speaker}` : ''}.`;
+    }
+
+    userPrompt += `
+
+Original text:
+"""
+${request.originalText}
+"""`;
+
+    try {
+      const response = await this.makeDirectAICall(systemPrompt, userPrompt);
+      const parsed = this.parseJsonResponse(response);
+
+      return {
+        transformedText: parsed.transformedText || request.originalText,
+        changes: parsed.changes || [],
+      };
+    } catch (error) {
+      console.error('[AIService] Text transformation failed:', error);
+      // Return original text on failure
+      return {
+        transformedText: request.originalText,
+        changes: [],
+      };
+    }
+  }
+
+  /**
+   * Build the system prompt for helper command interpretation
+   */
+  private buildHelperCommandSystemPrompt(context: HelperCommandRequest['storyContext']): string {
+    // Build preset sounds list
+    const presetSoundsInfo = context.presetSounds?.length
+      ? context.presetSounds.map(s => `- "${s.id}" (${s.name}, ${s.category})`).join('\n')
+      : 'none';
+
+    // Build visible/invisible beat info
+    const visibleTypes = context.visibleBeatTypes?.join(', ') || 'titleScreen, introText, dialogTree, movementChoice, pickProp, durScreen, endScreen, inputText, hyperText, videoBeat, aiDialogTree, aiSummary, onlineContent';
+    const invisibleTypes = context.invisibleBeatTypes?.join(', ') || 'setVariable, conditionBeat, addRemoveInventory, randomTarget, setTimer, aiCondition';
+
+    return `You are an AI assistant that interprets natural language commands for bulk story operations in an interactive narrative authoring tool.
+
+Available beat types: ${context.beatTypes.join(', ')}
+
+VISIBLE beat types (can have transitions, backgrounds, locations): ${visibleTypes}
+INVISIBLE beat types (logic-only, NO visuals/transitions): ${invisibleTypes}
+IMPORTANT: Only visible beats can have transitions, backgrounds, or locations. Invisible beats are logic-only.
+
+Available clusters: ${context.clusterNames.length > 0 ? context.clusterNames.join(', ') : 'none'}
+
+Available assets (ID: name, type):
+${context.assets.slice(0, 30).map(a => `- "${a.id}": ${a.name} (${a.type})`).join('\n')}
+${context.assets.length > 30 ? `... and ${context.assets.length - 30} more` : ''}
+
+PRESET SOUNDS (use the ID, not the name):
+${presetSoundsInfo}
+
+Available characters: ${context.characterNames.length > 0 ? context.characterNames.join(', ') : 'none'}
+
+Sample beat names: ${context.sampleBeatNames.slice(0, 10).join(', ')}
+
+Modifiable beat properties: ${context.modifiableProperties.beats.join(', ')}
+Modifiable location properties: ${context.modifiableProperties.locations.join(', ')}
+Transition properties: ${context.modifiableProperties.transitions.join(', ')}
+
+Your task:
+1. Parse the user's natural language command
+2. Identify the action type (setProperty, addElement, removeElement, moveElement, transformText)
+3. Identify what elements to target (beats, locations, clusters)
+4. Identify any filters (beat types, cluster names, patterns)
+5. Identify any exclusions ("except...")
+6. Determine the modification to apply
+7. Rate your confidence (0-1)
+
+Common patterns:
+- "Apply/Add/Set X to all Y" → setProperty/addElement on Y
+- "Remove X from Y" → removeElement
+- "Move X to/next to Y" → moveElement
+- "Change/Replace X to Y" → transformText for text content, setProperty for properties
+- "except cluster/beat X" → exclusionSelector
+
+SOUND EFFECTS ON BUTTONS/LOCATIONS:
+- "buttons" are LOCATIONS within beats (kind='button'), NOT beats themselves
+- When user says "all buttons", target locations with locationKind: ["button"], NOT beats
+- Use targetSelector.targetType: "location" and filters.locationKind: ["button"]
+- Property is "sound" with a PRESET SOUND ID (e.g., "click-soft", not "Soft Click")
+- When user mentions a sound by name like "Soft Click", find the matching preset ID from the list above
+- Example: "Apply sound to all buttons" → targetType: "location", locationKind: ["button"], property: "sound", value: "click-soft"
+
+TRANSITIONS:
+- For transitions, set the "transition" property on beats
+- The value MUST be an object with BOTH "type" AND "duration" fields:
+  { "type": "fade", "duration": 1000 }
+- BOTH fields are REQUIRED - never omit duration!
+- Valid transition types: "none", "fade", "slide", "zoom", "dissolve"
+- Duration is a NUMBER in milliseconds (not a string):
+  - "500ms" → duration: 500
+  - "1 second" → duration: 1000
+  - "2s" → duration: 2000
+- Examples:
+  - "fade 1000ms" → { "type": "fade", "duration": 1000 }
+  - "fade transition" (no duration specified) → { "type": "fade", "duration": 500 } (default to 500)
+  - "slide 2 seconds" → { "type": "slide", "duration": 2000 }
+- ONLY apply transitions to VISIBLE beat types (not setVariable, conditionBeat, etc.)
+- When user says "all beats", filter to only visible beat types for transitions
+
+FILTERING TO VISIBLE BEATS:
+- When user says "all visible beats" or "visible beats", you MUST include ALL visible beat types in filters.beatTypes
+- Copy this EXACT list: ["titleScreen", "introText", "dialogTree", "movementChoice", "pickProp", "durScreen", "endScreen", "inputText", "hyperText", "videoBeat", "aiDialogTree", "aiSummary", "onlineContent"]
+- Do NOT omit any types from this list - endScreen, introText, aiSummary are all visible beat types
+- For transitions AND backgrounds, always filter to visible beat types only
+
+BACKGROUNDS:
+- To set a background image, use the "node" property on beats
+- The value MUST be the ASSET ID (the quoted string like "asset_1234567890_1"), NOT the filename
+- Look in the "Available assets" list above - the ID is the quoted part before the colon
+- When user mentions a file name like "smithy.jpg":
+  1. Find the matching asset by name in the assets list
+  2. Use its ID (e.g., "asset_1769032511458_1") as the value, NOT the filename
+- Example: If assets list shows: - "asset_123": smithy.jpg (background)
+  → User says "set background to smithy.jpg" → use value: "asset_123"
+- CRITICAL: Never use the filename (smithy.jpg) as the value - always use the asset ID
+
+IMPORTANT for text transformations (transformText action type):
+- When the user asks to "replace X with Y" or "change X to Y" in text content, use targetType: "text"
+- Do NOT specify beatTypes in the filters UNLESS the user explicitly mentions specific beat types
+- By leaving beatTypes empty or undefined, the system will search ALL text-containing beats automatically
+- Text can appear in many beat types: introText, dialogTree, titleScreen, endScreen, hyperText, etc.
+- Only specify beatTypes if the user explicitly says something like "in dialog beats only" or "in intro text beats"
+
+Text transformation FLAGS:
+- adjustPronouns: Set to true when replacing gendered terms (prince→princess, he→she) and pronouns need adjusting
+- adaptContext: Set to true when the replacement changes the semantic meaning/theme and surrounding context should be adapted.
+  Examples where adaptContext should be TRUE:
+  * "change blacksmith to jeweler" - related terms like forge, sword, anvil should become workshop, jewelry, workbench
+  * "replace baker with florist" - oven, bread, dough should become greenhouse, flowers, bouquets
+  * "change knight to scholar" - armor, sword, battle should become robes, quill, debate
+  * When user says "adapt surrounding sentences", "adjust context", "make it fit", etc.
+  Examples where adaptContext should be FALSE:
+  * Simple name changes: "change John to Mary" (just a name, not a themed concept)
+  * Specific word replacement: "fix typo: change teh to the"
+  * When user explicitly says "just replace" or "exact replacement only"
+
+Always be helpful and try to interpret the user's intent, even if the command is ambiguous. If uncertain, set confidence lower and provide clarificationQuestions.`;
+  }
+
+  /**
+   * Make a direct AI call using the current provider
+   */
+  private async makeDirectAICall(systemPrompt: string, userPrompt: string): Promise<string> {
+    if (!this.currentProvider) {
+      throw new Error('No AI provider configured');
+    }
+
+    // Get the provider's internal client for direct calls
+    const provider = this.currentProvider as any;
+
+    // Claude provider
+    if (provider.name === 'claude' && provider.client) {
+      const response = await provider.client.messages.create({
+        model: provider.model || 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        temperature: 0.3, // Lower temperature for more consistent parsing
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+
+      const textBlock = response.content.find((block: any) => block.type === 'text');
+      return textBlock?.text || '';
+    }
+
+    // OpenAI provider
+    if (provider.name === 'openai' && provider.client) {
+      const response = await provider.client.chat.completions.create({
+        model: provider.model || 'gpt-4',
+        max_tokens: 4096,
+        temperature: 0.3,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      });
+
+      return response.choices[0]?.message?.content || '';
+    }
+
+    throw new Error(`Provider ${provider.name} not supported for direct calls`);
+  }
+
+  /**
+   * Parse JSON from AI response, handling markdown code blocks
+   */
+  private parseJsonResponse(response: string): any {
+    let jsonStr = response.trim();
+
+    // Remove markdown code blocks if present
+    if (jsonStr.startsWith('```')) {
+      const lines = jsonStr.split('\n');
+      lines.shift(); // Remove opening ```json or ```
+      while (lines.length > 0 && lines[lines.length - 1].trim().startsWith('```')) {
+        lines.pop();
+      }
+      jsonStr = lines.join('\n').trim();
+    }
+
+    // Try to parse as JSON
+    try {
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      // Try to extract JSON from the response
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      throw new Error('Failed to parse AI response as JSON');
     }
   }
 

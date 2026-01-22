@@ -342,3 +342,70 @@ export interface AIServiceOptions {
   /** Number of retries */
   maxRetries?: number;
 }
+
+// ============================================================================
+// Helper Command Types (for AI-powered bulk operations)
+// ============================================================================
+
+// Re-export helper command types for convenience
+export type {
+  StructuredAction,
+  ElementSelector,
+  Modification,
+  HelperCommandRequest,
+  HelperCommandResponse,
+  HelperCommandContext,
+  TextTransform,
+} from './helperCommand';
+
+/**
+ * Text transformation request for AI-powered text changes
+ */
+export interface TextTransformationRequest {
+  /** Original text to transform */
+  originalText: string;
+
+  /** Transformation to apply */
+  transform: {
+    /** Primary text/name to find */
+    find: string;
+    /** Primary replacement text */
+    replace: string;
+    /** Additional find/replace pairs */
+    additionalReplacements?: Array<{
+      find: string;
+      replace: string;
+    }>;
+    /** Whether to adjust pronouns */
+    adjustPronouns: boolean;
+    /**
+     * Whether to adapt surrounding context semantically.
+     * When true, the AI should analyze and transform related terms
+     * (e.g., "blacksmith" → "jeweler" would also change "forge" → "workshop", "sword" → "jewelry")
+     */
+    adaptContext?: boolean;
+  };
+
+  /** Context about the text */
+  context?: {
+    /** Type of text (dialog, narration, button, etc.) */
+    textType: string;
+    /** Speaker name if applicable */
+    speaker?: string;
+  };
+}
+
+/**
+ * Text transformation response
+ */
+export interface TextTransformationResponse {
+  /** Transformed text */
+  transformedText: string;
+
+  /** Changes made */
+  changes: Array<{
+    original: string;
+    replacement: string;
+    reason: string;
+  }>;
+}

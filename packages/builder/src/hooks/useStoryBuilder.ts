@@ -234,6 +234,11 @@ export function useStoryBuilder() {
             console.log(`[updateBeat] Called updateParameters for beat ${beatId}:`, Object.keys(params));
           }
 
+          // Log transition updates for debugging
+          if ((updates as any).transition) {
+            console.log(`[updateBeat] Setting transition for beat ${beatId}:`, (updates as any).transition);
+          }
+
           // Update beat properties while maintaining the Beat instance
           Object.assign(beat, updates);
           return beat;
