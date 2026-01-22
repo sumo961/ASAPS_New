@@ -324,10 +324,10 @@ export const Header: React.FC<HeaderProps> = ({
                           setShowToolsMenu(false);
                         }}
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                        title="AI-powered bulk operations (Ctrl+Shift+K)"
+                        title="Bulk transformation commands (Ctrl+Shift+K)"
                       >
                         <Wand2 className="w-4 h-4" />
-                        Helper Commands
+                        Transformations
                       </button>
                     )}
                     {onMergeDialogTrees && (

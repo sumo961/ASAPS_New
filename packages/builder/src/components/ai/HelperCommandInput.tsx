@@ -1,8 +1,9 @@
 /**
- * Helper Command Input Component
+ * Transformation Command Input Component
  *
- * Input field for AI-powered bulk operations.
- * Accepts natural language commands and shows preview before execution.
+ * Input field for bulk story transformation operations.
+ * Basic commands (backgrounds, transitions, sounds) work without AI.
+ * Complex commands (text transformations) use AI when configured.
  * Supports conversation-style clarification with the AI.
  * Integrates with command system for undo/redo support.
  */
@@ -14,6 +15,7 @@ import { useCommandManager } from '../../hooks/useCommandManager';
 import { getAIService } from '../../services/AIService';
 import { getHelperCommandFilter } from '../../services/HelperCommandFilter';
 import { getHelperCommandExecutor } from '../../services/HelperCommandExecutor';
+import { getDeterministicParser } from '../../services/DeterministicCommandParser';
 import type { BeatStateMutations } from '../../commands/BeatCommands';
 import type { Beat, Cluster, ContainerBeatPosition, BeatConfig } from '@asaps/core';
 import { getAllPresetSounds } from '@asaps/core';
@@ -25,33 +27,44 @@ import type {
 } from '../../types/helperCommand';
 import { HelperCommandPreview } from './HelperCommandPreview';
 
-// Example commands
+// Example commands - items with noAI: true work without AI configured
 const EXAMPLES = [
   {
-    command: "Apply the 'Soft Click' sound effect to all buttons",
-    description: "Adds a click sound to every button location",
-    category: 'sound'
+    command: "Set all button sounds to 'Soft Click'",
+    description: "Adds a click sound to every button",
+    category: 'sound',
+    noAI: true,
   },
   {
-    command: "Set all beat transitions to fade 500ms",
-    description: "Changes transition style on all beats",
-    category: 'transition'
+    command: "Set all transitions to fade 500ms",
+    description: "Changes transition style on all visible beats",
+    category: 'transition',
+    noAI: true,
   },
   {
-    command: "Add background 'forest' to all dialogTree beats",
-    description: "Sets background for specific beat type",
-    category: 'background'
+    command: "Set all backgrounds to forest.jpg",
+    description: "Sets background for all visible beats",
+    category: 'background',
+    noAI: true,
   },
   {
     command: "Remove all meters from dialog beats",
-    description: "Removes meter locations from beats",
-    category: 'remove'
+    description: "Removes meter locations from dialog beats",
+    category: 'remove',
+    noAI: true,
   },
   {
     command: "Change 'Prince' to 'Princess' with correct pronouns",
     description: "AI-powered text transformation",
-    category: 'text'
-  }
+    category: 'text',
+    noAI: false,
+  },
+  {
+    command: "Change blacksmith to jeweler and adapt context",
+    description: "AI adapts related terms (forge→workshop, etc.)",
+    category: 'text',
+    noAI: false,
+  },
 ];
 
 /** A message in the conversation */
@@ -93,6 +106,9 @@ export interface HelperCommandInputProps {
 
   /** Callback to delete a beat (used for mutations) */
   onDeleteBeat?: (beatId: string) => void;
+
+  /** Callback when changes are applied - use to refresh UI */
+  onChangesApplied?: (affectedBeatIds: string[]) => void;
 }
 
 export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
@@ -106,6 +122,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
   onUpdateBeat,
   onAddBeat,
   onDeleteBeat,
+  onChangesApplied,
 }) => {
   const { isConfigured, error: aiError } = useAI();
   const { execute: executeCommand } = useCommandManager();
@@ -115,6 +132,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
   // State
   const [command, setCommand] = useState('');
   const [isInterpreting, setIsInterpreting] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
   const [parsedAction, setParsedAction] = useState<StructuredAction | null>(null);
   const [preview, setPreview] = useState<ChangePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -219,7 +237,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
 
   // Interpret command (or continue conversation)
   const interpretCommand = useCallback(async () => {
-    if (!command.trim() || !isConfigured) return;
+    if (!command.trim()) return;
 
     const userMessage = command.trim();
     setCommand('');
@@ -237,19 +255,53 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
     setPreview(null);
 
     try {
-      const aiService = getAIService();
       const context = buildContext();
+      const isFollowUp = conversation.length > 0;
 
-      // Include conversation history for follow-up messages
-      const conversationHistory = buildConversationHistory();
-      const fullCommand = conversationHistory
-        ? `${conversationHistory}\nUser: ${userMessage}`
-        : userMessage;
+      // Try deterministic parsing first (only for new commands, not follow-ups)
+      let response = null;
+      let usedDeterministic = false;
 
-      const response = await aiService.interpretHelperCommand({
-        command: fullCommand,
-        storyContext: context,
-      });
+      if (!isFollowUp) {
+        const parser = getDeterministicParser();
+        response = parser.parse(userMessage, context);
+        if (response) {
+          usedDeterministic = true;
+          console.log('[HelperCommand] Used deterministic parser');
+        }
+      }
+
+      // Fall back to AI if:
+      // - Deterministic parsing didn't match
+      // - This is a follow-up conversation
+      // - AI is configured
+      if (!response) {
+        if (!isConfigured) {
+          // No AI configured and deterministic didn't work
+          setError('Command not recognized. Please configure AI for complex commands, or try simpler patterns like "set all transitions to fade 500ms"');
+          setConversation(prev => [...prev, {
+            role: 'assistant',
+            content: 'I couldn\'t recognize that command pattern. Try simpler commands like:\n• "set all backgrounds to forest.jpg"\n• "set all button sounds to Soft Click"\n• "set all transitions to fade 500ms"',
+            timestamp: new Date(),
+          }]);
+          setIsInterpreting(false);
+          return;
+        }
+
+        console.log('[HelperCommand] Using AI interpreter');
+        const aiService = getAIService();
+
+        // Include conversation history for follow-up messages
+        const conversationHistory = buildConversationHistory();
+        const fullCommand = conversationHistory
+          ? `${conversationHistory}\nUser: ${userMessage}`
+          : userMessage;
+
+        response = await aiService.interpretHelperCommand({
+          command: fullCommand,
+          storyContext: context,
+        });
+      }
 
       // If AI needs clarification, add its question to the conversation
       if (!response.fullyUnderstood && response.clarificationQuestions?.length) {
@@ -279,10 +331,11 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
         // Full understanding - show the interpretation
         setParsedAction(response.action);
 
-        // Add success message to conversation
+        // Add success message to conversation (with indicator if deterministic)
+        const prefix = usedDeterministic ? '⚡ ' : '';
         setConversation(prev => [...prev, {
           role: 'assistant',
-          content: response.action.interpretation,
+          content: prefix + response.action.interpretation,
           timestamp: new Date(),
           needsClarification: false,
         }]);
@@ -315,11 +368,17 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
     } finally {
       setIsInterpreting(false);
     }
-  }, [command, isConfigured, buildContext, buildConversationHistory, beats, clusters, containerBeatPositions]);
+  }, [command, isConfigured, buildContext, buildConversationHistory, beats, clusters, containerBeatPositions, conversation.length]);
 
   // Execute the helper command using the executor which properly handles all change types
   const applyChanges = useCallback(async () => {
     if (!parsedAction || !preview) return;
+
+    const startTime = Date.now();
+    const MIN_DISPLAY_TIME = 600; // Minimum time to show loading overlay (ms)
+
+    setIsApplying(true);
+    setError(null);
 
     try {
       // Use the executor to create the batch command
@@ -335,11 +394,17 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
         parsedAction.exclusionSelector
       );
 
+      // Collect affected beat IDs for refresh callback
+      const affectedBeatIds = new Set<string>();
+      filterResult.beats.forEach(b => affectedBeatIds.add(b.id));
+      filterResult.locations.forEach(l => affectedBeatIds.add(l.beat.id));
+
       // Execute using the executor
       const batchCommand = await executor.execute(parsedAction, filterResult);
 
       if (!batchCommand) {
         setError('No changes to apply');
+        setIsApplying(false);
         return;
       }
 
@@ -353,16 +418,29 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
         success: true,
       }, ...prev.slice(0, 9)]);
 
-      // Reset state
+      // Notify parent to refresh UI for affected beats
+      if (onChangesApplied) {
+        onChangesApplied(Array.from(affectedBeatIds));
+      }
+
+      // Ensure minimum display time for the loading overlay
+      const elapsed = Date.now() - startTime;
+      if (elapsed < MIN_DISPLAY_TIME) {
+        await new Promise(resolve => setTimeout(resolve, MIN_DISPLAY_TIME - elapsed));
+      }
+
+      // Reset state and close
       setCommand('');
       setParsedAction(null);
       setPreview(null);
       setConversation([]);
+      setIsApplying(false);
       onClose();
 
     } catch (err) {
       console.error('Failed to execute command:', err);
       setError(err instanceof Error ? err.message : 'Failed to execute command');
+      setIsApplying(false);
 
       // Add failed command to history
       setRecentCommands(prev => [{
@@ -372,7 +450,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
         success: false,
       }, ...prev.slice(0, 9)]);
     }
-  }, [parsedAction, preview, beats, clusters, containerBeatPositions, conversation, mutations, executeCommand, onClose]);
+  }, [parsedAction, preview, beats, clusters, containerBeatPositions, conversation, mutations, executeCommand, onClose, onChangesApplied]);
 
   // Handle keyboard
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -427,12 +505,23 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
 
   return (
     <div className="fixed right-0 top-0 bottom-0 w-[480px] bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col">
+      {/* Applying Changes Overlay */}
+      {isApplying && (
+        <div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center">
+          <Loader2 className="w-10 h-10 text-purple-600 animate-spin mb-4" />
+          <p className="text-lg font-medium text-gray-900">Applying changes...</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {preview?.totalAffected || 0} element{preview?.totalAffected !== 1 ? 's' : ''} being updated
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <Wand2 className="w-5 h-5 text-purple-600" />
-            <h2 className="text-lg font-semibold text-gray-900">AI Helper Commands</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Transformation Commands</h2>
           </div>
           <button
             onClick={onClose}
@@ -443,21 +532,21 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
           </button>
         </div>
         <p className="text-sm text-gray-600">
-          Use natural language to make bulk changes to your story
+          Use natural language to make bulk changes to your story. Complex changes (e.g., context-aware text) require AI - smaller local models via Ollama work fine.
         </p>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* AI Not Configured Warning */}
+        {/* AI Not Configured Info */}
         {!isConfigured && (
-          <div className="m-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="m-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <span className="text-lg">⚡</span>
               <div>
-                <p className="text-sm font-medium text-yellow-900">AI Not Configured</p>
-                <p className="text-sm text-yellow-700 mt-1">
-                  Configure your AI provider in settings to use helper commands.
+                <p className="text-sm font-medium text-blue-900">Basic Commands Available</p>
+                <p className="text-sm text-blue-700 mt-1">
+                  Commands marked with ⚡ work without AI. Configure AI in settings for advanced features like text transformations.
                 </p>
               </div>
             </div>
@@ -544,14 +633,16 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
                   ? "Type your response..."
                   : hasActiveConversation
                   ? "Add more details or press Enter to continue..."
-                  : "Type a command like 'Set all transitions to fade 500ms'..."
+                  : isConfigured
+                  ? "Type a command like 'Set all transitions to fade 500ms'..."
+                  : "Basic commands work without AI (see examples with ⚡)..."
               }
-              disabled={!isConfigured || isInterpreting}
+              disabled={isInterpreting}
               className="w-full pl-4 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
             />
             <button
               onClick={interpretCommand}
-              disabled={!isConfigured || !command.trim() || isInterpreting}
+              disabled={!command.trim() || isInterpreting}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-purple-600 hover:bg-purple-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title={waitingForClarification ? "Send response (Enter)" : "Interpret (Enter)"}
             >
@@ -595,6 +686,9 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
             {/* Examples Panel */}
             {showExamples && (
               <div className="mx-4 mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-xs text-gray-500 mb-2">
+                  <span className="text-amber-500">⚡</span> = Works without AI
+                </p>
                 <div className="space-y-2">
                   {EXAMPLES.map((example, index) => (
                     <button
@@ -602,8 +696,11 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
                       onClick={() => useExample(example)}
                       className="w-full text-left p-2 hover:bg-white rounded transition-colors"
                     >
-                      <p className="text-sm font-medium text-gray-800">{example.command}</p>
-                      <p className="text-xs text-gray-500">{example.description}</p>
+                      <div className="flex items-center gap-1">
+                        {example.noAI && <span className="text-amber-500" title="Works without AI">⚡</span>}
+                        <p className="text-sm font-medium text-gray-800">{example.command}</p>
+                      </div>
+                      <p className="text-xs text-gray-500 ml-4">{example.description}</p>
                     </button>
                   ))}
                 </div>

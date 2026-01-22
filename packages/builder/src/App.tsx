@@ -76,6 +76,7 @@ const isElectron = () => typeof window !== 'undefined' && !!window.electronAPI?.
 function App() {
   const { state, actions, initializeStory } = useStoryBuilder();
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
+  const [beatRefreshKey, setBeatRefreshKey] = useState(0); // Increments to force visual editor refresh
   const [showPreview, setShowPreview] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
@@ -110,9 +111,7 @@ function App() {
     closeModal: closeAIDebugModal,
   } = useAIDebug({ checkUI: true, checkConsole: true, delay: 1500 });
 
-  // Command manager hook - provides global Ctrl+Z/Ctrl+Shift+Z keyboard shortcuts for undo/redo
-  // This ensures undo/redo works even after modal dialogs (like HelperCommandInput) close
-  useCommandManager();
+  // Command manager callback - see below for useCommandManager call after handlers are defined
 
   // Import ASML dialog state
   const [showImportAsmlDialog, setShowImportAsmlDialog] = useState(false);
@@ -1581,6 +1580,66 @@ function App() {
     }
     markChanged();
   }, [actions, state.beats, selectedBeat, markChanged]);
+
+  // Handle bulk transformation changes - force UI refresh for affected beats
+  const handleTransformationChangesApplied = useCallback((affectedBeatIds: string[]) => {
+    console.log('[App] Transformation changes applied to beats:', affectedBeatIds);
+    markChanged();
+
+    // Force refresh of selected beat if it was affected
+    if (selectedBeat && affectedBeatIds.includes(selectedBeat.id)) {
+      const updatedBeat = state.beats.find(b => b.id === selectedBeat.id);
+      if (updatedBeat) {
+        // Force re-render by clearing and re-setting
+        setSelectedBeat(null);
+        setTimeout(() => setSelectedBeat(updatedBeat), 0);
+      }
+    }
+  }, [selectedBeat, state.beats, markChanged]);
+
+  // Handle command operations (execute, undo, redo) - refresh UI after any beat changes
+  const handleCommandExecuted = useCallback((type: 'execute' | 'undo' | 'redo') => {
+    console.log(`[App] Command ${type} executed`);
+
+    // Mark as changed for undo/redo operations that modify state
+    if (type === 'undo' || type === 'redo') {
+      markChanged();
+    }
+
+    // Force visual editor to refresh by incrementing the key
+    // This ensures the editor re-reads the beat data even if the object reference hasn't changed
+    setBeatRefreshKey(k => k + 1);
+  }, [markChanged]);
+
+  // Refs to access current values in the refresh effect without adding dependencies
+  const selectedBeatRef = useRef(selectedBeat);
+  selectedBeatRef.current = selectedBeat;
+  const beatsForRefreshRef = useRef(state.beats);
+  beatsForRefreshRef.current = state.beats;
+
+  // Force selectedBeat refresh when beatRefreshKey changes (after undo/redo)
+  // This runs after React has processed the state update from the command
+  useEffect(() => {
+    if (beatRefreshKey > 0 && selectedBeatRef.current) {
+      const beatId = selectedBeatRef.current.id;
+      // Find the beat in the updated state and force a re-selection
+      const freshBeat = beatsForRefreshRef.current.find(b => b.id === beatId);
+      if (freshBeat) {
+        // Clear and restore to force all dependent components to re-read the beat
+        setSelectedBeat(null);
+        // Use requestAnimationFrame to ensure the null state is painted first
+        requestAnimationFrame(() => {
+          setSelectedBeat(freshBeat);
+        });
+      }
+    }
+  }, [beatRefreshKey]);
+
+  // Command manager hook - provides global Ctrl+Z/Ctrl+Shift+Z keyboard shortcuts for undo/redo
+  // Must be called after handleCommandExecuted is defined
+  useCommandManager({
+    onCommandExecuted: handleCommandExecuted,
+  });
 
   const handleBeatDelete = useCallback((beatId: string) => {
     actions.deleteBeat(beatId);
@@ -3329,6 +3388,7 @@ function App() {
             clusters={state.clusters || []}
             containerBeatPositions={state.containerBeatPositions || []}
             selectedBeat={selectedBeat}
+            refreshKey={beatRefreshKey}
             selectedCluster={selectedCluster}
             onBeatSelect={handleBeatSelect}
             onBeatUpdate={handleBeatUpdate}
@@ -3616,7 +3676,7 @@ function App() {
         onReplaceInBeat={handleReplaceInBeat}
       />
 
-      {/* AI Helper Commands Panel */}
+      {/* Transformation Commands Panel */}
       <HelperCommandInput
         isOpen={showHelperCommands}
         onClose={() => setShowHelperCommands(false)}
@@ -3627,6 +3687,7 @@ function App() {
         characterNames={characters.map(c => c.name)}
         onUpdateBeat={actions.updateBeat}
         onDeleteBeat={actions.deleteBeat}
+        onChangesApplied={handleTransformationChangesApplied}
       />
 
       {/* Save Project Dialog */}

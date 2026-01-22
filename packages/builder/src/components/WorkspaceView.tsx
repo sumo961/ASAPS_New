@@ -13,6 +13,8 @@ interface WorkspaceViewProps {
   clusters: Cluster[];
   containerBeatPositions?: ContainerBeatPosition[];
   selectedBeat: Beat | null;
+  /** Increments to force visual editor refresh (e.g., after undo/redo) */
+  refreshKey?: number;
   selectedCluster: Cluster | null;
   onBeatSelect: (beat: Beat) => void;
   onBeatMove: (beatId: string, position: { x: number; y: number }) => void;
@@ -65,6 +67,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   clusters,
   containerBeatPositions = [],
   selectedBeat,
+  refreshKey = 0,
   selectedCluster,
   onBeatSelect,
   onBeatMove,
@@ -229,8 +232,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         ) : (
           <div className="h-full w-full">
             <VisualWorkspace
-              // Key includes _version to force re-render when beat parameters change (e.g., after merge)
-              key={`${selectedBeat?.id}-${(selectedBeat as any)?._version || 0}`}
+              // Key includes refreshKey and _version to force re-render when beat changes (e.g., after undo/redo)
+              key={`${selectedBeat?.id}-${refreshKey}-${(selectedBeat as any)?._version || 0}`}
               beat={selectedBeat}
               beats={beats}
               assets={assets}

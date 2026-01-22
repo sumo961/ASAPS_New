@@ -53,17 +53,30 @@ export interface UseCommandManagerReturn {
 }
 
 /**
+ * Options for useCommandManager hook
+ */
+export interface UseCommandManagerOptions {
+  /** CommandManager options */
+  managerOptions?: CommandManagerOptions;
+
+  /** Enable keyboard shortcuts (default: true) */
+  enableKeyboardShortcuts?: boolean;
+
+  /** Callback fired after any command operation (execute, undo, redo) */
+  onCommandExecuted?: (type: 'execute' | 'undo' | 'redo', command: Command | null) => void;
+}
+
+/**
  * Hook for managing undo/redo with command pattern
  *
- * @param options - CommandManager options
- * @param enableKeyboardShortcuts - Enable Ctrl+Z/Ctrl+Shift+Z shortcuts (default: true)
+ * @param options - Hook options
  * @returns Command manager interface
  *
  * @example
  * ```tsx
  * const { execute, undo, redo, canUndo, canRedo } = useCommandManager({
- *   projectId: 'my-project',
- *   maxHistory: 50,
+ *   managerOptions: { projectId: 'my-project', maxHistory: 50 },
+ *   onCommandExecuted: (type, cmd) => console.log('Command:', type, cmd?.description),
  * });
  *
  * // Execute a command
@@ -77,19 +90,33 @@ export interface UseCommandManagerReturn {
  * ```
  */
 export function useCommandManager(
-  options?: CommandManagerOptions,
+  options?: UseCommandManagerOptions | CommandManagerOptions,
   enableKeyboardShortcuts: boolean = true
 ): UseCommandManagerReturn {
+  // Handle both old and new options format for backwards compatibility
+  const hookOptions: UseCommandManagerOptions = options && 'managerOptions' in options
+    ? options
+    : { managerOptions: options as CommandManagerOptions | undefined, enableKeyboardShortcuts };
+
+  const {
+    managerOptions,
+    enableKeyboardShortcuts: enableShortcuts = enableKeyboardShortcuts,
+    onCommandExecuted,
+  } = hookOptions;
   // Use the singleton command manager so history persists across components
   // This ensures that commands executed in one component (like HelperCommandInput)
   // can be undone from anywhere in the app
   const managerRef = useRef<CommandManager | null>(null);
 
   if (!managerRef.current) {
-    managerRef.current = getCommandManager(options);
+    managerRef.current = getCommandManager(managerOptions);
   }
 
   const manager = managerRef.current;
+
+  // Store callback in ref to avoid re-creating handlers
+  const onCommandExecutedRef = useRef(onCommandExecuted);
+  onCommandExecutedRef.current = onCommandExecuted;
 
   // State for triggering re-renders
   const [, setUpdateTrigger] = useState(0);
@@ -106,7 +133,7 @@ export function useCommandManager(
 
   // Keyboard shortcuts
   useEffect(() => {
-    if (!enableKeyboardShortcuts) {
+    if (!enableShortcuts) {
       return;
     }
 
@@ -114,19 +141,25 @@ export function useCommandManager(
       // Check for Ctrl+Z or Cmd+Z (undo)
       if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
         event.preventDefault();
+        const cmd = manager.getUndoCommand();
         await manager.undo();
+        onCommandExecutedRef.current?.('undo', cmd);
       }
 
       // Check for Ctrl+Shift+Z or Cmd+Shift+Z (redo)
       if ((event.ctrlKey || event.metaKey) && event.key === 'z' && event.shiftKey) {
         event.preventDefault();
+        const cmd = manager.getRedoCommand();
         await manager.redo();
+        onCommandExecutedRef.current?.('redo', cmd);
       }
 
       // Alternative: Ctrl+Y for redo (Windows convention)
       if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
         event.preventDefault();
+        const cmd = manager.getRedoCommand();
         await manager.redo();
+        onCommandExecutedRef.current?.('redo', cmd);
       }
     };
 
@@ -135,7 +168,7 @@ export function useCommandManager(
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [manager, enableKeyboardShortcuts]);
+  }, [manager, enableShortcuts]);
 
   // Note: We don't dispose the singleton manager on unmount
   // The singleton persists for the lifetime of the app
@@ -144,18 +177,23 @@ export function useCommandManager(
   const execute = useCallback(
     async (command: Command) => {
       await manager.execute(command);
+      onCommandExecutedRef.current?.('execute', command);
     },
     [manager]
   );
 
   // Undo
   const undo = useCallback(async () => {
+    const cmd = manager.getUndoCommand();
     await manager.undo();
+    onCommandExecutedRef.current?.('undo', cmd);
   }, [manager]);
 
   // Redo
   const redo = useCallback(async () => {
+    const cmd = manager.getRedoCommand();
     await manager.redo();
+    onCommandExecutedRef.current?.('redo', cmd);
   }, [manager]);
 
   // Clear history

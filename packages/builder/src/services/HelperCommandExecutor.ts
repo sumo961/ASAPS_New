@@ -703,16 +703,27 @@ export class HelperCommandExecutor {
     return (location as any)[property];
   }
 
-  private createBeatUpdate(property: string, value: any): Partial<BeatConfig> {
-    // Handle special properties
+  private createBeatUpdate(property: string, value: any): Partial<BeatConfig> & Record<string, any> {
+    // Handle special properties that are direct Beat properties (not parameters)
     if (property === 'transition') {
       return { transition: value as Transition };
     }
     if (property === 'sound') {
       return { sound: value as Sound };
     }
+    if (property === 'cluster') {
+      return { cluster: value };
+    }
+    if (property === 'defaultTarget') {
+      return { defaultTarget: value };
+    }
 
-    // Handle as parameter
+    // These are Beat class properties not in BeatConfig but set directly via Object.assign
+    if (property === 'node' || property === 'defaultTargetDelay') {
+      return { [property]: value };
+    }
+
+    // Handle as parameter (for beat-type-specific properties)
     return { parameters: { [property]: value } };
   }
 

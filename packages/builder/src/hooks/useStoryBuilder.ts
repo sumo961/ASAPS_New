@@ -241,6 +241,12 @@ export function useStoryBuilder() {
 
           // Update beat properties while maintaining the Beat instance
           Object.assign(beat, updates);
+
+          // Increment _version to signal to React that the beat has changed
+          // This is necessary because Object.assign mutates in place, keeping the same reference
+          // Components using beat in their key (e.g., VisualWorkspace) will detect this change
+          (beat as any)._version = ((beat as any)._version || 0) + 1;
+
           return beat;
         }
         return beat;
