@@ -426,8 +426,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   <Type className="w-3 h-3" />
                   Text
                 </button>
-                {/* Only show Hotspot button for movementChoice beats */}
-                {beatType === 'movementChoice' && (
+                {/* Show Hotspot button for movementChoice and pickProp beats */}
+                {(beatType === 'movementChoice' || beatType === 'pickProp') && (
                   <button
                     onClick={() => onElementAdd('hotspot')}
                     className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"

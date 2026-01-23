@@ -155,7 +155,8 @@ export const Inspector: React.FC<InspectorProps> = ({
   // Force re-render trigger for when we modify beat.locations directly
   const [locationUpdateTrigger, setLocationUpdateTrigger] = useState(0);
 
-  // Get available hotspots and props from beat.locations for MovementChoice association
+  // Get available hotspots and props from beat.locations for MovementChoice/PickProp association
+  // Dependencies include locations.size and activeTab to refresh when locations change or tab switches
   const availableLocations = useMemo(() => {
     if (!beat || !beat.locations) return { hotspots: [], props: [] };
 
@@ -164,7 +165,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     const props = locations.filter(loc => loc.kind === 'prop');
 
     return { hotspots, props };
-  }, [beat, locationUpdateTrigger]);
+  }, [beat, beat?.locations?.size, locationUpdateTrigger, activeTab]);
 
   // Asset selection modal state
   const [assetSelectionModal, setAssetSelectionModal] = useState<{
@@ -388,13 +389,25 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   // Helper functions for Pick Prop
   const handleAddProp = () => {
+    // Generate a unique prop name (New Prop 1, New Prop 2, etc.)
+    const existingProps = localBeat.parameters?.props || [];
+    let propNumber = existingProps.length + 1;
+    let propName = `New Prop ${propNumber}`;
+
+    // Ensure the name is unique
+    const existingNames = new Set(existingProps.map((p: any) => p.name));
+    while (existingNames.has(propName)) {
+      propNumber++;
+      propName = `New Prop ${propNumber}`;
+    }
+
     const newProp: PropWithEffect = {
       id: `prop_${Date.now()}`,
-      name: 'New Prop',
+      name: propName,
       description: '',
       target: ''
     };
-    handleParameterChange('props', [...(localBeat.parameters?.props || []), newProp]);
+    handleParameterChange('props', [...existingProps, newProp]);
   };
 
   const handleRemoveProp = (index: number) => {
@@ -432,6 +445,65 @@ export const Inspector: React.FC<InspectorProps> = ({
       };
       rebuildConnectionsAndUpdate(updatedBeat);
     }
+  };
+
+  // Create a new hotspot for a PickProp option (similar to handleCreateHotspotForChoice)
+  const handleCreateHotspotForProp = (propIndex: number) => {
+    if (!beat || !onUpdate) return;
+
+    const prop = localBeat.parameters?.props?.[propIndex];
+    if (!prop) return;
+
+    // Generate a unique hotspot name based on prop name
+    const hotspotName = prop.name || `Prop ${propIndex + 1}`;
+
+    // Check if a hotspot with this name already exists
+    const existingNames = new Set(
+      Array.from(beat.locations?.values() || []).map(loc => loc.name)
+    );
+    let finalName = hotspotName;
+    let counter = 1;
+    while (existingNames.has(finalName)) {
+      finalName = `${hotspotName} (${counter})`;
+      counter++;
+    }
+
+    // Create a new hotspot location
+    const newHotspot = {
+      kind: 'hotspot' as const,
+      name: finalName,
+      x: 100 + (propIndex * 50), // Stagger positions
+      y: 300 + (propIndex * 60),
+      width: 150,
+      height: 50,
+      zIndex: 10 + propIndex,
+    };
+
+    // Directly add to the beat's locations Map
+    beat.locations.set(finalName, newHotspot as any);
+
+    // Update the prop's locationName to reference this new hotspot
+    const newProps = [...(localBeat.parameters?.props || [])];
+    newProps[propIndex] = {
+      ...newProps[propIndex],
+      locationName: finalName
+    };
+
+    // Update local state with the new props
+    const updatedBeat = {
+      ...localBeat,
+      parameters: {
+        ...localBeat.parameters,
+        props: newProps
+      }
+    };
+    setLocalBeat(updatedBeat);
+
+    // Trigger re-render to update availableLocations
+    setLocationUpdateTrigger(prev => prev + 1);
+
+    // Use rebuildConnectionsAndUpdate to persist the changes
+    rebuildConnectionsAndUpdate(updatedBeat);
   };
 
   // Get beat content for visual editor
@@ -2103,6 +2175,62 @@ export const Inspector: React.FC<InspectorProps> = ({
                             placeholder="Description"
                             className="w-full px-2 py-1 text-sm border rounded"
                           />
+
+                          {/* Visual Element Association - like movementChoice */}
+                          <div className="flex gap-2">
+                            <select
+                              value={(prop as any).locationName || ''}
+                              onChange={(e) => handleUpdateProp(index, 'locationName', e.target.value)}
+                              className="flex-1 px-2 py-1 text-sm border rounded"
+                              title="Associate this prop with a hotspot or prop from the Visual Editor"
+                            >
+                              <option value="">Auto-create hotspot</option>
+                              {availableLocations.hotspots.length > 0 && (
+                                <optgroup label="Hotspots">
+                                  {availableLocations.hotspots.map((loc) => (
+                                    <option key={`hotspot-${loc.name}`} value={loc.name}>
+                                      🎯 {loc.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {availableLocations.props.length > 0 && (
+                                <optgroup label="Props">
+                                  {availableLocations.props.map((loc) => (
+                                    <option key={`prop-${loc.name}`} value={loc.name}>
+                                      📦 {loc.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => handleCreateHotspotForProp(index)}
+                              className="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 flex items-center gap-1"
+                              title="Create a new hotspot in the Visual Editor for this prop"
+                            >
+                              <MapPin className="w-3 h-3" />
+                              New
+                            </button>
+                          </div>
+
+                          {/* Inventory Name Override - allows different name in inventory than displayed */}
+                          <div>
+                            <label className="text-xs text-gray-600 mb-1 block">
+                              Inventory Name (overrides display name)
+                            </label>
+                            <input
+                              type="text"
+                              value={(prop as any).inventoryName || ''}
+                              onChange={(e) => handleUpdateProp(index, 'inventoryName', e.target.value)}
+                              placeholder={(prop as any).locationName || prop.name || 'Same as prop name'}
+                              className="w-full px-2 py-1 text-sm border rounded"
+                            />
+                            <span className="text-xs text-gray-400">
+                              Name added to inventory when picked. Leave empty to use "{(prop as any).locationName || prop.name || 'prop name'}"
+                            </span>
+                          </div>
 
                           {/* Prop Graphic Asset Selector */}
                           <div>

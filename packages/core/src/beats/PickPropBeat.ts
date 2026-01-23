@@ -116,12 +116,14 @@ export class PickPropBeat extends Beat {
     }
 
     // Render the prop selection interface with locations
+    // Include locationName for Visual Editor element association
     const propId = await renderer.renderPropSelection(
       processedQuestion,
       availableProps.map(p => ({
         id: p.id,
         name: this.processText(p.name, context),
-        description: this.processText(p.description, context)
+        description: this.processText(p.description, context),
+        locationName: p.locationName  // For visual element association (like movementChoice)
       })),
       locations
     );
@@ -142,8 +144,9 @@ export class PickPropBeat extends Beat {
         selectedProp.effects.forEach(effect => context.applyEffect(effect));
       }
 
-      // Add prop to inventory by default
-      context.addToInventory(selectedProp.name);
+      // Add prop to inventory with fallback chain: inventoryName → locationName → name
+      const inventoryItemName = selectedProp.inventoryName || selectedProp.locationName || selectedProp.name;
+      context.addToInventory(inventoryItemName);
 
       // Apply direct counter fields (new feature)
       if (selectedProp.counter) {

@@ -68,6 +68,8 @@
         "name": "string",
         "description": "string",
         "assetId": "string?",
+        "locationName": "string?",
+        "inventoryName": "string?",
         "target": "string",
         "conditions": "condition[]?",
         "effects": "effect[]?",
@@ -76,7 +78,7 @@
         "counterValue": "number?",
         "soundEffect": "string?"
       },
-      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. Prop name is always added to inventory regardless of effects."
+      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name)."
     },
     "condition": {
       "description": "Condition for beat logic",

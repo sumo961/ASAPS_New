@@ -3139,16 +3139,32 @@ export function createPositionedElementData(
       }
     }
 
-    // For pickProp: match location.name to prop.name to get prop.id
+    // For pickProp: match location.name to prop.locationName first, then prop.name (like movementChoice)
     if (beatType === 'pickProp' && content.props && Array.isArray(content.props)) {
-      const prop = content.props.find((p: any) => p.name === location.name);
+      const locNameLower = location.name?.toLowerCase() || '';
+      // First priority: explicit locationName association (like movementChoice)
+      let prop = content.props.find((p: any) => p.locationName && p.locationName === location.name);
+      // Second: exact name match
+      if (!prop) {
+        prop = content.props.find((p: any) => p.name === location.name);
+      }
+      // Third: case-insensitive partial match (e.g., "Axe" matches "Axe.png" or vice versa)
+      if (!prop && locNameLower) {
+        prop = content.props.find((p: any) => {
+          const propNameLower = p.name?.toLowerCase() || '';
+          return propNameLower && (
+            locNameLower.includes(propNameLower) ||
+            propNameLower.includes(locNameLower)
+          );
+        });
+      }
       if (prop) {
         actionId = prop.id;
         // Only set targetBeatId when markVisited is enabled for this beat
         if (markVisited) {
           targetBeatId = prop.target;
         }
-        console.log(`[createPositionedElementData] PickProp: location "${location.name}" → prop ID "${actionId}", target "${targetBeatId}", markVisited=${markVisited}`);
+        console.log(`[createPositionedElementData] PickProp: location "${location.name}" → prop ID "${actionId}" (via ${prop.locationName === location.name ? 'locationName' : prop.name === location.name ? 'exact name' : 'partial match'}), target "${targetBeatId}", markVisited=${markVisited}`);
       }
     }
 
@@ -3358,6 +3374,13 @@ function getContentForLocation(
     }
     // Handle individual location hotspots - match by name or text first
     if (content.choices) {
+      // FIRST: Try locationName match (hotspot/prop associated via Visual Editor)
+      const locationNameMatch = content.choices.find((c: any) =>
+        c.locationName && c.locationName === loc.name
+      );
+      if (locationNameMatch) {
+        return locationNameMatch.text || locationNameMatch.location;
+      }
       // Try exact match first (case-insensitive)
       const exactMatch = content.choices.find((c: any) =>
         (c.text && c.text.toLowerCase() === nameLower) ||
@@ -3381,6 +3404,48 @@ function getContentForLocation(
       if (locationNum && content.choices[parseInt(locationNum[1]) - 1]) {
         const choice = content.choices[parseInt(locationNum[1]) - 1];
         return choice.text || choice.location || `Location ${locationNum[1]}`;
+      }
+    }
+  }
+
+  // PickProp specific elements
+  if (beatType === 'pickProp') {
+    if (nameLower.includes('question')) {
+      return content.question || 'What do you want to interact with?';
+    }
+    // Handle prop hotspots - match by locationName first, then by name
+    if (content.props) {
+      // FIRST: Try locationName match (hotspot/prop associated via Visual Editor)
+      const locationNameMatch = content.props.find((p: any) =>
+        p.locationName && p.locationName === loc.name
+      );
+      if (locationNameMatch) {
+        return locationNameMatch.name || locationNameMatch.description;
+      }
+      // Try exact name match
+      const exactMatch = content.props.find((p: any) =>
+        p.name && p.name === loc.name
+      );
+      if (exactMatch) {
+        return exactMatch.name;
+      }
+      // Try case-insensitive exact match
+      const caseInsensitiveMatch = content.props.find((p: any) =>
+        p.name && p.name.toLowerCase() === nameLower
+      );
+      if (caseInsensitiveMatch) {
+        return caseInsensitiveMatch.name;
+      }
+      // Try partial match (e.g., "Axe" matches "Axe.png" or vice versa)
+      const partialMatch = content.props.find((p: any) => {
+        const propNameLower = p.name?.toLowerCase() || '';
+        return propNameLower && (
+          nameLower.includes(propNameLower) ||
+          propNameLower.includes(nameLower)
+        );
+      });
+      if (partialMatch) {
+        return partialMatch.name;
       }
     }
   }

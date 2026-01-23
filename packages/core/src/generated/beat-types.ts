@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-23T04:29:55.972Z
+ * Generated: 2026-01-23T16:11:44.296Z
  */
 
 // ============================================
@@ -67,6 +67,8 @@ export interface PropOption {
   name: string;
   description: string;
   assetId?: string;
+  locationName?: string;
+  inventoryName?: string;
   target: string;
   conditions?: Condition[];
   effects?: Effect[];
