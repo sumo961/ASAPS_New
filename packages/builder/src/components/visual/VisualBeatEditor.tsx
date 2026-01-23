@@ -363,10 +363,37 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     // Handle dragging
     if (!draggedElement) return;
 
-    const x = Math.max(0, Math.min(stageWidth - 50,
+    const draggedEl = elements.find(el => el.id === draggedElement);
+    if (!draggedEl) return;
+
+    const scale = draggedEl.scale || 1;
+
+    // Get base dimensions (account for sprite characters)
+    let baseWidth = draggedEl.width;
+    let baseHeight = draggedEl.height;
+    if (draggedEl.type === 'character' && draggedEl.characterId) {
+      const char = characters.find(c => c.id === draggedEl.characterId);
+      if (char?.visual?.type === 'sprite' && char.visual.spriteSheet) {
+        baseWidth = char.visual.spriteSheet.frameWidth;
+        baseHeight = char.visual.spriteSheet.frameHeight;
+      }
+    }
+
+    // Calculate effective dimensions
+    const effectiveWidth = baseWidth * scale;
+    const effectiveHeight = baseHeight * scale;
+
+    // Calculate the new effective position (where user is dragging to)
+    const newEffectiveX = Math.max(0, Math.min(stageWidth - effectiveWidth,
       (e.clientX - rect.left) / zoom - dragOffset.x));
-    const y = Math.max(0, Math.min(stageHeight - 50,
+    const newEffectiveY = Math.max(0, Math.min(stageHeight - effectiveHeight,
       (e.clientY - rect.top) / zoom - dragOffset.y));
+
+    // Convert effective position back to base position
+    // effectiveX = baseX + (baseWidth - effectiveWidth) / 2
+    // baseX = effectiveX - (baseWidth - effectiveWidth) / 2
+    const x = newEffectiveX - (baseWidth - effectiveWidth) / 2;
+    const y = newEffectiveY - (baseHeight - effectiveHeight) / 2;
 
     const updatedElements = elements.map(el =>
       el.id === draggedElement ? { ...el, x, y } : el
@@ -747,24 +774,29 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
               {elements
                 .filter(el => el.visible)
                 .map(el => {
-                  // Build transform string for overlay
-                  const transforms: string[] = [];
-                  if (el.rotation) {
-                    transforms.push(`rotate(${el.rotation}deg)`);
-                  }
-                  if (el.scale && el.scale !== 1) {
-                    transforms.push(`scale(${el.scale})`);
-                  }
+                  const scale = el.scale || 1;
 
                   // For sprite characters, use sprite frame dimensions
-                  let overlayWidth = el.width;
-                  let overlayHeight = el.height;
+                  let baseWidth = el.width;
+                  let baseHeight = el.height;
                   if (el.type === 'character' && el.characterId) {
                     const char = characters.find(c => c.id === el.characterId);
                     if (char?.visual?.type === 'sprite' && char.visual.spriteSheet) {
-                      overlayWidth = char.visual.spriteSheet.frameWidth;
-                      overlayHeight = char.visual.spriteSheet.frameHeight;
+                      baseWidth = char.visual.spriteSheet.frameWidth;
+                      baseHeight = char.visual.spriteSheet.frameHeight;
                     }
+                  }
+
+                  // Calculate effective dimensions and position (accounting for scale with center origin)
+                  const effectiveWidth = baseWidth * scale;
+                  const effectiveHeight = baseHeight * scale;
+                  const effectiveX = el.x + (baseWidth - effectiveWidth) / 2;
+                  const effectiveY = el.y + (baseHeight - effectiveHeight) / 2;
+
+                  // Build transform string - only rotation, no scale (we use effective dimensions)
+                  const transforms: string[] = [];
+                  if (el.rotation) {
+                    transforms.push(`rotate(${el.rotation}deg)`);
                   }
 
                   return (
@@ -772,10 +804,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                       key={`drag-overlay-${el.id}`}
                       style={{
                         position: 'absolute',
-                        left: `${el.x}px`,
-                        top: `${el.y}px`,
-                        width: `${overlayWidth}px`,
-                        height: `${overlayHeight}px`,
+                        left: `${effectiveX}px`,
+                        top: `${effectiveY}px`,
+                        width: `${effectiveWidth}px`,
+                        height: `${effectiveHeight}px`,
                         zIndex: (el.z || 0) + 1000,
                         cursor: el.locked ? 'not-allowed' : 'move',
                         pointerEvents: 'auto',
@@ -794,11 +826,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                           onSelectElement(el.id);
                         }
 
-                        // Start drag
+                        // Start drag - use effective position for offset calculation
                         setDraggedElement(el.id);
                         setDragOffset({
-                          x: (e.clientX - rect.left) / zoom - el.x,
-                          y: (e.clientY - rect.top) / zoom - el.y
+                          x: (e.clientX - rect.left) / zoom - effectiveX,
+                          y: (e.clientY - rect.top) / zoom - effectiveY
                         });
                       }}
                     />
@@ -809,24 +841,29 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
               {elements
                 .filter(el => el.visible && el.id === selectedElement)
                 .map(el => {
-                  // Build transform string for selection indicator
-                  const transforms: string[] = [];
-                  if (el.rotation) {
-                    transforms.push(`rotate(${el.rotation}deg)`);
-                  }
-                  if (el.scale && el.scale !== 1) {
-                    transforms.push(`scale(${el.scale})`);
-                  }
+                  const scale = el.scale || 1;
 
                   // For sprite characters, use sprite frame dimensions
-                  let displayWidth = el.width;
-                  let displayHeight = el.height;
+                  let baseWidth = el.width;
+                  let baseHeight = el.height;
                   if (el.type === 'character' && el.characterId) {
                     const char = characters.find(c => c.id === el.characterId);
                     if (char?.visual?.type === 'sprite' && char.visual.spriteSheet) {
-                      displayWidth = char.visual.spriteSheet.frameWidth;
-                      displayHeight = char.visual.spriteSheet.frameHeight;
+                      baseWidth = char.visual.spriteSheet.frameWidth;
+                      baseHeight = char.visual.spriteSheet.frameHeight;
                     }
+                  }
+
+                  // Calculate effective dimensions and position (accounting for scale with center origin)
+                  const effectiveWidth = baseWidth * scale;
+                  const effectiveHeight = baseHeight * scale;
+                  const effectiveX = el.x + (baseWidth - effectiveWidth) / 2;
+                  const effectiveY = el.y + (baseHeight - effectiveHeight) / 2;
+
+                  // Build transform string - only rotation, no scale (we use effective dimensions)
+                  const transforms: string[] = [];
+                  if (el.rotation) {
+                    transforms.push(`rotate(${el.rotation}deg)`);
                   }
 
                   return (
@@ -834,10 +871,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                       key={`selection-${el.id}`}
                       style={{
                         position: 'absolute',
-                        left: `${el.x}px`,
-                        top: `${el.y}px`,
-                        width: `${displayWidth}px`,
-                        height: `${displayHeight}px`,
+                        left: `${effectiveX}px`,
+                        top: `${effectiveY}px`,
+                        width: `${effectiveWidth}px`,
+                        height: `${effectiveHeight}px`,
                         border: '2px solid #3b82f6',
                         borderRadius: '4px',
                         pointerEvents: 'none',

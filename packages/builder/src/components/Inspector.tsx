@@ -19,6 +19,7 @@ interface ChoiceWithCounter {
   id: string;
   text: string;
   location?: string;
+  locationName?: string;  // References a hotspot/prop from beat.locations by name
   target?: string;
   counter?: string;
   counterOperation?: string;
@@ -150,6 +151,20 @@ export const Inspector: React.FC<InspectorProps> = ({
   // Get available counters and variables for dropdowns
   const availableCounters = useAvailableCounters(characters);
   const availableVariables = useAvailableVariables(globalSettings || null);
+
+  // Force re-render trigger for when we modify beat.locations directly
+  const [locationUpdateTrigger, setLocationUpdateTrigger] = useState(0);
+
+  // Get available hotspots and props from beat.locations for MovementChoice association
+  const availableLocations = useMemo(() => {
+    if (!beat || !beat.locations) return { hotspots: [], props: [] };
+
+    const locations = Array.from(beat.locations.values());
+    const hotspots = locations.filter(loc => loc.kind === 'hotspot');
+    const props = locations.filter(loc => loc.kind === 'prop');
+
+    return { hotspots, props };
+  }, [beat, locationUpdateTrigger]);
 
   // Asset selection modal state
   const [assetSelectionModal, setAssetSelectionModal] = useState<{
@@ -310,6 +325,65 @@ export const Inspector: React.FC<InspectorProps> = ({
       };
       rebuildConnectionsAndUpdate(updatedBeat);
     }
+  };
+
+  // Create a new hotspot for a MovementChoice option
+  const handleCreateHotspotForChoice = (choiceIndex: number) => {
+    if (!beat || !onUpdate) return;
+
+    const choice = localBeat.parameters?.choices?.[choiceIndex];
+    if (!choice) return;
+
+    // Generate a unique hotspot name based on choice text
+    const hotspotName = choice.text || choice.location || `Hotspot ${choiceIndex + 1}`;
+
+    // Check if a hotspot with this name already exists
+    const existingNames = new Set(
+      Array.from(beat.locations?.values() || []).map(loc => loc.name)
+    );
+    let finalName = hotspotName;
+    let counter = 1;
+    while (existingNames.has(finalName)) {
+      finalName = `${hotspotName} (${counter})`;
+      counter++;
+    }
+
+    // Create a new hotspot location
+    const newHotspot = {
+      kind: 'hotspot' as const,
+      name: finalName,
+      x: 100 + (choiceIndex * 50), // Stagger positions
+      y: 300 + (choiceIndex * 60),
+      width: 150,
+      height: 50,
+      zIndex: 10 + choiceIndex,
+    };
+
+    // Directly add to the beat's locations Map
+    beat.locations.set(finalName, newHotspot as any);
+
+    // Update the choice's locationName to reference this new hotspot
+    const newChoices = [...(localBeat.parameters?.choices || [])];
+    newChoices[choiceIndex] = {
+      ...newChoices[choiceIndex],
+      locationName: finalName
+    };
+
+    // Update local state with the new choices
+    const updatedBeat = {
+      ...localBeat,
+      parameters: {
+        ...localBeat.parameters,
+        choices: newChoices
+      }
+    };
+    setLocalBeat(updatedBeat);
+
+    // Trigger re-render to update availableLocations
+    setLocationUpdateTrigger(prev => prev + 1);
+
+    // Use rebuildConnectionsAndUpdate to persist the changes
+    rebuildConnectionsAndUpdate(updatedBeat);
   };
 
   // Helper functions for Pick Prop
@@ -1839,7 +1913,46 @@ export const Inspector: React.FC<InspectorProps> = ({
                             placeholder="Location description"
                             className="w-full px-2 py-1 text-sm border rounded"
                           />
-                          
+
+                          {/* Hotspot/Prop Association */}
+                          <div className="flex gap-2">
+                            <select
+                              value={choice.locationName || ''}
+                              onChange={(e) => handleUpdateChoice(index, 'locationName', e.target.value)}
+                              className="flex-1 px-2 py-1 text-sm border rounded"
+                              title="Associate this choice with a hotspot or prop from the Visual Editor"
+                            >
+                              <option value="">Auto-create hotspot</option>
+                              {availableLocations.hotspots.length > 0 && (
+                                <optgroup label="Hotspots">
+                                  {availableLocations.hotspots.map((loc) => (
+                                    <option key={`hotspot-${loc.name}`} value={loc.name}>
+                                      🎯 {loc.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {availableLocations.props.length > 0 && (
+                                <optgroup label="Props">
+                                  {availableLocations.props.map((loc) => (
+                                    <option key={`prop-${loc.name}`} value={loc.name}>
+                                      📦 {loc.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => handleCreateHotspotForChoice(index)}
+                              className="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 flex items-center gap-1"
+                              title="Create a new hotspot in the Visual Editor for this choice"
+                            >
+                              <MapPin className="w-3 h-3" />
+                              New
+                            </button>
+                          </div>
+
                           <select
                             value={choice.target || ''}
                             onChange={(e) => handleUpdateChoice(index, 'target', e.target.value)}

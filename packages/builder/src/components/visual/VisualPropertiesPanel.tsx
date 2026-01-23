@@ -575,61 +575,95 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
             
             {expandedSections.transform && (
               <div className="px-4 pb-4 space-y-3">
-                {/* Position */}
-                <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">
-                    Position
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-gray-600">X</label>
-                      <input
-                        type="number"
-                        value={Math.round(selected.x)}
-                        onChange={(e) => onElementUpdate(selected.id, { x: parseInt(e.target.value) || 0 })}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Y</label>
-                      <input
-                        type="number"
-                        value={Math.round(selected.y)}
-                        onChange={(e) => onElementUpdate(selected.id, { y: parseInt(e.target.value) || 0 })}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
+                {/* Position - shows effective position accounting for scale transform */}
+                {(() => {
+                  const scale = selected.scale || 1;
+                  // Calculate effective dimensions (visual size after scale)
+                  const effectiveWidth = selected.width * scale;
+                  const effectiveHeight = selected.height * scale;
+                  // Calculate effective position (top-left of scaled element, transform origin is center)
+                  const effectiveX = selected.x + (selected.width - effectiveWidth) / 2;
+                  const effectiveY = selected.y + (selected.height - effectiveHeight) / 2;
 
-                {/* Size */}
-                <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">
-                    Size
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-gray-600">Width</label>
-                      <input
-                        type="number"
-                        value={Math.round(selected.width)}
-                        onChange={(e) => onElementUpdate(selected.id, { width: parseInt(e.target.value) || 50 })}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        min="10"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Height</label>
-                      <input
-                        type="number"
-                        value={Math.round(selected.height)}
-                        onChange={(e) => onElementUpdate(selected.id, { height: parseInt(e.target.value) || 50 })}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        min="10"
-                      />
-                    </div>
-                  </div>
-                </div>
+                  return (
+                    <>
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 mb-1 block">
+                          Position
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs text-gray-600">X</label>
+                            <input
+                              type="number"
+                              value={Math.round(effectiveX)}
+                              onChange={(e) => {
+                                const newEffectiveX = parseInt(e.target.value) || 0;
+                                // Convert effective X back to base X
+                                const baseX = newEffectiveX - (selected.width - effectiveWidth) / 2;
+                                onElementUpdate(selected.id, { x: Math.round(baseX) });
+                              }}
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-600">Y</label>
+                            <input
+                              type="number"
+                              value={Math.round(effectiveY)}
+                              onChange={(e) => {
+                                const newEffectiveY = parseInt(e.target.value) || 0;
+                                // Convert effective Y back to base Y
+                                const baseY = newEffectiveY - (selected.height - effectiveHeight) / 2;
+                                onElementUpdate(selected.id, { y: Math.round(baseY) });
+                              }}
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Size - shows effective size accounting for scale */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 mb-1 block">
+                          Size
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs text-gray-600">Width</label>
+                            <input
+                              type="number"
+                              value={Math.round(effectiveWidth)}
+                              onChange={(e) => {
+                                const newEffectiveWidth = parseInt(e.target.value) || 50;
+                                // Convert effective width back to base width
+                                const baseWidth = newEffectiveWidth / scale;
+                                onElementUpdate(selected.id, { width: Math.round(baseWidth) });
+                              }}
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                              min="10"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-600">Height</label>
+                            <input
+                              type="number"
+                              value={Math.round(effectiveHeight)}
+                              onChange={(e) => {
+                                const newEffectiveHeight = parseInt(e.target.value) || 50;
+                                // Convert effective height back to base height
+                                const baseHeight = newEffectiveHeight / scale;
+                                onElementUpdate(selected.id, { height: Math.round(baseHeight) });
+                              }}
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                              min="10"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* Scale - hide for characters since they have their own Size control */}
                 {selected.type !== 'character' && (

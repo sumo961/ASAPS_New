@@ -50,6 +50,7 @@
         "id": "string",
         "text": "string",
         "location": "string",
+        "locationName": "string?",
         "target": "string",
         "conditions": "condition[]?",
         "effects": "effect[]?",
@@ -58,7 +59,7 @@
         "counterValue": "number?",
         "soundEffect": "string?"
       },
-      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected."
+      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name."
     },
     "propOption": {
       "description": "A prop interaction choice",

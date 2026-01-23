@@ -159,6 +159,12 @@ export function generateDefaultLocations(
     let buttonY = currentY;
 
     content.choices.forEach((choice: any, index: number) => {
+      // Skip auto-generation if this choice has a locationName set
+      // (it's linked to an existing hotspot/prop in beat.locations)
+      if (choice.locationName) {
+        return;
+      }
+
       const choiceText = choice.text || choice.location || `Location ${index + 1}`;
       locations.push({
         kind: 'hotspot',

@@ -555,6 +555,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       if (el.textAlign) location.textAlign = el.textAlign;
       location.autosize = el.fontSize === undefined;
 
+      // Add transform properties (rotation and scale)
+      if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
+      if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
+
       // Add character-specific properties
       if (el.type === 'character') {
         if (el.characterId) location.characterId = el.characterId;
@@ -638,6 +642,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         if (el.fontSize !== undefined) location.fontSize = el.fontSize;
         if (el.textAlign) location.textAlign = el.textAlign;
         location.autosize = el.fontSize === undefined;
+
+        // Add transform properties (rotation and scale)
+        if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
+        if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
 
         // Add character-specific properties (for kind='character')
         if (el.type === 'character') {
@@ -837,8 +845,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             z: loc.zIndex || 0,
             width: loc.width,
             height: loc.height,
-            rotation: 0,
-            scale: 1,
+            rotation: loc.rotation || 0,
+            scale: loc.scale || 1,
             visible: true,
             locked: false,
             sound: loc.sound,
@@ -991,8 +999,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           z: loc.zIndex || 0,
           width: loc.width,
           height: loc.height,
-          rotation: 0,
-          scale: 1,
+          rotation: loc.rotation || 0,
+          scale: loc.scale || 1,
           visible: true,
           locked: false,
           sound: loc.sound,
@@ -1909,6 +1917,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       if (el.assetId) location.assetId = el.assetId;
       if (el.imageUrl) location.imageUrl = el.imageUrl;  // Preserve direct image URL (ASML imports)
       if (el.sound) location.sound = el.sound;
+
+      // Add transform properties (rotation and scale)
+      if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
+      if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
 
       // Add font properties
       if (el.font) location.font = el.font;
