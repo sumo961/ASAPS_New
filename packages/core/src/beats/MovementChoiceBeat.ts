@@ -156,7 +156,8 @@ export class MovementChoiceBeat extends Beat {
       availableChoices.map(c => ({
         id: c.id,
         text: this.processText(c.text, context),
-        location: c.location || ''
+        location: c.location || '',
+        locationName: c.locationName  // Pass locationName for hotspot/prop association
       })),
       locations
     );

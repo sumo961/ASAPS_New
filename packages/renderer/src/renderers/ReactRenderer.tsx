@@ -1514,7 +1514,7 @@ export class ReactRenderer extends BaseRenderer {
     return this.renderPositionedBeat('dialogTree', content, defaultLocations, true);
   }
 
-  async renderMovement(question: string, choices: { id: string; text: string; location: string }[], locations?: Location[]): Promise<string> {
+  async renderMovement(question: string, choices: { id: string; text: string; location: string; locationName?: string }[], locations?: Location[]): Promise<string> {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);

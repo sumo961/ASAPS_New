@@ -3037,8 +3037,15 @@ export function createPositionedElementData(
 
     // For movementChoice: match location.name to choice properties with multiple fallbacks
     if (beatType === 'movementChoice' && content.choices && Array.isArray(content.choices)) {
-      // Try matching by text first (since SchemaLocationInitializer uses choice.text for location.name)
-      let choice = content.choices.find((c: any) => c.text === location.name);
+      // First priority: match by locationName field (explicit association set in builder)
+      let choice = content.choices.find((c: any) => c.locationName && c.locationName === location.name);
+      if (choice) {
+        console.log(`[createPositionedElementData] MovementChoice: matched by locationName "${location.name}"`);
+      }
+      // Try matching by text (since SchemaLocationInitializer uses choice.text for location.name)
+      if (!choice) {
+        choice = content.choices.find((c: any) => c.text === location.name);
+      }
       // Fallback to location match
       if (!choice) {
         choice = content.choices.find((c: any) => c.location === location.name);
@@ -3058,9 +3065,9 @@ export function createPositionedElementData(
           }
         }
       }
-      // Fallback to case-insensitive partial match - ONLY for hotspot elements
+      // Fallback to case-insensitive partial match - for hotspot and prop elements
       // Don't try to match text, character, or other non-interactive elements to choices
-      if (!choice && location.name && location.kind === 'hotspot') {
+      if (!choice && location.name && (location.kind === 'hotspot' || location.kind === 'prop')) {
         const locNameLower = location.name.toLowerCase();
         choice = content.choices.find((c: any) => {
           // Only match if both sides have content
@@ -3082,10 +3089,11 @@ export function createPositionedElementData(
         if (markVisited) {
           targetBeatId = choice.target;
         }
-        console.log(`[createPositionedElementData] MovementChoice: location "${location.name}" → choice ID "${actionId}", target "${targetBeatId}", markVisited=${markVisited}`);
-      } else {
-        console.warn(`[createPositionedElementData] MovementChoice: NO MATCH for location "${location.name}"`);
-        console.log(`[createPositionedElementData] Available choices:`, content.choices.map((c: any) => ({ id: c.id, text: c.text, location: c.location })));
+        console.log(`[createPositionedElementData] MovementChoice: location "${location.name}" (kind=${location.kind}) → choice ID "${actionId}", target "${targetBeatId}", markVisited=${markVisited}`);
+      } else if (location.kind === 'hotspot' || location.kind === 'prop') {
+        // Only warn for interactive element types that should have been matched
+        console.warn(`[createPositionedElementData] MovementChoice: NO MATCH for location "${location.name}" (kind=${location.kind})`);
+        console.log(`[createPositionedElementData] Available choices:`, content.choices.map((c: any) => ({ id: c.id, text: c.text, location: c.location, locationName: c.locationName })));
       }
     }
 
