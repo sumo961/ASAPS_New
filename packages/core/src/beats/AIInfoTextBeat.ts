@@ -51,6 +51,12 @@ export class AIInfoTextBeat extends Beat {
 
   private generatedText: string | null = null;
   private lastContextHash: string | null = null;
+  private _aiSuggestions: string[] = [];
+
+  /** Get AI suggestions for improving the beat (e.g., missing variables) */
+  public get aiSuggestions(): string[] {
+    return this._aiSuggestions;
+  }
 
   constructor(config: BeatConfig & {
     parameters?: Partial<AIInfoTextBeatParams>;
@@ -127,6 +133,15 @@ export class AIInfoTextBeat extends Beat {
         // Generate new text
         this.generatedText = await this.generateText(context, aiService);
         this.lastContextHash = contextHash;
+
+        // Store suggestions in renderer state for preview to display
+        if (this._aiSuggestions.length > 0) {
+          renderer.setState('aiSuggestions', {
+            beatId: this.id,
+            beatName: this.name || this.id,
+            suggestions: this._aiSuggestions,
+          });
+        }
       }
 
       // Render the generated text
@@ -210,6 +225,26 @@ export class AIInfoTextBeat extends Beat {
       });
     }
 
+    // Build list of available data for AI
+    const variables = context.getVariables();
+    const counters = context.getCounters();
+    const inventory = context.getInventory();
+
+    const availableData: string[] = [];
+    if (Object.keys(variables).length > 0) {
+      availableData.push(`Variables: ${Object.keys(variables).join(', ')}`);
+    }
+    if (Object.keys(counters).length > 0) {
+      availableData.push(`Counters: ${Object.keys(counters).join(', ')}`);
+    }
+    if (inventory.length > 0) {
+      availableData.push(`Inventory items: ${inventory.join(', ')}`);
+    }
+
+    const dataAvailability = availableData.length > 0
+      ? `AVAILABLE DATA (you may reference these):\n${availableData.join('\n')}`
+      : 'AVAILABLE DATA: None - no player variables, counters, or inventory items exist yet.';
+
     // Build the generation prompt
     const prompt = `Generate a short text response (${this.maxSentences} sentence${this.maxSentences > 1 ? 's' : ''} maximum) for the following situation:
 
@@ -218,24 +253,57 @@ CONTEXT: ${this.prompt}
 PLAYER STATE:
 ${filteredContext}
 
-REQUIREMENTS:
-1. Write exactly ${this.maxSentences} sentence${this.maxSentences > 1 ? 's' : ''} or fewer
-2. Personalize the text based on the player's state (use their name, reference their situation)
-3. Keep the tone appropriate to the context
-4. Be concise and engaging
+${dataAvailability}
 
-Return ONLY the generated text, no JSON or additional formatting.`;
+CRITICAL REQUIREMENTS:
+1. Write exactly ${this.maxSentences} sentence${this.maxSentences > 1 ? 's' : ''} or fewer
+2. ONLY reference data that exists in PLAYER STATE above
+3. Do NOT use placeholders like [Player Name], [Location], etc.
+4. Do NOT reference variables, names, or data that are not explicitly listed above
+5. If no personalization data is available, write engaging generic text
+6. Keep the tone appropriate to the context
+7. Be concise and engaging
+
+Return a JSON object with this exact format:
+{
+  "text": "Your generated text here",
+  "suggestions": ["suggestion 1", "suggestion 2"]
+}
+
+The "suggestions" array should contain ideas for story variables that would improve personalization (e.g., "Add a 'playerName' variable for personalized greetings"). Leave empty if no suggestions.`;
 
     console.log(`[AIInfoTextBeat ${this.id}] Generating text...`);
 
     const response = await aiService.generateContent(prompt, {
-      maxTokens: 150, // Keep response short
+      maxTokens: 250, // Increased for JSON response
     });
 
-    // Clean up the response (generateContent returns a string directly)
-    let text = typeof response === 'string' ? response : '';
+    // Parse the response (could be JSON or plain text)
+    const rawResponse = typeof response === 'string' ? response : '';
+    let text = '';
+    this._aiSuggestions = [];
 
-    // Remove any markdown or quotes
+    try {
+      // Try to extract JSON from response (may be wrapped in markdown code blocks)
+      const jsonMatch = rawResponse.match(/\{[\s\S]*"text"[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        text = parsed.text || '';
+        if (Array.isArray(parsed.suggestions)) {
+          this._aiSuggestions = parsed.suggestions.filter((s: unknown) => typeof s === 'string' && s.trim());
+        }
+        console.log(`[AIInfoTextBeat ${this.id}] Parsed JSON response, suggestions:`, this._aiSuggestions);
+      } else {
+        // Fallback to plain text
+        text = rawResponse;
+      }
+    } catch {
+      // JSON parse failed, use raw response as text
+      console.warn(`[AIInfoTextBeat ${this.id}] Failed to parse JSON, using raw response`);
+      text = rawResponse;
+    }
+
+    // Clean up the text
     text = text.replace(/^["']|["']$/g, '').trim();
     text = text.replace(/^#+\s*/gm, '').trim();
 

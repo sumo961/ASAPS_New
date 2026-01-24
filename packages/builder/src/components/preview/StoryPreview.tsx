@@ -385,6 +385,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
   const [isRunning, setIsRunning] = useState(false);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
+  const [aiSuggestions, setAiSuggestions] = useState<{ beatId: string; beatName: string; suggestions: string[] } | null>(null);
   const [activeTimers, setActiveTimers] = useState<any[]>([]);
   const [debugStartBeat, setDebugStartBeat] = useState<string | null>(null);
   const boxVisibility = settings?.textbox?.boxVisibility || 'all';
@@ -1163,6 +1164,14 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
             });
           }
         });
+
+        // Listen for AI suggestions from AI-powered beats
+        (rendererRef.current as any).onStateChange('aiSuggestions', (suggestions: { beatId: string; beatName: string; suggestions: string[] } | null) => {
+          if (suggestions && suggestions.suggestions.length > 0) {
+            console.log('[StoryPreview] Received AI suggestions:', suggestions);
+            setAiSuggestions(suggestions);
+          }
+        });
       }
 
       // Also update debug info when beats are visited (for the visited beats list)
@@ -1838,6 +1847,32 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {aiSuggestions && aiSuggestions.suggestions.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="w-4 h-4 text-amber-600" />
+                      <div className="text-sm font-medium text-amber-800">AI Suggestions</div>
+                    </div>
+                    <div className="text-xs text-amber-700 mb-2">
+                      From beat: <span className="font-mono">{aiSuggestions.beatName}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {aiSuggestions.suggestions.map((suggestion, idx) => (
+                        <div key={idx} className="text-xs text-amber-900 bg-amber-100 p-2 rounded flex items-start gap-2">
+                          <span className="text-amber-600 font-bold">•</span>
+                          <span>{suggestion}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setAiSuggestions(null)}
+                      className="mt-2 text-xs text-amber-600 hover:text-amber-800 underline"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 )}
               </div>
