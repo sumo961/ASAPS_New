@@ -128,7 +128,7 @@ export class AIDurScreenBeat extends Beat {
 
     // Check if AI service is available
     const aiService = renderer.getState('aiService');
-    if (!aiService || typeof aiService.generateText !== 'function') {
+    if (!aiService || typeof aiService.generateContent !== 'function') {
       console.warn(`[AIDurScreenBeat ${this.id}] AI service not configured, using fallback`);
       const processedFallback = this.processText(this.fallbackText, context);
       const duration = this.calculateDuration(processedFallback);
@@ -262,14 +262,12 @@ Return ONLY the generated text, no JSON or additional formatting.`;
 
     console.log(`[AIDurScreenBeat ${this.id}] Generating text...`);
 
-    const response = await aiService.generateText({
-      prompt,
-      maxTokens: 100, // Keep response short
-      temperature: 0.7,
+    const response = await aiService.generateContent(prompt, {
+      maxTokens: 150, // Keep response short
     });
 
-    // Clean up the response
-    let text = typeof response === 'string' ? response : response.text || response.content || '';
+    // Clean up the response (generateContent returns a string directly)
+    let text = typeof response === 'string' ? response : '';
 
     // Remove any markdown or quotes
     text = text.replace(/^["']|["']$/g, '').trim();
