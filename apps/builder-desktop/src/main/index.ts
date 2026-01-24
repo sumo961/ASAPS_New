@@ -111,7 +111,9 @@ function setupAutoUpdater(): void {
       cancelId: 1,
     }).then((result) => {
       if (result.response === 0) {
-        autoUpdater.quitAndInstall();
+        // isSilent: true = run installer silently
+        // isForceRunAfter: true = launch app after installation completes
+        autoUpdater.quitAndInstall(true, true);
       }
     });
   });
@@ -119,6 +121,13 @@ function setupAutoUpdater(): void {
   // Event: Error
   autoUpdater.on('error', (error) => {
     console.error('[AutoUpdater] Error:', error);
+    console.error('[AutoUpdater] Error message:', error.message);
+    console.error('[AutoUpdater] Error stack:', error.stack);
+  });
+
+  // Log when update is being installed
+  autoUpdater.on('before-quit-for-update', () => {
+    console.log('[AutoUpdater] Quitting for update installation...');
   });
 
   // Delay initial check by 5 seconds to not slow startup
@@ -536,13 +545,12 @@ app.on('window-all-closed', () => {
 });
 
 // Clean up API server before quitting
-app.on('before-quit', async () => {
-  try {
-    await apiServer.stop();
-    console.log('[Main] API server stopped');
-  } catch (error) {
-    console.error('[Main] Error stopping API server:', error);
-  }
+// Note: Using sync-style approach to avoid interfering with auto-updater's quit process
+app.on('before-quit', () => {
+  // Stop API server (fire and forget to not block auto-update installation)
+  apiServer.stop()
+    .then(() => console.log('[Main] API server stopped'))
+    .catch((error) => console.error('[Main] Error stopping API server:', error));
 });
 
 // Handle file open on macOS (when double-clicking a file)
