@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { Sparkles, Loader2, AlertCircle, BookOpen, X } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, BookOpen, X, Cpu, Info } from 'lucide-react';
 import { useAI } from '../../hooks/useAI';
 import type { StoryGenerationRequest } from '../../types/ai';
 
@@ -34,6 +34,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
   const [genre, setGenre] = useState<string>('');
   const [length, setLength] = useState<'short' | 'medium' | 'long'>('medium');
   const [complexity, setComplexity] = useState<'linear' | 'moderate' | 'complex'>('moderate');
+  const [includeAIBeats, setIncludeAIBeats] = useState(false);
 
   /**
    * Generate story from prompt
@@ -50,6 +51,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
       genre: genre || undefined,
       length,
       complexity,
+      includeAIBeats,
     };
 
     const result = await generateStory(request);
@@ -212,6 +214,41 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* AI-Powered Beats Toggle */}
+          <div className="border-t border-gray-200 pt-6">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeAIBeats}
+                onChange={(e) => setIncludeAIBeats(e.target.checked)}
+                disabled={isGenerating}
+                className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-purple-600" />
+                  <span className="font-medium text-gray-900">Include AI-Powered Beats</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Enables: onlineContent, aiCondition, aiDialogTree, aiSummary
+                </p>
+              </div>
+            </label>
+
+            {includeAIBeats && (
+              <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-800">
+                  <p className="font-medium">These beats require at runtime:</p>
+                  <ul className="mt-1 list-disc list-inside space-y-0.5">
+                    <li>An AI API key (OpenAI, Claude, etc.)</li>
+                    <li>Internet connection or local AI model</li>
+                  </ul>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

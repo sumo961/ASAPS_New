@@ -1495,6 +1495,22 @@ export function buildEnhancedUserPrompt(request: StoryGenerationRequest): string
     parts.push(`Additional requirements: ${request.context}`);
   }
 
+  // AI-powered beats section
+  if (request.includeAIBeats) {
+    parts.push(`🤖 AI-POWERED BEATS ENABLED
+You may use these advanced beat types that leverage AI at runtime:
+- **onlineContent**: Fetch and display real-time data from web APIs or AI queries
+- **aiCondition**: AI-driven branching that analyzes player state to determine path
+- **aiDialogTree**: Generate personalized dialog trees at runtime using AI
+- **aiSummary**: Generate a narrative summary of the player's journey at the end
+
+Use these sparingly for dynamic, personalized experiences. They require an AI API key and internet at runtime.`);
+  } else {
+    parts.push(`🚫 AI-POWERED BEATS DISABLED
+Do NOT use these beat types: onlineContent, aiCondition, aiDialogTree, aiSummary
+Use only standard beat types that work offline.`);
+  }
+
   parts.push(`
 Remember to:
 - Use invisible beats (setVariable, conditionBeat) for logic

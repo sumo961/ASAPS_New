@@ -56,6 +56,9 @@ export interface StoryGenerationRequest {
 
   /** Additional context or requirements */
   context?: string;
+
+  /** Include AI-powered beats (onlineContent, aiCondition, aiDialogTree, aiSummary) */
+  includeAIBeats?: boolean;
 }
 
 /**
