@@ -161,7 +161,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
   describe('2. pickProp beat with choiceDelay', () => {
     it('should export ASML with delay element', () => {
       const story = new Story();
-      story.addBeat({
+      const beat = createTestBeat({
         id: 'pickprop_beat',
         name: 'PickProp Test',
         type: 'pickProp',
@@ -184,6 +184,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
           ]
         }
       });
+      story.addBeat(beat);
 
       const xml = generator.generate(story);
 
@@ -204,7 +205,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
   describe('3. dialogTree beat with choiceDelay', () => {
     it('should export ASML with delay element', () => {
       const story = new Story();
-      story.addBeat({
+      const beat = createTestBeat({
         id: 'dialog_beat',
         name: 'Dialog Test',
         type: 'dialogTree',
@@ -229,6 +230,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
           }
         }
       });
+      story.addBeat(beat);
 
       const xml = generator.generate(story);
 
@@ -251,7 +253,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
   describe('4. Beats WITHOUT choiceDelay should not export delay element', () => {
     it('should not include delay element when choiceDelay is not set', () => {
       const story = new Story();
-      story.addBeat({
+      const beat = createTestBeat({
         id: 'no_delay_beat',
         name: 'No Delay Test',
         type: 'movementChoice',
@@ -267,6 +269,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
           ]
         }
       });
+      story.addBeat(beat);
 
       const xml = generator.generate(story);
 
@@ -280,7 +283,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
 
     it('should not include delay element when choiceDelay is 0', () => {
       const story = new Story();
-      story.addBeat({
+      const beat = createTestBeat({
         id: 'zero_delay_beat',
         name: 'Zero Delay Test',
         type: 'pickProp',
@@ -297,6 +300,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
           ]
         }
       });
+      story.addBeat(beat);
 
       const xml = generator.generate(story);
 
@@ -308,7 +312,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
   describe('5. Import/export round-trip', () => {
     it('should preserve choiceDelay through complete round-trip', async () => {
       const originalStory = new Story();
-      originalStory.addBeat({
+      const beat = createTestBeat({
         id: 'roundtrip_beat',
         name: 'Round Trip Test',
         type: 'movementChoice',
@@ -325,6 +329,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
           ]
         }
       });
+      originalStory.addBeat(beat);
 
       // Export to XML
       const xml = generator.generate(originalStory);
@@ -350,7 +355,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
   describe('6. Edge cases', () => {
     it('should handle negative delay values (treat as 0)', () => {
       const story = new Story();
-      story.addBeat({
+      const beat = createTestBeat({
         id: 'negative_delay_beat',
         name: 'Negative Delay Test',
         type: 'movementChoice',
@@ -367,6 +372,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
           ]
         }
       });
+      story.addBeat(beat);
 
       const xml = generator.generate(story);
       // Should not export delay for negative values
@@ -375,7 +381,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
 
     it('should handle decimal precision correctly', () => {
       const story = new Story();
-      story.addBeat({
+      const beat = createTestBeat({
         id: 'decimal_delay_beat',
         name: 'Decimal Delay Test',
         type: 'dialogTree',
@@ -395,6 +401,7 @@ describe('Feature 3: Choice Delay with Fade-in', () => {
           }
         }
       });
+      story.addBeat(beat);
 
       const xml = generator.generate(story);
       // Should preserve decimal precision

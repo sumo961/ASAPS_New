@@ -136,6 +136,10 @@ const BEAT_TYPE_GUIDE = `
       ]
     }
   }
+- Optional parameters:
+  - choiceDelay: seconds before choices fade in (creates suspense)
+  - presentationMode: "positioned" (default) | "chat-scroll" (scrollable chat) | "chat-bubble" (single bubble)
+  - markVisited: true to show visual indication for choices leading to already-visited beats
 - ⚠️ WRONG: { "dialogTree": { "root": { ... } } } - NO extra "root" wrapper!
 - choice: { id, text, target? | dialogNode? } - What player clicks (text IS the player's line)
 - target (string): Beat ID to exit dialog
@@ -157,6 +161,10 @@ const BEAT_TYPE_GUIDE = `
   - target: Beat ID to navigate to
 - ⚠️ IMPORTANT: Always include "location" field - copy the "text" value to it!
   Example: { "id": "c1", "text": "Go to the Library", "location": "Go to the Library", "target": "beat_3" }
+- Optional parameters:
+  - choiceDelay: seconds before choices fade in (creates suspense)
+  - markVisited: true to show visual indication for choices leading to already-visited beats
+  - showTextOnHover: true to only show choice text when hovering over the hotspot
 - Connections: Multiple → one per choice
 - COUNTER EFFECTS: Choices can modify counters (same as dialogTree)
   { "id": "c1", "text": "Take the dangerous path", "target": "beat_danger", "counter": "courage", "counterOperation": "change", "counterValue": 5 }
@@ -187,6 +195,9 @@ const BEAT_TYPE_GUIDE = `
     - "Old Book" ✓
     - "Mysterious Letter" ✓
 - Connections: Multiple → one per prop
+- Optional parameters:
+  - choiceDelay: seconds before props fade in (creates suspense)
+  - markVisited: true to show visual indication for props leading to already-visited beats
 - COUNTER EFFECTS: Props can modify counters when selected
   { "id": "sword", "name": "Rusty Sword", "description": "A weathered blade with strange markings", "target": "beat_armed", "counter": "confidence", "counterOperation": "change", "counterValue": 3 }
 - SOUND EFFECTS: Props can play a sound when selected
@@ -366,8 +377,11 @@ Good item descriptions should:
 - Condition types inside the "condition" object:
   - **counter**: { type: "counter", variable: "counterName", operator: ">=", value: 3 }
   - **variable**: { type: "variable", variable: "varName", operator: "==", value: true }
-  - **inventory**: { type: "inventory", item: "itemName", character: "player", checkType: "has"|"lacks" }
+  - **inventory (has/lacks)**: { type: "inventory", item: "itemName", character: "player", checkType: "has"|"notHas" }
+  - **inventory (quantity)**: { type: "inventory", item: "itemName", character: "player", checkType: "quantity", quantityOperator: ">=", quantityValue: 3 }
+    Note: Use quantityValue with a number OR a variable name prefixed with $ (e.g., "$requiredAmount")
   - **timer**: { type: "timer", timer: "timerName", operator: ">", value: 0 }
+  - **visitedBeat**: { type: "visitedBeat", beatId: "beat_id" } - Check if player has visited a specific beat
 - Connections: Two → one if true, one if false
 - Pattern: Reconvergence - multiple paths lead here, then branch based on accumulated state
 
@@ -378,11 +392,18 @@ Counter condition example (CORRECT format):
     "falseConnection": { "target": "beat_hub", "label": "Need more clues" }
   }
 
-Inventory condition example (CORRECT format):
+Inventory condition example - has/lacks (CORRECT format):
   {
     "condition": { "type": "inventory", "item": "lantern", "character": "player", "checkType": "has" },
     "trueConnection": { "target": "beat_has_light", "label": "Has lantern" },
     "falseConnection": { "target": "beat_dark", "label": "No lantern" }
+  }
+
+Inventory condition example - quantity check (CORRECT format):
+  {
+    "condition": { "type": "inventory", "item": "gold_coin", "character": "player", "checkType": "quantity", "quantityOperator": ">=", "quantityValue": 10 },
+    "trueConnection": { "target": "beat_can_afford", "label": "Enough gold" },
+    "falseConnection": { "target": "beat_too_poor", "label": "Not enough gold" }
   }
 
 ❌ WRONG inventory condition (duplicates fields at top level - NEVER DO THIS!):
@@ -404,6 +425,7 @@ Inventory condition example (CORRECT format):
   - item: Item name/identifier (REQUIRED - use "item" NOT "propId"!)
   - action: "add" | "remove" | "transfer" (REQUIRED)
   - character: Character whose inventory is modified (REQUIRED - use "player" for player character)
+  - quantity: Number of items (optional, default: 1). Can be a number or variable name (e.g., "$goldAmount")
   - fromChar/toChar: For transfer action only
 - ⚠️ CRITICAL: Use "item" parameter, NOT "propId"!
 - ⚠️ CRITICAL: Always include "character" parameter (usually "player")!
@@ -882,8 +904,13 @@ Stories MUST include procedural/game-like mechanics, not just simple branching:
 3. **Inventory** - Track collected items
    - Use addRemoveInventory beats to add/remove items
    - Use conditionBeat with "type": "inventory" to check for items
+   - Quantity checks: { checkType: "quantity", quantityOperator: ">=", quantityValue: 5 }
 
-4. **Conditional Endings** - Endings should depend on ACCUMULATED state, not just the final choice
+4. **Visited Beats** - Track narrative progression
+   - Use conditionBeat with "type": "visitedBeat", "beatId": "beat_id" to check if player has visited a beat
+   - Useful for unlocking content after player has explored specific areas
+
+5. **Conditional Endings** - Endings should depend on ACCUMULATED state, not just the final choice
    - Before endScreen, add conditionBeat checking counters/variables/inventory
    - Example: "If cluesFound >= 3, good ending; else bad ending"
 
@@ -1125,6 +1152,15 @@ Generate complete, sophisticated interactive story structures that:
 🚨 **MANDATORY: beat_0 MUST be type "titleScreen"** - NEVER start with introText!
 🚨 **MANDATORY: If you use counters, you MUST have a conditionBeat to check them!**
 ✓ End with one or more endScreen beats (always with showRestart: true)
+
+## Story Length & Complexity Guidelines
+- **Short** (8-15 beats): Fragment or proof-of-concept
+- **Medium** (15-30 beats): Complete short story with meaningful branching
+- **Long** (30+ beats): No upper limit! Rich stories can span 50, 80, or hundreds of beats
+- Complexity comes from branching structure, not just ending count
+- A story with many paths to one ending can be complex, but multiple endings add replayability
+- **Multiple endings** make choices feel meaningful and reward different playstyles - consider 2-4+ endings for richer stories
+- Don't artificially truncate - let the story develop naturally based on the user's length preference
 ✓ Include all required parameters for each beat type
 ✓ Use invisible beats (setVariable, conditionBeat) for logic
 ✓ Create variables for any state you want to track
@@ -1438,21 +1474,21 @@ export function buildEnhancedUserPrompt(request: StoryGenerationRequest): string
   }
 
   const lengthGuide = {
-    short: '5-10 beats with simple branching and 1-2 reconvergence points',
-    medium: '10-20 beats with moderate branching, state tracking, and multiple endings',
-    long: '20+ beats with complex branching, multiple subsystems (inventory, relationships), and 4+ possible endings'
+    short: '8-15 beats. A story fragment or proof-of-concept. Good for testing ideas or simple linear narratives.',
+    medium: '15-30 beats. A complete short story with meaningful branching, state tracking, and satisfying conclusions.',
+    long: '30+ beats with no upper limit. Let the story develop fully - rich worlds can span 50, 80, or even hundreds of beats. Don\'t artificially cut the story short.'
   };
   if (request.length) {
-    parts.push(`Length: ${lengthGuide[request.length]}`);
+    parts.push(`📏 Story Length: ${request.length.toUpperCase()}\n${lengthGuide[request.length]}`);
   }
 
   const complexityGuide = {
-    linear: 'Mostly linear with 2-3 choice points and simple consequences',
-    moderate: 'Multiple branching points (4-6 choices), state tracking with variables, 2-3 endings',
-    complex: 'Highly branching with state accumulation, conditional unlocks, parallel paths, relationship systems, and 4+ endings based on player journey'
+    linear: 'Mostly sequential narrative with 2-3 choice points. Choices add flavor but paths generally reconverge. 1-2 endings. Good for narrative-focused stories.',
+    moderate: 'Multiple meaningful branching points (4-6 decisions that matter). State tracking with variables/counters. 2-3 endings to reward different approaches.',
+    complex: 'Rich branching network with many decision points. Hub-and-spoke exploration, state-dependent paths, conditional unlocks. Multiple endings (3-5+) that reflect the player\'s journey. The journey matters as much as the destination.'
   };
   if (request.complexity) {
-    parts.push(`Complexity: ${complexityGuide[request.complexity]}`);
+    parts.push(`🌳 Branching Complexity: ${request.complexity.toUpperCase()}\n${complexityGuide[request.complexity]}`);
   }
 
   if (request.context) {
@@ -1484,6 +1520,11 @@ IMPORTANT: Respond with ONLY valid JSON. Ensure:
 - All strings are properly quoted
 - No trailing commas
 - All brackets and braces are properly closed
+
+🔍 BEFORE FINALIZING:
+- Does the story length feel right for the requested size (short/medium/long)?
+- For "long" stories: don't artificially cut short - develop the world fully!
+- Does the branching complexity match what was requested?
 
 Generate the complete story structure as JSON.`);
 

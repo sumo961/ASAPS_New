@@ -394,11 +394,11 @@ function createMenu(): void {
         { type: 'separator' },
         {
           label: 'Documentation',
-          click: () => shell.openExternal('https://asaps.example.com/docs'),
+          click: () => shell.openExternal('https://github.com/sumo961/ASAPS_New/blob/main/docs/USER_GUIDE.md'),
         },
         {
           label: 'Report Issue',
-          click: () => shell.openExternal('https://github.com/asaps/asaps-modern/issues'),
+          click: () => shell.openExternal('https://github.com/sumo961/ASAPS_New/issues'),
         },
       ],
     },

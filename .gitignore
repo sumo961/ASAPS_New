@@ -114,3 +114,8 @@ apps/builder-desktop/builder/
 apps/player-desktop/src-tauri/gen/
 test-data/
 Progress.md
+
+# Documentation (local drafts, not for GitHub)
+docs/Old_guide/
+docs/Understanding Interactive Digital Narrative.pdf
+docs/USER_GUIDE Kopie.md

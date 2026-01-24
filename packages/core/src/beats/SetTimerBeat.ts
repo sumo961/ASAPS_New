@@ -90,7 +90,12 @@ export class SetTimerBeat extends Beat {
       return continueConnection.targetId;
     }
 
-    // Fallback to default behavior if no continue connection found
-    return super.getNextBeat(context);
+    // Fallback to defaultTarget if no continue connection found
+    // Don't use super.getNextBeat() as it would return the timer target connection
+    if (this.defaultTarget) {
+      return this.defaultTarget;
+    }
+
+    return null;
   }
 }

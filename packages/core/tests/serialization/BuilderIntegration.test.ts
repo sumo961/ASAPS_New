@@ -144,16 +144,17 @@ describe('Builder Integration - Complete Save/Load Cycle', () => {
       }
     });
 
-    // Verify
+    // Verify - speaker is stored inside dialogTree, not at top level
     const params = beat.getParameters();
-    expect(params.speaker).toBe('Gandalf the Grey');
+    expect(params.dialogTree.speaker).toBe('Gandalf the Grey');
     expect(params.dialogTree.text).toBe('You shall not pass!');
 
     // 3. Save
     const serialized = beat.toJSON();
     console.log('[Integration Test] Serialized dialog:', JSON.stringify(serialized, null, 2));
 
-    expect(serialized.parameters.speaker).toBe('Gandalf the Grey');
+    // Speaker is stored inside dialogTree, not at top level
+    expect(serialized.parameters.dialogTree.speaker).toBe('Gandalf the Grey');
     expect(serialized.parameters.dialogTree.text).toBe('You shall not pass!');
 
     // 4. Load
@@ -165,9 +166,9 @@ describe('Builder Integration - Complete Save/Load Cycle', () => {
     });
     restored.updateParameters(serialized.parameters);
 
-    // 5. Verify
+    // 5. Verify - speaker is stored inside dialogTree, not at top level
     const restoredParams = restored.getParameters();
-    expect(restoredParams.speaker).toBe('Gandalf the Grey');
+    expect(restoredParams.dialogTree.speaker).toBe('Gandalf the Grey');
     expect(restoredParams.dialogTree.text).toBe('You shall not pass!');
   });
 

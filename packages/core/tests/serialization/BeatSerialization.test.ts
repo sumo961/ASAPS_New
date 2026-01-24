@@ -227,8 +227,9 @@ describe('Beat Serialization', () => {
       const serialized = beat.toJSON();
       console.log('[DialogTree] Serialized:', JSON.stringify(serialized, null, 2));
 
-      expect(serialized.parameters.speaker).toBe('NPC');
-      expect(serialized.parameters.dialogTree).toEqual(dialogTree);
+      // Speaker is stored inside dialogTree, not at top level
+      expect(serialized.parameters.dialogTree.speaker).toBe('NPC');
+      expect(serialized.parameters.dialogTree.text).toBe('Hello there!');
       expect(serialized.parameters.choiceDelay).toBe(2.5);
 
       const restored = registry.createBeat('dialogTree', {
@@ -240,8 +241,9 @@ describe('Beat Serialization', () => {
       restored.updateParameters(serialized.parameters);
 
       const restoredParams = restored.getParameters();
-      expect(restoredParams.speaker).toBe('NPC');
-      expect(restoredParams.dialogTree).toEqual(dialogTree);
+      // Speaker is stored inside dialogTree, not at top level
+      expect(restoredParams.dialogTree.speaker).toBe('NPC');
+      expect(restoredParams.dialogTree.text).toBe('Hello there!');
       expect(restoredParams.choiceDelay).toBe(2.5);
     });
   });

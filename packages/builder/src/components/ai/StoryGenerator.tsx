@@ -177,9 +177,9 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
                 >
                   <div className="font-medium capitalize">{len}</div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {len === 'short' && '5-8 beats'}
-                    {len === 'medium' && '10-15 beats'}
-                    {len === 'long' && '20-30 beats'}
+                    {len === 'short' && '8-15 beats'}
+                    {len === 'medium' && '15-30 beats'}
+                    {len === 'long' && '30+ beats'}
                   </div>
                 </button>
               ))}
