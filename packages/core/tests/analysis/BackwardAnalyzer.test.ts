@@ -89,7 +89,7 @@ describe('BackwardAnalyzer', () => {
     it('should find paths through multiple beats', () => {
       const beats = [
         createMockBeat({ id: '0', name: 'Start', type: 'titleScreen', connections: [{ targetId: '1' }] }),
-        createMockBeat({ id: '1', name: 'Middle', type: 'introText', connections: [{ targetId: '2' }] }),
+        createMockBeat({ id: '1', name: 'Middle', type: 'infoText', connections: [{ targetId: '2' }] }),
         createMockBeat({ id: '2', name: 'End', type: 'endScreen' }),
       ];
       const story = createMockStory(beats);
@@ -177,8 +177,8 @@ describe('BackwardAnalyzer', () => {
             { targetId: '2', label: 'Option B' },
           ],
         }),
-        createMockBeat({ id: '1', name: 'Path A', type: 'introText', connections: [{ targetId: '3' }] }),
-        createMockBeat({ id: '2', name: 'Path B', type: 'introText', connections: [{ targetId: '3' }] }),
+        createMockBeat({ id: '1', name: 'Path A', type: 'infoText', connections: [{ targetId: '3' }] }),
+        createMockBeat({ id: '2', name: 'Path B', type: 'infoText', connections: [{ targetId: '3' }] }),
         createMockBeat({ id: '3', name: 'Convergence', type: 'endScreen' }),
       ];
       const story = createMockStory(beats);
@@ -202,9 +202,9 @@ describe('BackwardAnalyzer', () => {
             { targetId: '2', label: 'Right' },
           ],
         }),
-        createMockBeat({ id: '1', name: 'Left', type: 'introText', connections: [{ targetId: '3' }] }),
-        createMockBeat({ id: '2', name: 'Right', type: 'introText', connections: [{ targetId: '3' }] }),
-        createMockBeat({ id: '3', name: 'Required', type: 'introText', connections: [{ targetId: '4' }] }),
+        createMockBeat({ id: '1', name: 'Left', type: 'infoText', connections: [{ targetId: '3' }] }),
+        createMockBeat({ id: '2', name: 'Right', type: 'infoText', connections: [{ targetId: '3' }] }),
+        createMockBeat({ id: '3', name: 'Required', type: 'infoText', connections: [{ targetId: '4' }] }),
         createMockBeat({ id: '4', name: 'End', type: 'endScreen' }),
       ];
       const story = createMockStory(beats);
@@ -223,7 +223,7 @@ describe('BackwardAnalyzer', () => {
       const beats = [
         createMockBeat({ id: '0', name: 'Start', type: 'titleScreen', connections: [{ targetId: '1' }] }),
         createMockBeat({ id: '1', name: 'End', type: 'endScreen' }),
-        createMockBeat({ id: '2', name: 'Orphan', type: 'introText' }), // No incoming edges
+        createMockBeat({ id: '2', name: 'Orphan', type: 'infoText' }), // No incoming edges
       ];
       const story = createMockStory(beats);
       const analyzer = new BackwardAnalyzer(story);
@@ -241,10 +241,10 @@ describe('BackwardAnalyzer', () => {
         createMockBeat({
           id: '1',
           name: 'Loop A',
-          type: 'introText',
+          type: 'infoText',
           connections: [{ targetId: '2' }, { targetId: '3' }],
         }),
-        createMockBeat({ id: '2', name: 'Loop B', type: 'introText', connections: [{ targetId: '1' }] }),
+        createMockBeat({ id: '2', name: 'Loop B', type: 'infoText', connections: [{ targetId: '1' }] }),
         createMockBeat({ id: '3', name: 'End', type: 'endScreen' }),
       ];
       const story = createMockStory(beats);
@@ -269,7 +269,7 @@ describe('BackwardAnalyzer', () => {
           createMockBeat({
             id: String(i),
             name: `Beat ${i}`,
-            type: 'introText',
+            type: 'infoText',
             connections: [{ targetId: String(i + 1) }],
           })
         );
@@ -311,7 +311,7 @@ describe('BackwardAnalyzer', () => {
       const beats = [
         createMockBeat({ id: '0', name: 'Start', type: 'titleScreen' }),
         createMockBeat({ id: '1', name: 'Good Ending', type: 'endScreen' }),
-        createMockBeat({ id: '2', name: 'Middle', type: 'introText' }),
+        createMockBeat({ id: '2', name: 'Middle', type: 'infoText' }),
         createMockBeat({ id: '3', name: 'Bad Ending', type: 'endScreen' }),
         createMockBeat({ id: '4', name: 'Secret Ending', type: 'endScreen' }),
       ];
@@ -330,7 +330,7 @@ describe('BackwardAnalyzer', () => {
     it('should return empty array if no endings', () => {
       const beats = [
         createMockBeat({ id: '0', name: 'Start', type: 'titleScreen' }),
-        createMockBeat({ id: '1', name: 'Middle', type: 'introText' }),
+        createMockBeat({ id: '1', name: 'Middle', type: 'infoText' }),
       ];
       const story = createMockStory(beats);
       const analyzer = new BackwardAnalyzer(story);

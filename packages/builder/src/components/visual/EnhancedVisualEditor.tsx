@@ -132,7 +132,7 @@ export const EnhancedVisualEditor: React.FC<EnhancedVisualEditorProps> = ({
           });
           break;
           
-        case 'introText':
+        case 'infoText':
         case 'durScreen':
           // Add text
           newElements.push({

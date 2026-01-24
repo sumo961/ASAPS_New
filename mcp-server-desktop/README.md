@@ -111,7 +111,7 @@ The story immediately appears in your ASAPS Builder window!
 | Type | Description | Key Parameters |
 |------|-------------|----------------|
 | `titleScreen` | Opening title with start button | `title`, `author`, `buttonText` |
-| `introText` | Narrative text with continue | `text`, `buttonText` |
+| `infoText` | Narrative text with continue | `text`, `buttonText` |
 | `dialogTree` | Branching conversation | `dialogTree` (nested structure) |
 | `movementChoice` | Location navigation | `question`, `choices[]` |
 | `pickProp` | Item interaction | `question`, `props[]` |

@@ -188,7 +188,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
 
     // Classify beat types as visible or invisible
     const visibleBeatTypes = [
-      'titleScreen', 'introText', 'dialogTree', 'movementChoice',
+      'titleScreen', 'infoText', 'dialogTree', 'movementChoice',
       'pickProp', 'durScreen', 'endScreen', 'inputText', 'hyperText',
       'videoBeat', 'aiDialogTree', 'aiSummary', 'onlineContent'
     ];

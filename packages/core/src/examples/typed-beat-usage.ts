@@ -102,7 +102,7 @@ const storyBeats: TypedBeatConfig<BeatType>[] = [
   },
   {
     id: 'beat_1',
-    type: 'introText',
+    type: 'infoText',
     parameters: {
       text: 'You wake up in a mysterious temple...',
       buttonText: 'Continue',

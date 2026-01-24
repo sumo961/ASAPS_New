@@ -3,18 +3,18 @@ import { ASMLProcessor } from '../../src/xml/ASMLProcessor';
 import { Story } from '../../src/engine/Story';
 import { BeatTypeRegistry } from '../../src/beats/BeatRegistry';
 
-// Test XML with introText that has both "Main Text" and "text" locations
+// Test XML with infoText that has both "Main Text" and "text" locations
 const testASMLWithDuplicateLocations = `<?xml version="1.0" encoding="UTF-8"?>
-<story title="IntroText Fix Test" author="Test" version="1.0">
+<story title="InfoText Fix Test" author="Test" version="1.0">
   <plot>
     <beat>
       <id id="0" name="Title" />
-      <function kind="titleScreen" title="IntroText Fix Test" author="Test" buttonText="Begin" />
+      <function kind="titleScreen" title="InfoText Fix Test" author="Test" buttonText="Begin" />
     </beat>
 
     <beat>
       <id id="1" name="Intro Text Test" />
-      <function kind="introText" text="This is a test of the introText fix. There should be only one text element, properly positioned." buttonText="Continue" />
+      <function kind="infoText" text="This is a test of the infoText fix. There should be only one text element, properly positioned." buttonText="Continue" />
       <!-- This location should be ignored due to being "Main Text" -->
       <locs>
         <loc kind="text" name="Main Text" x="50" y="100" width="400" height="100" />
@@ -30,8 +30,8 @@ const testASMLWithDuplicateLocations = `<?xml version="1.0" encoding="UTF-8"?>
   </plot>
 </story>`;
 
-// Skipping - test has implementation issues (missing introTextBeat variable, etc.)
-describe.skip('IntroText Fix - Duplicate Content Prevention', () => {
+// Skipping - test has implementation issues (missing infoTextBeat variable, etc.)
+describe.skip('InfoText Fix - Duplicate Content Prevention', () => {
   let processor: ASMLProcessor;
 
   beforeEach(() => {
@@ -47,12 +47,12 @@ describe.skip('IntroText Fix - Duplicate Content Prevention', () => {
     const beats = result.story.getAllBeats();
     expect(beats).toHaveLength(3);
 
-    // Check the introText beat specifically
-    const introTextBeat = beats[1];
-    expect(introTextBeat.type).toBe('introText');
+    // Check the infoText beat specifically
+    const infoTextBeat = beats[1];
+    expect(infoTextBeat.type).toBe('infoText');
 
     // Get the locations from the beat
-    const locations = Array.from(introTextBeat.locations.values());
+    const locations = Array.from(infoTextBeat.locations.values());
     console.log('Locations found:', locations.map(loc => ({ name: loc.name, x: loc.x, y: loc.y })));
 
     // Should have only 1 location (the "text" one, not the "Main Text" one)
@@ -68,15 +68,15 @@ describe.skip('IntroText Fix - Duplicate Content Prevention', () => {
   it('should have correct beat parameters', async () => {
     const result = await processor.parseASML(testASMLWithDuplicateLocations);
 
-    const introTextBeat = result.story.getBeat('1');
-    expect(introTextBeat).toBeDefined();
+    const infoTextBeat = result.story.getBeat('1');
+    expect(infoTextBeat).toBeDefined();
 
-    const params = introTextBeat.getParameters();
-    expect(params.text).toBe('This is a test of the introText fix. There should be only one text element, properly positioned.');
+    const params = infoTextBeat.getParameters();
+    expect(params.text).toBe('This is a test of the infoText fix. There should be only one text element, properly positioned.');
     expect(params.buttonText).toBe('Continue');
   });
 
-  it('should handle introText beat execution without duplication', async () => {
+  it('should handle infoText beat execution without duplication', async () => {
     const result = await processor.parseASML(testASMLWithDuplicateLocations);
     const story = result.story;
 
@@ -85,7 +85,7 @@ describe.skip('IntroText Fix - Duplicate Content Prevention', () => {
       setState: () => {},
       renderText: async (text: string, buttonText: string, locations?: any[]) => {
         console.log('renderText called with:', { text, buttonText, locations: locations?.length });
-        expect(text).toBe('This is a test of the introText fix. There should be only one text element, properly positioned.');
+        expect(text).toBe('This is a test of the infoText fix. There should be only one text element, properly positioned.');
         expect(buttonText).toBe('Continue');
         expect(locations?.length).toBe(1); // Should only have 1 location
         if (locations && locations.length > 0) {
@@ -96,8 +96,8 @@ describe.skip('IntroText Fix - Duplicate Content Prevention', () => {
       }
     };
 
-    // Execute the introText beat
-    const context = await introTextBeat.execute(mockRenderer as any);
+    // Execute the infoText beat
+    const context = await infoTextBeat.execute(mockRenderer as any);
 
     expect(context).toBeDefined();
   });
@@ -108,11 +108,11 @@ describe.skip('IntroText Fix - Duplicate Content Prevention', () => {
     // Test the renderer's content resolution
     const { createPositionedElementData } = await import('../../src/components/PositionedBeatView');
 
-    const introTextBeat = result.story.getBeat('1');
-    const locations = Array.from(introTextBeat.locations.values());
-    const content = introTextBeat.getParameters();
+    const infoTextBeat = result.story.getBeat('1');
+    const locations = Array.from(infoTextBeat.locations.values());
+    const content = infoTextBeat.getParameters();
 
-    const elements = createPositionedElementData(locations, content, 'introText');
+    const elements = createPositionedElementData(locations, content, 'infoText');
 
     console.log('Generated elements:', elements.map(el => ({ name: el.location.name, content: el.content })));
 
@@ -127,7 +127,7 @@ describe.skip('IntroText Fix - Duplicate Content Prevention', () => {
 });
 
 // Skipping - tries to import from renderer package which doesn't exist in core
-describe.skip('IntroText Fix - Content Resolution', () => {
+describe.skip('InfoText Fix - Content Resolution', () => {
   it('should return empty content for "Main Text" elements', async () => {
     const { getContentForLocation } = await import('../../src/components/PositionedBeatView');
 
@@ -152,11 +152,11 @@ describe.skip('IntroText Fix - Content Resolution', () => {
     const content = { text: 'Test intro text content' };
 
     // "Main Text" should return empty content
-    const mainTextContent = getContentForLocation(mainTextLocation, content, 'introText');
+    const mainTextContent = getContentForLocation(mainTextLocation, content, 'infoText');
     expect(mainTextContent).toBe('');
 
     // Normal "text" should return the actual content
-    const normalTextContent = getContentForLocation(normalTextLocation, content, 'introText');
+    const normalTextContent = getContentForLocation(normalTextLocation, content, 'infoText');
     expect(normalTextContent).toBe('Test intro text content');
   });
 });

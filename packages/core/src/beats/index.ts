@@ -1,5 +1,5 @@
 export { Beat } from './Beat';
-export { IntroTextBeat } from './IntroTextBeat';
+export { InfoTextBeat } from './InfoTextBeat';
 export { TitleScreenBeat } from './TitleScreenBeat';
 export { MovementChoiceBeat } from './MovementChoiceBeat';
 export { PickPropBeat } from './PickPropBeat';
@@ -25,3 +25,4 @@ export { OnlineContentBeat, type OnlineContentBeatParams } from './OnlineContent
 export { AIConditionBeat, type AIConditionCategory, type AIConditionBeatParams } from './AIConditionBeat';
 export { AIDialogTreeBeat, type AIDialogExitTarget, type AIDialogTreeBeatParams } from './AIDialogTreeBeat';
 export { AISummaryBeat, type AISummaryBeatParams } from './AISummaryBeat';
+export { AIInfoTextBeat, type AIInfoTextBeatParams } from './AIInfoTextBeat';

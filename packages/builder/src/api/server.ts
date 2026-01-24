@@ -273,7 +273,7 @@ export class APIServer {
           multiple: 'Beats with connectionType="multiple" define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.',
           conditional: 'conditionBeat uses trueTarget and falseTarget PARAMETERS, not connections array.',
         },
-        note: 'IMPORTANT: Do NOT put multiple connections for single-type beats. For branching, use dialogTree or movementChoice instead of multiple connections from introText.',
+        note: 'IMPORTANT: Do NOT put multiple connections for single-type beats. For branching, use dialogTree or movementChoice instead of multiple connections from infoText.',
       },
 
       storyStructure: {
@@ -292,19 +292,19 @@ export class APIServer {
       },
 
       tips: [
-        'CRITICAL: Start with a titleScreen beat as beat_0 - NEVER start with introText!',
-        'Use introText for narration and scene-setting (single connection only!)',
+        'CRITICAL: Start with a titleScreen beat as beat_0 - NEVER start with infoText!',
+        'Use infoText for narration and scene-setting (single connection only!)',
         'Use dialogTree for character conversations with choices',
         'dialogTree, movementChoice, and pickProp support "choiceDelay" parameter (seconds before showing choices)',
         'DialogTree choices can modify counters directly with counter/counterOperation/counterValue',
         'Use movementChoice for exploration/navigation branching',
-        'IMPORTANT: For branching story points, use dialogTree or movementChoice - NEVER multiple connections from introText',
+        'IMPORTANT: For branching story points, use dialogTree or movementChoice - NEVER multiple connections from infoText',
         'End branches with endScreen beats - ALWAYS set showRestart: true so player can replay!',
         'Position beats using x, y coordinates (grid: ~300px horizontal, ~200px vertical spacing)',
         'Use meaningful beat IDs like "beat_0", "beat_1", etc.',
         'CRITICAL - Counter Threshold Reachability: Before using conditionBeat to check a counter threshold (e.g., score >= 3), count ALL places where that counter can be increased and ensure the threshold is reachable. If you have 2 choices that each add +1, max is 2, so >= 3 is IMPOSSIBLE. Always provide 1-2 MORE increment opportunities than the highest threshold requires.',
         'CRITICAL - NO DUPLICATE CONNECTIONS: For dialogTree, movementChoice, pickProp - targets are ONLY in choices[].target or props[].target. Do NOT also add a "connections" array - that creates duplicates!',
-        'CRITICAL - inputText is for GETTING player input (names, passwords). To DISPLAY text, use introText instead!',
+        'CRITICAL - inputText is for GETTING player input (names, passwords). To DISPLAY text, use infoText instead!',
         'CRITICAL - Never chain identical single-item pickProps (e.g., Shovel → Shovel → Shovel). One pickProp to pick up an item is fine, then move to different content.',
         'CRITICAL - GENERATE ALL BEATS: Every target ID you reference MUST have a beat with that ID. If a choice targets "beat_22", you MUST include beat_22. Never stop generating early!',
         'All beats support an optional "notes" field for author annotations (not shown to players). Use notes to: suggest visual assets, mark areas needing review, explain narrative intent, or flag TODOs for the human author.',
@@ -668,7 +668,7 @@ export class APIServer {
           },
           {
             id: 'beat_1',
-            type: 'introText',
+            type: 'infoText',
             name: 'Introduction',
             parameters: {
               text: 'You stand at a crossroads. The morning mist swirls around your feet as you consider your options.',
@@ -693,7 +693,7 @@ export class APIServer {
           },
           {
             id: 'beat_3',
-            type: 'introText',
+            type: 'infoText',
             name: 'Forest Path',
             parameters: {
               text: 'The forest path leads you through ancient trees. Shafts of sunlight pierce the canopy above.',
@@ -704,7 +704,7 @@ export class APIServer {
           },
           {
             id: 'beat_4',
-            type: 'introText',
+            type: 'infoText',
             name: 'Mountain Road',
             parameters: {
               text: 'The mountain road climbs steadily upward. The air grows thin but the view is breathtaking.',

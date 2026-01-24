@@ -287,7 +287,7 @@ describe.skip('BeatTypeRegistry', () => {
 
       const expectedTypes = [
         'titleScreen',
-        'introText',
+        'infoText',
         'dialogTree',
         'movementChoice',
         'pickProp',
@@ -307,7 +307,7 @@ describe.skip('BeatTypeRegistry', () => {
       registry.registerDefaultBeats();
 
       // Visible beats
-      const visibleBeats = ['titleScreen', 'introText', 'dialogTree', 'movementChoice', 'pickProp', 'videoBeat', 'endScreen'];
+      const visibleBeats = ['titleScreen', 'infoText', 'dialogTree', 'movementChoice', 'pickProp', 'videoBeat', 'endScreen'];
       visibleBeats.forEach(beatType => {
         const definition = registry.getBeatDefinition(beatType);
         expect(definition?.category).toBe('visible');

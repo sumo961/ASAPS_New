@@ -278,6 +278,8 @@ const BEAT_TYPE_ALIASES: Record<string, string> = {
   'conditionCheck': 'conditionBeat',
   'addInventory': 'addRemoveInventory',
   'removeInventory': 'addRemoveInventory',
+  // Renamed in v2.3 - introText is now infoText
+  'introText': 'infoText',
 };
 
 /**

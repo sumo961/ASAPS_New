@@ -9,7 +9,7 @@
  *
  * CONNECTION RULES:
  * - SINGLE CONNECTION beats: Can only connect to ONE target beat via the connections array
- *   titleScreen, introText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
+ *   titleScreen, infoText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
  *
  * - MULTIPLE CONNECTION beats: Support multiple targets via their parameters (NOT the connections array)
  *   - dialogTree: targets defined in dialogTree.choices[].target
@@ -123,13 +123,13 @@
  * - Example choice with counter effect: { "text": "Stand your ground", "target": "fight", "counter": "courage", "counterOperation": "change", "counterValue": 10 }
  * - Best practice: Define all counters you plan to use on relevant characters first
  *
- * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from introText!
+ * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from infoText!
  */
 export const BEAT_TYPES = {
   // Story structure - SINGLE CONNECTION (one Continue button)
-  // 🚨🚨🚨 MANDATORY: beat_0 MUST be titleScreen - NEVER start with introText! 🚨🚨🚨
+  // 🚨🚨🚨 MANDATORY: beat_0 MUST be titleScreen - NEVER start with infoText! 🚨🚨🚨
   titleScreen: '🚨 MANDATORY FIRST BEAT (beat_0)! Start screen with title and author. SINGLE CONNECTION: only one target via connections array.',
-  introText: 'Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: introText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead.',
+  infoText: 'Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: infoText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead.',
   endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true } }',
 
   // Interactive content - MULTIPLE CONNECTIONS via parameters
@@ -246,7 +246,7 @@ Return a JSON object with this structure:
   "beats": [
     {
       "id": "beat-0",
-      "type": "titleScreen",  // 🚨 MANDATORY: First beat MUST be titleScreen, NEVER introText!
+      "type": "titleScreen",  // 🚨 MANDATORY: First beat MUST be titleScreen, NEVER infoText!
       "label": "Title",
       "parameters": { "title": "...", "subtitle": "...", "buttonText": "Begin" }
     }
@@ -258,7 +258,7 @@ Return a JSON object with this structure:
 }
 
 CRITICAL CONNECTION RULES:
-- SINGLE CONNECTION beats (titleScreen, introText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
+- SINGLE CONNECTION beats (titleScreen, infoText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
 - MULTIPLE CONNECTION beats (dialogTree, movementChoice, pickProp, hyperText, randomTarget): Define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.
   🚫 FORBIDDEN: Do NOT add a "connection" parameter to these beats - it triggers validation errors!
 - conditionBeat: EXACTLY 3 parameters allowed: "condition", "trueConnection", "falseConnection"
@@ -380,7 +380,7 @@ CRITICAL ANTI-PATTERNS TO AVOID:
 
 2. inputText MISUSE - inputText is for GETTING player input only!
    ❌ WRONG: inputText with "Read the note:" - nothing for player to type!
-   ✓ CORRECT: Use introText to DISPLAY text
+   ✓ CORRECT: Use infoText to DISPLAY text
    ✓ CORRECT: Use inputText only when player must TYPE something (names, passwords)
 
 3. Chains of identical single-item pickProps - avoid repetitive patterns!
@@ -399,11 +399,11 @@ Important:
 - Use descriptive labels for beats
 - Create engaging, coherent narrative flow
 - Use appropriate beat types for each story moment
-- NEVER put multiple connections from introText - use movementChoice or dialogTree for branching
+- NEVER put multiple connections from infoText - use movementChoice or dialogTree for branching
 - For dialogTree beats, targets go in dialogTree.choices[].target parameter - NO connections array!
 - For movementChoice beats, targets go in choices[].target parameter - NO connections array!
 - For pickProp beats, targets go in props[].target parameter - NO connections array!
-- Only titleScreen and introText need a "connections" array (single target beats)
+- Only titleScreen and infoText need a "connections" array (single target beats)
 - Ensure all beat IDs are unique and all connections reference valid beat IDs`;
 
   const userPrompt = `Create an interactive story with these requirements:
@@ -492,7 +492,7 @@ function generateStorySimulation(config: StoryConfig): GeneratedStory {
   // Introduction
   beats.push({
     id: 'beat-1',
-    type: 'introText',
+    type: 'infoText',
     label: 'Introduction',
     parameters: {
       text: `${prompt}\n\nYour adventure begins here...`,
@@ -533,7 +533,7 @@ function generateStorySimulation(config: StoryConfig): GeneratedStory {
       // Add narrative beat
       beats.push({
         id: beatId,
-        type: 'introText',
+        type: 'infoText',
         label: `Scene ${i + 1}`,
         parameters: {
           text: `Part ${i + 1} of your ${genre} adventure continues...`,
@@ -865,7 +865,7 @@ function suggestBeatsSimulation(config: SuggestBeatsConfig): BeatSuggestion {
   const suggestions = [
     { type: 'dialogTree', label: 'Conversation', description: 'Add a dialogue with choices', rationale: 'Engage player with character interaction' },
     { type: 'movementChoice', label: 'Location Choice', description: 'Player chooses where to go', rationale: 'Provide exploration options' },
-    { type: 'introText', label: 'Narrative', description: 'Continue the story', rationale: 'Advance the plot' },
+    { type: 'infoText', label: 'Narrative', description: 'Continue the story', rationale: 'Advance the plot' },
   ];
 
   return {
@@ -966,7 +966,7 @@ function createBeatSimulation(config: CreateBeatConfig): GeneratedBeat {
 
   return {
     id: `beat-${Date.now()}`,
-    type: 'introText',
+    type: 'infoText',
     label: 'New Beat',
     parameters: {
       text: description,

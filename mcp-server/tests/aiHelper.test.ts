@@ -30,7 +30,7 @@ describe('BEAT_TYPES', () => {
   it('should define all required beat types', () => {
     const requiredTypes = [
       'titleScreen',
-      'introText',
+      'infoText',
       'endScreen',
       'dialogTree',
       'movementChoice',
@@ -288,7 +288,7 @@ describe('createBeatFromDescription (simulation mode)', () => {
 
     expect(beat).toBeDefined();
     expect(beat.id).toBeDefined();
-    expect(beat.type).toBe('introText');
+    expect(beat.type).toBe('infoText');
     expect(beat.label).toBe('New Beat');
   });
 

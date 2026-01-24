@@ -135,7 +135,7 @@ describe('validateAllBeats', () => {
   it('should accept if all beats are valid', () => {
     const beats: StoryBeat[] = [
       { id: 'beat_0', type: 'titleScreen' },
-      { id: 'beat_1', type: 'introText' },
+      { id: 'beat_1', type: 'infoText' },
       { id: 'beat_2', type: 'endScreen' },
     ];
     const result = validateAllBeats(beats);
@@ -186,7 +186,7 @@ describe('validateStory', () => {
       metadata: { title: 'Test Story', author: 'Test' },
       beats: [
         { id: 'beat_0', type: 'titleScreen', parameters: { title: 'Welcome' } },
-        { id: 'beat_1', type: 'introText', parameters: { text: 'Hello' } },
+        { id: 'beat_1', type: 'infoText', parameters: { text: 'Hello' } },
         { id: 'beat_2', type: 'endScreen', parameters: {} },
       ],
       connections: [
@@ -212,7 +212,7 @@ describe('findDuplicateBeatIds', () => {
   it('should return empty array for unique IDs', () => {
     const beats: StoryBeat[] = [
       { id: 'beat_0', type: 'titleScreen' },
-      { id: 'beat_1', type: 'introText' },
+      { id: 'beat_1', type: 'infoText' },
       { id: 'beat_2', type: 'endScreen' },
     ];
     const duplicates = findDuplicateBeatIds(beats);
@@ -222,7 +222,7 @@ describe('findDuplicateBeatIds', () => {
   it('should find duplicate IDs', () => {
     const beats: StoryBeat[] = [
       { id: 'beat_0', type: 'titleScreen' },
-      { id: 'beat_1', type: 'introText' },
+      { id: 'beat_1', type: 'infoText' },
       { id: 'beat_0', type: 'endScreen' }, // duplicate
     ];
     const duplicates = findDuplicateBeatIds(beats);
@@ -233,7 +233,7 @@ describe('findDuplicateBeatIds', () => {
   it('should find multiple duplicate IDs', () => {
     const beats: StoryBeat[] = [
       { id: 'beat_0', type: 'titleScreen' },
-      { id: 'beat_1', type: 'introText' },
+      { id: 'beat_1', type: 'infoText' },
       { id: 'beat_0', type: 'endScreen' },
       { id: 'beat_1', type: 'movementChoice' },
     ];
@@ -246,7 +246,7 @@ describe('findDuplicateBeatIds', () => {
   it('should handle beats without IDs', () => {
     const beats: StoryBeat[] = [
       { id: 'beat_0', type: 'titleScreen' },
-      { type: 'introText' }, // no id
+      { type: 'infoText' }, // no id
       { id: 'beat_0', type: 'endScreen' },
     ];
     const duplicates = findDuplicateBeatIds(beats);

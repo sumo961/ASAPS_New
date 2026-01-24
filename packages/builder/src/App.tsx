@@ -693,7 +693,7 @@ function App() {
       const createdBeats: Beat[] = [];
       // Known beat types for validation (including AI variations that map to canonical types)
       const knownBeatTypes = new Set([
-        'titleScreen', 'introText', 'dialogTree', 'conversationChoice', 'movementChoice',
+        'titleScreen', 'infoText', 'dialogTree', 'conversationChoice', 'movementChoice',
         'pickProp', 'videoBeat', 'endScreen', 'durScreen', 'SWFBeat', 'inputText', 'hyperText',
         'setVariable', 'setGlobal', 'setCounter', 'counter', 'variable', 'conditionBeat', 'conditionCheck', 'condition',
         'randomTarget', 'setTimer', 'addRemoveInventory', 'addInventory', 'removeInventory'
@@ -706,7 +706,7 @@ function App() {
             { x: beatData.x || 200, y: beatData.y || 200 };
 
           // Log warning if AI generated an unknown beat type
-          const beatType = beatData.type || 'introText';
+          const beatType = beatData.type || 'infoText';
           if (!knownBeatTypes.has(beatType)) {
             console.warn(`[App] AI generated unknown beat type: "${beatType}" for beat ${beatData.id}. Check AI prompt constraints.`);
           }
@@ -785,7 +785,7 @@ function App() {
       // Extract connections from beat parameters
       if (story.beats && Array.isArray(story.beats)) {
         story.beats.forEach((beatData: any) => {
-          // Single connection (introText, titleScreen, etc.)
+          // Single connection (infoText, titleScreen, etc.)
           if (beatData.parameters?.connection?.target) {
             connectionsToCreate.push({
               source: beatData.id,
@@ -2826,7 +2826,7 @@ function App() {
 
     // Check if beat types match the default types
     const beatTypes = state.beats.map(b => b.type).sort();
-    const defaultBeatTypes = ['endScreen', 'introText', 'titleScreen'];
+    const defaultBeatTypes = ['endScreen', 'infoText', 'titleScreen'];
 
     if (JSON.stringify(beatTypes) !== JSON.stringify(defaultBeatTypes)) return false;
 
@@ -3047,7 +3047,7 @@ function App() {
 
         // Pass the AI-generated ID and name directly to addBeat
         const beat = actions.addBeat(
-          beatData.type || 'introText',
+          beatData.type || 'infoText',
           position,
           { id: beatData.id, name: beatData.label || beatData.name }
         );
@@ -3248,7 +3248,7 @@ function App() {
 
     // Create beat at center or specified position
     const position = beatData.position || { x: 400, y: 300 };
-    const beat = actions.addBeat(beatData.type || 'introText', position);
+    const beat = actions.addBeat(beatData.type || 'infoText', position);
 
     // Apply AI-generated parameters
     if (beatData.parameters) {

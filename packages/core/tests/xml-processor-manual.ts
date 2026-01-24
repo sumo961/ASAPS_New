@@ -37,7 +37,7 @@ const testASML = `<?xml version="1.0" encoding="UTF-8"?>
     
     <beat>
       <id id="1" name="Opening" />
-      <function kind="introText" text="Welcome to this interactive story..." buttonText="Continue" />
+      <function kind="infoText" text="Welcome to this interactive story..." buttonText="Continue" />
     </beat>
     
     <beat>
@@ -167,7 +167,7 @@ function testBeatRegistry() {
   
   // Test beat creation
   console.log('\\n🏗️ Testing Beat Creation:');
-  const testTypes = ['titleScreen', 'introText', 'dialogTree', 'movementChoice', 'setVariable'];
+  const testTypes = ['titleScreen', 'infoText', 'dialogTree', 'movementChoice', 'setVariable'];
   
   testTypes.forEach(type => {
     try {

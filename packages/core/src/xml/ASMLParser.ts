@@ -111,6 +111,7 @@ const LEGACY_TYPE_MAP: Record<string, string> = {
   'conditionCheck': 'conditionBeat',
   'setGlobal': 'setVariable',
   'globalTimer': 'setTimer',
+  'introText': 'infoText',  // Renamed in v2.3
 };
 
 // ============================================
@@ -258,8 +259,8 @@ function getContentForLocation(
 
   // Buttons: look up choice text by name or index
   if (kind === 'button') {
-    // For introText/titleScreen - single button beats
-    if (beatType === 'introText' || beatType === 'titleScreen') {
+    // For infoText/titleScreen - single button beats (also handles legacy introText)
+    if (beatType === 'infoText' || beatType === 'introText' || beatType === 'titleScreen') {
       return parameters.buttonText || 'Continue';
     }
 
@@ -1690,7 +1691,7 @@ export class ASMLParser {
         // Connection handled at end via <target> element
         break;
 
-      case 'introText':
+      case 'infoText':
       case 'setVariable':
       case 'setCounter':
       case 'videoBeat':

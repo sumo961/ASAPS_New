@@ -17,7 +17,7 @@ describe('AIValidator', () => {
           backgroundImage: { type: 'string', required: false },
         },
       },
-      introText: {
+      infoText: {
         name: 'Intro Text',
         category: 'visible',
         connectionType: 'single',
@@ -209,7 +209,7 @@ describe('AIValidator', () => {
       const beat: GeneratedBeat = {
         id: 'beat_2',
         name: 'Introduction',
-        type: 'introText',
+        type: 'infoText',
         position: { x: 200, y: 100 },
         parameters: {
           text: 'Once upon a time...',
@@ -251,7 +251,7 @@ describe('AIValidator', () => {
           {
             id: 'beat_2',
             name: 'Intro',
-            type: 'introText',
+            type: 'infoText',
             position: { x: 100, y: 200 },
             parameters: {
               text: 'Welcome!',
@@ -365,7 +365,7 @@ describe('AIValidator', () => {
           {
             id: 'beat_3',
             name: 'Left Path',
-            type: 'introText',
+            type: 'infoText',
             position: { x: 50, y: 300 },
             parameters: { text: 'You went left' },
             connections: [],
@@ -373,7 +373,7 @@ describe('AIValidator', () => {
           {
             id: 'beat_4',
             name: 'Right Path',
-            type: 'introText',
+            type: 'infoText',
             position: { x: 150, y: 300 },
             parameters: { text: 'You went right' },
             connections: [],
@@ -572,7 +572,7 @@ describe('AIValidator', () => {
           {
             id: 'beat_1',
             name: 'A',
-            type: 'introText',
+            type: 'infoText',
             position: { x: 0, y: 0 },
             parameters: { text: 'A' },
             connections: [{ targetId: 'beat_2' }],
@@ -580,7 +580,7 @@ describe('AIValidator', () => {
           {
             id: 'beat_2',
             name: 'B',
-            type: 'introText',
+            type: 'infoText',
             position: { x: 0, y: 100 },
             parameters: { text: 'B' },
             connections: [{ targetId: 'beat_1' }], // Circular

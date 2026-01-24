@@ -247,7 +247,7 @@ export class AIService {
 
     // If beat has connections array at top level, convert to parameters.connection
     if (beat.connections && Array.isArray(beat.connections) && beat.connections.length > 0) {
-      // For single-connection beats (titleScreen, introText, etc.)
+      // For single-connection beats (titleScreen, infoText, etc.)
       // Take the first connection and put it in parameters.connection
       const firstConnection = beat.connections[0];
 
@@ -947,7 +947,7 @@ export class AIService {
 
   /**
    * Auto-fix missing connections on linear beats (common smaller model issue)
-   * Linear beats like introText, durScreen, setVariable need a 'connection' parameter
+   * Linear beats like infoText, durScreen, setVariable need a 'connection' parameter
    * to specify their next beat. Smaller models often forget this.
    */
   private autoFixMissingConnections(response: StoryGenerationResponse): void {
@@ -962,7 +962,7 @@ export class AIService {
 
     // Beat types that require a single 'connection' parameter
     const linearBeatTypes = new Set([
-      'introText',
+      'infoText',
       'durScreen',
       'setVariable',
       'addRemoveInventory',
@@ -1083,11 +1083,11 @@ export class AIService {
         if (existingEndScreen) {
           console.log(`[AIService.autoFix]   No next beat, connecting to existing endScreen: ${existingEndScreen.id}`);
           targetId = existingEndScreen.id;
-        } else if (beat.type === 'introText') {
-          // Convert terminal introText to endScreen
-          console.log(`[AIService.autoFix]   Converting terminal introText ${beat.id} to endScreen`);
+        } else if (beat.type === 'infoText') {
+          // Convert terminal infoText to endScreen
+          console.log(`[AIService.autoFix]   Converting terminal infoText ${beat.id} to endScreen`);
           beat.type = 'endScreen';
-          // Transform parameters: introText has text/buttonText, endScreen has message/showRestart
+          // Transform parameters: infoText has text/buttonText, endScreen has message/showRestart
           const message = beat.parameters?.text || 'The End';
           beat.parameters = {
             message: message,
@@ -1702,7 +1702,7 @@ ${request.originalText}
       : 'none';
 
     // Build visible/invisible beat info
-    const visibleTypes = context.visibleBeatTypes?.join(', ') || 'titleScreen, introText, dialogTree, movementChoice, pickProp, durScreen, endScreen, inputText, hyperText, videoBeat, aiDialogTree, aiSummary, onlineContent';
+    const visibleTypes = context.visibleBeatTypes?.join(', ') || 'titleScreen, infoText, dialogTree, movementChoice, pickProp, durScreen, endScreen, inputText, hyperText, videoBeat, aiDialogTree, aiSummary, onlineContent';
     const invisibleTypes = context.invisibleBeatTypes?.join(', ') || 'setVariable, conditionBeat, addRemoveInventory, randomTarget, setTimer, aiCondition';
 
     return `You are an AI assistant that interprets natural language commands for bulk story operations in an interactive narrative authoring tool.
@@ -1773,8 +1773,8 @@ TRANSITIONS:
 
 FILTERING TO VISIBLE BEATS:
 - When user says "all visible beats" or "visible beats", you MUST include ALL visible beat types in filters.beatTypes
-- Copy this EXACT list: ["titleScreen", "introText", "dialogTree", "movementChoice", "pickProp", "durScreen", "endScreen", "inputText", "hyperText", "videoBeat", "aiDialogTree", "aiSummary", "onlineContent"]
-- Do NOT omit any types from this list - endScreen, introText, aiSummary are all visible beat types
+- Copy this EXACT list: ["titleScreen", "infoText", "dialogTree", "movementChoice", "pickProp", "durScreen", "endScreen", "inputText", "hyperText", "videoBeat", "aiDialogTree", "aiSummary", "onlineContent"]
+- Do NOT omit any types from this list - endScreen, infoText, aiSummary are all visible beat types
 - For transitions AND backgrounds, always filter to visible beat types only
 
 BACKGROUNDS:
@@ -1792,7 +1792,7 @@ IMPORTANT for text transformations (transformText action type):
 - When the user asks to "replace X with Y" or "change X to Y" in text content, use targetType: "text"
 - Do NOT specify beatTypes in the filters UNLESS the user explicitly mentions specific beat types
 - By leaving beatTypes empty or undefined, the system will search ALL text-containing beats automatically
-- Text can appear in many beat types: introText, dialogTree, titleScreen, endScreen, hyperText, etc.
+- Text can appear in many beat types: infoText, dialogTree, titleScreen, endScreen, hyperText, etc.
 - Only specify beatTypes if the user explicitly says something like "in dialog beats only" or "in intro text beats"
 
 Text transformation FLAGS:

@@ -1223,9 +1223,9 @@ export class ReactRenderer extends BaseRenderer {
 
     // Use provided locations or generate default locations from schema
     const content = { text, buttonText };
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('introText', content);
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('infoText', content);
 
-    await this.renderPositionedBeat('introText', content, effectiveLocations);
+    await this.renderPositionedBeat('infoText', content, effectiveLocations);
   }
 
   async renderDialog(speaker: string, text: string, emotion?: string, locations?: Location[]): Promise<void> {

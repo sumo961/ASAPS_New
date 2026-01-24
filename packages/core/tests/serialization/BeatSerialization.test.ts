@@ -16,13 +16,13 @@ describe('Beat Serialization', () => {
     registry = BeatTypeRegistry.getInstance();
   });
 
-  describe('IntroTextBeat Serialization', () => {
+  describe('InfoTextBeat Serialization', () => {
     it('should serialize and deserialize text parameter', () => {
       // Create beat with text
-      const beat = registry.createBeat('introText', {
+      const beat = registry.createBeat('infoText', {
         id: 'test-1',
         name: 'Test Intro',
-        type: 'introText',
+        type: 'infoText',
         parameters: {
           text: 'This is my intro text',
           buttonText: 'Continue'
@@ -31,14 +31,14 @@ describe('Beat Serialization', () => {
 
       // Serialize
       const serialized = beat.toJSON();
-      console.log('[IntroText] Serialized:', JSON.stringify(serialized, null, 2));
+      console.log('[InfoText] Serialized:', JSON.stringify(serialized, null, 2));
 
       // Check serialized data includes text
       expect(serialized.parameters.text).toBe('This is my intro text');
       expect(serialized.parameters.buttonText).toBe('Continue');
 
       // Deserialize
-      const restored = registry.createBeat('introText', {
+      const restored = registry.createBeat('infoText', {
         id: serialized.id,
         name: serialized.name,
         type: serialized.type,
@@ -54,10 +54,10 @@ describe('Beat Serialization', () => {
     });
 
     it('should serialize and deserialize background node', () => {
-      const beat = registry.createBeat('introText', {
+      const beat = registry.createBeat('infoText', {
         id: 'test-2',
         name: 'Test Intro with Background',
-        type: 'introText',
+        type: 'infoText',
         node: 'background-asset-123',
         parameters: {
           text: 'Text with background',
@@ -67,14 +67,14 @@ describe('Beat Serialization', () => {
 
       // Serialize
       const serialized = beat.toJSON();
-      console.log('[IntroText Background] Serialized:', JSON.stringify(serialized, null, 2));
+      console.log('[InfoText Background] Serialized:', JSON.stringify(serialized, null, 2));
 
       // Check node is serialized at top level AND in parameters
       expect(serialized.node).toBe('background-asset-123');
       expect(serialized.parameters.node).toBe('background-asset-123');
 
       // Deserialize
-      const restored = registry.createBeat('introText', {
+      const restored = registry.createBeat('infoText', {
         id: serialized.id,
         name: serialized.name,
         type: serialized.type,
@@ -90,10 +90,10 @@ describe('Beat Serialization', () => {
     });
 
     it('should serialize and deserialize locations', () => {
-      const beat = registry.createBeat('introText', {
+      const beat = registry.createBeat('infoText', {
         id: 'test-3',
         name: 'Test with Locations',
-        type: 'introText',
+        type: 'infoText',
         locations: [
           { kind: 'text', name: 'mainText', x: 100, y: 200, width: 400, height: 100 },
           { kind: 'button', name: 'continueBtn', x: 300, y: 500, width: 200, height: 50 }
@@ -105,7 +105,7 @@ describe('Beat Serialization', () => {
 
       // Serialize
       const serialized = beat.toJSON();
-      console.log('[IntroText Locations] Serialized:', JSON.stringify(serialized, null, 2));
+      console.log('[InfoText Locations] Serialized:', JSON.stringify(serialized, null, 2));
 
       // Check locations are serialized
       expect(serialized.locations).toHaveLength(2);
@@ -114,7 +114,7 @@ describe('Beat Serialization', () => {
       expect(serialized.locations[1].kind).toBe('button');
 
       // Deserialize
-      const restored = registry.createBeat('introText', {
+      const restored = registry.createBeat('infoText', {
         id: serialized.id,
         name: serialized.name,
         type: serialized.type,
@@ -290,10 +290,10 @@ describe('Beat Serialization', () => {
   describe('Complete Serialization Round-Trip', () => {
     it('should preserve all data through complete save/load cycle', () => {
       // Create a beat with EVERYTHING
-      const beat = registry.createBeat('introText', {
+      const beat = registry.createBeat('infoText', {
         id: 'complete-1',
         name: 'Complete Beat',
-        type: 'introText',
+        type: 'infoText',
         x: 150,
         y: 250,
         cluster: 'chapter1',
@@ -325,7 +325,7 @@ describe('Beat Serialization', () => {
       // Verify ALL properties are serialized
       expect(serialized.id).toBe('complete-1');
       expect(serialized.name).toBe('Complete Beat');
-      expect(serialized.type).toBe('introText');
+      expect(serialized.type).toBe('infoText');
       expect(serialized.x).toBe(150);
       expect(serialized.y).toBe(250);
       expect(serialized.cluster).toBe('chapter1');

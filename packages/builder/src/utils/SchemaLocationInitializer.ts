@@ -131,7 +131,7 @@ function getDefaultTextForLocation(
   }
 
   // Intro/Dur text
-  if (beatType === 'introText' || beatType === 'durScreen') {
+  if (beatType === 'infoText' || beatType === 'durScreen') {
     if (nameLower.includes('text')) return params.text || '';
     if (nameLower.includes('continue')) return params.buttonText || 'Continue';
   }

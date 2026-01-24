@@ -157,7 +157,7 @@ const injectStoryTool: Tool = {
             id: { type: 'string', description: 'Unique beat ID (e.g., "beat_0", "beat_1")' },
             type: {
               type: 'string',
-              description: 'Beat type (titleScreen, introText, dialogTree, movementChoice, pickProp, endScreen, etc.)',
+              description: 'Beat type (titleScreen, infoText, dialogTree, movementChoice, pickProp, endScreen, etc.)',
             },
             name: { type: 'string', description: 'Display name in editor' },
             parameters: {
@@ -397,7 +397,7 @@ async function handleInjectStory(args: any): Promise<any> {
       return {
         success: false,
         error: `Beat "${beat.id}" is missing required field: type`,
-        message: 'Every beat needs a type (e.g., "titleScreen", "introText").',
+        message: 'Every beat needs a type (e.g., "titleScreen", "infoText").',
       };
     }
   }

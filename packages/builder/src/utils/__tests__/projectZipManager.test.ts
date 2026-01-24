@@ -38,7 +38,7 @@ describe('projectZipManager', () => {
           {
             id: 'beat_1',
             name: 'Intro',
-            type: 'introText',
+            type: 'infoText',
             parameters: { text: 'Welcome', buttonText: 'Continue' },
             connections: [{ targetId: 'beat_2' }],
             locations: [],
@@ -434,7 +434,7 @@ describe('projectZipManager', () => {
             beats: [
               {
                 id: 'beat_1',
-                type: 'introText',
+                type: 'infoText',
                 node: 'old_asset_id',
                 parameters: { text: 'Test' }
               }

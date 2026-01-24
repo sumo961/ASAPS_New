@@ -41,7 +41,7 @@ interface ClusterContainerNodeData {
 // Beat type colors (same as main flowchart)
 const beatTypeColors: Record<string, string> = {
   titleScreen: '#3b82f6',
-  introText: '#10b981',
+  infoText: '#10b981',
   dialogTree: '#8b5cf6',
   conversationChoice: '#a855f7',
   movementChoice: '#f59e0b',
@@ -58,7 +58,7 @@ const beatTypeColors: Record<string, string> = {
 // Beat type icons (same as BeatNode)
 const beatTypeIcons: Record<string, string> = {
   titleScreen: '🎬',
-  introText: '📝',
+  infoText: '📝',
   dialogTree: '🌳',
   conversationChoice: '💬',
   movementChoice: '🚶',

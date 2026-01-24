@@ -15,7 +15,7 @@ describe('projectDeserializer', () => {
         {
           id: 'beat_1',
           name: 'Intro',
-          type: 'introText',
+          type: 'infoText',
           x: 100,
           y: 200,
           parameters: {
@@ -32,7 +32,7 @@ describe('projectDeserializer', () => {
       expect(beats).toHaveLength(1);
       expect(beats[0].id).toBe('beat_1');
       expect(beats[0].name).toBe('Intro');
-      expect(beats[0].type).toBe('introText');
+      expect(beats[0].type).toBe('infoText');
       expect(beats[0].x).toBe(100);
       expect(beats[0].y).toBe(200);
 
@@ -54,7 +54,7 @@ describe('projectDeserializer', () => {
         {
           id: 'beat_2',
           name: 'Intro',
-          type: 'introText',
+          type: 'infoText',
           x: 200,
           y: 0,
           parameters: { text: 'Welcome', buttonText: 'Continue' }
@@ -73,7 +73,7 @@ describe('projectDeserializer', () => {
 
       expect(beats).toHaveLength(3);
       expect(beats[0].type).toBe('titleScreen');
-      expect(beats[1].type).toBe('introText');
+      expect(beats[1].type).toBe('infoText');
       expect(beats[2].type).toBe('endScreen');
     });
 
@@ -82,7 +82,7 @@ describe('projectDeserializer', () => {
         {
           id: 'beat_1',
           name: 'Start',
-          type: 'introText',
+          type: 'infoText',
           parameters: { text: 'Start' },
           connections: [
             { targetId: 'beat_2', label: 'Next' }
@@ -102,7 +102,7 @@ describe('projectDeserializer', () => {
         {
           id: 'beat_1',
           name: 'Dialog',
-          type: 'introText',
+          type: 'infoText',
           parameters: { text: 'Hello' },
           locations: [
             { name: 'char_1', x: 100, y: 200, char: 'character_id' }
@@ -124,7 +124,7 @@ describe('projectDeserializer', () => {
         {
           id: 'beat_1',
           name: 'Scene',
-          type: 'introText',
+          type: 'infoText',
           node: 'background_asset_id',
           parameters: { text: 'Scene text', node: 'background_asset_id' }
         }
@@ -140,7 +140,7 @@ describe('projectDeserializer', () => {
         {
           id: 'beat_1',
           name: 'Valid',
-          type: 'introText',
+          type: 'infoText',
           parameters: {}
         },
         {
@@ -167,11 +167,11 @@ describe('projectDeserializer', () => {
         }
       ];
 
-      // Should fallback to IntroTextBeat based on registry implementation
+      // Should fallback to InfoTextBeat based on registry implementation
       const beats = deserializeBeats(beatsData);
 
       expect(beats).toHaveLength(1);
-      // The registry falls back to introText for unknown types
+      // The registry falls back to infoText for unknown types
       expect(beats[0]).toBeDefined();
     });
   });
@@ -183,7 +183,7 @@ describe('projectDeserializer', () => {
           {
             id: 'beat_1',
             name: 'Test',
-            type: 'introText',
+            type: 'infoText',
             getParameters: () => ({ text: 'Test', buttonText: 'Continue' }),
             updateParameters: () => {},
             x: 0,
@@ -229,7 +229,7 @@ describe('projectDeserializer', () => {
             {
               id: 'beat_1',
               name: 'Intro',
-              type: 'introText',
+              type: 'infoText',
               parameters: { text: 'Welcome', buttonText: 'Start' },
               connections: [],
               locations: [],

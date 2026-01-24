@@ -52,7 +52,7 @@ describe('PersistenceContext - SaveCurrentProject', () => {
       result.current.updateStory({
         title: 'My Untitled Story',
         beats: [
-          { id: '1', type: 'introText', name: 'Introduction' } as Beat,
+          { id: '1', type: 'infoText', name: 'Introduction' } as Beat,
           { id: '2', type: 'dialogTree', name: 'First Choice' } as Beat,
         ],
         characters: [{ id: 'char1', name: 'Hero' }],
@@ -75,7 +75,7 @@ describe('PersistenceContext - SaveCurrentProject', () => {
     const { result } = renderHook(() => useProject(), { wrapper });
 
     const mockBeats = [
-      { id: '1', type: 'introText', name: 'Introduction' } as Beat,
+      { id: '1', type: 'infoText', name: 'Introduction' } as Beat,
       { id: '2', type: 'dialogTree', name: 'Choice 1' } as Beat,
     ];
 
@@ -244,7 +244,7 @@ describe('PersistenceContext - Integration', () => {
     act(() => {
       result.current.persist.updateProjectStory({
         title: 'My Story',
-        beats: [{ id: '1', type: 'introText', name: 'Intro' } as Beat],
+        beats: [{ id: '1', type: 'infoText', name: 'Intro' } as Beat],
       });
       result.current.save.markChanged();
     });

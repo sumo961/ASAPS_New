@@ -145,7 +145,7 @@ describe.skip('ASMLProcessor', () => {
     </beat>
     <beat>
       <id id="1" name="Intro" />
-      <function kind="introText" text="Welcome to the story..." buttonText="Continue" />
+      <function kind="infoText" text="Welcome to the story..." buttonText="Continue" />
     </beat>
     <beat>
       <id id="2" name="Dialog" />
@@ -191,7 +191,7 @@ describe.skip('ASMLProcessor', () => {
 
       // Check each beat type
       expect(beats[0].type).toBe('titleScreen');
-      expect(beats[1].type).toBe('introText');
+      expect(beats[1].type).toBe('infoText');
       expect(beats[2].type).toBe('dialogTree');
       expect(beats[3].type).toBe('movementChoice');
       expect(beats[4].type).toBe('pickProp');

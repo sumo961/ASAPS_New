@@ -73,7 +73,7 @@ export interface PersistenceContextValue {
 const PersistenceContext = createContext<PersistenceContextValue | null>(null);
 
 /**
- * Check if a project is a default/empty project (3 default beats: titleScreen, introText, endScreen)
+ * Check if a project is a default/empty project (3 default beats: titleScreen, infoText, endScreen)
  * These shouldn't be auto-saved as they clutter the project library
  */
 const isDefaultProject = (project: Project): boolean => {
@@ -94,7 +94,7 @@ const isDefaultProject = (project: Project): boolean => {
 
   // Get beat types and sort for comparison
   const types = beats.map((b: any) => b.type).sort();
-  const defaultTypes = ['endScreen', 'introText', 'titleScreen'];
+  const defaultTypes = ['endScreen', 'infoText', 'titleScreen'];
 
   // Check if the types match the default pattern
   return JSON.stringify(types) === JSON.stringify(defaultTypes);

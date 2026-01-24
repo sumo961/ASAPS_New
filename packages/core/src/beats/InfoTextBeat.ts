@@ -2,10 +2,11 @@ import { Beat } from './Beat';
 import type { BeatConfig } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { IRenderer } from '../types';
-import type { IntroTextParameters } from '../generated/beat-types';
+import type { InfoTextParameters } from '../generated/beat-types';
 
-export class IntroTextBeat extends Beat {
+export class InfoTextBeat extends Beat {
   public text: string;
+  public textVariations?: string[];
   public buttonText?: string;
   public locs: any[];
   public backgroundSound?: string;
@@ -14,10 +15,12 @@ export class IntroTextBeat extends Beat {
     node?: string;
     locs?: any[];
     backgroundSound?: string;
-    parameters?: Partial<IntroTextParameters>;
-  } & Partial<IntroTextParameters>) {
+    textVariations?: string[];
+    parameters?: Partial<InfoTextParameters & { textVariations?: string[] }>;
+  } & Partial<InfoTextParameters>) {
     super(config);
     this.text = config.text || config.parameters?.text || '';
+    this.textVariations = config.textVariations || config.parameters?.textVariations;
     this.buttonText = config.buttonText || config.parameters?.buttonText;
     this.locs = config.locs || config.parameters?.locs || [];
     this.backgroundSound = config.backgroundSound || config.parameters?.backgroundSound;
@@ -32,6 +35,9 @@ export class IntroTextBeat extends Beat {
       node: this.node,
       backgroundSound: this.backgroundSound
     };
+    if (this.textVariations && this.textVariations.length > 0) {
+      params.textVariations = this.textVariations;
+    }
     if (this.locs && this.locs.length > 0) {
       params.locs = this.locs;
     }
@@ -40,10 +46,25 @@ export class IntroTextBeat extends Beat {
 
   updateParameters(params: Record<string, any>): void {
     if (params.text !== undefined) this.text = params.text;
+    if (params.textVariations !== undefined) this.textVariations = params.textVariations;
     if (params.buttonText !== undefined) this.buttonText = params.buttonText;
     if (params.node !== undefined) this.node = params.node;
     if (params.locs !== undefined) this.locs = params.locs;
     if (params.backgroundSound !== undefined) this.backgroundSound = params.backgroundSound;
+  }
+
+  /**
+   * Select text from variations (if any) or return main text.
+   * Combines main text with variations array for random selection.
+   */
+  private selectText(): string {
+    if (this.textVariations && this.textVariations.length > 0) {
+      // Combine main text with variations
+      const allOptions = [this.text, ...this.textVariations];
+      const randomIndex = Math.floor(Math.random() * allOptions.length);
+      return allOptions[randomIndex];
+    }
+    return this.text;
   }
 
   protected async performAction(
@@ -52,8 +73,11 @@ export class IntroTextBeat extends Beat {
   ): Promise<string | null> {
     // Background is now handled centrally in Beat.execute()
 
+    // Select text (handles random variation selection)
+    const selectedText = this.selectText();
+
     // Process text with variable interpolation
-    const processedText = this.processText(this.text, context);
+    const processedText = this.processText(selectedText, context);
     const processedButtonText = this.processText(this.buttonText || 'Continue', context);
 
     const locations = Array.from(this.locations.values());

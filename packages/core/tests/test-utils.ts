@@ -141,7 +141,7 @@ export const TestXML = {
     </beat>
     <beat>
       <id id="1" name="Intro" />
-      <function kind="introText" text="Welcome to the story..." buttonText="Continue" />
+      <function kind="infoText" text="Welcome to the story..." buttonText="Continue" />
     </beat>
     <beat>
       <id id="2" name="Dialog" />

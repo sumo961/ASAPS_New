@@ -3271,8 +3271,8 @@ function getContentForLocation(
     }
   }
 
-  // Intro Text / Dur Screen specific elements
-  if (beatType === 'introText' || beatType === 'durScreen') {
+  // Info Text / Dur Screen specific elements
+  if (beatType === 'infoText' || beatType === 'durScreen') {
     if (nameLower.includes('text') || nameLower.includes('message')) {
       return content.text || '';
     }

@@ -25,7 +25,7 @@ export interface ImportTwineDialogProps {
 type DialogStep = 'select' | 'preview' | 'importing' | 'complete' | 'error';
 
 const BEAT_TYPE_ICONS: Record<SuggestedBeatType, string> = {
-  introText: '📝',
+  infoText: '📝',
   dialogTree: '🌳',
   hyperText: '🔗',
   endScreen: '🏁',
@@ -34,7 +34,7 @@ const BEAT_TYPE_ICONS: Record<SuggestedBeatType, string> = {
 };
 
 const BEAT_TYPE_LABELS: Record<SuggestedBeatType, string> = {
-  introText: 'Intro Text',
+  infoText: 'Intro Text',
   dialogTree: 'Dialog Tree',
   hyperText: 'Hyper Text',
   endScreen: 'End Screen',

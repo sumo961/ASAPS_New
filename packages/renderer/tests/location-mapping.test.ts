@@ -137,14 +137,14 @@ describe('Schema Location Mapping', () => {
       expect(resolveContent('startButton', content, 'titleScreen')).toBe('Start Game');
     });
 
-    it('should resolve introText locations correctly', () => {
+    it('should resolve infoText locations correctly', () => {
       const content = {
         text: 'Once upon a time...',
         buttonText: 'Continue'
       };
 
-      expect(resolveContent('Text', content, 'introText')).toBe('Once upon a time...');
-      expect(resolveContent('continueButton', content, 'introText')).toBe('Continue');
+      expect(resolveContent('Text', content, 'infoText')).toBe('Once upon a time...');
+      expect(resolveContent('continueButton', content, 'infoText')).toBe('Continue');
     });
 
     it('should resolve inputText locations correctly', () => {
@@ -261,8 +261,8 @@ describe('Schema Location Mapping', () => {
         buttonText: true // Boolean
       };
 
-      expect(resolveContent('Text', content, 'introText')).toBe('123');
-      expect(resolveContent('continueButton', content, 'introText')).toBe('true');
+      expect(resolveContent('Text', content, 'infoText')).toBe('123');
+      expect(resolveContent('continueButton', content, 'infoText')).toBe('true');
     });
 
     it('should prioritize exact matches over partial matches', () => {
@@ -292,7 +292,7 @@ describe('Schema Location Mapping', () => {
     it('should have location mappings for all common visual beat types', () => {
       const requiredBeats = [
         'titleScreen',
-        'introText',
+        'infoText',
         'inputText',
         'endScreen',
         'movementChoice',

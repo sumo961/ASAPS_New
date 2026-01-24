@@ -234,7 +234,7 @@ describe('TreeLayoutAlgorithm', () => {
     it('should return positions for all beats', () => {
       const beats = [
         { id: 'beat1', type: 'titleScreen', parameters: { connection: { target: 'beat2' } } },
-        { id: 'beat2', type: 'introText', parameters: {} }
+        { id: 'beat2', type: 'infoText', parameters: {} }
       ];
 
       const positions = applyTreeLayoutToBeats(beats);
@@ -247,7 +247,7 @@ describe('TreeLayoutAlgorithm', () => {
     it('should merge external edges with parameter edges', () => {
       const beats = [
         { id: 'beat1', type: 'titleScreen', parameters: {} },
-        { id: 'beat2', type: 'introText', parameters: {} },
+        { id: 'beat2', type: 'infoText', parameters: {} },
         { id: 'beat3', type: 'endScreen', parameters: {} }
       ];
       const externalEdges = [
@@ -292,7 +292,7 @@ describe('TreeLayoutAlgorithm', () => {
     it('should position clusters and their internal beats', () => {
       const beats = [
         { id: 'outside', type: 'titleScreen', parameters: { connection: { target: 'inside1' } } },
-        { id: 'inside1', type: 'introText', cluster: 'cluster1', parameters: { connection: { target: 'inside2' } } },
+        { id: 'inside1', type: 'infoText', cluster: 'cluster1', parameters: { connection: { target: 'inside2' } } },
         { id: 'inside2', type: 'endScreen', cluster: 'cluster1', parameters: {} }
       ];
       const clusters = [{
@@ -323,8 +323,8 @@ describe('TreeLayoutAlgorithm', () => {
     it('should skip internal cluster edges in main layout', () => {
       const beats = [
         { id: 'start', type: 'titleScreen', parameters: { connection: { target: 'a' } } },
-        { id: 'a', type: 'introText', cluster: 'c1', parameters: { connection: { target: 'b' } } },
-        { id: 'b', type: 'introText', cluster: 'c1', parameters: { connection: { target: 'end' } } },
+        { id: 'a', type: 'infoText', cluster: 'c1', parameters: { connection: { target: 'b' } } },
+        { id: 'b', type: 'infoText', cluster: 'c1', parameters: { connection: { target: 'end' } } },
         { id: 'end', type: 'endScreen', parameters: {} }
       ];
       const clusters = [{
@@ -348,8 +348,8 @@ describe('TreeLayoutAlgorithm', () => {
     it('should handle multiple clusters', () => {
       const beats = [
         { id: 'root', type: 'titleScreen', parameters: {} },
-        { id: 'c1_b1', type: 'introText', cluster: 'cluster1', parameters: {} },
-        { id: 'c2_b1', type: 'introText', cluster: 'cluster2', parameters: {} }
+        { id: 'c1_b1', type: 'infoText', cluster: 'cluster1', parameters: {} },
+        { id: 'c2_b1', type: 'infoText', cluster: 'cluster2', parameters: {} }
       ];
       const clusters = [
         { id: 'cluster1', beatIds: ['c1_b1'], containerBounds: { width: 300, height: 200 } },
@@ -374,9 +374,9 @@ describe('TreeLayoutAlgorithm', () => {
 
     it('should layout beats within cluster using tree algorithm', () => {
       const beats = [
-        { id: 'parent', type: 'introText', cluster: 'c1', parameters: {} },
-        { id: 'child1', type: 'introText', cluster: 'c1', parameters: {} },
-        { id: 'child2', type: 'introText', cluster: 'c1', parameters: {} }
+        { id: 'parent', type: 'infoText', cluster: 'c1', parameters: {} },
+        { id: 'child1', type: 'infoText', cluster: 'c1', parameters: {} },
+        { id: 'child2', type: 'infoText', cluster: 'c1', parameters: {} }
       ];
       const clusters = [{
         id: 'c1',

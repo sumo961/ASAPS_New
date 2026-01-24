@@ -213,7 +213,7 @@ export abstract class Beat {
     // Excluded: durScreen (has own timer), logic beats (instant), endScreen (no timeout needed)
     const supportsDefaultTargetTimeout = [
       'titleScreen',
-      'introText',
+      'infoText',
       'dialogTree',
       'movementChoice',
       'pickProp',

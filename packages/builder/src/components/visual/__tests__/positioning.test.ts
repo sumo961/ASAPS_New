@@ -121,7 +121,7 @@ describe('Text Box Positioning Logic', () => {
   });
 
   describe('Beat Type Specific Positioning', () => {
-    it('should position introText elements correctly', () => {
+    it('should position infoText elements correctly', () => {
       const textWidth = 400;
       const textHeight = 100;
       const buttonWidth = 200;

@@ -262,7 +262,7 @@ export class HelperCommandFilter {
   private queryBeatsWithText(filters: SelectorFilters): FilterResult {
     // For text queries, if no beat types specified, search ALL beats with text
     const textBeatTypes = [
-      'introText', 'titleScreen', 'endScreen', 'durScreen',
+      'infoText', 'titleScreen', 'endScreen', 'durScreen',
       'dialogTree', 'hyperText', 'inputText', 'movementChoice',
       'pickProp', 'aiDialogTree', 'aiSummary'
     ];

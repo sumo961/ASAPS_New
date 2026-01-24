@@ -317,7 +317,7 @@ Only reference actual choices (from counters/variables) and locations visited.`)
         const typeNote = {
           'onlineContent': '(info)',
           'aiSummary': '(summary)',
-          'introText': '(intro)',
+          'infoText': '(intro)',
           'durScreen': '(info)',
           'titleScreen': '(start)',
           'endScreen': '(end)',

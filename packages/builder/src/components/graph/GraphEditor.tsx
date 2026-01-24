@@ -78,7 +78,7 @@ const edgeTypes: EdgeTypes = {
 // Beat type colors
 const beatTypeColors: Record<string, string> = {
   titleScreen: '#3b82f6',
-  introText: '#10b981',
+  infoText: '#10b981',
   dialogTree: '#8b5cf6',
   conversationChoice: '#a855f7',
   movementChoice: '#f59e0b',

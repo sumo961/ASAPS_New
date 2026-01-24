@@ -1,10 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
-import { 
-  Story, 
-  Beat, 
+import {
+  Story,
+  Beat,
   BeatTypeRegistry,
   TitleScreenBeat,
-  IntroTextBeat,
+  InfoTextBeat,
   EndScreenBeat,
   ASMLProcessor,
   ASMLGenerator
@@ -311,10 +311,10 @@ export function useStoryBuilder() {
     });
     
     // Create intro beat
-    const introBeat = beatRegistry.current.createBeat('introText', {
+    const introBeat = beatRegistry.current.createBeat('infoText', {
       id: 'beat_1',
       name: 'Introduction',
-      type: 'introText',
+      type: 'infoText',
       x: 400,
       y: 200,
       parameters: {

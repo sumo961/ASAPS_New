@@ -53,7 +53,7 @@ interface SoundMatch {
  * Visible beat types for filtering
  */
 const VISIBLE_BEAT_TYPES = [
-  'titleScreen', 'introText', 'dialogTree', 'movementChoice',
+  'titleScreen', 'infoText', 'dialogTree', 'movementChoice',
   'pickProp', 'durScreen', 'endScreen', 'inputText', 'hyperText',
   'videoBeat', 'aiDialogTree', 'aiSummary', 'onlineContent'
 ];
@@ -516,8 +516,8 @@ function normalizeBeatType(input: string): string | null {
     'dialogtree': 'dialogTree',
     'title': 'titleScreen',
     'titlescreen': 'titleScreen',
-    'intro': 'introText',
-    'introtext': 'introText',
+    'intro': 'infoText',
+    'introtext': 'infoText',
     'end': 'endScreen',
     'endscreen': 'endScreen',
     'movement': 'movementChoice',

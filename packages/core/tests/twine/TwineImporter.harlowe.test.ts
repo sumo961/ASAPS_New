@@ -141,7 +141,7 @@ describe('TwineImporter - Harlowe format', () => {
     expect(beatNames).toContain('Ending #2');
   });
 
-  it('should create intermediate IntroText beats for conditional content', () => {
+  it('should create intermediate InfoText beats for conditional content', () => {
     const importer = new TwineImporter();
     const result = importer.import(harloweTestHtml);
 
@@ -155,12 +155,12 @@ describe('TwineImporter - Harlowe format', () => {
     // Check true beat has the conditional text
     const trueParams = trueBeat!.getParameters();
     expect(trueParams.text).toContain('The truth is');
-    expect(trueBeat!.type).toBe('introText');
+    expect(trueBeat!.type).toBe('infoText');
 
     // Check false beat has the conditional text
     const falseParams = falseBeat!.getParameters();
     expect(falseParams.text).toContain('You stammer');
-    expect(falseBeat!.type).toBe('introText');
+    expect(falseBeat!.type).toBe('infoText');
 
     // The conditionBeat should point to these intermediate beats
     const lookAtTom = result.beats.find(b => b.name === 'Look at Tom');

@@ -4,7 +4,7 @@ import {
   Beat,
   BeatTypeRegistry,
   TitleScreenBeat,
-  IntroTextBeat,
+  InfoTextBeat,
   EndScreenBeat,
   DialogTreeBeat,
   ASMLProcessor,
@@ -828,10 +828,10 @@ export function useStoryBuilder() {
     });
     
     // Create intro beat
-    const introBeat = beatRegistry.current.createBeat('introText', {
+    const introBeat = beatRegistry.current.createBeat('infoText', {
       id: 'beat_1',
       name: 'Introduction',
-      type: 'introText',
+      type: 'infoText',
       x: 400,
       y: 200,
       parameters: {

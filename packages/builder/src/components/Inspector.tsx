@@ -219,7 +219,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   const supportsVisualEditor = (beatType: string) => {
     const visualBeatTypes = [
       'titleScreen',
-      'introText',
+      'infoText',
       'durScreen',
       'pickProp',
       'movementChoice',
@@ -519,7 +519,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           author: params.author || 'Unknown Author',
           buttonText: params.buttonText || 'Start',
         };
-      case 'introText':
+      case 'infoText':
       case 'durScreen':
         return {
           text: params.text || '',
@@ -663,7 +663,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       case 'titleScreen':
         if (!localBeat.parameters?.title) errors.push('Title is required');
         break;
-      case 'introText':
+      case 'infoText':
         if (!localBeat.parameters?.text) errors.push('Text content is required');
         break;
       case 'dialogTree':
@@ -797,7 +797,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       const parameters = { ...beatToUpdate.parameters };
 
       // Ensure button text is saved for applicable beats
-      if (['titleScreen', 'introText', 'durScreen', 'endScreen'].includes(beat.type)) {
+      if (['titleScreen', 'infoText', 'durScreen', 'endScreen'].includes(beat.type)) {
         parameters.buttonText = beatToUpdate.parameters.buttonText ||
           (beat.type === 'titleScreen' ? 'Start' :
            beat.type === 'endScreen' ? 'Play Again' :
@@ -989,7 +989,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         const parameters = { ...localBeat.parameters };
 
         // Ensure button text is saved for applicable beats
-        if (['titleScreen', 'introText', 'durScreen', 'endScreen'].includes(beat.type)) {
+        if (['titleScreen', 'infoText', 'durScreen', 'endScreen'].includes(beat.type)) {
           parameters.buttonText = localBeat.parameters.buttonText ||
             (beat.type === 'titleScreen' ? 'Start' :
              beat.type === 'endScreen' ? 'Play Again' :

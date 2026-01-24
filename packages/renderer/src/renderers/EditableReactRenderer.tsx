@@ -82,7 +82,7 @@ export class EditableReactRenderer extends ReactRenderer {
       this.backgroundImageUrl = this.getState('backgroundAssetUrl') || null;
       
       if (locations && locations.length > 0) {
-        await this.renderPositionedBeat('introText', { text, buttonText }, locations, false);
+        await this.renderPositionedBeat('infoText', { text, buttonText }, locations, false);
         return;
       }
       

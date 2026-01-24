@@ -161,7 +161,7 @@ describe('asmlAssetImporter', () => {
       it('should link background with bg: prefix', () => {
         const mockBeat = {
           id: 'beat1',
-          type: 'introText',
+          type: 'infoText',
           node: undefined,
           getParameters: () => ({ node: 'castle' }),
           updateParameters: vi.fn()
@@ -179,7 +179,7 @@ describe('asmlAssetImporter', () => {
       it('should handle background with same name as sound using prefix', () => {
         const mockBeat = {
           id: 'beat2',
-          type: 'introText',
+          type: 'infoText',
           getParameters: () => ({ node: 'forest' }),
           updateParameters: vi.fn()
         };
@@ -199,7 +199,7 @@ describe('asmlAssetImporter', () => {
       it('should link beat sound with prefix', () => {
         const mockBeat = {
           id: 'beat1',
-          type: 'introText',
+          type: 'infoText',
           sound: { file: 'click' },
           getParameters: () => ({})
         };
@@ -220,7 +220,7 @@ describe('asmlAssetImporter', () => {
 
         const mockBeat = {
           id: 'beat1',
-          type: 'introText',
+          type: 'infoText',
           locations: new Map([['prop1', mockLocation]]),
           getParameters: () => ({})
         };

@@ -50,8 +50,8 @@ Respond with JSON in this structure:
 7. Position beats to the right of current beat with vertical spacing
 
 ## Common Patterns
-- After titleScreen → introText or dialogTree (setup story)
-- After introText → movementChoice or pickProp (give player agency)
+- After titleScreen → infoText or dialogTree (setup story)
+- After infoText → movementChoice or pickProp (give player agency)
 - After choice beats → durScreen or dialogTree (show consequences)
 - Before endScreen → climactic beats (dialogTree, conditionBeat)
 - Use setVariable before conditional branches

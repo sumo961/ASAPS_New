@@ -35,7 +35,7 @@ describe('AIService', () => {
           dialogTree: { type: 'object', required: true },
         },
       },
-      introText: {
+      infoText: {
         name: 'Intro Text',
         category: 'visible',
         parameters: {
@@ -326,7 +326,7 @@ describe('AIService', () => {
       currentBeat: {
         id: 'beat_1',
         name: 'Current Beat',
-        type: 'introText',
+        type: 'infoText',
         parameters: { text: 'Some text' },
       },
       existingBeats: [],

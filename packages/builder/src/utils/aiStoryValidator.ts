@@ -45,7 +45,7 @@ function extractTargetIds(beat: any): string[] {
 
   const params = beat.parameters || {};
 
-  // Single connection (introText, titleScreen, etc.)
+  // Single connection (infoText, titleScreen, etc.)
   if (params.connection?.target) {
     targets.push(params.connection.target);
   }

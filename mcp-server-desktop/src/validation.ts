@@ -87,7 +87,7 @@ export function validateBeat(beat: StoryBeat, index: number): ValidationResult {
     return {
       success: false,
       error: `Beat "${beat.id}" is missing required field: type`,
-      message: 'Every beat needs a type (e.g., "titleScreen", "introText").',
+      message: 'Every beat needs a type (e.g., "titleScreen", "infoText").',
     };
   }
   return { success: true };

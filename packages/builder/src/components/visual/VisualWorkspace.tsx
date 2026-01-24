@@ -1098,7 +1098,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         // Populate text content from beat parameters based on element name
         // Note: nameLower is already defined above for button detection
         if (element.type === 'dialog' || element.type === 'text') {
-          if (beat.type === 'introText' || beat.type === 'durScreen') {
+          if (beat.type === 'infoText' || beat.type === 'durScreen') {
             element.text = params.text || '';
           } else if (beat.type === 'hyperText') {
             element.text = params.text || '';
@@ -1286,7 +1286,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         // CRITICAL FIX: If element is a dialog/text and has no text, get it from beat parameters
         if ((element.type === 'dialog' || loc.kind === 'text') && !element.text && !isButtonByName) {
           // For different beat types, get text from appropriate parameter
-          if (beat.type === 'introText' || beat.type === 'durScreen') {
+          if (beat.type === 'infoText' || beat.type === 'durScreen') {
             element.text = params.text;
           } else if (beat.type === 'hyperText') {
             element.text = params.text;
@@ -1310,7 +1310,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               element.text = params.buttonText || 'Continue';
             }
           } else {
-            // Default for introText, durScreen, inputText, etc.
+            // Default for infoText, durScreen, inputText, etc.
             element.text = params.buttonText || 'Continue';
           }
         }
@@ -1486,7 +1486,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       relevantParams.message = params.message;
       relevantParams.restartText = params.restartText;
       relevantParams.creditsText = params.creditsText;
-    } else if (beat.type === 'introText' || beat.type === 'durScreen') {
+    } else if (beat.type === 'infoText' || beat.type === 'durScreen') {
       relevantParams.text = params.text;
       relevantParams.buttonText = params.buttonText;
     } else {
@@ -1499,8 +1499,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       let updated = [...prev];
       let changed = false;
 
-      // Update text content and auto-resize for IntroText/DurScreen
-      if ((beat.type === 'introText' || beat.type === 'durScreen') && params.text) {
+      // Update text content and auto-resize for InfoText/DurScreen
+      if ((beat.type === 'infoText' || beat.type === 'durScreen') && params.text) {
         updated = updated.map((e: VisualElement) => {
           if (e.type === 'text' && e.name === 'text') {
             if (e.text !== params.text) {
@@ -1752,7 +1752,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           author: params.author || 'Unknown',
           buttonText: params.buttonText || 'Start'
         };
-      case 'introText':
+      case 'infoText':
         return {
           text: params.text || '',
           buttonText: params.buttonText || 'Continue'

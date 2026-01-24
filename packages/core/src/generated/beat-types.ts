@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-23T16:11:44.296Z
+ * Generated: 2026-01-24T13:09:24.434Z
  */
 
 // ============================================
@@ -99,13 +99,15 @@ export interface TitleScreenParameters {
 }
 
 /**
- * Intro Text - Text display with continue button
+ * Info Text - Text display with continue button
  * Category: visible
  * Connection Type: single
  */
-export interface IntroTextParameters {
+export interface InfoTextParameters {
   /** Text content to display */
   text: string;
+  /** Optional array of text variations. Combined with main text for random selection at runtime. */
+  textVariations?: string[] | undefined;
   /** Continue button text (also used as connection label) */
   buttonText?: string | undefined;
   /** Target beat when button is clicked */
@@ -246,6 +248,8 @@ export interface ConditionBeatParameters {
 export interface DurScreenParameters {
   /** Text to display */
   text: string;
+  /** Optional array of text variations. Combined with main text for random selection at runtime. */
+  textVariations?: string[] | undefined;
   /** Display duration in milliseconds */
   duration: number;
   /** Target beat after duration expires */
@@ -462,6 +466,32 @@ export interface AiSummaryParameters {
   resetOnRestart?: boolean | undefined;
 }
 
+/**
+ * AI Info Text - Generate contextual 1-2 sentence info text using AI at runtime
+ * Category: visible
+ * Connection Type: single
+ */
+export interface AiInfoTextParameters {
+  /** Context/instruction for AI (e.g., "A merchant's reply when the player can't afford the item") */
+  prompt: string;
+  /** Specific variables to include in AI context (leave empty for all) */
+  contextVariables?: string[] | undefined;
+  /** Include player variables in context */
+  includeVariables?: boolean | undefined;
+  /** Include player inventory in context */
+  includeInventory?: boolean | undefined;
+  /** Include visited beats in context */
+  includeHistory?: boolean | undefined;
+  /** Maximum sentences to generate */
+  maxSentences?: number | undefined;
+  /** Text to show if AI is unavailable */
+  fallbackText: string;
+  /** Continue button text */
+  buttonText?: string | undefined;
+  /** Target beat when button is clicked */
+  connection: Connection;
+}
+
 // ============================================
 // Beat Type Union and Maps
 // ============================================
@@ -471,7 +501,7 @@ export interface AiSummaryParameters {
  */
 export type BeatType =
   | 'titleScreen'
-  | 'introText'
+  | 'infoText'
   | 'dialogTree'
   | 'movementChoice'
   | 'pickProp'
@@ -488,14 +518,15 @@ export type BeatType =
   | 'onlineContent'
   | 'aiCondition'
   | 'aiDialogTree'
-  | 'aiSummary';
+  | 'aiSummary'
+  | 'aiInfoText';
 
 /**
  * Map of beat type name to its parameter interface
  */
 export interface BeatParameterMap {
   'titleScreen': TitleScreenParameters;
-  'introText': IntroTextParameters;
+  'infoText': InfoTextParameters;
   'dialogTree': DialogTreeParameters;
   'movementChoice': MovementChoiceParameters;
   'pickProp': PickPropParameters;
@@ -513,6 +544,7 @@ export interface BeatParameterMap {
   'aiCondition': AiConditionParameters;
   'aiDialogTree': AiDialogTreeParameters;
   'aiSummary': AiSummaryParameters;
+  'aiInfoText': AiInfoTextParameters;
 }
 
 // ============================================

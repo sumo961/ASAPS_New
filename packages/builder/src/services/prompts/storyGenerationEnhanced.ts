@@ -97,26 +97,26 @@ const BEAT_TYPE_GUIDE = `
 🚨🚨🚨 **titleScreen** - Story opening (MANDATORY FIRST BEAT!) 🚨🚨🚨
 - Use: Start of EVERY story - this MUST be the first beat (beat_0)
 - Parameters: title, author, startButtonText
-- Connections: Single → first story beat (usually introText)
+- Connections: Single → first story beat (usually infoText)
 - ⚠️⚠️⚠️ CRITICAL: beat_0 MUST ALWAYS be type "titleScreen"!
-- ❌ WRONG: Starting with introText, dialogTree, or any other beat type
-- ✓ CORRECT: beat_0 is titleScreen → beat_1 is introText or other content
-- Example: titleScreen "The Mystery Begins" → introText "You arrive..."
+- ❌ WRONG: Starting with infoText, dialogTree, or any other beat type
+- ✓ CORRECT: beat_0 is titleScreen → beat_1 is infoText or other content
+- Example: titleScreen "The Mystery Begins" → infoText "You arrive..."
 
-**introText** - Display text with continue button (SINGLE CONNECTION ONLY!)
+**infoText** - Display text with continue button (SINGLE CONNECTION ONLY!)
 - Use: Narration, scene setting, exposition
 - Parameters: text, buttonText, backgroundAssetId
 - Connections: Single → next beat (ONLY ONE connection allowed!)
-- ⚠️ CRITICAL: introText can ONLY connect to ONE beat!
-- ❌ WRONG: introText with 2+ connections (use movementChoice for branching!)
-- ✓ CORRECT: introText → one target beat
+- ⚠️ CRITICAL: infoText can ONLY connect to ONE beat!
+- ❌ WRONG: infoText with 2+ connections (use movementChoice for branching!)
+- ✓ CORRECT: infoText → one target beat
 - For branching choices, use movementChoice or dialogTree instead!
 - Example: "You arrive at the mansion..." → movementChoice (for choices)
 
 **durScreen** - Timed auto-advance text
 - Use: Quick transitions, atmosphere, montages
 - Parameters: text, duration (seconds) - NO connection inside parameters!
-- ⚠️ NOTE: durScreen does NOT support backgroundAssetId - use introText if you need a background
+- ⚠️ NOTE: durScreen does NOT support backgroundAssetId - use infoText if you need a background
 - ⚠️ CRITICAL: Connection goes in "connections" array at beat level, NOT inside parameters!
 - ❌ WRONG: "parameters": { "text": "...", "duration": 3, "connection": { "target": "beat_5" } }
 - ✓ CORRECT: "parameters": { "text": "...", "duration": 3 }, "connections": [{ "targetId": "beat_5" }]
@@ -177,7 +177,7 @@ const BEAT_TYPE_GUIDE = `
 - 🚨 **AUTO-INVENTORY**: pickProp AUTOMATICALLY adds the selected prop's "name" to player inventory!
   - DO NOT follow pickProp with addRemoveInventory - this creates DUPLICATE inventory items!
   - The player will see both "Silver Key" (from pickProp) and "silver_key" (from addRemoveInventory)
-  - ✓ CORRECT: pickProp → introText describing what you found
+  - ✓ CORRECT: pickProp → infoText describing what you found
   - ✗ WRONG: pickProp → addRemoveInventory (creates duplicates!)
 - Parameters: question (REQUIRED!), props (array of {id, name, description, target})
   - question: Text prompt asking what to pick (REQUIRED - e.g., "What do you examine?")
@@ -207,7 +207,7 @@ const BEAT_TYPE_GUIDE = `
 - Example: "What do you pick up?" → [Silver Key | Old Book | Lantern] → each leads to different beat
 
 🚨🚨🚨 **MANDATORY: DESCRIBE ITEMS AFTER PICKUP!** 🚨🚨🚨
-Every pickProp choice MUST lead to an introText that describes what the player learns from the item!
+Every pickProp choice MUST lead to an infoText that describes what the player learns from the item!
 Players need narrative payoff - don't just silently add items to inventory!
 
 ❌ WRONG (item picked but never described):
@@ -215,7 +215,7 @@ Players need narrative payoff - don't just silently add items to inventory!
   Problem: Player has no idea what the photograph shows!
 
 ✓ CORRECT (item described after pickup):
-  pickProp "Old Photograph" → introText "The photograph shows a young girl standing in front of a farmhouse. In the distance, snow-capped mountains loom. On the back, someone has written 'Blackwood Estate, 1923' in faded ink." → movementChoice
+  pickProp "Old Photograph" → infoText "The photograph shows a young girl standing in front of a farmhouse. In the distance, snow-capped mountains loom. On the back, someone has written 'Blackwood Estate, 1923' in faded ink." → movementChoice
 
 ### Item Description Pattern (REQUIRED for every pickProp choice):
 \`\`\`
@@ -224,15 +224,15 @@ pickProp beat:
   - "Dusty Letter" → beat_letter_desc
   - "Strange Key" → beat_key_desc
 
-beat_photo_desc (introText):
+beat_photo_desc (infoText):
   text: "The photograph shows a family portrait - but one face has been scratched out violently. The date on the back reads 1952."
   → continues to next beat
 
-beat_letter_desc (introText):
+beat_letter_desc (infoText):
   text: "The letter is addressed to 'My Dearest E.' and speaks of a secret meeting at midnight. The handwriting is elegant but hurried."
   → continues to next beat
 
-beat_key_desc (introText):
+beat_key_desc (infoText):
   text: "The key is ornate, with a strange symbol etched into the handle - the same symbol you saw above the basement door."
   → continues to next beat
 \`\`\`
@@ -605,7 +605,7 @@ Creates backtracking and exploration incentive
 \`\`\`
 🚨 CRITICAL: inputText MUST connect TO conditionBeat!
 
-Flow: introText("Enter the code") → inputText → conditionBeat → success/failure
+Flow: infoText("Enter the code") → inputText → conditionBeat → success/failure
 
 Step 1: Clue beat reveals the code (e.g., "The combination is 8192")
 Step 2: Puzzle beat asks for input:
@@ -671,7 +671,7 @@ Clusters are containers that help organize larger projects into logical sections
 {
   "id": "beat_forest_1",
   "name": "Enter the Forest",
-  "type": "introText",
+  "type": "infoText",
   "cluster": "The Forest",
   "parameters": { "text": "You step into the dark woods..." }
 }
@@ -693,14 +693,14 @@ Clusters are containers that help organize larger projects into logical sections
 - Two connections from conditionBeat (true/false paths)
 
 ### Pacing Guidelines
-- Start simple: titleScreen → introText → first choice
+- Start simple: titleScreen → infoText → first choice
 - Build complexity: Introduce one mechanic at a time
 - Mid-game: Combine multiple beat types (dialog + inventory + conditions)
 - Climax: State checks, accumulated variables determine outcome
 - Resolution: Multiple endScreens based on player journey
 
 ### Common Anti-Patterns to Avoid
-❌ Too many consecutive introText beats (boring, no interaction)
+❌ Too many consecutive infoText beats (boring, no interaction)
 ✓ Mix dialog, choices, and exploration
 
 ❌ Branching with no reconvergence (exponential content explosion)
@@ -736,8 +736,8 @@ CORRECT (generic hub + conditional branching):
   multiple paths → conditionBeat first → state-specific hub beat texts
 
 CORRECT (conditional text before hub):
-  path A → conditionBeat (clues >= 3?) → "You have enough evidence" (introText) → Hub
-  path B → conditionBeat (clues >= 3?) → "You need more clues" (introText) → Hub
+  path A → conditionBeat (clues >= 3?) → "You have enough evidence" (infoText) → Hub
+  path B → conditionBeat (clues >= 3?) → "You need more clues" (infoText) → Hub
   Hub has generic text: "Where would you like to go?"
 \`\`\`
 
@@ -756,7 +756,7 @@ DO NOT also add a "connections" array - this creates duplicates!
 ❌ **Using inputText to display information**
 inputText is for GETTING player input (names, passwords, answers)
 ✗ WRONG: inputText with prompt "Read the note:" - player has nothing to input!
-✓ CORRECT: Use introText to DISPLAY text to the player
+✓ CORRECT: Use infoText to DISPLAY text to the player
 ✓ CORRECT: Use inputText only when you need the player to TYPE something
 
 ❌ **Chains of single-item pickProps with identical content**
@@ -771,7 +771,7 @@ pickProp AUTOMATICALLY adds the selected item's "name" to player inventory.
 DO NOT follow pickProp with addRemoveInventory action="add" - this creates DUPLICATE entries!
 ✗ WRONG: pickProp "Golden Key" → addRemoveInventory item="golden_key" action="add"
   Result: Player sees BOTH "Golden Key" AND "golden_key" in inventory!
-✓ CORRECT: pickProp "Golden Key" → introText "You pick up the golden key and examine it closely..."
+✓ CORRECT: pickProp "Golden Key" → infoText "You pick up the golden key and examine it closely..."
 ✓ CORRECT: Use addRemoveInventory ONLY to REMOVE items or add items from non-pickProp sources (NPC gifts, story events)
 
 ❌ **pickProp props without descriptions**
@@ -783,8 +783,8 @@ Always include descriptions for pickProp items to help players make informed cho
 When player picks up an item, they MUST learn something about it in the very next beat!
 ✗ WRONG: pickProp "Old Photo" → movementChoice (photo never explained!)
 ✗ WRONG: pickProp "Secret Letter" → dialogTree with NPC (letter content never revealed!)
-✓ CORRECT: pickProp "Old Photo" → introText describing what the photo shows → next beat
-✓ CORRECT: pickProp "Secret Letter" → introText revealing letter contents → dialogTree
+✓ CORRECT: pickProp "Old Photo" → infoText describing what the photo shows → next beat
+✓ CORRECT: pickProp "Secret Letter" → infoText revealing letter contents → dialogTree
 
 ## ⚠️ CRITICAL: Counter Threshold Reachability
 
@@ -1149,7 +1149,7 @@ Generate complete, sophisticated interactive story structures that:
 \`\`\`
 
 ## Critical Requirements
-🚨 **MANDATORY: beat_0 MUST be type "titleScreen"** - NEVER start with introText!
+🚨 **MANDATORY: beat_0 MUST be type "titleScreen"** - NEVER start with infoText!
 🚨 **MANDATORY: If you use counters, you MUST have a conditionBeat to check them!**
 ✓ End with one or more endScreen beats (always with showRestart: true)
 
@@ -1333,7 +1333,7 @@ beat_4 now checks variable and shows new option to progress
 🚨🚨🚨 **CRITICAL - CONNECTIONS RULE** 🚨🚨🚨
 
 **ONLY these beat types should have a "connections" array:**
-- titleScreen, introText, durScreen, setVariable, addRemoveInventory, videoBeat
+- titleScreen, infoText, durScreen, setVariable, addRemoveInventory, videoBeat
 These are single-path beats that need "connections" to specify the next beat.
 - ⚠️ Use "targetId" in connections: { "targetId": "beat_X" } NOT { "target": "beat_X" }
 
@@ -1580,7 +1580,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
         {
           id: "beat_1",
           name: "Crime Scene",
-          type: "introText",
+          type: "infoText",
           position: { x: 400, y: 300 },
           parameters: {
             text: "Lord Blackwood lies dead in his study. Three suspects remain: the Butler, the Maid, and the mysterious Guest. You must find the truth.",
@@ -1631,7 +1631,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
         {
           id: "beat_5",
           name: "Library Complete",
-          type: "introText",
+          type: "infoText",
           position: { x: 1300, y: 200 },
           parameters: {
             text: "You've searched the library thoroughly.",
@@ -1668,7 +1668,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
         {
           id: "beat_8",
           name: "Study Complete",
-          type: "introText",
+          type: "infoText",
           position: { x: 1300, y: 350 },
           parameters: {
             text: "You've examined the study.",
@@ -1718,7 +1718,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
         {
           id: "beat_11",
           name: "Interrogation Complete",
-          type: "introText",
+          type: "infoText",
           position: { x: 1300, y: 500 },
           parameters: {
             text: "The butler has nothing more to say.",
@@ -1745,7 +1745,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
         {
           id: "beat_13",
           name: "Ready for Accusation",
-          type: "introText",
+          type: "infoText",
           position: { x: 1900, y: 200 },
           parameters: {
             text: "You've gathered enough evidence. Time to make your accusation.",
@@ -1863,7 +1863,7 @@ Beat types used strategically:
 - dialogTree: Character interrogation with branching responses
 - setVariable: Track clues invisibly
 - conditionBeat: Gate progression and determine ending quality
-- introText: Narration between major beats
+- infoText: Narration between major beats
 - endScreen: Multiple endings based on player performance
 
 This creates meaningful choices where thoroughness is rewarded with better endings.`

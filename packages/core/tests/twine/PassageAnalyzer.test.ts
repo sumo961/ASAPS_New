@@ -17,19 +17,19 @@ const createPassage = (name: string, content: string, tags: string[] = []): Twin
 describe('PassageAnalyzer', () => {
   describe('analyzePassage', () => {
     describe('beat type classification', () => {
-      it('should classify terminal passage without links as introText', () => {
+      it('should classify terminal passage without links as infoText', () => {
         const passage = createPassage('Test', 'Just some text with no links.');
         const result = PassageAnalyzer.analyzePassage(passage);
 
-        expect(result.suggestedBeatType).toBe('introText');
+        expect(result.suggestedBeatType).toBe('infoText');
         expect(result.linkPosition).toBe('none');
       });
 
-      it('should classify passage with single link as introText', () => {
+      it('should classify passage with single link as infoText', () => {
         const passage = createPassage('Test', 'Some text.\n\n[[Continue]]');
         const result = PassageAnalyzer.analyzePassage(passage);
 
-        expect(result.suggestedBeatType).toBe('introText');
+        expect(result.suggestedBeatType).toBe('infoText');
       });
 
       it('should classify passage with multiple end links as dialogTree', () => {
@@ -154,7 +154,7 @@ describe('PassageAnalyzer', () => {
         const result = PassageAnalyzer.analyzePassage(passage);
 
         // This passage has both text and set operation, so it should create additional beat
-        expect(result.suggestedBeatType).toBe('introText');
+        expect(result.suggestedBeatType).toBe('infoText');
         expect(result.additionalBeats.some(b => b.type === 'setVariable')).toBe(true);
       });
     });
@@ -234,7 +234,7 @@ describe('PassageAnalyzer', () => {
 
       expect(result.passages).toHaveLength(3);
       expect(result.stats.total).toBe(3);
-      expect(result.stats.byType.introText).toBe(1);
+      expect(result.stats.byType.infoText).toBe(1);
       expect(result.stats.byType.dialogTree).toBe(1);
       expect(result.stats.byType.endScreen).toBe(1);
     });
@@ -274,7 +274,7 @@ describe('PassageAnalyzer', () => {
       const summary = PassageAnalyzer.getSummary(result);
 
       expect(summary).toContain('Total passages: 2');
-      expect(summary).toContain('IntroText:');
+      expect(summary).toContain('InfoText:');
       expect(summary).toContain('EndScreen:');
     });
 

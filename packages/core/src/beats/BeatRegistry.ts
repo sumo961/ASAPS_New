@@ -1,6 +1,6 @@
 import { Beat } from './Beat';
 import { TitleScreenBeat } from './TitleScreenBeat';
-import { IntroTextBeat } from './IntroTextBeat';
+import { InfoTextBeat } from './InfoTextBeat';
 import { DialogTreeBeat } from './DialogTreeBeat';
 import { ConversationChoiceBeat } from './ConversationChoiceBeat';
 import { MovementChoiceBeat } from './MovementChoiceBeat';
@@ -21,6 +21,7 @@ import { OnlineContentBeat } from './OnlineContentBeat';
 import { AIConditionBeat } from './AIConditionBeat';
 import { AIDialogTreeBeat } from './AIDialogTreeBeat';
 import { AISummaryBeat } from './AISummaryBeat';
+import { AIInfoTextBeat } from './AIInfoTextBeat';
 import type { BeatConfig } from '../types';
 
 type BeatConstructor = new (config: BeatConfig) => Beat;
@@ -55,7 +56,8 @@ export class BeatTypeRegistry {
   private registerDefaultBeats(): void {
     // Visible beats
     this.registerBeatType('titleScreen', TitleScreenBeat);
-    this.registerBeatType('introText', IntroTextBeat);
+    this.registerBeatType('infoText', InfoTextBeat);
+    this.registerBeatType('introText', InfoTextBeat); // Legacy alias - renamed to infoText in v2.3
     this.registerBeatType('dialogTree', DialogTreeBeat);
     this.registerBeatType('conversationChoice', ConversationChoiceBeat); // Legacy
     this.registerBeatType('movementChoice', MovementChoiceBeat);
@@ -88,6 +90,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('aiCondition', AIConditionBeat);
     this.registerBeatType('aiDialogTree', AIDialogTreeBeat);
     this.registerBeatType('aiSummary', AISummaryBeat);
+    this.registerBeatType('aiInfoText', AIInfoTextBeat);
   }
 
   registerBeatType(type: string, constructor: BeatConstructor): void {
@@ -134,9 +137,9 @@ export class BeatTypeRegistry {
         });
       }
 
-      // For unknown visible beat types, fall back to IntroTextBeat
-      console.warn(`[BeatRegistry] Unknown visible beat type: "${type}", falling back to IntroTextBeat`);
-      return new IntroTextBeat(config);
+      // For unknown visible beat types, fall back to InfoTextBeat
+      console.warn(`[BeatRegistry] Unknown visible beat type: "${type}", falling back to InfoTextBeat`);
+      return new InfoTextBeat(config);
     }
     return new BeatClass(config);
   }

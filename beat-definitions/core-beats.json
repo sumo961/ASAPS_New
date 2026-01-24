@@ -172,9 +172,9 @@
       "renderer": "titleScreen"
     },
 
-    "introText": {
-      "category": "visible", 
-      "displayName": "Intro Text",
+    "infoText": {
+      "category": "visible",
+      "displayName": "Info Text",
       "icon": "📝",
       "description": "Text display with continue button",
       "connectionType": "single",
@@ -184,6 +184,17 @@
           "required": true,
           "default": "",
           "description": "Text content to display"
+        },
+        "textVariations": {
+          "type": "array<string>",
+          "required": false,
+          "description": "Optional array of text variations. Combined with main text for random selection at runtime.",
+          "ui": {
+            "control": "text-variations",
+            "label": "Text Variations",
+            "addLabel": "Add Variation",
+            "help": "One variation (including main text) selected randomly each time"
+          }
         },
         "buttonText": {
           "type": "string",
@@ -561,7 +572,7 @@
 
     "durScreen": {
       "category": "visible",
-      "displayName": "Duration Screen", 
+      "displayName": "Duration Screen",
       "icon": "⏳",
       "description": "Timed display screen",
       "connectionType": "single",
@@ -571,6 +582,17 @@
           "required": true,
           "default": "",
           "description": "Text to display"
+        },
+        "textVariations": {
+          "type": "array<string>",
+          "required": false,
+          "description": "Optional array of text variations. Combined with main text for random selection at runtime.",
+          "ui": {
+            "control": "text-variations",
+            "label": "Text Variations",
+            "addLabel": "Add Variation",
+            "help": "One variation (including main text) selected randomly each time"
+          }
         },
         "duration": {
           "type": "number",
@@ -1236,6 +1258,99 @@
         "purpose": "Personalized ending that explains how choices led to this outcome",
         "features": ["References player name", "Explains key decisions", "Narrative epilogue"]
       }
+    },
+
+    "aiInfoText": {
+      "category": "visible",
+      "displayName": "AI Info Text",
+      "icon": "🤖📝",
+      "description": "Generate contextual 1-2 sentence info text using AI at runtime",
+      "connectionType": "single",
+      "parameters": {
+        "prompt": {
+          "type": "string",
+          "required": true,
+          "description": "Context/instruction for AI (e.g., \"A merchant's reply when the player can't afford the item\")",
+          "ui": {
+            "control": "textarea",
+            "rows": 3,
+            "label": "AI Prompt"
+          }
+        },
+        "contextVariables": {
+          "type": "array<string>",
+          "required": false,
+          "description": "Specific variables to include in AI context (leave empty for all)",
+          "ui": {
+            "label": "Context Variables",
+            "addLabel": "Add Variable"
+          }
+        },
+        "includeVariables": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include player variables in context"
+        },
+        "includeInventory": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Include player inventory in context"
+        },
+        "includeHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Include visited beats in context"
+        },
+        "maxSentences": {
+          "type": "number",
+          "required": false,
+          "default": 2,
+          "description": "Maximum sentences to generate",
+          "ui": {
+            "control": "number",
+            "min": 1,
+            "max": 5,
+            "label": "Max Sentences"
+          }
+        },
+        "fallbackText": {
+          "type": "string",
+          "required": true,
+          "default": "Continue...",
+          "description": "Text to show if AI is unavailable",
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "Fallback Text"
+          }
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Continue",
+          "description": "Continue button text"
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat when button is clicked"
+        }
+      },
+      "locations": ["text", "continueButton"],
+      "locationMapping": {
+        "text": "text",
+        "continueButton": "buttonText"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "textDisplay",
+      "aiNotes": {
+        "purpose": "Generate short contextual text that responds to player state",
+        "examples": ["Merchant reaction to player's offer", "NPC comment on player's inventory", "Dynamic weather description"]
+      }
     }
   },
 
@@ -1278,7 +1393,7 @@
       "conditional": "As separate trueConnection and falseConnection within <function>"
     },
     "example": {
-      "introText": "<function kind='introText' text='...'><connection target='beat_2' label='Continue' /></function>",
+      "infoText": "<function kind='infoText' text='...'><connection target='beat_2' label='Continue' /></function>",
       "movementChoice": "<function kind='movementChoice'><choice text='Go left' target='beat_3' /></function>"
     }
   },

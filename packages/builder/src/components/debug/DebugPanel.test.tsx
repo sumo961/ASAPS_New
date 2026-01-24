@@ -13,10 +13,10 @@ describe('DebugPanel', () => {
 
     const registry = BeatTypeRegistry.getInstance();
 
-    const beat1 = registry.createBeat('introText', {
+    const beat1 = registry.createBeat('infoText', {
       id: 'beat1',
       name: 'Start',
-      type: 'introText',
+      type: 'infoText',
       parameters: { text: 'Start text', buttonText: 'Continue' },
       connections: [{ targetId: 'beat2' }],
       x: 0,

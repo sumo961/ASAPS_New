@@ -24,7 +24,7 @@ describe('ReachabilityAnalyzer', () => {
       const beat2 = createTestBeat({
         id: 'beat2',
         name: 'Beat 2',
-        type: 'introText',
+        type: 'infoText',
         parameters: { text: 'Middle' },
         connections: [{ targetId: 'beat3' }]
       });
@@ -77,7 +77,7 @@ describe('ReachabilityAnalyzer', () => {
       const beat3 = createTestBeat({
         id: 'beat3',
         name: 'Orphaned Beat',
-        type: 'introText',
+        type: 'infoText',
         parameters: { text: 'Orphaned' }
       });
 
@@ -126,7 +126,7 @@ describe('ReachabilityAnalyzer', () => {
       const orphan = createTestBeat({
         id: 'orphan',
         name: 'Orphan',
-        type: 'introText',
+        type: 'infoText',
         parameters: { text: 'Orphan' }
       });
 
@@ -420,7 +420,7 @@ describe('ReachabilityAnalyzer', () => {
       const middle = createTestBeat({
         id: 'middle',
         name: 'Middle',
-        type: 'introText',
+        type: 'infoText',
         parameters: { text: 'Middle' },
         connections: [{ targetId: 'end' }]
       });
@@ -598,7 +598,7 @@ describe('ReachabilityAnalyzer', () => {
       const orphan = createTestBeat({
         id: 'orphan',
         name: 'Orphan',
-        type: 'introText',
+        type: 'infoText',
         parameters: { text: 'Orphan' }
       });
 
@@ -632,7 +632,7 @@ describe('ReachabilityAnalyzer', () => {
       const orphan = createTestBeat({
         id: 'orphan',
         name: 'Orphan',
-        type: 'introText',
+        type: 'infoText',
         parameters: { text: 'Orphan' }
       });
 

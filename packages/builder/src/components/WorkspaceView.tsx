@@ -114,7 +114,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     if (!beat) return false;
     const visualBeatTypes = [
       'titleScreen',
-      'introText',
+      'infoText',
       'durScreen',
       'pickProp',
       'movementChoice',

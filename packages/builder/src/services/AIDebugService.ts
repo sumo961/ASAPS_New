@@ -255,7 +255,7 @@ export class AIDebugService {
     // Key parameters to check by beat type
     const keyParams: Record<string, string[]> = {
       titleScreen: ['title', 'subtitle'],
-      introText: ['text', 'buttonText'],
+      infoText: ['text', 'buttonText'],
       dialogTree: ['dialogTree'],
       movementChoice: ['text', 'choices'],
       endScreen: ['message'],

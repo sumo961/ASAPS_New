@@ -168,7 +168,7 @@ export class PreviewDebugger {
       }
 
       // Check for dead ends (visible beats with no outgoing connections)
-      const visibleTypes = ['titleScreen', 'introText', 'movementChoice', 'pickProp', 'dialogTree', 'videoBeat', 'durScreen', 'inputText', 'hyperText', 'onlineContent', 'aiDialogTree'];
+      const visibleTypes = ['titleScreen', 'infoText', 'movementChoice', 'pickProp', 'dialogTree', 'videoBeat', 'durScreen', 'inputText', 'hyperText', 'onlineContent', 'aiDialogTree'];
       for (const beat of beats) {
         // aiSummary is like endScreen - doesn't need outgoing connections
         if (visibleTypes.includes(beat.type) && beat.type !== 'endScreen' && beat.type !== 'aiSummary') {
@@ -232,7 +232,7 @@ export class PreviewDebugger {
           if (!params.author) warnings.push(`Title screen missing author`);
           break;
           
-        case 'introText':
+        case 'infoText':
           if (!params.text) errors.push(`Intro text beat missing text content`);
           break;
           
@@ -324,7 +324,7 @@ export class PreviewDebugger {
     // This would normally load from beat-definitions/core-beats.json
     const definitions: Record<string, any> = {
       titleScreen: { connectionType: 'single' },
-      introText: { connectionType: 'single' },
+      infoText: { connectionType: 'single' },
       movementChoice: { connectionType: 'multiple' },
       pickProp: { connectionType: 'multiple' },
       dialogTree: { connectionType: 'multiple' },

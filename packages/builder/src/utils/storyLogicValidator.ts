@@ -74,7 +74,7 @@ function extractTargetIds(beat: any): string[] {
 
   const params = beat.parameters || {};
 
-  // Single connection (introText, titleScreen, etc.)
+  // Single connection (infoText, titleScreen, etc.)
   if (params.connection?.target) {
     targets.push(params.connection.target);
   }
@@ -150,7 +150,7 @@ function extractBeatText(beat: any): string[] {
   const texts: string[] = [];
   const params = beat.parameters || {};
 
-  // introText, durScreen
+  // infoText, durScreen
   if (params.text) texts.push(params.text);
 
   // movementChoice question
@@ -291,7 +291,7 @@ function isPrecededByConditionCheck(
 }
 
 /**
- * Check if pickProp items lead to introText beats that describe them
+ * Check if pickProp items lead to infoText beats that describe them
  */
 function validatePickPropDescriptions(beats: any[]): LogicIssue[] {
   const issues: LogicIssue[] = [];
@@ -308,19 +308,19 @@ function validatePickPropDescriptions(beats: any[]): LogicIssue[] {
       const targetBeat = beatMap.get(prop.target);
       if (!targetBeat) continue;
 
-      // Check if the target is an introText (good) or something else (potentially bad)
-      if (targetBeat.type !== 'introText' && targetBeat.type !== 'durScreen') {
+      // Check if the target is an infoText (good) or something else (potentially bad)
+      if (targetBeat.type !== 'infoText' && targetBeat.type !== 'durScreen') {
         // The item picked doesn't lead to a description beat
         issues.push({
           type: 'warning',
           category: 'undescribed_item',
-          message: `pickProp item "${prop.name}" in beat '${beat.name || beat.id}' leads directly to ${targetBeat.type} without an introText describing what the player learns from the item.`,
+          message: `pickProp item "${prop.name}" in beat '${beat.name || beat.id}' leads directly to ${targetBeat.type} without an infoText describing what the player learns from the item.`,
           beatId: beat.id,
           beatName: beat.name,
           beatType: beat.type,
           itemName: prop.name,
           targetBeatType: targetBeat.type,
-          suggestedFix: `Add an introText beat between the pickProp and ${targetBeat.type} to describe what the player sees/learns from "${prop.name}" (e.g., what a letter says, what a photo shows, what makes a key special).`
+          suggestedFix: `Add an infoText beat between the pickProp and ${targetBeat.type} to describe what the player sees/learns from "${prop.name}" (e.g., what a letter says, what a photo shows, what makes a key special).`
         });
       }
     }

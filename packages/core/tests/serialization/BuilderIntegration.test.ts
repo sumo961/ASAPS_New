@@ -13,14 +13,14 @@ import { BeatTypeRegistry } from '../../src/beats/BeatRegistry';
 import { Story } from '../../src/engine/Story';
 
 describe('Builder Integration - Complete Save/Load Cycle', () => {
-  it('should preserve IntroTextBeat text after edit → save → load', () => {
+  it('should preserve InfoTextBeat text after edit → save → load', () => {
     const registry = BeatTypeRegistry.getInstance();
 
-    // 1. User creates an IntroTextBeat in builder
-    const beat = registry.createBeat('introText', {
+    // 1. User creates an InfoTextBeat in builder
+    const beat = registry.createBeat('infoText', {
       id: 'test-intro',
       name: 'My Intro',
-      type: 'introText',
+      type: 'infoText',
       parameters: {
         text: 'Initial text',
         buttonText: 'Start'
@@ -47,7 +47,7 @@ describe('Builder Integration - Complete Save/Load Cycle', () => {
     expect(serialized.parameters.buttonText).toBe('Continue');
 
     // 4. Project is loaded back (simulates deserializeBeats)
-    const restored = registry.createBeat('introText', {
+    const restored = registry.createBeat('infoText', {
       id: serialized.id,
       name: serialized.name,
       type: serialized.type,
@@ -70,11 +70,11 @@ describe('Builder Integration - Complete Save/Load Cycle', () => {
   it('should preserve background node (asset) after edit → save → load', () => {
     const registry = BeatTypeRegistry.getInstance();
 
-    // 1. User creates an IntroTextBeat with background
-    const beat = registry.createBeat('introText', {
+    // 1. User creates an InfoTextBeat with background
+    const beat = registry.createBeat('infoText', {
       id: 'test-bg',
       name: 'Beat with Background',
-      type: 'introText',
+      type: 'infoText',
       node: 'asset-forest-bg',
       parameters: {
         text: 'You are in a forest',
@@ -101,7 +101,7 @@ describe('Builder Integration - Complete Save/Load Cycle', () => {
     expect(serialized.parameters.node).toBe('asset-castle-bg');
 
     // 4. Load
-    const restored = registry.createBeat('introText', {
+    const restored = registry.createBeat('infoText', {
       id: serialized.id,
       name: serialized.name,
       type: serialized.type,
@@ -189,10 +189,10 @@ describe('Builder Integration - Complete Save/Load Cycle', () => {
       }
     });
 
-    const beat2 = registry.createBeat('introText', {
+    const beat2 = registry.createBeat('infoText', {
       id: 'beat-2',
       name: 'Intro',
-      type: 'introText',
+      type: 'infoText',
       x: 300,
       y: 100,
       node: 'bg-forest',

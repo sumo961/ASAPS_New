@@ -345,7 +345,7 @@ export class ConstraintPathAnalyzer {
   }
 
   /**
-   * Handle automatic beat (introText, durScreen, etc.)
+   * Handle automatic beat (infoText, durScreen, etc.)
    */
   private exploreAutomaticBeat(beat: Beat, connections: Connection[], state: ExplorationState): void {
     // Check for defaultTarget first

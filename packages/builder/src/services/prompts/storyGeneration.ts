@@ -144,7 +144,7 @@ export function getStoryGenerationExample(): { user: string; assistant: string }
         {
           id: "beat_1",
           name: "Discovery",
-          type: "introText",
+          type: "infoText",
           position: { x: 400, y: 100 },
           parameters: {
             text: "You arrive at Blackwood Manor as a detective. Lord Blackwood has been murdered, and three suspects remain.",

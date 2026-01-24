@@ -1,5 +1,5 @@
-import React from 'react';
-import { Variable, Box, Timer, User, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Variable, Box, Timer, User, ChevronDown, ChevronRight, Plus, Trash2, Shuffle } from 'lucide-react';
 import type { Beat } from '@asaps/core';
 import type { AvailableCounter, AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
 
@@ -15,7 +15,7 @@ interface ParameterDefinition {
   // For fields that reference beats (target selectors)
   targetField?: boolean;
   ui?: {
-    control?: 'text' | 'textarea' | 'select' | 'number';
+    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations';
     options?: string[];
     label?: string;
     min?: number;
@@ -26,6 +26,8 @@ interface ParameterDefinition {
     addLabel?: string;
     // For arrays - label for each item
     itemLabel?: string;
+    // Help text shown below the field
+    help?: string;
   };
 }
 
@@ -63,6 +65,113 @@ const BEAT_TYPE_ALIASES: Record<string, string> = {
   'conditionCheck': 'conditionBeat',
   'addInventory': 'addRemoveInventory',
   'removeInventory': 'addRemoveInventory',
+};
+
+/**
+ * Collapsible editor for text variations
+ * Shows variations in a collapsible section with add/remove functionality
+ */
+interface TextVariationsEditorProps {
+  items: string[];
+  label: string;
+  addLabel: string;
+  helpText: string;
+  onChange: (items: string[]) => void;
+}
+
+const TextVariationsEditor: React.FC<TextVariationsEditorProps> = ({
+  items,
+  label,
+  addLabel,
+  helpText,
+  onChange,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(items.length > 0);
+
+  const handleAdd = () => {
+    onChange([...items, '']);
+    setIsExpanded(true);
+  };
+
+  const handleRemove = (index: number) => {
+    const newItems = items.filter((_, i) => i !== index);
+    onChange(newItems);
+  };
+
+  const handleUpdate = (index: number, value: string) => {
+    const newItems = [...items];
+    newItems[index] = value;
+    onChange(newItems);
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-gray-500" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-gray-500" />
+          )}
+          <Shuffle className="w-4 h-4 text-purple-500" />
+          <span className="text-sm font-medium text-gray-700">{label}</span>
+          {items.length > 0 && (
+            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+              {items.length} variation{items.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="p-3 space-y-2 bg-white">
+          {items.length === 0 && (
+            <p className="text-xs text-gray-500 italic py-1">
+              No variations defined. Only the main text will be shown.
+            </p>
+          )}
+
+          {items.map((item, index) => (
+            <div key={index} className="flex gap-2">
+              <textarea
+                value={item}
+                onChange={(e) => handleUpdate(index, e.target.value)}
+                placeholder={`Variation ${index + 1}`}
+                className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm resize-none"
+                rows={2}
+              />
+              <button
+                type="button"
+                onClick={() => handleRemove(index)}
+                className="text-red-500 hover:text-red-700 p-1 self-start mt-1"
+                title="Remove variation"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={handleAdd}
+            className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600"
+          >
+            <Plus className="w-3 h-3" />
+            {addLabel}
+          </button>
+
+          <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+            <Shuffle className="w-3 h-3" />
+            {helpText}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 };
 
 /**
@@ -628,6 +737,20 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           const items = (value as any[]) || [];
           const addLabel = paramDef.ui?.addLabel || `Add ${label.replace(/s$/, '')}`;
           const itemLabel = paramDef.ui?.itemLabel || label.replace(/s$/, '');
+
+          // Special handling for textVariations with collapsible UI
+          if (paramName === 'textVariations' && itemType === 'string') {
+            return (
+              <TextVariationsEditor
+                key={paramName}
+                items={items}
+                label={paramDef.ui?.label || 'Text Variations (optional)'}
+                addLabel={addLabel}
+                helpText={paramDef.ui?.help || 'One variation (including main text) selected randomly each time'}
+                onChange={(newItems) => onParameterChange(paramName, newItems)}
+              />
+            );
+          }
 
           // For array<object> with itemSchema
           if (itemType === 'object' && paramDef.itemSchema) {

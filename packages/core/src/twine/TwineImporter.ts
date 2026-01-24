@@ -358,7 +358,7 @@ export class TwineImporter {
     const { suggestedBeatType: beatType, displayText, choices, parsed } = analyzed;
 
     switch (beatType) {
-      case 'introText':
+      case 'infoText':
         return {
           text: displayText,
           buttonText: choices.length > 0 ? choices[0].text : 'Continue',
@@ -622,7 +622,7 @@ export class TwineImporter {
         const config: BeatConfig = {
           id: beatId,
           name: `${analyzed.passage.name} (True)`,
-          type: 'introText',
+          type: 'infoText',
           parameters: {
             text: thenText,
             buttonText: linkText || 'Continue', // Use link text for button
@@ -630,7 +630,7 @@ export class TwineImporter {
           defaultTarget: finalTarget, // Passage name, resolved later
         };
 
-        beats.push(this.registry.createBeat('introText', config));
+        beats.push(this.registry.createBeat('infoText', config));
 
         // Store mapping so conditionBeat can point here instead of final target
         this.conditionalContentBeatIds.set(`${analyzed.passage.name}:then`, beatId);
@@ -646,7 +646,7 @@ export class TwineImporter {
         const config: BeatConfig = {
           id: beatId,
           name: `${analyzed.passage.name} (False)`,
-          type: 'introText',
+          type: 'infoText',
           parameters: {
             text: elseText,
             buttonText: linkText || 'Continue', // Use link text for button
@@ -654,7 +654,7 @@ export class TwineImporter {
           defaultTarget: finalTarget, // Passage name, resolved later
         };
 
-        beats.push(this.registry.createBeat('introText', config));
+        beats.push(this.registry.createBeat('infoText', config));
 
         // Store mapping so conditionBeat can point here instead of final target
         this.conditionalContentBeatIds.set(`${analyzed.passage.name}:else`, beatId);

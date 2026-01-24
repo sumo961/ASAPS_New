@@ -530,7 +530,7 @@ export class ASMLGenerator {
         if (params.author) attrs.push(`author="${this.escapeXml(params.author)}"`);
         break;
         
-      case 'introText':
+      case 'infoText':
         if (params.text) attrs.push(`text="${this.escapeXml(params.text)}"`);
         break;
         
@@ -792,7 +792,7 @@ export class ASMLGenerator {
           // Sound is stored on locations, not on connections - no enrichment needed
 
           // Invisible beats and simple progression beats should not have labels on connections
-          const noLabelBeats = ['setVariable', 'setTimer', 'addRemoveInventory', 'randomTarget', 'introText', 'durScreen', 'endScreen', 'inputText', 'hyperText'];
+          const noLabelBeats = ['setVariable', 'setTimer', 'addRemoveInventory', 'randomTarget', 'infoText', 'durScreen', 'endScreen', 'inputText', 'hyperText'];
           if (noLabelBeats.includes(beat.type)) {
             // Don't include label - button text is shown in visual editor instead
             this.generateConnection({ ...conn, label: undefined }, lines, indent + this.indent);

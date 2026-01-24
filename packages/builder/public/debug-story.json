@@ -34,7 +34,7 @@
       },
       {
         "id": "beat_2",
-        "type": "introText",
+        "type": "infoText",
         "name": "Welcome to the Shop",
         "parameters": {
           "text": "You enter the blacksmith's shop. The forge glows with intense heat.\n\nThe blacksmith looks up. \"Welcome, traveler! I have fine weapons for sale.\"\n\nYou check your purse and count your gold coins.",
@@ -83,7 +83,7 @@
       },
       {
         "id": "beat_6",
-        "type": "introText",
+        "type": "infoText",
         "name": "Success",
         "parameters": {
           "text": "The blacksmith accepts your gold with a smile.\n\n\"A fair price! Here is your new sword.\"\n\nYou've successfully purchased the sword!",
@@ -93,7 +93,7 @@
       },
       {
         "id": "beat_7",
-        "type": "introText",
+        "type": "infoText",
         "name": "Not Enough Gold",
         "parameters": {
           "text": "The blacksmith frowns.\n\n\"You don't have that much gold, traveler. Perhaps you should count your coins again.\"",

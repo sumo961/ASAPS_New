@@ -15,7 +15,7 @@ interface BeatNodeData {
 const beatTypeIcons: Record<string, string> = {
   // Visible beats
   titleScreen: '🎬',
-  introText: '📝',
+  infoText: '📝',
   dialogTree: '🌳',
   conversationChoice: '💬',
   movementChoice: '🚶',

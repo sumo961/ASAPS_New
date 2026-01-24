@@ -79,7 +79,7 @@ describe('aiStoryValidator', () => {
       const story = {
         beats: [
           { id: 'beat_0', type: 'titleScreen', parameters: {} },
-          { id: 'beat_0', type: 'introText', parameters: {} }, // duplicate
+          { id: 'beat_0', type: 'infoText', parameters: {} }, // duplicate
           { id: 'beat_1', type: 'endScreen', parameters: {} },
         ],
       };
@@ -148,7 +148,7 @@ describe('aiStoryValidator', () => {
               },
             },
           },
-          { id: 'beat_2', type: 'introText', parameters: {} },
+          { id: 'beat_2', type: 'infoText', parameters: {} },
           { id: 'beat_3', type: 'endScreen', parameters: {} },
         ],
       };
@@ -183,8 +183,8 @@ describe('aiStoryValidator', () => {
       const story = {
         beats: [
           { id: 'beat_0', type: 'titleScreen', parameters: {} },
-          { id: 'beat_1', type: 'introText', parameters: {} }, // orphaned
-          { id: 'beat_2', type: 'introText', parameters: {} }, // orphaned
+          { id: 'beat_1', type: 'infoText', parameters: {} }, // orphaned
+          { id: 'beat_2', type: 'infoText', parameters: {} }, // orphaned
         ],
       };
 
@@ -211,7 +211,7 @@ describe('aiStoryValidator', () => {
     it('should warn if first beat is not titleScreen', () => {
       const story = {
         beats: [
-          { id: 'beat_0', type: 'introText', parameters: {} },
+          { id: 'beat_0', type: 'infoText', parameters: {} },
           { id: 'beat_1', type: 'endScreen', parameters: {} },
         ],
       };
@@ -226,7 +226,7 @@ describe('aiStoryValidator', () => {
       const story = {
         beats: [
           { id: 'beat_0', type: 'titleScreen', parameters: {} },
-          { id: 'beat_1', type: 'introText', parameters: {} },
+          { id: 'beat_1', type: 'infoText', parameters: {} },
         ],
       };
 
@@ -255,7 +255,7 @@ describe('aiStoryValidator', () => {
               ],
             },
           },
-          { id: 'beat_2', type: 'introText', parameters: {} },
+          { id: 'beat_2', type: 'infoText', parameters: {} },
           { id: 'beat_3', type: 'endScreen', parameters: {} },
         ],
       };

@@ -12,7 +12,7 @@ import { HarloweParser } from './HarloweParser';
 export type TwineFormat = 'sugarcube' | 'harlowe' | 'unknown';
 
 export type SuggestedBeatType =
-  | 'introText'
+  | 'infoText'
   | 'dialogTree'
   | 'hyperText'
   | 'endScreen'
@@ -176,7 +176,7 @@ export class PassageAnalyzer {
     const stats = {
       total: analyzed.length,
       byType: {
-        introText: 0,
+        infoText: 0,
         dialogTree: 0,
         hyperText: 0,
         endScreen: 0,
@@ -358,12 +358,12 @@ export class PassageAnalyzer {
 
     // No links - terminal passage
     if (linkPosition === 'none' || parsed.links.length === 0) {
-      return 'introText';
+      return 'infoText';
     }
 
     // Single link at end - narrative with continue
     if (parsed.links.length === 1 && linkPosition === 'end') {
-      return 'introText';
+      return 'infoText';
     }
 
     // Multiple links at end (not inline) - choice-based
@@ -381,8 +381,8 @@ export class PassageAnalyzer {
         // Check if the link text appears in the narrative text (not just as the link)
         const textWithoutLinkMarkup = parsed.text.replace(/\[\[[^\]]+\]\]/g, '');
         if (!textWithoutLinkMarkup.includes(linkText)) {
-          // Link text is NOT in the narrative - this should be introText with continue button
-          return 'introText';
+          // Link text is NOT in the narrative - this should be infoText with continue button
+          return 'infoText';
         }
       }
       return 'hyperText';
@@ -393,8 +393,8 @@ export class PassageAnalyzer {
       return 'dialogTree';
     }
 
-    // Single link somewhere - introText
-    return 'introText';
+    // Single link somewhere - infoText
+    return 'infoText';
   }
 
   /**
@@ -435,7 +435,7 @@ export class PassageAnalyzer {
       `Total passages: ${result.stats.total}`,
       '',
       'Beat type breakdown:',
-      `  IntroText: ${result.stats.byType.introText}`,
+      `  IntroText: ${result.stats.byType.infoText}`,
       `  DialogTree: ${result.stats.byType.dialogTree}`,
       `  HyperText: ${result.stats.byType.hyperText}`,
       `  EndScreen: ${result.stats.byType.endScreen}`,
