@@ -383,7 +383,7 @@ function App() {
   // Persistence hooks
   const { markChanged, saveNow } = useSave();
   const { updateStory, updateGlobalSettings, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled } = useProject();
-  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback, pauseAutoSave, resumeAutoSave } = usePersistence();
+  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback, pauseAutoSave, resumeAutoSave, initialized: storageInitialized } = usePersistence();
 
   // Electron integration - set up menu event listeners
   useEffect(() => {
@@ -1179,6 +1179,12 @@ function App() {
         return;
       }
 
+      // CRITICAL: Wait for storage to be initialized before checking for projects
+      if (!storageInitialized) {
+        console.log('[App] Waiting for storage initialization...');
+        return;
+      }
+
       console.log('[App] Initializing app - currentProject:', currentProject, 'beats.length:', state.beats.length);
 
       // CRITICAL FIX: Reset loadedProjectIdRef on fresh start
@@ -1192,7 +1198,33 @@ function App() {
       const hasAnyProjects = currentProject !== null && currentProject !== undefined;
 
       if (!hasAnyProjects && state.beats.length === 0) {
-        console.log('[App] No projects exist and no beats - initializing from scratch');
+        console.log('[App] No current project and no beats - checking for existing untitled project');
+
+        // CRITICAL FIX: Check if there's an existing untitled project in IndexedDB
+        // This prevents creating new projects on every reload and preserves settings
+        try {
+          const projectsResult = await storage.listProjects();
+          if (projectsResult.success && projectsResult.data) {
+            const existingUntitled = projectsResult.data.find(p => p.name === 'Untitled Project');
+            if (existingUntitled) {
+              console.log('[App] Found existing untitled project:', existingUntitled.id);
+              hasInitializedRef.current = true;
+
+              // Load the existing untitled project
+              const loaded = await loadProject(existingUntitled.id);
+              if (loaded) {
+                console.log('[App] SUCCESS: Loaded existing untitled project');
+                return; // Exit early - project loaded, beats will come from project
+              } else {
+                console.log('[App] FAILED to load existing untitled project, creating new one');
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('[App] Could not check for existing untitled project:', error);
+        }
+
+        console.log('[App] No existing untitled project found - initializing from scratch');
 
         // Mark as initialized BEFORE async operations to prevent race conditions
         hasInitializedRef.current = true;
@@ -1220,7 +1252,8 @@ function App() {
     };
 
     initializeApp();
-  }, [currentProject, state.beats.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProject, state.beats.length, storage, loadProject, storageInitialized]);
 
   // Load project data when currentProject changes
   useEffect(() => {
@@ -1414,6 +1447,13 @@ function App() {
       } else if (isNewUntitledProject && state.beats.length === 0) {
         console.log('[App] >>> New untitled project but no beats yet, waiting...');
         // Don't mark as loaded yet - wait for beats to appear
+
+        // CRITICAL FIX: Even when waiting for beats, restore globalSettings immediately
+        // This ensures hotspot settings (showInPreview, labelDisplay) are applied
+        if (currentProject.globalSettings) {
+          console.log('[App] >>> Restoring globalSettings from untitled project (while waiting for beats)');
+          setGlobalSettings(currentProject.globalSettings);
+        }
       } else if (!isNewUntitledProject) {
         // This is an existing saved project - load its data
         console.log('[App] >>> REPLACING state with loaded project data');
@@ -3645,7 +3685,14 @@ function App() {
       {showSettings && (
         <GlobalSettingsInspector
           settings={globalSettings}
-          onUpdate={(newSettings) => setGlobalSettings(newSettings)}
+          onUpdate={(newSettings) => {
+            setGlobalSettings(newSettings);
+            // CRITICAL: Also persist to project immediately, not just React state
+            // This ensures hotspot settings (showInPreview, labelDisplay) and other
+            // global settings are saved when user clicks "Save Settings"
+            updateGlobalSettings(newSettings);
+            markChanged();
+          }}
           onClose={handleCloseSettings}
           assets={assets}
           themeId={currentThemeId}

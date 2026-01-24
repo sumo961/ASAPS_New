@@ -53,7 +53,7 @@ export interface PersistenceContextValue {
   deleteProject: (projectId: string) => Promise<boolean>;
   updateProjectMetadata: (updates: Partial<Pick<Project, 'name' | 'description' | 'themeId'>>) => Promise<void>;
   updateProjectStory: (storyData: Partial<any>) => void;
-  updateProjectGlobalSettings: (settings: GlobalSettings) => void;
+  updateProjectGlobalSettings: (settings: GlobalSettings) => Promise<void>;
   saveCurrentProject: (name: string, description?: string) => Promise<string>;
 
   // Untitled project management
@@ -553,8 +553,9 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
   /**
    * Update project's global settings (per-project settings persistence)
+   * This directly saves to IndexedDB to ensure settings persist even for untitled projects
    */
-  const updateProjectGlobalSettings = useCallback((settings: GlobalSettings) => {
+  const updateProjectGlobalSettings = useCallback(async (settings: GlobalSettings) => {
     const projectToUpdate = currentProjectRef.current || currentProject;
 
     if (!projectToUpdate) {
@@ -572,7 +573,21 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
     currentProjectRef.current = updatedProject;
     setCurrentProject(updatedProject);
-  }, [currentProject]);
+
+    // CRITICAL: Directly save to IndexedDB to ensure persistence
+    // This bypasses auto-save restrictions for untitled projects
+    // because when user explicitly saves settings, they should be persisted
+    try {
+      const result = await storage.updateProject(updatedProject);
+      if (result.success) {
+        console.log('[PersistenceContext] Global settings saved to IndexedDB');
+      } else {
+        console.error('[PersistenceContext] Failed to save global settings:', result.error);
+      }
+    } catch (error) {
+      console.error('[PersistenceContext] Error saving global settings to IndexedDB:', error);
+    }
+  }, [currentProject, storage]);
 
   /**
    * Save current project with a new name (convert from untitled to named)

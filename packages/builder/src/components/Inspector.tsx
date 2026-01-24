@@ -1531,7 +1531,40 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Quantity Comparison
+                                Compare What
+                                <span className="text-xs text-gray-500 block">
+                                  What value to check
+                                </span>
+                              </label>
+                              <select
+                                value={localBeat.parameters?.compareSource || 'inventory'}
+                                onChange={(e) => handleParameterChange('compareSource', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              >
+                                <option value="inventory">Item Quantity in Inventory</option>
+                                <option value="variable">Variable/Counter Value</option>
+                              </select>
+                            </div>
+                            {localBeat.parameters?.compareSource === 'variable' && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Variable to Check
+                                  <span className="text-xs text-gray-500 block">
+                                    e.g., goldOffer (without $)
+                                  </span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={localBeat.parameters?.compareVariable || ''}
+                                  onChange={(e) => handleParameterChange('compareVariable', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                  placeholder="e.g., goldOffer"
+                                />
+                              </div>
+                            )}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Comparison
                               </label>
                               <select
                                 value={localBeat.parameters?.quantityOperator || '>='}
@@ -1548,14 +1581,14 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Quantity Value
+                                Threshold Value
                                 <span className="text-xs text-gray-500 block">
                                   Number or $variableName
                                 </span>
                               </label>
                               <input
                                 type="text"
-                                value={localBeat.parameters?.quantityValue ?? '1'}
+                                value={localBeat.parameters?.quantityValue ?? ''}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   // If it's a pure number, convert it
@@ -1565,8 +1598,18 @@ export const Inspector: React.FC<InspectorProps> = ({
                                   );
                                 }}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                placeholder="e.g., 50 or $goldAmount"
+                                placeholder="e.g., 50 or $requiredAmount"
                               />
+                            </div>
+                            {/* Preview of what the comparison evaluates to */}
+                            <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
+                              <strong>Evaluates:</strong>{' '}
+                              {localBeat.parameters?.compareSource === 'variable'
+                                ? `$${localBeat.parameters?.compareVariable || 'variable'}`
+                                : `${localBeat.parameters?.item || 'Item'} quantity`
+                              }
+                              {' '}{localBeat.parameters?.quantityOperator || '>='}{' '}
+                              {localBeat.parameters?.quantityValue || 'threshold'}
                             </div>
                           </>
                         )}

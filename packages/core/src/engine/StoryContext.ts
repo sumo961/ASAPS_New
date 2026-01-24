@@ -312,28 +312,47 @@ export class StoryContext extends EventEmitter {
 
       // Check if this is a quantity comparison (vs just existence check)
       if (condition.quantityCheck && condition.quantityOperator) {
-        // Resolve quantityValue - can be a number or a variable name (prefixed with $)
-        let compareValue: number;
+        // Determine the left side of the comparison
+        let leftValue: number;
+        const compareSource = (condition as any).compareSource || 'inventory';
+
+        if (compareSource === 'variable') {
+          // Compare a variable/counter value against the threshold
+          const rawVar = (condition as any).compareVariable || '';
+          // Strip $ prefix if present (user might enter $goldOffer or goldOffer)
+          const compareVar = rawVar.startsWith('$') ? rawVar.substring(1) : rawVar;
+          const resolved = this.getVariable(compareVar) ?? this.state.counters[compareVar] ?? 0;
+          leftValue = typeof resolved === 'number' ? resolved : parseInt(resolved) || 0;
+        } else {
+          // Compare inventory quantity against the threshold (default behavior)
+          leftValue = itemQuantity;
+        }
+
+        // Resolve quantityValue (threshold) - can be a number or a variable name (prefixed with $)
+        let threshold: number;
         if (typeof condition.quantityValue === 'string') {
           // Variable reference - strip $ prefix if present
           const varName = condition.quantityValue.startsWith('$')
             ? condition.quantityValue.substring(1)
             : condition.quantityValue;
           const resolved = this.getVariable(varName) ?? this.state.counters[varName] ?? 0;
-          compareValue = typeof resolved === 'number' ? resolved : parseInt(resolved) || 0;
+          threshold = typeof resolved === 'number' ? resolved : parseInt(resolved) || 0;
         } else {
-          compareValue = condition.quantityValue ?? 0;
+          threshold = condition.quantityValue ?? 0;
         }
 
-        console.log(`[StoryContext] Inventory quantity check: "${itemToCheck}" qty=${itemQuantity} ${condition.quantityOperator} ${compareValue}`);
+        const leftLabel = compareSource === 'variable'
+          ? `$${(condition as any).compareVariable}`
+          : `"${itemToCheck}" qty`;
+        console.log(`[StoryContext] Quantity check: ${leftLabel}=${leftValue} ${condition.quantityOperator} ${threshold}`);
 
         switch (condition.quantityOperator) {
-          case '==': return itemQuantity === compareValue;
-          case '!=': return itemQuantity !== compareValue;
-          case '>': return itemQuantity > compareValue;
-          case '<': return itemQuantity < compareValue;
-          case '>=': return itemQuantity >= compareValue;
-          case '<=': return itemQuantity <= compareValue;
+          case '==': return leftValue === threshold;
+          case '!=': return leftValue !== threshold;
+          case '>': return leftValue > threshold;
+          case '<': return leftValue < threshold;
+          case '>=': return leftValue >= threshold;
+          case '<=': return leftValue <= threshold;
           default: return false;
         }
       }

@@ -83,10 +83,16 @@ export interface Condition {
   counter2?: string;
   // For visitedBeat type
   beatId?: string;
+  // For inventory conditions
+  item?: string;                   // Inventory item name to check
+  character?: string;              // Character whose inventory to check (default: 'player')
+  checkType?: 'has' | 'notHas' | 'quantity'; // Type of inventory check
   // For inventory quantity check
   quantityCheck?: boolean;         // Whether to check quantity (vs just existence)
   quantityOperator?: '==' | '!=' | '>' | '<' | '>=' | '<=';
   quantityValue?: number | string; // Number or variable name (prefixed with $)
+  compareSource?: 'inventory' | 'variable'; // What to compare: inventory quantity or variable value
+  compareVariable?: string;        // Variable name when compareSource is 'variable'
 }
 
 export interface Effect {

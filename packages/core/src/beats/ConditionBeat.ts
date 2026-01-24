@@ -28,6 +28,8 @@ export class ConditionBeat extends Beat {
   public quantityCheck?: boolean;
   public quantityOperator?: string;
   public quantityValue?: number | string;
+  public compareSource?: 'inventory' | 'variable'; // What to compare: inventory quantity or variable value
+  public compareVariable?: string; // Variable name when compareSource is 'variable'
   // VisitedBeat-specific parameter
   public beatId?: string;
 
@@ -79,6 +81,8 @@ export class ConditionBeat extends Beat {
     this.quantityCheck = this.checkType === 'quantity';
     this.quantityOperator = conditionObj.quantityOperator || params.quantityOperator || (config as any).quantityOperator;
     this.quantityValue = conditionObj.quantityValue ?? params.quantityValue ?? (config as any).quantityValue;
+    this.compareSource = conditionObj.compareSource || (params as any).compareSource || (config as any).compareSource || 'inventory';
+    this.compareVariable = conditionObj.compareVariable || (params as any).compareVariable || (config as any).compareVariable;
     // VisitedBeat-specific parameter
     this.beatId = conditionObj.beatId || params.beatId || (config as any).beatId;
 
@@ -113,7 +117,9 @@ export class ConditionBeat extends Beat {
         if (this.checkType === 'quantity') {
           condition.quantityCheck = true;
           condition.quantityOperator = this.quantityOperator || '>=';
-          condition.quantityValue = this.quantityValue ?? 1;
+          condition.quantityValue = this.quantityValue;
+          condition.compareSource = this.compareSource || 'inventory';
+          condition.compareVariable = this.compareVariable;
         }
         break;
       case 'variable':
@@ -154,6 +160,8 @@ export class ConditionBeat extends Beat {
       quantityCheck: this.quantityCheck,
       quantityOperator: this.quantityOperator,
       quantityValue: this.quantityValue,
+      compareSource: this.compareSource,
+      compareVariable: this.compareVariable,
       beatId: this.beatId
     };
   }
@@ -303,6 +311,18 @@ export class ConditionBeat extends Beat {
       this.quantityValue = params.quantityValue;
     } else if (conditionObj.quantityValue !== undefined) {
       this.quantityValue = conditionObj.quantityValue;
+    }
+
+    if ((params as any).compareSource !== undefined) {
+      this.compareSource = (params as any).compareSource;
+    } else if (conditionObj.compareSource !== undefined) {
+      this.compareSource = conditionObj.compareSource;
+    }
+
+    if ((params as any).compareVariable !== undefined) {
+      this.compareVariable = (params as any).compareVariable;
+    } else if (conditionObj.compareVariable !== undefined) {
+      this.compareVariable = conditionObj.compareVariable;
     }
 
     if (params.beatId !== undefined) {
