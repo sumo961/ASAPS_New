@@ -22,6 +22,7 @@ import { AIConditionBeat } from './AIConditionBeat';
 import { AIDialogTreeBeat } from './AIDialogTreeBeat';
 import { AISummaryBeat } from './AISummaryBeat';
 import { AIInfoTextBeat } from './AIInfoTextBeat';
+import { AIDurScreenBeat } from './AIDurScreenBeat';
 import type { BeatConfig } from '../types';
 
 type BeatConstructor = new (config: BeatConfig) => Beat;
@@ -91,6 +92,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('aiDialogTree', AIDialogTreeBeat);
     this.registerBeatType('aiSummary', AISummaryBeat);
     this.registerBeatType('aiInfoText', AIInfoTextBeat);
+    this.registerBeatType('aiDurScreen', AIDurScreenBeat);
   }
 
   registerBeatType(type: string, constructor: BeatConstructor): void {

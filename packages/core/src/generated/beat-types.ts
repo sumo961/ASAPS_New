@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-24T13:09:24.434Z
+ * Generated: 2026-01-24T13:35:34.064Z
  */
 
 // ============================================
@@ -492,6 +492,36 @@ export interface AiInfoTextParameters {
   connection: Connection;
 }
 
+/**
+ * AI Duration Screen - Generate text using AI with automatic duration based on reading speed
+ * Category: visible
+ * Connection Type: single
+ */
+export interface AiDurScreenParameters {
+  /** Context/instruction for AI (e.g., "Describe the atmosphere as the player enters the dark cave") */
+  prompt: string;
+  /** Specific variables to include in AI context (leave empty for all) */
+  contextVariables?: string[] | undefined;
+  /** Include player variables in context */
+  includeVariables?: boolean | undefined;
+  /** Include player inventory in context */
+  includeInventory?: boolean | undefined;
+  /** Include visited beats in context */
+  includeHistory?: boolean | undefined;
+  /** Maximum sentences to generate */
+  maxSentences?: number | undefined;
+  /** Text to show if AI is unavailable */
+  fallbackText: string;
+  /** Reading speed in words per minute (average adult: 200-250) */
+  wordsPerMinute?: number | undefined;
+  /** Minimum display duration in milliseconds */
+  minDuration?: number | undefined;
+  /** Maximum display duration in milliseconds */
+  maxDuration?: number | undefined;
+  /** Target beat after duration expires */
+  connection?: Connection | undefined;
+}
+
 // ============================================
 // Beat Type Union and Maps
 // ============================================
@@ -519,7 +549,8 @@ export type BeatType =
   | 'aiCondition'
   | 'aiDialogTree'
   | 'aiSummary'
-  | 'aiInfoText';
+  | 'aiInfoText'
+  | 'aiDurScreen';
 
 /**
  * Map of beat type name to its parameter interface
@@ -545,6 +576,7 @@ export interface BeatParameterMap {
   'aiDialogTree': AiDialogTreeParameters;
   'aiSummary': AiSummaryParameters;
   'aiInfoText': AiInfoTextParameters;
+  'aiDurScreen': AiDurScreenParameters;
 }
 
 // ============================================

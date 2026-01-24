@@ -41,6 +41,7 @@ const BEAT_COLORS: Record<string, string> = {
   aiCondition: '#c026d3',
   aiSummary: '#059669',
   aiInfoText: '#8b5cf6',
+  aiDurScreen: '#a78bfa',
 };
 
 // Default colors by category

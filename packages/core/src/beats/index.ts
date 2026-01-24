@@ -26,3 +26,4 @@ export { AIConditionBeat, type AIConditionCategory, type AIConditionBeatParams }
 export { AIDialogTreeBeat, type AIDialogExitTarget, type AIDialogTreeBeatParams } from './AIDialogTreeBeat';
 export { AISummaryBeat, type AISummaryBeatParams } from './AISummaryBeat';
 export { AIInfoTextBeat, type AIInfoTextBeatParams } from './AIInfoTextBeat';
+export { AIDurScreenBeat, type AIDurScreenBeatParams } from './AIDurScreenBeat';
