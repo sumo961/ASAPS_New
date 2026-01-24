@@ -1824,6 +1824,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           restartText: params.restartText || 'Play Again',
           creditsText: params.creditsText || 'Credits'
         };
+      case 'aiInfoText':
+        return {
+          text: params.fallbackText || '[AI-generated text will appear here]',
+          buttonText: params.buttonText || 'Continue'
+        };
+      case 'aiDurScreen':
+        return {
+          text: params.fallbackText || '[AI-generated text will appear here]',
+          // No button - auto-advances based on reading time
+        };
       default:
         return params;
     }

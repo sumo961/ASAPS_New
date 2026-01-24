@@ -133,20 +133,20 @@ export const EnhancedVisualEditor: React.FC<EnhancedVisualEditorProps> = ({
           break;
           
         case 'infoText':
-        case 'durScreen':
+        case 'aiInfoText':
           // Add text
           newElements.push({
             id: `text_${Date.now()}`,
             kind: 'text',
             name: 'Text',
-            text: params.text || '',
+            text: params.text || params.fallbackText || '',
             x: stageWidth / 2 - 300,
             y: stageHeight / 2 - 100,
             z: 1,
             width: 600,
             height: 200
           });
-          
+
           // Add continue button
           newElements.push({
             id: `continue_${Date.now()}`,
@@ -158,6 +158,22 @@ export const EnhancedVisualEditor: React.FC<EnhancedVisualEditorProps> = ({
             z: 2,
             width: 200,
             height: 40
+          });
+          break;
+
+        case 'durScreen':
+        case 'aiDurScreen':
+          // Add text only (no button - auto-advances)
+          newElements.push({
+            id: `text_${Date.now()}`,
+            kind: 'text',
+            name: 'Text',
+            text: params.text || params.fallbackText || '',
+            x: stageWidth / 2 - 300,
+            y: stageHeight / 2 - 100,
+            z: 1,
+            width: 600,
+            height: 200
           });
           break;
           

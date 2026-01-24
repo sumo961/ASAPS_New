@@ -230,7 +230,9 @@ export const Inspector: React.FC<InspectorProps> = ({
       'hyperText',
       'onlineContent',
       'aiDialogTree',
-      'aiSummary'
+      'aiSummary',
+      'aiInfoText',
+      'aiDurScreen'
     ];
     return visualBeatTypes.includes(beatType);
   };
