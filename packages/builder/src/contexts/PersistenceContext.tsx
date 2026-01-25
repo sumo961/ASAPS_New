@@ -75,8 +75,16 @@ const PersistenceContext = createContext<PersistenceContextValue | null>(null);
 /**
  * Check if a project is a default/empty project (3 default beats: titleScreen, infoText, endScreen)
  * These shouldn't be auto-saved as they clutter the project library
+ * EXCEPTION: If the project has a custom name (not "Untitled Project"), it's saveable
+ * because the user explicitly named it
  */
 const isDefaultProject = (project: Project): boolean => {
+  // CRITICAL FIX: If the project has a custom name, it's NOT a default project
+  // The user explicitly saved it with a name, so they want it preserved
+  if (project.name && project.name !== 'Untitled Project') {
+    return false;
+  }
+
   const story = project.story as any;
   if (!story) return false;
 
@@ -171,12 +179,18 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
     // CRITICAL FIX: For untitled projects, throw error to prevent auto-save
     // This forces the user to manually save (which opens Save Project dialog)
-    // CRITICAL: Use ref instead of state for immediate synchronous access
-    // This allows saveCurrentProject to set isUntitledProjectRef.current = false
-    // and have getProjectData see it immediately, before React state updates
-    if (isUntitledProjectRef.current) {
+    // Check BOTH the ref AND the actual project name for robustness
+    // The project name check is the authoritative source - if it's named, it's saveable
+    const isActuallyUntitled = projectToUse.name === 'Untitled Project';
+    if (isActuallyUntitled) {
       console.log('[PersistenceContext] getProjectData - BLOCKING auto-save for untitled project:', projectToUse.name);
       throw new Error('Cannot auto-save untitled project');
+    }
+
+    // Sync ref with actual project name in case they got out of sync
+    if (isUntitledProjectRef.current !== isActuallyUntitled) {
+      console.log('[PersistenceContext] getProjectData - Syncing isUntitledProjectRef:', isActuallyUntitled);
+      isUntitledProjectRef.current = isActuallyUntitled;
     }
 
     // Sync project data before retrieving if sync callback is registered
@@ -401,13 +415,18 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       commandManager.setProjectId(newProjectId);
       commandManager.clear();
 
-      // CRITICAL: If creating an "Untitled Project", mark it as untitled to block auto-save
-      // This prevents the default 3-beat project from being auto-saved before user makes changes
-      // or before an AI-generated story replaces it
+      // CRITICAL: Set isUntitledProject based on the project name
+      // This ensures auto-save is blocked for untitled projects but enabled for named ones
       if (name === 'Untitled Project') {
         isUntitledProjectRef.current = true;
         setIsUntitledProject(true);
         console.log('[PersistenceProvider] Created untitled project - auto-save blocked');
+      } else {
+        // CRITICAL FIX: Reset the ref for named projects
+        // This ensures auto-save works after the user saves with a name
+        isUntitledProjectRef.current = false;
+        setIsUntitledProject(false);
+        console.log('[PersistenceProvider] Created named project - auto-save enabled');
       }
 
       return newProjectId;

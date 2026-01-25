@@ -1198,19 +1198,38 @@ function App() {
       const hasAnyProjects = currentProject !== null && currentProject !== undefined;
 
       if (!hasAnyProjects && state.beats.length === 0) {
-        console.log('[App] No current project and no beats - checking for existing untitled project');
+        console.log('[App] No current project and no beats - checking for existing untitled projects');
 
-        // CRITICAL FIX: Check if there's an existing untitled project in IndexedDB
-        // This prevents creating new projects on every reload and preserves settings
+        // CRITICAL FIX: Clean up ALL old untitled projects, keep only the most recent one
         try {
           const projectsResult = await storage.listProjects();
           if (projectsResult.success && projectsResult.data) {
-            const existingUntitled = projectsResult.data.find(p => p.name === 'Untitled Project');
-            if (existingUntitled) {
-              console.log('[App] Found existing untitled project:', existingUntitled.id);
+            // Find ALL untitled projects, sorted by modification date (newest first)
+            const untitledProjects = projectsResult.data
+              .filter(p => p.name === 'Untitled Project')
+              .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime());
+
+            console.log('[App] Found', untitledProjects.length, 'untitled projects');
+
+            if (untitledProjects.length > 0) {
+              // Delete all but the most recent untitled project
+              if (untitledProjects.length > 1) {
+                console.log('[App] Cleaning up', untitledProjects.length - 1, 'old untitled projects');
+                for (let i = 1; i < untitledProjects.length; i++) {
+                  try {
+                    await storage.deleteProject(untitledProjects[i].id);
+                    console.log('[App] Deleted old untitled project:', untitledProjects[i].id);
+                  } catch (e) {
+                    console.warn('[App] Failed to delete old untitled project:', e);
+                  }
+                }
+              }
+
+              // Load the most recent untitled project
+              const existingUntitled = untitledProjects[0];
+              console.log('[App] Loading most recent untitled project:', existingUntitled.id);
               hasInitializedRef.current = true;
 
-              // Load the existing untitled project
               const loaded = await loadProject(existingUntitled.id);
               if (loaded) {
                 console.log('[App] SUCCESS: Loaded existing untitled project');
@@ -1221,7 +1240,7 @@ function App() {
             }
           }
         } catch (error) {
-          console.warn('[App] Could not check for existing untitled project:', error);
+          console.warn('[App] Could not check for existing untitled projects:', error);
         }
 
         console.log('[App] No existing untitled project found - initializing from scratch');
@@ -1239,12 +1258,25 @@ function App() {
         // This prevents showing "unsaved" indicator for a fresh default story
 
         // Create untitled project - the loading effect will handle saving beats when they appear
-        try {
-          console.log('[App] Creating untitled project (beats will be saved by loading effect)');
-          await createProject('Untitled Project', 'Auto-saved untitled work');
-          console.log('[App] SUCCESS: Created untitled project');
-        } catch (error) {
-          console.error('[App] FAILED to create untitled project:', error);
+        // CRITICAL: Retry project creation if it fails to ensure we have a valid project
+        let retryCount = 0;
+        const maxRetries = 3;
+        while (retryCount < maxRetries) {
+          try {
+            console.log(`[App] Creating untitled project (attempt ${retryCount + 1}/${maxRetries})...`);
+            await createProject('Untitled Project', 'Auto-saved untitled work');
+            console.log('[App] SUCCESS: Created untitled project');
+            break; // Success, exit retry loop
+          } catch (error) {
+            retryCount++;
+            console.error(`[App] FAILED to create untitled project (attempt ${retryCount}/${maxRetries}):`, error);
+            if (retryCount < maxRetries) {
+              // Wait a bit before retrying
+              await new Promise(resolve => setTimeout(resolve, 500));
+            } else {
+              console.error('[App] CRITICAL: All project creation attempts failed. User may need to manually save.');
+            }
+          }
         }
       } else {
         console.log('[App] SKIPPING initialization - hasAnyProjects:', hasAnyProjects, 'beats.length:', state.beats.length);
@@ -1445,15 +1477,20 @@ function App() {
         console.log('[App] >>> SUCCESS: Saved beats to new untitled project');
         console.log('[App] >>> isUntitledProject set to:', true);
       } else if (isNewUntitledProject && state.beats.length === 0) {
-        console.log('[App] >>> New untitled project but no beats yet, waiting...');
-        // Don't mark as loaded yet - wait for beats to appear
+        // Existing untitled project with no beats - initialize default story
+        console.log('[App] >>> Untitled project has no beats - initializing default story');
 
         // CRITICAL FIX: Even when waiting for beats, restore globalSettings immediately
         // This ensures hotspot settings (showInPreview, labelDisplay) are applied
         if (currentProject.globalSettings) {
-          console.log('[App] >>> Restoring globalSettings from untitled project (while waiting for beats)');
+          console.log('[App] >>> Restoring globalSettings from untitled project');
           setGlobalSettings(currentProject.globalSettings);
         }
+
+        // Initialize the default 3-beat story (title, intro, end)
+        initializeStory();
+        loadedProjectIdRef.current = currentProject.id;
+        console.log('[App] >>> Default story initialized for untitled project');
       } else if (!isNewUntitledProject) {
         // This is an existing saved project - load its data
         console.log('[App] >>> REPLACING state with loaded project data');
@@ -1592,7 +1629,7 @@ function App() {
 
     console.log('[App] >>> LOAD EFFECT completed');
     console.log('[App] ==========================================');
-  }, [currentProject, actions, setIsUntitledProject, state.beats, state.title, state.author, state.connections, characters, updateMetadata, updateStory]);
+  }, [currentProject, actions, setIsUntitledProject, state.beats, state.title, state.author, state.connections, characters, updateMetadata, updateStory, initializeStory]);
 
   // Handler functions
   const handleBeatSelect = useCallback((beat: Beat) => {
@@ -2695,10 +2732,12 @@ function App() {
    * Handle manual save - for untitled projects, this shows the Save Project dialog
    */
   const handleSave = useCallback(async () => {
-    console.log('[App] handleSave called - isUntitledProject:', isUntitledProject, 'should open dialog:', isUntitledProject);
-    if (isUntitledProject) {
-      // For untitled projects, show the Save Project dialog
-      console.log('[App] Opening SaveProjectDialog for untitled project');
+    console.log('[App] handleSave called - isUntitledProject:', isUntitledProject, 'currentProject:', currentProject?.id, 'should open dialog:', isUntitledProject || !currentProject);
+    // CRITICAL FIX: Also show dialog if there's no current project at all
+    // This handles the edge case where initialization failed to create a project
+    if (isUntitledProject || !currentProject) {
+      // For untitled projects or missing project, show the Save Project dialog
+      console.log('[App] Opening SaveProjectDialog for untitled/missing project');
       setShowSaveProjectDialog(true);
     } else {
       // For named projects, just save now
@@ -2710,7 +2749,7 @@ function App() {
         console.error('[App] Save failed:', error);
       }
     }
-  }, [isUntitledProject, saveNow]);
+  }, [isUntitledProject, currentProject, saveNow]);
 
   /**
    * Handle Save Project - shows dialog for naming untitled project
@@ -2724,13 +2763,46 @@ function App() {
    */
   const handleSaveProjectConfirmed = useCallback(async (name: string, description?: string) => {
     try {
+      // CRITICAL FIX: If there's no current project (initialization failed),
+      // create one first with the current beats, then save it
+      if (!currentProject) {
+        console.log('[App] No current project - creating new project with current beats:', name);
+
+        // Create a new project first
+        const newProjectId = await createProject(name, description);
+        console.log('[App] Created new project:', newProjectId);
+
+        // Sync the current beats to the project
+        syncProjectData();
+
+        // Mark as NOT untitled since we just named it
+        setIsUntitledProject(false);
+
+        // Wait for sync to propagate then save directly to storage
+        // Using a small delay to ensure the project ref is updated
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Get the updated project from storage manager and save it
+        // This bypasses the auto-save protections (isDefaultProject check)
+        // which are meant for auto-save, not explicit manual saves
+        const result = await storage.getProject(newProjectId);
+        if (result.success && result.data) {
+          const updatedProject = { ...result.data, modifiedAt: new Date() };
+          await storage.updateProject(updatedProject);
+          console.log('[App] Saved beats to new project');
+        }
+
+        alert('Project saved successfully!');
+        return;
+      }
+
       await saveCurrent(name, description);
       alert('Project saved successfully!');
     } catch (error) {
       console.error('Failed to save project:', error);
       alert('Failed to save project. Please try again.');
     }
-  }, [saveCurrent]);
+  }, [saveCurrent, currentProject, createProject, syncProjectData, setIsUntitledProject, storage]);
 
   /**
    * Handle closing Save Project dialog
