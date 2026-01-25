@@ -104,29 +104,44 @@ function setupAutoUpdater(): void {
   // Event: Update downloaded
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
     console.log('[AutoUpdater] Update downloaded:', info.version);
-    dialog.showMessageBox(mainWindow!, {
-      type: 'info',
-      title: 'Update Ready',
-      message: 'Update downloaded successfully!',
-      detail: 'The update will be installed when you restart the app. Would you like to restart now?',
-      buttons: ['Restart Now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    }).then((result) => {
-      if (result.response === 0) {
-        console.log('[AutoUpdater] User chose to restart now');
-        isUpdating = true;
 
-        // On macOS, we need a small delay before quitAndInstall
-        // to ensure the update process is ready
-        setTimeout(() => {
-          console.log('[AutoUpdater] Calling quitAndInstall...');
-          // isSilent: false on macOS (no installer), true on Windows
-          // isForceRunAfter: true = launch app after installation completes
-          autoUpdater.quitAndInstall(false, true);
-        }, 100);
-      }
-    });
+    // On macOS, quitAndInstall doesn't work reliably for unsigned apps
+    // Instead, open the releases page for manual download
+    if (process.platform === 'darwin') {
+      dialog.showMessageBox(mainWindow!, {
+        type: 'info',
+        title: 'Update Ready',
+        message: `Version ${info.version} is ready to install!`,
+        detail: 'Due to macOS security restrictions, please download the new version manually.\n\nClick "Open Downloads" to get the latest DMG, then drag it to your Applications folder to replace this version.',
+        buttons: ['Open Downloads', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+      }).then((result) => {
+        if (result.response === 0) {
+          // Open the GitHub releases page for the specific version
+          const releaseUrl = `https://github.com/sumo961/ASAPS_New/releases/tag/v${info.version}`;
+          console.log('[AutoUpdater] Opening release page:', releaseUrl);
+          shell.openExternal(releaseUrl);
+        }
+      });
+    } else {
+      // On Windows, quitAndInstall works fine
+      dialog.showMessageBox(mainWindow!, {
+        type: 'info',
+        title: 'Update Ready',
+        message: 'Update downloaded successfully!',
+        detail: 'The update will be installed when you restart the app. Would you like to restart now?',
+        buttons: ['Restart Now', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+      }).then((result) => {
+        if (result.response === 0) {
+          console.log('[AutoUpdater] User chose to restart now');
+          isUpdating = true;
+          autoUpdater.quitAndInstall(true, true);
+        }
+      });
+    }
   });
 
   // Event: Error
