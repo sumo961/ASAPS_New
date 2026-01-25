@@ -5,6 +5,9 @@ import * as fs from 'fs/promises';
 import { getEmbeddedAPIServer } from './api-server';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
 
+// Track if we're in the process of installing an update
+let isUpdating = false;
+
 // Get the API server instance
 const apiServer = getEmbeddedAPIServer({ port: 3001, host: 'localhost' });
 
@@ -111,9 +114,17 @@ function setupAutoUpdater(): void {
       cancelId: 1,
     }).then((result) => {
       if (result.response === 0) {
-        // isSilent: true = run installer silently
-        // isForceRunAfter: true = launch app after installation completes
-        autoUpdater.quitAndInstall(true, true);
+        console.log('[AutoUpdater] User chose to restart now');
+        isUpdating = true;
+
+        // On macOS, we need a small delay before quitAndInstall
+        // to ensure the update process is ready
+        setTimeout(() => {
+          console.log('[AutoUpdater] Calling quitAndInstall...');
+          // isSilent: false on macOS (no installer), true on Windows
+          // isForceRunAfter: true = launch app after installation completes
+          autoUpdater.quitAndInstall(false, true);
+        }, 100);
       }
     });
   });
@@ -128,6 +139,7 @@ function setupAutoUpdater(): void {
   // Log when update is being installed
   autoUpdater.on('before-quit-for-update', () => {
     console.log('[AutoUpdater] Quitting for update installation...');
+    isUpdating = true;
   });
 
   // Delay initial check by 5 seconds to not slow startup
@@ -539,15 +551,21 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  // Always quit when updating, regardless of platform
+  if (isUpdating || process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 // Clean up API server before quitting
-// Note: Using sync-style approach to avoid interfering with auto-updater's quit process
-app.on('before-quit', () => {
-  // Stop API server (fire and forget to not block auto-update installation)
+// Note: Skip cleanup during update to avoid interfering with auto-updater's quit process
+app.on('before-quit', (event) => {
+  if (isUpdating) {
+    console.log('[Main] Skipping API server cleanup during update');
+    return;
+  }
+
+  // Stop API server (fire and forget to not block quit)
   apiServer.stop()
     .then(() => console.log('[Main] API server stopped'))
     .catch((error) => console.error('[Main] Error stopping API server:', error));
