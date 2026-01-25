@@ -859,6 +859,63 @@ Three styles:
 - **Bullet Points** - Key events listed
 - **Reflection** - Thoughtful commentary on choices
 
+## AI Info Text (Runtime)
+
+Generate contextual, personalized text based on the player's current state:
+
+**Use Cases:**
+- Personalized greetings using player name variables
+- Context-aware reactions to player inventory
+- Dynamic descriptions that change based on previous choices
+
+**Parameters:**
+- `prompt`: Context for the AI (e.g., "A merchant's reply when the player can't afford the item")
+- `fallbackText`: Text shown if AI is unavailable
+- `buttonText`: Continue button label
+- `includeVariables`: Include player variables in AI context
+- `includeInventory`: Include player's inventory in AI context
+- `includeHistory`: Include visited beats in AI context
+- `maxSentences`: Maximum sentences to generate (default: 2)
+
+**Example:**
+```
+Prompt: "Describe how the room changes based on the player's mood variable"
+Fallback: "The room feels different today."
+Include Variables: true
+```
+
+## AI Duration Screen (Runtime)
+
+Like AI Info Text, but auto-advances based on reading speed:
+
+**Use Cases:**
+- Atmospheric transitions that adapt to player state
+- Dynamic montages reflecting player choices
+- Personalized scene-setting text
+
+**Additional Parameters:**
+- `wordsPerMinute`: Reading speed (default: 200)
+- `minDuration`: Minimum display time in ms (default: 2000)
+- `maxDuration`: Maximum display time in ms (default: 15000)
+
+The duration is calculated automatically: (word count / WPM) × 60 × 1000 ms, clamped between min and max.
+
+## Text Variations (Non-AI)
+
+For random variety without AI, both **Info Text** and **Duration Screen** beats support `textVariations`:
+
+```json
+{
+  "text": "You enter the room.",
+  "textVariations": [
+    "The room greets you with familiar shadows.",
+    "Everything looks just as you left it."
+  ]
+}
+```
+
+At runtime, one text is randomly selected from the main text plus all variations.
+
 ---
 
 # Part 7: Testing & Publishing
@@ -1162,11 +1219,11 @@ Quick reference for all beat types.
 | Beat | Purpose | Key Settings |
 |------|---------|--------------|
 | Title Screen | Story opening | title, subtitle, author, button text |
-| Intro Text | Narration | text, button text |
+| Info Text | Narration | text, button text, textVariations (optional array for random selection) |
 | Dialog Tree | Choices | prompt, choices (each with text, target, condition) |
 | Movement Choice | Navigation | description, destinations |
 | Pick Prop | Item selection | prompt, props, display mode |
-| Duration Screen | Timed display | text, duration, show timer |
+| Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
 | Video Beat | Video playback | video asset, autoplay, controls, skip |
 | Input Text | Text entry | prompt, placeholder, validation, save target |
 | Hyper Text | Clickable text | text with links, link targets |
@@ -1183,6 +1240,13 @@ Quick reference for all beat types.
 | Random Target | Randomization | targets with optional weights |
 | Set Timer | Timed events | timer name, duration, expiration target |
 | Inventory | Item management | action (add/remove/transfer), item, quantity, character |
+
+## AI Runtime Beats
+
+| Beat | Purpose | Key Settings |
+|------|---------|--------------|
+| AI Info Text | Dynamic narrative text | prompt, fallbackText, buttonText, includeVariables, includeInventory, includeHistory, maxSentences |
+| AI Duration Screen | Dynamic timed text | prompt, fallbackText, wordsPerMinute, minDuration, maxDuration, context options |
 | AI Condition | AI branching | prompt, categories, fallback |
 | AI Dialog | AI conversation | personality, context, max turns |
 | AI Summary | Journey recap | style, length, include options |

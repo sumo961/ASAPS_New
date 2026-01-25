@@ -164,6 +164,8 @@ export class AIInfoTextBeat extends Beat {
   private createContextHash(context: StoryContext): string {
     const variables = context.getVariables();
     const counters = context.getCounters();
+    const inventory = context.getInventory();
+    const visitedBeats = context.getVisitedBeats();
 
     const keyValues: string[] = [];
 
@@ -186,6 +188,16 @@ export class AIInfoTextBeat extends Beat {
     // Include counters
     for (const [key, value] of Object.entries(counters)) {
       keyValues.push(`counter:${key}:${value}`);
+    }
+
+    // Include inventory if enabled
+    if (this.includeInventory && inventory.length > 0) {
+      keyValues.push(`inventory:${inventory.sort().join(',')}`);
+    }
+
+    // Include history if enabled
+    if (this.includeHistory && visitedBeats.length > 0) {
+      keyValues.push(`history:${visitedBeats.join(',')}`);
     }
 
     return keyValues.join('|');

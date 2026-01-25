@@ -1100,6 +1100,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         if (element.type === 'dialog' || element.type === 'text') {
           if (beat.type === 'infoText' || beat.type === 'durScreen') {
             element.text = params.text || '';
+          } else if (beat.type === 'aiInfoText' || beat.type === 'aiDurScreen') {
+            // AI beats use fallbackText for visual editor preview
+            element.text = params.fallbackText || '[AI-generated text]';
           } else if (beat.type === 'hyperText') {
             element.text = params.text || '';
           } else if (beat.type === 'endScreen' && nameLower.includes('message')) {
@@ -1288,6 +1291,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           // For different beat types, get text from appropriate parameter
           if (beat.type === 'infoText' || beat.type === 'durScreen') {
             element.text = params.text;
+          } else if (beat.type === 'aiInfoText' || beat.type === 'aiDurScreen') {
+            // AI beats use fallbackText for visual editor preview
+            element.text = params.fallbackText || '[AI-generated text]';
           } else if (beat.type === 'hyperText') {
             element.text = params.text;
           } else if (beat.type === 'endScreen' && loc.name === 'End Message') {
@@ -1489,6 +1495,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     } else if (beat.type === 'infoText' || beat.type === 'durScreen') {
       relevantParams.text = params.text;
       relevantParams.buttonText = params.buttonText;
+    } else if (beat.type === 'aiInfoText' || beat.type === 'aiDurScreen') {
+      // AI beats use fallbackText for visual editor preview
+      relevantParams.fallbackText = params.fallbackText;
+      relevantParams.prompt = params.prompt;
+      relevantParams.buttonText = params.buttonText;
     } else {
       relevantParams.text = params.text;
       relevantParams.buttonText = params.buttonText;
@@ -1510,6 +1521,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               const { width, height } = autoSizeTextBox(e, params.text);
               console.log('[VisualWorkspace] Auto-resizing textbox to:', { width, height });
               return { ...e, text: params.text, width, height };
+            }
+          }
+          return e;
+        });
+      }
+
+      // Update text content for AI beats (using fallbackText)
+      if ((beat.type === 'aiInfoText' || beat.type === 'aiDurScreen') && params.fallbackText) {
+        updated = updated.map((e: VisualElement) => {
+          if (e.type === 'text' && e.name === 'text') {
+            if (e.text !== params.fallbackText) {
+              changed = true;
+              console.log('[VisualWorkspace] Updating AI beat text element');
+              const { width, height } = autoSizeTextBox(e, params.fallbackText);
+              return { ...e, text: params.fallbackText, width, height };
             }
           }
           return e;

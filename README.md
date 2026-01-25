@@ -4,13 +4,16 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASAPS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.8)
+## ⚠️ Development Status (v0.9.9)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
-| **AI-Based Beats** | **NEW in v0.9.8**: AI Summary, Online Content, AI Condition, AI Dialog Tree beats for dynamic content |
+| **Transformation Commands** | **NEW in v0.9.9**: Bulk rename/delete/merge for characters, variables, beats |
+| **AI Runtime Beats** | **NEW in v0.9.9**: aiInfoText, aiDurScreen for dynamic AI-generated content during playback |
+| **Text Variations** | **NEW in v0.9.9**: Random text selection for Info Text and Duration Screen beats |
+| **AI-Based Beats** | AI Summary, Online Content, AI Condition, AI Dialog Tree beats for dynamic content |
 | Assets (graphics, sounds, sprite animations) | Fully implemented |
 | Visual dialog editor | Supports all phases of dialog trees (v0.9.4) |
 | Project switching | Occasional issues; reload interface to resolve |
@@ -27,10 +30,26 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
-### 🤖 AI-Based Beats (v0.9.8)
+### 🚀 Productivity Features (v0.9.9)
+
+**Transformation Commands** - Bulk operations for efficient story editing:
+- Rename/delete/merge characters, variables, and beats across entire story
+- Deterministic parsing ensures reliable operation without AI hallucination
+
+**Inventory Quantity Functions** - Enhanced inventory system:
+- `getInventoryQuantity(item)`, `setInventoryQuantity(item, n)`, `addInventoryQuantity(item, n)`, `removeInventoryQuantity(item, n)`
+- Use in conditions or arithmetic operations
+
+**Text Variations** - Random text selection for replay value:
+- Add multiple text variations to Info Text and Duration Screen beats
+- One randomly selected at runtime for narrative variety
+
+### 🤖 AI-Based Beats (v0.9.8+)
 
 AI beats enable dynamic, personalized story experiences that respond to player choices in real-time:
 
+- **AI Info Text**: AI-generated contextual text with Continue button (v0.9.9)
+- **AI Duration Screen**: AI-generated text with auto-advance based on reading speed (v0.9.9)
 - **AI Summary Beat**: Generates a narrative summary of the player's journey at story end
 - **Online Content Beat**: Fetches and displays real-time information from the web (weather, news, facts)
 - **AI Condition Beat**: Uses AI to evaluate complex conditions based on story context
@@ -66,9 +85,9 @@ Each release includes:
 
 Download the latest release to get started without building from source.
 
-### 📖 Tutorial
+### 📖 Documentation
 
-For a comprehensive guide to using ASAPS Modern, see the **[Getting Started Tutorial](docs/tutorial/GETTING_STARTED.md)**.
+For a comprehensive guide to using ASAPS Modern, including conceptual foundations, interface walkthrough, and beat reference, see the **[User Guide](docs/USER_GUIDE.md)**.
 
 ## 🚀 Quick Start
 
@@ -290,6 +309,25 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.9 (2026-01-25)
+- **Transformation Commands**: Bulk rename/delete/merge operations for characters, variables, and beats
+  - Deterministic sentence-based parsing for reliable operation
+  - Full undo support for all transformation commands
+- **Inventory Quantity Functions**: Enhanced inventory with quantity tracking
+  - `getInventoryQuantity`, `setInventoryQuantity`, `addInventoryQuantity`, `removeInventoryQuantity`
+  - Use in conditions and arithmetic expressions
+- **Text Variations**: Random text selection for Info Text and Duration Screen beats
+  - Add multiple text variations that combine with main text
+  - One randomly selected at runtime for narrative variety
+- **AI Info Text Beat**: AI-generated contextual text with Continue button
+  - Personalized narrative that adapts to player state
+  - Response caching based on context hash
+- **AI Duration Screen Beat**: AI-generated text with auto-advance
+  - Calculates display time based on reading speed (words per minute)
+  - Configurable min/max duration bounds
+- **Beat Rename**: introText → infoText (automatic migration for existing projects)
+- **Documentation**: Comprehensive USER_GUIDE.md replaces tutorial folder
 
 ### v0.9.7 (2026-01-16)
 - **AI Provider Improvements**: Fixed external AI providers (OpenAI, Claude, Kimi) in desktop app

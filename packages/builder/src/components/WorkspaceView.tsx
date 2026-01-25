@@ -125,7 +125,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       'hyperText',
       'onlineContent',
       'aiDialogTree',
-      'aiSummary'
+      'aiSummary',
+      'aiInfoText',
+      'aiDurScreen'
     ];
     return visualBeatTypes.includes(beat.type);
   };

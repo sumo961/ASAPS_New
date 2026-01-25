@@ -106,6 +106,9 @@ const BEAT_TYPE_GUIDE = `
 **infoText** - Display text with continue button (SINGLE CONNECTION ONLY!)
 - Use: Narration, scene setting, exposition
 - Parameters: text, buttonText, backgroundAssetId
+- Optional: textVariations (array of alternative texts) - one is randomly selected at runtime
+  Example: { "text": "Hello!", "textVariations": ["Hi there!", "Greetings!"] }
+  At runtime, randomly selects from: ["Hello!", "Hi there!", "Greetings!"]
 - Connections: Single → next beat (ONLY ONE connection allowed!)
 - ⚠️ CRITICAL: infoText can ONLY connect to ONE beat!
 - ❌ WRONG: infoText with 2+ connections (use movementChoice for branching!)
@@ -116,6 +119,8 @@ const BEAT_TYPE_GUIDE = `
 **durScreen** - Timed auto-advance text
 - Use: Quick transitions, atmosphere, montages
 - Parameters: text, duration (seconds) - NO connection inside parameters!
+- Optional: textVariations (array of alternative texts) - one is randomly selected at runtime
+  Example: { "text": "Time passes...", "textVariations": ["Days go by...", "The hours slip away..."], "duration": 3 }
 - ⚠️ NOTE: durScreen does NOT support backgroundAssetId - use infoText if you need a background
 - ⚠️ CRITICAL: Connection goes in "connections" array at beat level, NOT inside parameters!
 - ❌ WRONG: "parameters": { "text": "...", "duration": 3, "connection": { "target": "beat_5" } }
@@ -460,6 +465,46 @@ Inventory condition example - quantity check (CORRECT format):
 - Connections: Single → continues immediately, timer runs in background
 - Combine with: conditionBeat checking timer expired
 - Example: { "name": "bombTimer", "value": 300, "timerTarget": "beat_explosion" }
+
+### AI RUNTIME BEATS (Require AI service at playback time)
+
+**aiInfoText** - AI-generated contextual text with Continue button
+- Use: Personalized narrative text that adapts to player state
+- Parameters:
+  - prompt: Context/instruction for AI (e.g., "A merchant's reply when player can't afford the item")
+  - fallbackText: Text shown if AI is unavailable (REQUIRED)
+  - buttonText: Continue button label (default: "Continue")
+  - includeVariables: Include player variables in AI context (default: true)
+  - includeInventory: Include player inventory in AI context (default: false)
+  - includeHistory: Include visited beats in AI context (default: false)
+  - maxSentences: Maximum sentences to generate (default: 2)
+  - contextVariables: Specific variable names to include (optional array)
+- Connections: Single → next beat
+- Example: Generate personalized greetings using playerName, or context-aware descriptions
+- ⚠️ Requires AI API key and internet at runtime - always provide good fallbackText!
+
+**aiDurScreen** - AI-generated text with auto-advance based on reading speed
+- Use: Dynamic transitions and atmospheric text that adapts to player state
+- Parameters:
+  - prompt: Context/instruction for AI
+  - fallbackText: Text shown if AI is unavailable (REQUIRED)
+  - includeVariables, includeInventory, includeHistory: Same as aiInfoText
+  - maxSentences: Maximum sentences to generate (default: 2)
+  - contextVariables: Specific variable names to include (optional)
+  - wordsPerMinute: Reading speed for duration calculation (default: 200)
+  - minDuration: Minimum display time in milliseconds (default: 2000)
+  - maxDuration: Maximum display time in milliseconds (default: 15000)
+- Connections: Single → auto-advances after calculated duration
+- Duration formula: (wordCount / wordsPerMinute) × 60 × 1000 ms, clamped to min/max
+- Example: "Three days pass..." that adapts based on what the player accomplished
+
+**aiDialogTree** - AI-generated branching dialogue at runtime
+- Use: Dynamic conversations that adapt to context and player history
+- Creates personalized NPC responses based on player state
+
+**aiSummary** - AI-generated narrative summary
+- Use: Recap the player's journey at endings or checkpoints
+- Summarizes key choices and their consequences
 
 ## Beat Notes (Author Annotations) - USE LIBERALLY!
 
@@ -1503,11 +1548,15 @@ You may use these advanced beat types that leverage AI at runtime:
 - **aiCondition**: AI-driven branching that analyzes player state to determine path
 - **aiDialogTree**: Generate personalized dialog trees at runtime using AI
 - **aiSummary**: Generate a narrative summary of the player's journey at the end
+- **aiInfoText**: Generate contextual 1-2 sentence text using AI based on player state (like infoText but dynamic)
+  Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences
+- **aiDurScreen**: Generate contextual text with automatic duration based on reading speed (like durScreen but dynamic)
+  Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, wordsPerMinute, minDuration, maxDuration
 
 Use these sparingly for dynamic, personalized experiences. They require an AI API key and internet at runtime.`);
   } else {
     parts.push(`🚫 AI-POWERED BEATS DISABLED
-Do NOT use these beat types: onlineContent, aiCondition, aiDialogTree, aiSummary
+Do NOT use these beat types: onlineContent, aiCondition, aiDialogTree, aiSummary, aiInfoText, aiDurScreen
 Use only standard beat types that work offline.`);
   }
 

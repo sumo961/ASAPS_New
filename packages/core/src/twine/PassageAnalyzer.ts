@@ -435,7 +435,7 @@ export class PassageAnalyzer {
       `Total passages: ${result.stats.total}`,
       '',
       'Beat type breakdown:',
-      `  IntroText: ${result.stats.byType.infoText}`,
+      `  InfoText: ${result.stats.byType.infoText}`,
       `  DialogTree: ${result.stats.byType.dialogTree}`,
       `  HyperText: ${result.stats.byType.hyperText}`,
       `  EndScreen: ${result.stats.byType.endScreen}`,
