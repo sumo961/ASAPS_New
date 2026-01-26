@@ -164,7 +164,7 @@ asaps-modern/
 
 #### Visible Beats
 - **Title Screen**: Opening screen with title and author
-- **Intro Text**: Display text with continue button
+- **Info Text**: Display text with continue button
 - **Dialog Tree**: Complex branching conversations
 - **Movement Choice**: Location-based navigation
 - **Pick Prop**: Interactive object selection
