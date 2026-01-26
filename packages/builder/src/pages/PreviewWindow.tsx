@@ -215,6 +215,14 @@ export const PreviewWindow: React.FC = () => {
       return;
     }
 
+    // Check if this is the first beat - no paths needed
+    const firstBeatId = story.getMetadata().firstBeatId;
+    if (startBeatId === firstBeatId) {
+      setGeneratedPresets([]);
+      setSelectedPreset(null);
+      return;
+    }
+
     setIsGeneratingPresets(true);
 
     // Run in a timeout to avoid blocking UI
@@ -223,6 +231,20 @@ export const PreviewWindow: React.FC = () => {
         const result = generatePathPresets(story, startBeatId);
         setGeneratedPresets(result.presets);
         console.log('[PreviewWindow] Generated', result.presets.length, 'presets for beat:', startBeatId);
+
+        // Auto-select first preset if there's only one path
+        if (result.presets.length === 1) {
+          const preset: StatePreset = {
+            ...result.presets[0].preset,
+            id: 'auto_0',
+            createdAt: new Date().toISOString(),
+            modifiedAt: new Date().toISOString(),
+          };
+          setSelectedPreset(preset);
+        } else if (result.presets.length > 0 && !selectedPreset) {
+          // If no preset selected and there are paths, suggest selecting one
+          // Don't auto-select to let user choose
+        }
       } catch (error) {
         console.error('[PreviewWindow] Failed to generate presets:', error);
         setGeneratedPresets([]);
@@ -230,7 +252,16 @@ export const PreviewWindow: React.FC = () => {
         setIsGeneratingPresets(false);
       }
     }, 0);
-  }, [story, startBeatId]);
+  }, [story, startBeatId, selectedPreset]);
+
+  // Auto-generate presets when start beat changes
+  useEffect(() => {
+    // Clear any previously selected preset when beat changes
+    setSelectedPreset(null);
+    if (startBeatId && story) {
+      handleGeneratePresets();
+    }
+  }, [startBeatId, story]); // Note: intentionally not including handleGeneratePresets to avoid loops
 
   // Group presets by outcome for display
   const presetsByOutcome = useMemo(() => {
@@ -701,22 +732,29 @@ export const PreviewWindow: React.FC = () => {
             </div>
           )}
 
-          {/* State Presets dropdown */}
-          {!isRunning && startBeatId && (
+          {/* Path State dropdown - shows how player could arrive at this beat */}
+          {!isRunning && startBeatId && startBeatId !== story.getMetadata().firstBeatId && (
             <div className="relative">
               <button
-                onClick={() => {
-                  if (generatedPresets.length === 0 && !isGeneratingPresets) {
-                    handleGeneratePresets();
-                  }
-                  setShowPresetMenu(!showPresetMenu);
-                }}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-2"
-                title="State presets for testing"
+                onClick={() => setShowPresetMenu(!showPresetMenu)}
+                className={`px-3 py-1.5 text-sm border rounded hover:bg-gray-50 flex items-center gap-2 ${
+                  generatedPresets.length > 0 && !selectedPreset
+                    ? 'border-amber-400 bg-amber-50'
+                    : 'border-gray-300'
+                }`}
+                title="Select how the player arrived at this beat"
               >
                 <Database className="w-3 h-3" />
-                <span className="max-w-32 truncate">
-                  {selectedPreset ? selectedPreset.name : 'State preset'}
+                <span className="max-w-40 truncate">
+                  {isGeneratingPresets ? (
+                    'Analyzing...'
+                  ) : selectedPreset ? (
+                    selectedPreset.name.replace(/^.*? - /, '') // Show just the path part
+                  ) : generatedPresets.length > 0 ? (
+                    `Select path (${generatedPresets.length})`
+                  ) : (
+                    'No paths found'
+                  )}
                 </span>
                 {isGeneratingPresets ? (
                   <RefreshCw className="w-3 h-3 animate-spin" />
@@ -725,30 +763,36 @@ export const PreviewWindow: React.FC = () => {
                 )}
               </button>
               {showPresetMenu && (
-                <div className="absolute left-0 top-full mt-1 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                  {/* Header with refresh button */}
-                  <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-600">
-                      Paths to "{story.getBeat(startBeatId)?.name}"
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleGeneratePresets();
-                      }}
-                      className="p-1 hover:bg-gray-100 rounded"
-                      title="Regenerate presets"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isGeneratingPresets ? 'animate-spin' : ''}`} />
-                    </button>
+                <div className="absolute left-0 top-full mt-1 w-96 max-h-[28rem] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                  {/* Header */}
+                  <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">
+                        How did the player arrive here?
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleGeneratePresets();
+                        }}
+                        className="p-1 hover:bg-gray-200 rounded"
+                        title="Re-analyze paths"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isGeneratingPresets ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Select a path to set variables, counters, and visited beats
+                    </div>
                   </div>
 
-                  {/* No preset option */}
+                  {/* Clean state option */}
                   <button
                     onClick={() => { setSelectedPreset(null); setShowPresetMenu(false); }}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${!selectedPreset ? 'bg-blue-50 text-blue-700' : ''}`}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 border-b border-gray-100 ${!selectedPreset ? 'bg-blue-50 text-blue-700' : ''}`}
                   >
-                    <div className="font-medium">No preset (clean state)</div>
+                    <div className="font-medium">Start fresh (no prior state)</div>
+                    <div className="text-xs text-gray-500">All variables reset, no beats visited</div>
                   </button>
 
                   {isGeneratingPresets ? (
@@ -769,36 +813,79 @@ export const PreviewWindow: React.FC = () => {
                         <div className="px-3 py-1 bg-gray-50 text-xs font-medium text-gray-600 border-t border-gray-200">
                           → {outcome} ({presets.length} {presets.length === 1 ? 'path' : 'paths'})
                         </div>
-                        {presets.map((genPreset, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              // Convert GeneratedPreset to StatePreset format
-                              const preset: StatePreset = {
-                                ...genPreset.preset,
-                                id: `gen_${idx}`,
-                                createdAt: new Date().toISOString(),
-                                modifiedAt: new Date().toISOString(),
-                              };
-                              setSelectedPreset(preset);
-                              setShowPresetMenu(false);
-                            }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
-                              selectedPreset?.name === genPreset.preset.name ? 'bg-blue-50 text-blue-700' : ''
-                            }`}
-                          >
-                            <div className="font-medium truncate">{genPreset.pathDescription}</div>
-                            <div className="text-xs text-gray-500 truncate">
-                              {Object.keys(genPreset.preset.state.variables).length > 0 && (
-                                <span>Vars: {Object.keys(genPreset.preset.state.variables).length} • </span>
+                        {presets.map((genPreset, idx) => {
+                          const { variables, counters, inventory, visitedBeats } = genPreset.preset.state;
+                          const varCount = Object.keys(variables).length;
+                          const counterCount = Object.keys(counters).length;
+                          const invCount = inventory.length;
+
+                          // Build a more informative summary
+                          const summaryParts: string[] = [];
+
+                          // Show actual variable values if few, otherwise count
+                          if (varCount > 0) {
+                            if (varCount <= 2) {
+                              const varStr = Object.entries(variables)
+                                .map(([k, v]) => `${k}=${v}`)
+                                .join(', ');
+                              summaryParts.push(varStr);
+                            } else {
+                              summaryParts.push(`${varCount} vars`);
+                            }
+                          }
+
+                          // Show actual counter values if few, otherwise count
+                          if (counterCount > 0) {
+                            if (counterCount <= 2) {
+                              const counterStr = Object.entries(counters)
+                                .map(([k, v]) => `${k}:${v}`)
+                                .join(', ');
+                              summaryParts.push(counterStr);
+                            } else {
+                              summaryParts.push(`${counterCount} counters`);
+                            }
+                          }
+
+                          // Show actual items if few, otherwise count
+                          if (invCount > 0) {
+                            if (invCount <= 2) {
+                              summaryParts.push(inventory.join(', '));
+                            } else {
+                              summaryParts.push(`${invCount} items`);
+                            }
+                          }
+
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                // Convert GeneratedPreset to StatePreset format
+                                const preset: StatePreset = {
+                                  ...genPreset.preset,
+                                  id: `gen_${idx}`,
+                                  createdAt: new Date().toISOString(),
+                                  modifiedAt: new Date().toISOString(),
+                                };
+                                setSelectedPreset(preset);
+                                setShowPresetMenu(false);
+                              }}
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                                selectedPreset?.name === genPreset.preset.name ? 'bg-blue-50 text-blue-700' : ''
+                              }`}
+                            >
+                              <div className="font-medium truncate">{genPreset.pathDescription}</div>
+                              {summaryParts.length > 0 ? (
+                                <div className="text-xs text-gray-500 truncate mt-0.5">
+                                  {summaryParts.join(' • ')}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-400 italic mt-0.5">
+                                  {visitedBeats.length} beats visited, no state changes
+                                </div>
                               )}
-                              {genPreset.preset.state.inventory.length > 0 && (
-                                <span>Items: {genPreset.preset.state.inventory.length} • </span>
-                              )}
-                              <span>Visited: {genPreset.preset.state.visitedBeats.length}</span>
-                            </div>
-                          </button>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     ))
                   )}

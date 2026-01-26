@@ -864,7 +864,8 @@ export class StateSimulationAnalyzer {
         // Include all beat IDs for this path (for highlighting)
         const pathBeatIds = path.steps.map(s => s.beatId);
 
-        return { decisions, summary, pathBeatIds };
+        // Include full simulated path for preset generation
+        return { decisions, summary, pathBeatIds, simulatedPath: path, finalState: path.finalState };
       });
 
       outcomes.push({
