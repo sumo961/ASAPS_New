@@ -4,6 +4,8 @@ import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
 import { Inspector } from './components/Inspector';
 import { StoryPreview } from './components/preview/StoryPreview';
+import { PreviewWindow } from './pages/PreviewWindow';
+import { previewWindowManager, type PreviewWindowState } from './services/PreviewWindowManager';
 import { GlobalSettingsInspector } from './components/settings/GlobalSettingsInspector';
 import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
@@ -70,10 +72,18 @@ declare global {
 // Helper to check if running in Electron
 const isElectron = () => typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
 
+// Check if we're in the preview window route
+const isPreviewWindowRoute = () => typeof window !== 'undefined' && window.location.hash === '#/preview-window';
+
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
 
 function App() {
+  // If we're in the preview window route, render the standalone preview
+  if (isPreviewWindowRoute()) {
+    return <PreviewWindow />;
+  }
+
   const { state, actions, initializeStory } = useStoryBuilder();
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
   const [beatRefreshKey, setBeatRefreshKey] = useState(0); // Increments to force visual editor refresh
@@ -91,6 +101,7 @@ function App() {
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [showHelperCommands, setShowHelperCommands] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
+  const [previewWindowOpen, setPreviewWindowOpen] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Cluster naming modal state (replaces prompt() for Electron compatibility)
@@ -201,9 +212,17 @@ function App() {
         e.preventDefault();
         setShowHelperCommands(prev => !prev);
       }
-    };
+      };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Subscribe to preview window state changes
+  useEffect(() => {
+    const unsubscribe = previewWindowManager.subscribe((windowState: PreviewWindowState) => {
+      setPreviewWindowOpen(windowState.isOpen);
+    });
+    return unsubscribe;
   }, []);
 
   // Project and global settings
@@ -2628,6 +2647,107 @@ function App() {
     resumeAutoSave();
   }, [resumeAutoSave]);
 
+  // Serialize story data for preview window
+  const getSerializedStoryData = useCallback(() => {
+    // Serialize beats with all their data
+    const serializedBeats = state.beats.map(beat => ({
+      id: beat.id,
+      name: beat.name,
+      type: beat.type,
+      x: beat.x,
+      y: beat.y,
+      parameters: beat.getParameters?.() || {},
+      connections: beat.connections?.map(conn => ({
+        targetId: conn.targetId,
+        label: conn.label,
+        condition: conn.condition,
+      })) || [],
+      locations: beat.locations ? Array.from(beat.locations.values()) : [],
+      animations: beat.animations || [],
+    }));
+
+    return {
+      title: state.title,
+      author: state.author,
+      firstBeatId: state.beats[0]?.id || '0',
+      beats: serializedBeats,
+    };
+  }, [state.beats, state.title, state.author]);
+
+  // Toggle preview window (separate window mode)
+  const handleTogglePreviewWindow = useCallback(() => {
+    if (state.beats.length === 0) {
+      alert('Please add some beats to your story first!');
+      return;
+    }
+
+    if (previewWindowManager.isWindowOpen()) {
+      previewWindowManager.close();
+    } else {
+      // Serialize story data for the preview window
+      const storyData = getSerializedStoryData();
+
+      previewWindowManager.open({
+        storyData,
+        settings: globalSettings,
+        assets: assets,
+        characters: characters,
+        themeAssets: themeAssets,
+        beatId: selectedBeat?.id,
+      });
+    }
+  }, [state.beats, selectedBeat, assets, characters, themeAssets, getSerializedStoryData, globalSettings]);
+
+  // Keyboard shortcut for preview window (Ctrl/Cmd+Shift+P)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        handleTogglePreviewWindow();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleTogglePreviewWindow]);
+
+  // Auto-reload preview window when story changes (debounced)
+  const previewUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    // Only send updates if preview window is open
+    if (!previewWindowOpen) return;
+
+    // Clear any pending update
+    if (previewUpdateTimeoutRef.current) {
+      clearTimeout(previewUpdateTimeoutRef.current);
+    }
+
+    // Debounce updates to avoid flooding
+    previewUpdateTimeoutRef.current = setTimeout(() => {
+      const storyData = getSerializedStoryData();
+      previewWindowManager.sendUpdate({
+        storyData,
+        settings: globalSettings,
+        assets: assets,
+        characters: characters,
+        themeAssets: themeAssets,
+      });
+      console.log('[App] Sent auto-reload update to preview window');
+    }, 300);
+
+    return () => {
+      if (previewUpdateTimeoutRef.current) {
+        clearTimeout(previewUpdateTimeoutRef.current);
+      }
+    };
+  }, [previewWindowOpen, state.beats, state.connections, globalSettings, assets, characters, themeAssets, getSerializedStoryData]);
+
+  // Auto-navigate preview to selected beat
+  useEffect(() => {
+    if (!previewWindowOpen || !selectedBeat) return;
+
+    previewWindowManager.navigateToBeat(selectedBeat.id);
+  }, [previewWindowOpen, selectedBeat]);
+
   // Asset and character handlers
   const handleAssetSelect = useCallback((type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => {
     // Implement asset selection modal
@@ -3448,7 +3568,8 @@ function App() {
         onExportAsmlWithAssets={handleExportAsmlWithAssets}
         onImportZip={handleImportZip}
         onImportTwine={handleImportTwine}
-        onPreview={handlePreview}
+        onPreview={handleTogglePreviewWindow}
+        previewWindowOpen={previewWindowOpen}
         onCharacters={handleOpenCharacterManager}
         onAssets={handleOpenAssetManager}
         onSettings={handleOpenSettings}

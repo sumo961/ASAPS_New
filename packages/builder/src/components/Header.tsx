@@ -37,6 +37,7 @@ interface HeaderProps {
   currentProjectId?: string;
   onMergeDialogTrees?: () => void;
   onHelperCommands?: () => void;
+  previewWindowOpen?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -66,6 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentProjectId,
   onMergeDialogTrees,
   onHelperCommands,
+  previewWindowOpen,
 }) => {
   const { status, lastSaved, error: saveError } = useSave();
   const { load } = useProject();
@@ -451,11 +453,16 @@ export const Header: React.FC<HeaderProps> = ({
 
           {onPreview && (
             <button
-              className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center gap-1.5"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                previewWindowOpen
+                  ? 'bg-green-600 text-white ring-2 ring-green-300 hover:bg-green-700'
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
               onClick={onPreview}
+              title={previewWindowOpen ? 'Preview window open (Cmd+Shift+P to close)' : 'Open preview window (Cmd+Shift+P)'}
             >
               <Play className="w-4 h-4" />
-              Preview
+              {previewWindowOpen ? 'Preview Open' : 'Preview'}
             </button>
           )}
         </div>

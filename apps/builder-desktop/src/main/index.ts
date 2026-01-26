@@ -199,6 +199,7 @@ function checkForUpdatesManually(): void {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let previewWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
 
 function createWindow(): void {
@@ -539,6 +540,82 @@ ipcMain.handle('settings:set-mcp-enabled', async (_, enabled: boolean) => {
     }
   }
   return appSettings.mcpEnabled;
+});
+
+// ============================================================================
+// Preview Window Management
+// ============================================================================
+
+function createPreviewWindow(): void {
+  if (previewWindow && !previewWindow.isDestroyed()) {
+    previewWindow.focus();
+    return;
+  }
+
+  // Get main window position to offset preview window
+  const mainBounds = mainWindow?.getBounds() || { x: 100, y: 100 };
+
+  previewWindow = new BrowserWindow({
+    width: 1200,
+    height: 900,
+    x: mainBounds.x + 50,
+    y: mainBounds.y + 50,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    },
+    title: 'ASAPS Preview',
+    show: false,
+  });
+
+  // Show when ready
+  previewWindow.once('ready-to-show', () => {
+    previewWindow?.show();
+  });
+
+  // Load the preview window route
+  if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) {
+    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+    previewWindow.loadURL(`${devUrl}#/preview-window`);
+  } else {
+    // In production, load with hash route
+    previewWindow.loadFile(join(__dirname, '../../builder/index.html'), {
+      hash: '/preview-window',
+    });
+  }
+
+  // Notify main window when preview is closed
+  previewWindow.on('closed', () => {
+    previewWindow = null;
+    mainWindow?.webContents.send('preview:closed');
+  });
+}
+
+// Preview window IPC handlers
+ipcMain.handle('preview:open', async () => {
+  createPreviewWindow();
+  return true;
+});
+
+ipcMain.handle('preview:close', async () => {
+  if (previewWindow && !previewWindow.isDestroyed()) {
+    previewWindow.close();
+  }
+  return true;
+});
+
+ipcMain.handle('preview:is-open', async () => {
+  return previewWindow !== null && !previewWindow.isDestroyed();
+});
+
+ipcMain.handle('preview:send-message', async (_, message: any) => {
+  if (previewWindow && !previewWindow.isDestroyed()) {
+    previewWindow.webContents.send('preview:message', message);
+    return true;
+  }
+  return false;
 });
 
 // App lifecycle

@@ -78,6 +78,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('menu:auto-arrange', callback);
   },
 
+  // Preview window operations
+  preview: {
+    open: () => ipcRenderer.invoke('preview:open'),
+    close: () => ipcRenderer.invoke('preview:close'),
+    isOpen: () => ipcRenderer.invoke('preview:is-open'),
+    sendMessage: (message: any) => ipcRenderer.invoke('preview:send-message', message),
+  },
+  onPreviewMessage: (callback: (message: any) => void) => {
+    const handler = (_: unknown, message: any) => callback(message);
+    ipcRenderer.on('preview:message', handler);
+    return () => ipcRenderer.removeListener('preview:message', handler);
+  },
+  onPreviewClosed: (callback: () => void) => {
+    ipcRenderer.on('preview:closed', callback);
+    return () => ipcRenderer.removeListener('preview:closed', callback);
+  },
+
   // Platform info
   platform: process.platform,
   isElectron: true,
@@ -120,6 +137,14 @@ declare global {
       onMenuAutoArrange: (callback: () => void) => () => void;
       onProjectOpen: (callback: (path: string) => void) => () => void;
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
+      preview: {
+        open: () => Promise<boolean>;
+        close: () => Promise<boolean>;
+        isOpen: () => Promise<boolean>;
+        sendMessage: (message: any) => Promise<boolean>;
+      };
+      onPreviewMessage: (callback: (message: any) => void) => () => void;
+      onPreviewClosed: (callback: () => void) => () => void;
       platform: NodeJS.Platform;
       isElectron: boolean;
     };
