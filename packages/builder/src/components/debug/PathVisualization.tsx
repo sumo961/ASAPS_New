@@ -4,6 +4,7 @@ import {
   Story,
   ConstraintPathAnalyzer,
   BackwardAnalyzer,
+  StateSimulationAnalyzer,
   PathQueryEngine,
   constraintSetToStrings,
 } from '@asaps/core';
@@ -31,41 +32,39 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   const [selectedBackwardBeat, setSelectedBackwardBeat] = useState<string | null>(null);
   const [expandedBackwardPath, setExpandedBackwardPath] = useState<number | null>(null);
 
-  // Run constraint-based path analysis
-  const analysisResult = useMemo<ConstraintPathResult | null>(() => {
-    try {
-      const analyzer = new ConstraintPathAnalyzer(story, {
-        maxOutcomes: 500,
-        maxDepth: 100,
-        maxConstraintSets: 50,
-      });
-      return analyzer.analyze();
-    } catch (error) {
-      console.error('[PathVisualization] Constraint analysis error:', error);
-      return null;
-    }
+  // Use state-based simulation analyzer for more accurate path analysis
+  const simulationAnalyzer = useMemo(() => {
+    return new StateSimulationAnalyzer(story, {
+      maxDepth: 200,
+      maxPaths: 500,
+    });
   }, [story]);
 
-  // Get backward analyzer for the story
-  const backwardAnalyzer = useMemo(() => {
-    return new BackwardAnalyzer(story);
-  }, [story]);
+  // Run state-based path analysis (forward)
+  const analysisResult = useMemo<ConstraintPathResult | null>(() => {
+    try {
+      return simulationAnalyzer.analyze();
+    } catch (error) {
+      console.error('[PathVisualization] Simulation analysis error:', error);
+      return null;
+    }
+  }, [simulationAnalyzer]);
 
   // Get endings for backward analysis
   const endings = useMemo(() => {
-    return backwardAnalyzer.getEndings();
-  }, [backwardAnalyzer]);
+    return simulationAnalyzer.getEndings();
+  }, [simulationAnalyzer]);
 
   // Run backward analysis when a beat is selected
   const backwardResult = useMemo<BackwardAnalysisResult | null>(() => {
     if (!selectedBackwardBeat) return null;
     try {
-      return backwardAnalyzer.analyzeBackward(selectedBackwardBeat);
+      return simulationAnalyzer.analyzeBackward(selectedBackwardBeat);
     } catch (error) {
       console.error('[PathVisualization] Backward analysis error:', error);
       return null;
     }
-  }, [backwardAnalyzer, selectedBackwardBeat]);
+  }, [simulationAnalyzer, selectedBackwardBeat]);
 
   // Query engine for filtering outcomes
   const queryEngine = useMemo(() => {
@@ -96,7 +95,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
     return beat ? beat.name : beatId;
   };
 
-  // Forward: Handle outcome click - highlight path
+  // Forward: Handle outcome click - highlight ALL beats from ALL path variations
   const handleOutcomeClick = (index: number, outcome: OutcomeGroup) => {
     const isDeselecting = selectedOutcome === index;
     setSelectedOutcome(isDeselecting ? null : index);
@@ -104,8 +103,26 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
     if (isDeselecting) {
       onHighlightPath?.([]);
     } else {
-      const beatIds = outcome.representativePath.map(step => step.beatId);
-      onHighlightPath?.(beatIds);
+      // Collect all unique beat IDs from all path variations
+      const allBeatIds = new Set<string>();
+
+      // Add beats from representative path
+      for (const step of outcome.representativePath) {
+        allBeatIds.add(step.beatId);
+      }
+
+      // Add beats from all path variations (if available)
+      if (outcome.pathVariations) {
+        for (const variation of outcome.pathVariations) {
+          if (variation.pathBeatIds) {
+            for (const beatId of variation.pathBeatIds) {
+              allBeatIds.add(beatId);
+            }
+          }
+        }
+      }
+
+      onHighlightPath?.(Array.from(allBeatIds));
     }
   };
 
@@ -451,37 +468,26 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                           </div>
                         )}
 
-                        {/* Show OR alternatives if multiple constraint sets */}
-                        {outcome.constraintSets.length > 1 && (
+                        {/* Show path variations if multiple paths lead to this ending */}
+                        {outcome.pathVariations && outcome.pathVariations.length > 1 && (
                           <div className="py-2 border-b border-gray-200 mb-2">
-                            <div className="text-xs text-gray-500 mb-1">
-                              Alternative paths ({outcome.constraintSets.length} variations):
+                            <div className="text-xs text-gray-500 mb-2">
+                              Path variations ({outcome.pathVariations.length} different orderings):
                             </div>
-                            <div className="space-y-2">
-                              {outcome.constraintSets.slice(0, 3).map((cs, csIndex) => {
-                                const csStrings = getFilteredConstraints(constraintSetToStrings(cs));
-                                if (csStrings.length === 0) return null;
-                                return (
-                                  <div key={csIndex} className="flex items-start gap-2">
-                                    <span className="text-xs text-gray-400 flex-shrink-0">
-                                      {csIndex === 0 ? 'IF' : 'OR'}
-                                    </span>
-                                    <div className="flex flex-wrap gap-1">
-                                      {csStrings.slice(0, 4).map((c, ci) => (
-                                        <span key={ci} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
-                                          {c}
-                                        </span>
-                                      ))}
-                                      {csStrings.length > 4 && (
-                                        <span className="text-xs text-gray-400">+{csStrings.length - 4} more</span>
-                                      )}
-                                    </div>
+                            <div className="space-y-1 max-h-40 overflow-y-auto">
+                              {outcome.pathVariations.slice(0, 10).map((variation, vIndex) => (
+                                <div key={vIndex} className="flex items-start gap-2">
+                                  <span className="text-xs text-gray-400 flex-shrink-0 w-4">
+                                    {vIndex + 1}.
+                                  </span>
+                                  <div className="text-xs text-gray-600 break-words">
+                                    {variation.summary || 'Direct path'}
                                   </div>
-                                );
-                              })}
-                              {outcome.constraintSets.length > 3 && (
-                                <div className="text-xs text-gray-400">
-                                  +{outcome.constraintSets.length - 3} more variations...
+                                </div>
+                              ))}
+                              {outcome.pathVariations.length > 10 && (
+                                <div className="text-xs text-gray-400 pl-6">
+                                  +{outcome.pathVariations.length - 10} more variations...
                                 </div>
                               )}
                             </div>

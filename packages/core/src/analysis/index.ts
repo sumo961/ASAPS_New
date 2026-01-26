@@ -4,6 +4,15 @@
 export { ConstraintPathAnalyzer } from './ConstraintPathAnalyzer';
 export { BackwardAnalyzer } from './BackwardAnalyzer';
 export { PathQueryEngine } from './PathQuery';
+
+// State-based simulation analysis (improved path finding)
+export { StateSimulationAnalyzer } from './StateSimulationAnalyzer';
+export type {
+  SimulationState,
+  SimulatedStep,
+  SimulatedPath,
+  SimulationAnalysisConfig,
+} from './StateSimulationAnalyzer';
 export type {
   ConstraintAnalysisConfig,
 } from './ConstraintPathAnalyzer';
@@ -11,6 +20,7 @@ export type {
   ConstraintSet,
   OutcomeGroup,
   PathStep,
+  PathVariation,
   ConstraintPathResult,
   NumericRange,
   ValueConstraint,

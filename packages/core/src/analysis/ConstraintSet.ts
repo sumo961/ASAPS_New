@@ -50,6 +50,18 @@ export interface ConstraintSet {
 }
 
 /**
+ * Summary of a path variation's decisions
+ */
+export interface PathVariation {
+  decisions: Array<{
+    beatName: string;
+    choice: string;
+  }>;
+  summary: string; // Human-readable summary like "A → B → C"
+  pathBeatIds?: string[]; // All beat IDs visited on this path (for highlighting)
+}
+
+/**
  * Represents an outcome group - paths that end at the same beat
  */
 export interface OutcomeGroup {
@@ -59,6 +71,9 @@ export interface OutcomeGroup {
 
   // Different constraint sets that can lead to this ending (disjunction)
   constraintSets: ConstraintSet[];
+
+  // Path variations - summaries of different decision sequences leading to this ending
+  pathVariations?: PathVariation[];
 
   // Representative path for visualization (one example)
   representativePath: PathStep[];
