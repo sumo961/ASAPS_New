@@ -4,7 +4,7 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASAPS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.9)
+## ⚠️ Development Status (v0.9.10)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
@@ -26,7 +26,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Beat Notes | Author annotations for beats (not shown to players) (v0.9.6) |
 | Timer Progress Bar | Visual timer for default target delays (v0.9.6) |
 | Visual Inventory System | Interactor-facing inventory display with configurable HUD overlay (v0.9.6) |
-| Path Analysis | Work in progress - may show extra paths for complex branching stories |
+| Path Analysis | **Improved in v0.9.10**: New StateSimulationAnalyzer for accurate hub-and-spoke patterns |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
@@ -309,6 +309,14 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.10 (2026-01-26)
+- **Improved Path Analysis**: New StateSimulationAnalyzer for accurate hub-and-spoke story patterns
+  - Simulates actual gameplay with full state tracking
+  - Correctly handles patterns where players visit multiple locations in any order
+  - Finds all valid orderings (e.g., 24 orderings × 4 endings = 96 paths)
+  - Properly highlights condition-gated beats (e.g., `beat_incomplete`)
+- **ASML Fix**: Parse `<connection>` elements within titleScreen beats
 
 ### v0.9.9 (2026-01-25)
 - **Transformation Commands**: Bulk rename/delete/merge operations for characters, variables, and beats
