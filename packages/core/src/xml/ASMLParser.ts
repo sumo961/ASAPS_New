@@ -1664,7 +1664,7 @@ export class ASMLParser {
 
     // Parse nested elements based on beat type
     switch (beatType) {
-      case 'titleScreen':
+      case 'titleScreen': {
         // Parse titleScreen-specific elements
         const titleEl = functionElement.querySelector('title');
         if (titleEl) {
@@ -1675,8 +1675,13 @@ export class ASMLParser {
           parameters.author = authorEl.textContent || '';
         }
         // Button text parsed below in generic section
-        // Connection handled at end via <target> element
+        // Parse connection element if present
+        const titleConnectionEl = functionElement.querySelector('connection');
+        if (titleConnectionEl) {
+          connections.push(this.parseConnection(titleConnectionEl));
+        }
         break;
+      }
 
       case 'durScreen':
         // Parse durScreen-specific elements
