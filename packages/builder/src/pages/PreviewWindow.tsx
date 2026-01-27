@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
-import type { StatePreset } from '@asaps/core';
+import type { StatePreset, IAIService } from '@asaps/core';
 import { ReactRenderer, getAudioManager } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -16,10 +16,226 @@ import type { PreviewMessage, SerializedStoryData } from '../services/PreviewWin
 import type { Asset } from '../components/assets/AssetManager';
 import type { Character } from '../types/character';
 import { generatePathPresets, groupPresetsByOutcome, type GeneratedPreset } from '../services/PathBasedPresetGenerator';
+import { getSavedAIConfig } from '../hooks/useAI';
+import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
+import { buildChatRequestBody } from '../services/providers/openai-utils';
 
 // Stage dimensions (matching StoryPreview)
 const STAGE_WIDTH = 1024;
 const STAGE_HEIGHT = 768;
+
+// Proxy endpoint for CORS-blocked requests (custom baseUrls)
+const CLAUDE_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/claude';
+const OPENAI_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/openai';
+
+/**
+ * Strip thinking/reasoning blocks from AI responses.
+ */
+function stripThinkingBlocks(text: string): string {
+  let result = text;
+  result = result.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  result = result.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+  result = result.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '');
+  result = result.replace(/^\s+/, '').replace(/\s+$/, '');
+  result = result.replace(/\n{3,}/g, '\n\n');
+  return result;
+}
+
+/**
+ * Make a proxied request to avoid CORS issues with custom API endpoints
+ */
+async function makeProxyRequest(
+  endpoint: string,
+  baseUrl: string,
+  apiKey: string,
+  requestBody: any
+): Promise<any> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ baseUrl, apiKey, ...requestBody }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Proxy request failed' }));
+    throw new Error(error.message || 'Proxy request failed');
+  }
+
+  return response.json();
+}
+
+/**
+ * Create an AI service adapter that implements IAIService interface
+ */
+function createAIServiceAdapter(): IAIService | null {
+  const savedConfig = getSavedAIConfig();
+  if (!savedConfig || !savedConfig.apiKey) {
+    console.log('[PreviewWindow] No AI configuration found');
+    return null;
+  }
+
+  console.log('[PreviewWindow] Creating AI service adapter for provider:', savedConfig.provider);
+  const useProxy = !!savedConfig.baseUrl;
+
+  if (savedConfig.provider === 'claude') {
+    const model = savedConfig.model || 'claude-sonnet-4-20250514';
+    const client = !useProxy ? new Anthropic({
+      apiKey: savedConfig.apiKey,
+      dangerouslyAllowBrowser: true,
+    }) : null;
+
+    return {
+      async generateContent(prompt: string, options?: { maxTokens?: number }): Promise<string> {
+        const requestBody = {
+          model,
+          max_tokens: options?.maxTokens || 4096,
+          messages: [{ role: 'user' as const, content: prompt }],
+        };
+
+        let response;
+        if (useProxy) {
+          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+        } else {
+          const apiResponse = await client!.messages.create(requestBody);
+          response = { content: apiResponse.content };
+        }
+
+        const content = response.content[0];
+        if (content.type === 'text') return content.text;
+        throw new Error('Unexpected response type from Claude');
+      },
+
+      async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
+        const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.`;
+        const requestBody = {
+          model,
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user' as const, content: request.prompt }],
+        };
+
+        let response;
+        if (useProxy) {
+          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+        } else {
+          const apiResponse = await client!.messages.create(requestBody as any);
+          response = { content: apiResponse.content };
+        }
+
+        const content = response.content[0];
+        if (content.type !== 'text') throw new Error('Unexpected response type from Claude');
+        const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not extract JSON from response');
+        return JSON.parse(jsonMatch[0]);
+      },
+
+      async classifyContent(prompt: string, categories: string[]): Promise<string> {
+        const systemPrompt = `You are a classifier. Classify into ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name.`;
+        const requestBody = {
+          model,
+          max_tokens: 100,
+          system: systemPrompt,
+          messages: [{ role: 'user' as const, content: prompt }],
+        };
+
+        let response;
+        if (useProxy) {
+          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+        } else {
+          const apiResponse = await client!.messages.create(requestBody as any);
+          response = { content: apiResponse.content };
+        }
+
+        const content = response.content[0];
+        if (content.type === 'text') {
+          const result = content.text.trim();
+          const match = categories.find(c => c.toLowerCase() === result.toLowerCase());
+          return match || categories[0];
+        }
+        return categories[0];
+      },
+    };
+  } else {
+    // OpenAI provider
+    const model = savedConfig.model || 'gpt-4';
+    const client = !useProxy ? new OpenAI({
+      apiKey: savedConfig.apiKey,
+      dangerouslyAllowBrowser: true,
+    }) : null;
+
+    return {
+      async generateContent(prompt: string, options?: { maxTokens?: number }): Promise<string> {
+        const requestBody = buildChatRequestBody(
+          model,
+          [{ role: 'user' as const, content: prompt }],
+          options?.maxTokens || 4096
+        );
+
+        let content: string;
+        if (useProxy) {
+          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+          content = response.choices?.[0]?.message?.content || '';
+        } else {
+          const response = await client!.chat.completions.create(requestBody as any);
+          content = response.choices[0]?.message?.content || '';
+        }
+        return stripThinkingBlocks(content);
+      },
+
+      async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
+        const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.`;
+        const requestBody = buildChatRequestBody(
+          model,
+          [
+            { role: 'system' as const, content: systemPrompt },
+            { role: 'user' as const, content: request.prompt },
+          ],
+          4096
+        );
+
+        let content: string;
+        if (useProxy) {
+          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+          content = response.choices?.[0]?.message?.content || '';
+        } else {
+          const response = await client!.chat.completions.create(requestBody as any);
+          content = response.choices[0]?.message?.content || '';
+        }
+
+        content = stripThinkingBlocks(content);
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not extract JSON from response');
+        return JSON.parse(jsonMatch[0]);
+      },
+
+      async classifyContent(prompt: string, categories: string[]): Promise<string> {
+        const systemPrompt = `You are a classifier. Classify into ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name.`;
+        const requestBody = buildChatRequestBody(
+          model,
+          [
+            { role: 'system' as const, content: systemPrompt },
+            { role: 'user' as const, content: prompt },
+          ],
+          100
+        );
+
+        let result: string;
+        if (useProxy) {
+          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+          result = (response.choices?.[0]?.message?.content || '').trim();
+        } else {
+          const response = await client!.chat.completions.create(requestBody as any);
+          result = (response.choices[0]?.message?.content || '').trim();
+        }
+
+        result = stripThinkingBlocks(result);
+        const match = categories.find(c => c.toLowerCase() === result.toLowerCase());
+        return match || categories[0];
+      },
+    };
+  }
+}
 
 interface PreviewData {
   storyData?: SerializedStoryData;
@@ -358,9 +574,44 @@ export const PreviewWindow: React.FC = () => {
         };
       });
 
+      // Set up sprite data resolver for character spritesheets
+      if (previewData.characters && previewData.characters.length > 0) {
+        (reactRenderer as any).setSpriteDataResolver?.((characterId: string) => {
+          const character = previewData.characters?.find(c => c.id === characterId);
+          if (!character || character.visual.type !== 'sprite' || !character.visual.spriteSheet) {
+            return null;
+          }
+
+          const sheet = character.visual.spriteSheet;
+          return {
+            frameWidth: sheet.frameWidth,
+            frameHeight: sheet.frameHeight,
+            imageWidth: sheet.imageWidth,
+            defaultFrame: 0,
+            animations: sheet.animations?.map(a => ({
+              name: a.name,
+              frames: a.frames,
+              frameDuration: a.frameDuration,
+              loop: a.loop,
+            })),
+            activeAnimation: undefined,
+          };
+        });
+        console.log('[PreviewWindow] Sprite data resolver set up');
+      }
+
       const engine = new StoryEngine(reactRenderer as any);
       rendererRef.current = reactRenderer;
       engineRef.current = engine;
+
+      // Set up AI service for AI-powered beats
+      const aiServiceAdapter = createAIServiceAdapter();
+      if (aiServiceAdapter) {
+        reactRenderer.setState('aiService', aiServiceAdapter);
+        console.log('[PreviewWindow] AI service adapter configured for runtime AI beats');
+      } else {
+        console.log('[PreviewWindow] No AI configuration found - AI beats will show fallback messages');
+      }
     }
 
     // Apply theme
