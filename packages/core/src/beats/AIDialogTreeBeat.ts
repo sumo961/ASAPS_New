@@ -31,6 +31,9 @@ export interface AIDialogTreeBeatParams {
   /** Include visited beats in context */
   includeVisitedBeats?: boolean;
 
+  /** Include rich choice history in context */
+  includeChoiceHistory?: boolean;
+
   /** Maximum conversation turns */
   maxTurns?: number;
 
@@ -68,6 +71,7 @@ export class AIDialogTreeBeat extends Beat {
   public includeVariables: boolean;
   public includeInventory: boolean;
   public includeVisitedBeats: boolean;
+  public includeChoiceHistory: boolean;
   public maxTurns: number;
   public presentationMode: 'positioned' | 'chat-scroll' | 'chat-bubble';
   public showAvatars: boolean;
@@ -91,6 +95,7 @@ export class AIDialogTreeBeat extends Beat {
     this.includeVariables = params.includeVariables ?? config.includeVariables ?? true;
     this.includeInventory = params.includeInventory ?? config.includeInventory ?? true;
     this.includeVisitedBeats = params.includeVisitedBeats ?? config.includeVisitedBeats ?? true;
+    this.includeChoiceHistory = params.includeChoiceHistory ?? config.includeChoiceHistory ?? true;
     this.maxTurns = params.maxTurns || config.maxTurns || 3;
     this.presentationMode = params.presentationMode || config.presentationMode || 'positioned';
     this.showAvatars = params.showAvatars ?? config.showAvatars ?? true;
@@ -107,6 +112,7 @@ export class AIDialogTreeBeat extends Beat {
       includeVariables: this.includeVariables,
       includeInventory: this.includeInventory,
       includeVisitedBeats: this.includeVisitedBeats,
+      includeChoiceHistory: this.includeChoiceHistory,
       maxTurns: this.maxTurns,
       presentationMode: this.presentationMode,
       showAvatars: this.showAvatars,
@@ -123,6 +129,7 @@ export class AIDialogTreeBeat extends Beat {
     if (params.includeVariables !== undefined) this.includeVariables = params.includeVariables;
     if (params.includeInventory !== undefined) this.includeInventory = params.includeInventory;
     if (params.includeVisitedBeats !== undefined) this.includeVisitedBeats = params.includeVisitedBeats;
+    if (params.includeChoiceHistory !== undefined) this.includeChoiceHistory = params.includeChoiceHistory;
     if (params.maxTurns !== undefined) this.maxTurns = params.maxTurns;
     if (params.presentationMode !== undefined) this.presentationMode = params.presentationMode;
     if (params.showAvatars !== undefined) this.showAvatars = params.showAvatars;
@@ -260,6 +267,15 @@ export class AIDialogTreeBeat extends Beat {
       ...Object.entries(counters).map(([k, v]) => `${k}:${v}`),
     ];
 
+    // Include choice history if enabled
+    if (this.includeChoiceHistory) {
+      const choiceHistory = context.getChoiceHistory();
+      if (choiceHistory.length > 0) {
+        const choiceKeys = choiceHistory.map(c => `${c.beatId}:${c.choiceText}`);
+        keyValues.push(`choices:${choiceKeys.join(',')}`);
+      }
+    }
+
     return keyValues.join('|');
   }
 
@@ -274,6 +290,7 @@ export class AIDialogTreeBeat extends Beat {
       includeVariables: this.includeVariables,
       includeInventory: this.includeInventory,
       includeHistory: this.includeVisitedBeats,
+      includeChoiceHistory: this.includeChoiceHistory,
     });
 
     // Build exit target descriptions

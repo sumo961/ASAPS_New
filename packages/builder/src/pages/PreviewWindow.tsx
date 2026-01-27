@@ -745,11 +745,13 @@ export const PreviewWindow: React.FC = () => {
       const engine = new StoryEngine(reactRenderer as any);
       rendererRef.current = reactRenderer;
       engineRef.current = engine;
+    }
 
-      // Set up AI service for AI-powered beats
+    // Set up AI service for AI-powered beats (update on every previewData change)
+    if (rendererRef.current) {
       const aiServiceAdapter = createAIServiceAdapter();
       if (aiServiceAdapter) {
-        reactRenderer.setState('aiService', aiServiceAdapter);
+        rendererRef.current.setState('aiService', aiServiceAdapter);
         console.log('[PreviewWindow] AI service adapter configured for runtime AI beats');
       } else {
         console.log('[PreviewWindow] No AI configuration found - AI beats will show fallback messages');
@@ -767,7 +769,7 @@ export const PreviewWindow: React.FC = () => {
           description: c.description || '',
         })) || [],
       };
-      reactRenderer.setState('storyContext', storyContext);
+      rendererRef.current.setState('storyContext', storyContext);
       console.log('[PreviewWindow] Story context set for AI beats:', {
         title: storyContext.title,
         characterCount: storyContext.characters.length,

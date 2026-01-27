@@ -220,6 +220,7 @@ export class AISummaryBeat extends Beat {
     const journeySummary = contextBuilder.buildJourneySummary({
       includeVariables: this.includeVariables,
       includeCounters: this.includeCounters,
+      includeChoiceHistory: this.includeAllChoices,
     });
 
     // Determine strict word limits (500 max for long, much less for shorter)

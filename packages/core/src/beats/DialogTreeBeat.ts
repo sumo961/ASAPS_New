@@ -462,6 +462,17 @@ export class DialogTreeBeat extends Beat {
         }
 
         if (selectedChoice) {
+          // Record this choice for AI context
+          context.recordChoice({
+            beatId: this.id,
+            beatName: this.name || this.id,
+            beatType: 'dialogTree',
+            choiceText: selectedChoice.text,
+            choiceContext: this.currentNode?.text
+              ? `${this.currentNode.speaker || 'NPC'}: "${this.currentNode.text.substring(0, 100)}${this.currentNode.text.length > 100 ? '...' : ''}"`
+              : this.name || 'Dialog choice',
+          });
+
           // Apply effects from the selected choice
           if (selectedChoice.effects) {
             selectedChoice.effects.forEach(effect => context.applyEffect(effect));

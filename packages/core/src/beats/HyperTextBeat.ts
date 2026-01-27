@@ -159,6 +159,15 @@ export class HyperTextBeat extends Beat {
     const selectedLink = this.hyperlinks.find(link => link.targetBeatId === selectedTargetId);
     
     if (selectedLink) {
+      // Record this choice for AI context
+      context.recordChoice({
+        beatId: this.id,
+        beatName: this.name || this.id,
+        beatType: 'hyperText',
+        choiceText: `Clicked "${selectedLink.word}"`,
+        choiceContext: this.text.length > 100 ? this.text.substring(0, 100) + '...' : this.text,
+      });
+
       // Add the connection dynamically if it doesn't exist
       if (!this.hasConnection(selectedTargetId)) {
         this.addConnection({
@@ -166,7 +175,7 @@ export class HyperTextBeat extends Beat {
           label: selectedLink.word
         });
       }
-      
+
       return selectedTargetId;
     }
 

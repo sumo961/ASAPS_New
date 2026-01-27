@@ -1038,6 +1038,12 @@
           "default": true,
           "description": "Include counters in evaluation"
         },
+        "evaluateChoiceHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include rich choice history in evaluation (what choices were made)"
+        },
         "fallbackTarget": {
           "type": "string",
           "required": false,
@@ -1113,6 +1119,12 @@
           "required": false,
           "default": true,
           "description": "Include visited beats in context"
+        },
+        "includeChoiceHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include rich choice history in context (what choices were made)"
         },
         "maxTurns": {
           "type": "number",
@@ -1304,6 +1316,18 @@
           "default": false,
           "description": "Include visited beats in context"
         },
+        "includeCounters": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include counters in context"
+        },
+        "includeChoiceHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include rich choice history in context (what choices were made)"
+        },
         "maxSentences": {
           "type": "number",
           "required": false,
@@ -1396,6 +1420,18 @@
           "required": false,
           "default": false,
           "description": "Include visited beats in context"
+        },
+        "includeCounters": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include counters in context"
+        },
+        "includeChoiceHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include rich choice history in context (what choices were made)"
         },
         "maxSentences": {
           "type": "number",

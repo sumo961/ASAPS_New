@@ -20,6 +20,12 @@ export interface AIInfoTextBeatParams {
   /** Include visited beats in context */
   includeHistory?: boolean;
 
+  /** Include counters in context */
+  includeCounters?: boolean;
+
+  /** Include rich choice history in context */
+  includeChoiceHistory?: boolean;
+
   /** Maximum sentences to generate (default: 2) */
   maxSentences?: number;
 
@@ -45,6 +51,8 @@ export class AIInfoTextBeat extends Beat {
   public includeVariables: boolean;
   public includeInventory: boolean;
   public includeHistory: boolean;
+  public includeCounters: boolean;
+  public includeChoiceHistory: boolean;
   public maxSentences: number;
   public fallbackText: string;
   public buttonText: string;
@@ -69,6 +77,8 @@ export class AIInfoTextBeat extends Beat {
     this.includeVariables = params.includeVariables ?? config.includeVariables ?? true;
     this.includeInventory = params.includeInventory ?? config.includeInventory ?? false;
     this.includeHistory = params.includeHistory ?? config.includeHistory ?? false;
+    this.includeCounters = params.includeCounters ?? config.includeCounters ?? true;
+    this.includeChoiceHistory = params.includeChoiceHistory ?? config.includeChoiceHistory ?? true;
     this.maxSentences = params.maxSentences || config.maxSentences || 2;
     this.fallbackText = params.fallbackText || config.fallbackText || 'Continue...';
     this.buttonText = params.buttonText || config.buttonText || 'Continue';
@@ -81,6 +91,8 @@ export class AIInfoTextBeat extends Beat {
       includeVariables: this.includeVariables,
       includeInventory: this.includeInventory,
       includeHistory: this.includeHistory,
+      includeCounters: this.includeCounters,
+      includeChoiceHistory: this.includeChoiceHistory,
       maxSentences: this.maxSentences,
       fallbackText: this.fallbackText,
       buttonText: this.buttonText,
@@ -93,6 +105,8 @@ export class AIInfoTextBeat extends Beat {
     if (params.includeVariables !== undefined) this.includeVariables = params.includeVariables;
     if (params.includeInventory !== undefined) this.includeInventory = params.includeInventory;
     if (params.includeHistory !== undefined) this.includeHistory = params.includeHistory;
+    if (params.includeCounters !== undefined) this.includeCounters = params.includeCounters;
+    if (params.includeChoiceHistory !== undefined) this.includeChoiceHistory = params.includeChoiceHistory;
     if (params.maxSentences !== undefined) this.maxSentences = params.maxSentences;
     if (params.fallbackText !== undefined) this.fallbackText = params.fallbackText;
     if (params.buttonText !== undefined) this.buttonText = params.buttonText;
@@ -185,9 +199,11 @@ export class AIInfoTextBeat extends Beat {
       }
     }
 
-    // Include counters
-    for (const [key, value] of Object.entries(counters)) {
-      keyValues.push(`counter:${key}:${value}`);
+    // Include counters if enabled
+    if (this.includeCounters) {
+      for (const [key, value] of Object.entries(counters)) {
+        keyValues.push(`counter:${key}:${value}`);
+      }
     }
 
     // Include inventory if enabled
@@ -198,6 +214,15 @@ export class AIInfoTextBeat extends Beat {
     // Include history if enabled
     if (this.includeHistory && visitedBeats.length > 0) {
       keyValues.push(`history:${visitedBeats.join(',')}`);
+    }
+
+    // Include choice history if enabled
+    if (this.includeChoiceHistory) {
+      const choiceHistory = context.getChoiceHistory();
+      if (choiceHistory.length > 0) {
+        const choiceKeys = choiceHistory.map(c => `${c.beatId}:${c.choiceText}`);
+        keyValues.push(`choices:${choiceKeys.join(',')}`);
+      }
     }
 
     return keyValues.join('|');
@@ -248,11 +273,13 @@ export class AIInfoTextBeat extends Beat {
         }
       }
       filteredContext = `Variables: ${JSON.stringify(filtered)}`;
-      if (this.includeInventory) {
+      if (this.includeInventory || this.includeCounters || this.includeChoiceHistory) {
         filteredContext += '\n' + contextBuilder.buildPromptContext({
           includeVariables: false,
-          includeInventory: true,
+          includeInventory: this.includeInventory,
           includeHistory: this.includeHistory,
+          includeCounters: this.includeCounters,
+          includeChoiceHistory: this.includeChoiceHistory,
         });
       }
     } else {
@@ -260,6 +287,8 @@ export class AIInfoTextBeat extends Beat {
         includeVariables: this.includeVariables,
         includeInventory: this.includeInventory,
         includeHistory: this.includeHistory,
+        includeCounters: this.includeCounters,
+        includeChoiceHistory: this.includeChoiceHistory,
       });
     }
 
@@ -269,13 +298,13 @@ export class AIInfoTextBeat extends Beat {
     const inventory = context.getInventory();
 
     const availableData: string[] = [];
-    if (Object.keys(variables).length > 0) {
+    if (this.includeVariables && Object.keys(variables).length > 0) {
       availableData.push(`Variables: ${Object.keys(variables).join(', ')}`);
     }
-    if (Object.keys(counters).length > 0) {
+    if (this.includeCounters && Object.keys(counters).length > 0) {
       availableData.push(`Counters: ${Object.keys(counters).join(', ')}`);
     }
-    if (inventory.length > 0) {
+    if (this.includeInventory && inventory.length > 0) {
       availableData.push(`Inventory items: ${inventory.join(', ')}`);
     }
 

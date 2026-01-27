@@ -11,6 +11,19 @@ export interface InventoryEntry {
   quantity: number;
 }
 
+/**
+ * Rich choice record for AI context
+ * Captures what choice was made, not just which beat was visited
+ */
+export interface ChoiceRecord {
+  beatId: string;
+  beatName?: string;
+  beatType?: string;
+  choiceText: string;      // What the player clicked (e.g., "Take the bike")
+  choiceContext?: string;  // The question/prompt (e.g., "How will you travel?")
+  timestamp: number;
+}
+
 interface StoryState {
   currentBeatId: string;
   variables: Record<string, any>;
@@ -34,6 +47,7 @@ export interface SerializedStoryState {
   visitedBeats: string[]; // Array instead of Set for JSON serialization
   timers: Record<string, { value: number; target?: string }>;
   history: string[]; // Include beat history for proper restoration
+  choiceHistory?: ChoiceRecord[]; // Rich choice tracking for AI context
 }
 
 /**
@@ -77,6 +91,7 @@ interface AISuggestion {
 export class StoryContext extends EventEmitter {
   private state: StoryState;
   private history: string[] = [];
+  private choiceHistory: ChoiceRecord[] = [];
   private story?: Story;
   private timerManager: TimerManager;
 
@@ -432,6 +447,31 @@ export class StoryContext extends EventEmitter {
     this.history.push(beatId);
   }
 
+  /**
+   * Record a player choice for rich AI context
+   * Called by choice beats (DialogTree, MovementChoice, PickProp, HyperText)
+   */
+  recordChoice(choice: Omit<ChoiceRecord, 'timestamp'>): void {
+    this.choiceHistory.push({
+      ...choice,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Get the rich choice history for AI prompts
+   */
+  getChoiceHistory(): ChoiceRecord[] {
+    return [...this.choiceHistory];
+  }
+
+  /**
+   * Get recent choices (for context-limited AI prompts)
+   */
+  getRecentChoices(limit: number = 10): ChoiceRecord[] {
+    return this.choiceHistory.slice(-limit);
+  }
+
   private resolveValue(ref: string | undefined): any {
     if (!ref) {
       return undefined;
@@ -497,6 +537,7 @@ export class StoryContext extends EventEmitter {
       timers: {}
     };
     this.history = [];
+    this.choiceHistory = [];
     this.emit('reset');
   }
 
@@ -734,7 +775,8 @@ export class StoryContext extends EventEmitter {
       ),
       visitedBeats: Array.from(this.state.visitedBeats),
       timers: { ...this.state.timers },
-      history: [...this.history]
+      history: [...this.history],
+      choiceHistory: this.choiceHistory.map(c => ({ ...c })),
     };
   }
 
@@ -774,6 +816,11 @@ export class StoryContext extends EventEmitter {
 
     // Restore history
     this.history = [...serialized.history];
+
+    // Restore choice history (if available - may be missing in old saves)
+    this.choiceHistory = serialized.choiceHistory
+      ? serialized.choiceHistory.map(c => ({ ...c }))
+      : [];
 
     // Restart any saved timers
     for (const [name, timer] of Object.entries(serialized.timers)) {

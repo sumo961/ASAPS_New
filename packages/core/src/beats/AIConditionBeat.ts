@@ -32,6 +32,9 @@ export interface AIConditionBeatParams {
   /** Include counters in evaluation */
   evaluateCounters?: boolean;
 
+  /** Include rich choice history in evaluation */
+  evaluateChoiceHistory?: boolean;
+
   /** Fallback target if AI can't decide (separate from base Beat's defaultTarget) */
   fallbackTarget?: string;
 
@@ -58,6 +61,7 @@ export class AIConditionBeat extends Beat {
   public evaluateInventory: boolean;
   public evaluateHistory: boolean;
   public evaluateCounters: boolean;
+  public evaluateChoiceHistory: boolean;
   public aiDefaultTarget?: string;
   public timeout: number;
 
@@ -73,6 +77,7 @@ export class AIConditionBeat extends Beat {
     this.evaluateInventory = params.evaluateInventory ?? config.evaluateInventory ?? true;
     this.evaluateHistory = params.evaluateHistory ?? config.evaluateHistory ?? true;
     this.evaluateCounters = params.evaluateCounters ?? config.evaluateCounters ?? true;
+    this.evaluateChoiceHistory = params.evaluateChoiceHistory ?? config.evaluateChoiceHistory ?? true;
     this.aiDefaultTarget = params.fallbackTarget || config.fallbackTarget || params.defaultTarget || config.defaultTarget;
     this.timeout = params.timeout || config.timeout || 30000;
   }
@@ -85,6 +90,7 @@ export class AIConditionBeat extends Beat {
       evaluateInventory: this.evaluateInventory,
       evaluateHistory: this.evaluateHistory,
       evaluateCounters: this.evaluateCounters,
+      evaluateChoiceHistory: this.evaluateChoiceHistory,
       fallbackTarget: this.aiDefaultTarget,
       timeout: this.timeout,
     };
@@ -97,6 +103,7 @@ export class AIConditionBeat extends Beat {
     if (params.evaluateInventory !== undefined) this.evaluateInventory = params.evaluateInventory;
     if (params.evaluateHistory !== undefined) this.evaluateHistory = params.evaluateHistory;
     if (params.evaluateCounters !== undefined) this.evaluateCounters = params.evaluateCounters;
+    if (params.evaluateChoiceHistory !== undefined) this.evaluateChoiceHistory = params.evaluateChoiceHistory;
     if (params.fallbackTarget !== undefined) this.aiDefaultTarget = params.fallbackTarget;
     if (params.timeout !== undefined) this.timeout = params.timeout;
   }
@@ -162,6 +169,7 @@ export class AIConditionBeat extends Beat {
         includeInventory: this.evaluateInventory,
         includeHistory: this.evaluateHistory,
         includeCounters: this.evaluateCounters,
+        includeChoiceHistory: this.evaluateChoiceHistory,
       });
 
       // Build the classification prompt

@@ -1,4 +1,4 @@
-import type { StoryContext } from '../engine/StoryContext';
+import type { StoryContext, ChoiceRecord } from '../engine/StoryContext';
 import type { Story } from '../engine/Story';
 
 export interface PlayerContextOptions {
@@ -8,8 +8,10 @@ export interface PlayerContextOptions {
   includeVariables?: boolean;
   /** Include player inventory */
   includeInventory?: boolean;
-  /** Include visited beats history */
+  /** Include visited beats history (just beat names) */
   includeHistory?: boolean;
+  /** Include rich choice history (what choices were made, not just which beats) */
+  includeChoiceHistory?: boolean;
   /** Include counter values */
   includeCounters?: boolean;
   /** Specific counter names to include (if empty, includes all) */
@@ -18,6 +20,8 @@ export interface PlayerContextOptions {
   includeCharacterInventories?: boolean;
   /** Maximum history items to include */
   maxHistoryItems?: number;
+  /** Maximum choice history items to include */
+  maxChoiceItems?: number;
 }
 
 export interface PlayerContextData {
@@ -29,6 +33,7 @@ export interface PlayerContextData {
   characterInventoriesWithQuantities?: Record<string, Array<{ name: string; quantity: number }>>;
   visitedBeats: string[];
   history: string[];
+  choiceHistory?: ChoiceRecord[];
 }
 
 /**
@@ -50,10 +55,12 @@ export class PlayerContextBuilder {
       includeVariables = true,
       includeInventory = true,
       includeHistory = false,
+      includeChoiceHistory = false,
       includeCounters = true,
       counters = [],
       includeCharacterInventories = false,
       maxHistoryItems = 50,
+      maxChoiceItems = 20,
     } = options;
 
     // Get variables
@@ -128,6 +135,12 @@ export class PlayerContextBuilder {
         )
       : undefined;
 
+    // Get rich choice history
+    const fullChoiceHistory = this.context.getChoiceHistory();
+    const choiceHistory = includeChoiceHistory
+      ? fullChoiceHistory.slice(-maxChoiceItems)
+      : undefined;
+
     return {
       variables: selectedVariables,
       counters: selectedCounters,
@@ -137,6 +150,7 @@ export class PlayerContextBuilder {
       characterInventoriesWithQuantities,
       visitedBeats,
       history,
+      choiceHistory,
     };
   }
 
@@ -206,10 +220,19 @@ export class PlayerContextBuilder {
       }
     }
 
-    // History section (for journey summary)
+    // History section (for journey summary - just beat names)
     if (data.history.length > 0 && options.includeHistory) {
       const historyDescriptions = this.getBeatDescriptions(data.history);
       sections.push(`Journey Path (${data.history.length} beats):\n${historyDescriptions.join(' → ')}`);
+    }
+
+    // Rich choice history section (what choices were made)
+    if (data.choiceHistory && data.choiceHistory.length > 0) {
+      const choiceLines = data.choiceHistory.map(choice => {
+        const context = choice.choiceContext ? `"${choice.choiceContext}"` : choice.beatName || choice.beatId;
+        return `  - ${context} → chose "${choice.choiceText}"`;
+      });
+      sections.push(`Player Choices:\n${choiceLines.join('\n')}`);
     }
 
     return sections.join('\n\n');
@@ -222,11 +245,13 @@ export class PlayerContextBuilder {
     includeVariables?: boolean;
     includeCounters?: boolean;
     includeInventory?: boolean;
+    includeChoiceHistory?: boolean;
   } = {}): string {
     const {
       includeVariables = true,
       includeCounters = true,
       includeInventory = true,
+      includeChoiceHistory = true,
     } = options;
 
     const history = this.context.getHistory();
@@ -234,13 +259,15 @@ export class PlayerContextBuilder {
     const counters = this.context.getCounters();
     const inventoryEntries = this.context.getInventoryEntries();
     const visitedBeats = this.context.getVisitedBeats();
+    const choiceHistory = this.context.getChoiceHistory();
 
     const sections: string[] = [];
 
     // Journey statistics
     sections.push(`## Journey Statistics
 - Total beats visited: ${history.length}
-- Unique beats visited: ${visitedBeats.length}`);
+- Unique beats visited: ${visitedBeats.length}
+- Choices made: ${choiceHistory.length}`);
 
     if (includeVariables) {
       // Player profile from variables
@@ -283,6 +310,16 @@ ${counterLines.join('\n')}`);
       );
       sections.push(`## Final Inventory
 ${inventoryFormatted.join(', ')}`);
+    }
+
+    // Rich choice history - what the player actually chose
+    if (includeChoiceHistory && choiceHistory.length > 0) {
+      const choiceLines = choiceHistory.map(choice => {
+        const context = choice.choiceContext || choice.beatName || 'Choice';
+        return `- At "${context}": chose "${choice.choiceText}"`;
+      });
+      sections.push(`## Player Choices (in order)
+${choiceLines.join('\n')}`);
     }
 
     // Full journey path with beat type context

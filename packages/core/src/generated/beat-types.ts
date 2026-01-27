@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-01-24T13:35:34.064Z
+ * Generated: 2026-01-27T02:22:55.231Z
  */
 
 // ============================================
@@ -404,6 +404,8 @@ export interface AiConditionParameters {
   evaluateHistory?: boolean | undefined;
   /** Include counters in evaluation */
   evaluateCounters?: boolean | undefined;
+  /** Include rich choice history in evaluation (what choices were made) */
+  evaluateChoiceHistory?: boolean | undefined;
   /** Fallback target if AI can't decide (used when no category matches) */
   fallbackTarget?: string | undefined;
   /** Maximum response time in ms */
@@ -428,6 +430,8 @@ export interface AiDialogTreeParameters {
   includeInventory?: boolean | undefined;
   /** Include visited beats in context */
   includeVisitedBeats?: boolean | undefined;
+  /** Include rich choice history in context (what choices were made) */
+  includeChoiceHistory?: boolean | undefined;
   /** Maximum conversation turns */
   maxTurns?: number | undefined;
   /** Exit targets for conversation outcomes */
@@ -482,6 +486,10 @@ export interface AiInfoTextParameters {
   includeInventory?: boolean | undefined;
   /** Include visited beats in context */
   includeHistory?: boolean | undefined;
+  /** Include counters in context */
+  includeCounters?: boolean | undefined;
+  /** Include rich choice history in context (what choices were made) */
+  includeChoiceHistory?: boolean | undefined;
   /** Maximum sentences to generate */
   maxSentences?: number | undefined;
   /** Text to show if AI is unavailable */
@@ -508,6 +516,10 @@ export interface AiDurScreenParameters {
   includeInventory?: boolean | undefined;
   /** Include visited beats in context */
   includeHistory?: boolean | undefined;
+  /** Include counters in context */
+  includeCounters?: boolean | undefined;
+  /** Include rich choice history in context (what choices were made) */
+  includeChoiceHistory?: boolean | undefined;
   /** Maximum sentences to generate */
   maxSentences?: number | undefined;
   /** Text to show if AI is unavailable */

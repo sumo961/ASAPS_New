@@ -139,6 +139,15 @@ export class PickPropBeat extends Beat {
     }
 
     if (selectedProp) {
+      // Record this choice for AI context
+      context.recordChoice({
+        beatId: this.id,
+        beatName: this.name || this.id,
+        beatType: 'pickProp',
+        choiceText: `Picked up ${selectedProp.name}`,
+        choiceContext: this.question,
+      });
+
       // Apply prop effects (e.g., add to inventory)
       if (selectedProp.effects) {
         selectedProp.effects.forEach(effect => context.applyEffect(effect));

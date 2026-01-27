@@ -173,6 +173,15 @@ export class MovementChoiceBeat extends Beat {
     }
 
     if (selectedChoice) {
+      // Record this choice for AI context
+      context.recordChoice({
+        beatId: this.id,
+        beatName: this.name || this.id,
+        beatType: 'movementChoice',
+        choiceText: selectedChoice.text,
+        choiceContext: this.question,
+      });
+
       // Apply any location effects
       if (selectedChoice.location) {
         context.setVariable('currentLocation', selectedChoice.location);
