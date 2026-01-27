@@ -70,13 +70,27 @@ async function makeProxyRequest(
  */
 function createAIServiceAdapter(): IAIService | null {
   const savedConfig = getSavedAIConfig();
-  if (!savedConfig || !savedConfig.apiKey) {
+  console.log('[PreviewWindow] Loaded AI config:', savedConfig ? {
+    provider: savedConfig.provider,
+    providerType: savedConfig.providerType,
+    hasApiKey: !!savedConfig.apiKey,
+    hasBaseUrl: !!savedConfig.baseUrl,
+    baseUrl: savedConfig.baseUrl,
+    model: savedConfig.model,
+  } : null);
+
+  // For local providers with a baseUrl, API key is optional
+  const hasValidConfig = savedConfig && (savedConfig.apiKey || savedConfig.baseUrl);
+  if (!hasValidConfig) {
     console.log('[PreviewWindow] No AI configuration found');
     return null;
   }
 
   console.log('[PreviewWindow] Creating AI service adapter for provider:', savedConfig.provider);
-  const useProxy = !!savedConfig.baseUrl;
+
+  // Use proxy only for remote custom URLs (not localhost)
+  const isLocalUrl = savedConfig.baseUrl?.includes('localhost') || savedConfig.baseUrl?.includes('127.0.0.1');
+  const useProxy = !!savedConfig.baseUrl && !isLocalUrl;
 
   if (savedConfig.provider === 'claude') {
     const model = savedConfig.model || 'claude-sonnet-4-20250514';
@@ -157,10 +171,13 @@ function createAIServiceAdapter(): IAIService | null {
       },
     };
   } else {
-    // OpenAI provider
+    // OpenAI provider (also used for local/Ollama)
     const model = savedConfig.model || 'gpt-4';
+
+    // Create client - for local URLs, include baseURL; for remote custom URLs, we use proxy
     const client = !useProxy ? new OpenAI({
-      apiKey: savedConfig.apiKey,
+      apiKey: savedConfig.apiKey || 'ollama', // Ollama doesn't need a real key
+      baseURL: isLocalUrl ? savedConfig.baseUrl : undefined,
       dangerouslyAllowBrowser: true,
     }) : null;
 
