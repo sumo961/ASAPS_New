@@ -591,6 +591,131 @@ export const PreviewWindow: React.FC = () => {
         };
       });
 
+      // Set up character meter frame resolver for HUD overlays
+      if (previewData.characters && previewData.characters.length > 0) {
+        (reactRenderer as any).setCharacterMeterFrameResolver?.((characterId: string) => {
+          const character = previewData.characters?.find(c => c.id === characterId);
+          if (!character || !character.meterFrame) {
+            return null;
+          }
+
+          // Filter to visible counters
+          const visibleCounters = character.counters?.filter(c => c.visible) || [];
+          if (visibleCounters.length === 0) {
+            return null;
+          }
+
+          // Build counter data with current values
+          const counters = visibleCounters.map(counter => ({
+            name: counter.name,
+            displayName: counter.displayName,
+            value: countersRef.current[counter.name] ?? counter.value,
+            min: counter.min ?? 0,
+            max: counter.max ?? 100,
+            color: counter.color || '#3B82F6',
+            showNumericValue: counter.showNumericValue ?? false,
+            numericFormat: counter.numericFormat || 'value',
+            orientation: counter.levelMeterOrientation || 'horizontal',
+          }));
+
+          return {
+            counters,
+            config: character.meterFrame,
+          };
+        });
+        console.log('[PreviewWindow] Character meter frame resolver set up');
+      }
+
+      // Set up character inventory resolver for HUD overlays
+      if (previewData.characters && previewData.characters.length > 0) {
+        // Build prop asset map from PickProp beats
+        const propAssetMap = new Map<string, string>();
+        if (story) {
+          const allBeats = story.getAllBeats();
+          for (const beat of allBeats) {
+            if (beat.type === 'pickProp') {
+              const props = (beat as any).props || [];
+              for (const prop of props) {
+                if (prop.name && prop.assetId) {
+                  const asset = previewData.assets?.find(a => a.id === prop.assetId);
+                  if (asset?.url) {
+                    propAssetMap.set(prop.name, asset.url);
+                    propAssetMap.set(prop.name.toLowerCase(), asset.url);
+                  }
+                }
+              }
+              // Also check beat locations for prop graphics
+              const locations = Array.from(beat.locations?.values?.() || []);
+              for (const loc of locations) {
+                if ((loc as any).kind === 'prop' && (loc as any).name && (loc as any).assetId) {
+                  const asset = previewData.assets?.find(a => a.id === (loc as any).assetId);
+                  if (asset?.url) {
+                    propAssetMap.set((loc as any).name, asset.url);
+                    propAssetMap.set((loc as any).name.toLowerCase(), asset.url);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        (reactRenderer as any).setCharacterInventoryResolver?.((characterId: string) => {
+          const character = previewData.characters?.find(c => c.id === characterId);
+          if (!character || !character.inventoryFrame) {
+            return null;
+          }
+
+          // Get current inventory from runtime context
+          const ctx = engineRef.current?.getContext();
+          if (!ctx) {
+            return null;
+          }
+
+          const isPlayer = character.role === 'player';
+          const runtimeInventory = isPlayer
+            ? ctx.getInventoryEntries()
+            : (ctx.getState().characterInventories[character.name] || []);
+
+          if (runtimeInventory.length === 0) {
+            return null;
+          }
+
+          // Build item data
+          const itemDefinitions = character.inventory || [];
+          const itemData = runtimeInventory.map((entry: { name: string; quantity: number }) => {
+            const definition = itemDefinitions.find((def: any) => def.name === entry.name);
+            if (definition) {
+              const icon = definition.icon || propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
+              return {
+                id: definition.id,
+                name: definition.name,
+                displayName: definition.displayName,
+                description: definition.description || '',
+                icon,
+                quantity: entry.quantity,
+                category: definition.category || '',
+              };
+            }
+            const propIcon = propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
+            return {
+              id: entry.name,
+              name: entry.name,
+              displayName: entry.name,
+              description: '',
+              icon: propIcon,
+              quantity: entry.quantity,
+              category: '',
+            };
+          });
+
+          return {
+            items: itemData,
+            config: character.inventoryFrame,
+          };
+        });
+        console.log('[PreviewWindow] Character inventory resolver set up');
+      }
+
       // Set up sprite data resolver for character spritesheets
       if (previewData.characters && previewData.characters.length > 0) {
         (reactRenderer as any).setSpriteDataResolver?.((characterId: string) => {
@@ -629,6 +754,24 @@ export const PreviewWindow: React.FC = () => {
       } else {
         console.log('[PreviewWindow] No AI configuration found - AI beats will show fallback messages');
       }
+
+      // Set up story context for AI beats to use
+      // This provides story metadata and character info for better AI responses
+      const storyContext = {
+        title: previewData.storyData?.title || 'Untitled Story',
+        author: previewData.storyData?.author || 'Unknown',
+        characters: previewData.characters?.map(c => ({
+          id: c.id,
+          name: c.name,
+          role: c.role,
+          description: c.description || '',
+        })) || [],
+      };
+      reactRenderer.setState('storyContext', storyContext);
+      console.log('[PreviewWindow] Story context set for AI beats:', {
+        title: storyContext.title,
+        characterCount: storyContext.characters.length,
+      });
     }
 
     // Apply theme

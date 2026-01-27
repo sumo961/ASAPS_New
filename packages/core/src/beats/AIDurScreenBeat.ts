@@ -160,7 +160,7 @@ export class AIDurScreenBeat extends Beat {
         }
 
         // Generate new text
-        this.generatedText = await this.generateText(context, aiService);
+        this.generatedText = await this.generateText(context, aiService, renderer);
         this.lastContextHash = contextHash;
 
         // Store suggestions in renderer state for preview to display
@@ -240,10 +240,36 @@ export class AIDurScreenBeat extends Beat {
   /**
    * Generate text using AI
    */
-  private async generateText(context: StoryContext, aiService: any): Promise<string> {
+  private async generateText(context: StoryContext, aiService: any, renderer?: any): Promise<string> {
     // Build player context
     const story = context.getStory();
     const contextBuilder = new PlayerContextBuilder(context, story);
+
+    // Get story context from renderer state (if available)
+    const storyContext = renderer?.getState?.('storyContext') || {};
+    const storyTitle = storyContext.title || story?.getMetadata?.()?.title || 'Interactive Story';
+    const storyAuthor = storyContext.author || story?.getMetadata?.()?.author || '';
+    const characters = storyContext.characters || [];
+
+    // Build story context section for prompt
+    let storyContextSection = `STORY: "${storyTitle}"`;
+    if (storyAuthor) {
+      storyContextSection += ` by ${storyAuthor}`;
+    }
+    if (characters.length > 0) {
+      const charDescriptions = characters
+        .filter((c: any) => c.name && c.name !== 'player')
+        .map((c: any) => {
+          let desc = c.name;
+          if (c.role) desc += ` (${c.role})`;
+          if (c.description) desc += `: ${c.description}`;
+          return desc;
+        })
+        .join('; ');
+      if (charDescriptions) {
+        storyContextSection += `\nCHARACTERS: ${charDescriptions}`;
+      }
+    }
 
     // Filter variables if contextVariables is specified
     let filteredContext: string;
@@ -294,7 +320,9 @@ export class AIDurScreenBeat extends Beat {
     // Build the generation prompt
     const prompt = `Generate a short text response (${this.maxSentences} sentence${this.maxSentences > 1 ? 's' : ''} maximum) for the following situation:
 
-CONTEXT: ${this.prompt}
+${storyContextSection}
+
+SCENE CONTEXT: ${this.prompt}
 
 PLAYER STATE:
 ${filteredContext}
