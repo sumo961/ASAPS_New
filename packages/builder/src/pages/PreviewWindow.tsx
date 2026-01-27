@@ -390,7 +390,8 @@ export const PreviewWindow: React.FC = () => {
   }, [story, previewData, animationEnabled]);
 
   // Start preview (startPaused = true means pause after showing the first beat)
-  const startPreview = useCallback(async (overrideBeatId?: string, startPaused: boolean = true) => {
+  // overridePreset allows passing a preset directly (bypasses React state timing issues)
+  const startPreview = useCallback(async (overrideBeatId?: string, startPaused: boolean = true, overridePreset?: StatePreset | null) => {
     if (!engineRef.current || !rendererRef.current || !story || !previewData) return;
 
     try {
@@ -422,12 +423,13 @@ export const PreviewWindow: React.FC = () => {
       await engineRef.current.loadStory(story);
       const context = engineRef.current.getContext();
 
-      // Apply selected preset
-      if (selectedPreset) {
-        Object.entries(selectedPreset.state.variables).forEach(([key, value]) => context.setVariable(key, value));
-        Object.entries(selectedPreset.state.counters).forEach(([key, value]) => context.setCounter(key, value));
-        selectedPreset.state.inventory.forEach(item => context.addToInventory(item));
-        selectedPreset.state.visitedBeats.forEach(beatId => context.markBeatVisited(beatId));
+      // Apply selected preset (use override if provided, otherwise use state)
+      const presetToApply = overridePreset !== undefined ? overridePreset : selectedPreset;
+      if (presetToApply) {
+        Object.entries(presetToApply.state.variables).forEach(([key, value]) => context.setVariable(key, value));
+        Object.entries(presetToApply.state.counters).forEach(([key, value]) => context.setCounter(key, value));
+        presetToApply.state.inventory.forEach(item => context.addToInventory(item));
+        presetToApply.state.visitedBeats.forEach(beatId => context.markBeatVisited(beatId));
       }
 
       // Set up beat tracking and debug info updates
@@ -540,7 +542,7 @@ export const PreviewWindow: React.FC = () => {
   }, [story, previewData, isRunning, startPreview]);
 
   // Restart preview
-  const handleRestart = useCallback((overrideBeatId?: string) => {
+  const handleRestart = useCallback((overrideBeatId?: string, overridePreset?: StatePreset | null) => {
     try {
       const audioManager = getAudioManager();
       audioManager.stopAllSounds();
@@ -557,7 +559,7 @@ export const PreviewWindow: React.FC = () => {
     setIsPaused(false);
     setDebugInfo({});
     setActiveTimers([]);
-    startPreview(overrideBeatId, true); // Start paused
+    startPreview(overrideBeatId, true, overridePreset); // Start paused with preset
   }, [startPreview]);
 
   // Stop preview
@@ -788,7 +790,12 @@ export const PreviewWindow: React.FC = () => {
 
                   {/* Clean state option */}
                   <button
-                    onClick={() => { setSelectedPreset(null); setShowPresetMenu(false); }}
+                    onClick={() => {
+                      setSelectedPreset(null);
+                      setShowPresetMenu(false);
+                      // Auto-restart preview with no preset (pass null explicitly)
+                      setTimeout(() => handleRestart(startBeatId || undefined, null), 50);
+                    }}
                     className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 border-b border-gray-100 ${!selectedPreset ? 'bg-blue-50 text-blue-700' : ''}`}
                   >
                     <div className="font-medium">Start fresh (no prior state)</div>
@@ -868,6 +875,8 @@ export const PreviewWindow: React.FC = () => {
                                 };
                                 setSelectedPreset(preset);
                                 setShowPresetMenu(false);
+                                // Auto-restart preview with the selected path (pass preset directly to avoid state timing issues)
+                                setTimeout(() => handleRestart(startBeatId || undefined, preset), 50);
                               }}
                               className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
                                 selectedPreset?.name === genPreset.preset.name ? 'bg-blue-50 text-blue-700' : ''
