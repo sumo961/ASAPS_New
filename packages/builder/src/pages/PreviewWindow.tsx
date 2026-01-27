@@ -326,8 +326,11 @@ export const PreviewWindow: React.FC = () => {
             setPreviewData(message.payload);
             setConnectionStatus('connected');
             // If a specific beat was requested, set it as start
+            // Otherwise default to the first beat of the story
             if (message.payload.beatId) {
               setStartBeatId(message.payload.beatId);
+            } else if (message.payload.storyData?.firstBeatId) {
+              setStartBeatId(message.payload.storyData.firstBeatId);
             }
           }
           break;
@@ -573,8 +576,18 @@ export const PreviewWindow: React.FC = () => {
           }
 
           const defaultState = character.states.find(s => s.id === character.defaultState);
-          return resolveImage(defaultState?.visual) ||
-            resolveImage({ assetId: character.visual.defaultAssetId, image: character.visual.defaultImage });
+          const resolvedDefault = resolveImage(defaultState?.visual);
+          if (resolvedDefault) return resolvedDefault;
+
+          // Fall back to character's default image (static) or spriteSheet (sprite)
+          if (character.visual.type === 'sprite' && character.visual.spriteSheet?.url) {
+            // For sprite characters, return the spriteSheet URL
+            // Note: This returns the full spritesheet; frame extraction happens in renderer
+            console.log(`[PreviewWindow] Resolved sprite character ${character.name} → spriteSheet URL`);
+            return character.visual.spriteSheet.url;
+          }
+
+          return resolveImage({ assetId: character.visual.defaultAssetId, image: character.visual.defaultImage });
         });
       }
 
@@ -955,7 +968,8 @@ export const PreviewWindow: React.FC = () => {
   }, [story, previewData, isRunning, startPreview]);
 
   // Restart preview
-  const handleRestart = useCallback((overrideBeatId?: string, overridePreset?: StatePreset | null) => {
+  // pauseOnStart: true to pause at first beat (useful when reviewing with preset state)
+  const handleRestart = useCallback((overrideBeatId?: string, overridePreset?: StatePreset | null, pauseOnStart: boolean = false) => {
     try {
       const audioManager = getAudioManager();
       audioManager.stopAllSounds();
@@ -972,7 +986,7 @@ export const PreviewWindow: React.FC = () => {
     setIsPaused(false);
     setDebugInfo({});
     setActiveTimers([]);
-    startPreview(overrideBeatId, true, overridePreset); // Start paused with preset
+    startPreview(overrideBeatId, pauseOnStart, overridePreset);
   }, [startPreview]);
 
   // Stop preview
@@ -1207,7 +1221,8 @@ export const PreviewWindow: React.FC = () => {
                       setSelectedPreset(null);
                       setShowPresetMenu(false);
                       // Auto-restart preview with no preset (pass null explicitly)
-                      setTimeout(() => handleRestart(startBeatId || undefined, null), 50);
+                      // pauseOnStart=true so user can review initial state
+                      setTimeout(() => handleRestart(startBeatId || undefined, null, true), 50);
                     }}
                     className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 border-b border-gray-100 ${!selectedPreset ? 'bg-blue-50 text-blue-700' : ''}`}
                   >
@@ -1289,7 +1304,8 @@ export const PreviewWindow: React.FC = () => {
                                 setSelectedPreset(preset);
                                 setShowPresetMenu(false);
                                 // Auto-restart preview with the selected path (pass preset directly to avoid state timing issues)
-                                setTimeout(() => handleRestart(startBeatId || undefined, preset), 50);
+                                // pauseOnStart=true so user can review initial state with preset
+                                setTimeout(() => handleRestart(startBeatId || undefined, preset, true), 50);
                               }}
                               className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
                                 selectedPreset?.name === genPreset.preset.name ? 'bg-blue-50 text-blue-700' : ''
