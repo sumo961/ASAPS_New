@@ -936,8 +936,71 @@ export const PreviewWindow: React.FC = () => {
       context.on('variableChanged', updateDebugInfo);
       context.on('counterChanged', updateDebugInfo);
       context.on('inventoryChanged', updateDebugInfo);
-      context.on('timerStarted', updateDebugInfo);
-      context.on('timerStopped', updateDebugInfo);
+
+      // Set up timer manager for defaultTarget timers (used by DurScreen, timed beats)
+      const timerManager = context.getTimerManager();
+
+      const updateTimers = () => {
+        const timers = timerManager.getActiveTimers();
+        setActiveTimers(timers);
+
+        // Update renderer's timer state for progress bar
+        if (rendererRef.current) {
+          // Find default target timer (created by Beat.execute when showTimer is true)
+          const defaultTargetTimer = timers.find((t: any) => t.name?.startsWith('defaultTarget_'));
+
+          if (defaultTargetTimer) {
+            // Extract beatId from timer name: defaultTarget_<beatId>
+            const beatId = defaultTargetTimer.name.replace('defaultTarget_', '');
+            const beat = story.getBeat(beatId);
+
+            // Only show progress bar if beat has showTimer: true
+            if (beat?.showTimer) {
+              (rendererRef.current as any).setTimerState?.({
+                totalTime: defaultTargetTimer.totalTime || defaultTargetTimer.remainingTime + 1,
+                remainingTime: defaultTargetTimer.remainingTime,
+                visible: true,
+                label: undefined,
+              });
+            } else {
+              (rendererRef.current as any).setTimerState?.(undefined);
+            }
+          } else {
+            // No active default target timer
+            (rendererRef.current as any).setTimerState?.(undefined);
+          }
+        }
+      };
+
+      timerManager.on('timerStarted', updateTimers);
+      timerManager.on('timerTick', updateTimers);
+      timerManager.on('timerStopped', updateTimers);
+
+      // Handle timer expiration - navigate to target beat
+      timerManager.on('timerExpired', async ({ name, targetBeat }: { name: string; targetBeat?: string }) => {
+        if (targetBeat && rendererRef.current) {
+          console.log(`[PreviewWindow] Timer "${name}" expired, navigating to: ${targetBeat}`);
+          const beat = story.getBeat(targetBeat);
+          if (beat) {
+            if (engineRef.current) {
+              engineRef.current.stop();
+            }
+            context.markBeatVisited(targetBeat);
+            try {
+              const nextBeatId = await beat.execute(context, rendererRef.current as any);
+              if (nextBeatId) {
+                const nextBeat = story.getBeat(nextBeatId);
+                if (nextBeat) {
+                  context.markBeatVisited(nextBeatId);
+                  await nextBeat.execute(context, rendererRef.current as any);
+                }
+              }
+            } catch (error) {
+              console.error('[PreviewWindow] Error executing timer target beat:', error);
+            }
+          }
+        }
+      });
 
       // Initial debug info
       updateDebugInfo();
