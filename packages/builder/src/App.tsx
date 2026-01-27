@@ -2253,8 +2253,22 @@ function App() {
           setShowImportAsmlDialog(true);
         } else {
           // No assets, import directly
-          await actions.importStory(text);
+          // CRITICAL: Clear existing assets and characters first to start fresh
+          setAssets([]);
+          setCharacters([]);
+
+          const importResult = await actions.importStory(text);
           setSelectedBeat(null);
+
+          // CRITICAL: Create a new project for the imported story
+          // Use the title from the import result (not state, which is async)
+          const importedTitle = importResult.title || 'Imported Story';
+          pendingNewProjectIdRef.current = 'pending';
+          const newProjectId = await createProject(importedTitle, `Imported from ASML`);
+          pendingNewProjectIdRef.current = newProjectId;
+          loadedProjectIdRef.current = newProjectId;
+          console.log('[App] ASML import - Created new project:', newProjectId, 'with title:', importedTitle);
+
           alert('Story imported successfully!');
         }
       } catch (error) {
@@ -2272,7 +2286,7 @@ function App() {
     };
 
     input.click();
-  }, [actions]);
+  }, [actions, createProject]);
 
   /**
    * Handle import dialog completion (with or without assets)
@@ -2284,8 +2298,14 @@ function App() {
   }) => {
     setShowImportAsmlDialog(false);
 
+    // CRITICAL: Clear existing assets and characters first to start fresh
+    setAssets([]);
+    setCharacters([]);
+
     try {
-      const projectId = currentProject?.id || 'temp-project';
+      // Create a temporary project ID for asset storage during import
+      // We'll create the real project after import succeeds
+      const tempProjectId = `import-${Date.now()}`;
 
       // Import with or without assets
       const importResult = await actions.importStory(importAsmlContent, {
@@ -2293,7 +2313,7 @@ function App() {
         addAsset: async (asset: Asset, blob: Blob) => {
           try {
             // Convert to stored format and persist using HybridStorageAdapter
-            const storedAsset = await assetToStored(asset, projectId, blob);
+            const storedAsset = await assetToStored(asset, tempProjectId, blob);
             const storage = getStorageAdapter();
             await storage.initialize();
             await storage.saveAsset(storedAsset);
@@ -2309,7 +2329,7 @@ function App() {
             return true;
           }
         },
-        projectId
+        projectId: tempProjectId
       });
 
       setSelectedBeat(null);
@@ -2426,6 +2446,15 @@ function App() {
         });
       }
 
+      // CRITICAL: Create a new project for the imported story
+      // Use the title from the import result (not state, which is async)
+      const importedTitle = importResult.title || 'Imported Story';
+      pendingNewProjectIdRef.current = 'pending';
+      const newProjectId = await createProject(importedTitle, `Imported from ASML`);
+      pendingNewProjectIdRef.current = newProjectId;
+      loadedProjectIdRef.current = newProjectId;
+      console.log('[App] ASML import with assets - Created new project:', newProjectId, 'with title:', importedTitle);
+
       // Show summary
       let message = 'Story imported successfully!';
       if (importResult.assetStats) {
@@ -2454,7 +2483,7 @@ function App() {
     // Clear import state
     setImportAsmlContent('');
     setImportAsmlManifest(null);
-  }, [actions, importAsmlContent, currentProject?.id]);
+  }, [actions, importAsmlContent, createProject]);
 
   /**
    * Handle import dialog cancellation

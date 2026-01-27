@@ -89,6 +89,8 @@ export interface ImportStoryOptions {
 export interface ImportStoryResult {
   /** Whether import was successful */
   success: boolean;
+  /** Imported story title */
+  title: string;
   /** Imported characters (need to be added to character manager) */
   characters: Character[];
   /** Asset import stats */
@@ -474,6 +476,7 @@ export function useStoryBuilder() {
     if (!result.success || !result.story) {
       return {
         success: false,
+        title: 'Imported Story',
         characters: [],
         errors: [`Failed to import story: ${result.errors.join(', ')}`]
       };
@@ -616,6 +619,7 @@ export function useStoryBuilder() {
 
     return {
       success: true,
+      title: metadata?.title || 'Imported Story',
       characters: importedCharacters,
       assetStats: assetImportResult?.stats,
       errors,
