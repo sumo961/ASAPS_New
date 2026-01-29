@@ -1152,6 +1152,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                     theme={theme}
                     isVisited={isButtonVisited}
                     soundBlobResolver={soundBlobResolver}
+                    stageWidth={stageWidth}
                   />
                 );
               })}
@@ -1523,6 +1524,11 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           stageWidth,
           stageHeight
         );
+
+      // Debug logging for button overflow issues
+      if (content && content.length > 30) {
+        console.log(`[Button] "${content.substring(0, 40)}..." x=${location.x}, stageW=${stageWidth}, calcW=${smartBtnDims.width}, calcH=${smartBtnDims.height}`);
+      }
 
       // Check if this button leads to a visited beat
       const isButtonVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
@@ -2182,13 +2188,9 @@ const ButtonElement: React.FC<{
     ? (isHovered && theme.buttonHoverUrl ? theme.buttonHoverUrl : theme.buttonNormalUrl)
     : undefined;
 
-  // Calculate minimum width needed to fit text with padding
-  // Approximate: fontSize * 0.6 per character + padding
-  const textLength = content?.length || 0;
-  const estimatedTextWidth = textLength * computedFontSize * 0.6;
-  const minWidthNeeded = estimatedTextWidth + (paddingHorizontal * 2) + 8; // 8px for border
-  // Use at least the location width, but expand if text needs more space
-  const effectiveMinWidth = Math.max(minWidthNeeded, 100); // At least 100px
+  // Set a reasonable minimum width for buttons
+  // Don't base on text length since text wraps - just ensure buttons aren't too narrow
+  const effectiveMinWidth = 100; // Just a reasonable minimum
 
   const buttonStyle: React.CSSProperties = {
     ...style,
@@ -2217,13 +2219,16 @@ const ButtonElement: React.FC<{
     cursor: interactive ? 'pointer' : 'default',
     wordWrap: 'break-word',
     overflowWrap: 'break-word',
+    whiteSpace: 'normal',  // Ensure text wraps to multiple lines
     boxSizing: 'border-box',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    lineHeight: '1.2',
+    lineHeight: '1.4',
     minWidth: `${effectiveMinWidth}px`,
-    minHeight: `${computedFontSize * 1.2 + (paddingVertical * 2) + 4}px`, // Font + padding + border
+    maxWidth: '100%',  // Never exceed container width - allows text wrapping
+    minHeight: `${computedFontSize * 1.4 + (paddingVertical * 2) + 4}px`, // Font + padding + border
+    overflow: 'hidden',  // Prevent content from overflowing
   };
 
 
@@ -4114,7 +4119,8 @@ const FlexButtonElement: React.FC<{
   theme: RenderThemeSettings;
   isVisited?: boolean;
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>;
-}> = ({ element, onAction, interactive, hideButtonBox = false, theme, isVisited = false, soundBlobResolver }) => {
+  stageWidth?: number;
+}> = ({ element, onAction, interactive, hideButtonBox = false, theme, isVisited = false, soundBlobResolver, stageWidth }) => {
   const { location, content, actionId } = element;
   const [isHovered, setIsHovered] = React.useState(false);
 
@@ -4202,10 +4208,14 @@ const FlexButtonElement: React.FC<{
     }
   };
 
+  // Calculate max width: leave 10% margin (5% on each side) from stage edges
+  const maxButtonWidth = stageWidth ? stageWidth * 0.9 : undefined;
+
   return (
     <button
       style={{
         minWidth: `${Math.min(location.width, 200)}px`,
+        maxWidth: maxButtonWidth ? `${maxButtonWidth}px` : '90%',
         padding: hideButtonBox ? '0' : '12px 24px',
         // Use background image if available, otherwise use solid color
         ...(buttonImageUrl ? {
@@ -4231,6 +4241,7 @@ const FlexButtonElement: React.FC<{
         opacity: isVisited ? 0.7 : 1,
         wordWrap: 'break-word',
         overflowWrap: 'break-word',
+        whiteSpace: 'normal',
         boxSizing: 'border-box',
         lineHeight: '1.4',
       }}
