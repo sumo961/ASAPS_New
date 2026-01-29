@@ -553,6 +553,33 @@ export const PreviewWindow: React.FC = () => {
         });
       }
 
+      // Set up sound blob resolver for beat sounds
+      // This fetches audio from URLs and converts to blobs for the audio manager
+      reactRenderer.setSoundBlobResolver(async (assetIdOrUrl: string): Promise<Blob | null> => {
+        try {
+          // First try to find asset by ID
+          const asset = previewData.assets?.find(a => a.id === assetIdOrUrl);
+          const url = asset?.url || assetIdOrUrl;
+
+          if (!url || (!url.startsWith('http') && !url.startsWith('blob:') && !url.startsWith('data:'))) {
+            console.warn('[PreviewWindow] Invalid sound URL:', url);
+            return null;
+          }
+
+          const response = await fetch(url);
+          if (!response.ok) {
+            console.warn('[PreviewWindow] Failed to fetch sound:', url);
+            return null;
+          }
+
+          return await response.blob();
+        } catch (error) {
+          console.warn('[PreviewWindow] Error loading sound:', error);
+          return null;
+        }
+      });
+      console.log('[PreviewWindow] Sound blob resolver set up');
+
       // Set up character resolver
       if (previewData.characters && previewData.characters.length > 0) {
         (reactRenderer as any).setCharacterResolver((characterId: string, stateId?: string) => {
@@ -1005,6 +1032,70 @@ export const PreviewWindow: React.FC = () => {
       // Initial debug info
       updateDebugInfo();
 
+      // Start background music BEFORE engine.start() because engine.start() blocks until story ends
+      const soundSettings = previewData.settings?.sound;
+      if (soundSettings) {
+        const backgroundMusicAssetId = soundSettings.backgroundMusicAssetId;
+        const backgroundMusicUrl = soundSettings.backgroundMusic;
+
+        if ((backgroundMusicAssetId || backgroundMusicUrl) && !soundSettings.mute && soundEnabled) {
+          try {
+            const audioManager = getAudioManager();
+            const volume = (soundSettings.backgroundVolume || 70) / 100;
+
+            let audioUrl: string | null = null;
+
+            // First priority: use backgroundMusicAssetId if available
+            if (backgroundMusicAssetId && previewData.assets) {
+              const asset = previewData.assets.find((a: Asset) => a.id === backgroundMusicAssetId);
+              if (asset?.url) {
+                audioUrl = asset.url;
+                console.log(`[PreviewWindow] Found background music asset: ${asset.name}`);
+              }
+            }
+
+            // Fallback: try to find asset by URL or name reference
+            if (!audioUrl && backgroundMusicUrl && previewData.assets) {
+              const audioAsset = previewData.assets.find((a: Asset) =>
+                a.id === backgroundMusicUrl ||
+                a.name === backgroundMusicUrl ||
+                a.url === backgroundMusicUrl ||
+                a.name?.replace(/\.[^/.]+$/, '') === backgroundMusicUrl
+              );
+              if (audioAsset?.url) {
+                audioUrl = audioAsset.url;
+                console.log(`[PreviewWindow] Found background music by name match: ${audioAsset.name}`);
+              }
+            }
+
+            // Fallback: external URL
+            if (!audioUrl && backgroundMusicUrl?.startsWith('http')) {
+              audioUrl = backgroundMusicUrl;
+            }
+
+            if (audioUrl) {
+              // Fetch and play as blob for better caching
+              try {
+                const response = await fetch(audioUrl);
+                if (response.ok) {
+                  const blob = await response.blob();
+                  await audioManager.playSoundFromBlob(blob, volume, true, audioUrl); // true = loop
+                  console.log('[PreviewWindow] Background music started successfully');
+                }
+              } catch (fetchError) {
+                // Fallback to direct URL playback
+                console.warn('[PreviewWindow] Blob fetch failed, trying direct URL:', fetchError);
+                await audioManager.playSound(audioUrl, volume, true);
+              }
+            } else {
+              console.warn(`[PreviewWindow] Could not resolve background music. AssetId: ${backgroundMusicAssetId}, URL: ${backgroundMusicUrl}`);
+            }
+          } catch (error) {
+            console.warn('[PreviewWindow] Failed to start background music:', error);
+          }
+        }
+      }
+
       // Start from the specified beat or the beginning
       const actualStartBeat = overrideBeatId || startBeatId || undefined;
       await engineRef.current.start(actualStartBeat);
@@ -1014,7 +1105,7 @@ export const PreviewWindow: React.FC = () => {
     } finally {
       setIsRunning(false);
     }
-  }, [story, previewData, startBeatId, selectedPreset]);
+  }, [story, previewData, startBeatId, selectedPreset, soundEnabled]);
 
   // Auto-start preview when story is loaded
   useEffect(() => {
