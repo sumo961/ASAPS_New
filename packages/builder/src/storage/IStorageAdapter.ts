@@ -137,6 +137,12 @@ export interface IStorageAdapter {
   deleteProjectAssets(projectId: string): Promise<void>;
 
   /**
+   * Reassociate all assets from one project ID to another
+   * Used when importing assets with a temp ID then creating the real project
+   */
+  reassociateAssets(fromProjectId: string, toProjectId: string): Promise<number>;
+
+  /**
    * Get asset as data URL (for embedding in HTML)
    * Useful for small assets that need inline embedding
    */

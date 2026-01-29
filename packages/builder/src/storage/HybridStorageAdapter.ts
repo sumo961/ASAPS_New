@@ -497,6 +497,14 @@ export class HybridStorageAdapter implements IStorageAdapter {
     }
   }
 
+  /**
+   * Reassociate all assets from one project ID to another
+   * Alias for migrateProjectAssets for interface consistency
+   */
+  async reassociateAssets(fromProjectId: string, toProjectId: string): Promise<number> {
+    return this.migrateProjectAssets(fromProjectId, toProjectId);
+  }
+
   async getAssetDataURL(assetId: string): Promise<string | null> {
     const blob = await this.loadAsset(assetId);
     if (!blob) return null;

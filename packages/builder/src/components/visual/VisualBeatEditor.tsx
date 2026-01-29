@@ -751,6 +751,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                 interactive={false}
                 hideTextBoxes={activeBoxVisibility === 'hideText' || activeBoxVisibility === 'hideAll'}
                 hideButtonBoxes={activeBoxVisibility === 'hideAll'}
+                editorMode={true}
                 theme={globalSettings ? (() => {
                   const baseTheme = convertGlobalSettingsToTheme(globalSettings);
                   return {

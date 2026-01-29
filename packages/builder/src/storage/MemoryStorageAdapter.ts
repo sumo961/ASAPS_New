@@ -178,6 +178,20 @@ export class MemoryStorageAdapter implements IStorageAdapter {
     }
   }
 
+  async reassociateAssets(fromProjectId: string, toProjectId: string): Promise<number> {
+    this.ensureReady();
+
+    let count = 0;
+    for (const [assetId, info] of this.assetMetadata.entries()) {
+      if (info.projectId === fromProjectId) {
+        info.projectId = toProjectId;
+        this.assetMetadata.set(assetId, info);
+        count++;
+      }
+    }
+    return count;
+  }
+
   async getAssetDataURL(assetId: string): Promise<string | null> {
     this.ensureReady();
 

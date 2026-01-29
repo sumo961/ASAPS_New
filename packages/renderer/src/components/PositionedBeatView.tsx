@@ -44,6 +44,177 @@ function isBuiltInFont(fontName: string | undefined): boolean {
   return fontName in FONT_FAMILIES;
 }
 
+// Default stage dimensions (can be overridden by project settings)
+const DEFAULT_STAGE_WIDTH = 1024;
+const DEFAULT_STAGE_HEIGHT = 768;
+const DEFAULT_BUTTON_HEIGHT = 50;
+const BUTTON_PADDING_PERCENT = 0.05; // 5% padding above button
+
+/**
+ * Calculate smart button dimensions that grow to fit content
+ *
+ * Logic:
+ * 1. Start with location's width and height
+ * 2. If text doesn't fit, grow horizontally first (max: mirror left margin on right)
+ * 3. Then grow vertically if needed
+ *
+ * @param content - The button text content
+ * @param fontSize - Font size in pixels
+ * @param location - The button's location with x, y, width, height
+ * @param paddingH - Horizontal padding
+ * @param paddingV - Vertical padding
+ * @param stageWidth - Stage width from project settings
+ * @param stageHeight - Stage height from project settings
+ */
+function calculateSmartButtonDimensions(
+  content: string,
+  fontSize: number,
+  location: { x: number; y: number; width: number; height: number },
+  paddingH: number,
+  paddingV: number,
+  stageWidth: number,
+  stageHeight: number
+): { width: number; height: number } {
+  // Estimate text dimensions
+  const charWidth = fontSize * 0.6; // Average character width for buttons
+  const lineHeight = fontSize * 1.4;
+  const contentPaddingH = paddingH * 2;
+  const contentPaddingV = paddingV * 2;
+
+  // Calculate text width needed
+  const textWidth = content.length * charWidth;
+  const minWidthNeeded = textWidth + contentPaddingH;
+
+  // Calculate available width
+  const maxWidth = stageWidth - location.x;
+
+  // Start with location dimensions
+  let newWidth = Math.max(location.width, minWidthNeeded);
+  let newHeight = location.height;
+
+  // Cap width at max
+  if (newWidth > maxWidth) {
+    newWidth = maxWidth;
+  }
+
+  // Calculate how many lines needed at this width
+  const availableContentWidth = newWidth - contentPaddingH;
+  const charsPerLine = Math.floor(availableContentWidth / charWidth);
+  const linesNeeded = charsPerLine > 0 ? Math.ceil(content.length / charsPerLine) : 1;
+  const heightNeeded = linesNeeded * lineHeight + contentPaddingV;
+
+  // Grow height if needed (max: mirror top margin at bottom)
+  const maxHeight = stageHeight - (location.y * 2);
+  if (heightNeeded > location.height) {
+    newHeight = Math.min(heightNeeded, maxHeight);
+  }
+
+  return { width: newWidth, height: newHeight };
+}
+
+/**
+ * Calculate smart text box dimensions that grow to fit content
+ *
+ * Logic:
+ * 1. Start with location's width and height
+ * 2. If text doesn't fit, grow horizontally first (max: mirror left margin on right)
+ * 3. Then grow vertically (max: leave room for button if applicable)
+ * 4. Only scroll if content still doesn't fit
+ *
+ * @param content - The text content
+ * @param fontSize - Font size in pixels
+ * @param location - The element's location with x, y, width, height
+ * @param padding - Padding inside the text box
+ * @param buttonHeight - Actual calculated button height (0 if no button)
+ * @param stageWidth - Stage width from project settings
+ * @param stageHeight - Stage height from project settings
+ */
+function calculateSmartTextBoxDimensions(
+  content: string,
+  fontSize: number,
+  location: { x: number; y: number; width: number; height: number },
+  padding: number,
+  buttonHeight: number,
+  stageWidth: number,
+  stageHeight: number
+): { width: number; height: number; needsScroll: boolean } {
+  // Estimate text dimensions
+  const charWidth = fontSize * 0.55; // Average character width
+  const lineHeight = fontSize * 1.5;
+  const contentPadding = padding * 2; // Padding on both sides
+
+  // Calculate available content area
+  const availableContentWidth = location.width - contentPadding;
+
+  // Estimate how many lines the text needs at current width
+  const estimatedCharsPerLine = Math.floor(availableContentWidth / charWidth);
+  const estimatedLines = estimatedCharsPerLine > 0 ? Math.ceil(content.length / estimatedCharsPerLine) : 1;
+  const estimatedContentHeight = estimatedLines * lineHeight;
+  const estimatedTotalHeight = estimatedContentHeight + contentPadding;
+
+  // Check if content fits in original dimensions
+  if (estimatedTotalHeight <= location.height) {
+    return { width: location.width, height: location.height, needsScroll: false };
+  }
+
+  // Calculate maximum allowed dimensions
+  // Max width: mirror left margin on right side (if x=30, max width reaches to stageWidth-30)
+  const maxWidth = stageWidth - location.x;
+
+  // Max height depends on button height
+  // For button beats: leave room for actual button height + 5% padding
+  // For non-button beats: mirror top margin at bottom
+  const buttonSpace = buttonHeight > 0 ? (buttonHeight + stageHeight * BUTTON_PADDING_PERCENT) : 0;
+  const maxHeight = stageHeight - (location.y * 2 + buttonSpace);
+
+  // Try growing horizontally first
+  let newWidth = location.width;
+  let newHeight = location.height;
+  let needsScroll = false;
+
+  // Step 1: Grow width if possible
+  if (newWidth < maxWidth) {
+    // Try progressively wider widths
+    for (let testWidth = location.width; testWidth <= maxWidth; testWidth += 50) {
+      const testContentWidth = testWidth - contentPadding;
+      const testCharsPerLine = Math.floor(testContentWidth / charWidth);
+      const testLines = testCharsPerLine > 0 ? Math.ceil(content.length / testCharsPerLine) : 1;
+      const testTotalHeight = testLines * lineHeight + contentPadding;
+
+      newWidth = testWidth;
+      if (testTotalHeight <= location.height) {
+        // Content fits at this width with original height
+        return { width: newWidth, height: location.height, needsScroll: false };
+      }
+      if (testTotalHeight <= maxHeight) {
+        // Content fits at this width with some vertical growth
+        newHeight = Math.min(testTotalHeight, maxHeight);
+        return { width: newWidth, height: newHeight, needsScroll: false };
+      }
+    }
+    // Max width reached
+    newWidth = maxWidth;
+  }
+
+  // Step 2: Calculate needed height at max width
+  const finalContentWidth = newWidth - contentPadding;
+  const finalCharsPerLine = Math.floor(finalContentWidth / charWidth);
+  const finalLines = finalCharsPerLine > 0 ? Math.ceil(content.length / finalCharsPerLine) : 1;
+  const finalContentHeight = finalLines * lineHeight + contentPadding;
+
+  if (finalContentHeight <= maxHeight) {
+    // Content fits with vertical growth
+    newHeight = finalContentHeight;
+    return { width: newWidth, height: newHeight, needsScroll: false };
+  }
+
+  // Step 3: Content doesn't fit even at max dimensions - enable scrolling
+  newHeight = maxHeight;
+  needsScroll = true;
+
+  return { width: newWidth, height: newHeight, needsScroll };
+}
+
 /**
  * PositionedBeatView - React component for rendering positioned beat elements
  * 
@@ -240,6 +411,10 @@ export interface PositionedBeatViewProps {
   };
   /** Subscribe to timer state updates for real-time progress bar */
   onSubscribeTimerState?: (listener: (state: PositionedBeatViewProps['timerState']) => void) => () => void;
+  /** Beat type for smart text box sizing (determines if there's a button) */
+  beatType?: string;
+  /** Editor mode - disables smart text box sizing to match selection handles */
+  editorMode?: boolean;
 }
 
 /**
@@ -473,6 +648,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   inventoryVisible = false,
   timerState: initialTimerState,
   onSubscribeTimerState,
+  beatType,
+  editorMode = false,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -804,6 +981,27 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       el.location.kind !== 'text' && el.location.kind !== 'dialog' && el.location.kind !== 'button'
     );
 
+    // Calculate button heights first (so text elements know how much space to reserve)
+    let previewMaxButtonHeight = 0;
+    for (const btnEl of buttonElements) {
+      const btnFontSize = btnEl.location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
+      const btnPaddingH = 16;
+      const btnPaddingV = 10;
+      const btnDims = calculateSmartButtonDimensions(
+        btnEl.content || '',
+        btnFontSize,
+        { x: btnEl.location.x, y: btnEl.location.y, width: btnEl.location.width, height: btnEl.location.height },
+        btnPaddingH,
+        btnPaddingV,
+        stageWidth,
+        stageHeight
+      );
+      if (btnDims.height > previewMaxButtonHeight) {
+        previewMaxButtonHeight = btnDims.height;
+      }
+    }
+    const previewCalculatedButtonHeight = previewMaxButtonHeight > 0 ? previewMaxButtonHeight : DEFAULT_BUTTON_HEIGHT;
+
     // Sort text elements for animation sequencing: title first, then author, then others
     const sortedTextElements = [...textElements].sort((a, b) => {
       const aName = a.location.name?.toLowerCase() || '';
@@ -876,6 +1074,11 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             characterInventoryResolver={characterInventoryResolver}
             inventoryVisible={inventoryVisible}
             containerDimensions={{ width: stageWidth, height: stageHeight }}
+            beatType={beatType}
+            stageWidth={stageWidth}
+            stageHeight={stageHeight}
+            calculatedButtonHeight={previewCalculatedButtonHeight}
+            editorMode={editorMode}
           />
         ))}
 
@@ -960,6 +1163,29 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Non-preview mode: use absolute positioning for all elements
   // Apply collision detection to adjust button positions when text boxes grow
   const adjustedElements = adjustElementsForCollisions(elements, stageWidth, theme);
+
+  // Calculate button heights first (so text elements know how much space to reserve)
+  const buttonElements = adjustedElements.filter(el => el.location.kind === 'button');
+  let maxButtonHeight = 0;
+  for (const btnEl of buttonElements) {
+    const btnFontSize = btnEl.location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
+    const btnPaddingH = 16;
+    const btnPaddingV = 10;
+    const btnDims = calculateSmartButtonDimensions(
+      btnEl.content || '',
+      btnFontSize,
+      { x: btnEl.location.x, y: btnEl.location.y, width: btnEl.location.width, height: btnEl.location.height },
+      btnPaddingH,
+      btnPaddingV,
+      stageWidth,
+      stageHeight
+    );
+    if (btnDims.height > maxButtonHeight) {
+      maxButtonHeight = btnDims.height;
+    }
+  }
+  // Use calculated max or default if no buttons found
+  const calculatedButtonHeight = maxButtonHeight > 0 ? maxButtonHeight : DEFAULT_BUTTON_HEIGHT;
 
   // Calculate animation delays for sequenced typewriter effect on text elements
   const animation = theme.textEffects?.animation || 'none';
@@ -1050,6 +1276,11 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           characterInventoryResolver={characterInventoryResolver}
           inventoryVisible={inventoryVisible}
           containerDimensions={{ width: stageWidth, height: stageHeight }}
+          beatType={beatType}
+          stageWidth={stageWidth}
+          stageHeight={stageHeight}
+          calculatedButtonHeight={calculatedButtonHeight}
+          editorMode={editorMode}
         />
       ))}
     </div>
@@ -1097,6 +1328,16 @@ interface PositionedElementProps {
   inventoryVisible?: boolean;
   /** Container dimensions for screen-docked meter frames */
   containerDimensions?: { width: number; height: number };
+  /** Beat type for smart text box sizing (determines if there's a button) */
+  beatType?: string;
+  /** Stage width from project settings for smart sizing calculations */
+  stageWidth?: number;
+  /** Stage height from project settings for smart sizing calculations */
+  stageHeight?: number;
+  /** Calculated button height for this beat (used by text elements to reserve space) */
+  calculatedButtonHeight?: number;
+  /** Editor mode - disables smart text box sizing to match selection handles */
+  editorMode?: boolean;
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -1124,6 +1365,11 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   characterInventoryResolver,
   inventoryVisible = false,
   containerDimensions,
+  beatType,
+  stageWidth = DEFAULT_STAGE_WIDTH,
+  stageHeight = DEFAULT_STAGE_HEIGHT,
+  calculatedButtonHeight = 0,
+  editorMode = false,
 }) => {
   const { location, content, assetUrl, hyperlinks } = element;
 
@@ -1251,6 +1497,11 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           animationDelay={animationDelay}
           onAnimationComplete={onAnimationComplete}
           skipAnimation={skipAnimation}
+          beatType={beatType}
+          stageWidth={stageWidth}
+          stageHeight={stageHeight}
+          calculatedButtonHeight={calculatedButtonHeight}
+          editorMode={editorMode}
         />
       );
     }
@@ -1378,6 +1629,11 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           animationDelay={animationDelay}
           onAnimationComplete={onAnimationComplete}
           skipAnimation={skipAnimation}
+          beatType={beatType}
+          stageWidth={stageWidth}
+          stageHeight={stageHeight}
+          calculatedButtonHeight={calculatedButtonHeight}
+          editorMode={editorMode}
         />
       );
     }
@@ -1515,8 +1771,13 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   }
 };
 
+// Beat types that have continue buttons (need to reserve space at bottom)
+const BUTTON_BEAT_TYPES = ['infoText', 'endScreen', 'aiSummary', 'aiInfoText'];
+// Beat types without buttons (durScreen, aiDurScreen) - can use full height
+const NO_BUTTON_BEAT_TYPES = ['durScreen', 'aiDurScreen'];
+
 /**
- * Text element renderer with improved autosize calculation
+ * Text element renderer with smart autosize calculation
  */
 const TextElement: React.FC<{
   style: React.CSSProperties;
@@ -1528,7 +1789,12 @@ const TextElement: React.FC<{
   animationDelay?: number;  // Delay in ms before starting animation
   onAnimationComplete?: () => void;  // Callback when animation finishes
   skipAnimation?: boolean;  // When true, immediately show full text
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false }) => {
+  beatType?: string;  // Beat type to determine if there's a button
+  stageWidth?: number;  // Stage width from project settings
+  stageHeight?: number;  // Stage height from project settings
+  calculatedButtonHeight?: number;  // Pre-calculated button height for this beat
+  editorMode?: boolean;  // Editor mode - disables smart sizing
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const [animationStarted, setAnimationStarted] = React.useState(false);
@@ -1677,29 +1943,42 @@ const TextElement: React.FC<{
     ? { animation: `fadeIn ${fadeInDuration}ms ease-in` }
     : {};
 
-  // For text elements, we need to handle height carefully:
-  // - Short content: auto height that expands to fit
-  // - Long content (200+ chars): constrained height with scrolling
-  // This ensures long AI-generated content doesn't overflow the screen
-  const elementHeight = style?.height;
-  const hasValidHeight = elementHeight && typeof elementHeight === 'string' && elementHeight.endsWith('px');
-  const minHeight = hasValidHeight ? elementHeight : '60px';
+  // Smart text box sizing: grow horizontally first, then vertically, scroll only as last resort
+  // SKIP smart sizing in editor mode - use original dimensions to match selection handles
+  let dimensionStyle: React.CSSProperties;
+  if (editorMode) {
+    // Editor mode: use exact stored dimensions to match selection handles
+    dimensionStyle = {
+      width: `${location.width}px`,
+      height: `${location.height}px`,
+      overflowY: 'auto',
+    };
+  } else {
+    // Runtime/preview mode: use smart sizing
+    // Use pre-calculated button height if provided, otherwise use default
+    const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true; // Default to having button
+    const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
+    const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
+      ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
+      : 0;
 
-  // For very long content, cap the height to a percentage of viewport and enable scrolling
-  // This creates a scrollable textbox for AI-generated content
-  const needsScrolling = isVeryLongContent; // 200+ chars
-  const maxHeight = needsScrolling ? '50vh' : undefined;
-  const heightStyle = needsScrolling
-    ? {
-        height: maxHeight,  // Fixed height to enable scrolling
-        minHeight: '100px',
-        maxHeight,
-        overflowY: 'auto' as const,
-      }
-    : {
-        height: 'auto',
-        minHeight,
-      };
+    // Calculate smart dimensions
+    const smartDims = calculateSmartTextBoxDimensions(
+      content,
+      computedFontSize,
+      { x: location.x, y: location.y, width: location.width, height: location.height },
+      padding,
+      effectiveButtonHeight,
+      stageWidth,
+      stageHeight
+    );
+
+    dimensionStyle = {
+      width: `${smartDims.width}px`,
+      height: `${smartDims.height}px`,
+      overflowY: smartDims.needsScroll ? 'auto' : 'hidden',
+    };
+  }
 
   // For typewriter animation, render full text but make unrevealed characters transparent
   // This keeps text centered while characters appear one by one
@@ -1719,7 +1998,7 @@ const TextElement: React.FC<{
         style={{
           ...style,
           ...animationStyle,
-          ...heightStyle,
+          ...dimensionStyle,
           backgroundColor: bgWithOpacity,
           padding: shouldHideTextBox ? '0' : `${padding}px`,
           border: shouldHideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
@@ -1885,6 +2164,14 @@ const ButtonElement: React.FC<{
     ? (isHovered && theme.buttonHoverUrl ? theme.buttonHoverUrl : theme.buttonNormalUrl)
     : undefined;
 
+  // Calculate minimum width needed to fit text with padding
+  // Approximate: fontSize * 0.6 per character + padding
+  const textLength = content?.length || 0;
+  const estimatedTextWidth = textLength * computedFontSize * 0.6;
+  const minWidthNeeded = estimatedTextWidth + (paddingHorizontal * 2) + 8; // 8px for border
+  // Use at least the location width, but expand if text needs more space
+  const effectiveMinWidth = Math.max(minWidthNeeded, 100); // At least 100px
+
   const buttonStyle: React.CSSProperties = {
     ...style,
     // Use background image if available, otherwise use solid color
@@ -1917,7 +2204,8 @@ const ButtonElement: React.FC<{
     alignItems: 'center',
     justifyContent: 'center',
     lineHeight: '1.2',
-    overflow: 'hidden',
+    minWidth: `${effectiveMinWidth}px`,
+    minHeight: `${computedFontSize * 1.2 + (paddingVertical * 2) + 4}px`, // Font + padding + border
   };
 
 
@@ -2182,7 +2470,7 @@ const HyperTextContent: React.FC<{
 };
 
 /**
- * Dialog element renderer
+ * Dialog element renderer with smart autosize calculation
  */
 const DialogElement: React.FC<{
   style: React.CSSProperties;
@@ -2196,7 +2484,12 @@ const DialogElement: React.FC<{
   animationDelay?: number;
   onAnimationComplete?: () => void;
   skipAnimation?: boolean;
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false }) => {
+  beatType?: string;  // Beat type to determine if there's a button
+  stageWidth?: number;  // Stage width from project settings
+  stageHeight?: number;  // Stage height from project settings
+  calculatedButtonHeight?: number;  // Pre-calculated button height for this beat
+  editorMode?: boolean;  // Editor mode - disables smart sizing
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const hasCalledCompleteRef = React.useRef(false);
@@ -2286,10 +2579,43 @@ const DialogElement: React.FC<{
   // Calculate padding as percentage of box size
   const paddingHorizontal = Math.max(Math.floor(location.width * 0.04), 12);
   const paddingVertical = Math.max(Math.floor(location.height * 0.1), 12);
+  const totalPadding = Math.max(paddingHorizontal, paddingVertical);
 
-  // Always use auto height for dialog boxes to prevent content clipping
-  // minHeight ensures the box maintains a reasonable size even with short text
-  const heightStyle = { height: 'auto', minHeight: '60px' };
+  // Smart text box sizing: grow horizontally first, then vertically, scroll only as last resort
+  // SKIP smart sizing in editor mode - use original dimensions to match selection handles
+  let dimensionStyle: React.CSSProperties;
+  if (editorMode) {
+    // Editor mode: use exact stored dimensions to match selection handles
+    dimensionStyle = {
+      width: `${location.width}px`,
+      height: `${location.height}px`,
+      overflowY: 'auto',
+    };
+  } else {
+    // Runtime/preview mode: use smart sizing
+    // Use pre-calculated button height if provided, otherwise use default
+    const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
+    const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
+    const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
+      ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
+      : 0;
+
+    const smartDims = calculateSmartTextBoxDimensions(
+      content,
+      computedFontSize,
+      { x: location.x, y: location.y, width: location.width, height: location.height },
+      totalPadding,
+      effectiveButtonHeight,
+      stageWidth,
+      stageHeight
+    );
+
+    dimensionStyle = {
+      width: `${smartDims.width}px`,
+      height: `${smartDims.height}px`,
+      overflowY: smartDims.needsScroll ? 'auto' : 'hidden',
+    };
+  }
 
   // Use theme colors for text box styling
   const opacityValue = theme.textBox.opacity / 100;
@@ -2308,7 +2634,7 @@ const DialogElement: React.FC<{
     <div
       style={{
         ...style,
-        ...heightStyle,
+        ...dimensionStyle,
         // Use frame image if available, otherwise use solid background
         ...(hasFrameImage ? {
           backgroundImage: `url(${theme.textboxFrameUrl})`,
@@ -2331,7 +2657,6 @@ const DialogElement: React.FC<{
         boxSizing: 'border-box',
         display: 'block',
         lineHeight: '1.5',
-        overflow: 'hidden',
       }}
     >
       <span style={{ display: 'inline' }}>

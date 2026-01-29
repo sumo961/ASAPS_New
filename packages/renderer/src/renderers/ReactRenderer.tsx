@@ -1189,6 +1189,7 @@ export class ReactRenderer extends BaseRenderer {
               inventoryVisible={this.inventoryVisible}
               timerState={this.timerState}
               onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
+              beatType={beatType}
             />
           </ScaledStage>
         </div>

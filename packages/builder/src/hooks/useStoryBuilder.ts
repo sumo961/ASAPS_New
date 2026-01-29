@@ -473,6 +473,12 @@ export function useStoryBuilder() {
     const result = await processor.parseASML(xmlContent);
     console.warn('[importStory] ★★★ parseASML returned ★★★', result.success ? 'SUCCESS' : 'FAILED');
 
+    // Log parser warnings (useful for debugging missing beats)
+    if (result.warnings && result.warnings.length > 0) {
+      console.warn('[importStory] Parser warnings:', result.warnings);
+      errors.push(...result.warnings);
+    }
+
     if (!result.success || !result.story) {
       return {
         success: false,

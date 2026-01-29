@@ -755,9 +755,9 @@ export class ASMLParser {
 
       const story = new Story();
 
-      // Parse metadata
+      // Parse metadata (title may be updated later from titleScreen beat)
       const metadata = {
-        title: storyElement.getAttribute('title') || 'Untitled Story',
+        title: storyElement.getAttribute('title') || '',
         author: storyElement.getAttribute('author') || 'Unknown',
         version: storyElement.getAttribute('version') || '1.0.0'
       };
@@ -802,6 +802,32 @@ export class ASMLParser {
         // Add clusters to the story
         if (clusters && clusters.length > 0) {
           story.setClusters(clusters);
+        }
+
+        // If story title is still empty, try to extract from titleScreen beat
+        const currentMetadata = story.getMetadata();
+        if (!currentMetadata.title) {
+          // Look for a titleScreen beat and extract its title
+          const titleScreenBeat = beats.find(b => b.type === 'titleScreen');
+          if (titleScreenBeat) {
+            const params = titleScreenBeat.getParameters?.() || {};
+            if (params.title) {
+              story.setMetadata({
+                ...currentMetadata,
+                title: params.title
+              });
+            } else {
+              story.setMetadata({
+                ...currentMetadata,
+                title: 'Untitled Story'
+              });
+            }
+          } else {
+            story.setMetadata({
+              ...currentMetadata,
+              title: 'Untitled Story'
+            });
+          }
         }
       }
 
@@ -1001,6 +1027,11 @@ export class ASMLParser {
     const remainingBeats = beats.filter(beat => !mergedBeats.has(beat.id));
 
     console.log(`[ASMLParser] Dialog tree combination complete: merged ${mergeCount} beats, ${remainingBeats.length} beats remaining`);
+
+    // Add info message so users understand the beat count reduction
+    if (mergeCount > 0) {
+      this.warnings.push(`Combined ${mergeCount} consecutive dialog beats into nested dialogs (${beats.length} → ${remainingBeats.length} beats). This is normal behavior that creates proper dialog structures.`);
+    }
 
     return remainingBeats;
   }
@@ -1402,16 +1433,25 @@ export class ASMLParser {
 
     // Parse beats
     const beatElements = plotElement.querySelectorAll('beat');
+    console.log(`[ASMLParser] Found ${beatElements.length} beat elements in XML`);
+    let skippedBeats = 0;
     beatElements.forEach(beatElement => {
       try {
         const beat = this.parseBeat(beatElement);
         if (beat) {
           beats.push(beat);
+        } else {
+          skippedBeats++;
         }
       } catch (error: any) {
+        skippedBeats++;
         this.warnings.push(`Failed to parse beat: ${error.message}`);
       }
     });
+    console.log(`[ASMLParser] Successfully parsed ${beats.length} beats, skipped ${skippedBeats}`);
+    if (skippedBeats > 0) {
+      console.warn(`[ASMLParser] Check warnings for details on skipped beats:`, this.warnings);
+    }
 
     return { clusters, beats };
   }
@@ -2706,7 +2746,12 @@ export class ASMLParser {
       if (font) location.font = font;
 
       const fontSize = locEl.getAttribute('fontSize');
-      if (fontSize) location.fontSize = parseInt(fontSize);
+      if (fontSize) {
+        // Scale font size proportionally (average of X and Y scale factors)
+        const fontSizeScale = (SCALE_X + SCALE_Y) / 2;
+        location.fontSize = Math.round(parseInt(fontSize) * fontSizeScale);
+        console.warn(`[ASMLParser] Scaling fontSize: ${fontSize} → ${location.fontSize}`);
+      }
 
       const textAlign = locEl.getAttribute('textAlign') as 'left' | 'center' | 'right';
       if (textAlign) location.textAlign = textAlign;

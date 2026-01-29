@@ -430,6 +430,58 @@ export class FilesystemStorageAdapter implements IStorageAdapter {
     }
   }
 
+  async reassociateAssets(fromProjectId: string, toProjectId: string): Promise<number> {
+    this.ensureReady();
+
+    try {
+      // Update metadata files to point to new project ID
+      const metadataDir = path.join(this.baseDir, 'metadata');
+      let count = 0;
+
+      if (fs.existsSync(metadataDir)) {
+        const files = fs.readdirSync(metadataDir);
+        for (const file of files) {
+          if (file.endsWith('.json')) {
+            const filePath = path.join(metadataDir, file);
+            const data = fs.readFileSync(filePath, 'utf-8');
+            const metadata: AssetStorageInfo = JSON.parse(data);
+            if (metadata.projectId === fromProjectId) {
+              metadata.projectId = toProjectId;
+              fs.writeFileSync(filePath, JSON.stringify(metadata, null, 2));
+              count++;
+            }
+          }
+        }
+      }
+
+      // Move asset files if they exist in project-specific directories
+      const fromDir = path.join(this.baseDir, 'assets', fromProjectId);
+      const toDir = path.join(this.baseDir, 'assets', toProjectId);
+
+      if (fs.existsSync(fromDir)) {
+        if (!fs.existsSync(toDir)) {
+          fs.mkdirSync(toDir, { recursive: true });
+        }
+        const assetFiles = fs.readdirSync(fromDir);
+        for (const assetFile of assetFiles) {
+          const fromPath = path.join(fromDir, assetFile);
+          const toPath = path.join(toDir, assetFile);
+          fs.renameSync(fromPath, toPath);
+        }
+        // Remove empty source directory
+        fs.rmdirSync(fromDir);
+      }
+
+      return count;
+    } catch (err) {
+      throw new StorageError(
+        `Failed to reassociate assets from ${fromProjectId} to ${toProjectId}`,
+        'UNKNOWN',
+        err as Error
+      );
+    }
+  }
+
   async getAssetDataURL(assetId: string): Promise<string | null> {
     this.ensureReady();
 

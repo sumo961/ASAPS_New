@@ -366,8 +366,8 @@ function App() {
       boxVisibility: 'all'
     },
     textEffects: {
-      animation: 'typewriter',  // Visual Novel style typewriter effect
-      typewriterSpeed: 15,      // Characters per second (slower for visible effect)
+      animation: 'none',        // No typewriter effect by default
+      typewriterSpeed: 15,      // Characters per second (if typewriter enabled)
       fadeInDuration: 200
     },
     hotspots: {
@@ -2454,6 +2454,12 @@ function App() {
       pendingNewProjectIdRef.current = newProjectId;
       loadedProjectIdRef.current = newProjectId;
       console.log('[App] ASML import with assets - Created new project:', newProjectId, 'with title:', importedTitle);
+
+      // CRITICAL: Reassociate assets from tempProjectId to the actual project ID
+      // Assets were saved with tempProjectId during import, but now need to be linked to the real project
+      const storage = getStorageAdapter();
+      const migratedCount = await storage.reassociateAssets(tempProjectId, newProjectId);
+      console.log(`[App] ASML import - Reassociated ${migratedCount} assets from ${tempProjectId} to ${newProjectId}`);
 
       // Show summary
       let message = 'Story imported successfully!';
