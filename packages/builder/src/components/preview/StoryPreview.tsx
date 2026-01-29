@@ -1299,6 +1299,8 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
       if ((backgroundMusicAssetId || backgroundMusicUrl) && !soundSettings?.mute && soundEnabled) {
         try {
           const audioManager = getAudioManager();
+          // Stop any existing sounds first to prevent duplicates on restart
+          audioManager.stopAllSounds();
           const volume = (soundSettings.backgroundVolume || 70) / 100;
 
           let audioBlob: Blob | null = null;

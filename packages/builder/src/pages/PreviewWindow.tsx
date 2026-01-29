@@ -1032,8 +1032,73 @@ export const PreviewWindow: React.FC = () => {
       // Initial debug info
       updateDebugInfo();
 
-      // Note: Background music is handled by PlayerEngine.startBackgroundMusic()
-      // which is called during engine.start(). No need to start it here.
+      // Start background music if configured
+      // StoryEngine (from @asaps/core) doesn't handle background music,
+      // so we need to handle it here using the AudioManager
+      const soundSettings = previewData.settings?.sound;
+      if (soundSettings && soundEnabled) {
+        const backgroundMusicAssetId = soundSettings.backgroundMusicAssetId;
+        const backgroundMusicUrl = soundSettings.backgroundMusic;
+
+        if ((backgroundMusicAssetId || backgroundMusicUrl) && !soundSettings.mute) {
+          try {
+            const audioManager = getAudioManager();
+            // Stop any existing sounds first to prevent duplicates on restart
+            audioManager.stopAllSounds();
+            const volume = (soundSettings.backgroundVolume || 70) / 100;
+
+            let audioUrl: string | null = null;
+
+            // First priority: use backgroundMusicAssetId if available
+            if (backgroundMusicAssetId && previewData.assets) {
+              const asset = previewData.assets.find((a: Asset) => a.id === backgroundMusicAssetId);
+              if (asset?.url) {
+                audioUrl = asset.url;
+                console.log(`[PreviewWindow] Found background music asset: ${asset.name}`);
+              }
+            }
+
+            // Fallback: try to find asset by URL or name reference
+            if (!audioUrl && backgroundMusicUrl && previewData.assets) {
+              const audioAsset = previewData.assets.find((a: Asset) =>
+                a.id === backgroundMusicUrl ||
+                a.name === backgroundMusicUrl ||
+                a.url === backgroundMusicUrl ||
+                a.name?.replace(/\.[^/.]+$/, '') === backgroundMusicUrl
+              );
+              if (audioAsset?.url) {
+                audioUrl = audioAsset.url;
+                console.log(`[PreviewWindow] Found background music by name match: ${audioAsset.name}`);
+              }
+            }
+
+            // Fallback: external URL
+            if (!audioUrl && backgroundMusicUrl?.startsWith('http')) {
+              audioUrl = backgroundMusicUrl;
+            }
+
+            if (audioUrl) {
+              // Fetch and play as blob for better caching
+              try {
+                const response = await fetch(audioUrl);
+                if (response.ok) {
+                  const blob = await response.blob();
+                  await audioManager.playSoundFromBlob(blob, volume, true, audioUrl); // true = loop
+                  console.log('[PreviewWindow] Background music started successfully');
+                }
+              } catch (fetchError) {
+                // Fallback to direct URL playback
+                console.warn('[PreviewWindow] Blob fetch failed, trying direct URL:', fetchError);
+                await audioManager.playSound(audioUrl, volume, true);
+              }
+            } else {
+              console.warn(`[PreviewWindow] Could not resolve background music. AssetId: ${backgroundMusicAssetId}, URL: ${backgroundMusicUrl}`);
+            }
+          } catch (error) {
+            console.warn('[PreviewWindow] Failed to start background music:', error);
+          }
+        }
+      }
 
       // Start from the specified beat or the beginning
       const actualStartBeat = overrideBeatId || startBeatId || undefined;
@@ -1044,7 +1109,7 @@ export const PreviewWindow: React.FC = () => {
     } finally {
       setIsRunning(false);
     }
-  }, [story, previewData, startBeatId, selectedPreset]);
+  }, [story, previewData, startBeatId, selectedPreset, soundEnabled]);
 
   // Auto-start preview when story is loaded
   useEffect(() => {
