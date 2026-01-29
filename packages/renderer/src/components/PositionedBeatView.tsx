@@ -85,8 +85,9 @@ function calculateSmartButtonDimensions(
   const textWidth = content.length * charWidth;
   const minWidthNeeded = textWidth + contentPaddingH;
 
-  // Calculate available width
-  const maxWidth = stageWidth - location.x;
+  // Calculate available width - leave 5% margin on the right edge
+  const rightMargin = stageWidth * 0.05;
+  const maxWidth = stageWidth - location.x - rightMargin;
 
   // Start with location dimensions
   let newWidth = Math.max(location.width, minWidthNeeded);
@@ -158,8 +159,9 @@ function calculateSmartTextBoxDimensions(
   }
 
   // Calculate maximum allowed dimensions
-  // Max width: mirror left margin on right side (if x=30, max width reaches to stageWidth-30)
-  const maxWidth = stageWidth - location.x;
+  // Max width: leave 5% margin on right edge to prevent overflow
+  const rightMargin = stageWidth * 0.05;
+  const maxWidth = stageWidth - location.x - rightMargin;
 
   // Max height depends on button height
   // For button beats: leave room for actual button height + 5% padding
