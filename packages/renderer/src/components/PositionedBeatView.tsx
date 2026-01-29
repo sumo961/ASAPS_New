@@ -1509,7 +1509,21 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
     }
 
     case 'button': {
-      // Use stored dimensions directly - auto-sizing happens at import time
+      // Calculate smart dimensions for the button to prevent overflow
+      const btnFontSize = location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
+      const btnPaddingH = 16;
+      const btnPaddingV = 10;
+      const smartBtnDims = editorMode ? { width: location.width, height: location.height } :
+        calculateSmartButtonDimensions(
+          content,
+          btnFontSize,
+          { x: location.x, y: location.y, width: location.width, height: location.height },
+          btnPaddingH,
+          btnPaddingV,
+          stageWidth,
+          stageHeight
+        );
+
       // Check if this button leads to a visited beat
       const isButtonVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
       // Wrap button in a div that handles the fade-in animation
@@ -1520,6 +1534,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         <div
           style={{
             ...baseStyle,
+            width: `${smartBtnDims.width}px`,
+            height: `${smartBtnDims.height}px`,
             opacity: buttonOpacity,
             transition: 'opacity 300ms ease-in',
             pointerEvents: shouldShowButtons ? 'auto' : 'none',
