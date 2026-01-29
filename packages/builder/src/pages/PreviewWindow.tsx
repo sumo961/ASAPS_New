@@ -302,6 +302,7 @@ export const PreviewWindow: React.FC = () => {
   const shouldPauseOnFirstBeatRef = useRef<boolean>(true);
   const hasResumedRef = useRef<boolean>(false); // Prevents race condition with auto-pause setTimeout
   const stateChangeUnsubscribeRef = useRef<(() => void) | null>(null); // Cleanup previous listener
+  const handleRestartRef = useRef<((beatId?: string, preset?: StatePreset | null, pauseOnStart?: boolean) => void) | null>(null);
 
   // Detect if running in Electron
   useEffect(() => {
@@ -337,10 +338,12 @@ export const PreviewWindow: React.FC = () => {
 
         case 'NAVIGATE_TO_BEAT':
           if (message.payload?.beatId) {
+            console.log('[PreviewWindow] NAVIGATE_TO_BEAT:', message.payload.beatId, 'isRunning:', isRunning, 'isPaused:', isPaused);
             setStartBeatId(message.payload.beatId);
-            // If preview is running, restart from this beat
-            if (isRunning && engineRef.current) {
-              handleRestart(message.payload.beatId);
+            // Always restart/start from this beat when a beat is selected in the editor
+            // This provides immediate feedback when clicking beats in the flowchart
+            if (handleRestartRef.current) {
+              handleRestartRef.current(message.payload.beatId, undefined, true); // pauseOnStart=true so user can see the beat
             }
           }
           break;
@@ -383,7 +386,7 @@ export const PreviewWindow: React.FC = () => {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [isRunning]);
+  }, [isRunning, isPaused]);
 
   // Reconstruct story from serialized data
   useEffect(() => {
@@ -1146,6 +1149,9 @@ export const PreviewWindow: React.FC = () => {
     setActiveTimers([]);
     startPreview(overrideBeatId, pauseOnStart, overridePreset);
   }, [startPreview]);
+
+  // Keep ref updated for use in message handler
+  handleRestartRef.current = handleRestart;
 
   // Stop preview
   const stopPreview = useCallback(() => {
