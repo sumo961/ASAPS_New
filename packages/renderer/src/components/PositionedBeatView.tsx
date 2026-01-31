@@ -1469,11 +1469,13 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
 
       // Calculate expanded width for long content, centered in container
       // Note: We only expand for genuinely long content that needs more space.
-      // User-defined dimensions from the Visual Editor are respected.
+      // In editor mode, respect user-defined dimensions to match selection handles.
       let effectiveWidth = location.width;
       let effectiveLeft = effectiveX;
 
-      if (containerDimensions && (isLongContent || isVeryLongContent)) {
+      // Only auto-expand in preview/runtime mode, not in editor mode
+      // This ensures the rendered text box matches the selection handles in the visual editor
+      if (!editorMode && containerDimensions && (isLongContent || isVeryLongContent)) {
         const containerWidth = containerDimensions.width;
         // Use 90% for very long, 80% for long content
         const widthPercent = isVeryLongContent ? 0.9 : 0.8;
@@ -1934,7 +1936,9 @@ const TextElement: React.FC<{
     console.log(`[PositionedBeatView] Text "${location.name}": auto-sized to fontSize=${computedFontSize} (contentLength=${contentLength})`);
   }
 
-  const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
+  // In editor mode, keep text centered to match user expectations (they positioned the box)
+  // In preview mode, auto-switch to left alignment for long content (better readability)
+  const computedTextAlign = location.textAlign || (editorMode ? 'center' : (isLongContent ? 'left' : 'center'));
   // Apply font mapping: use element's font if explicitly set, otherwise use theme default
   // Title/author elements use titleFont, others use textFont
   const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
