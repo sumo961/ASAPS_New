@@ -269,6 +269,7 @@ export const PreviewWindow: React.FC = () => {
   const [story, setStory] = useState<Story | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isWaitingToStart, setIsWaitingToStart] = useState(false); // Ready to preview but waiting for user click
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
   const [startBeatId, setStartBeatId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
@@ -299,10 +300,9 @@ export const PreviewWindow: React.FC = () => {
   const engineRef = useRef<StoryEngine | null>(null);
   const countersRef = useRef<Record<string, number>>({});
   const isElectronRef = useRef<boolean>(false);
-  const shouldPauseOnFirstBeatRef = useRef<boolean>(true);
-  const hasResumedRef = useRef<boolean>(false); // Prevents race condition with auto-pause setTimeout
   const stateChangeUnsubscribeRef = useRef<(() => void) | null>(null); // Cleanup previous listener
   const handleRestartRef = useRef<((beatId?: string, preset?: StatePreset | null, pauseOnStart?: boolean) => void) | null>(null);
+  const navigatedBeatIdRef = useRef<string | null>(null); // Track manually navigated beat to prevent STORY_UPDATE from overwriting
 
   // Detect if running in Electron
   useEffect(() => {
@@ -324,27 +324,59 @@ export const PreviewWindow: React.FC = () => {
       switch (message.type) {
         case 'STORY_UPDATE':
           if (message.payload) {
+            const payloadBeatId = message.payload.beatId;
+            const firstBeatId = message.payload.storyData?.firstBeatId;
+
+            console.log('[PreviewWindow] STORY_UPDATE received:', {
+              payloadBeatId,
+              firstBeatId,
+              hasAutoStarted: hasAutoStarted.current,
+              isWaitingToStart
+            });
+
             setPreviewData(message.payload);
             setConnectionStatus('connected');
-            // If a specific beat was requested, set it as start
-            // Otherwise default to the first beat of the story
-            if (message.payload.beatId) {
-              setStartBeatId(message.payload.beatId);
-            } else if (message.payload.storyData?.firstBeatId) {
-              setStartBeatId(message.payload.storyData.firstBeatId);
+
+            // On first load (no story running), show "waiting to start" state
+            if (!hasAutoStarted.current) {
+              // Determine which beat to start from
+              const targetBeatId = payloadBeatId || firstBeatId;
+              if (targetBeatId) {
+                setStartBeatId(targetBeatId);
+              }
+              console.log('[PreviewWindow] STORY_UPDATE: first load, showing wait state for:', targetBeatId);
+              hasAutoStarted.current = true;
+              setIsWaitingToStart(true);
             }
+            // If already initialized, only update startBeatId if explicitly provided
+            else if (payloadBeatId && !isWaitingToStart && !isRunning && !isPaused) {
+              console.log('[PreviewWindow] STORY_UPDATE: beat changed to:', payloadBeatId);
+              setStartBeatId(payloadBeatId);
+              setIsWaitingToStart(true);
+            }
+            // Otherwise don't change startBeatId - just update the story data
           }
           break;
 
         case 'NAVIGATE_TO_BEAT':
           if (message.payload?.beatId) {
-            console.log('[PreviewWindow] NAVIGATE_TO_BEAT:', message.payload.beatId, 'isRunning:', isRunning, 'isPaused:', isPaused);
+            console.log('[PreviewWindow] NAVIGATE_TO_BEAT:', message.payload.beatId);
+            // Track this as a manual navigation to prevent STORY_UPDATE from overwriting
+            navigatedBeatIdRef.current = message.payload.beatId;
             setStartBeatId(message.payload.beatId);
-            // Always restart/start from this beat when a beat is selected in the editor
-            // This provides immediate feedback when clicking beats in the flowchart
-            if (handleRestartRef.current) {
-              handleRestartRef.current(message.payload.beatId, undefined, true); // pauseOnStart=true so user can see the beat
+            // Mark as already started to prevent auto-start effect from running
+            hasAutoStarted.current = true;
+            // Stop any current execution and wait for user to click to start
+            if (engineRef.current) {
+              engineRef.current.stop();
             }
+            if (rendererRef.current) {
+              rendererRef.current.clear();
+            }
+            setIsRunning(false);
+            setIsPaused(false);
+            setIsWaitingToStart(true); // Show "click to start" state
+            setCurrentBeat(null);
           }
           break;
 
@@ -442,10 +474,7 @@ export const PreviewWindow: React.FC = () => {
   // Track if we've auto-started (ref to persist across renders)
   const hasAutoStarted = useRef(false);
 
-  // Reset auto-start flag when story data changes
-  useEffect(() => {
-    hasAutoStarted.current = false;
-  }, [previewData?.storyData]);
+  // Note: hasAutoStarted is now only used to track if we've shown the initial "waiting to start" state
 
   // Generate presets when story or start beat changes
   const handleGeneratePresets = useCallback(() => {
@@ -851,6 +880,11 @@ export const PreviewWindow: React.FC = () => {
     if (!engineRef.current || !rendererRef.current || !story || !previewData) return;
 
     try {
+      // Stop any previous run and clear renderer
+      if (engineRef.current) {
+        engineRef.current.stop();
+      }
+      rendererRef.current.clear();
       setIsRunning(true);
 
       // Initialize beat locations
@@ -919,10 +953,6 @@ export const PreviewWindow: React.FC = () => {
         }
       };
 
-      // Set whether we should auto-pause on the first beat
-      shouldPauseOnFirstBeatRef.current = startPaused;
-      hasResumedRef.current = false; // Reset the resumed flag
-
       // Clean up previous state change listener to avoid multiple callbacks
       if (stateChangeUnsubscribeRef.current) {
         stateChangeUnsubscribeRef.current();
@@ -935,25 +965,6 @@ export const PreviewWindow: React.FC = () => {
           setCurrentBeat(beat || null);
           // Update debug info when beat changes
           updateDebugInfo();
-
-          // Auto-pause only on the first beat (start paused)
-          if (shouldPauseOnFirstBeatRef.current && engineRef.current) {
-            shouldPauseOnFirstBeatRef.current = false; // Only pause once - using ref so it persists
-            // Small delay to let the beat render before pausing
-            setTimeout(() => {
-              // Check if user has already clicked to resume - if so, don't pause
-              if (hasResumedRef.current) {
-                console.log('[PreviewWindow] Skipping auto-pause - user already resumed');
-                return;
-              }
-              if (engineRef.current && !engineRef.current.isPaused()) {
-                engineRef.current.pause();
-                setIsPaused(true);
-                setIsRunning(false);
-                console.log('[PreviewWindow] Started paused at beat:', beatInfo.name);
-              }
-            }, 50);
-          }
         }
       });
 
@@ -1115,18 +1126,8 @@ export const PreviewWindow: React.FC = () => {
   }, [story, previewData, startBeatId, selectedPreset, soundEnabled]);
 
   // Auto-start preview when story is loaded
-  useEffect(() => {
-    // Only auto-start once when story first loads
-    if (story && previewData && !isRunning && !hasAutoStarted.current) {
-      hasAutoStarted.current = true;
-      // Small delay to ensure renderer is initialized
-      const timer = setTimeout(() => {
-        console.log('[PreviewWindow] Auto-starting preview');
-        startPreview();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [story, previewData, isRunning, startPreview]);
+  // Note: Auto-start is disabled. User must click to start preview.
+  // This provides clearer UX - user sees which beat they'll preview before it runs.
 
   // Restart preview
   // pauseOnStart: true to pause at first beat (useful when reviewing with preset state)
@@ -1192,7 +1193,6 @@ export const PreviewWindow: React.FC = () => {
   // Resume preview
   const resumePreview = useCallback(async () => {
     if (engineRef.current && isPaused) {
-      hasResumedRef.current = true; // Prevent race condition with auto-pause setTimeout
       setIsPaused(false);
       setIsRunning(true);
       await engineRef.current.resume();
@@ -1225,14 +1225,23 @@ export const PreviewWindow: React.FC = () => {
         e.preventDefault();
         setInventoryVisible(prev => !prev);
       }
-      // Escape: Stop preview
-      if (e.key === 'Escape' && (isRunning || isPaused)) {
-        stopPreview();
+      // Escape: Stop preview or cancel waiting
+      if (e.key === 'Escape') {
+        if (isWaitingToStart) {
+          setIsWaitingToStart(false);
+          navigatedBeatIdRef.current = null;
+          setStartBeatId(null);
+        } else if (isRunning || isPaused) {
+          stopPreview();
+        }
       }
       // Space: Start/pause/resume preview
       if (e.key === ' ' && story) {
         e.preventDefault();
-        if (isPaused) {
+        if (isWaitingToStart) {
+          setIsWaitingToStart(false);
+          startPreview(startBeatId || undefined, false);
+        } else if (isPaused) {
           resumePreview();
         } else if (isRunning) {
           pausePreview();
@@ -1244,7 +1253,7 @@ export const PreviewWindow: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isRunning, isPaused, story, startPreview, stopPreview, pausePreview, resumePreview]);
+  }, [isRunning, isPaused, isWaitingToStart, story, startBeatId, startPreview, stopPreview, pausePreview, resumePreview]);
 
   // Update renderer inventory visibility
   useEffect(() => {
@@ -1252,6 +1261,7 @@ export const PreviewWindow: React.FC = () => {
       (rendererRef.current as any).setInventoryVisible(inventoryVisible);
     }
   }, [inventoryVisible]);
+
 
   // Loading state
   if (connectionStatus === 'connecting' && !previewData) {
@@ -1304,7 +1314,7 @@ export const PreviewWindow: React.FC = () => {
               {showBeatMenu && (
                 <div className="absolute left-0 top-full mt-1 w-64 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                   <button
-                    onClick={() => { setStartBeatId(null); setShowBeatMenu(false); }}
+                    onClick={() => { navigatedBeatIdRef.current = null; setStartBeatId(null); setShowBeatMenu(false); }}
                     className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${!startBeatId ? 'bg-blue-50 text-blue-700' : ''}`}
                   >
                     <div className="font-medium">Start from beginning</div>
@@ -1313,7 +1323,7 @@ export const PreviewWindow: React.FC = () => {
                   {story.getAllBeats().map((beat) => (
                     <button
                       key={beat.id}
-                      onClick={() => { setStartBeatId(beat.id); setShowBeatMenu(false); }}
+                      onClick={() => { navigatedBeatIdRef.current = null; setStartBeatId(beat.id); setShowBeatMenu(false); }}
                       className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${startBeatId === beat.id ? 'bg-blue-50 text-blue-700' : ''}`}
                     >
                       <div className="font-medium truncate">{beat.name}</div>
@@ -1382,6 +1392,7 @@ export const PreviewWindow: React.FC = () => {
                   {/* Clean state option */}
                   <button
                     onClick={() => {
+                      navigatedBeatIdRef.current = null; // Allow STORY_UPDATE to work normally
                       setSelectedPreset(null);
                       setShowPresetMenu(false);
                       // Auto-restart preview with no preset (pass null explicitly)
@@ -1458,6 +1469,7 @@ export const PreviewWindow: React.FC = () => {
                             <button
                               key={idx}
                               onClick={() => {
+                                navigatedBeatIdRef.current = null; // Allow STORY_UPDATE to work normally
                                 // Convert GeneratedPreset to StatePreset format
                                 const preset: StatePreset = {
                                   ...genPreset.preset,
@@ -1498,7 +1510,33 @@ export const PreviewWindow: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {!isRunning && !isPaused ? (
+          {isWaitingToStart ? (
+            <>
+              <button
+                onClick={() => {
+                  setIsWaitingToStart(false);
+                  startPreview(startBeatId || undefined, false);
+                }}
+                className="px-4 py-1.5 bg-amber-500 text-white text-sm rounded hover:bg-amber-600 flex items-center gap-2"
+              >
+                <Play className="w-4 h-4" />
+                Start Preview
+              </button>
+              <button
+                onClick={() => {
+                  setIsWaitingToStart(false);
+                  navigatedBeatIdRef.current = null;
+                  setStartBeatId(null);
+                }}
+                className="px-3 py-1.5 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <div className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded flex items-center gap-1">
+                Ready
+              </div>
+            </>
+          ) : !isRunning && !isPaused ? (
             <button
               onClick={() => startPreview()}
               className="px-4 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 flex items-center gap-2"
@@ -1581,7 +1619,9 @@ export const PreviewWindow: React.FC = () => {
             }}
           >
             <div
-              className="relative bg-white shadow-lg"
+              className={`relative bg-white shadow-lg transition-all duration-200 ${
+                (isPaused || isWaitingToStart) ? 'ring-4 ring-amber-400 ring-offset-2' : ''
+              }`}
               style={{
                 width: STAGE_WIDTH,
                 height: STAGE_HEIGHT,
@@ -1590,19 +1630,36 @@ export const PreviewWindow: React.FC = () => {
               }}
             >
               <div ref={containerRef} className="absolute inset-0" />
-              {/* Click overlay to resume when paused */}
-              {isPaused && (
+              {/* Waiting to start overlay - shows when navigated to a beat but not yet started */}
+              {isWaitingToStart && (
                 <div
-                  className="absolute inset-0 cursor-pointer flex items-end justify-center pb-4"
+                  className="absolute inset-0 z-50 bg-gray-900/30 cursor-pointer flex items-center justify-center"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsWaitingToStart(false);
+                    startPreview(startBeatId || undefined, false); // Start without auto-pause
+                  }}
+                  title="Click to start preview"
+                >
+                  <div className="bg-black/80 text-white px-6 py-3 rounded-lg text-base flex items-center gap-3 shadow-lg">
+                    <Play className="w-5 h-5" />
+                    Click to preview from {story?.getBeat(startBeatId || '')?.name || 'this beat'}
+                  </div>
+                </div>
+              )}
+              {/* Pause overlay - blocks all interaction including hover */}
+              {isPaused && !isWaitingToStart && (
+                <div
+                  className="absolute inset-0 z-50 bg-black/20 cursor-pointer flex items-end justify-center pb-4"
                   onClick={(e) => {
                     e.stopPropagation();
                     resumePreview();
                   }}
-                  title="Click anywhere to resume"
+                  title="Click to resume"
                 >
-                  <div className="bg-black/60 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 pointer-events-none">
+                  <div className="bg-black/70 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
                     <Play className="w-4 h-4" />
-                    Click to continue
+                    Click anywhere to continue
                   </div>
                 </div>
               )}
@@ -1827,7 +1884,9 @@ export const PreviewWindow: React.FC = () => {
           </button>
           <div className="w-px h-5 bg-gray-400 mx-1" />
           <div className="text-xs text-gray-500">
-            {isPaused ? (
+            {isWaitingToStart ? (
+              <span className="text-amber-600 font-medium">▶ Ready to preview: {story?.getBeat(startBeatId || '')?.name || 'Unknown'}</span>
+            ) : isPaused ? (
               <span className="text-yellow-600 font-medium">⏸ PAUSED at: {currentBeat?.name || 'Unknown'}</span>
             ) : currentBeat ? (
               `${currentBeat.name} (${currentBeat.type})`
@@ -1835,7 +1894,12 @@ export const PreviewWindow: React.FC = () => {
               'Ready'
             )}
           </div>
-          {isPaused && (
+          {isWaitingToStart && (
+            <div className="ml-2 text-xs text-gray-400">
+              Click stage to start
+            </div>
+          )}
+          {isPaused && !isWaitingToStart && (
             <div className="ml-2 text-xs text-gray-400">
               Press Space to resume
             </div>
