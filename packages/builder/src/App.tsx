@@ -1183,11 +1183,27 @@ function App() {
   const loadedProjectIdRef = useRef<string | null>(null);
   // Track if we've already initialized to prevent React Strict Mode double-init
   const hasInitializedRef = useRef<boolean>(false);
+
+  // LocalStorage key for remembering last used project
+  const LAST_PROJECT_KEY = 'asaps-last-project-id';
   // CRITICAL: Track when we're transitioning to a new project after save
   // This prevents the load effect from trying to reload the old project
   // during the async window between saveCurrentProject completing and
   // React propagating the new currentProject value
   const pendingNewProjectIdRef = useRef<string | null>(null);
+
+  // Save current project ID to localStorage so we can restore it on next session
+  // This prevents the "reset to untitled project" issue when user comes back
+  useEffect(() => {
+    if (currentProject && currentProject.id) {
+      try {
+        localStorage.setItem(LAST_PROJECT_KEY, currentProject.id);
+        console.log('[App] Saved last project ID to localStorage:', currentProject.id);
+      } catch (e) {
+        console.warn('[App] Failed to save last project ID to localStorage:', e);
+      }
+    }
+  }, [currentProject?.id]);
 
   // Initialize with a basic story and create untitled project on mount
   useEffect(() => {
@@ -1217,9 +1233,33 @@ function App() {
       const hasAnyProjects = currentProject !== null && currentProject !== undefined;
 
       if (!hasAnyProjects && state.beats.length === 0) {
-        console.log('[App] No current project and no beats - checking for existing untitled projects');
+        console.log('[App] No current project and no beats - checking for last session or existing projects');
 
-        // CRITICAL FIX: Clean up ALL old untitled projects, keep only the most recent one
+        // FIRST: Check if we have a last used project ID in localStorage
+        // This restores the user's session when they come back after being away
+        try {
+          const lastProjectId = localStorage.getItem(LAST_PROJECT_KEY);
+          if (lastProjectId) {
+            console.log('[App] Found last project ID in localStorage:', lastProjectId);
+            hasInitializedRef.current = true;
+            const loaded = await loadProject(lastProjectId);
+            if (loaded) {
+              console.log('[App] SUCCESS: Restored last session project');
+              return; // Exit early - project loaded
+            } else {
+              console.log('[App] Last project no longer exists, falling back to untitled search');
+              // Clear the invalid last project ID
+              localStorage.removeItem(LAST_PROJECT_KEY);
+            }
+          }
+        } catch (e) {
+          console.warn('[App] Failed to restore last project from localStorage:', e);
+        }
+
+        // Reset hasInitializedRef in case it was set by failed last project load
+        hasInitializedRef.current = false;
+
+        // SECOND: Look for existing untitled projects
         try {
           const projectsResult = await storage.listProjects();
           if (projectsResult.success && projectsResult.data) {
@@ -1262,7 +1302,7 @@ function App() {
           console.warn('[App] Could not check for existing untitled projects:', error);
         }
 
-        console.log('[App] No existing untitled project found - initializing from scratch');
+        console.log('[App] No last project or existing untitled project found - initializing from scratch');
 
         // Mark as initialized BEFORE async operations to prevent race conditions
         hasInitializedRef.current = true;
