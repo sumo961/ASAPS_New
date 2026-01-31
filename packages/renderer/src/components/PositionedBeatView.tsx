@@ -1488,8 +1488,10 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         ...baseStyle,
         left: `${effectiveLeft}px`,
         width: `${effectiveWidth}px`,
-        height: 'auto',
-        minHeight: `${location.height}px`,
+        // In editor mode, use exact height to match selection handles
+        // In preview mode, use auto height so content can expand naturally
+        height: editorMode ? `${location.height}px` : 'auto',
+        minHeight: editorMode ? undefined : `${location.height}px`,
       };
       return (
         <TextElement
@@ -1616,17 +1618,18 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
     case 'dialog': {
       // For long content (like AI-generated text), expand width to use more screen space
       // This ensures AI content isn't constrained to narrow visual editor widths
+      // BUT: In editor mode, always use exact dimensions to match selection handles
       const dialogContentLength = content?.length || 0;
       const isDialogLongContent = dialogContentLength > 150;
       const isDialogVeryLongContent = dialogContentLength > 300;
 
       // Calculate expanded width for long content, centered in container
       // Note: We only expand for genuinely long content that needs more space.
-      // User-defined dimensions from the Visual Editor are respected.
+      // In editor mode, we skip this expansion to match the selection handles exactly.
       let dialogEffectiveWidth = location.width;
       let dialogEffectiveLeft = effectiveX;
 
-      if (containerDimensions && (isDialogLongContent || isDialogVeryLongContent)) {
+      if (!editorMode && containerDimensions && (isDialogLongContent || isDialogVeryLongContent)) {
         const containerWidth = containerDimensions.width;
         // Use 90% for very long, 80% for long content
         const widthPercent = isDialogVeryLongContent ? 0.9 : 0.8;
@@ -1639,8 +1642,10 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         ...baseStyle,
         left: `${dialogEffectiveLeft}px`,
         width: `${dialogEffectiveWidth}px`,
-        height: 'auto',
-        minHeight: `${location.height}px`,
+        // In editor mode, use exact height to match selection handles
+        // In preview mode, use auto height so content can expand naturally
+        height: editorMode ? `${location.height}px` : 'auto',
+        minHeight: editorMode ? undefined : `${location.height}px`,
       };
       return (
         <DialogElement
@@ -2043,15 +2048,23 @@ const TextElement: React.FC<{
           overflow: 'auto', // Always allow scrolling for content that exceeds element bounds
           lineHeight: isLongContent ? '1.5' : '1.4',
           boxSizing: 'border-box',
-          display: isVeryLongContent ? 'block' : 'table',
+          // In editor mode, use flexbox for exact dimension matching with selection handles
+          // In preview mode, use table/table-cell for vertical centering (but table can shrink-wrap)
+          display: editorMode ? 'flex' : (isVeryLongContent ? 'block' : 'table'),
+          // Flexbox centering for editor mode
+          alignItems: editorMode ? 'center' : undefined,
+          justifyContent: editorMode ? 'center' : undefined,
           whiteSpace: 'pre-wrap', // Preserve line breaks in imported content
         }}
       >
         <span
           style={{
-            display: isVeryLongContent ? 'block' : 'table-cell',
-            verticalAlign: isVeryLongContent ? undefined : 'middle',
+            // In editor mode, span is just a wrapper; in preview mode, use table-cell for vertical centering
+            display: editorMode ? 'block' : (isVeryLongContent ? 'block' : 'table-cell'),
+            verticalAlign: editorMode ? undefined : (isVeryLongContent ? undefined : 'middle'),
             textAlign: computedTextAlign,
+            // In editor mode, limit width to prevent overflow while keeping text centered
+            width: editorMode ? '100%' : undefined,
           }}
         >
           {animation === 'typewriter' ? (
