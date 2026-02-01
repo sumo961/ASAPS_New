@@ -4,15 +4,29 @@ A modern TypeScript implementation of the Advanced Stories Authoring and Present
 
 ![ASAPS Modern Screenshot](assets/screenshot.png)
 
-## ⚠️ Development Status (v0.9.10)
+## 📖 Documentation
+
+For a comprehensive guide to using ASAPS Modern, including conceptual foundations, interface walkthrough, and beat reference, see the **[User Guide](docs/USER_GUIDE.md)**.
+
+The User Guide covers:
+- **Conceptual Framework**: Understanding interactive narratives and ASAPS philosophy
+- **Interface Overview**: Workspace layout, graph editor, and inspector panels
+- **Beat Types Reference**: Complete documentation of all 14+ beat types
+- **Preview Mode**: Testing stories with path-based presets and state simulation
+- **AI Integration**: Configuring AI providers for dynamic content generation
+- **Tips & Best Practices**: Workflow recommendations for efficient story creation
+
+## ⚠️ Development Status (v0.9.11)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
-| **Transformation Commands** | **NEW in v0.9.9**: Bulk rename/delete/merge for characters, variables, beats |
-| **AI Runtime Beats** | **NEW in v0.9.9**: aiInfoText, aiDurScreen for dynamic AI-generated content during playback |
-| **Text Variations** | **NEW in v0.9.9**: Random text selection for Info Text and Duration Screen beats |
+| **Independent Preview Window** | **NEW in v0.9.11**: Preview in separate window with path-based presets and InputText value entry |
+| **UI Tooltips** | **NEW in v0.9.11**: Descriptive tooltips throughout app to help beginners |
+| **Transformation Commands** | Bulk rename/delete/merge for characters, variables, beats (v0.9.9) |
+| **AI Runtime Beats** | aiInfoText, aiDurScreen for dynamic AI-generated content during playback (v0.9.9) |
+| **Text Variations** | Random text selection for Info Text and Duration Screen beats (v0.9.9) |
 | **AI-Based Beats** | AI Summary, Online Content, AI Condition, AI Dialog Tree beats for dynamic content |
 | Assets (graphics, sounds, sprite animations) | Fully implemented |
 | Visual dialog editor | Supports all phases of dialog trees (v0.9.4) |
@@ -26,9 +40,21 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Beat Notes | Author annotations for beats (not shown to players) (v0.9.6) |
 | Timer Progress Bar | Visual timer for default target delays (v0.9.6) |
 | Visual Inventory System | Interactor-facing inventory display with configurable HUD overlay (v0.9.6) |
-| Path Analysis | **Improved in v0.9.10**: New StateSimulationAnalyzer for accurate hub-and-spoke patterns |
+| Path Analysis | StateSimulationAnalyzer for accurate hub-and-spoke patterns (v0.9.10) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
+
+### 🖥️ Independent Preview Window (v0.9.11)
+
+The preview system has been completely redesigned:
+
+- **Separate window**: Preview now opens in its own dedicated window for side-by-side editing and testing
+- **Path-based presets**: Automatically analyzes all paths to a beat and generates state presets
+- **InputText value entry**: Enter custom values when paths include inputText beats (instead of auto-generated placeholders)
+- **Debug panel**: Real-time display of current beat, visited beats, variables, and counters
+- **Keyboard shortcuts**: Space (pause/resume), Escape (stop), I (toggle inventory)
+
+**UI Tooltips**: Descriptive tooltips throughout the app help beginners understand beat types, settings, and controls.
 
 ### 🚀 Productivity Features (v0.9.9)
 
@@ -84,10 +110,6 @@ Each release includes:
 - **Windows**: Installer (.exe) and portable version
 
 Download the latest release to get started without building from source.
-
-### 📖 Documentation
-
-For a comprehensive guide to using ASAPS Modern, including conceptual foundations, interface walkthrough, and beat reference, see the **[User Guide](docs/USER_GUIDE.md)**.
 
 ## 🚀 Quick Start
 
