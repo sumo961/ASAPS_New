@@ -1192,16 +1192,28 @@
           "default": true,
           "description": "Include player variables in summary"
         },
-        "includeAllChoices": {
+        "includeInventory": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Include player inventory in summary"
+        },
+        "includeVisitedBeats": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include full choice history"
+          "description": "Include visited beats in summary"
+        },
+        "includeChoiceHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include rich choice history in summary (what choices were made)"
         },
         "includeCounters": {
           "type": "boolean",
           "required": false,
-          "default": true,
+          "default": false,
           "description": "Include final counter values"
         },
         "summaryStyle": {

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-02-01T17:35:50.562Z
+ * Generated: 2026-02-01T19:33:09.219Z
  */
 
 // ============================================
@@ -450,8 +450,12 @@ export interface AiSummaryParameters {
   prompt?: string | undefined;
   /** Include player variables in summary */
   includeVariables?: boolean | undefined;
-  /** Include full choice history */
-  includeAllChoices?: boolean | undefined;
+  /** Include player inventory in summary */
+  includeInventory?: boolean | undefined;
+  /** Include visited beats in summary */
+  includeVisitedBeats?: boolean | undefined;
+  /** Include rich choice history in summary (what choices were made) */
+  includeChoiceHistory?: boolean | undefined;
   /** Include final counter values */
   includeCounters?: boolean | undefined;
   /** Summary style */

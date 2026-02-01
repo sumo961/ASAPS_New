@@ -245,12 +245,14 @@ export class PlayerContextBuilder {
     includeVariables?: boolean;
     includeCounters?: boolean;
     includeInventory?: boolean;
+    includeVisitedBeats?: boolean;
     includeChoiceHistory?: boolean;
   } = {}): string {
     const {
       includeVariables = true,
       includeCounters = true,
       includeInventory = true,
+      includeVisitedBeats = true,
       includeChoiceHistory = true,
     } = options;
 
@@ -323,16 +325,18 @@ ${choiceLines.join('\n')}`);
     }
 
     // Full journey path with beat type context
-    const journeyPath = this.getBeatDescriptions(history);
-    sections.push(`## Journey Path (scene names only - no AI or automated discussions occurred)
+    if (includeVisitedBeats) {
+      const journeyPath = this.getBeatDescriptions(history);
+      sections.push(`## Journey Path (scene names only - no AI or automated discussions occurred)
 ${journeyPath.join(' → ')}`);
 
-    // Important note for AI
-    sections.push(`## IMPORTANT NOTE
+      // Important note for AI
+      sections.push(`## IMPORTANT NOTE
 The journey path above shows scene/topic names the player visited.
 These are NOT conversations or discussions - they are screen titles.
 Do NOT invent or mention any "AI discussions", "AI car" content, or similar.
 Only reference actual choices (from counters/variables) and locations visited.`);
+    }
 
     return sections.join('\n\n');
   }

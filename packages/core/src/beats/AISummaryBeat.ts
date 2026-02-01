@@ -11,8 +11,14 @@ export interface AISummaryBeatParams {
   /** Include player variables in summary */
   includeVariables?: boolean;
 
-  /** Include full choice history */
-  includeAllChoices?: boolean;
+  /** Include player inventory in summary */
+  includeInventory?: boolean;
+
+  /** Include visited beats in summary */
+  includeVisitedBeats?: boolean;
+
+  /** Include rich choice history in summary (what choices were made) */
+  includeChoiceHistory?: boolean;
 
   /** Include final counter values */
   includeCounters?: boolean;
@@ -57,7 +63,9 @@ export interface AISummaryBeatParams {
 export class AISummaryBeat extends Beat {
   public prompt?: string;
   public includeVariables: boolean;
-  public includeAllChoices: boolean;
+  public includeInventory: boolean;
+  public includeVisitedBeats: boolean;
+  public includeChoiceHistory: boolean;
   public includeCounters: boolean;
   public summaryStyle: 'narrative' | 'bullet-points' | 'reflection';
   public maxLength: 'short' | 'medium' | 'long';
@@ -79,8 +87,10 @@ export class AISummaryBeat extends Beat {
 
     this.prompt = params.prompt || config.prompt;
     this.includeVariables = params.includeVariables ?? config.includeVariables ?? true;
-    this.includeAllChoices = params.includeAllChoices ?? config.includeAllChoices ?? true;
-    this.includeCounters = params.includeCounters ?? config.includeCounters ?? true;
+    this.includeInventory = params.includeInventory ?? config.includeInventory ?? false;
+    this.includeVisitedBeats = params.includeVisitedBeats ?? config.includeVisitedBeats ?? true;
+    this.includeChoiceHistory = params.includeChoiceHistory ?? config.includeChoiceHistory ?? true;
+    this.includeCounters = params.includeCounters ?? config.includeCounters ?? false;
     this.summaryStyle = params.summaryStyle || config.summaryStyle || 'narrative';
     this.maxLength = params.maxLength || config.maxLength || 'medium';
     this.title = params.title || config.title || 'Your Journey';
@@ -96,7 +106,9 @@ export class AISummaryBeat extends Beat {
     return {
       prompt: this.prompt,
       includeVariables: this.includeVariables,
-      includeAllChoices: this.includeAllChoices,
+      includeInventory: this.includeInventory,
+      includeVisitedBeats: this.includeVisitedBeats,
+      includeChoiceHistory: this.includeChoiceHistory,
       includeCounters: this.includeCounters,
       summaryStyle: this.summaryStyle,
       maxLength: this.maxLength,
@@ -113,7 +125,9 @@ export class AISummaryBeat extends Beat {
   updateParameters(params: Record<string, any>): void {
     if (params.prompt !== undefined) this.prompt = params.prompt;
     if (params.includeVariables !== undefined) this.includeVariables = params.includeVariables;
-    if (params.includeAllChoices !== undefined) this.includeAllChoices = params.includeAllChoices;
+    if (params.includeInventory !== undefined) this.includeInventory = params.includeInventory;
+    if (params.includeVisitedBeats !== undefined) this.includeVisitedBeats = params.includeVisitedBeats;
+    if (params.includeChoiceHistory !== undefined) this.includeChoiceHistory = params.includeChoiceHistory;
     if (params.includeCounters !== undefined) this.includeCounters = params.includeCounters;
     if (params.summaryStyle !== undefined) this.summaryStyle = params.summaryStyle;
     if (params.maxLength !== undefined) this.maxLength = params.maxLength;
@@ -219,8 +233,10 @@ export class AISummaryBeat extends Beat {
     const contextBuilder = new PlayerContextBuilder(context, story);
     const journeySummary = contextBuilder.buildJourneySummary({
       includeVariables: this.includeVariables,
+      includeInventory: this.includeInventory,
+      includeVisitedBeats: this.includeVisitedBeats,
+      includeChoiceHistory: this.includeChoiceHistory,
       includeCounters: this.includeCounters,
-      includeChoiceHistory: this.includeAllChoices,
     });
 
     // Determine strict word limits (500 max for long, much less for shorter)
