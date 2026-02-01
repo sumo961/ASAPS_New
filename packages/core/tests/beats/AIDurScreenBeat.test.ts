@@ -149,6 +149,8 @@ describe('AIDurScreenBeat', () => {
         includeVariables: true,
         includeInventory: true,
         includeHistory: true,
+        includeChoiceHistory: true,
+        includeCounters: true,
         maxSentences: 3,
         wordsPerMinute: 180,
         minDuration: 1500,

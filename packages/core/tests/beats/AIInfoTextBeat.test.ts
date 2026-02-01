@@ -140,6 +140,8 @@ describe('AIInfoTextBeat', () => {
         includeVariables: true,
         includeInventory: true,
         includeHistory: true,
+        includeChoiceHistory: true,
+        includeCounters: true,
         maxSentences: 5,
       });
     });
