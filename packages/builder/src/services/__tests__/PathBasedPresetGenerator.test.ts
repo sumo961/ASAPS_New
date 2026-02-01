@@ -221,6 +221,183 @@ describe('PathBasedPresetGenerator', () => {
     });
   });
 
+  describe('InputText Beat Extraction', () => {
+    it('should extract inputText beats from path with simulated values', () => {
+      const story = new Story({
+        title: 'InputText Story',
+        author: 'Test',
+        firstBeatId: 'start'
+      });
+
+      const start = createTestBeat({
+        id: 'start',
+        name: 'Start',
+        type: 'titleScreen',
+        parameters: { title: 'Test' },
+        connections: [{ targetId: 'getName' }]
+      });
+
+      const getName = createTestBeat({
+        id: 'getName',
+        name: 'Get Name',
+        type: 'inputText',
+        parameters: {
+          prompt: 'What is your name?',
+          saveToType: 'variable',
+          variable: 'playerName',
+          validation: 'none'
+        },
+        connections: [{ targetId: 'end' }]
+      });
+
+      const end = createTestBeat({
+        id: 'end',
+        name: 'End',
+        type: 'endScreen',
+        parameters: { message: 'Done' }
+      });
+
+      story.addBeat(start);
+      story.addBeat(getName);
+      story.addBeat(end);
+
+      const result = generatePathPresets(story, 'end');
+
+      expect(result.presets.length).toBeGreaterThan(0);
+
+      // Each preset should have inputTextBeats array
+      const preset = result.presets[0];
+      expect(preset).toHaveProperty('inputTextBeats');
+      expect(preset.inputTextBeats.length).toBe(1);
+
+      // Check inputText beat info
+      const inputTextBeat = preset.inputTextBeats[0];
+      expect(inputTextBeat.beatId).toBe('getName');
+      expect(inputTextBeat.beatName).toBe('Get Name');
+      expect(inputTextBeat.prompt).toBe('What is your name?');
+      expect(inputTextBeat.variableName).toBe('playerName');
+      expect(inputTextBeat.saveToType).toBe('variable');
+      expect(inputTextBeat.validation).toBe('none');
+      // Should have a simulated value (placeholder)
+      expect(inputTextBeat.simulatedValue).toBe('PlayerName');
+    });
+
+    it('should extract multiple inputText beats with different validation types', () => {
+      const story = new Story({
+        title: 'Multi-Input Story',
+        author: 'Test',
+        firstBeatId: 'start'
+      });
+
+      const start = createTestBeat({
+        id: 'start',
+        name: 'Start',
+        type: 'titleScreen',
+        parameters: { title: 'Test' },
+        connections: [{ targetId: 'getName' }]
+      });
+
+      const getName = createTestBeat({
+        id: 'getName',
+        name: 'Get Name',
+        type: 'inputText',
+        parameters: {
+          prompt: 'What is your name?',
+          saveToType: 'variable',
+          variable: 'playerName',
+          validation: 'none'
+        },
+        connections: [{ targetId: 'getAge' }]
+      });
+
+      const getAge = createTestBeat({
+        id: 'getAge',
+        name: 'Get Age',
+        type: 'inputText',
+        parameters: {
+          prompt: 'How old are you?',
+          saveToType: 'variable',
+          variable: 'age',
+          validation: 'numeric'
+        },
+        connections: [{ targetId: 'getEmail' }]
+      });
+
+      const getEmail = createTestBeat({
+        id: 'getEmail',
+        name: 'Get Email',
+        type: 'inputText',
+        parameters: {
+          prompt: 'What is your email?',
+          saveToType: 'variable',
+          variable: 'email',
+          validation: 'email'
+        },
+        connections: [{ targetId: 'end' }]
+      });
+
+      const end = createTestBeat({
+        id: 'end',
+        name: 'End',
+        type: 'endScreen',
+        parameters: { message: 'Done' }
+      });
+
+      story.addBeat(start);
+      story.addBeat(getName);
+      story.addBeat(getAge);
+      story.addBeat(getEmail);
+      story.addBeat(end);
+
+      const result = generatePathPresets(story, 'end');
+
+      expect(result.presets.length).toBeGreaterThan(0);
+
+      const preset = result.presets[0];
+      expect(preset.inputTextBeats.length).toBe(3);
+
+      // Check each has appropriate simulated value
+      const nameInput = preset.inputTextBeats.find(b => b.variableName === 'playerName');
+      const ageInput = preset.inputTextBeats.find(b => b.variableName === 'age');
+      const emailInput = preset.inputTextBeats.find(b => b.variableName === 'email');
+
+      expect(nameInput?.simulatedValue).toBe('PlayerName');
+      expect(ageInput?.simulatedValue).toBe(42);
+      expect(emailInput?.simulatedValue).toBe('user@example.com');
+    });
+
+    it('should have empty inputTextBeats for paths without inputText beats', () => {
+      const story = new Story({
+        title: 'Simple Story',
+        author: 'Test',
+        firstBeatId: 'start'
+      });
+
+      const start = createTestBeat({
+        id: 'start',
+        name: 'Start',
+        type: 'titleScreen',
+        parameters: { title: 'Test' },
+        connections: [{ targetId: 'end' }]
+      });
+
+      const end = createTestBeat({
+        id: 'end',
+        name: 'End',
+        type: 'endScreen',
+        parameters: { message: 'Done' }
+      });
+
+      story.addBeat(start);
+      story.addBeat(end);
+
+      const result = generatePathPresets(story, 'end');
+
+      expect(result.presets.length).toBeGreaterThan(0);
+      expect(result.presets[0].inputTextBeats).toEqual([]);
+    });
+  });
+
   describe('Preset Deduplication', () => {
     it('should not include duplicate presets with identical states', () => {
       const story = new Story({

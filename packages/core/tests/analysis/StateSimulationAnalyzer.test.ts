@@ -508,6 +508,217 @@ describe('StateSimulationAnalyzer', () => {
     });
   });
 
+  describe('InputText Beat Handling', () => {
+    it('should generate placeholder value for inputText beat with variable save', () => {
+      const story = new Story({
+        title: 'InputText Test',
+        author: 'Test',
+        firstBeatId: 'start'
+      });
+
+      const start = createTestBeat({
+        id: 'start',
+        name: 'Start',
+        type: 'titleScreen',
+        parameters: { title: 'Start' },
+        connections: [{ targetId: 'input' }]
+      });
+
+      const input = createTestBeat({
+        id: 'input',
+        name: 'Get Name',
+        type: 'inputText',
+        parameters: {
+          prompt: 'What is your name?',
+          saveToType: 'variable',
+          variable: 'playerName',
+          validation: 'none'
+        },
+        connections: [{ targetId: 'end' }]
+      });
+
+      const end = createTestBeat({
+        id: 'end',
+        name: 'End',
+        type: 'endScreen',
+        parameters: { message: 'Done' }
+      });
+
+      story.addBeat(start);
+      story.addBeat(input);
+      story.addBeat(end);
+
+      const analyzer = new StateSimulationAnalyzer(story);
+      const result = analyzer.analyze();
+
+      // Should find the path and include state with playerName variable
+      expect(result.outcomes.length).toBeGreaterThanOrEqual(1);
+
+      // Check the final state in the path has the variable set
+      const outcome = result.outcomes[0];
+      if (outcome.pathVariations && outcome.pathVariations[0]?.finalState) {
+        const finalState = outcome.pathVariations[0].finalState;
+        expect(finalState.variables.get('playerName')).toBe('PlayerName');
+      }
+    });
+
+    it('should generate numeric placeholder for numeric validation', () => {
+      const story = new Story({
+        title: 'Numeric InputText Test',
+        author: 'Test',
+        firstBeatId: 'start'
+      });
+
+      const start = createTestBeat({
+        id: 'start',
+        name: 'Start',
+        type: 'titleScreen',
+        parameters: { title: 'Start' },
+        connections: [{ targetId: 'input' }]
+      });
+
+      const input = createTestBeat({
+        id: 'input',
+        name: 'Get Age',
+        type: 'inputText',
+        parameters: {
+          prompt: 'Enter your age',
+          saveToType: 'variable',
+          variable: 'age',
+          validation: 'numeric'
+        },
+        connections: [{ targetId: 'end' }]
+      });
+
+      const end = createTestBeat({
+        id: 'end',
+        name: 'End',
+        type: 'endScreen',
+        parameters: { message: 'Done' }
+      });
+
+      story.addBeat(start);
+      story.addBeat(input);
+      story.addBeat(end);
+
+      const analyzer = new StateSimulationAnalyzer(story);
+      const result = analyzer.analyze();
+
+      expect(result.outcomes.length).toBeGreaterThanOrEqual(1);
+
+      // Check the final state has numeric placeholder
+      const outcome = result.outcomes[0];
+      if (outcome.pathVariations && outcome.pathVariations[0]?.finalState) {
+        const finalState = outcome.pathVariations[0].finalState;
+        expect(finalState.variables.get('age')).toBe(42);
+      }
+    });
+
+    it('should generate email placeholder for email validation', () => {
+      const story = new Story({
+        title: 'Email InputText Test',
+        author: 'Test',
+        firstBeatId: 'start'
+      });
+
+      const start = createTestBeat({
+        id: 'start',
+        name: 'Start',
+        type: 'titleScreen',
+        parameters: { title: 'Start' },
+        connections: [{ targetId: 'input' }]
+      });
+
+      const input = createTestBeat({
+        id: 'input',
+        name: 'Get Email',
+        type: 'inputText',
+        parameters: {
+          prompt: 'Enter your email',
+          saveToType: 'variable',
+          variable: 'email',
+          validation: 'email'
+        },
+        connections: [{ targetId: 'end' }]
+      });
+
+      const end = createTestBeat({
+        id: 'end',
+        name: 'End',
+        type: 'endScreen',
+        parameters: { message: 'Done' }
+      });
+
+      story.addBeat(start);
+      story.addBeat(input);
+      story.addBeat(end);
+
+      const analyzer = new StateSimulationAnalyzer(story);
+      const result = analyzer.analyze();
+
+      expect(result.outcomes.length).toBeGreaterThanOrEqual(1);
+
+      // Check the final state has email placeholder
+      const outcome = result.outcomes[0];
+      if (outcome.pathVariations && outcome.pathVariations[0]?.finalState) {
+        const finalState = outcome.pathVariations[0].finalState;
+        expect(finalState.variables.get('email')).toBe('user@example.com');
+      }
+    });
+
+    it('should handle counter save type for inputText beat', () => {
+      const story = new Story({
+        title: 'Counter InputText Test',
+        author: 'Test',
+        firstBeatId: 'start'
+      });
+
+      const start = createTestBeat({
+        id: 'start',
+        name: 'Start',
+        type: 'titleScreen',
+        parameters: { title: 'Start' },
+        connections: [{ targetId: 'input' }]
+      });
+
+      const input = createTestBeat({
+        id: 'input',
+        name: 'Get Score',
+        type: 'inputText',
+        parameters: {
+          prompt: 'Enter score',
+          saveToType: 'counter',
+          counter: 'score',
+          validation: 'numeric'
+        },
+        connections: [{ targetId: 'end' }]
+      });
+
+      const end = createTestBeat({
+        id: 'end',
+        name: 'End',
+        type: 'endScreen',
+        parameters: { message: 'Done' }
+      });
+
+      story.addBeat(start);
+      story.addBeat(input);
+      story.addBeat(end);
+
+      const analyzer = new StateSimulationAnalyzer(story);
+      const result = analyzer.analyze();
+
+      expect(result.outcomes.length).toBeGreaterThanOrEqual(1);
+
+      // Check the final state has counter set
+      const outcome = result.outcomes[0];
+      if (outcome.pathVariations && outcome.pathVariations[0]?.finalState) {
+        const finalState = outcome.pathVariations[0].finalState;
+        expect(finalState.counters.get('score')).toBe(42);
+      }
+    });
+  });
+
   describe('Cycle Detection', () => {
     it('should detect cycles and not get stuck in infinite loops', () => {
       const story = new Story({

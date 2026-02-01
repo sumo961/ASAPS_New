@@ -15,6 +15,23 @@ import {
 } from '@asaps/core';
 
 /**
+ * Information about an inputText beat that needs user input
+ */
+export interface InputTextBeatInfo {
+  beatId: string;
+  beatName: string;
+  prompt: string;
+  variableName: string;
+  saveToType: 'variable' | 'counter' | 'characterName';
+  validation: 'none' | 'numeric' | 'email' | 'alphanumeric';
+  placeholder?: string;
+  minLength?: number;
+  maxLength?: number;
+  // The auto-generated placeholder value from simulation
+  simulatedValue: string | number;
+}
+
+/**
  * A generated preset with path context
  */
 export interface GeneratedPreset {
@@ -26,6 +43,9 @@ export interface GeneratedPreset {
   pathDescription: string;     // e.g., "Via Expert A → Expert B"
   pathIndex: number;           // Index in the outcome group
   totalPathsInGroup: number;   // How many paths lead to this outcome
+
+  // InputText beats in this path that need user input
+  inputTextBeats: InputTextBeatInfo[];
 }
 
 /**
@@ -92,12 +112,16 @@ export function generatePathPresets(
       path.steps.slice(0, stepIndex + 1).map(s => s.beatId)
     );
 
+    // Extract inputText beats from the path (up to the target beat)
+    const inputTextBeats = extractInputTextBeats(story, path, stepIndex, stateAtTarget);
+
     return {
       preset,
       outcomeGroup,
       pathDescription,
       pathIndex: pathIndexInGroup,
       totalPathsInGroup: totalInGroup,
+      inputTextBeats,
     };
   });
 
@@ -210,6 +234,62 @@ function buildPathDescription(path: SimulatedPath, upToIndex: number): string {
   // Take up to 3 most recent decisions
   const recent = relevantDecisions.slice(-3);
   return 'Via ' + recent.map(d => d.choiceMade || d.beatName).join(' → ');
+}
+
+/**
+ * Extract inputText beat information from a path
+ */
+function extractInputTextBeats(
+  story: Story,
+  path: SimulatedPath,
+  upToIndex: number,
+  stateAtTarget: SimulationState
+): InputTextBeatInfo[] {
+  const inputTextBeats: InputTextBeatInfo[] = [];
+
+  // Look through the path steps up to the target beat
+  for (let i = 0; i <= upToIndex; i++) {
+    const step = path.steps[i];
+    if (step.beatType === 'inputText') {
+      const beat = story.getBeat(step.beatId);
+      if (!beat) continue;
+
+      const params = beat.getParameters();
+      const variableName = params.variable || params.variableName || 'userInput';
+      const saveToType = params.saveToType || 'variable';
+      const validation = params.validation || 'none';
+
+      // Get the simulated value from state
+      let simulatedValue: string | number = '';
+      if (saveToType === 'variable') {
+        const value = stateAtTarget.variables.get(variableName);
+        // Convert boolean to string, otherwise use as-is
+        simulatedValue = typeof value === 'boolean' ? String(value) : (value || '');
+      } else if (saveToType === 'counter') {
+        const counterName = params.counter;
+        simulatedValue = stateAtTarget.counters.get(counterName) || 0;
+      } else if (saveToType === 'characterName') {
+        const charKey = `character_${params.characterId}_name`;
+        const value = stateAtTarget.variables.get(charKey);
+        simulatedValue = typeof value === 'boolean' ? String(value) : (value || '');
+      }
+
+      inputTextBeats.push({
+        beatId: step.beatId,
+        beatName: step.beatName,
+        prompt: params.prompt || 'Enter your response:',
+        variableName,
+        saveToType: saveToType as 'variable' | 'counter' | 'characterName',
+        validation: validation as 'none' | 'numeric' | 'email' | 'alphanumeric',
+        placeholder: params.placeholder,
+        minLength: params.minLength,
+        maxLength: params.maxLength,
+        simulatedValue,
+      });
+    }
+  }
+
+  return inputTextBeats;
 }
 
 /**

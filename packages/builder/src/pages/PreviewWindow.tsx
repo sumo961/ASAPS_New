@@ -15,7 +15,8 @@ import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
 import type { PreviewMessage, SerializedStoryData } from '../services/PreviewWindowManager';
 import type { Asset } from '../components/assets/AssetManager';
 import type { Character } from '../types/character';
-import { generatePathPresets, groupPresetsByOutcome, type GeneratedPreset } from '../services/PathBasedPresetGenerator';
+import { generatePathPresets, groupPresetsByOutcome, type GeneratedPreset, type InputTextBeatInfo } from '../services/PathBasedPresetGenerator';
+import { InputTextValuesModal } from '../components/preview/InputTextValuesModal';
 import { getSavedAIConfig } from '../hooks/useAI';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
@@ -335,6 +336,10 @@ export const PreviewWindow: React.FC = () => {
   const [selectedPreset, setSelectedPreset] = useState<StatePreset | null>(null);
   const [generatedPresets, setGeneratedPresets] = useState<GeneratedPreset[]>([]);
   const [isGeneratingPresets, setIsGeneratingPresets] = useState(false);
+  // Input text values modal state
+  const [showInputTextModal, setShowInputTextModal] = useState(false);
+  const [pendingInputTextBeats, setPendingInputTextBeats] = useState<InputTextBeatInfo[]>([]);
+  const [pendingPreset, setPendingPreset] = useState<StatePreset | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(true);
   const [debugInfo, setDebugInfo] = useState<{
     visitedBeats?: string[];
@@ -1523,6 +1528,8 @@ export const PreviewWindow: React.FC = () => {
                             }
                           }
 
+                          const hasInputText = genPreset.inputTextBeats && genPreset.inputTextBeats.length > 0;
+
                           return (
                             <button
                               key={idx}
@@ -1535,17 +1542,33 @@ export const PreviewWindow: React.FC = () => {
                                   createdAt: new Date().toISOString(),
                                   modifiedAt: new Date().toISOString(),
                                 };
-                                setSelectedPreset(preset);
                                 setShowPresetMenu(false);
-                                // Auto-restart preview with the selected path (pass preset directly to avoid state timing issues)
-                                // pauseOnStart=true so user can review initial state with preset
-                                setTimeout(() => handleRestart(startBeatId || undefined, preset, true), 50);
+
+                                // If path has inputText beats, show the modal first
+                                if (hasInputText) {
+                                  setPendingPreset(preset);
+                                  setPendingInputTextBeats(genPreset.inputTextBeats);
+                                  setShowInputTextModal(true);
+                                } else {
+                                  // No inputText beats - proceed immediately
+                                  setSelectedPreset(preset);
+                                  // Auto-restart preview with the selected path (pass preset directly to avoid state timing issues)
+                                  // pauseOnStart=true so user can review initial state with preset
+                                  setTimeout(() => handleRestart(startBeatId || undefined, preset, true), 50);
+                                }
                               }}
                               className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
                                 selectedPreset?.name === genPreset.preset.name ? 'bg-blue-50 text-blue-700' : ''
                               }`}
                             >
-                              <div className="font-medium truncate">{genPreset.pathDescription}</div>
+                              <div className="font-medium truncate flex items-center gap-2">
+                                {genPreset.pathDescription}
+                                {hasInputText && (
+                                  <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                    {genPreset.inputTextBeats.length} input{genPreset.inputTextBeats.length > 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
                               {summaryParts.length > 0 ? (
                                 <div className="text-xs text-gray-500 truncate mt-0.5">
                                   {summaryParts.join(' • ')}
@@ -1965,6 +1988,64 @@ export const PreviewWindow: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* InputText Values Modal */}
+      {showInputTextModal && pendingInputTextBeats.length > 0 && (
+        <InputTextValuesModal
+          inputTextBeats={pendingInputTextBeats}
+          onConfirm={(userValues) => {
+            // Merge user values into the pending preset
+            if (pendingPreset) {
+              const updatedVariables = { ...pendingPreset.state.variables };
+              const updatedCounters = { ...pendingPreset.state.counters };
+
+              // Apply user-entered values
+              for (const beat of pendingInputTextBeats) {
+                const value = userValues[beat.variableName];
+                if (beat.saveToType === 'counter') {
+                  updatedCounters[beat.variableName] = typeof value === 'number' ? value : parseFloat(String(value)) || 0;
+                } else {
+                  updatedVariables[beat.variableName] = String(value);
+                }
+              }
+
+              const updatedPreset: StatePreset = {
+                ...pendingPreset,
+                state: {
+                  ...pendingPreset.state,
+                  variables: updatedVariables,
+                  counters: updatedCounters,
+                },
+              };
+
+              setSelectedPreset(updatedPreset);
+              setShowInputTextModal(false);
+              setPendingInputTextBeats([]);
+              setPendingPreset(null);
+
+              // Start preview with updated preset
+              setTimeout(() => handleRestart(startBeatId || undefined, updatedPreset, true), 50);
+            }
+          }}
+          onUsePlaceholders={() => {
+            // Use the preset as-is with placeholder values
+            if (pendingPreset) {
+              setSelectedPreset(pendingPreset);
+              setShowInputTextModal(false);
+              setPendingInputTextBeats([]);
+              setPendingPreset(null);
+
+              // Start preview with placeholder values
+              setTimeout(() => handleRestart(startBeatId || undefined, pendingPreset, true), 50);
+            }
+          }}
+          onCancel={() => {
+            setShowInputTextModal(false);
+            setPendingInputTextBeats([]);
+            setPendingPreset(null);
+          }}
+        />
+      )}
     </div>
   );
 };

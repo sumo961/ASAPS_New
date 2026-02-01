@@ -651,6 +651,49 @@ export class StateSimulationAnalyzer {
         break;
       }
 
+      case 'inputText': {
+        // InputText beats capture user input into a variable, counter, or character name
+        // For simulation, we generate placeholder values based on the beat configuration
+        const saveToType = params.saveToType || 'variable';
+        const variableName = params.variable || params.variableName || 'userInput';
+        const counterName = params.counter;
+        const validation = params.validation || 'none';
+
+        // Generate appropriate placeholder value based on validation type
+        let placeholderValue: string | number;
+        switch (validation) {
+          case 'numeric':
+            placeholderValue = 42;
+            break;
+          case 'email':
+            placeholderValue = 'user@example.com';
+            break;
+          case 'alphanumeric':
+            placeholderValue = 'User1';
+            break;
+          default:
+            // Use the variable name as a readable placeholder
+            placeholderValue = variableName.charAt(0).toUpperCase() + variableName.slice(1);
+        }
+
+        if (saveToType === 'variable' && variableName) {
+          newState.variables.set(variableName, placeholderValue);
+        } else if (saveToType === 'counter' && counterName) {
+          const numValue = typeof placeholderValue === 'number' ? placeholderValue : 0;
+          const operation = params.counterOperation || 'set';
+          if (operation === 'change') {
+            const currentValue = newState.counters.get(counterName) || 0;
+            newState.counters.set(counterName, currentValue + numValue);
+          } else {
+            newState.counters.set(counterName, numValue);
+          }
+        } else if (saveToType === 'characterName' && params.characterId) {
+          // Store character name in a special variable format
+          newState.variables.set(`character_${params.characterId}_name`, placeholderValue);
+        }
+        break;
+      }
+
       // Other beat types don't modify state
     }
 
