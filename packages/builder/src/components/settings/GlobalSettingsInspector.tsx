@@ -624,6 +624,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'project' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
             }`}
+            title="Project dimensions, aspect ratio, and scaling mode"
           >
             <Maximize className="w-4 h-4" />
             Project
@@ -633,6 +634,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'colors' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
             }`}
+            title="Button colors, text box colors, and background color"
           >
             <Palette className="w-4 h-4" />
             Colors
@@ -642,6 +644,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'fonts' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
             }`}
+            title="Font families and sizes for titles, text, and buttons"
           >
             <Type className="w-4 h-4" />
             Fonts
@@ -651,6 +654,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'textbox' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
             }`}
+            title="Text box appearance: corners, padding, borders, and position"
           >
             <Box className="w-4 h-4" />
             Text Box
@@ -660,6 +664,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'effects' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
             }`}
+            title="Text animations (typewriter, fade) and hotspot visibility"
           >
             <Sliders className="w-4 h-4" />
             Effects
@@ -669,6 +674,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'sound' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
             }`}
+            title="Background music and volume settings"
           >
             <Music className="w-4 h-4" />
             Sound
@@ -678,6 +684,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'copyright' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
             }`}
+            title="Copyright notice displayed at the end of your story"
           >
             <Copyright className="w-4 h-4" />
             Copyright
@@ -687,6 +694,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'variables' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
             }`}
+            title="Define global variables for tracking story state (use Set Variable beats to modify them)"
           >
             <Variable className="w-4 h-4" />
             Variables
@@ -696,6 +704,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'debug' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
             }`}
+            title="Testing options: start beat override and variable display"
           >
             <Monitor className="w-4 h-4" />
             Debug

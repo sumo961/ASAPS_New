@@ -1225,12 +1225,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                     value={localBeat.name}
                     onChange={(e) => handleChange('name', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    title="A descriptive name for this beat. This name appears in the graph editor and helps you identify beats in your story."
                   />
                 </div>
 
                 {/* Background Sound for ALL beats */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                    title="Play a sound or music when this beat starts. The sound will loop until the player leaves this beat."
+                  >
                     <Music className="w-4 h-4 inline mr-1" />
                     Background Sound
                   </label>

@@ -14,6 +14,7 @@ interface BeatType {
   icon: string;
   category: 'visible' | 'invisible' | 'ai';
   color: string;
+  description: string;
 }
 
 // Color mapping for beat types (can be overridden per-type)
@@ -78,6 +79,7 @@ function buildBeatTypesFromSchema(): BeatType[] {
     category: string;
     displayName: string;
     icon: string;
+    description?: string;
   }>;
 
   for (const [type, def] of Object.entries(schemaBeats)) {
@@ -93,6 +95,7 @@ function buildBeatTypesFromSchema(): BeatType[] {
       icon: def.icon,
       category,
       color,
+      description: def.description || `Add a ${def.displayName} beat`,
     });
   }
 
@@ -135,7 +138,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
               className="w-full p-1 mb-1 cursor-move hover:bg-gray-100 rounded transition-colors"
               draggable
               onDragStart={(e) => onDragStart(e, beat.type)}
-              title={beat.name}
+              title={`${beat.name}: ${beat.description}`}
             >
               <span className="text-lg block text-center">{beat.icon}</span>
             </div>
@@ -173,6 +176,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
                 draggable
                 onDragStart={(e) => onDragStart(e, beat.type)}
                 style={{ borderLeftColor: beat.color, borderLeftWidth: '4px' }}
+                title={beat.description}
               >
                 <span className="text-xl">{beat.icon}</span>
                 <span className="text-sm font-medium">{beat.name}</span>
@@ -183,7 +187,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
 
         {/* Invisible Beats */}
         <div>
-          <h4 className="text-sm font-medium text-gray-600 mb-2">Logic Beats</h4>
+          <h4 className="text-sm font-medium text-gray-600 mb-2" title="Logic beats run in the background without displaying anything to the user">Logic Beats</h4>
           <div className="grid grid-cols-2 gap-2">
             {invisibleBeats.map((beat) => (
               <div
@@ -192,6 +196,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
                 draggable
                 onDragStart={(e) => onDragStart(e, beat.type)}
                 style={{ borderLeftColor: beat.color, borderLeftWidth: '4px' }}
+                title={beat.description}
               >
                 <span className="text-xl">{beat.icon}</span>
                 <span className="text-sm font-medium">{beat.name}</span>
@@ -203,7 +208,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
         {/* AI-Powered Beats */}
         {aiBeats.length > 0 && (
           <div>
-            <h4 className="text-sm font-medium text-gray-600 mb-2">AI Beats</h4>
+            <h4 className="text-sm font-medium text-gray-600 mb-2" title="AI beats use artificial intelligence to generate dynamic content">AI Beats</h4>
             <div className="grid grid-cols-2 gap-2">
               {aiBeats.map((beat) => (
                 <div
@@ -212,6 +217,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
                   draggable
                   onDragStart={(e) => onDragStart(e, beat.type)}
                   style={{ borderLeftColor: beat.color, borderLeftWidth: '4px' }}
+                  title={beat.description}
                 >
                   <span className="text-xl">{beat.icon}</span>
                   <span className="text-sm font-medium">{beat.name}</span>

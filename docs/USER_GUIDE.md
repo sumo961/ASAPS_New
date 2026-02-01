@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Version 0.9.8*
+*Version 0.9.10*
 
 ---
 
@@ -250,7 +250,7 @@ Every IDN needs a title card. This beat displays:
 
 ---
 
-### Intro Text
+### Info Text
 
 **Purpose:** Deliver narrative text with a simple continue option.
 
@@ -340,7 +340,7 @@ Present objects the interactor can interact with. Great for investigation scenes
 
 **Purpose:** Timed text display.
 
-Like Intro Text, but advances automatically after a set time. Useful for dramatic pauses, cutscene-style moments, or keeping the pace moving.
+Like Info Text, but advances automatically after a set time. Useful for dramatic pauses, cutscene-style moments, or keeping the pace moving.
 
 **Key Settings:**
 - **Text** - Content to display
@@ -924,48 +924,119 @@ You've built something. Time to make sure it works and share it with the world.
 
 ## Preview Mode
 
+The Preview Window is your primary tool for testing your interactive narrative. It provides a comprehensive testing environment with powerful debugging features.
+
 ![Preview Panel](images/08-preview-panel.png)
 *The Preview panel*
 
 ### Starting a Preview
 
-1. Click **Preview** in the header
-2. Click **Start Preview**
-3. Experience your system!
+1. Click **Preview** in the header (or use the shortcut)
+2. The preview window opens in a new panel
+3. Click anywhere on the stage to begin, or use the controls
+
+**Pro Tip:** You can preview from any beat in your story—just right-click a beat in the flowchart and select "Preview from here."
 
 ![Preview Running](images/09-preview-running.png)
 *Preview mode showing the experience in action*
 
 ### Preview Controls
 
+The top toolbar provides essential controls:
+
 | Control | Function |
 |---------|----------|
-| Start from... | Choose starting beat |
-| Stop | End preview |
-| Zoom | Adjust size |
-| Fit | Auto-fit window |
-| Text Animation | Toggle typewriter effect |
-| Mute | Silence audio |
-| Show Inventory | Display item panel (Ctrl/Cmd+I) |
+| **Play/Pause** | Start, pause, or resume preview |
+| **Stop** | End preview and return to editing |
+| **Restart** | Start over from the beginning |
+| **Step** | Advance one beat at a time |
+| **Zoom** | Adjust display size |
+| **Fit** | Auto-fit to window |
+| **Text Animation** | Toggle typewriter effect on/off |
+| **Mute** | Silence all audio |
+| **Inventory** | Show/hide inventory panel (Ctrl/Cmd+I) |
+| **Debug Panel** | Toggle debug information sidebar |
+
+### Path-Based State Presets
+
+When previewing from a beat other than the start, ASAPS Modern intelligently analyzes all paths to that beat and generates **state presets** representing different ways the interactor could have arrived there.
+
+![Path Presets Menu](images/10-path-presets.png)
+*The path presets menu showing different routes to the current beat*
+
+**Using Path Presets:**
+
+1. Right-click a beat and select **Preview from here**
+2. Click the **Path Presets** dropdown in the toolbar
+3. Browse presets grouped by ending/outcome:
+   - Each preset shows the path taken (e.g., "Via Forest → Bridge")
+   - State summary shows variables, counters, and inventory
+   - Badge indicates if the path includes user input
+4. Select a preset to load that state
+
+**InputText Beats in Paths:**
+
+When a path includes **inputText** beats (where the interactor types input), ASAPS Modern prompts you to enter values:
+
+![InputText Values Modal](images/11-inputtext-modal.png)
+*Modal for entering values that would have been typed by the interactor*
+
+- Each input shows the beat name and prompt
+- Enter meaningful values (e.g., a character name)
+- Or click "Use Placeholders" for auto-generated values
+- Values are merged into the state before preview starts
+
+This ensures variables like `playerName` or `playerGender` have realistic values when testing later parts of your story.
 
 ### Debug Panel
 
-While previewing, view:
-- Current beat name and ID
-- All variables and their values
-- Counter values
-- Navigation history
-- Active timers
+The debug panel (toggle with the bug icon) shows real-time state information:
 
-### State Presets
+**Current Beat:**
+- Beat name and ID
+- Beat type
 
-Test specific scenarios without replaying from the start:
+**Variables:**
+- All story variables and their current values
+- Updated in real-time as the story progresses
 
-1. Click **State Presets**
-2. Create a preset with specific variable values
-3. Start preview with that preset loaded
+**Counters:**
+- Numeric counters with current values
+- Shows both character-specific and global counters
 
-Perfect for testing "what if the player has the key and 500 gold and has already met the wizard?"
+**Inventory:**
+- Items held by each character
+- Quantity of stackable items
+
+**History:**
+- List of visited beat IDs
+- Useful for debugging conditions based on beat history
+
+**Active Timers:**
+- Running timers with remaining time
+- Timer names and target beats
+
+### Manual State Editing
+
+For advanced testing, you can manually edit the current state:
+
+1. Open the Debug Panel
+2. Click **Edit State**
+3. Modify variables, counters, or inventory
+4. Changes take effect immediately
+
+This is useful for testing edge cases like "What if the player has negative gold?" or "What happens with 100 items in inventory?"
+
+### State Presets (Saved)
+
+Save commonly-used test states for quick access:
+
+1. Set up your desired state (through play or manual editing)
+2. Click **Save Preset** in the debug panel
+3. Name your preset (e.g., "Has all keys", "Low health scenario")
+4. Access saved presets from the preset menu
+
+Perfect for regression testing—create presets for critical game states and verify they still work after changes.
 
 ## Debug Tools
 

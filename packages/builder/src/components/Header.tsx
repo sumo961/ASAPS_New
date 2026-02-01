@@ -119,6 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
             onChange={(e) => onTitleChange(e.target.value)}
             className="px-3 py-1.5 text-lg font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
             placeholder="Story Title"
+            title="Enter the title that will appear on your story's title screen"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           />
         </div>
@@ -358,6 +359,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors flex items-center gap-1.5"
               onClick={onCharacters}
+              title="Create and manage characters with appearances, stats, and inventory"
             >
               <Users className="w-4 h-4" />
               Characters
@@ -368,6 +370,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               className="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors flex items-center gap-1.5"
               onClick={onAssets}
+              title="Manage images, sounds, videos, and fonts for your story"
             >
               <Image className="w-4 h-4" />
               Assets
@@ -378,6 +381,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               className="px-3 py-1.5 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors flex items-center gap-1.5"
               onClick={onSettings}
+              title="Configure stage size, typography, colors, and global story settings"
             >
               <Settings className="w-4 h-4" />
               Settings
@@ -388,7 +392,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               className="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors flex items-center gap-1.5"
               onClick={onDebug}
-              title="Debug Tools"
+              title="Analyze reachability, find dead ends, and debug story paths"
             >
               <Bug className="w-4 h-4" />
               Debug
@@ -421,6 +425,7 @@ export const Header: React.FC<HeaderProps> = ({
                       setShowAIMenu(false);
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                    title="Generate a complete story structure from a description"
                   >
                     <Sparkles className="w-4 h-4" />
                     Generate Story
@@ -431,6 +436,7 @@ export const Header: React.FC<HeaderProps> = ({
                       setShowAIMenu(false);
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                    title="Create a new beat by describing what you want in plain language"
                   >
                     <FileText className="w-4 h-4" />
                     Create Beat from Description
@@ -442,6 +448,7 @@ export const Header: React.FC<HeaderProps> = ({
                       setShowAIMenu(false);
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                    title="Set up your AI provider (Claude, OpenAI, or local Ollama)"
                   >
                     <Settings className="w-4 h-4" />
                     Configure AI

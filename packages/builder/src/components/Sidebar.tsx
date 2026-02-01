@@ -273,6 +273,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
+            title="Search by beat name, type, or ID"
             className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -282,7 +283,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={handleCreateCluster}
             className="w-full mt-2 p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center justify-center gap-2"
-            title="Create New Cluster"
+            title="Create a cluster to organize related beats into groups. Clusters help keep complex stories manageable."
           >
             <FolderPlus className="w-4 h-4" />
             <span className="text-sm">Add Cluster</span>

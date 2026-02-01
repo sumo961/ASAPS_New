@@ -157,6 +157,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
               ? 'text-blue-600 border-blue-600'
               : 'text-gray-600 border-transparent hover:text-gray-800'
           }`}
+          title="Find beats that cannot be reached from the start. Unreachable beats will never be seen by players."
         >
           <AlertCircle className="w-4 h-4" />
           Reachability Analysis
@@ -168,6 +169,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
               ? 'text-blue-600 border-blue-600'
               : 'text-gray-600 border-transparent hover:text-gray-800'
           }`}
+          title="Explore all possible paths through your story. See how many ways players can reach each beat."
         >
           <GitBranch className="w-4 h-4" />
           Path Analysis
@@ -179,6 +181,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
               ? 'text-blue-600 border-blue-600'
               : 'text-gray-600 border-transparent hover:text-gray-800'
           }`}
+          title="Check for logic errors: undefined variables, missing connections, and unused counters."
         >
           <FileText className="w-4 h-4" />
           Story Logic
