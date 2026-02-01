@@ -43,6 +43,59 @@ function stripThinkingBlocks(text: string): string {
 }
 
 /**
+ * Extract JSON from AI response using brace matching.
+ * This is more reliable than regex because it handles nested braces correctly
+ * and stops at the matching closing brace instead of the last brace in the text.
+ */
+function extractJSON(text: string): string {
+  const jsonStart = text.indexOf('{');
+  if (jsonStart === -1) {
+    throw new Error('No JSON object found in response');
+  }
+
+  let braceCount = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = jsonStart; i < text.length; i++) {
+    const char = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '{') braceCount++;
+      if (char === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          return text.slice(jsonStart, i + 1);
+        }
+      }
+    }
+  }
+
+  // If we didn't find a matching close brace, try the greedy regex as fallback
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return jsonMatch[0];
+  }
+
+  throw new Error('Could not extract complete JSON from response');
+}
+
+/**
  * Make a proxied request to avoid CORS issues with custom API endpoints
  */
 async function makeProxyRequest(
@@ -139,9 +192,8 @@ function createAIServiceAdapter(): IAIService | null {
 
         const content = response.content[0];
         if (content.type !== 'text') throw new Error('Unexpected response type from Claude');
-        const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error('Could not extract JSON from response');
-        return JSON.parse(jsonMatch[0]);
+        const jsonStr = extractJSON(content.text);
+        return JSON.parse(jsonStr);
       },
 
       async classifyContent(prompt: string, categories: string[]): Promise<string> {
@@ -221,9 +273,8 @@ function createAIServiceAdapter(): IAIService | null {
         }
 
         content = stripThinkingBlocks(content);
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error('Could not extract JSON from response');
-        return JSON.parse(jsonMatch[0]);
+        const jsonStr = extractJSON(content);
+        return JSON.parse(jsonStr);
       },
 
       async classifyContent(prompt: string, categories: string[]): Promise<string> {
@@ -1220,12 +1271,19 @@ export const PreviewWindow: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl/Cmd+I: Toggle inventory
+      // Skip keyboard shortcuts when focus is in an input/textarea
+      // This allows users to type normally in inputText beats during preview
+      const target = e.target as HTMLElement;
+      const isInputFocused = target.tagName === 'INPUT' ||
+                             target.tagName === 'TEXTAREA' ||
+                             target.isContentEditable;
+
+      // Ctrl/Cmd+I: Toggle inventory (works even in input)
       if ((e.ctrlKey || e.metaKey) && (e.key === 'i' || e.key === 'I')) {
         e.preventDefault();
         setInventoryVisible(prev => !prev);
       }
-      // Escape: Stop preview or cancel waiting
+      // Escape: Stop preview or cancel waiting (works even in input)
       if (e.key === 'Escape') {
         if (isWaitingToStart) {
           setIsWaitingToStart(false);
@@ -1235,8 +1293,8 @@ export const PreviewWindow: React.FC = () => {
           stopPreview();
         }
       }
-      // Space: Start/pause/resume preview
-      if (e.key === ' ' && story) {
+      // Space: Start/pause/resume preview (skip if typing in input)
+      if (e.key === ' ' && story && !isInputFocused) {
         e.preventDefault();
         if (isWaitingToStart) {
           setIsWaitingToStart(false);
@@ -1627,6 +1685,7 @@ export const PreviewWindow: React.FC = () => {
                 height: STAGE_HEIGHT,
                 transform: `scale(${scale})`,
                 transformOrigin: 'top left',
+                overflow: 'hidden', // Clip any content that exceeds stage bounds
               }}
             >
               <div ref={containerRef} className="absolute inset-0" />

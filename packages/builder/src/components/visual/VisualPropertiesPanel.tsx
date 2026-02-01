@@ -1122,6 +1122,24 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       </div>
                     </div>
 
+                    {/* Require Scroll to Bottom - Only for text and dialog elements */}
+                    {(selected.type === 'text' || selected.type === 'dialog') && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selected.requireScrollToBottom ?? false}
+                            onChange={(e) => onElementUpdate(selected.id, { requireScrollToBottom: e.target.checked })}
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-xs font-medium text-gray-700">Require scroll to bottom</span>
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1 ml-5">
+                          When enabled, the Continue button will be disabled until the player scrolls to the bottom of this text box.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Click Sound Section - Only for interactive elements */}
                     {(selected.type === 'button' || selected.type === 'text' || selected.type === 'dialog') && (
                       <div className="mt-4">

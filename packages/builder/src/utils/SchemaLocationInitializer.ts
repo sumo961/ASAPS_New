@@ -30,6 +30,10 @@ export interface VisualElement {
   fontSize?: number;
   textAlign?: 'left' | 'center' | 'right';
   fontOverridden?: boolean;  // True if font/size explicitly set, false = use theme defaults
+  // Scroll behavior properties
+  requireScrollToBottom?: boolean;  // If true, continue button disabled until scrolled
+  manuallyResized?: boolean;        // User has manually resized - skip auto-sizing
+  initialAutoSized?: boolean;       // Was auto-sized on creation
 }
 
 interface LocationDefinition {
@@ -272,6 +276,9 @@ export function initializeLocationsFromSchema(
     let width = locationDef.defaultWidth || 400;
     let height = locationDef.defaultHeight || 50;
 
+    // AI content beats need special handling
+    const isAIContentBeat = ['onlineContent', 'aiSummary', 'aiInfoText'].includes(beat.type);
+
     // Auto-size text elements based on content
     if (defaultText && (elementType === 'text' || elementType === 'dialog' || elementType === 'button')) {
       const sized = autoSizeText(
@@ -283,6 +290,13 @@ export function initializeLocationsFromSchema(
       );
       width = sized.width;
       height = sized.height;
+
+      // For AI content beats, use wider minimum width since content will be longer than placeholder
+      // This ensures the text box uses more of the available stage width
+      if (isAIContentBeat && (locationName === 'text' || locationName === 'summary')) {
+        const minAITextWidth = Math.floor(stageWidth * 0.75); // 75% of stage width
+        width = Math.max(width, minAITextWidth);
+      }
 
       // Cap height for endScreen messages to leave room for buttons
       if (beat.type === 'endScreen' && locationName === 'message') {
@@ -310,9 +324,17 @@ export function initializeLocationsFromSchema(
         currentY += height + 20; // Stack vertically
       }
     } else if (locationName === 'title') {
-      // Title at top
-      y = 60;
-      currentY = y + height + 40; // Space after title
+      // Title at top - use tighter spacing for AI beats
+      y = isAIContentBeat ? 40 : 60;
+      // For AI beats, cap title height and reduce gap
+      if (isAIContentBeat) {
+        const originalHeight = height;
+        height = Math.min(height, 80); // Cap title height for AI beats
+        currentY = y + height + 15; // Smaller gap after title
+        console.log(`[SchemaLocationInitializer] AI title: y=${y}, height=${height} (was ${originalHeight}), nextY=${currentY}`);
+      } else {
+        currentY = y + height + 40; // Space after title
+      }
     } else if (locationName === 'author') {
       // Author below title
       y = currentY;
@@ -321,6 +343,20 @@ export function initializeLocationsFromSchema(
       // Summary gets extra gap from title and more height
       y = currentY + 20; // Extra gap before summary
       currentY = y + height + 30;
+    } else if ((locationName === 'text' || locationName === 'summary') && isAIContentBeat) {
+      // For AI content beats, text/summary element should fill available space
+      // If this is the first element (no title), start higher
+      if (beat.type === 'aiInfoText' && currentY === 100) {
+        currentY = 60; // Start higher for title-less AI beats
+      }
+      y = currentY;
+      // Calculate available height: from currentY to button area
+      const buttonAreaTop = stageHeight - 150; // Button is at stageHeight - 150
+      const availableHeight = buttonAreaTop - y - 30; // Leave 30px gap above button
+      const originalHeight = height;
+      height = Math.max(height, Math.min(availableHeight, 400)); // Use available space, cap at 400
+      console.log(`[SchemaLocationInitializer] AI ${locationName}: y=${y}, height=${height} (was ${originalHeight}), availableHeight=${availableHeight}, buttonAreaTop=${buttonAreaTop}`);
+      currentY = y + height + 20;
     } else {
       // Stack other elements
       y = currentY;
@@ -330,6 +366,12 @@ export function initializeLocationsFromSchema(
     // Use standard font sizes - let content scroll if needed
     const fontSize = locationDef.fontSize || 16;
     console.log(`[SchemaLocationInitializer] ${beat.type}/${locationName}: fontSize=${fontSize}, locationDef.fontSize=${locationDef.fontSize}`);
+
+    // Determine if this element should require scroll-to-bottom
+    // For AI summary beats with medium/long summaries, the summary element should require scrolling
+    const shouldRequireScroll = beat.type === 'aiSummary' &&
+      locationName === 'summary' &&
+      (params.maxLength === 'medium' || params.maxLength === 'long');
 
     // Create element
     const element: VisualElement = {
@@ -349,6 +391,10 @@ export function initializeLocationsFromSchema(
       font: undefined, // Use theme default
       fontSize,
       textAlign: 'center',
+      // Mark as auto-sized so we can re-auto-size when content changes (unless manually resized)
+      initialAutoSized: true,
+      // For longer AI summaries, require user to scroll to bottom before continuing
+      requireScrollToBottom: shouldRequireScroll,
     };
 
     elements.push(element);
@@ -594,6 +640,10 @@ export function initializeBeatLocations(
       if (el.fontSize !== undefined) location.fontSize = el.fontSize;
       if (el.textAlign) location.textAlign = el.textAlign;
       location.autosize = el.fontSize === undefined;
+      // Scroll behavior properties
+      if (el.requireScrollToBottom) location.requireScrollToBottom = el.requireScrollToBottom;
+      if (el.initialAutoSized) location.initialAutoSized = el.initialAutoSized;
+      if (el.manuallyResized) location.manuallyResized = el.manuallyResized;
 
       beat.locations.set(el.name || el.id, location);
     });

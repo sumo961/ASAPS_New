@@ -117,6 +117,9 @@ export class OnlineContentBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
+    // Mark this as an online content beat for centering in PositionedBeatView
+    renderer.setState('currentBeatType', 'onlineContent');
+
     try {
       let content: string;
 
@@ -164,19 +167,26 @@ export class OnlineContentBeat extends Beat {
       const processedTitle = title ? this.processText(title, context) : '';
 
       // Update location content - title and text should be separate
+      console.log(`[OnlineContentBeat ${this.id}] Updating locations, count=${this.locations.size}`);
       for (const [name, loc] of this.locations) {
         const nameLower = name.toLowerCase();
         if (nameLower === 'title' || nameLower.includes('title')) {
           (loc as any).content = processedTitle;
+          console.log(`[OnlineContentBeat ${this.id}] Location "${name}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height} -> TITLE`);
         } else if (nameLower === 'text' || nameLower.includes('text')) {
           (loc as any).content = processedText; // Content WITHOUT title
+          console.log(`[OnlineContentBeat ${this.id}] Location "${name}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height} -> TEXT (${processedText.length} chars)`);
         } else if (nameLower.includes('button') || nameLower.includes('continue')) {
           (loc as any).content = processedButtonText;
+          console.log(`[OnlineContentBeat ${this.id}] Location "${name}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height} -> BUTTON`);
+        } else {
+          console.log(`[OnlineContentBeat ${this.id}] Location "${name}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height} -> UNMATCHED`);
         }
       }
 
       // Render as text display - pass content (not title) as main text
       const locations = Array.from(this.locations.values());
+      console.log(`[OnlineContentBeat ${this.id}] Calling renderText with ${locations.length} locations`);
       await renderer.renderText(processedText, processedButtonText, locations);
 
       return this.getNextBeat(context);

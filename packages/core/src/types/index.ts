@@ -31,6 +31,10 @@ export interface Location {
   autosize?: boolean;  // Auto-calculate font size based on box dimensions
   fontOverridden?: boolean;  // True if font/size explicitly set, false = use theme defaults
   visible?: boolean;   // Element visibility (false = hidden, true/undefined = visible)
+  // Scroll behavior properties (for text/dialog elements)
+  requireScrollToBottom?: boolean;  // If true, continue button disabled until user scrolls to bottom
+  manuallyResized?: boolean;        // User has manually resized - skip auto-sizing on content change
+  initialAutoSized?: boolean;       // Was auto-sized on creation (enables re-auto-sizing when content changes)
   // Meter-specific fields (for kind='meter')
   counterName?: string;      // Name of the counter to display
   meterOrientation?: 'horizontal' | 'vertical';

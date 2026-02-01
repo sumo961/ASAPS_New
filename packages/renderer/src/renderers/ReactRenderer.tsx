@@ -55,18 +55,17 @@ const ScaledStage: React.FC<ScaledStageProps> = ({ children, width, height }) =>
     return <div ref={containerRef} style={{ width, height, visibility: 'hidden' }}>{children}</div>;
   }
 
-  // When scale is 1 (or close to it), fill the container entirely
-  // Otherwise center the scaled content
-  const fillContainer = scale >= 0.99;
-
+  // Always use fixed stage dimensions and apply uniform scale
+  // This ensures the stage maintains its aspect ratio
   return (
     <div
       ref={containerRef}
       style={{
-        width: fillContainer ? '100%' : width,
-        height: fillContainer ? '100%' : height,
-        transform: fillContainer ? 'none' : `scale(${scale})`,
+        width: width,
+        height: height,
+        transform: scale < 1 ? `scale(${scale})` : 'none',
         transformOrigin: 'center center',
+        overflow: 'hidden', // Clip any content that escapes the stage bounds
       }}
     >
       {children}
@@ -1166,7 +1165,7 @@ export class ReactRenderer extends BaseRenderer {
       const stageHeight = this.context.height;
 
       this.renderComponent(
-        <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           <ScaledStage width={stageWidth} height={stageHeight}>
             <PositionedBeatView
               stageWidth={stageWidth}
@@ -1222,11 +1221,21 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
+    // Use currentBeatType from state if set (for AI beats), otherwise default to infoText
+    const beatType = (this.getState('currentBeatType') as string) || 'infoText';
+
+    console.log(`[ReactRenderer.renderText] beatType=${beatType}, text.length=${text.length}, locations provided=${!!locations}, count=${locations?.length || 0}`);
+
     // Use provided locations or generate default locations from schema
     const content = { text, buttonText };
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('infoText', content);
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations(beatType === 'onlineContent' ? 'infoText' : beatType, content);
 
-    await this.renderPositionedBeat('infoText', content, effectiveLocations);
+    // Log each location's position and dimensions
+    effectiveLocations.forEach((loc, i) => {
+      console.log(`[ReactRenderer.renderText] Location[${i}] "${loc.name}" (${loc.kind}): x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height}, content="${(loc as any).content?.substring?.(0, 50) || 'N/A'}..."`);
+    });
+
+    await this.renderPositionedBeat(beatType, content, effectiveLocations);
   }
 
   async renderDialog(speaker: string, text: string, emotion?: string, locations?: Location[]): Promise<void> {
@@ -1284,8 +1293,10 @@ export class ReactRenderer extends BaseRenderer {
       const nonButtonLocations = locations.filter(loc => loc.kind !== 'button');
       if (nonButtonLocations.length > 0) {
         const content = { text, speaker, emotion, choices: [] };
+        // Use currentBeatType from state if set (for AI beats), otherwise default to dialogTree
+        const beatType = (this.getState('currentBeatType') as string) || 'dialogTree';
         // waitForAction=false means render and return immediately
-        await this.renderPositionedBeat('dialogTree', content, nonButtonLocations, false);
+        await this.renderPositionedBeat(beatType, content, nonButtonLocations, false);
       }
     }
   }
@@ -1362,7 +1373,7 @@ export class ReactRenderer extends BaseRenderer {
     const stageHeight = this.context.height;
 
     this.renderComponent(
-      <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         <ScaledStage width={stageWidth} height={stageHeight}>
           <ChatDialogView
             messages={[...this.chatMessages]}
@@ -1399,6 +1410,9 @@ export class ReactRenderer extends BaseRenderer {
       return this.renderChatDialog(choices);
     }
 
+    // Use currentBeatType from state if set (for AI beats), otherwise default to dialogTree
+    const beatType = (this.getState('currentBeatType') as string) || 'dialogTree';
+
     // Use positioned rendering if locations are available
     if (locations && locations.length > 0) {
       // Check if current choices match the location names (for buttons)
@@ -1414,7 +1428,7 @@ export class ReactRenderer extends BaseRenderer {
           choices,
           markVisited
         };
-        return this.renderPositionedBeat('dialogTree', content, locations, true);
+        return this.renderPositionedBeat(beatType, content, locations, true);
       }
 
       // No button locations but we have choices - need to generate buttons
@@ -1449,7 +1463,7 @@ export class ReactRenderer extends BaseRenderer {
           choices,
           markVisited
         };
-        return this.renderPositionedBeat('dialogTree', content, generatedLocations, true);
+        return this.renderPositionedBeat(beatType, content, generatedLocations, true);
       }
 
       // Choice text doesn't match button names - map choices to buttons by index
@@ -1502,7 +1516,7 @@ export class ReactRenderer extends BaseRenderer {
         choices,
         markVisited
       };
-      return this.renderPositionedBeat('dialogTree', content, mappedLocations, true);
+      return this.renderPositionedBeat(beatType, content, mappedLocations, true);
     }
 
     // No locations provided - generate default locations from schema
@@ -1511,8 +1525,8 @@ export class ReactRenderer extends BaseRenderer {
       choices,
       markVisited
     };
-    const defaultLocations = generateDefaultLocations('dialogTree', content);
-    return this.renderPositionedBeat('dialogTree', content, defaultLocations, true);
+    const defaultLocations = generateDefaultLocations(beatType, content);
+    return this.renderPositionedBeat(beatType, content, defaultLocations, true);
   }
 
   async renderMovement(question: string, choices: { id: string; text: string; location: string; locationName?: string }[], locations?: Location[]): Promise<string> {

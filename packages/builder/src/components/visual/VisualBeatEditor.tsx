@@ -80,6 +80,10 @@ export interface VisualElement {
   fontSize?: number;
   textAlign?: 'left' | 'center' | 'right';
   fontOverridden?: boolean;  // True if font/size explicitly set, false = use theme defaults
+  // Scroll behavior properties (for text/dialog elements)
+  requireScrollToBottom?: boolean;  // If true, continue button disabled until user scrolls to bottom
+  manuallyResized?: boolean;        // User has manually resized - skip auto-sizing on content change
+  initialAutoSized?: boolean;       // Was auto-sized on creation
   // Hotspot override properties (per-element)
   hotspotOverride?: {
     enabled: boolean;
@@ -173,6 +177,12 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Debug logging for background
   console.log(`[VisualBeatEditor] backgroundAssetId="${backgroundAssetId}", found=${!!backgroundAsset}, url="${resolvedBackgroundUrl?.substring(0, 80) || 'none'}", assets.length=${assets.length}`);
 
+  // Debug logging for element positions - compare input elements vs what renderer receives
+  console.log(`[VisualBeatEditor] ====== ELEMENT POSITIONS (bounding boxes) ======`);
+  elements.filter(el => el.visible).forEach(el => {
+    console.log(`[VisualBeatEditor] "${el.name}" (${el.type}): x=${el.x}, y=${el.y}, w=${el.width}, h=${el.height}, z=${el.z}`);
+  });
+
   // Convert VisualElements to Location objects for the renderer
   const locationsForRenderer: Location[] = elements
     .filter(el => el.visible)
@@ -213,6 +223,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       numericFormat: el.numericFormat,
       meterColor: el.meterColor,
       meterBackgroundColor: el.meterBackgroundColor,
+      // Scroll behavior properties
+      requireScrollToBottom: el.requireScrollToBottom,
+      manuallyResized: el.manuallyResized,
+      initialAutoSized: el.initialAutoSized,
     }));
 
   // Asset resolver function to look up asset URLs by ID
@@ -228,6 +242,12 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     beatType || 'unknown',
     assetResolver
   );
+
+  // Debug logging - compare renderer positions with bounding box positions
+  console.log(`[VisualBeatEditor] ====== RENDERER POSITIONS (positionedElements) ======`);
+  positionedElements.forEach(el => {
+    console.log(`[VisualBeatEditor] "${el.location.name}" (${el.location.kind}): x=${el.location.x}, y=${el.location.y}, w=${el.location.width}, h=${el.location.height}`);
+  });
 
   // Add asset URLs to elements (keeping this for backwards compatibility)
   positionedElements.forEach(el => {
@@ -354,7 +374,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       }
 
       const updatedElements = elements.map(el =>
-        el.id === resizingElement ? { ...el, x: newX, y: newY, width: newWidth, height: newHeight } : el
+        el.id === resizingElement ? { ...el, x: newX, y: newY, width: newWidth, height: newHeight, manuallyResized: true } : el
       );
       onElementsChange(updatedElements);
       return;

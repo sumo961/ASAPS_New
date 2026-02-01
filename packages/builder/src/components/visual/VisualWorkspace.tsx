@@ -585,6 +585,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         if (el.meterBackgroundColor) location.meterBackgroundColor = el.meterBackgroundColor;
       }
 
+      // Add scroll behavior properties (for text/dialog elements)
+      if (el.requireScrollToBottom) location.requireScrollToBottom = el.requireScrollToBottom;
+      if (el.manuallyResized) location.manuallyResized = el.manuallyResized;
+      if (el.initialAutoSized) location.initialAutoSized = el.initialAutoSized;
+
       targetBeat.locations.set(el.name || el.id, location);
     });
 

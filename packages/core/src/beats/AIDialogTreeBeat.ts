@@ -183,6 +183,8 @@ export class AIDialogTreeBeat extends Beat {
     // Set presentation mode for consistent styling with regular DialogTreeBeat
     renderer.setState('presentationMode', this.presentationMode || 'positioned');
     renderer.setState('showAvatars', this.showAvatars ?? true);
+    // Mark this as an AI dialog tree for centering in PositionedBeatView
+    renderer.setState('currentBeatType', 'aiDialogTree');
     // Default responseDelay to 1.5s for chat modes if not explicitly set
     const isChatMode = this.presentationMode && this.presentationMode !== 'positioned';
     const defaultDelay = isChatMode ? 1.5 : 0;
@@ -372,27 +374,16 @@ Return a JSON object with this structure:
     // Parse and validate the response
     let dialogTree: DialogNode;
     if (typeof response === 'string') {
-      // Try to extract JSON from the response
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        let jsonStr = jsonMatch[0];
+      // First, try to repair/extract JSON from the response
+      // This handles cases where AI includes extra content before or after JSON
+      let jsonStr = this.repairJSON(response);
 
-        // Try to repair common JSON issues from AI models
-        try {
-          dialogTree = JSON.parse(jsonStr);
-        } catch (parseError) {
-          console.log(`[AIDialogTreeBeat] Initial JSON parse failed, attempting repair...`);
-          jsonStr = this.repairJSON(jsonStr);
-          try {
-            dialogTree = JSON.parse(jsonStr);
-            console.log(`[AIDialogTreeBeat] JSON repair successful`);
-          } catch (repairError) {
-            console.error(`[AIDialogTreeBeat] JSON repair failed:`, repairError);
-            throw new Error(`Could not parse AI response as JSON: ${(parseError as Error).message}`);
-          }
-        }
-      } else {
-        throw new Error('Could not parse AI response as JSON');
+      try {
+        dialogTree = JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error(`[AIDialogTreeBeat] JSON parse failed after repair:`, parseError);
+        console.error(`[AIDialogTreeBeat] Attempted to parse: ${jsonStr.substring(0, 500)}...`);
+        throw new Error(`Could not parse AI response as JSON: ${(parseError as Error).message}`);
       }
     } else {
       dialogTree = response;
@@ -410,15 +401,21 @@ Return a JSON object with this structure:
 
     // Remove any thinking/reasoning that might be before the JSON
     const jsonStart = repaired.indexOf('{');
+    if (jsonStart === -1) {
+      console.error(`[AIDialogTreeBeat] No JSON object found in response`);
+      throw new Error('No JSON object found in AI response');
+    }
     if (jsonStart > 0) {
+      console.log(`[AIDialogTreeBeat] Removing ${jsonStart} chars before JSON`);
       repaired = repaired.slice(jsonStart);
     }
 
-    // Remove trailing content after the JSON
+    // Remove trailing content after the JSON by finding the matching closing brace
     let braceCount = 0;
     let inString = false;
     let escaped = false;
     let jsonEnd = repaired.length;
+    let foundEnd = false;
 
     for (let i = 0; i < repaired.length; i++) {
       const char = repaired[i];
@@ -444,12 +441,16 @@ Return a JSON object with this structure:
           braceCount--;
           if (braceCount === 0) {
             jsonEnd = i + 1;
+            foundEnd = true;
             break;
           }
         }
       }
     }
 
+    if (foundEnd && jsonEnd < repaired.length) {
+      console.log(`[AIDialogTreeBeat] Removing ${repaired.length - jsonEnd} chars after JSON`);
+    }
     repaired = repaired.slice(0, jsonEnd);
 
     // Fix trailing commas before ] or }
