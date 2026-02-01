@@ -2022,6 +2022,7 @@ export const PreviewWindow: React.FC = () => {
               setShowInputTextModal(false);
               setPendingInputTextBeats([]);
               setPendingPreset(null);
+              setIsWaitingToStart(false); // Clear the "click to preview" overlay
 
               // Start preview with updated preset
               setTimeout(() => handleRestart(startBeatId || undefined, updatedPreset, true), 50);
@@ -2034,6 +2035,7 @@ export const PreviewWindow: React.FC = () => {
               setShowInputTextModal(false);
               setPendingInputTextBeats([]);
               setPendingPreset(null);
+              setIsWaitingToStart(false); // Clear the "click to preview" overlay
 
               // Start preview with placeholder values
               setTimeout(() => handleRestart(startBeatId || undefined, pendingPreset, true), 50);
