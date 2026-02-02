@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Additional styles for the web player */
+.asaps-player {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Ensure animations work properly */
+@keyframes asaps-spin {
+  to { transform: rotate(360deg); }
+}
+
+.asaps-spinner {
+  animation: asaps-spin 1s linear infinite;
+}

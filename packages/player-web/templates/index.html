@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>{{STORY_TITLE}}</title>
+  <meta name="description" content="{{STORY_DESCRIPTION}}">
+  <meta name="author" content="{{STORY_AUTHOR}}">
+
+  <!-- Prevent zooming on mobile -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1a2e;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    #player {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Responsive iframe mode */
+    .iframe-mode #player {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    /* Loading state */
+    .loading-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: #fff;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid #4a4a8a;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
+  <!-- Player CSS -->
+  <link rel="stylesheet" href="{{PLAYER_CSS}}">
+</head>
+<body>
+  <div id="player">
+    <div class="loading-screen">
+      <div class="spinner"></div>
+      <div>Loading story...</div>
+    </div>
+  </div>
+
+  <!-- Story data -->
+  <script>
+    window.ASAPS_STORY_DATA = '{{STORY_DATA}}';
+    window.ASAPS_STORY_URL = '{{STORY_URL}}';
+    window.ASAPS_CONFIG = {
+      enableAI: {{ENABLE_AI}},
+      showApiKeyPrompt: {{SHOW_API_KEY_PROMPT}},
+    };
+  </script>
+
+  <!-- Player script -->
+  <script src="{{PLAYER_JS}}"></script>
+
+  <!-- Initialize player -->
+  <script>
+    (function() {
+      // Detect iframe mode
+      if (window.parent !== window) {
+        document.body.classList.add('iframe-mode');
+      }
+
+      // Get story source
+      var storySource;
+      if (window.ASAPS_STORY_DATA && window.ASAPS_STORY_DATA !== '{{STORY_DATA}}') {
+        // Inline base64 data
+        storySource = 'data:application/zip;base64,' + window.ASAPS_STORY_DATA;
+      } else if (window.ASAPS_STORY_URL && window.ASAPS_STORY_URL !== '{{STORY_URL}}') {
+        // External file
+        storySource = window.ASAPS_STORY_URL;
+      } else {
+        // Default to story.asaps.zip in same directory
+        storySource = 'story.asaps.zip';
+      }
+
+      // Initialize player
+      ASAPSPlayer.init('#player', {
+        story: storySource,
+        enableAI: window.ASAPS_CONFIG.enableAI,
+        onError: function(error) {
+          console.error('Story error:', error);
+        },
+        onEnd: function() {
+          console.log('Story ended');
+        },
+      });
+    })();
+  </script>
+</body>
+</html>
