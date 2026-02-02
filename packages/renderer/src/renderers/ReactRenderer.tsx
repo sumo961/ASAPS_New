@@ -17,14 +17,27 @@ interface ScaledStageProps {
   children: React.ReactNode;
   width: number;
   height: number;
+  /** When true, skip internal scaling (parent handles it) */
+  disableScaling?: boolean;
 }
 
-const ScaledStage: React.FC<ScaledStageProps> = ({ children, width, height }) => {
+const ScaledStage: React.FC<ScaledStageProps> = ({
+  children,
+  width,
+  height,
+  disableScaling = false
+}) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [scale, setScale] = React.useState<number | null>(null);
+  const [scale, setScale] = React.useState<number | null>(disableScaling ? 1 : null);
 
   // Use useLayoutEffect to calculate scale synchronously before paint
   React.useLayoutEffect(() => {
+    // Skip scaling calculation if disabled (parent handles it)
+    if (disableScaling) {
+      setScale(1);
+      return;
+    }
+
     const updateScale = () => {
       if (containerRef.current) {
         const parent = containerRef.current.parentElement;
@@ -33,11 +46,11 @@ const ScaledStage: React.FC<ScaledStageProps> = ({ children, width, height }) =>
           const availableHeight = parent.clientHeight;
           const scaleX = availableWidth / width;
           const scaleY = availableHeight / height;
-          // Use the smaller scale to fit entirely within viewport
-          let newScale = Math.min(scaleX, scaleY, 1); // Cap at 1 to not upscale
+          // Use the smaller scale to fit entirely within viewport (allow up to 2x for larger screens)
+          let newScale = Math.min(scaleX, scaleY, 2);
           console.log(`[ScaledStage] container: ${availableWidth}x${availableHeight}, stage: ${width}x${height}, scaleX: ${scaleX.toFixed(4)}, scaleY: ${scaleY.toFixed(4)}, scale: ${newScale.toFixed(4)}`);
           // If very close to 1, use exactly 1 to avoid sub-pixel letterboxing
-          if (newScale > 0.99) {
+          if (newScale > 0.99 && newScale < 1.01) {
             newScale = 1;
           }
           setScale(newScale);
@@ -48,7 +61,7 @@ const ScaledStage: React.FC<ScaledStageProps> = ({ children, width, height }) =>
     updateScale();
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
-  }, [width, height]);
+  }, [width, height, disableScaling]);
 
   // Don't render until scale is calculated to prevent flash
   if (scale === null) {
@@ -63,7 +76,7 @@ const ScaledStage: React.FC<ScaledStageProps> = ({ children, width, height }) =>
       style={{
         width: width,
         height: height,
-        transform: scale < 1 ? `scale(${scale})` : 'none',
+        transform: scale !== 1 ? `scale(${scale})` : 'none',
         transformOrigin: 'center center',
         overflow: 'hidden', // Clip any content that escapes the stage bounds
       }}
@@ -939,6 +952,13 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Disable internal scaling (when parent handles scaling via CSS transforms)
+   */
+  setDisableScaling(disable: boolean): void {
+    this.setState('disableScaling', disable);
+  }
+
+  /**
    * Set the character meter frame resolver function
    * This allows the renderer to get meter frame data for character HUD overlays
    * The resolver should look up the character and return { counters, config }
@@ -1163,10 +1183,11 @@ export class ReactRenderer extends BaseRenderer {
       // Use project's stage dimensions from context
       const stageWidth = this.context.width;
       const stageHeight = this.context.height;
+      const disableScaling = this.getState('disableScaling') as boolean | undefined;
 
       this.renderComponent(
         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          <ScaledStage width={stageWidth} height={stageHeight}>
+          <ScaledStage width={stageWidth} height={stageHeight} disableScaling={disableScaling}>
             <PositionedBeatView
               stageWidth={stageWidth}
               stageHeight={stageHeight}
@@ -1371,10 +1392,11 @@ export class ReactRenderer extends BaseRenderer {
 
     const stageWidth = this.context.width;
     const stageHeight = this.context.height;
+    const disableScaling = this.getState('disableScaling') as boolean | undefined;
 
     this.renderComponent(
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        <ScaledStage width={stageWidth} height={stageHeight}>
+        <ScaledStage width={stageWidth} height={stageHeight} disableScaling={disableScaling}>
           <ChatDialogView
             messages={[...this.chatMessages]}
             choices={choices}
@@ -1404,6 +1426,17 @@ export class ReactRenderer extends BaseRenderer {
 
     // Get markVisited from renderer state (set by the beat)
     const markVisited = this.getState('markVisited') || false;
+
+    // Log choice rendering info
+    console.log(`[renderChoices] Rendering ${choices.length} choices:`, choices.map(c => c.text).join(', '));
+    if (locations) {
+      const buttonLocs = locations.filter(l => l.kind === 'button');
+      const textLocs = locations.filter(l => l.kind === 'text' || l.kind === 'dialog');
+      console.log(`[renderChoices] Locations: ${buttonLocs.length} buttons, ${textLocs.length} text elements`);
+      buttonLocs.forEach((loc, i) => {
+        console.log(`[renderChoices]   Button ${i}: "${loc.name}" at (${loc.x}, ${loc.y}) size ${loc.width}x${loc.height}`);
+      });
+    }
 
     // If in chat mode, use chat rendering
     if (this.currentPresentationMode !== 'positioned') {

@@ -592,7 +592,7 @@ export const PreviewWindow: React.FC = () => {
     return groupPresetsByOutcome(generatedPresets);
   }, [generatedPresets]);
 
-  // Calculate fit scale
+  // Calculate fit scale based on available space
   useLayoutEffect(() => {
     const calculateFitScale = () => {
       if (!previewAreaRef.current) return;
@@ -603,8 +603,10 @@ export const PreviewWindow: React.FC = () => {
 
       const scaleX = availableWidth / STAGE_WIDTH;
       const scaleY = availableHeight / STAGE_HEIGHT;
-      const newFitScale = Math.min(scaleX, scaleY, 1);
+      // Allow scaling up to fill available space (max 2x to avoid excessive pixelation)
+      const newFitScale = Math.min(scaleX, scaleY, 2);
 
+      console.log(`[PreviewWindow] Available: ${availableWidth}x${availableHeight}, fitScale: ${newFitScale.toFixed(3)}`);
       setFitScale(newFitScale);
 
       if (isAutoFit) {
@@ -612,14 +614,18 @@ export const PreviewWindow: React.FC = () => {
       }
     };
 
-    calculateFitScale();
+    // Use requestAnimationFrame to ensure DOM is ready
+    const rafId = requestAnimationFrame(calculateFitScale);
 
     const resizeObserver = new ResizeObserver(calculateFitScale);
     if (previewAreaRef.current) {
       resizeObserver.observe(previewAreaRef.current);
     }
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
+    };
   }, [isAutoFit]);
 
   // Initialize renderer
@@ -632,6 +638,9 @@ export const PreviewWindow: React.FC = () => {
         width: STAGE_WIDTH,
         height: STAGE_HEIGHT,
       });
+
+      // Disable renderer's internal scaling - PreviewWindow handles scaling via CSS transforms
+      (reactRenderer as any).setDisableScaling?.(true);
 
       // Set up asset resolver
       if (previewData.assets && previewData.assets.length > 0) {
@@ -1318,6 +1327,21 @@ export const PreviewWindow: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isRunning, isPaused, isWaitingToStart, story, startBeatId, startPreview, stopPreview, pausePreview, resumePreview]);
 
+  // Initialize inventory visibility based on player character's showOnDemand setting
+  // This runs once when previewData is first loaded
+  const initialInventorySetRef = useRef(false);
+  useEffect(() => {
+    if (previewData?.characters && !initialInventorySetRef.current) {
+      const playerChar = previewData.characters.find(c => c.role === 'player' && c.inventoryFrame);
+      if (playerChar?.inventoryFrame) {
+        const showByDefault = !playerChar.inventoryFrame.showOnDemand;
+        console.log(`[PreviewWindow] Setting initial inventory visibility: ${showByDefault} (showOnDemand=${playerChar.inventoryFrame.showOnDemand})`);
+        setInventoryVisible(showByDefault);
+        initialInventorySetRef.current = true;
+      }
+    }
+  }, [previewData?.characters]);
+
   // Update renderer inventory visibility
   useEffect(() => {
     if (rendererRef.current && 'setInventoryVisible' in rendererRef.current) {
@@ -1689,9 +1713,9 @@ export const PreviewWindow: React.FC = () => {
         {/* Preview Area */}
         <div
           ref={previewAreaRef}
-          className="flex-1 flex items-center justify-center overflow-auto py-4 px-2"
+          className="flex-1 flex items-center justify-center overflow-hidden p-5"
         >
-          {/* Stage wrapper */}
+          {/* Stage wrapper - sized to scaled dimensions */}
           <div
             style={{
               width: STAGE_WIDTH * scale,
@@ -1699,6 +1723,7 @@ export const PreviewWindow: React.FC = () => {
               flexShrink: 0,
             }}
           >
+            {/* Inner stage - full size with CSS transform */}
             <div
               className={`relative bg-white shadow-lg transition-all duration-200 ${
                 (isPaused || isWaitingToStart) ? 'ring-4 ring-amber-400 ring-offset-2' : ''
@@ -1708,9 +1733,10 @@ export const PreviewWindow: React.FC = () => {
                 height: STAGE_HEIGHT,
                 transform: `scale(${scale})`,
                 transformOrigin: 'top left',
-                overflow: 'hidden', // Clip any content that exceeds stage bounds
+                overflow: 'hidden',
               }}
             >
+              {/* Renderer container */}
               <div ref={containerRef} className="absolute inset-0" />
               {/* Waiting to start overlay - shows when navigated to a beat but not yet started */}
               {isWaitingToStart && (

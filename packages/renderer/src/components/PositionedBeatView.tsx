@@ -155,29 +155,34 @@ function calculateSmartTextBoxDimensions(
   const estimatedContentHeight = estimatedLines * lineHeight;
   const estimatedTotalHeight = estimatedContentHeight + contentPadding;
 
-  console.log(`[calculateSmartTextBoxDimensions] Input: loc(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}), fontSize=${fontSize}, padding=${padding}, buttonHeight=${buttonHeight}, stage=${stageWidth}x${stageHeight}`);
-  console.log(`[calculateSmartTextBoxDimensions] Estimates: charWidth=${charWidth.toFixed(1)}, lineHeight=${lineHeight.toFixed(1)}, charsPerLine=${estimatedCharsPerLine}, lines=${estimatedLines}, contentHeight=${estimatedContentHeight.toFixed(1)}, totalHeight=${estimatedTotalHeight.toFixed(1)}`);
+  const contentPreview = content.substring(0, 50).replace(/\n/g, '\\n');
+  console.log(`[SmartTextBox] Input: loc(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}), fontSize=${fontSize}, content="${contentPreview}..." (${content.length} chars)`);
+  console.log(`[SmartTextBox] Estimates: charWidth=${charWidth.toFixed(1)}, lineHeight=${lineHeight.toFixed(1)}, charsPerLine=${estimatedCharsPerLine}, lines=${estimatedLines}, neededHeight=${estimatedTotalHeight.toFixed(1)}`);
 
   // Check if content fits in original dimensions
   if (estimatedTotalHeight <= location.height) {
-    console.log(`[calculateSmartTextBoxDimensions] Content fits in original dimensions`);
+    console.log(`[SmartTextBox] ✓ Content fits in original dimensions (${location.width}x${location.height})`);
     return { width: location.width, height: location.height, needsScroll: false, xOffset: 0 };
   }
 
   // Calculate maximum allowed dimensions
-  // Max width: leave 5% margin on right edge to prevent overflow
+  // Max right growth: leave 5% margin on right edge
   const rightMargin = stageWidth * 0.05;
-  const maxWidth = stageWidth - location.x - rightMargin;
+  const maxRightGrowth = stageWidth - location.x - rightMargin - location.width;
+
+  // Max left growth: can grow left up to 5% from left edge
+  const leftMargin = stageWidth * 0.05;
+  const maxLeftGrowth = location.x - leftMargin;
+
+  // Total max width considering both directions
+  const maxWidth = location.width + Math.max(0, maxRightGrowth) + Math.max(0, maxLeftGrowth);
 
   // Max height: available space from text box top to button area (or bottom margin)
-  // For button beats: leave room for actual button height + padding above button
-  // For non-button beats: leave a small bottom margin
   const buttonSpace = buttonHeight > 0 ? (buttonHeight + stageHeight * BUTTON_PADDING_PERCENT) : (stageHeight * 0.05);
-  const bottomMargin = stageHeight * 0.02; // Small margin above button
+  const bottomMargin = stageHeight * 0.02;
   const maxHeight = stageHeight - location.y - buttonSpace - bottomMargin;
 
-  console.log(`[calculateSmartTextBoxDimensions] Max dimensions: maxWidth=${maxWidth.toFixed(1)}, maxHeight=${maxHeight.toFixed(1)}, buttonSpace=${buttonSpace.toFixed(1)}`);
-  console.log(`[calculateSmartTextBoxDimensions] maxHeight calculation: stageHeight(${stageHeight}) - location.y(${location.y}) - buttonSpace(${buttonSpace.toFixed(1)}) - bottomMargin(${bottomMargin.toFixed(1)}) = ${maxHeight.toFixed(1)}`);
+  console.log(`[SmartTextBox] Max growth: rightGrowth=${maxRightGrowth.toFixed(1)}, leftGrowth=${maxLeftGrowth.toFixed(1)}, maxWidth=${maxWidth.toFixed(1)}, maxHeight=${maxHeight.toFixed(1)}`);
 
   // Try growing horizontally first
   let newWidth = location.width;
@@ -185,72 +190,95 @@ function calculateSmartTextBoxDimensions(
   let needsScroll = false;
 
   // For long content, use more horizontal space for better readability
-  // This ensures AI-generated text doesn't end up in narrow columns
   const isLongContent = content.length > 200;
   const minPreferredWidth = isLongContent ? Math.floor(maxWidth * 0.85) : location.width;
+
+  // Minimum width to prevent extremely narrow text boxes (at least 150px or 30% of stage)
+  const absoluteMinWidth = Math.max(150, stageWidth * 0.3);
+
+  // Check if current width is too narrow
+  if (location.width < absoluteMinWidth && estimatedCharsPerLine < 10) {
+    console.log(`[SmartTextBox] ⚠️ Width too narrow (${location.width}px, ${estimatedCharsPerLine} chars/line), forcing minimum ${absoluteMinWidth}px`);
+    newWidth = Math.min(absoluteMinWidth, maxWidth);
+  }
 
   // Step 1: Ensure minimum preferred width for long content
   if (newWidth < minPreferredWidth && newWidth < maxWidth) {
     newWidth = Math.min(minPreferredWidth, maxWidth);
+    console.log(`[SmartTextBox] Expanding to preferred width: ${newWidth.toFixed(1)}`);
   }
 
-  // Height buffer for long content - word-wrap doesn't pack text as efficiently as char-based estimation
-  // Only apply to long content (> 200 chars) to avoid affecting short text boxes
+  // Height buffer for long content
   const needsHeightBuffer = content.length > 200;
-  const heightBuffer = needsHeightBuffer ? 1.15 : 1.0; // 15% buffer for long content
+  const heightBuffer = needsHeightBuffer ? 1.15 : 1.0;
 
   // Step 2: Check if content fits at current width, grow if needed
   if (newWidth < maxWidth) {
-    // Try progressively wider widths starting from current
     for (let testWidth = newWidth; testWidth <= maxWidth; testWidth += 50) {
       const testContentWidth = testWidth - contentPadding;
       const testCharsPerLine = Math.floor(testContentWidth / charWidth);
       const testLines = testCharsPerLine > 0 ? Math.ceil(content.length / testCharsPerLine) : 1;
       const testContentHeight = testLines * lineHeight;
       const testTotalHeight = testContentHeight + contentPadding;
-      // Apply height buffer for long content
       const bufferedHeight = Math.ceil(testTotalHeight * heightBuffer);
 
       newWidth = testWidth;
-      // Calculate xOffset to keep box centered when width expands
+
+      // Calculate xOffset: prefer growing right, then left if right is exhausted
       const widthIncrease = newWidth - location.width;
-      const xOffset = widthIncrease > 0 ? Math.floor(widthIncrease / 2) : 0;
+      let xOffset = 0;
+      if (widthIncrease > 0) {
+        // How much can we grow right?
+        const rightGrowthUsed = Math.min(widthIncrease, Math.max(0, maxRightGrowth));
+        // Remaining growth goes left
+        const leftGrowthUsed = widthIncrease - rightGrowthUsed;
+        // xOffset is negative when growing left
+        xOffset = -leftGrowthUsed;
+
+        if (leftGrowthUsed > 0) {
+          console.log(`[SmartTextBox] Growing: right=${rightGrowthUsed.toFixed(1)}, left=${leftGrowthUsed.toFixed(1)}, xOffset=${xOffset.toFixed(1)}`);
+        }
+      }
 
       if (testTotalHeight <= location.height) {
-        // Content fits at this width with original height (no buffer needed)
+        console.log(`[SmartTextBox] ✓ Fits at width=${newWidth.toFixed(1)} with original height, xOffset=${xOffset}`);
         return { width: newWidth, height: location.height, needsScroll: false, xOffset };
       }
       if (bufferedHeight <= maxHeight) {
-        // Content fits at this width with some vertical growth (use buffered height)
         newHeight = Math.min(bufferedHeight, maxHeight);
+        console.log(`[SmartTextBox] ✓ Fits at ${newWidth.toFixed(1)}x${newHeight.toFixed(1)}, xOffset=${xOffset}`);
         return { width: newWidth, height: newHeight, needsScroll: false, xOffset };
       }
     }
-    // Max width reached
     newWidth = maxWidth;
   }
 
-  // Calculate xOffset to keep box centered when width expands
+  // Calculate final xOffset
   const finalWidthIncrease = newWidth - location.width;
-  const finalXOffset = finalWidthIncrease > 0 ? Math.floor(finalWidthIncrease / 2) : 0;
+  let finalXOffset = 0;
+  if (finalWidthIncrease > 0) {
+    const rightGrowthUsed = Math.min(finalWidthIncrease, Math.max(0, maxRightGrowth));
+    const leftGrowthUsed = finalWidthIncrease - rightGrowthUsed;
+    finalXOffset = -leftGrowthUsed;
+  }
 
   // Step 3: Calculate needed height at max width
   const finalContentWidth = newWidth - contentPadding;
   const finalCharsPerLine = Math.floor(finalContentWidth / charWidth);
   const finalLines = finalCharsPerLine > 0 ? Math.ceil(content.length / finalCharsPerLine) : 1;
   const finalContentHeight = finalLines * lineHeight + contentPadding;
-  // Apply height buffer for long content
   const bufferedFinalHeight = Math.ceil(finalContentHeight * heightBuffer);
 
   if (bufferedFinalHeight <= maxHeight) {
-    // Content fits with vertical growth (use buffered height)
     newHeight = bufferedFinalHeight;
+    console.log(`[SmartTextBox] ✓ Final size: ${newWidth.toFixed(1)}x${newHeight.toFixed(1)}, xOffset=${finalXOffset}`);
     return { width: newWidth, height: newHeight, needsScroll: false, xOffset: finalXOffset };
   }
 
-  // Step 4: Content doesn't fit even at max dimensions - enable scrolling
+  // Step 4: Content doesn't fit - enable scrolling
   newHeight = maxHeight;
   needsScroll = true;
+  console.log(`[SmartTextBox] ⚠️ Needs scroll: ${newWidth.toFixed(1)}x${newHeight.toFixed(1)}, xOffset=${finalXOffset}`);
 
   return { width: newWidth, height: newHeight, needsScroll, xOffset: finalXOffset };
 }
@@ -546,9 +574,11 @@ function adjustElementsForCollisions(
     el.location.kind !== 'text' && el.location.kind !== 'dialog' && el.location.kind !== 'button'
   );
 
+  console.log(`[CollisionDetect] Processing ${textElements.length} text elements, ${buttonElements.length} buttons`);
+
   // Calculate actual bounds for text elements
   // Use SMART-SIZED dimensions to account for text box expansion
-  const textBoxBounds: { bottom: number; left: number; right: number }[] = [];
+  const textBoxBounds: { bottom: number; left: number; right: number; name: string }[] = [];
   const adjustedTextElements = textElements.map(el => {
     const width = el.location.width;
     const originalHeight = el.location.height || 50;
@@ -566,14 +596,18 @@ function adjustElementsForCollisions(
       stageHeight
     );
 
-    // Use the smart-sized height for collision detection
+    // Use the smart-sized height and apply xOffset for collision detection
     const height = smartDims.height;
+    const effectiveX = el.location.x + (smartDims.xOffset || 0);
+    const effectiveWidth = smartDims.width;
 
-    // Calculate bounds using smart-sized height
+    // Calculate bounds using smart-sized dimensions
     const bottom = el.location.y + height;
-    const left = el.location.x;
-    const right = el.location.x + width;
-    textBoxBounds.push({ bottom, left, right });
+    const left = effectiveX;
+    const right = effectiveX + effectiveWidth;
+    textBoxBounds.push({ bottom, left, right, name: el.location.name });
+
+    console.log(`[CollisionDetect] Text "${el.location.name}": original(${el.location.x},${el.location.y},${el.location.width}x${originalHeight}) → smart(${effectiveX},${el.location.y},${effectiveWidth}x${height}), bottom=${bottom}`);
 
     // Return element unchanged - respect user positions
     return el;
@@ -587,7 +621,7 @@ function adjustElementsForCollisions(
   // Only adjust Y position if there's a collision with text boxes
   const sortedButtons = [...buttonElements].sort((a, b) => a.location.y - b.location.y);
   const adjustedButtonElements: PositionedElementData[] = [];
-  const buttonBounds: { top: number; bottom: number; left: number; right: number }[] = [];
+  const buttonBounds: { top: number; bottom: number; left: number; right: number; name: string }[] = [];
 
   for (const el of sortedButtons) {
     let newY = el.location.y;
@@ -598,19 +632,30 @@ function adjustElementsForCollisions(
     const buttonRight = buttonX + buttonWidth;
     const buttonHeight = el.location.height;
 
+    console.log(`[CollisionDetect] Button "${el.location.name}": pos(${buttonX},${el.location.y}), size(${buttonWidth}x${buttonHeight})`);
+
     // Check collision with each text box
     for (const bounds of textBoxBounds) {
       const horizontalOverlap = buttonLeft < bounds.right && buttonRight > bounds.left;
       if (horizontalOverlap && newY < bounds.bottom + 35) {
+        const oldY = newY;
         newY = Math.max(newY, bounds.bottom + 35);
+        if (newY !== oldY) {
+          console.log(`[CollisionDetect]   ↳ Collision with text "${bounds.name}": moving Y from ${oldY} to ${newY}`);
+        }
       }
     }
 
     // Check collision with previously placed buttons
+    // Buttons should always stack vertically (regardless of horizontal position)
+    // to ensure dialog choices form a clear vertical list
     for (const bounds of buttonBounds) {
-      const horizontalOverlap = buttonLeft < bounds.right && buttonRight > bounds.left;
-      if (horizontalOverlap && newY < bounds.bottom + 20 && newY + buttonHeight > bounds.top) {
+      if (newY < bounds.bottom + 20 && newY + buttonHeight > bounds.top) {
+        const oldY = newY;
         newY = Math.max(newY, bounds.bottom + 20);
+        if (newY !== oldY) {
+          console.log(`[CollisionDetect]   ↳ Collision with button "${bounds.name}": moving Y from ${oldY} to ${newY}`);
+        }
       }
     }
 
@@ -619,11 +664,13 @@ function adjustElementsForCollisions(
       top: newY,
       bottom: newY + buttonHeight,
       left: buttonLeft,
-      right: buttonRight
+      right: buttonRight,
+      name: el.location.name
     });
 
     // Only create new location if Y position changed
     if (newY !== el.location.y) {
+      console.log(`[CollisionDetect] Button "${el.location.name}" adjusted: Y ${el.location.y} → ${newY}`);
       adjustedButtonElements.push({
         ...el,
         location: {
@@ -1785,6 +1832,14 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
 
       // Determine if inventory should be visible (controlled by Ctrl/Cmd+I toggle)
       const shouldShowInventory = inventoryData && inventoryData.items.length > 0 && inventoryVisible;
+
+      // Debug: Log inventory visibility
+      if (location.characterId) {
+        console.log(`[InventoryHUD] Character "${location.characterId}": inventoryVisible=${inventoryVisible}, hasInventoryData=${!!inventoryData}, itemCount=${inventoryData?.items?.length || 0}, shouldShow=${shouldShowInventory}`);
+        if (inventoryData) {
+          console.log(`[InventoryHUD]   Items:`, inventoryData.items.map((i: any) => i.name || i.id).join(', '));
+        }
+      }
 
       // Merge sprite animation from path animation into spriteSheet
       // When animatedPosition has sprite animation info and isAnimating is true, use it
