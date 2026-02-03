@@ -593,6 +593,8 @@ export const PreviewWindow: React.FC = () => {
   }, [generatedPresets]);
 
   // Calculate fit scale based on available space
+  // Note: We include `story` in deps so this effect re-runs when the main UI becomes visible
+  // (initially the component shows "Connecting..." which doesn't have previewAreaRef)
   useLayoutEffect(() => {
     const calculateFitScale = () => {
       if (!previewAreaRef.current) return;
@@ -626,7 +628,7 @@ export const PreviewWindow: React.FC = () => {
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
     };
-  }, [isAutoFit]);
+  }, [isAutoFit, story]);
 
   // Initialize renderer
   useEffect(() => {
