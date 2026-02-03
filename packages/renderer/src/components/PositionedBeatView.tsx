@@ -617,64 +617,84 @@ function adjustElementsForCollisions(
     return [...otherElements, ...adjustedTextElements];
   }
 
-  // Process buttons - RESPECT original X positions and widths
-  // Only adjust Y position if there's a collision with text boxes
+  // Process buttons - align all buttons into a vertical list
+  // Dialog choices should form a clean column, not be scattered across the stage
   const sortedButtons = [...buttonElements].sort((a, b) => a.location.y - b.location.y);
   const adjustedButtonElements: PositionedElementData[] = [];
-  const buttonBounds: { top: number; bottom: number; left: number; right: number; name: string }[] = [];
+
+  // For multiple buttons (dialog choices), align them all to a consistent position
+  // Use the rightmost button's X position, or center if very different positions
+  const buttonXPositions = sortedButtons.map(b => b.location.x);
+  const buttonWidths = sortedButtons.map(b => b.location.width);
+  const maxButtonWidth = Math.max(...buttonWidths);
+
+  // Calculate target X: use rightmost position if buttons are scattered,
+  // otherwise keep original positions
+  const minX = Math.min(...buttonXPositions);
+  const maxX = Math.max(...buttonXPositions);
+  const xSpread = maxX - minX;
+
+  // If buttons are spread across more than 100px horizontally, align them
+  const shouldAlignButtons = sortedButtons.length > 1 && xSpread > 100;
+  // Target X: right-align buttons to fit on stage, with margin
+  const targetX = shouldAlignButtons
+    ? Math.min(maxX, stageWidth - maxButtonWidth - 20)
+    : -1; // -1 means keep original X
+
+  console.log(`[CollisionDetect] Button alignment: spread=${xSpread}px, shouldAlign=${shouldAlignButtons}, targetX=${targetX}`);
+
+  // Find the lowest point of all text boxes to start buttons below
+  const lowestTextBottom = textBoxBounds.length > 0
+    ? Math.max(...textBoxBounds.map(b => b.bottom))
+    : 0;
+
+  // Stack buttons vertically starting below all text
+  let nextY = lowestTextBottom + 35; // Start below text with gap
+
+  // Helper to estimate button height based on text content and width
+  // Uses same calculations as calculateSmartButtonDimensions for consistency
+  const estimateButtonHeight = (text: string, width: number, fontSize: number): number => {
+    const buttonPaddingV = 12; // Vertical padding per side
+    const buttonPaddingH = 20; // Horizontal padding per side
+    const charWidth = fontSize * 0.6; // Same as calculateSmartButtonDimensions
+    const lineHeight = fontSize * 1.4; // Same as calculateSmartButtonDimensions
+    const contentPaddingH = buttonPaddingH * 2;
+    const contentPaddingV = buttonPaddingV * 2;
+    const availableContentWidth = width - contentPaddingH;
+    const charsPerLine = Math.max(1, Math.floor(availableContentWidth / charWidth));
+    const linesNeeded = Math.max(1, Math.ceil(text.length / charsPerLine));
+    const heightNeeded = linesNeeded * lineHeight + contentPaddingV;
+    return heightNeeded;
+  };
 
   for (const el of sortedButtons) {
-    let newY = el.location.y;
-    // KEEP original X position and width
-    const buttonX = el.location.x;
-    const buttonWidth = el.location.width;
-    const buttonLeft = buttonX;
-    const buttonRight = buttonX + buttonWidth;
-    const buttonHeight = el.location.height;
+    const buttonWidth = el.location.width || 300;
+    const fontSize = el.location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
+    const buttonText = el.content || el.location.name || '';
 
-    console.log(`[CollisionDetect] Button "${el.location.name}": pos(${buttonX},${el.location.y}), size(${buttonWidth}x${buttonHeight})`);
+    // Calculate actual button height based on text wrapping
+    const estimatedHeight = estimateButtonHeight(buttonText, buttonWidth, fontSize);
+    const buttonHeight = Math.max(el.location.height || 42, estimatedHeight);
 
-    // Check collision with each text box
-    for (const bounds of textBoxBounds) {
-      const horizontalOverlap = buttonLeft < bounds.right && buttonRight > bounds.left;
-      if (horizontalOverlap && newY < bounds.bottom + 35) {
-        const oldY = newY;
-        newY = Math.max(newY, bounds.bottom + 35);
-        if (newY !== oldY) {
-          console.log(`[CollisionDetect]   ↳ Collision with text "${bounds.name}": moving Y from ${oldY} to ${newY}`);
-        }
-      }
-    }
+    // Determine X position
+    const newX = shouldAlignButtons ? targetX : el.location.x;
 
-    // Check collision with previously placed buttons
-    // Buttons should always stack vertically (regardless of horizontal position)
-    // to ensure dialog choices form a clear vertical list
-    for (const bounds of buttonBounds) {
-      if (newY < bounds.bottom + 20 && newY + buttonHeight > bounds.top) {
-        const oldY = newY;
-        newY = Math.max(newY, bounds.bottom + 20);
-        if (newY !== oldY) {
-          console.log(`[CollisionDetect]   ↳ Collision with button "${bounds.name}": moving Y from ${oldY} to ${newY}`);
-        }
-      }
-    }
+    // Use calculated Y position (stacking)
+    const newY = nextY;
 
-    // Record this button's bounds for subsequent buttons
-    buttonBounds.push({
-      top: newY,
-      bottom: newY + buttonHeight,
-      left: buttonLeft,
-      right: buttonRight,
-      name: el.location.name
-    });
+    console.log(`[CollisionDetect] Button "${el.location.name}": original(${el.location.x},${el.location.y}) → adjusted(${newX},${newY}), estimatedH=${estimatedHeight.toFixed(0)}`);
 
-    // Only create new location if Y position changed
-    if (newY !== el.location.y) {
-      console.log(`[CollisionDetect] Button "${el.location.name}" adjusted: Y ${el.location.y} → ${newY}`);
+    // Update next Y position for stacking
+    nextY = newY + buttonHeight + 15; // 15px gap between buttons
+
+    // Create adjusted element
+    const positionChanged = newX !== el.location.x || newY !== el.location.y;
+    if (positionChanged) {
       adjustedButtonElements.push({
         ...el,
         location: {
           ...el.location,
+          x: newX,
           y: newY
         }
       });
