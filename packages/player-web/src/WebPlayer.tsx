@@ -23,7 +23,10 @@ export interface WebPlayerProps {
   onError?: (error: Error) => void;
 }
 
-type PlayerState = 'loading' | 'playing' | 'error' | 'ended';
+type PlayerState = 'splash' | 'loading' | 'playing' | 'error' | 'ended';
+
+// Splash screen duration in milliseconds
+const SPLASH_DURATION = 2000;
 
 export const WebPlayer: React.FC<WebPlayerProps> = ({
   story,
@@ -36,10 +39,33 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<PlayerEngine | null>(null);
   const rendererRef = useRef<ReactRenderer | null>(null);
-  const [state, setState] = useState<PlayerState>('loading');
+  const [state, setState] = useState<PlayerState>('splash');
   const [error, setError] = useState<string | null>(null);
+  const [splashFading, setSplashFading] = useState(false);
+
+  // Handle splash screen timing
+  useEffect(() => {
+    if (state !== 'splash') return;
+
+    // Start fade-out animation before transitioning
+    const fadeTimer = setTimeout(() => {
+      setSplashFading(true);
+    }, SPLASH_DURATION - 500); // Start fade 500ms before end
+
+    const transitionTimer = setTimeout(() => {
+      setState('loading');
+    }, SPLASH_DURATION);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(transitionTimer);
+    };
+  }, [state]);
 
   useEffect(() => {
+    // Don't initialize until splash is done
+    if (state === 'splash') return;
+
     let mounted = true;
 
     const initPlayer = async () => {
@@ -247,7 +273,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         rendererRef.current = null;
       }
     };
-  }, [story, enableAI, onEnd, onError]);
+  }, [state, story, enableAI, onEnd, onError]);
 
   // Note: Container resize is handled internally by ScaledStage component
   // via its own ResizeObserver
@@ -280,6 +306,70 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   return (
     <div className="asaps-player" style={containerStyle}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {state === 'splash' && (
+        <div style={{
+          ...overlayStyle,
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+          opacity: splashFading ? 0 : 1,
+          transition: 'opacity 0.5s ease-out',
+        }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '24px',
+          }}>
+            {/* ASAPS Logo/Icon */}
+            <div style={{
+              width: 80,
+              height: 80,
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              borderRadius: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 8px 32px rgba(99, 102, 241, 0.3)',
+              animation: 'asaps-pulse 2s ease-in-out infinite',
+            }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
+                <line x1="12" y1="22" x2="12" y2="15.5" />
+                <polyline points="22 8.5 12 15.5 2 8.5" />
+                <polyline points="2 15.5 12 8.5 22 15.5" />
+                <line x1="12" y1="2" x2="12" y2="8.5" />
+              </svg>
+            </div>
+            <div style={{
+              fontSize: '14px',
+              color: '#a5b4fc',
+              letterSpacing: '3px',
+              textTransform: 'uppercase',
+              fontWeight: 500,
+            }}>
+              Made with
+            </div>
+            <div style={{
+              fontSize: '32px',
+              fontWeight: 700,
+              background: 'linear-gradient(135deg, #fff 0%, #a5b4fc 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '2px',
+            }}>
+              ASAPS
+            </div>
+            <div style={{
+              fontSize: '12px',
+              color: '#6366f1',
+              marginTop: '8px',
+              opacity: 0.8,
+            }}>
+              Advanced Story Authoring and Presentation System
+            </div>
+          </div>
+        </div>
+      )}
 
       {state === 'loading' && (
         <div style={overlayStyle}>
@@ -318,6 +408,10 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
       <style>{`
         @keyframes asaps-spin {
           to { transform: rotate(360deg); }
+        }
+        @keyframes asaps-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
         }
       `}</style>
     </div>

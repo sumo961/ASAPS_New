@@ -58,6 +58,7 @@ interface GlobalSettings {
     highlightColor: string;
     opacity: number;
     showInPreview: 'visible' | 'onHover' | 'invisible';
+    labelDisplay?: 'none' | 'hover' | 'always';
   };
   sound?: {
     backgroundMusic?: string;
@@ -184,6 +185,7 @@ function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSett
       showLabels: settings.hotspots.labels ?? true,
       opacity: (settings.hotspots.opacity ?? 30) / 100,
       showInPreview: settings.hotspots.showInPreview ?? 'visible',
+      labelDisplay: settings.hotspots.labelDisplay ?? 'hover',
     } : undefined,
   };
 }
@@ -540,7 +542,36 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
       this.assetMap.set(asset.id, asset.url);
     }
 
-    console.log(`[PlayerEngine] Setting up resolvers with ${this.assetMap.size} assets, ${characters.length} characters`);
+    // Build prop asset map from PickProp beats for inventory icon resolution
+    const propAssetMap = new Map<string, string>();
+    const allBeats = story.getAllBeats();
+    for (const beat of allBeats) {
+      if (beat.type === 'pickProp') {
+        const props = (beat as any).props || [];
+        for (const prop of props) {
+          if (prop.name && prop.assetId) {
+            const url = this.assetMap.get(prop.assetId);
+            if (url) {
+              propAssetMap.set(prop.name, url);
+              propAssetMap.set(prop.name.toLowerCase(), url);
+            }
+          }
+        }
+        // Also check beat locations for prop graphics
+        const locations = Array.from(beat.locations?.values?.() || []);
+        for (const loc of locations) {
+          if ((loc as any).kind === 'prop' && (loc as any).name && (loc as any).assetId) {
+            const url = this.assetMap.get((loc as any).assetId);
+            if (url) {
+              propAssetMap.set((loc as any).name, url);
+              propAssetMap.set((loc as any).name.toLowerCase(), url);
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`[PlayerEngine] Setting up resolvers with ${this.assetMap.size} assets, ${characters.length} characters, ${propAssetMap.size} prop icons`);
 
     // Apply theme settings from globalSettings
     if (this.globalSettings && 'setTheme' in renderer) {
@@ -596,7 +627,14 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
           return undefined;
         }
 
-        console.log(`[CharacterResolver] Found character:`, { id: character.id, name: character.name, hasVisual: !!character.visual });
+        console.log(`[CharacterResolver] Found character:`, {
+          id: character.id,
+          name: character.name,
+          hasVisual: !!character.visual,
+          visualType: character.visual?.type,
+          hasSpriteSheet: !!character.visual?.spriteSheet,
+          spriteSheetUrl: character.visual?.spriteSheet?.url?.substring(0, 80) + '...',
+        });
 
         // Find the state image
         const states = character.states || [];
@@ -619,13 +657,66 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         }
 
         // Check for direct URL (not from builder)
-        const directUrl = state?.visual?.image || state?.url || character.visual?.defaultImage;
+        // Support multiple paths: states, spriteSheet, or defaultImage
+        const directUrl = state?.visual?.image ||
+                          state?.url ||
+                          character.visual?.spriteSheet?.url ||
+                          character.visual?.defaultImage;
+
+        console.log(`[CharacterResolver] Direct URL check:`, {
+          stateVisualImage: !!state?.visual?.image,
+          stateUrl: !!state?.url,
+          spriteSheetUrl: !!character.visual?.spriteSheet?.url,
+          defaultImage: !!character.visual?.defaultImage,
+          directUrl: directUrl?.substring(0, 50),
+        });
+
         if (directUrl && !directUrl.includes('localhost:5173')) {
+          console.log(`[CharacterResolver] Resolved ${characterId} via direct URL: ${directUrl.substring(0, 50)}...`);
           return directUrl;
         }
 
         console.log(`[CharacterResolver] Could not resolve ${characterId}, assetId: ${assetId}`);
         return undefined;
+      });
+    }
+
+    // Sprite data resolver - provides spritesheet frame dimensions for character sprites
+    if ('setSpriteDataResolver' in renderer) {
+      renderer.setSpriteDataResolver((characterId: string) => {
+        // Find character by id, name, or displayName
+        const character = characters.find((c: any) =>
+          c.id === characterId ||
+          c.name === characterId ||
+          c.displayName === characterId ||
+          c.name?.toLowerCase() === characterId?.toLowerCase() ||
+          c.displayName?.toLowerCase() === characterId?.toLowerCase()
+        );
+
+        if (!character || character.visual?.type !== 'sprite' || !character.visual?.spriteSheet) {
+          return null;
+        }
+
+        const sheet = character.visual.spriteSheet;
+        console.log(`[SpriteDataResolver] Returning sprite data for ${characterId}:`, {
+          frameWidth: sheet.frameWidth,
+          frameHeight: sheet.frameHeight,
+          imageWidth: sheet.imageWidth,
+        });
+
+        return {
+          frameWidth: sheet.frameWidth,
+          frameHeight: sheet.frameHeight,
+          imageWidth: sheet.imageWidth,
+          defaultFrame: 0,
+          animations: sheet.animations?.map((a: any) => ({
+            name: a.name,
+            frames: a.frames,
+            frameDuration: a.frameDuration,
+            loop: a.loop,
+          })),
+          activeAnimation: undefined,
+        };
       });
     }
 
@@ -652,6 +743,144 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
           return null;
         }
       });
+    }
+
+    // Character inventory resolver - provides inventory HUD data for characters
+    if ('setCharacterInventoryResolver' in renderer) {
+      renderer.setCharacterInventoryResolver((characterId: string) => {
+        // Find character by id, name, or displayName
+        const character = characters.find((c: any) =>
+          c.id === characterId ||
+          c.name === characterId ||
+          c.displayName === characterId ||
+          c.name?.toLowerCase() === characterId?.toLowerCase() ||
+          c.displayName?.toLowerCase() === characterId?.toLowerCase()
+        );
+
+        if (!character || !character.inventoryFrame) {
+          console.log(`[InventoryResolver] Character "${characterId}" not found or has no inventoryFrame`);
+          return null;
+        }
+
+        // Get runtime inventory from context
+        const ctx = this.engine?.getContext();
+        if (!ctx) {
+          console.log(`[InventoryResolver] No context available for inventory lookup`);
+          return null;
+        }
+
+        const isPlayer = character.role === 'player';
+        const runtimeInventory = isPlayer
+          ? ctx.getInventoryEntries()
+          : (ctx.getState().characterInventories?.[character.name] || []);
+
+        console.log(`[InventoryResolver] Character "${characterId}" (${isPlayer ? 'player' : 'npc'}): ${runtimeInventory.length} items, showOnDemand=${character.inventoryFrame.showOnDemand}`);
+
+        if (runtimeInventory.length === 0) {
+          return null;
+        }
+
+        // Build item data from runtime inventory
+        const itemDefinitions = character.inventory || [];
+        const itemData = runtimeInventory.map((entry: { name: string; quantity: number }) => {
+          const definition = itemDefinitions.find((def: any) => def.name === entry.name);
+          if (definition) {
+            // Try to resolve icon from asset map, then prop asset map
+            const iconAssetId = definition.icon || definition.iconAssetId;
+            const iconUrl = iconAssetId ? this.assetMap.get(iconAssetId) : undefined;
+            const propIcon = propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase());
+            return {
+              id: definition.id || entry.name,
+              name: definition.name,
+              displayName: definition.displayName || definition.name,
+              description: definition.description || '',
+              icon: iconUrl || propIcon || '',
+              quantity: entry.quantity,
+              category: definition.category || '',
+            };
+          }
+          // No definition - try prop asset map for icon
+          const propIcon = propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
+          return {
+            id: entry.name,
+            name: entry.name,
+            displayName: entry.name,
+            description: '',
+            icon: propIcon,
+            quantity: entry.quantity,
+            category: '',
+          };
+        });
+
+        return {
+          items: itemData,
+          config: character.inventoryFrame,
+        };
+      });
+
+      // Set initial inventory visibility based on player character's showOnDemand setting
+      const playerChar = characters.find((c: any) => c.role === 'player' && c.inventoryFrame);
+      if (playerChar?.inventoryFrame) {
+        const showByDefault = !playerChar.inventoryFrame.showOnDemand;
+        if ('setInventoryVisible' in renderer) {
+          renderer.setInventoryVisible(showByDefault);
+          console.log(`[PlayerEngine] Inventory visibility set to ${showByDefault} (showOnDemand=${playerChar.inventoryFrame.showOnDemand})`);
+        }
+      }
+    }
+
+    // Character meter frame resolver - provides counter HUD data for characters
+    if ('setCharacterMeterFrameResolver' in renderer) {
+      renderer.setCharacterMeterFrameResolver((characterId: string) => {
+        // Find character by id, name, or displayName
+        const character = characters.find((c: any) =>
+          c.id === characterId ||
+          c.name === characterId ||
+          c.displayName === characterId ||
+          c.name?.toLowerCase() === characterId?.toLowerCase() ||
+          c.displayName?.toLowerCase() === characterId?.toLowerCase()
+        );
+
+        if (!character || !character.meterFrame) {
+          return null;
+        }
+
+        // Filter to visible counters
+        const visibleCounters = (character.counters || []).filter((c: any) => c.visible);
+        if (visibleCounters.length === 0) {
+          return null;
+        }
+
+        // Get runtime counter values from context
+        const ctx = this.engine?.getContext();
+
+        // Build counter data with current values
+        const counters = visibleCounters.map((counter: any) => {
+          // Get runtime value from context (returns 0 if not set)
+          // Fall back to definition value if context not available
+          const value = ctx ? ctx.getCounter(counter.name) : (counter.value ?? 0);
+
+          return {
+            name: counter.name,
+            displayName: counter.displayName,
+            value,
+            min: counter.min ?? 0,
+            max: counter.max ?? 100,
+            color: counter.color || '#3B82F6',
+            showNumericValue: counter.showNumericValue ?? false,
+            numericFormat: counter.numericFormat || 'value',
+            orientation: counter.levelMeterOrientation || 'horizontal',
+          };
+        });
+
+        console.log(`[MeterFrameResolver] Character "${characterId}": ${counters.length} visible counters`);
+
+        return {
+          counters,
+          config: character.meterFrame,
+        };
+      });
+      console.log('[PlayerEngine] Character meter frame resolver set up');
     }
   }
 
