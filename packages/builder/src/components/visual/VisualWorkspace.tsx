@@ -1198,7 +1198,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           size: loc.size,
           x: loc.x,
           y: loc.y,
-          z: loc.z || 0,
+          z: loc.zIndex ?? loc.z ?? 0,
           width: loc.width,
           height: loc.height,
           rotation: loc.rotation || 0,
@@ -1396,6 +1396,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const bgId = params.node || params.backgroundAssetId || '';
     // Use direct backgroundUrl from ASML import (if available) - avoids asset lookup
     const bgUrl = params.backgroundUrl || '';
+
+    // Fix z-index ordering: if all elements have the same z value, assign incremental values
+    // This ensures reordering works for ASML imports where z-index wasn't preserved
+    if (elements.length > 1) {
+      const zValues = elements.map((el: VisualElement) => el.z);
+      const allSameZ = zValues.every((z: number) => z === zValues[0]);
+      if (allSameZ) {
+        console.log(`[VisualWorkspace] All ${elements.length} elements have same z-index (${zValues[0]}), assigning incremental values`);
+        elements.forEach((el: VisualElement, idx: number) => {
+          el.z = idx;
+        });
+      }
+    }
 
     console.warn(`[VisualWorkspace] ★★★ Setting ${elements.length} elements for ${beat.type} ★★★`);
     console.warn(`[VisualWorkspace] ========== ELEMENT POSITIONS BEING SET ==========`);

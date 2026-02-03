@@ -2727,7 +2727,7 @@ export class ASMLParser {
         y: scaledY,
         width: scaledWidth ?? 100,
         height: scaledHeight ?? 100,
-        zIndex: parseInt(locEl.getAttribute('zIndex') || '0')
+        zIndex: parseInt(locEl.getAttribute('z') || locEl.getAttribute('zIndex') || '0')
       };
 
       // Parse optional properties
