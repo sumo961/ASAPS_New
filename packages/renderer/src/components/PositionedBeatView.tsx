@@ -1339,9 +1339,10 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Use calculated max or default if no buttons found
   const calculatedButtonHeight = maxButtonHeight > 0 ? maxButtonHeight : DEFAULT_BUTTON_HEIGHT;
 
-  // Apply collision detection to adjust button positions when text boxes grow
-  // Now we pass stageHeight and calculatedButtonHeight so it can calculate smart-sized text boxes
-  const adjustedElements = adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight);
+  // WYSIWYG: Always use stored positions directly
+  // Collision detection should run at content creation/import time and update stored positions,
+  // not at render time. This ensures editor, preview, and export all show the same thing.
+  const adjustedElements = elements;
 
   // Calculate animation delays for sequenced typewriter effect on text elements
   const animation = theme.textEffects?.animation || 'none';

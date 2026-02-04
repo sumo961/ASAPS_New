@@ -863,6 +863,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                 .filter(el => el.visible && el.id === selectedElement)
                 .map(el => {
                   const scale = el.scale || 1;
+                  // `size` is percentage scale for characters/props (e.g., 90 = 90%, 115 = 115%)
+                  // Applied with TOP-LEFT origin in the renderer, so no position adjustment needed
+                  const sizeScale = el.size !== undefined ? el.size / 100 : 1;
 
                   // For sprite characters, use sprite frame dimensions
                   let baseWidth = el.width;
@@ -875,11 +878,33 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     }
                   }
 
-                  // Calculate effective dimensions and position (accounting for scale with center origin)
-                  const effectiveWidth = baseWidth * scale;
-                  const effectiveHeight = baseHeight * scale;
-                  const effectiveX = el.x + (baseWidth - effectiveWidth) / 2;
-                  const effectiveY = el.y + (baseHeight - effectiveHeight) / 2;
+                  // For elements with `size` property (characters/props):
+                  // - Renderer uses width/height: 'auto' with scale transform from TOP-LEFT
+                  // - Position stays at el.x, el.y (no adjustment)
+                  // - Effective dimensions = baseWidth/height * sizeScale
+                  //
+                  // For elements with `scale` property (other elements):
+                  // - Uses center origin, so position needs adjustment
+                  const hasSize = el.size !== undefined && (el.type === 'character' || el.type === 'prop');
+
+                  let effectiveWidth: number;
+                  let effectiveHeight: number;
+                  let effectiveX: number;
+                  let effectiveY: number;
+
+                  if (hasSize) {
+                    // Size uses top-left origin - no position adjustment
+                    effectiveWidth = baseWidth * sizeScale;
+                    effectiveHeight = baseHeight * sizeScale;
+                    effectiveX = el.x;
+                    effectiveY = el.y;
+                  } else {
+                    // Scale uses center origin - adjust position
+                    effectiveWidth = baseWidth * scale;
+                    effectiveHeight = baseHeight * scale;
+                    effectiveX = el.x + (baseWidth - effectiveWidth) / 2;
+                    effectiveY = el.y + (baseHeight - effectiveHeight) / 2;
+                  }
 
                   // Build transform string - only rotation, no scale (we use effective dimensions)
                   const transforms: string[] = [];

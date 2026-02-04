@@ -888,6 +888,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
     // Merge: persisted elements (characters/props) + phase elements (dialog/choices)
     const allElements = [...persistedElements, ...phaseElements];
+
+    // Fix z-index ordering: if all elements have the same z value, assign incremental values
+    // This ensures reordering works for ASML imports where z-index wasn't preserved
+    if (allElements.length > 1) {
+      const zValues = allElements.map((el: VisualElement) => el.z);
+      const allSameZ = zValues.every((z: number) => z === zValues[0]);
+      if (allSameZ) {
+        console.log(`[VisualWorkspace] DialogTree: All ${allElements.length} elements have same z-index (${zValues[0]}), assigning incremental values`);
+        allElements.forEach((el: VisualElement, idx: number) => {
+          el.z = idx;
+        });
+      }
+    }
+
     setVisualElements(allElements);
     setHasChanges(false);
     prevPhaseIdRef.current = selectedPhaseId;
@@ -895,6 +909,56 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     prevChoicesCountRef.current = currentChoicesCount;
 
     console.log(`[VisualWorkspace] Loaded ${allElements.length} elements for phase: ${selectedPhaseId} (${persistedElements.length} persisted + ${phaseElements.length} phase, ${currentChoicesCount} choices)`);
+
+    // Update character/prop element dimensions based on actual image size
+    // This ensures the selection box matches the actual rendered graphic
+    const updateDialogTreeImageDimensions = async () => {
+      const elementsNeedingUpdate = allElements.filter(el =>
+        (el.type === 'character' || el.type === 'prop') &&
+        (el.imageUrl || el.assetUrl) &&
+        // Check for default/scaled default dimensions (100x100 or 128x128 from ASML scaling)
+        ((el.width === 100 && el.height === 100) || (el.width === 128 && el.height === 128))
+      );
+
+      if (elementsNeedingUpdate.length === 0) return;
+
+      console.log(`[VisualWorkspace] DialogTree: Loading ${elementsNeedingUpdate.length} images to get actual dimensions`);
+
+      const updates: { id: string; width: number; height: number }[] = [];
+
+      await Promise.all(elementsNeedingUpdate.map(el => {
+        return new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            // Apply size percentage to get effective dimensions
+            const sizeMultiplier = (el.size || 100) / 100;
+            const effectiveWidth = Math.round(img.naturalWidth * sizeMultiplier);
+            const effectiveHeight = Math.round(img.naturalHeight * sizeMultiplier);
+            console.log(`[VisualWorkspace] DialogTree: Image "${el.name}": natural=${img.naturalWidth}x${img.naturalHeight}, size=${el.size}%, effective=${effectiveWidth}x${effectiveHeight}`);
+            updates.push({ id: el.id, width: effectiveWidth, height: effectiveHeight });
+            resolve();
+          };
+          img.onerror = () => {
+            console.warn(`[VisualWorkspace] DialogTree: Failed to load image for "${el.name}"`);
+            resolve();
+          };
+          img.src = el.imageUrl || el.assetUrl || '';
+        });
+      }));
+
+      if (updates.length > 0) {
+        setVisualElements(prev => prev.map(el => {
+          const update = updates.find(u => u.id === el.id);
+          if (update) {
+            return { ...el, width: update.width, height: update.height };
+          }
+          return el;
+        }));
+        console.log(`[VisualWorkspace] DialogTree: Updated dimensions for ${updates.length} elements`);
+      }
+    };
+
+    updateDialogTreeImageDimensions();
   }, [beat, selectedPhaseId, selectedPhase, projectSettings, generatePhaseElements, characters, assets]);
 
   // Initialize from beat parameters
