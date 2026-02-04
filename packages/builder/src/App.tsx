@@ -37,6 +37,7 @@ import { useAIDebug } from './hooks/useAIDebug';
 import { useCommandManager } from './hooks/useCommandManager';
 import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
+import { HtmlExportDialog } from './components/export/HtmlExportDialog';
 import { getThemeService } from './services/ThemeService';
 import { themeToGlobalSettings } from './themes/migration/GlobalSettingsAdapter';
 import { BUILT_IN_THEMES } from '@asaps/core';
@@ -131,6 +132,9 @@ function App() {
 
   // Merge DialogTrees modal state
   const [showMergeDialogTrees, setShowMergeDialogTrees] = useState(false);
+
+  // HTML Export dialog state
+  const [showHtmlExportDialog, setShowHtmlExportDialog] = useState(false);
 
   // Import Twine dialog state
   const [showImportTwineDialog, setShowImportTwineDialog] = useState(false);
@@ -1884,8 +1888,8 @@ function App() {
     ) => {
       const BEAT_WIDTH = 160;
       const BEAT_HEIGHT = 80; // Must match NODE_HEIGHT in ClusterContainerNode.tsx
-      const PADDING = 20;
-      const MAX_ITERATIONS = 30;
+      const PADDING = 25; // Slightly larger padding for cleaner separation
+      const MAX_ITERATIONS = 100; // More iterations for complex layouts
 
       interface Element {
         id: string;
@@ -1907,6 +1911,7 @@ function App() {
       clusterPositions.forEach((pos, id) => {
         const size = clusterSizes.get(id) || { width: 300, height: 200 };
         elements.push({ id, x: pos.x, y: pos.y, width: size.width, height: size.height, isCluster: true });
+        console.log(`[Collision] Adding cluster ${id}: pos=(${pos.x.toFixed(0)}, ${pos.y.toFixed(0)}), size=${size.width}x${size.height}`);
       });
 
       // Check overlap between two elements
@@ -1917,9 +1922,11 @@ function App() {
                  b.y + b.height + PADDING < a.y);
       };
 
-      // Iteratively resolve overlaps
+      // Iteratively resolve overlaps with increasing force
       for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
         let hadOverlap = false;
+        // Increase push force as iterations go on to break deadlocks
+        const forceMult = 1 + (iter / MAX_ITERATIONS) * 0.5;
 
         for (let i = 0; i < elements.length; i++) {
           for (let j = i + 1; j < elements.length; j++) {
@@ -1928,6 +1935,15 @@ function App() {
 
             if (overlaps(a, b)) {
               hadOverlap = true;
+
+              // Determine collision type for different push strengths
+              const isClusterCluster = a.isCluster && b.isCluster;
+              const isClusterBeat = (a.isCluster && !b.isCluster) || (!a.isCluster && b.isCluster);
+
+              // Log cluster-cluster overlaps
+              if (isClusterCluster && iter === 0) {
+                console.log(`[Collision] CLUSTER OVERLAP: ${a.id} (${a.x.toFixed(0)},${a.y.toFixed(0)} ${a.width}x${a.height}) vs ${b.id} (${b.x.toFixed(0)},${b.y.toFixed(0)} ${b.width}x${b.height})`);
+              }
 
               // Calculate centers
               const aCenterX = a.x + a.width / 2;
@@ -1940,23 +1956,64 @@ function App() {
               const overlapY = (a.height + b.height) / 2 + PADDING - Math.abs(aCenterY - bCenterY);
 
               // Push apart in direction of least overlap
+              // Use MUCH stronger push for cluster-cluster collisions
               if (overlapX < overlapY) {
-                const shift = overlapX / 2 + 1;
-                if (aCenterX < bCenterX) {
-                  a.x -= shift;
-                  b.x += shift;
+                let shift: number;
+                if (isClusterCluster) {
+                  // Full overlap + extra margin for clusters
+                  shift = overlapX + 50;
+                } else if (isClusterBeat) {
+                  // For cluster-beat: only move the beat, push it fully clear
+                  shift = overlapX + 20;
                 } else {
-                  a.x += shift;
-                  b.x -= shift;
+                  // Beat-beat: normal push
+                  shift = (overlapX / 2 + 5) * forceMult;
+                }
+
+                if (isClusterBeat) {
+                  // Only move the beat, not the cluster
+                  if (a.isCluster) {
+                    b.x += aCenterX <= bCenterX ? shift : -shift;
+                  } else {
+                    a.x += aCenterX <= bCenterX ? -shift : shift;
+                  }
+                } else {
+                  if (aCenterX <= bCenterX) {
+                    a.x -= shift / 2;
+                    b.x += shift / 2;
+                  } else {
+                    a.x += shift / 2;
+                    b.x -= shift / 2;
+                  }
                 }
               } else {
-                const shift = overlapY / 2 + 1;
-                if (aCenterY < bCenterY) {
-                  a.y -= shift;
-                  b.y += shift;
+                let shift: number;
+                if (isClusterCluster) {
+                  // Full overlap + extra margin for clusters
+                  shift = overlapY + 50;
+                } else if (isClusterBeat) {
+                  // For cluster-beat: only move the beat
+                  shift = overlapY + 20;
                 } else {
-                  a.y += shift;
-                  b.y -= shift;
+                  // Beat-beat: normal push
+                  shift = (overlapY / 2 + 5) * forceMult;
+                }
+
+                if (isClusterBeat) {
+                  // Only move the beat, not the cluster
+                  if (a.isCluster) {
+                    b.y += aCenterY <= bCenterY ? shift : -shift;
+                  } else {
+                    a.y += aCenterY <= bCenterY ? -shift : shift;
+                  }
+                } else {
+                  if (aCenterY <= bCenterY) {
+                    a.y -= shift / 2;
+                    b.y += shift / 2;
+                  } else {
+                    a.y += shift / 2;
+                    b.y -= shift / 2;
+                  }
                 }
               }
             }
@@ -1973,10 +2030,21 @@ function App() {
       elements.forEach(el => {
         if (el.isCluster) {
           resolvedClusters.set(el.id, { x: el.x, y: el.y });
+          console.log(`[Collision] Final cluster ${el.id}: (${el.x.toFixed(0)}, ${el.y.toFixed(0)})`);
         } else {
           resolvedBeats.set(el.id, { x: el.x, y: el.y });
         }
       });
+
+      // Check if clusters still overlap after resolution
+      const clusterEls = elements.filter(e => e.isCluster);
+      for (let i = 0; i < clusterEls.length; i++) {
+        for (let j = i + 1; j < clusterEls.length; j++) {
+          if (overlaps(clusterEls[i], clusterEls[j])) {
+            console.warn(`[Collision] WARNING: Clusters still overlap after resolution: ${clusterEls[i].id} and ${clusterEls[j].id}`);
+          }
+        }
+      }
 
       return { resolvedBeats, resolvedClusters };
     };
@@ -1985,10 +2053,11 @@ function App() {
     const resolveInternalBeatCollisions = (
       beatPositions: Map<string, { x: number; y: number }>
     ): Map<string, { x: number; y: number }> => {
+      console.log('🔴🔴🔴 resolveInternalBeatCollisions CALLED with', beatPositions.size, 'beats');
       const BEAT_WIDTH = 160;
       const BEAT_HEIGHT = 80;
-      const PADDING = 20;
-      const MAX_ITERATIONS = 30;
+      const PADDING = 25; // Slightly larger padding for cleaner separation
+      const MAX_ITERATIONS = 100; // More iterations for complex clusters
 
       // Convert to array for easier manipulation
       const beats = Array.from(beatPositions.entries()).map(([id, pos]) => ({
@@ -1999,21 +2068,43 @@ function App() {
         height: BEAT_HEIGHT,
       }));
 
+      console.log('🟢🟢🟢 Created beats array with', beats.length, 'items');
+
       if (beats.length <= 1) {
+        console.log('🟡🟡🟡 Only 1 or fewer beats, returning early');
         return beatPositions;
       }
 
+      // Debug: Log all beat positions
+      console.log('🔵🔵🔵 Checking beats for collisions:', beats.slice(0, 3));
+
       // Check overlap between two beats
       const overlaps = (a: typeof beats[0], b: typeof beats[0]): boolean => {
-        return !(a.x + a.width + PADDING < b.x ||
-                 b.x + b.width + PADDING < a.x ||
-                 a.y + a.height + PADDING < b.y ||
-                 b.y + b.height + PADDING < a.y);
+        const noOverlapRight = a.x + a.width + PADDING < b.x;
+        const noOverlapLeft = b.x + b.width + PADDING < a.x;
+        const noOverlapBottom = a.y + a.height + PADDING < b.y;
+        const noOverlapTop = b.y + b.height + PADDING < a.y;
+        const hasOverlap = !(noOverlapRight || noOverlapLeft || noOverlapBottom || noOverlapTop);
+        return hasOverlap;
       };
 
-      // Iteratively resolve overlaps
+      // Debug: Check first few pairs for overlap
+      if (beats.length >= 2) {
+        for (let i = 0; i < Math.min(3, beats.length); i++) {
+          for (let j = i + 1; j < Math.min(4, beats.length); j++) {
+            const a = beats[i];
+            const b = beats[j];
+            console.log(`[CollisionDetection] Pair ${a.id}-${b.id}: a=(${a.x},${a.y}), b=(${b.x},${b.y}), overlaps=${overlaps(a, b)}`);
+          }
+        }
+      }
+
+      // Iteratively resolve overlaps with increasing force
+      let totalOverlapsFound = 0;
       for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
         let hadOverlap = false;
+        // Increase push force as iterations go on to break deadlocks
+        const forceMult = 1 + (iter / MAX_ITERATIONS) * 0.5;
 
         for (let i = 0; i < beats.length; i++) {
           for (let j = i + 1; j < beats.length; j++) {
@@ -2022,6 +2113,7 @@ function App() {
 
             if (overlaps(a, b)) {
               hadOverlap = true;
+              totalOverlapsFound++;
 
               // Calculate centers
               const aCenterX = a.x + a.width / 2;
@@ -2034,9 +2126,10 @@ function App() {
               const overlapY = (a.height + b.height) / 2 + PADDING - Math.abs(aCenterY - bCenterY);
 
               // Push apart in direction of least overlap
+              // Use full overlap amount (not half) to guarantee separation
               if (overlapX < overlapY) {
-                const shift = overlapX / 2 + 1;
-                if (aCenterX < bCenterX) {
+                const shift = (overlapX / 2 + 5) * forceMult;
+                if (aCenterX <= bCenterX) {
                   a.x -= shift;
                   b.x += shift;
                 } else {
@@ -2044,8 +2137,8 @@ function App() {
                   b.x -= shift;
                 }
               } else {
-                const shift = overlapY / 2 + 1;
-                if (aCenterY < bCenterY) {
+                const shift = (overlapY / 2 + 5) * forceMult;
+                if (aCenterY <= bCenterY) {
                   a.y -= shift;
                   b.y += shift;
                 } else {
@@ -2057,16 +2150,18 @@ function App() {
           }
         }
 
-        if (!hadOverlap) break;
+        if (!hadOverlap) {
+          console.log(`[CollisionDetection] Resolved all overlaps in ${iter} iterations, total overlaps found: ${totalOverlapsFound}`);
+          break;
+        }
+      }
+      if (totalOverlapsFound > 0) {
+        console.log(`[CollisionDetection] After ${MAX_ITERATIONS} iterations, total overlaps resolved: ${totalOverlapsFound}`);
       }
 
-      // Ensure minimum x/y values (keep beats inside cluster)
-      const MIN_X = 20;
-      const MIN_Y = 20;
-      beats.forEach(beat => {
-        beat.x = Math.max(MIN_X, beat.x);
-        beat.y = Math.max(MIN_Y, beat.y);
-      });
+      // NOTE: We no longer clamp minimum x/y here because:
+      // 1. It was destroying spacing by clamping multiple negative values to the same position
+      // 2. The caller now normalizes positions after collision resolution
 
       // Return resolved positions
       const resolved = new Map<string, { x: number; y: number }>();
@@ -2141,16 +2236,47 @@ function App() {
         undefined,
         externalEdges
       );
+      console.log(`[AutoArrange] Layout result - cluster positions:`, Array.from(result.clusterPositions.entries()));
 
-      // Calculate expanded cluster sizes from internal beat positions
-      // This ensures clusters are large enough to show all their beats
+      // First resolve internal collisions for each cluster, then calculate sizes
+      // This ensures clusters are sized based on collision-resolved positions
       const BEAT_WIDTH = 160;
       const BEAT_HEIGHT = 80; // Must match NODE_HEIGHT in ClusterContainerNode.tsx
-      const CLUSTER_PADDING = 40; // Padding around beats inside cluster
+      const CLUSTER_PADDING = 60; // Padding around beats inside cluster (increased for bottom space)
 
+      // Resolve collisions for all clusters first, then normalize to positive coordinates
+      const resolvedClusterInternalPositions = new Map<string, Map<string, { x: number; y: number }>>();
+      result.clusterInternalPositions.forEach((internalPositions, clusterId) => {
+        console.log(`[AutoArrange] Cluster ${clusterId}: ${internalPositions.size} beats before collision resolution`);
+        const resolved = resolveInternalBeatCollisions(internalPositions);
+
+        // Normalize positions to ensure all are positive and start from cluster padding
+        // Find minimum x and y values
+        let minX = Infinity, minY = Infinity;
+        resolved.forEach(pos => {
+          minX = Math.min(minX, pos.x);
+          minY = Math.min(minY, pos.y);
+        });
+
+        // Shift all positions so minimum is at (40, 60) - cluster internal padding
+        const INTERNAL_PADDING_X = 40;
+        const INTERNAL_PADDING_Y = 60; // Account for cluster header
+        const shiftX = INTERNAL_PADDING_X - minX;
+        const shiftY = INTERNAL_PADDING_Y - minY;
+
+        const normalized = new Map<string, { x: number; y: number }>();
+        resolved.forEach((pos, beatId) => {
+          normalized.set(beatId, { x: pos.x + shiftX, y: pos.y + shiftY });
+        });
+
+        console.log(`[AutoArrange] Cluster ${clusterId}: normalized positions (shifted by ${shiftX}, ${shiftY})`, Array.from(normalized.entries()));
+        resolvedClusterInternalPositions.set(clusterId, normalized);
+      });
+
+      // Calculate cluster sizes from RESOLVED positions (after collision detection)
       const clusterSizes = new Map<string, { width: number; height: number }>();
       clusters.forEach(c => {
-        const internalPositions = result.clusterInternalPositions.get(c.id);
+        const internalPositions = resolvedClusterInternalPositions.get(c.id);
         if (internalPositions && internalPositions.size > 0) {
           // Calculate the maximum extent of internal beats from cluster origin
           // Internal positions are relative to cluster origin (0,0), with layout starting
@@ -2161,9 +2287,11 @@ function App() {
             maxY = Math.max(maxY, pos.y + BEAT_HEIGHT);
           });
           // Add padding after the rightmost/bottommost beat
-          const width = Math.max(300, maxX + CLUSTER_PADDING);
-          const height = Math.max(200, maxY + CLUSTER_PADDING);
+          // Use smaller minimums to avoid overly wide clusters for simple vertical stacks
+          const width = Math.max(240, maxX + CLUSTER_PADDING);  // Reduced from 300
+          const height = Math.max(160, maxY + CLUSTER_PADDING); // Reduced from 200
           clusterSizes.set(c.id, { width, height });
+          console.log(`[AutoArrange] Cluster ${c.id} size: ${width}x${height} (maxX=${maxX}, maxY=${maxY})`);
         } else {
           // Fallback to stored bounds or default
           clusterSizes.set(c.id, c.containerBounds || { width: 300, height: 200 });
@@ -2171,11 +2299,13 @@ function App() {
       });
 
       // Resolve any overlaps between beats and clusters
+      console.log(`[AutoArrange] Resolving collisions: ${result.beatPositions.size} beats, ${result.clusterPositions.size} clusters`);
       const { resolvedBeats, resolvedClusters } = resolveCollisions(
         result.beatPositions,
         result.clusterPositions,
         clusterSizes
       );
+      console.log(`[AutoArrange] After collision resolution:`, Array.from(resolvedClusters.entries()));
 
       // Normalize positions to ensure all elements are visible (not at negative coords)
       const { normalizedBeats, normalizedClusters } = normalizePositions(
@@ -2201,12 +2331,9 @@ function App() {
         }
       });
 
-      // Apply positions to beats inside clusters with collision detection
-      result.clusterInternalPositions.forEach((internalPositions, clusterId) => {
-        // Resolve collisions for beats within this cluster
-        const resolvedInternalPositions = resolveInternalBeatCollisions(internalPositions);
-
-        resolvedInternalPositions.forEach((pos, beatId) => {
+      // Apply positions to beats inside clusters (already collision-resolved)
+      resolvedClusterInternalPositions.forEach((resolvedPositions, clusterId) => {
+        resolvedPositions.forEach((pos, beatId) => {
           if (actions.moveBeatInContainer) {
             actions.moveBeatInContainer(beatId, clusterId, pos.x, pos.y);
           }
@@ -3669,6 +3796,7 @@ function App() {
         currentProjectId={currentProject?.id}
         onMergeDialogTrees={() => setShowMergeDialogTrees(true)}
         onHelperCommands={() => setShowHelperCommands(true)}
+        onExportHtml={() => setShowHtmlExportDialog(true)}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -4069,6 +4197,16 @@ function App() {
         onMerge={actions.mergeDialogTrees}
         onBeatSelect={handleBeatSelect}
       />
+
+      {/* HTML Export Dialog */}
+      {currentProject && (
+        <HtmlExportDialog
+          isOpen={showHtmlExportDialog}
+          onClose={() => setShowHtmlExportDialog(false)}
+          projectId={currentProject.id}
+          projectName={currentProject.name}
+        />
+      )}
     </div>
   );
 }

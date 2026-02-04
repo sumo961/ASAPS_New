@@ -404,14 +404,15 @@ export function applyClusterAwareTreeLayout(
       e => clusterBeatIds.has(e.source) && clusterBeatIds.has(e.target)
     );
 
-    // Layout internal beats with smaller spacing
+    // Layout internal beats with proper spacing to avoid collisions
+    // BEAT_WIDTH=160, PADDING=20, so need spacing > 180 to avoid overlap
     const internalNodes = clusterBeats.map(b => ({ id: b.id }));
     const { positions: internalPos } = calculateTreeLayout(
       internalNodes,
       internalEdges,
       {
-        nodeSpacingX: 180,
-        nodeSpacingY: 100,
+        nodeSpacingX: 200,  // 160 (width) + 40 (comfortable gap)
+        nodeSpacingY: 120,  // 80 (height) + 40 (comfortable gap)
         startX: 40,  // Padding inside cluster
         startY: 60,  // Account for cluster header
       }
