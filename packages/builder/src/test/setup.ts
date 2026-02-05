@@ -36,6 +36,12 @@ vi.mock('lucide-react', () => {
   })
 });
 
+// Mock URL.createObjectURL and revokeObjectURL (not available in jsdom)
+if (typeof URL.createObjectURL === 'undefined') {
+  URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+  URL.revokeObjectURL = vi.fn();
+}
+
 // IndexedDB is now provided by fake-indexeddb/auto imported above
 
 // Mock window.matchMedia (only in browser-like environment)
