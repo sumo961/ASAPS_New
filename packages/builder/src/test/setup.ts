@@ -42,6 +42,55 @@ if (typeof URL.createObjectURL === 'undefined') {
   URL.revokeObjectURL = vi.fn();
 }
 
+// Mock Cache API (not available in jsdom)
+const mockCache = {
+  match: vi.fn().mockResolvedValue(undefined),
+  put: vi.fn().mockResolvedValue(undefined),
+  delete: vi.fn().mockResolvedValue(true),
+  keys: vi.fn().mockResolvedValue([]),
+  add: vi.fn().mockResolvedValue(undefined),
+  addAll: vi.fn().mockResolvedValue(undefined),
+  matchAll: vi.fn().mockResolvedValue([]),
+};
+
+const mockCaches = {
+  open: vi.fn().mockResolvedValue(mockCache),
+  has: vi.fn().mockResolvedValue(true),
+  delete: vi.fn().mockResolvedValue(true),
+  keys: vi.fn().mockResolvedValue(['assets']),
+  match: vi.fn().mockResolvedValue(undefined),
+};
+
+if (typeof globalThis.caches === 'undefined') {
+  (globalThis as any).caches = mockCaches;
+}
+
+// Mock FileReader for data URL conversion
+class MockFileReader {
+  result: string | ArrayBuffer | null = null;
+  onload: (() => void) | null = null;
+  onerror: ((error: any) => void) | null = null;
+
+  readAsDataURL(blob: Blob) {
+    // Simulate async reading
+    setTimeout(() => {
+      this.result = `data:${blob.type};base64,dGVzdA==`;
+      if (this.onload) this.onload();
+    }, 0);
+  }
+
+  readAsArrayBuffer(blob: Blob) {
+    setTimeout(() => {
+      this.result = new ArrayBuffer(8);
+      if (this.onload) this.onload();
+    }, 0);
+  }
+}
+
+if (typeof globalThis.FileReader === 'undefined') {
+  (globalThis as any).FileReader = MockFileReader;
+}
+
 // IndexedDB is now provided by fake-indexeddb/auto imported above
 
 // Mock window.matchMedia (only in browser-like environment)

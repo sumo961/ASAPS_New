@@ -1,19 +1,20 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import JSZip from 'jszip';
 import { exportProjectAsZip, importProjectFromZip } from '../projectZipManager';
-import { getStorageManager } from '../../storage/StorageManager';
 import type { Project, StoredAsset } from '../../storage/types';
 
-// Create a single mock instance that will be returned every time
-const mockStorageInstance = {
-  getProject: vi.fn(),
-  getProjectAssets: vi.fn(),
-  getAsset: vi.fn(),
-  createAsset: vi.fn(),
-  createProject: vi.fn(),
-  updateProject: vi.fn(),
-  projectExists: vi.fn()
-};
+// Use vi.hoisted to ensure the mock instance is created before vi.mock runs
+const { mockStorageInstance } = vi.hoisted(() => ({
+  mockStorageInstance: {
+    getProject: vi.fn(),
+    getProjectAssets: vi.fn(),
+    getAsset: vi.fn(),
+    createAsset: vi.fn(),
+    createProject: vi.fn(),
+    updateProject: vi.fn(),
+    projectExists: vi.fn()
+  }
+}));
 
 // Mock the storage manager to return the same instance
 vi.mock('../../storage/StorageManager', () => ({
