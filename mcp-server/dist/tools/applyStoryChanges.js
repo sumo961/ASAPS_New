@@ -156,7 +156,7 @@ BEAT TYPES AND CONNECTION RULES:
 
 SINGLE CONNECTION beats (only ONE target in connections array):
 - titleScreen: Start screen. Parameters: { title, author, buttonText }
-- introText: Narrative text with Continue. Parameters: { text, textColor, backgroundColor }
+- infoText: Narrative text with Continue. Parameters: { text, textColor, backgroundColor }
 - endScreen: Story ending. Parameters: { endTitle, endText }
 - durScreen: Timed auto-advance. Parameters: { text, duration }
 - videoBeat: Video playback. Parameters: { videoUrl }

@@ -8,7 +8,7 @@
  *
  * CONNECTION RULES:
  * - SINGLE CONNECTION beats: Can only connect to ONE target beat via the connections array
- *   titleScreen, introText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
+ *   titleScreen, infoText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
  *
  * - MULTIPLE CONNECTION beats: Support multiple targets via their parameters (NOT the connections array)
  *   - dialogTree: targets defined in dialogTree.choices[].target
@@ -122,13 +122,13 @@
  * - Example choice with counter effect: { "text": "Stand your ground", "target": "fight", "counter": "courage", "counterOperation": "change", "counterValue": 10 }
  * - Best practice: Define all counters you plan to use on relevant characters first
  *
- * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from introText!
+ * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from infoText!
  */
 export const BEAT_TYPES = {
     // Story structure - SINGLE CONNECTION (one Continue button)
-    // 🚨🚨🚨 MANDATORY: beat_0 MUST be titleScreen - NEVER start with introText! 🚨🚨🚨
+    // 🚨🚨🚨 MANDATORY: beat_0 MUST be titleScreen - NEVER start with infoText! 🚨🚨🚨
     titleScreen: '🚨 MANDATORY FIRST BEAT (beat_0)! Start screen with title and author. SINGLE CONNECTION: only one target via connections array.',
-    introText: 'Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: introText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead.',
+    infoText: 'Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: infoText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead. Optional: textVariations (array) for random text selection at runtime.',
     endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true } }',
     // Interactive content - MULTIPLE CONNECTIONS via parameters
     dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean). Choices can modify counters via counter/counterOperation/counterValue properties.',
@@ -137,7 +137,7 @@ export const BEAT_TYPES = {
     hyperText: 'Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Links can have custom styling (color, underline, bold). Supports optional defaultTarget for timed auto-advance.',
     inputText: 'Player text input. Save to: variable (default), characterName (update display name), or counter (numeric). Validation: none, numeric, email, alphanumeric. Properties: minLength, maxLength, required. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance.',
     // Timed content - SINGLE CONNECTION (NO defaultTarget - already timed by design)
-    durScreen: 'Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target via connections array at beat level. ❌ WRONG: connection inside parameters. ✓ CORRECT: "connections": [{ "targetId": "beat_5" }] at beat level.',
+    durScreen: 'Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target via connections array at beat level. ❌ WRONG: connection inside parameters. ✓ CORRECT: "connections": [{ "targetId": "beat_5" }] at beat level. Optional: textVariations (array) for random text selection at runtime.',
     videoBeat: 'Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.',
     // Logic beats (invisible - no defaultTarget needed)
     conditionBeat: 'Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat.',
@@ -145,6 +145,13 @@ export const BEAT_TYPES = {
     addRemoveInventory: 'Modify inventory. Actions: add, remove, or transfer (move between characters). Use "character" parameter to specify which character\'s inventory (defaults to player). Examples: { "action": "add", "item": "key", "character": "merchant" }, { "action": "transfer", "item": "sword", "fromCharacter": "player", "toCharacter": "companion" }. SINGLE CONNECTION: executes then continues to one target.',
     randomTarget: 'Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.',
     setTimer: 'Set/check timers. Beat continues immediately to SINGLE CONNECTION target while timer runs in background. Optional timerTarget parameter: where story jumps when timer expires.',
+    // AI-powered beats (require AI service at runtime)
+    aiInfoText: 'AI-generated contextual text with Continue button. Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables. SINGLE CONNECTION. Generates personalized 1-2 sentences based on player state.',
+    aiDurScreen: 'AI-generated text with auto-advance based on reading speed. Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables, wordsPerMinute (default 200), minDuration (ms), maxDuration (ms). SINGLE CONNECTION.',
+    aiDialogTree: 'AI-generated branching dialogue at runtime. Creates personalized conversations based on player state and context.',
+    aiSummary: 'AI-generated narrative summary of the player\'s journey. Useful for endings or recaps.',
+    aiCondition: 'AI-driven branching that analyzes player state to determine path. Parameters: prompt (what AI evaluates), categories (array of {name, description, targetId}), evaluateVariables, evaluateInventory, evaluateHistory, evaluateCounters, evaluateChoiceHistory, fallbackTarget, timeout. MULTIPLE CONNECTIONS via categories. AI classifies player state and routes to appropriate category target.',
+    onlineContent: 'Fetch and display real-time data from web APIs or AI queries. Parameters: sourceType ("api" or "ai-query"), apiUrl, apiParams, jsonPath, query, title, maxWords, fallbackText, buttonText. SINGLE CONNECTION. For dynamic content like weather, news, or AI-generated facts.',
 };
 /**
  * Generate a complete story using AI or simulation
@@ -189,7 +196,7 @@ Return a JSON object with this structure:
   "beats": [
     {
       "id": "beat-0",
-      "type": "titleScreen",  // 🚨 MANDATORY: First beat MUST be titleScreen, NEVER introText!
+      "type": "titleScreen",  // 🚨 MANDATORY: First beat MUST be titleScreen, NEVER infoText!
       "label": "Title",
       "parameters": { "title": "...", "subtitle": "...", "buttonText": "Begin" }
     }
@@ -201,7 +208,7 @@ Return a JSON object with this structure:
 }
 
 CRITICAL CONNECTION RULES:
-- SINGLE CONNECTION beats (titleScreen, introText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
+- SINGLE CONNECTION beats (titleScreen, infoText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
 - MULTIPLE CONNECTION beats (dialogTree, movementChoice, pickProp, hyperText, randomTarget): Define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.
   🚫 FORBIDDEN: Do NOT add a "connection" parameter to these beats - it triggers validation errors!
 - conditionBeat: EXACTLY 3 parameters allowed: "condition", "trueConnection", "falseConnection"
@@ -323,7 +330,7 @@ CRITICAL ANTI-PATTERNS TO AVOID:
 
 2. inputText MISUSE - inputText is for GETTING player input only!
    ❌ WRONG: inputText with "Read the note:" - nothing for player to type!
-   ✓ CORRECT: Use introText to DISPLAY text
+   ✓ CORRECT: Use infoText to DISPLAY text
    ✓ CORRECT: Use inputText only when player must TYPE something (names, passwords)
 
 3. Chains of identical single-item pickProps - avoid repetitive patterns!
@@ -342,11 +349,11 @@ Important:
 - Use descriptive labels for beats
 - Create engaging, coherent narrative flow
 - Use appropriate beat types for each story moment
-- NEVER put multiple connections from introText - use movementChoice or dialogTree for branching
+- NEVER put multiple connections from infoText - use movementChoice or dialogTree for branching
 - For dialogTree beats, targets go in dialogTree.choices[].target parameter - NO connections array!
 - For movementChoice beats, targets go in choices[].target parameter - NO connections array!
 - For pickProp beats, targets go in props[].target parameter - NO connections array!
-- Only titleScreen and introText need a "connections" array (single target beats)
+- Only titleScreen and infoText need a "connections" array (single target beats)
 - Ensure all beat IDs are unique and all connections reference valid beat IDs`;
     const userPrompt = `Create an interactive story with these requirements:
 
@@ -422,7 +429,7 @@ function generateStorySimulation(config) {
     // Introduction
     beats.push({
         id: 'beat-1',
-        type: 'introText',
+        type: 'infoText',
         label: 'Introduction',
         parameters: {
             text: `${prompt}\n\nYour adventure begins here...`,
@@ -461,7 +468,7 @@ function generateStorySimulation(config) {
             // Add narrative beat
             beats.push({
                 id: beatId,
-                type: 'introText',
+                type: 'infoText',
                 label: `Scene ${i + 1}`,
                 parameters: {
                     text: `Part ${i + 1} of your ${genre} adventure continues...`,
@@ -723,7 +730,7 @@ function suggestBeatsSimulation(config) {
     const suggestions = [
         { type: 'dialogTree', label: 'Conversation', description: 'Add a dialogue with choices', rationale: 'Engage player with character interaction' },
         { type: 'movementChoice', label: 'Location Choice', description: 'Player chooses where to go', rationale: 'Provide exploration options' },
-        { type: 'introText', label: 'Narrative', description: 'Continue the story', rationale: 'Advance the plot' },
+        { type: 'infoText', label: 'Narrative', description: 'Continue the story', rationale: 'Advance the plot' },
     ];
     return {
         beats: suggestions.slice(0, count),
@@ -803,7 +810,7 @@ function createBeatSimulation(config) {
     const { description } = config;
     return {
         id: `beat-${Date.now()}`,
-        type: 'introText',
+        type: 'infoText',
         label: 'New Beat',
         parameters: {
             text: description,

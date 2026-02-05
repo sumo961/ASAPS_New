@@ -292,9 +292,15 @@ export abstract class Beat {
   }
 
   getNextBeat(context: StoryContext): string | null {
+    console.log(`[Beat.getNextBeat] ${this.id} (${this.type}): connections=${this.connections?.length || 0}, defaultTarget=${this.defaultTarget}`);
+    if (this.connections && this.connections.length > 0) {
+      console.log(`[Beat.getNextBeat] ${this.id} connections:`, this.connections.map(c => ({ target: c.targetId, label: c.label, hasCondition: !!c.condition })));
+    }
+
     // First check conditional connections
     for (const connection of this.connections) {
       if (connection.condition && context.checkCondition(connection.condition)) {
+        console.log(`[Beat.getNextBeat] ${this.id}: Using conditional connection → ${connection.targetId}`);
         return connection.targetId;
       }
     }
@@ -302,6 +308,7 @@ export abstract class Beat {
     // Then check unconditional connections (user button clicks should use these)
     const unconditional = this.connections.find(c => !c.condition);
     if (unconditional) {
+      console.log(`[Beat.getNextBeat] ${this.id}: Using unconditional connection → ${unconditional.targetId}`);
       return unconditional.targetId;
     }
 
@@ -309,9 +316,11 @@ export abstract class Beat {
     // Note: Timer expiry handles defaultTarget directly via timerExpired event,
     // so this is mainly for beats with no explicit connections
     if (this.defaultTarget) {
+      console.log(`[Beat.getNextBeat] ${this.id}: Falling back to defaultTarget → ${this.defaultTarget}`);
       return this.defaultTarget;
     }
 
+    console.log(`[Beat.getNextBeat] ${this.id}: No next beat found`);
     return null;
   }
 

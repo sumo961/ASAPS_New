@@ -33,6 +33,7 @@ export interface PreviewMessage {
     beatId?: string;
     statePreset?: StatePreset;
     settings?: any;
+    projectSettings?: { width: number; height: number };
     assets?: any[];
     characters?: any[];
     themeAssets?: any;

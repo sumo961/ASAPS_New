@@ -8,7 +8,7 @@
  *
  * CONNECTION RULES:
  * - SINGLE CONNECTION beats: Can only connect to ONE target beat via the connections array
- *   titleScreen, introText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
+ *   titleScreen, infoText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
  *
  * - MULTIPLE CONNECTION beats: Support multiple targets via their parameters (NOT the connections array)
  *   - dialogTree: targets defined in dialogTree.choices[].target
@@ -122,24 +122,30 @@
  * - Example choice with counter effect: { "text": "Stand your ground", "target": "fight", "counter": "courage", "counterOperation": "change", "counterValue": 10 }
  * - Best practice: Define all counters you plan to use on relevant characters first
  *
- * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from introText!
+ * IMPORTANT: For branching story points, use dialogTree or movementChoice, NOT multiple connections from infoText!
  */
 export declare const BEAT_TYPES: {
     readonly titleScreen: "🚨 MANDATORY FIRST BEAT (beat_0)! Start screen with title and author. SINGLE CONNECTION: only one target via connections array.";
-    readonly introText: "Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: introText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead.";
+    readonly infoText: "Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: infoText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead. Optional: textVariations (array) for random text selection at runtime.";
     readonly endScreen: "End screen with message. 🚨 MUST be actual beats in beats array, NOT an \"endings\" metadata array! ALWAYS set showRestart: true. Use \"message\" parameter (not \"endMessage\"). Example: { \"id\": \"end_bad\", \"type\": \"endScreen\", \"parameters\": { \"message\": \"You lost!\", \"showRestart\": true } }";
     readonly dialogTree: "Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode (\"positioned\"/\"chat-scroll\"/\"chat-bubble\"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean). Choices can modify counters via counter/counterOperation/counterValue properties.";
     readonly movementChoice: "Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. IMPORTANT: Each choice needs { id, text, location, target } - always set \"location\" to same value as \"text\" for hover labels! Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).";
     readonly pickProp: "Interactive prop/item selection. MULTIPLE TARGETS: define targets in props[].target parameter. IMPORTANT: prop \"name\" should be ITEM NAMES ONLY (e.g., \"Silver Key\", \"Lantern\"), NOT action descriptions (e.g., \"Take the key\" is WRONG). For actions, use movementChoice instead. Supports: choiceDelay (seconds), markVisited (boolean).";
     readonly hyperText: "Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Links can have custom styling (color, underline, bold). Supports optional defaultTarget for timed auto-advance.";
     readonly inputText: "Player text input. Save to: variable (default), characterName (update display name), or counter (numeric). Validation: none, numeric, email, alphanumeric. Properties: minLength, maxLength, required. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance.";
-    readonly durScreen: "Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target via connections array at beat level. ❌ WRONG: connection inside parameters. ✓ CORRECT: \"connections\": [{ \"targetId\": \"beat_5\" }] at beat level.";
+    readonly durScreen: "Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target via connections array at beat level. ❌ WRONG: connection inside parameters. ✓ CORRECT: \"connections\": [{ \"targetId\": \"beat_5\" }] at beat level. Optional: textVariations (array) for random text selection at runtime.";
     readonly videoBeat: "Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.";
     readonly conditionBeat: "Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat.";
     readonly setVariable: "Set ONE variable/counter per beat. Operations: set (replace), change (add/subtract), multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.";
     readonly addRemoveInventory: "Modify inventory. Actions: add, remove, or transfer (move between characters). Use \"character\" parameter to specify which character's inventory (defaults to player). Examples: { \"action\": \"add\", \"item\": \"key\", \"character\": \"merchant\" }, { \"action\": \"transfer\", \"item\": \"sword\", \"fromCharacter\": \"player\", \"toCharacter\": \"companion\" }. SINGLE CONNECTION: executes then continues to one target.";
     readonly randomTarget: "Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.";
     readonly setTimer: "Set/check timers. Beat continues immediately to SINGLE CONNECTION target while timer runs in background. Optional timerTarget parameter: where story jumps when timer expires.";
+    readonly aiInfoText: "AI-generated contextual text with Continue button. Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables. SINGLE CONNECTION. Generates personalized 1-2 sentences based on player state.";
+    readonly aiDurScreen: "AI-generated text with auto-advance based on reading speed. Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables, wordsPerMinute (default 200), minDuration (ms), maxDuration (ms). SINGLE CONNECTION.";
+    readonly aiDialogTree: "AI-generated branching dialogue at runtime. Creates personalized conversations based on player state and context.";
+    readonly aiSummary: "AI-generated narrative summary of the player's journey. Useful for endings or recaps.";
+    readonly aiCondition: "AI-driven branching that analyzes player state to determine path. Parameters: prompt (what AI evaluates), categories (array of {name, description, targetId}), evaluateVariables, evaluateInventory, evaluateHistory, evaluateCounters, evaluateChoiceHistory, fallbackTarget, timeout. MULTIPLE CONNECTIONS via categories. AI classifies player state and routes to appropriate category target.";
+    readonly onlineContent: "Fetch and display real-time data from web APIs or AI queries. Parameters: sourceType (\"api\" or \"ai-query\"), apiUrl, apiParams, jsonPath, query, title, maxWords, fallbackText, buttonText. SINGLE CONNECTION. For dynamic content like weather, news, or AI-generated facts.";
 };
 /**
  * Story generation configuration

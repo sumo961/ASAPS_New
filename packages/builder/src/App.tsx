@@ -2937,6 +2937,7 @@ function App() {
       previewWindowManager.sendUpdate({
         storyData,
         settings: globalSettings,
+        projectSettings: { width: projectSettings.width, height: projectSettings.height },
         assets: assets,
         characters: characters,
         themeAssets: themeAssets,

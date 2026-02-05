@@ -311,6 +311,7 @@ interface PreviewData {
   beatId?: string;
   statePreset?: StatePreset;
   settings?: any;
+  projectSettings?: { width: number; height: number };
   assets?: Asset[];
   characters?: Character[];
   themeAssets?: any;
@@ -932,6 +933,27 @@ export const PreviewWindow: React.FC = () => {
       };
 
       (rendererRef.current as any).setTheme?.(themeWithAssets);
+
+      // Set layout theme for DialogTreeBeat to use
+      // This ensures preview uses the same layout calculations as the visual editor
+      const settings = previewData.settings;
+      rendererRef.current.setState('layoutTheme', {
+        fontSize: settings?.fonts?.textFontSize || 16,
+        fontFamily: settings?.fonts?.textFont || 'Arial',
+        padding: settings?.textbox?.padding || 20,
+        maxTextWidthRatio: 0.8,
+        maxButtonWidthRatio: 0.6,
+        textButtonGap: 20,
+        buttonGap: 16,
+        startY: 50,
+      });
+
+      // Set stage size for DialogTreeBeat to use
+      // This ensures preview uses the same stage dimensions as the visual editor
+      rendererRef.current.setState('stageSize', {
+        width: previewData.projectSettings?.width || 1024,
+        height: previewData.projectSettings?.height || 768,
+      });
     }
 
     return () => {

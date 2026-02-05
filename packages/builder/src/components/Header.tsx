@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2 } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
@@ -37,6 +37,7 @@ interface HeaderProps {
   currentProjectId?: string;
   onMergeDialogTrees?: () => void;
   onHelperCommands?: () => void;
+  onExportHtml?: () => void;
   previewWindowOpen?: boolean;
 }
 
@@ -67,6 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentProjectId,
   onMergeDialogTrees,
   onHelperCommands,
+  onExportHtml,
   previewWindowOpen,
 }) => {
   const { status, lastSaved, error: saveError } = useSave();
@@ -294,6 +296,22 @@ export const Header: React.FC<HeaderProps> = ({
                       <Download className="w-4 h-4" />
                       Export Project (ZIP)
                     </button>
+                  )}
+                  {onExportHtml && (
+                    <>
+                      <div className="my-2 border-t border-gray-200" />
+                      <button
+                        onClick={() => {
+                          onExportHtml();
+                          setShowExportMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                        title="Export as standalone HTML for web embedding"
+                      >
+                        <Globe className="w-4 h-4" />
+                        Export as HTML
+                      </button>
+                    </>
                   )}
                 </div>
               </>
