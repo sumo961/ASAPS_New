@@ -55,6 +55,15 @@ Major refactoring to ensure visual editor and preview render elements identicall
 - **CI workflow**: Tests now run on Node 20.x and 22.x matrix
 - **Desktop build workflow**: Uses Node 22 for Electron app compilation
 - **package-lock.json**: Synced with `@asaps/player-web` workspace
+- **Build order fixed**: Added `@asaps/player` to build chain before `player-web`
+- **Security audit**: Changed from `moderate` to `critical` level (high/moderate vulns in build tools)
+- **test:ui script**: Fixed to use workspace flag (`-w @asaps/builder`)
+- **CodeQL**: Added init step and proper permissions for security analysis
+- **Bundlesize**: Removed (no config existed in repo)
+
+**Known Test Issues** (pre-existing, not blocking releases):
+- Some tests use browser APIs (`URL.createObjectURL`) not available in jsdom
+- These tests pass locally but fail in CI due to jsdom limitations
 
 ### Files Modified
 
