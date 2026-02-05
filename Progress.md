@@ -47,6 +47,15 @@ Major refactoring to ensure visual editor and preview render elements identicall
 - **56 new tests**: Comprehensive tests for `elementSizing` and `dialogTreeLayout` modules
 - **WYSIWYG guarantee tests**: Verify `toLocations()` and `toVisualElements()` produce identical positions
 
+### CI/Infrastructure Updates
+
+- **Node.js requirement**: Updated minimum Node version from 18 to 20 (CI) and 22 (desktop builds)
+  - Several dependencies now require Node 20+ (`jsdom`, `lru-cache`, `minimatch`, etc.)
+  - `@electron/rebuild` requires Node 22.12.0+
+- **CI workflow**: Tests now run on Node 20.x and 22.x matrix
+- **Desktop build workflow**: Uses Node 22 for Electron app compilation
+- **package-lock.json**: Synced with `@asaps/player-web` workspace
+
 ### Files Modified
 
 | File | Changes |
@@ -59,6 +68,9 @@ Major refactoring to ensure visual editor and preview render elements identicall
 | `packages/renderer/src/components/PositionedBeatView.tsx` | Import sizing from core |
 | `mcp-server/src/utils/aiHelper.ts` | Added aiCondition, onlineContent |
 | `packages/builder/src/services/prompts/storyGenerationEnhanced.ts` | Full AI beat docs |
+| `.github/workflows/ci.yml` | Updated Node 18→20, 20→22 matrix |
+| `.github/workflows/build-desktop.yml` | Updated Node 20→22 for Electron |
+| `apps/builder-desktop/package.json` | Version bump to 0.9.12 |
 
 ---
 

@@ -128,8 +128,8 @@ Download the latest release to get started without building from source.
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ 
-- npm 7+
+- Node.js 20+ (22+ recommended for Electron desktop builds)
+- npm 9+
 
 ### Installation
 
