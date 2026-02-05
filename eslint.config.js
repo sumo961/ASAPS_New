@@ -38,7 +38,14 @@ export default tseslint.config(
         'warn',
         { argsIgnorePattern: '^_' }
       ],
-      'no-console': ['warn', { allow: ['warn', 'error'] }]
+      '@typescript-eslint/ban-ts-comment': 'warn',
+      '@typescript-eslint/no-this-alias': 'warn',
+      '@typescript-eslint/no-require-imports': 'warn',
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-case-declarations': 'warn',
+      'no-useless-escape': 'warn',
+      'no-control-regex': 'warn',
+      'prefer-const': 'warn'
     },
     settings: {
       react: {
