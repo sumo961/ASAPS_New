@@ -12,7 +12,7 @@ import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
-import type { DialogNode } from '@asaps/core';
+import type { DialogNode, DialogChoice } from '@asaps/core';
 
 import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
 import type { Character } from '../../types/character';
@@ -131,11 +131,11 @@ function findPhaseById(dialogTree: DialogNode | undefined, phaseId: string | nul
     if (!match) return null;
 
     const choiceIndex = parseInt(match[1], 10);
-    const choices = currentNode?.choices || [];
+    const choices: DialogChoice[] = currentNode?.choices || [];
 
     if (choiceIndex < 0 || choiceIndex >= choices.length) return null;
 
-    const choice = choices[choiceIndex];
+    const choice: DialogChoice = choices[choiceIndex];
     if (!choice.dialogNode) return null;
 
     currentNode = choice.dialogNode;
@@ -363,7 +363,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // IMPORTANT: These same values must be passed to DialogTreeBeat via renderer state
     // to ensure WYSIWYG - the preview uses the settings passed through previewData.settings
     const layoutTheme: DialogTreeLayoutTheme = {
-      fontSize: globalSettings?.fonts?.textFontSize || 16,
+      fontSize: globalSettings?.fonts?.fontSize?.text || 16,
       fontFamily: globalSettings?.fonts?.textFont || 'Arial',
       padding: globalSettings?.textbox?.padding || 20,
       maxTextWidthRatio: 0.8,

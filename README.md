@@ -16,14 +16,16 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.11)
+## ⚠️ Development Status (v0.9.12)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
-| **Independent Preview Window** | **NEW in v0.9.11**: Preview in separate window with path-based presets and InputText value entry |
-| **UI Tooltips** | **NEW in v0.9.11**: Descriptive tooltips throughout app to help beginners |
+| **HTML Export** | **NEW in v0.9.12**: Export stories as standalone HTML files with splash screen, counter HUD, and inventory icons |
+| **Unified Rendering** | **NEW in v0.9.12**: WYSIWYG alignment between visual editor and preview |
+| **Independent Preview Window** | Preview in separate window with path-based presets and InputText value entry (v0.9.11) |
+| **UI Tooltips** | Descriptive tooltips throughout app to help beginners (v0.9.11) |
 | **Transformation Commands** | Bulk rename/delete/merge for characters, variables, beats (v0.9.9) |
 | **AI Runtime Beats** | aiInfoText, aiDurScreen for dynamic AI-generated content during playback (v0.9.9) |
 | **Text Variations** | Random text selection for Info Text and Duration Screen beats (v0.9.9) |
@@ -43,6 +45,18 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Path Analysis | StateSimulationAnalyzer for accurate hub-and-spoke patterns (v0.9.10) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
+
+### 📦 HTML Export (v0.9.12)
+
+Export your stories as self-contained HTML files that run anywhere:
+
+- **Splash screen**: Professional loading experience with story title and author
+- **Counter HUD**: Visual display of counters/stats during gameplay
+- **Inventory icons**: Visual inventory system with item icons
+- **Tailwind CSS**: Modern styling that works across browsers
+- **Zero dependencies**: Single HTML file runs offline in any browser
+
+**Note**: AI-based beats (aiInfoText, aiDurScreen, aiDialogTree, aiSummary, aiCondition) are not yet supported in HTML export. Stories using these beats will show fallback text instead.
 
 ### 🖥️ Independent Preview Window (v0.9.11)
 

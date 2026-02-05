@@ -530,11 +530,11 @@ Inventory condition example - quantity check (CORRECT format):
 - Parameters:
   - sourceType: "api" (direct API call) or "ai-query" (AI search)
   - For API mode:
-    - apiUrl: URL to fetch (supports ${variable} interpolation)
+    - apiUrl: URL to fetch (supports \${variable} interpolation)
     - apiParams: Query parameters object
     - jsonPath: JSONPath to extract data (e.g., "$.current.temp_c")
   - For AI query mode:
-    - query: What to search/answer (supports ${variable} interpolation)
+    - query: What to search/answer (supports \${variable} interpolation)
   - title: Title above content (auto-derived from query if not set)
   - maxWords: Maximum words in response
   - fallbackText: Text if fetch fails (REQUIRED)
