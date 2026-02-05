@@ -506,6 +506,43 @@ Inventory condition example - quantity check (CORRECT format):
 - Use: Recap the player's journey at endings or checkpoints
 - Summarizes key choices and their consequences
 
+**aiCondition** - AI-driven branching that analyzes player state
+- Use: Complex branching based on accumulated player behavior/personality
+- Parameters:
+  - prompt: What the AI should evaluate (e.g., "Is the player playing aggressively or cautiously?")
+  - categories: Array of possible outcomes, each with:
+    - name: Category identifier (e.g., "aggressive", "cautious")
+    - description: When this category applies (e.g., "Player has made combative choices")
+    - targetId: Beat to navigate to for this category
+  - evaluateVariables: Include player variables (default: true)
+  - evaluateInventory: Include player inventory (default: true)
+  - evaluateHistory: Include visited beats (default: true)
+  - evaluateCounters: Include counter values (default: true)
+  - evaluateChoiceHistory: Include what choices player made (default: true)
+  - fallbackTarget: Beat to go to if AI can't decide
+  - timeout: Max response time in ms (default: 30000)
+- Connections: Multiple → one per category (AI picks the best match)
+- Example: AI determines if player is "hero" or "villain" based on past choices
+- ⚠️ Requires AI API at runtime - always provide fallbackTarget!
+
+**onlineContent** - Fetch and display real-time data
+- Use: Dynamic content from web APIs or AI-powered search
+- Parameters:
+  - sourceType: "api" (direct API call) or "ai-query" (AI search)
+  - For API mode:
+    - apiUrl: URL to fetch (supports ${variable} interpolation)
+    - apiParams: Query parameters object
+    - jsonPath: JSONPath to extract data (e.g., "$.current.temp_c")
+  - For AI query mode:
+    - query: What to search/answer (supports ${variable} interpolation)
+  - title: Title above content (auto-derived from query if not set)
+  - maxWords: Maximum words in response
+  - fallbackText: Text if fetch fails (REQUIRED)
+  - buttonText: Continue button label
+- Connections: Single → next beat
+- Examples: Real-time weather, current news, AI-generated fun facts
+- ⚠️ Requires internet at runtime - always provide fallbackText!
+
 ## Beat Notes (Author Annotations) - USE LIBERALLY!
 
 All beats can include a "notes" field for author documentation:

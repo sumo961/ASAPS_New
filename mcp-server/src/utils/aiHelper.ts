@@ -155,6 +155,8 @@ export const BEAT_TYPES = {
   aiDurScreen: 'AI-generated text with auto-advance based on reading speed. Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables, wordsPerMinute (default 200), minDuration (ms), maxDuration (ms). SINGLE CONNECTION.',
   aiDialogTree: 'AI-generated branching dialogue at runtime. Creates personalized conversations based on player state and context.',
   aiSummary: 'AI-generated narrative summary of the player\'s journey. Useful for endings or recaps.',
+  aiCondition: 'AI-driven branching that analyzes player state to determine path. Parameters: prompt (what AI evaluates), categories (array of {name, description, targetId}), evaluateVariables, evaluateInventory, evaluateHistory, evaluateCounters, evaluateChoiceHistory, fallbackTarget, timeout. MULTIPLE CONNECTIONS via categories. AI classifies player state and routes to appropriate category target.',
+  onlineContent: 'Fetch and display real-time data from web APIs or AI queries. Parameters: sourceType ("api" or "ai-query"), apiUrl, apiParams, jsonPath, query, title, maxWords, fallbackText, buttonText. SINGLE CONNECTION. For dynamic content like weather, news, or AI-generated facts.',
 } as const;
 
 /**
