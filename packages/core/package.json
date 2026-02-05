@@ -36,7 +36,7 @@
     "build:clean": "npx rimraf dist",
     "build:types": "tsc --declaration --declarationMap --emitDeclarationOnly --outDir dist || echo 'Type generation had warnings'",
     "build:js": "vite build",
-    "test": "vitest",
+    "test": "vitest run",
     "test:coverage": "vitest --coverage",
     "type-check": "tsc --noEmit"
   },

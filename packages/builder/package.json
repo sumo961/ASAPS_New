@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest run",
     "test:ui": "vitest --ui",
     "api:start": "tsx src/api/cli.ts",
     "api:dev": "tsx watch src/api/cli.ts",
