@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "api:start": "tsx src/api/cli.ts",
-    "api:dev": "tsx watch src/api/cli.ts"
+    "api:dev": "tsx watch src/api/cli.ts",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",

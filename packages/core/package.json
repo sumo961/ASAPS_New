@@ -37,7 +37,8 @@
     "build:types": "tsc --declaration --declarationMap --emitDeclarationOnly --outDir dist || echo 'Type generation had warnings'",
     "build:js": "vite build",
     "test": "vitest",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "eventemitter3": "^5.0.1",

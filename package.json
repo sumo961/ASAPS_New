@@ -23,7 +23,7 @@
     "test": "npm run test --workspaces",
     "lint": "eslint packages/*/src",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,css}\"",
-    "type-check": "tsc --noEmit",
+    "type-check": "npm run type-check -w @asaps/core && npm run type-check -w @asaps/renderer && npm run type-check -w @asaps/builder",
     "clean": "rimraf packages/*/dist packages/*/node_modules node_modules",
     "install:all": "npm install"
   },
