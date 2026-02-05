@@ -4,14 +4,13 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeAutoLayout, type LayoutElement, type AutoLayoutTheme } from '@asaps/core';
+import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
 import { VisualPropertiesPanel } from './VisualPropertiesPanel';
 import { AnimationPanel } from './AnimationPanel';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
-import { calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '../../utils/textSizeCalculator';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode } from '@asaps/core';
 
@@ -68,17 +67,18 @@ interface PhaseTreeNode {
 
 /**
  * Build a tree structure from DialogTree's nested DialogNode structure
+ * Generates unique IDs for phases based on their path through the tree
  */
 function buildPhaseTree(dialogTree: DialogNode | undefined): PhaseTreeNode | null {
   if (!dialogTree) return null;
 
-  function traverse(node: DialogNode, depth: number, choiceText?: string): PhaseTreeNode {
+  function traverse(node: DialogNode, depth: number, pathId: string, choiceText?: string): PhaseTreeNode {
     const truncatedText = node.text.length > 25
       ? node.text.substring(0, 25) + '...'
       : node.text;
 
     return {
-      id: node.id,
+      id: pathId,  // Use path-based ID instead of node.id (which may be 'root' for all nodes)
       speaker: node.speaker || 'NPC',
       text: truncatedText,
       fullText: node.text,
@@ -86,11 +86,11 @@ function buildPhaseTree(dialogTree: DialogNode | undefined): PhaseTreeNode | nul
       choiceText: choiceText ? (choiceText.length > 20 ? choiceText.substring(0, 20) + '...' : choiceText) : undefined,
       children: (node.choices || [])
         .filter(c => c.dialogNode)
-        .map(c => traverse(c.dialogNode!, depth + 1, c.text)),
+        .map((c, idx) => traverse(c.dialogNode!, depth + 1, `${pathId}_choice${idx}`, c.text)),
     };
   }
 
-  return traverse(dialogTree, 0);
+  return traverse(dialogTree, 0, 'root');
 }
 
 /**
@@ -107,25 +107,41 @@ function flattenPhaseTree(node: PhaseTreeNode | null): PhaseTreeNode[] {
 }
 
 /**
- * Find a DialogNode by ID in the tree
+ * Find a DialogNode by path-based ID in the tree
+ * Path IDs look like: "root", "root_choice0", "root_choice1", "root_choice0_choice2"
  */
 function findPhaseById(dialogTree: DialogNode | undefined, phaseId: string | null): DialogNode | null {
   if (!dialogTree || !phaseId) return null;
 
-  // Check if this is the node we're looking for
-  if (dialogTree.id === phaseId) {
-    return dialogTree;
+  // Parse the path to navigate to the correct node
+  // Path format: "root" or "root_choice0_choice1_..."
+  const parts = phaseId.split('_');
+
+  // First part should be 'root'
+  if (parts[0] !== 'root') return null;
+
+  // Start at the root node
+  let currentNode: DialogNode | undefined = dialogTree;
+
+  // Navigate through choice indices
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i];
+    // Part should be like "choice0", "choice1", etc.
+    const match = part.match(/^choice(\d+)$/);
+    if (!match) return null;
+
+    const choiceIndex = parseInt(match[1], 10);
+    const choices = currentNode?.choices || [];
+
+    if (choiceIndex < 0 || choiceIndex >= choices.length) return null;
+
+    const choice = choices[choiceIndex];
+    if (!choice.dialogNode) return null;
+
+    currentNode = choice.dialogNode;
   }
 
-  // Recursively search in choices
-  for (const choice of dialogTree.choices || []) {
-    if (choice.dialogNode) {
-      const found = findPhaseById(choice.dialogNode, phaseId);
-      if (found) return found;
-    }
-  }
-
-  return null;
+  return currentNode || null;
 }
 
 interface VisualWorkspaceProps {
@@ -328,10 +344,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
   /**
    * Generate visual elements for a specific DialogTree phase
-   * This creates the NPC text box and choice buttons with auto-layout
-   * Matches the preview renderer's flex-based layout positioning
+   * Uses the shared computeDialogTreeLayout from @asaps/core
+   * This ensures visual editor and preview use identical position calculations
    *
-   * Position priority:
+   * Position priority (handled by computeDialogTreeLayout):
    * 1. phaseOverrides (user-edited positions)
    * 2. storedLocations (imported ASML positions)
    * 3. auto-layout (fallback for new beats)
@@ -343,170 +359,47 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     overrides?: Record<string, Partial<{ x: number; y: number; width: number; height: number }>>,
     storedLocations?: Map<string, Location>
   ): VisualElement[] => {
-    const defaultFontSize = 16;
-    const defaultFont = globalSettings?.fonts?.textFont || 'Arial';
-    const padding = globalSettings?.textbox?.padding || 20;
-
-    // Gaps match preview renderer's flex layout
-    const textButtonGap = 20; // Gap between text box and first button
-    const buttonGap = 16; // Gap between buttons (matches preview's row gap)
-    const startY = 50; // Match preview's starting position
-
-    // Calculate text box dimensions first (same logic as preview/autoLayout)
-    const lineHeight = 1.4;
-    const contentPadding = padding * 2;
-    const text = phase.text || '';
-
-    // Estimate text width (same as autoLayout.ts)
-    const textWidth = text.length * defaultFontSize * 0.55;
-    const maxTextWidth = stageWidth * 0.8;
-
-    let textBoxWidth: number;
-    let textBoxHeight: number;
-
-    if (textWidth + contentPadding <= maxTextWidth) {
-      // Fits in single line - use actual text width
-      textBoxWidth = Math.max(200, Math.min(textWidth + contentPadding, maxTextWidth));
-      textBoxHeight = defaultFontSize * lineHeight + contentPadding;
-    } else {
-      // Multiple lines needed - use max width and calculate height
-      textBoxWidth = maxTextWidth;
-      const availableWidth = maxTextWidth - contentPadding;
-      const avgCharWidth = defaultFontSize * 0.55;
-      const charsPerLine = Math.floor(availableWidth / avgCharWidth);
-      const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
-      textBoxHeight = lines * defaultFontSize * lineHeight + contentPadding;
-    }
-
-    // Center text box horizontally
-    const textCenterX = (stageWidth - textBoxWidth) / 2;
-
-    // Create base elements for this phase
-    const baseElements: LayoutElement[] = [];
-
-    // NPC text box - centered horizontally with calculated dimensions
-    baseElements.push({
-      id: 'npc',
-      kind: 'dialog',
-      content: text,
-      x: textCenterX,
-      y: startY,
-      width: textBoxWidth,
-      height: textBoxHeight,
-      fontSize: defaultFontSize,
-      fontFamily: defaultFont,
-      speaker: phase.speaker,
-    });
-
-    // Calculate button positions - immediately after text box
-    const buttonStartY = startY + textBoxHeight + textButtonGap;
-
-    // Calculate button width - max of all button text widths, capped at 60%
-    const maxButtonWidth = stageWidth * 0.6;
-    const choices = phase.choices || [];
-
-    // Calculate dimensions for each button (including height for multi-line text)
-    const buttonDimensions = choices.map(choice => {
-      const btnText = choice.text || '';
-      return calculateButtonDimensions(btnText, defaultFontSize, defaultFont);
-    });
-
-    // Use uniform width for all buttons (max of calculated widths, capped)
-    const uniformButtonWidth = Math.min(
-      Math.max(200, ...buttonDimensions.map(d => d.width)),
-      maxButtonWidth
-    );
-    const buttonCenterX = (stageWidth - uniformButtonWidth) / 2;
-
-    // Choice buttons - positioned with cumulative Y based on individual heights
-    let currentY = buttonStartY;
-    choices.forEach((choice, idx) => {
-      // Use calculated height for this specific button
-      const buttonHeight = buttonDimensions[idx]?.height || 50;
-
-      baseElements.push({
-        id: `choice_${idx}`,
-        kind: 'button',
-        content: choice.text || '',
-        x: buttonCenterX,
-        y: currentY,
-        width: uniformButtonWidth,
-        height: buttonHeight,
-        fontSize: defaultFontSize,
-        fontFamily: defaultFont,
-      });
-
-      // Move Y position for next button
-      currentY += buttonHeight + buttonGap;
-    });
-
-    // Apply auto-layout (mainly for collision detection and fine-tuning)
-    const layoutTheme: AutoLayoutTheme = {
-      textBoxPadding: padding,
+    // Build theme from global settings
+    // IMPORTANT: These same values must be passed to DialogTreeBeat via renderer state
+    // to ensure WYSIWYG - the preview uses the settings passed through previewData.settings
+    const layoutTheme: DialogTreeLayoutTheme = {
+      fontSize: globalSettings?.fonts?.textFontSize || 16,
+      fontFamily: globalSettings?.fonts?.textFont || 'Arial',
+      padding: globalSettings?.textbox?.padding || 20,
       maxTextWidthRatio: 0.8,
       maxButtonWidthRatio: 0.6,
-      textButtonGap: textButtonGap,
-      buttonGap: buttonGap,
+      textButtonGap: 20,
+      buttonGap: 16,
+      startY: 50,
     };
-    const layoutResult = computeAutoLayout(baseElements, stageWidth, stageHeight, layoutTheme);
 
-    // Convert to VisualElements and apply overrides/stored positions
-    // Priority: 1. phaseOverrides, 2. storedLocations, 3. auto-layout
-    return layoutResult.adjustedElements.map((el) => {
-      const override = overrides?.[el.id];
+    // Log input overrides for debugging
+    if (overrides) {
+      console.log(`[VisualWorkspace] generatePhaseElements overrides for phase ${phase.id}:`, overrides);
+    }
 
-      // Look for stored position in beat.locations (from ASML import)
-      // Dialog elements: ASML uses kind='text' or kind='dialog'
-      // Button elements: ASML uses kind='button' (converted from 'text' during import)
-      let storedPosition: { x: number; y: number; width: number; height: number } | undefined;
-      if (storedLocations && storedLocations.size > 0) {
-        // For dialog, look for 'dialog' or 'text' kind locations (ASML uses 'text' for dialog boxes)
-        if (el.kind === 'dialog') {
-          storedLocations.forEach((loc) => {
-            // Accept both 'dialog' (modern) and 'text' (legacy ASML) kinds
-            // Exclude buttons by checking that name doesn't match button patterns
-            const isDialogLike = (loc.kind === 'dialog' || loc.kind === 'text') &&
-              !loc.name?.match(/^(choice|button)/i);
-            if (isDialogLike && !storedPosition) {
-              storedPosition = { x: loc.x, y: loc.y, width: loc.width, height: loc.height };
-            }
-          });
-        }
-        // For buttons, look for 'button' kind locations by index
-        if (el.kind === 'button') {
-          const choiceIdx = parseInt(el.id.replace('choice_', ''), 10);
-          let buttonIdx = 0;
-          storedLocations.forEach((loc) => {
-            if (loc.kind === 'button') {
-              if (buttonIdx === choiceIdx && !storedPosition) {
-                storedPosition = { x: loc.x, y: loc.y, width: loc.width, height: loc.height };
-              }
-              buttonIdx++;
-            }
-          });
-        }
-      }
-
-      return {
-        id: el.id,
-        type: el.kind === 'dialog' ? 'dialog' : 'button',
-        name: el.id === 'npc' ? `NPC: ${phase.speaker || 'Character'}` : `Choice ${el.id.replace('choice_', '')}`,
-        text: el.content,
-        speaker: el.speaker,
-        // Priority: override > storedPosition > auto-layout
-        x: override?.x ?? storedPosition?.x ?? el.x,
-        y: override?.y ?? storedPosition?.y ?? el.y,
-        width: override?.width ?? storedPosition?.width ?? el.width,
-        height: override?.height ?? storedPosition?.height ?? el.height,
-        z: 0,
-        rotation: 0,
-        scale: 1,
-        visible: true,
-        locked: false,
-        font: el.fontFamily,
-        fontSize: el.fontSize,
-      } as VisualElement;
+    // Use shared layout calculation (same function used by preview/renderer)
+    const layout = computeDialogTreeLayout({
+      phase: {
+        id: phase.id || 'root',
+        speaker: phase.speaker || '',
+        text: phase.text || '',
+        choices: (phase.choices || []).map((c, idx) => ({
+          id: c.id || `choice_${idx}`,
+          text: c.text || '',
+        })),
+      },
+      stageWidth,
+      stageHeight,
+      theme: layoutTheme,
+      overrides,
+      storedLocations,
     });
+
+    // Convert to VisualElements using the shared layout's method
+    const elements = layout.toVisualElements() as VisualElement[];
+    console.log(`[VisualWorkspace] generatePhaseElements output:`, elements.map(el => ({ id: el.id, name: el.name, text: el.text?.substring(0, 30), z: el.z })));
+    return elements;
   }, [globalSettings]);
 
   /**
@@ -687,15 +580,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const phaseKeyToSave = prevPhaseIdRef.current || selectedPhaseId;
       if (prevBeat.type === 'dialogTree' && phaseKeyToSave) {
         const phaseKey = phaseKeyToSave;
-        const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number }>> = {};
+        const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number; z: number }>> = {};
 
         visualElementsRef.current.forEach((el: VisualElement) => {
           // Save ALL elements to phaseOverrides (dialog, buttons, and others)
+          // Now includes z-index to preserve reordering
           overrides[el.id] = {
             x: el.x,
             y: el.y,
             width: el.width,
             height: el.height,
+            z: el.z,
           };
         });
 
@@ -704,7 +599,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           ...existingOverrides,
           [phaseKey]: overrides,
         };
-        console.log(`[VisualWorkspace] Saved phase overrides for phase: ${phaseKey} before beat change`);
+        console.log(`[VisualWorkspace] Saved phase overrides for phase: ${phaseKey} before beat change`, overrides);
       }
 
       // Save to parameters
@@ -743,7 +638,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
     // Calculate overrides: elements that differ from auto-layout
     // For simplicity, save all element positions as overrides
-    const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number }>> = {};
+    // Now includes z-index to preserve reordering
+    const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number; z: number }>> = {};
 
     visualElements.forEach(el => {
       overrides[el.id] = {
@@ -751,6 +647,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         y: el.y,
         width: el.width,
         height: el.height,
+        z: el.z,
       };
     });
 
@@ -764,14 +661,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       },
     });
 
-    console.log(`[VisualWorkspace] Saved phase overrides for phase: ${phaseKey}`);
+    console.log(`[VisualWorkspace] Saved phase overrides for phase: ${phaseKey}`, overrides);
   }, [beat, hasChanges, visualElements]);
 
   /**
    * Handle phase selection with auto-save
    */
   const handlePhaseSelect = useCallback((phaseId: string) => {
-    if (phaseId === selectedPhaseId) return; // Same phase, no action needed
+    console.log(`[VisualWorkspace] handlePhaseSelect called with: ${phaseId}, current: ${selectedPhaseId}`);
+
+    if (phaseId === selectedPhaseId) {
+      console.log(`[VisualWorkspace] Same phase selected, skipping`);
+      return; // Same phase, no action needed
+    }
 
     console.log(`[VisualWorkspace] Phase switch: ${selectedPhaseId} → ${phaseId}`);
 
@@ -782,6 +684,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Let the useEffect handle it after loading elements
     setSelectedPhaseId(phaseId);
     setHasChanges(false);
+    console.log(`[VisualWorkspace] Phase selection state updated to: ${phaseId}`);
   }, [selectedPhaseId, saveCurrentPhaseOverrides]);
 
   /**
@@ -889,16 +792,24 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Merge: persisted elements (characters/props) + phase elements (dialog/choices)
     const allElements = [...persistedElements, ...phaseElements];
 
+    // Log z-index values for debugging
+    console.log(`[VisualWorkspace] Phase elements z-values:`, phaseElements.map(el => ({ id: el.id, name: el.name, z: el.z })));
+
     // Fix z-index ordering: if all elements have the same z value, assign incremental values
     // This ensures reordering works for ASML imports where z-index wasn't preserved
+    // Skip this fix if any element has a non-zero z (meaning overrides were applied)
     if (allElements.length > 1) {
       const zValues = allElements.map((el: VisualElement) => el.z);
       const allSameZ = zValues.every((z: number) => z === zValues[0]);
-      if (allSameZ) {
+      const anyNonZero = zValues.some((z: number) => z !== 0);
+
+      if (allSameZ && !anyNonZero) {
         console.log(`[VisualWorkspace] DialogTree: All ${allElements.length} elements have same z-index (${zValues[0]}), assigning incremental values`);
         allElements.forEach((el: VisualElement, idx: number) => {
           el.z = idx;
         });
+      } else {
+        console.log(`[VisualWorkspace] DialogTree: Keeping existing z-values (allSame=${allSameZ}, anyNonZero=${anyNonZero})`);
       }
     }
 
