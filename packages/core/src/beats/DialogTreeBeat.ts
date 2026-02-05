@@ -1,8 +1,9 @@
 import { Beat } from './Beat';
-import type { BeatConfig, Condition, Effect } from '../types';
+import type { BeatConfig, Condition, Effect, Location } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { DialogTreeParameters, DialogNode, DialogChoice } from '../generated/beat-types';
+import { computeDialogTreeLayout, type DialogTreeLayoutTheme } from '../layout';
 
 /**
  * Phase layout override - stores position adjustments for elements that
@@ -342,42 +343,61 @@ export class DialogTreeBeat extends Beat {
       const phaseId = this.currentNode.id || 'root';
       const phaseOverrides = this.phaseOverrides?.[phaseId];
 
-      // When phaseOverrides exist, filter out dialog/button elements from baseLocations
-      // since those will be added from phaseOverrides to avoid duplicates
-      let locations = phaseOverrides
-        ? baseLocations.filter(loc => loc.kind !== 'dialog' && loc.kind !== 'button')
-        : [...baseLocations];
+      // Helper to identify dialog locations (can be 'dialog' or 'text' kind)
+      const isDialogLoc = (loc: Location) => loc.kind === 'dialog' ||
+        (loc.kind === 'text' && !loc.name?.match(/^(choice|button)/i));
 
-      if (phaseOverrides) {
-        // Add dialog element with position from phaseOverrides
-        const npcOverride = phaseOverrides['npc'];
-        if (npcOverride) {
-          locations.push({
-            kind: 'dialog' as const,
-            name: 'npc',
-            x: npcOverride.x ?? 0,
-            y: npcOverride.y ?? 0,
-            width: npcOverride.width ?? 400,
-            height: npcOverride.height ?? 100,
-          });
-        }
+      // Start with elements that aren't dialog or button (keep characters, props, etc.)
+      // Also filter out 'text' elements that are actually the dialog text box
+      let locations = baseLocations.filter(loc =>
+        loc.kind !== 'dialog' &&
+        loc.kind !== 'button' &&
+        !isDialogLoc(loc)
+      );
 
-        // Add button elements with positions from phaseOverrides
-        const choices = this.currentNode.choices || [];
-        choices.forEach((choice, idx) => {
-          const choiceOverride = phaseOverrides[`choice_${idx}`];
-          if (choiceOverride) {
-            locations.push({
-              kind: 'button' as const,
-              name: choice.text || `Choice ${idx + 1}`,
-              x: choiceOverride.x ?? 0,
-              y: choiceOverride.y ?? 0,
-              width: choiceOverride.width ?? 200,
-              height: choiceOverride.height ?? 50,
-            });
-          }
-        });
-      }
+      // Use the shared layout calculation (same function used by visual editor)
+      // This ensures WYSIWYG - positions calculated here match visual editor exactly
+      // Get layout theme from renderer state (set by PreviewWindow from globalSettings)
+      // Falls back to defaults if not set (e.g., standalone player without builder settings)
+      const rendererLayoutTheme = renderer.getState?.('layoutTheme') as DialogTreeLayoutTheme | undefined;
+      const layoutTheme: DialogTreeLayoutTheme = rendererLayoutTheme || {
+        fontSize: 16,
+        fontFamily: 'Arial',
+        padding: 20,
+        maxTextWidthRatio: 0.8,
+        maxButtonWidthRatio: 0.6,
+        textButtonGap: 20,
+        buttonGap: 16,
+        startY: 50,
+      };
+
+      // Get stage size from renderer state (set by PreviewWindow from projectSettings)
+      // Falls back to defaults if not set (e.g., standalone player without builder settings)
+      const rendererStageSize = renderer.getState?.('stageSize') as { width: number; height: number } | undefined;
+      const stageWidth = rendererStageSize?.width || 1024;
+      const stageHeight = rendererStageSize?.height || 768;
+
+      const layout = computeDialogTreeLayout({
+        phase: {
+          id: phaseId,
+          speaker: this.currentNode.speaker || '',
+          text: this.currentNode.text || '',
+          choices: (this.currentNode.choices || []).map((c, idx) => ({
+            id: c.id || `choice_${idx}`,
+            text: c.text || '',
+          })),
+        },
+        stageWidth,
+        stageHeight,
+        theme: layoutTheme,
+        overrides: phaseOverrides,
+        storedLocations: this.locations, // Pass stored locations from ASML import
+      });
+
+      // Add the calculated dialog and button locations
+      const layoutLocations = layout.toLocations();
+      locations = [...locations, ...layoutLocations];
+
       // Check conditions on the node
       if (this.currentNode.conditions) {
         const allConditionsMet = this.currentNode.conditions.every(

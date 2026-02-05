@@ -1,49 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import type { Location, AnimationPath, AnimationState } from '@asaps/core';
-import { getPresetSound, isPresetSound } from '@asaps/core';
+import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
 import { CharacterInventoryFrame, type InventoryFrameConfig, type InventoryItemData } from './CharacterInventoryFrame';
 import { TimerProgressBar } from './TimerProgressBar';
 import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
-
-/**
- * Font name to CSS font-family mapping
- * Used to convert user-friendly font names to proper CSS values
- */
-const FONT_FAMILIES: Record<string, string> = {
-  'Arial': 'Arial, sans-serif',
-  'Helvetica': 'Helvetica, Arial, sans-serif',
-  'Times New Roman': 'Times New Roman, serif',
-  'Courier New': 'Courier New, monospace',
-  'Georgia': 'Georgia, serif',
-  'Verdana': 'Verdana, sans-serif',
-  'Gothic': 'Georgia, serif',
-  'Handwriting': 'Brush Script MT, cursive',
-  'Handwriting2': 'Lucida Handwriting, cursive',
-  'Comic Sans MS': 'Comic Sans MS, cursive',
-  'Impact': 'Impact, sans-serif',
-  'Trebuchet MS': 'Trebuchet MS, sans-serif',
-  'Palatino': 'Palatino Linotype, Book Antiqua, Palatino, serif',
-};
-
-/**
- * Convert font name to CSS font-family value
- */
-function getFontFamily(fontName: string): string {
-  return FONT_FAMILIES[fontName] || fontName;
-}
-
-/**
- * Check if a font is a built-in font (not a custom theme font)
- * Used to determine if theme fonts should override location fonts
- */
-function isBuiltInFont(fontName: string | undefined): boolean {
-  if (!fontName) return true;
-  return fontName in FONT_FAMILIES;
-}
 
 // Default stage dimensions (can be overridden by project settings)
 const DEFAULT_STAGE_WIDTH = 1024;
@@ -676,16 +640,28 @@ function adjustElementsForCollisions(
     const estimatedHeight = estimateButtonHeight(buttonText, buttonWidth, fontSize);
     const buttonHeight = Math.max(el.location.height || 42, estimatedHeight);
 
-    // Determine X position
+    // Determine X position - only align if buttons are very scattered
     const newX = shouldAlignButtons ? targetX : el.location.x;
 
-    // Use calculated Y position (stacking)
-    const newY = nextY;
+    // Determine Y position - prevent overlap with BOTH text AND other buttons
+    let newY = el.location.y;
 
-    console.log(`[CollisionDetect] Button "${el.location.name}": original(${el.location.x},${el.location.y}) → adjusted(${newX},${newY}), estimatedH=${estimatedHeight.toFixed(0)}`);
+    // Check if button's top overlaps any text box's bottom
+    const buttonTop = el.location.y;
+    const overlapsText = textBoxBounds.some(tb => buttonTop < tb.bottom + 10);
 
-    // Update next Y position for stacking
-    nextY = newY + buttonHeight + 15; // 15px gap between buttons
+    if (overlapsText && buttonTop < lowestTextBottom + 10) {
+      // Button overlaps text - push it down below all text
+      newY = Math.max(nextY, lowestTextBottom + 35);
+    } else if (buttonTop < nextY) {
+      // Button doesn't overlap text but would overlap previous button - stack below
+      newY = nextY;
+    }
+
+    // Track cumulative stacking position for ALL subsequent buttons
+    nextY = newY + buttonHeight + 15;
+
+    console.log(`[CollisionDetect] Button "${el.location.name}": original(${el.location.x},${el.location.y}) → adjusted(${newX},${newY}), overlapsText=${overlapsText}`);
 
     // Create adjusted element
     const positionChanged = newX !== el.location.x || newY !== el.location.y;
@@ -1339,10 +1315,12 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Use calculated max or default if no buttons found
   const calculatedButtonHeight = maxButtonHeight > 0 ? maxButtonHeight : DEFAULT_BUTTON_HEIGHT;
 
-  // WYSIWYG: Always use stored positions directly
-  // Collision detection should run at content creation/import time and update stored positions,
-  // not at render time. This ensures editor, preview, and export all show the same thing.
-  const adjustedElements = elements;
+  // Apply collision detection to adjust button positions when text boxes grow
+  // SKIP in editor mode - we want WYSIWYG where selection handles match rendered positions exactly
+  // Collision adjustment should only happen in preview/runtime mode
+  const adjustedElements = editorMode
+    ? elements
+    : adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight);
 
   // Calculate animation delays for sequenced typewriter effect on text elements
   const animation = theme.textEffects?.animation || 'none';
@@ -1674,15 +1652,21 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
     }
 
     case 'button': {
-      // Calculate smart dimensions for the button to prevent overflow
+      // WYSIWYG: Use stored dimensions from visual editor in both editor and preview modes
+      // This ensures what users set in the visual editor is exactly what appears in preview
+      // Only fall back to smart sizing if no dimensions are stored (e.g., legacy content)
       const btnFontSize = location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
       const btnPaddingH = 16;
       const btnPaddingV = 10;
-      const smartBtnDims = editorMode ? { width: location.width, height: location.height } :
+
+      // Use stored dimensions if they look intentionally set (not just defaults)
+      const hasStoredDimensions = location.width && location.height;
+      const smartBtnDims = hasStoredDimensions ?
+        { width: location.width, height: location.height } :
         calculateSmartButtonDimensions(
           content,
           btnFontSize,
-          { x: location.x, y: location.y, width: location.width, height: location.height },
+          { x: location.x, y: location.y, width: location.width || 200, height: location.height || 50 },
           btnPaddingH,
           btnPaddingV,
           stageWidth,
@@ -2946,14 +2930,14 @@ const DialogElement: React.FC<{
   const isLongContent = contentLength > 80;
   const isVeryLongContent = contentLength > 200;
 
-  // Calculate font size
+  // Calculate font size - use theme's textFontSize for dialogs for consistent sizing
+  // Height-based calculation was causing inconsistent sizes depending on ASML import dimensions
   let computedFontSize: number;
   if (location.fontSize !== undefined) {
     computedFontSize = location.fontSize;
-  } else if (location.autosize !== false) {
-    computedFontSize = Math.min(Math.floor(location.height * 0.25), 24);
   } else {
-    computedFontSize = 16;
+    // Use theme font size for consistent dialog text
+    computedFontSize = theme.fonts.textFontSize ?? 18;
   }
 
   const animation = theme.textEffects?.animation || 'none';
