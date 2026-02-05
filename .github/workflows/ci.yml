@@ -68,7 +68,7 @@ jobs:
       run: npx playwright install --with-deps
 
     - name: Run UI tests
-      run: npm run test:ui
+      run: npm run test:ui -w @asaps/builder
 
     - name: Upload UI test results
       uses: actions/upload-artifact@v4
@@ -98,6 +98,12 @@ jobs:
       run: npm audit --audit-level=critical
       # Note: Using critical level as current high/moderate vulnerabilities are in build tools
       # (electron-builder, tar, vite), not runtime code. Review periodically.
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      with:
+        languages: javascript
 
     - name: Run CodeQL Analysis
       uses: github/codeql-action/analyze@v2
