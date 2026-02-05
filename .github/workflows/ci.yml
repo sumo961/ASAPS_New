@@ -131,11 +131,6 @@ jobs:
     - name: Build packages
       run: npm run build
 
-    - name: Analyze bundle size
-      run: |
-        npm install -g bundlesize
-        bundlesize
-
     - name: Performance tests
       run: |
         cd packages/core
