@@ -162,7 +162,7 @@ export class PathQueryEngine {
     // Check for variable constraint
     const constraintMatch = trimmed.match(/^(\w+)\s*(==|!=|>=|<=|>|<|=)\s*(.+)$/);
     if (constraintMatch) {
-      let operator: '==' | '!=' | '>' | '<' | '>=' | '<=' =
+      const operator: '==' | '!=' | '>' | '<' | '>=' | '<=' =
         constraintMatch[2] === '=' ? '==' : constraintMatch[2] as '==' | '!=' | '>' | '<' | '>=' | '<=';
 
       let value: any = constraintMatch[3].trim();

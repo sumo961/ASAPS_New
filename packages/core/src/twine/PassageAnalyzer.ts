@@ -93,7 +93,7 @@ export class PassageAnalyzer {
     const isSetVariablePassage = this.isSetVariablePassage(parsed);
 
     // Determine suggested beat type
-    let suggestedBeatType = this.classifyBeatType(
+    const suggestedBeatType = this.classifyBeatType(
       passage,
       parsed,
       linkPosition,

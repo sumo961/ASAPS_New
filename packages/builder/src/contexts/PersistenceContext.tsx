@@ -520,7 +520,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
       // CRITICAL: Serialize beats with toJSON() to capture derived connections
       // from choices/props arrays (MovementChoice, PickProp, HyperText, etc.)
-      let rawBeats = story.getAllBeats ? story.getAllBeats() : (story.beats instanceof Map ? Array.from(story.beats.values()) : []);
+      const rawBeats = story.getAllBeats ? story.getAllBeats() : (story.beats instanceof Map ? Array.from(story.beats.values()) : []);
       const serializedBeats = rawBeats.map((beat: any) => {
         if (typeof beat.toJSON === 'function') {
           return beat.toJSON();

@@ -430,7 +430,7 @@ export function useStoryBuilder() {
   ): Promise<ImportStoryResult> => {
     console.warn('[useStoryBuilder] ★★★ importStory CALLED ★★★');
     const errors: string[] = [];
-    let importedCharacters: Character[] = [];
+    const importedCharacters: Character[] = [];
     let assetImportResult: AsmlAssetImportResult | undefined;
 
     // Step 1: If assets need to be imported, do that first

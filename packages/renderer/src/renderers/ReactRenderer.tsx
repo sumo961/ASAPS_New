@@ -491,7 +491,7 @@ const HyperText: React.FC<{
   };
 
   const renderTextWithLinks = () => {
-    let text = data.text;
+    const text = data.text;
     const elements: React.ReactNode[] = [];
     let lastIndex = 0;
     const sortedLinks = [...data.links].sort((a, b) => b.word.length - a.word.length);
@@ -1232,7 +1232,7 @@ export class ReactRenderer extends BaseRenderer {
 
     // Use provided locations or generate default locations from schema
     const content = { title, author, buttonText };
-    let effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('titleScreen', content);
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('titleScreen', content);
 
     console.log(`[ReactRenderer ${this.instanceId}] ✅ Using POSITIONED rendering with ${effectiveLocations.length} locations`);
     await this.renderPositionedBeat('titleScreen', content, effectiveLocations);

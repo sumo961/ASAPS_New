@@ -99,7 +99,7 @@ export const SpriteSheetEditor: React.FC<SpriteSheetEditorProps> = ({
       setImageSize({ width: 0, height: 0 });
     };
     img.src = spriteSheetUrl;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [spriteSheetUrl]);
 
   // Calculate grid dimensions with safety checks (using useMemo to avoid re-render loops)

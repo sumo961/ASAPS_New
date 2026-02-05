@@ -350,8 +350,8 @@ export async function importProjectFromZip(
     let story = deserializeStory(projectData.project.story);
     let settings = projectData.project.settings || {};
     let globalSettings = projectData.project.globalSettings || undefined;
-    let themeId = projectData.project.themeId;
-    let themeOverrides = projectData.project.themeOverrides;
+    const themeId = projectData.project.themeId;
+    const themeOverrides = projectData.project.themeOverrides;
 
     // Always apply asset ID mapping if any IDs actually changed
     // (when generateNewId is false, mapping is identity so this is a no-op)

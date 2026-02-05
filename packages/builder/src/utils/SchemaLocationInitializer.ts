@@ -308,7 +308,7 @@ export function initializeLocationsFromSchema(
     }
 
     // Determine position
-    let x = centerX - width / 2; // Center horizontally by default
+    const x = centerX - width / 2; // Center horizontally by default
     let y = currentY;
 
     // Special positioning for certain elements
@@ -665,7 +665,7 @@ export function regenerateChoiceElements(
   const stageWidth = projectSettings.width || 1024;
   const stageHeight = projectSettings.height || 768;
   const centerX = stageWidth / 2;
-  let currentY = 250; // Starting position for choice buttons
+  const currentY = 250; // Starting position for choice buttons
 
   console.log(`[SchemaLocationInitializer] Regenerating choice elements for ${beatType}`);
 

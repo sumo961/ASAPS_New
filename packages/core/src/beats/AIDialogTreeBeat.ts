@@ -376,7 +376,7 @@ Return a JSON object with this structure:
     if (typeof response === 'string') {
       // First, try to repair/extract JSON from the response
       // This handles cases where AI includes extra content before or after JSON
-      let jsonStr = this.repairJSON(response);
+      const jsonStr = this.repairJSON(response);
 
       try {
         dialogTree = JSON.parse(jsonStr);

@@ -207,7 +207,7 @@ async function exportAsSingleFile(
   const playerScript = await getPlayerScript();
 
   // Build HTML
-  let html = HTML_TEMPLATE
+  const html = HTML_TEMPLATE
     .replace('{{STORY_TITLE}}', escapeHtml(project.name || 'ASAPS Story'))
     .replace('{{STORY_AUTHOR}}', escapeHtml(getAuthor(project)))
     .replace('{{ENABLE_AI}}', String(options.enableAI))
@@ -232,7 +232,7 @@ async function exportAsFolder(
   const playerScript = await getPlayerScript();
 
   // Build HTML that references external story file
-  let html = HTML_TEMPLATE
+  const html = HTML_TEMPLATE
     .replace('{{STORY_TITLE}}', escapeHtml(project.name || 'ASAPS Story'))
     .replace('{{STORY_AUTHOR}}', escapeHtml(getAuthor(project)))
     .replace('{{ENABLE_AI}}', String(options.enableAI))

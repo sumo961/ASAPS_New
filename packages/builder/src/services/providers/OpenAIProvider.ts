@@ -332,7 +332,7 @@ export class OpenAIProvider extends BaseAIProvider {
     let hasUnquotedKeys = false;
 
     // First pass: check if we have unquoted keys (outside of strings)
-    let testStr = repaired;
+    const testStr = repaired;
     let inStr = false;
     let escaped = false;
     let cleanedForTest = '';
@@ -838,7 +838,7 @@ export class OpenAIProvider extends BaseAIProvider {
       }
 
       let storyData;
-      let jsonString = jsonMatch[0];
+      const jsonString = jsonMatch[0];
 
       try {
         storyData = JSON.parse(jsonString);

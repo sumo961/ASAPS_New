@@ -248,7 +248,7 @@ export class StoryExporter {
         const updatedLocations = new Map();
         
         for (const [key, location] of updatedBeat.locations.entries()) {
-          let updatedLocation = { ...location };
+          const updatedLocation = { ...location };
           
           // If location references an asset by URL, update to file path
           if (location.name) {

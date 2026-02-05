@@ -441,9 +441,9 @@ export class BackwardAnalyzer {
         if (!fromBeat) continue;
 
         let newConstraints = cloneConstraintSet(current.constraints);
-        let newDecisionPoints = [...current.decisionPoints];
+        const newDecisionPoints = [...current.decisionPoints];
         // Track ALL beats in the path
-        let newPathBeats = [...current.pathBeats, { beatId: fromBeat.id, beatName: fromBeat.name, beatType: fromBeat.type }];
+        const newPathBeats = [...current.pathBeats, { beatId: fromBeat.id, beatName: fromBeat.name, beatType: fromBeat.type }];
 
         // Apply constraint from condition
         if (edge.conditionForThis) {

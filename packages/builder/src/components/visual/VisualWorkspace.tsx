@@ -2255,7 +2255,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           newDimensions = calculateTextBoxDimensions(text, fontSize, fontFamily);
                         }
 
-                        let resizedElement = { ...updatedElement, width: newDimensions.width, height: newDimensions.height };
+                        const resizedElement = { ...updatedElement, width: newDimensions.width, height: newDimensions.height };
 
                         // For buttons, recalculate x position to keep them centered
                         if (el.type === 'button') {

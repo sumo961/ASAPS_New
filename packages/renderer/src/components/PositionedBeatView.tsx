@@ -911,7 +911,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         animationManager.stop(animation.id);
       });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [animationsKey]); // Use stable key to prevent restarts on array reference changes
 
   // Helper to get animated position for an element

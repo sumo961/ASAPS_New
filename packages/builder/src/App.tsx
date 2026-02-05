@@ -743,7 +743,7 @@ function App() {
 
           // Apply parameters directly to the beat instance
           if (beatData.parameters) {
-            let params = { ...beatData.parameters };
+            const params = { ...beatData.parameters };
 
             // Transform conditionBeat nested format to flat format
             if (beatData.type === 'conditionBeat') {
@@ -1347,7 +1347,7 @@ function App() {
     };
 
     initializeApp();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [currentProject, state.beats.length, storage, loadProject, storageInitialized]);
 
   // Load project data when currentProject changes
@@ -3457,7 +3457,7 @@ function App() {
 
         // Update beat with generated parameters
         if (beatData.parameters) {
-          let params = { ...beatData.parameters };
+          const params = { ...beatData.parameters };
 
           // Transform conditionBeat nested format to flat format
           if (beatData.type === 'conditionBeat') {

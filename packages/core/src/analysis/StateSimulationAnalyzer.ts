@@ -779,8 +779,8 @@ export class StateSimulationAnalyzer {
       case '<=': return numLeft <= numRight;
       case '>':  return numLeft > numRight;
       case '<':  return numLeft < numRight;
-      case '==': return left == right; // eslint-disable-line eqeqeq
-      case '!=': return left != right; // eslint-disable-line eqeqeq
+      case '==': return left == right;  
+      case '!=': return left != right;  
       default:   return false;
     }
   }
