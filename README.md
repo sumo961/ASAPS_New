@@ -50,7 +50,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 
 Export your stories as self-contained HTML files that run anywhere:
 
-- **Splash screen**: Professional loading experience with story title and author
+- **Splash screen**: Professional loading experience
 - **Counter HUD**: Visual display of counters/stats during gameplay
 - **Inventory icons**: Visual inventory system with item icons
 - **Tailwind CSS**: Modern styling that works across browsers
