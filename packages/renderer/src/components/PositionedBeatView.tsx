@@ -2291,12 +2291,12 @@ const TextElement: React.FC<{
           // Don't set overflow here - let dimensionStyle handle it
           lineHeight: isLongContent ? '1.5' : '1.4',
           boxSizing: 'border-box',
-          // Use flexbox for all modes - it works with inner wrapper for scroll indicators
-          // For scrollable content, use block to allow normal flow
-          display: needsScroll || isVeryLongContent ? 'block' : 'flex',
-          // Flexbox centering when not scrolling
-          alignItems: needsScroll || isVeryLongContent ? undefined : 'center',
-          justifyContent: needsScroll || isVeryLongContent ? undefined : 'center',
+          // Use flexbox for centering when content fits without scrolling
+          // Only switch to block display when actually needing to scroll
+          display: needsScroll ? 'block' : 'flex',
+          // Flexbox centering when content fits (vertical centering for non-scrollable content)
+          alignItems: needsScroll ? undefined : 'center',
+          justifyContent: needsScroll ? undefined : 'center',
           whiteSpace: 'pre-wrap', // Preserve line breaks in imported content
         }}
       >
@@ -2305,7 +2305,7 @@ const TextElement: React.FC<{
           position: 'relative',
           width: '100%',
           // Only set height for scrollable content; for centered content, let it be natural
-          height: needsScroll || isVeryLongContent ? '100%' : undefined,
+          height: needsScroll ? '100%' : undefined,
         }}>
           <span
             style={{
@@ -3037,11 +3037,11 @@ const DialogElement: React.FC<{
         wordWrap: 'break-word',
         overflowWrap: 'break-word',
         boxSizing: 'border-box',
-        // Use flexbox for centering when not scrolling (matching TextElement logic)
-        // For scrollable content or very long content, use block to allow normal flow
-        display: needsScroll || isVeryLongContent ? 'block' : 'flex',
-        alignItems: needsScroll || isVeryLongContent ? undefined : 'center',
-        justifyContent: needsScroll || isVeryLongContent ? undefined : 'center',
+        // Use flexbox for centering when content fits without scrolling
+        // Only switch to block display when actually needing to scroll
+        display: needsScroll ? 'block' : 'flex',
+        alignItems: needsScroll ? undefined : 'center',
+        justifyContent: needsScroll ? undefined : 'center',
         lineHeight: '1.5',
       }}
     >
@@ -3049,8 +3049,8 @@ const DialogElement: React.FC<{
       <div style={{
         position: 'relative',
         width: '100%',
-        // Only set height for scrollable/long content; for centered content, let it be natural
-        height: needsScroll || isVeryLongContent ? '100%' : undefined,
+        // Only set height for scrollable content; for centered content, let it be natural
+        height: needsScroll ? '100%' : undefined,
       }}>
         <span style={{ display: 'block', width: '100%', textAlign: computedTextAlign }}>
           {animation === 'typewriter' ? (
