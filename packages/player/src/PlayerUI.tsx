@@ -27,18 +27,14 @@ export interface PlayerSettings {
   masterVolume: number;
   musicVolume: number;
   sfxVolume: number;
-  textSpeed: number; // 0-100, where 100 is instant
-  autoAdvance: boolean;
-  autoAdvanceDelay: number; // seconds
+  muted: boolean;              // Global mute toggle
 }
 
 const DEFAULT_SETTINGS: PlayerSettings = {
   masterVolume: 100,
   musicVolume: 100,
   sfxVolume: 100,
-  textSpeed: 50,
-  autoAdvance: false,
-  autoAdvanceDelay: 3,
+  muted: false,
 };
 
 interface PlayerUIProps {
@@ -74,6 +70,8 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
   const [playTime, setPlayTime] = useState('0:00');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [confirmOverwrite, setConfirmOverwrite] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -126,13 +124,31 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
   }, [activePanel, loadSaveSlots]);
 
   // Handlers
-  const handleSaveToSlot = async (slotId: number) => {
+  const handleSaveToSlot = async (slotId: number, force: boolean = false) => {
+    // Check if slot is occupied and show confirmation
+    const existingSlot = saveSlots.find(s => s.slotId === slotId);
+    if (existingSlot && !force) {
+      setConfirmOverwrite(slotId);
+      return;
+    }
+
     try {
       await player.saveToSlot(slotId);
       await loadSaveSlots();
+      setConfirmOverwrite(null);
     } catch (error) {
       console.error('Failed to save:', error);
     }
+  };
+
+  const handleConfirmSave = async () => {
+    if (confirmOverwrite !== null) {
+      await handleSaveToSlot(confirmOverwrite, true);
+    }
+  };
+
+  const handleCancelSave = () => {
+    setConfirmOverwrite(null);
   };
 
   const handleLoadFromSlot = async (slotId: number) => {
@@ -155,13 +171,44 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
     }
   };
 
-  const handleDeleteSlot = async (slotId: number) => {
+  const handleDeleteSlot = async (slotId: number, force: boolean = false) => {
+    if (!force) {
+      setConfirmDelete(slotId);
+      return;
+    }
+
     try {
       await player.deleteSaveSlot(slotId);
       await loadSaveSlots();
+      setConfirmDelete(null);
     } catch (error) {
       console.error('Failed to delete save:', error);
     }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (confirmDelete !== null) {
+      await handleDeleteSlot(confirmDelete, true);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setConfirmDelete(null);
+  };
+
+  // Calculate relative time (e.g., "2 min ago")
+  const formatRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return formatDate(date);
   };
 
   const toggleFullscreen = async () => {
@@ -402,41 +449,133 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
             {activePanel === 'save' && (
               <>
                 <h2 style={{ margin: '0 0 16px 0' }}>Save Game</h2>
+
+                {/* Overwrite Confirmation Dialog */}
+                {confirmOverwrite !== null && (
+                  <div style={{
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '16px',
+                  }}>
+                    <div style={{ marginBottom: '12px', fontWeight: 500 }}>
+                      Overwrite Slot {confirmOverwrite + 1}?
+                    </div>
+                    <div style={{ fontSize: '13px', opacity: 0.8, marginBottom: '12px' }}>
+                      This will replace the existing save. This action cannot be undone.
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        style={{ ...styles.button, background: 'rgba(239, 68, 68, 0.4)', flex: 1 }}
+                        onClick={handleConfirmSave}
+                      >
+                        Overwrite
+                      </button>
+                      <button
+                        style={{ ...styles.button, flex: 1 }}
+                        onClick={handleCancelSave}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Delete Confirmation Dialog */}
+                {confirmDelete !== null && (
+                  <div style={{
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '16px',
+                  }}>
+                    <div style={{ marginBottom: '12px', fontWeight: 500 }}>
+                      Delete Slot {confirmDelete + 1}?
+                    </div>
+                    <div style={{ fontSize: '13px', opacity: 0.8, marginBottom: '12px' }}>
+                      This will permanently delete this save. This action cannot be undone.
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        style={{ ...styles.button, background: 'rgba(239, 68, 68, 0.4)', flex: 1 }}
+                        onClick={handleConfirmDelete}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        style={{ ...styles.button, flex: 1 }}
+                        onClick={handleCancelDelete}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div style={styles.slotList}>
                   {Array.from({ length: 10 }, (_, i) => {
                     const slot = saveSlots.find(s => s.slotId === i);
+                    const isSelected = confirmOverwrite === i || confirmDelete === i;
                     return (
                       <div
                         key={i}
-                        style={styles.slotItem}
-                        onClick={() => handleSaveToSlot(i)}
+                        style={{
+                          ...styles.slotItem,
+                          border: isSelected ? '2px solid #6366f1' : 'none',
+                          opacity: (confirmOverwrite !== null || confirmDelete !== null) && !isSelected ? 0.5 : 1,
+                        }}
+                        onClick={() => confirmOverwrite === null && confirmDelete === null && handleSaveToSlot(i)}
                       >
                         {slot?.thumbnail ? (
                           <img src={slot.thumbnail} alt="" style={styles.slotThumbnail} />
                         ) : (
-                          <div style={styles.slotThumbnail} />
+                          <div style={{
+                            ...styles.slotThumbnail,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            color: 'rgba(255,255,255,0.4)',
+                          }}>
+                            {slot ? 'No preview' : 'Empty'}
+                          </div>
                         )}
                         <div style={styles.slotInfo}>
                           <div style={styles.slotTitle}>
-                            {slot ? `Slot ${i + 1}` : `Empty Slot ${i + 1}`}
+                            Slot {i + 1}
+                            {!slot && <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 'normal' }}> - Empty</span>}
                           </div>
                           {slot && (
-                            <div style={styles.slotMeta}>
-                              {formatDate(slot.timestamp)} - {formatPlayTimeFromSeconds(slot.playTime)}
+                            <>
+                              <div style={styles.slotMeta}>
+                                {formatRelativeTime(slot.timestamp)}
+                              </div>
+                              <div style={{ ...styles.slotMeta, fontSize: '11px' }}>
+                                Play time: {formatPlayTimeFromSeconds(slot.playTime)}
+                              </div>
+                            </>
+                          )}
+                          {!slot && (
+                            <div style={{ ...styles.slotMeta, color: '#6366f1' }}>
+                              Save here
                             </div>
                           )}
                         </div>
-                        {slot && (
-                          <button
-                            style={{ ...styles.button, background: 'rgba(255,0,0,0.3)' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSlot(i);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {slot && (
+                            <button
+                              style={{ ...styles.button, fontSize: '11px', padding: '4px 8px', background: 'rgba(255,0,0,0.2)' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSlot(i);
+                              }}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -449,23 +588,48 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
               <>
                 <h2 style={{ margin: '0 0 16px 0' }}>Load Game</h2>
                 <div style={styles.slotList}>
-                  {/* Auto-save slot */}
+                  {/* Auto-save slot - highlighted at top */}
                   {autoSave && (
                     <div
-                      style={{ ...styles.slotItem, borderLeft: '3px solid #4a9eff' }}
+                      style={{
+                        ...styles.slotItem,
+                        borderLeft: '4px solid #6366f1',
+                        background: 'rgba(99, 102, 241, 0.15)',
+                      }}
                       onClick={handleLoadAutoSave}
                     >
                       {autoSave.thumbnail ? (
                         <img src={autoSave.thumbnail} alt="" style={styles.slotThumbnail} />
                       ) : (
-                        <div style={styles.slotThumbnail} />
+                        <div style={{
+                          ...styles.slotThumbnail,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11px',
+                          color: 'rgba(255,255,255,0.4)',
+                        }}>
+                          Auto
+                        </div>
                       )}
                       <div style={styles.slotInfo}>
-                        <div style={styles.slotTitle}>Auto-Save</div>
+                        <div style={{ ...styles.slotTitle, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
+                            <path d="M12 2v10l4 4" />
+                            <circle cx="12" cy="12" r="10" />
+                          </svg>
+                          Auto-Save
+                        </div>
                         <div style={styles.slotMeta}>
-                          {formatDate(autoSave.timestamp)} - {formatPlayTimeFromSeconds(autoSave.playTime)}
+                          {formatRelativeTime(autoSave.timestamp)}
+                        </div>
+                        <div style={{ ...styles.slotMeta, fontSize: '11px' }}>
+                          Play time: {formatPlayTimeFromSeconds(autoSave.playTime)}
                         </div>
                       </div>
+                      <button style={{ ...styles.button, fontSize: '12px' }}>
+                        Load
+                      </button>
                     </div>
                   )}
 
@@ -480,20 +644,50 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
                         {slot.thumbnail ? (
                           <img src={slot.thumbnail} alt="" style={styles.slotThumbnail} />
                         ) : (
-                          <div style={styles.slotThumbnail} />
+                          <div style={{
+                            ...styles.slotThumbnail,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            color: 'rgba(255,255,255,0.4)',
+                          }}>
+                            No preview
+                          </div>
                         )}
                         <div style={styles.slotInfo}>
                           <div style={styles.slotTitle}>Slot {slot.slotId + 1}</div>
                           <div style={styles.slotMeta}>
-                            {formatDate(slot.timestamp)} - {formatPlayTimeFromSeconds(slot.playTime)}
+                            {formatRelativeTime(slot.timestamp)}
+                          </div>
+                          <div style={{ ...styles.slotMeta, fontSize: '11px' }}>
+                            Play time: {formatPlayTimeFromSeconds(slot.playTime)}
                           </div>
                         </div>
+                        <button style={{ ...styles.button, fontSize: '12px' }}>
+                          Load
+                        </button>
                       </div>
                     ))
                   ) : (
                     !autoSave && (
-                      <div style={{ textAlign: 'center', padding: '20px', opacity: 0.7 }}>
-                        No saved games found
+                      <div style={{
+                        textAlign: 'center',
+                        padding: '40px 20px',
+                        opacity: 0.7,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '12px',
+                      }}>
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.5">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="12" y1="18" x2="12" y2="12" />
+                          <line x1="9" y1="15" x2="15" y2="15" />
+                        </svg>
+                        <div>No saved games found</div>
+                        <div style={{ fontSize: '12px' }}>Save your game to see it here</div>
                       </div>
                     )
                   )}
@@ -549,43 +743,38 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
                 </div>
 
                 <div style={styles.settingsGroup}>
-                  <label style={styles.settingsLabel}>
-                    Text Speed: {settings.textSpeed === 100 ? 'Instant' : `${settings.textSpeed}%`}
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={settings.textSpeed}
-                    onChange={(e) => updateSetting('textSpeed', Number(e.target.value))}
-                    style={styles.slider}
-                  />
-                </div>
-
-                <div style={styles.settingsGroup}>
-                  <label style={{ ...styles.settingsLabel, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      type="checkbox"
-                      checked={settings.autoAdvance}
-                      onChange={(e) => updateSetting('autoAdvance', e.target.checked)}
-                    />
-                    Auto-advance text
-                  </label>
-                  {settings.autoAdvance && (
-                    <div style={{ marginTop: '8px' }}>
-                      <label style={styles.settingsLabel}>
-                        Delay: {settings.autoAdvanceDelay}s
-                      </label>
-                      <input
-                        type="range"
-                        min="1"
-                        max="10"
-                        value={settings.autoAdvanceDelay}
-                        onChange={(e) => updateSetting('autoAdvanceDelay', Number(e.target.value))}
-                        style={styles.slider}
-                      />
-                    </div>
-                  )}
+                  <button
+                    onClick={() => updateSetting('muted', !settings.muted)}
+                    style={{
+                      ...styles.button,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      justifyContent: 'center',
+                      background: settings.muted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255,255,255,0.2)',
+                      border: settings.muted ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(255,255,255,0.3)',
+                    }}
+                  >
+                    {settings.muted ? (
+                      <>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                          <line x1="23" y1="9" x2="17" y2="15" />
+                          <line x1="17" y1="9" x2="23" y2="15" />
+                        </svg>
+                        Muted
+                      </>
+                    ) : (
+                      <>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                        </svg>
+                        Sound On
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 <button

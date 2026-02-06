@@ -3,8 +3,8 @@
  * Self-contained player that can be embedded in any webpage
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import { PlayerEngine } from '@asaps/player';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
 import { ReactRenderer, type RenderContext } from '@asaps/renderer';
 import { WebAIService } from './WebAIProvider';
 
@@ -17,6 +17,8 @@ export interface WebPlayerProps {
   height?: string | number;
   /** Enable AI features (default: true) */
   enableAI?: boolean;
+  /** Show UI overlay with save/load/settings (default: true) */
+  showUI?: boolean;
   /** Callback when story ends */
   onEnd?: () => void;
   /** Callback when error occurs */
@@ -33,6 +35,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   width = '100%',
   height = '100%',
   enableAI = true,
+  showUI = true,
   onEnd,
   onError,
 }) => {
@@ -42,6 +45,17 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   const [state, setState] = useState<PlayerState>('splash');
   const [error, setError] = useState<string | null>(null);
   const [splashFading, setSplashFading] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
+
+  // Handle settings changes from PlayerUI
+  const handleSettingsChange = useCallback((settings: PlayerSettings) => {
+    if (playerRef.current) {
+      // Apply mute state
+      playerRef.current.setMuted(settings.muted);
+      // Apply master volume
+      playerRef.current.setMasterVolume(settings.masterVolume);
+    }
+  }, []);
 
   // Handle splash screen timing
   useEffect(() => {
@@ -232,6 +246,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         if (!mounted) return;
 
         setState('playing');
+        setPlayerReady(true);
         console.log('[WebPlayer] Starting story playback...');
 
         // Start the story
@@ -264,6 +279,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
 
     return () => {
       mounted = false;
+      setPlayerReady(false);
       if (playerRef.current) {
         playerRef.current.dispose();
         playerRef.current = null;
@@ -403,6 +419,21 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             {error || 'An error occurred'}
           </div>
         </div>
+      )}
+
+      {/* Player UI overlay with save/load/settings */}
+      {showUI && playerReady && playerRef.current && (
+        <PlayerUI
+          player={playerRef.current}
+          config={{
+            showSaveLoad: true,
+            showSettings: true,
+            showFullscreen: true,
+            showPlayTime: true,
+            menuPosition: 'top',
+          }}
+          onSettingsChange={handleSettingsChange}
+        />
       )}
 
       <style>{`

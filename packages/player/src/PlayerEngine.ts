@@ -5,6 +5,7 @@ import { AssetResolver } from './AssetResolver';
 import { SaveSystem, SaveSlot, ISaveStorageAdapter } from './SaveSystem';
 import { WebSaveAdapter } from './storage/WebSaveAdapter';
 import { EventEmitter } from 'eventemitter3';
+import { captureScreenshot as captureScreenshotUtil } from './utils/screenshot';
 
 /**
  * GlobalSettings from the builder export (simplified version)
@@ -939,6 +940,50 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
   }
 
   /**
+   * Set muted state for all audio
+   */
+  setMuted(muted: boolean): void {
+    // Mute/unmute background music
+    if (this.backgroundMusicAudio) {
+      this.backgroundMusicAudio.muted = muted;
+    }
+
+    // Mute/unmute any audio elements in the container (SFX)
+    const audioElements = this.config.container.querySelectorAll('audio');
+    audioElements.forEach(audio => {
+      audio.muted = muted;
+    });
+
+    // Also inform the renderer if it has audio elements
+    const renderer = this.config.renderer as any;
+    if ('setMuted' in renderer && typeof renderer.setMuted === 'function') {
+      renderer.setMuted(muted);
+    }
+
+    console.log(`[PlayerEngine] Audio muted: ${muted}`);
+  }
+
+  /**
+   * Set master volume for all audio (0-100)
+   */
+  setMasterVolume(volume: number): void {
+    const normalizedVolume = Math.max(0, Math.min(100, volume)) / 100;
+
+    // Set background music volume
+    if (this.backgroundMusicAudio) {
+      this.backgroundMusicAudio.volume = normalizedVolume;
+    }
+
+    // Set volume for any audio elements in the container
+    const audioElements = this.config.container.querySelectorAll('audio');
+    audioElements.forEach(audio => {
+      audio.volume = normalizedVolume;
+    });
+
+    console.log(`[PlayerEngine] Master volume: ${volume}%`);
+  }
+
+  /**
    * Start playing the story
    */
   async start(): Promise<void> {
@@ -1113,23 +1158,12 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
    * Capture a screenshot for save thumbnails
    */
   private async captureScreenshot(): Promise<string | undefined> {
-    // Try to capture from the container
-    try {
-      const canvas = this.config.container.querySelector('canvas');
-      if (canvas) {
-        return canvas.toDataURL('image/jpeg', 0.5);
-      }
-
-      // Try html2canvas if available
-      if (typeof (window as any).html2canvas === 'function') {
-        const screenshot = await (window as any).html2canvas(this.config.container);
-        return screenshot.toDataURL('image/jpeg', 0.5);
-      }
-    } catch (error) {
-      console.warn('Failed to capture screenshot:', error);
-    }
-
-    return undefined;
+    return captureScreenshotUtil(this.config.container, {
+      quality: 0.5,
+      maxWidth: 160,
+      maxHeight: 90,
+      format: 'image/jpeg',
+    });
   }
 
   /**

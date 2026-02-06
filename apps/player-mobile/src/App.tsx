@@ -5,9 +5,11 @@ import { PlayerEngine } from '@asaps/player';
 import { ReactRenderer, type RenderContext } from '@asaps/renderer';
 import type { SaveSlot } from '@asaps/player';
 import { MobileSaveAdapter } from './storage/MobileSaveAdapter';
+import { MobileAIService } from './services/AIService';
+import { loadAISettings, saveAISettings, getDefaultModel, type AISettings, type AIProvider } from './services/AIConfig';
 
 type AppState = 'library' | 'loading' | 'playing' | 'error';
-type MenuPanel = 'none' | 'main' | 'save' | 'load' | 'settings';
+type MenuPanel = 'none' | 'main' | 'save' | 'load' | 'settings' | 'ai-settings';
 
 interface RecentStory {
   name: string;
@@ -17,16 +19,12 @@ interface RecentStory {
 
 interface Settings {
   masterVolume: number;
-  textSpeed: number;
   haptics: boolean;
-  autoAdvance: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   masterVolume: 100,
-  textSpeed: 50,
   haptics: true,
-  autoAdvance: false,
 };
 
 const App: React.FC = () => {
@@ -37,6 +35,13 @@ const App: React.FC = () => {
   const [saveSlots, setSaveSlots] = useState<SaveSlot[]>([]);
   const [autoSave, setAutoSave] = useState<SaveSlot | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [aiSettings, setAiSettings] = useState<AISettings>({
+    provider: 'openai',
+    apiKey: '',
+    baseUrl: '',
+    model: '',
+  });
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<PlayerEngine | null>(null);
@@ -68,6 +73,11 @@ const App: React.FC = () => {
       }
     };
     loadSettings();
+  }, []);
+
+  // Load AI settings from storage
+  useEffect(() => {
+    loadAISettings().then(setAiSettings);
   }, []);
 
   // Save settings when they change
@@ -147,6 +157,12 @@ const App: React.FC = () => {
       const renderer = new ReactRenderer(context);
       rendererRef.current = renderer;
 
+      // Set up AI service if configured
+      if (aiSettings?.apiKey) {
+        const aiService = new MobileAIService(aiSettings);
+        renderer.setState('aiService', aiService);
+      }
+
       // Create player
       const player = new PlayerEngine({
         container: containerRef.current,
@@ -186,7 +202,7 @@ const App: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to open story');
       setAppState('error');
     }
-  }, [haptic]);
+  }, [haptic, aiSettings]);
 
   const handleImport = useCallback(async () => {
     await haptic();
@@ -370,6 +386,7 @@ const App: React.FC = () => {
                   {menuPanel === 'save' && 'Save Game'}
                   {menuPanel === 'load' && 'Load Game'}
                   {menuPanel === 'settings' && 'Settings'}
+                  {menuPanel === 'ai-settings' && 'AI Settings'}
                 </span>
                 <button
                   className="menu-button"
@@ -512,28 +529,152 @@ const App: React.FC = () => {
                       />
                     </div>
 
-                    <div className="settings-group">
-                      <label className="settings-label">
-                        Text Speed: {settings.textSpeed === 100 ? 'Instant' : `${settings.textSpeed}%`}
-                      </label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={settings.textSpeed}
-                        onChange={(e) => setSettings(s => ({ ...s, textSpeed: Number(e.target.value) }))}
-                        className="settings-slider"
-                      />
-                    </div>
-
                     <div className="settings-toggle" onClick={() => setSettings(s => ({ ...s, haptics: !s.haptics }))}>
                       <span>Haptic Feedback</span>
                       <div className={`toggle-switch ${settings.haptics ? 'active' : ''}`} />
                     </div>
 
-                    <div className="settings-toggle" onClick={() => setSettings(s => ({ ...s, autoAdvance: !s.autoAdvance }))}>
-                      <span>Auto-advance Text</span>
-                      <div className={`toggle-switch ${settings.autoAdvance ? 'active' : ''}`} />
+                    <div className="menu-item" style={{ marginTop: 16 }} onClick={() => openMenu('ai-settings')}>
+                      <span className="menu-item-icon">🤖</span>
+                      <div className="menu-item-text">
+                        <div className="menu-item-title">AI Settings</div>
+                        <div className="menu-item-subtitle">
+                          {aiSettings.apiKey ? 'Configured' : 'Not configured'}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* AI Settings Panel */}
+                {menuPanel === 'ai-settings' && (
+                  <>
+                    <div style={{ padding: '0 16px 16px', color: '#888', fontSize: 13, lineHeight: 1.5 }}>
+                      Configure AI for dynamic story content. Some stories use AI-powered beats that require an API key.
+                    </div>
+
+                    <div className="settings-group">
+                      <label className="settings-label">AI Provider</label>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {(['openai', 'anthropic', 'custom'] as AIProvider[]).map(provider => (
+                          <button
+                            key={provider}
+                            onClick={() => setAiSettings(s => ({ ...s, provider, model: '' }))}
+                            style={{
+                              flex: 1,
+                              minWidth: 80,
+                              padding: '12px 8px',
+                              background: aiSettings.provider === provider ? '#2a2a55' : '#252542',
+                              border: `2px solid ${aiSettings.provider === provider ? '#6366f1' : '#333'}`,
+                              borderRadius: 8,
+                              color: '#fff',
+                              fontSize: 14,
+                            }}
+                          >
+                            {provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : 'Custom'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="settings-group">
+                      <label className="settings-label">API Key</label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          type={showApiKey ? 'text' : 'password'}
+                          value={aiSettings.apiKey}
+                          onChange={(e) => setAiSettings(s => ({ ...s, apiKey: e.target.value }))}
+                          placeholder="Enter API key"
+                          style={{
+                            flex: 1,
+                            padding: '12px 14px',
+                            background: '#252542',
+                            border: '1px solid #444',
+                            borderRadius: 6,
+                            color: '#fff',
+                            fontSize: 14,
+                          }}
+                        />
+                        <button
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          style={{
+                            width: 44,
+                            background: '#252542',
+                            border: '1px solid #444',
+                            borderRadius: 6,
+                            fontSize: 16,
+                          }}
+                        >
+                          {showApiKey ? '🙈' : '👁️'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {aiSettings.provider === 'custom' && (
+                      <div className="settings-group">
+                        <label className="settings-label">Custom API URL</label>
+                        <input
+                          type="text"
+                          value={aiSettings.baseUrl || ''}
+                          onChange={(e) => setAiSettings(s => ({ ...s, baseUrl: e.target.value }))}
+                          placeholder="e.g., http://localhost:11434/v1"
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            background: '#252542',
+                            border: '1px solid #444',
+                            borderRadius: 6,
+                            color: '#fff',
+                            fontSize: 14,
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="settings-group">
+                      <label className="settings-label">Model (Optional)</label>
+                      <input
+                        type="text"
+                        value={aiSettings.model || ''}
+                        onChange={(e) => setAiSettings(s => ({ ...s, model: e.target.value }))}
+                        placeholder={`Default: ${getDefaultModel(aiSettings.provider) || 'None'}`}
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px',
+                          background: '#252542',
+                          border: '1px solid #444',
+                          borderRadius: 6,
+                          color: '#fff',
+                          fontSize: 14,
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ padding: 16 }}>
+                      <button
+                        onClick={async () => {
+                          await haptic(ImpactStyle.Medium);
+                          await saveAISettings(aiSettings);
+                          // Update the current renderer if playing
+                          if (rendererRef.current && aiSettings.apiKey) {
+                            const aiService = new MobileAIService(aiSettings);
+                            rendererRef.current.setState('aiService', aiService);
+                          }
+                          setMenuPanel('settings');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '14px 20px',
+                          background: '#6366f1',
+                          border: 'none',
+                          borderRadius: 8,
+                          color: '#fff',
+                          fontSize: 16,
+                          fontWeight: 500,
+                        }}
+                      >
+                        Save Settings
+                      </button>
                     </div>
                   </>
                 )}
