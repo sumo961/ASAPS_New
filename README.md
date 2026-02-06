@@ -16,14 +16,15 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.12)
+## ⚠️ Development Status (v0.9.13)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
-| **HTML Export** | **NEW in v0.9.12**: Export stories as standalone HTML files with splash screen, counter HUD, and inventory icons |
-| **Unified Rendering** | **NEW in v0.9.12**: WYSIWYG alignment between visual editor and preview |
+| **AI Dialog Fix** | **NEW in v0.9.13**: Fixed AIDialogTree generation across all players, updated OpenAI defaults to GPT-5.2 |
+| **HTML Export** | Export stories as standalone HTML files with splash screen, counter HUD, and inventory icons (v0.9.12) |
+| **Unified Rendering** | WYSIWYG alignment between visual editor and preview (v0.9.12) |
 | **Independent Preview Window** | Preview in separate window with path-based presets and InputText value entry (v0.9.11) |
 | **UI Tooltips** | Descriptive tooltips throughout app to help beginners (v0.9.11) |
 | **Transformation Commands** | Bulk rename/delete/merge for characters, variables, beats (v0.9.9) |
@@ -56,7 +57,7 @@ Export your stories as self-contained HTML files that run anywhere:
 - **Tailwind CSS**: Modern styling that works across browsers
 - **Zero dependencies**: Single HTML file runs offline in any browser
 
-**Note**: AI-based beats (aiInfoText, aiDurScreen, aiDialogTree, aiSummary, aiCondition) are not yet supported in HTML export. Stories using these beats will show fallback text instead.
+**Note**: AI-based beats (aiInfoText, aiDurScreen, aiSummary, aiCondition) are not yet supported in HTML export. aiDialogTree now works in the web player (v0.9.13). Stories using unsupported AI beats will show fallback text instead.
 
 ### 🖥️ Independent Preview Window (v0.9.11)
 

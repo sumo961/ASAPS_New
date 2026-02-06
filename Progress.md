@@ -1,5 +1,53 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-06: AI Dialog Fix & Model Defaults Update (v0.9.13)
+
+### Overview
+
+This release fixes AI-powered dialog tree generation in the web player and all player platforms, and updates all OpenAI model defaults from GPT-5.1 to GPT-5.2.
+
+### AI Dialog Tree Fix (Bug Fix)
+
+The `AIDialogTreeBeat` was failing in the web player (and would fail in desktop/mobile players) with "No valid JSON found in response":
+
+- **Root cause**: `WebAIService.generateDialog` was prepending its own JSON format instructions (a `nodes[]` array format) that conflicted with the detailed nested `dialogNode` format that `AIDialogTreeBeat` sends in its prompt. The model received two incompatible format specifications and produced unparseable output.
+- **Additional issues**: `maxTokens` was only 2000 (insufficient for complex trees), no handling for `<think>` blocks from reasoning models, and no markdown code block stripping.
+
+**Fix applied across all players:**
+- Proper system/user message separation (instead of concatenating into a single prompt)
+- Minimal system prompt that doesn't conflict with AIDialogTreeBeat's detailed format
+- Increased `max_tokens` to 8192 for complex dialog trees
+- Robust JSON extraction handling markdown code blocks and balanced braces
+- `<think>` block stripping for reasoning models
+
+### OpenAI Model Default Update
+
+Updated all remaining `gpt-5.1` references to `gpt-5.2`:
+- `OpenAIProvider.ts` default model
+- `AIConfigDialog.tsx` default model and UI label (now shows "GPT-5.2")
+- `PreviewWindow.tsx` OpenAI fallback (was `gpt-4` with only 8k context!)
+- `StoryPreview.tsx` OpenAI fallback
+- `AIService.ts` direct call fallback
+- `ai.ts` type documentation
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/player-web/src/WebAIProvider.ts` | Rewrote generateDialog with proper system/user separation, extractJSON, thinking block stripping |
+| `packages/builder/public/player-web.js` | Rebuilt player-web bundle |
+| `apps/player-desktop/src/services/AIService.ts` | Same generateDialog fix + helper methods |
+| `apps/player-mobile/src/services/AIService.ts` | Same generateDialog fix + helper methods |
+| `apps/player-desktop/src/services/LocalLLMProvider.ts` | Same fix adapted for local LLM (single prompt) |
+| `packages/builder/src/pages/PreviewWindow.tsx` | Bumped dialog tokens to 8192, fixed gpt-4 fallback to gpt-5.2 |
+| `packages/builder/src/components/preview/StoryPreview.tsx` | Fixed gpt-4 fallback to gpt-5.2 |
+| `packages/builder/src/services/AIService.ts` | Fixed gpt-4 fallback to gpt-5.2 |
+| `packages/builder/src/services/providers/OpenAIProvider.ts` | Default model gpt-5.1 → gpt-5.2 |
+| `packages/builder/src/components/ai/AIConfigDialog.tsx` | Default model + UI label updated to GPT-5.2 |
+| `packages/builder/src/types/ai.ts` | Documentation updated |
+
+---
+
 ## 2026-02-05: HTML Export & Unified Rendering Architecture (v0.9.12)
 
 ### Overview
