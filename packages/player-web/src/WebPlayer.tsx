@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
 import { ReactRenderer, type RenderContext } from '@asaps/renderer';
-import { WebAIService } from './WebAIProvider';
+import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 
 export interface WebPlayerProps {
   /** Story data as ArrayBuffer, base64 string, or URL */
@@ -46,6 +46,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [splashFading, setSplashFading] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState(() => getAIConfigStatus().configured);
 
   // Handle settings changes from PlayerUI
   const handleSettingsChange = useCallback((settings: PlayerSettings) => {
@@ -55,6 +56,12 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
       // Apply master volume
       playerRef.current.setMasterVolume(settings.masterVolume);
     }
+  }, []);
+
+  // Handle AI settings button click
+  const handleAISettings = useCallback(async () => {
+    const configured = await showAISettings();
+    setAiConfigured(configured);
   }, []);
 
   // Handle splash screen timing
@@ -434,6 +441,53 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           }}
           onSettingsChange={handleSettingsChange}
         />
+      )}
+
+      {/* AI Settings button - shown when AI is enabled */}
+      {enableAI && playerReady && (
+        <button
+          onClick={handleAISettings}
+          title={aiConfigured ? 'AI Configured - Click to change' : 'Configure AI API Key'}
+          style={{
+            position: 'absolute',
+            bottom: '16px',
+            right: '16px',
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            border: 'none',
+            background: aiConfigured
+              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+              : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            color: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            zIndex: 100,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+          }}
+        >
+          {/* AI brain icon */}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
+            <path d="M6 10a4 4 0 0 0-4 4v2a4 4 0 0 0 4 4"/>
+            <path d="M18 10a4 4 0 0 1 4 4v2a4 4 0 0 1-4 4"/>
+            <path d="M12 17v5"/>
+            <path d="M8 17l-2 5"/>
+            <path d="M16 17l2 5"/>
+            {aiConfigured && <circle cx="19" cy="5" r="3" fill="#10b981" stroke="white"/>}
+          </svg>
+        </button>
       )}
 
       <style>{`

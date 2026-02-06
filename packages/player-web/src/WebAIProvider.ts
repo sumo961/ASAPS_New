@@ -290,8 +290,26 @@ export function isAIConfigured(): boolean {
 }
 
 /**
+ * Get current AI configuration (without API key for display)
+ */
+export function getAIConfigStatus(): { configured: boolean; provider?: AIProvider } {
+  const config = loadConfig();
+  if (config) {
+    return { configured: true, provider: config.provider };
+  }
+  return { configured: false };
+}
+
+/**
  * Clear stored AI configuration
  */
 export function clearAIConfig(): void {
   localStorage.removeItem(STORAGE_KEY);
+}
+
+/**
+ * Show AI settings modal (can be called manually from UI)
+ */
+export function showAISettings(): Promise<boolean> {
+  return showApiKeyPrompt().then(config => config !== null);
 }
