@@ -10,7 +10,7 @@ import JSZip from 'jszip';
 import { getStorageManager } from '../storage/StorageManager';
 import type { StoredAsset } from '../storage/types';
 
-export type AIProvider = 'openai' | 'anthropic' | 'custom';
+export type AIProvider = 'openai' | 'anthropic' | 'custom' | 'local';
 
 // Template for standalone HTML player
 const HTML_TEMPLATE = `<!DOCTYPE html>

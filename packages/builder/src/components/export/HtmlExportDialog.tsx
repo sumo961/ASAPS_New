@@ -35,15 +35,21 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     setError(null);
 
     try {
+      // For local provider, we need baseUrl but not apiKey
+      // For others, we need apiKey (baseUrl is optional)
+      const hasAIConfig = aiProvider === 'local'
+        ? !!aiBaseUrl
+        : !!aiApiKey;
+
       const options: HtmlExportOptions = {
         mode,
         responsive: true,
         enableAI,
-        showApiKeyPrompt: enableAI && !aiApiKey, // Only prompt if no key provided
-        aiProvider: enableAI && aiApiKey ? aiProvider : undefined,
-        aiApiKey: enableAI && aiApiKey ? aiApiKey : undefined,
-        aiBaseUrl: enableAI && aiApiKey && aiBaseUrl ? aiBaseUrl : undefined,
-        aiModel: enableAI && aiApiKey && aiModel ? aiModel : undefined,
+        showApiKeyPrompt: enableAI && !hasAIConfig, // Only prompt if no config provided
+        aiProvider: enableAI && hasAIConfig ? aiProvider : undefined,
+        aiApiKey: enableAI && hasAIConfig && aiApiKey ? aiApiKey : undefined,
+        aiBaseUrl: enableAI && hasAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
+        aiModel: enableAI && hasAIConfig && aiModel ? aiModel : undefined,
       };
 
       await downloadHtmlExport(projectId, projectName, options);
@@ -152,57 +158,69 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     <option value="openai">OpenAI (GPT-4o)</option>
                     <option value="anthropic">Anthropic (Claude)</option>
                     <option value="custom">Custom (OpenAI-compatible)</option>
+                    <option value="local">Local LLM (self-hosted server)</option>
                   </select>
                 </div>
 
-                {/* Base URL - shown for custom provider */}
-                {aiProvider === 'custom' && (
+                {/* Base URL - required for local/custom, optional for others */}
+                {(aiProvider === 'custom' || aiProvider === 'local') && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Base URL
+                      Base URL {aiProvider === 'local' ? '' : ''}
                     </label>
                     <input
                       type="text"
                       value={aiBaseUrl}
                       onChange={(e) => setAiBaseUrl(e.target.value)}
-                      placeholder="https://api.example.com/v1"
+                      placeholder={
+                        aiProvider === 'local'
+                          ? 'http://localhost:8080/v1'
+                          : 'https://api.example.com/v1'
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      OpenAI-compatible API endpoint (e.g., local LLM, Azure OpenAI)
+                      {aiProvider === 'local'
+                        ? 'URL of your local LLM server (llama.cpp, Ollama, etc.)'
+                        : 'OpenAI-compatible API endpoint (Azure OpenAI, proxy, etc.)'
+                      }
                     </p>
                   </div>
                 )}
 
-                {/* API Key Input */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    API Key (optional)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      value={aiApiKey}
-                      onChange={(e) => setAiApiKey(e.target.value)}
-                      placeholder={
-                        aiProvider === 'openai' ? 'sk-...' :
-                        aiProvider === 'anthropic' ? 'sk-ant-...' :
-                        'Enter API key'
-                      }
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
-                    >
-                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                {/* API Key Input - not shown for local */}
+                {aiProvider !== 'local' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      API Key {aiApiKey ? '' : '(optional)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showApiKey ? 'text' : 'password'}
+                        value={aiApiKey}
+                        onChange={(e) => setAiApiKey(e.target.value)}
+                        placeholder={
+                          aiProvider === 'openai' ? 'sk-...' :
+                          aiProvider === 'anthropic' ? 'sk-ant-...' :
+                          'Enter API key'
+                        }
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                      >
+                        {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {aiApiKey && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Warning: API key will be visible in the exported HTML source code
+                      </p>
+                    )}
                   </div>
-                  <p className="text-xs text-amber-600 mt-1">
-                    Warning: API key will be visible in the exported HTML source code
-                  </p>
-                </div>
+                )}
 
                 {/* Advanced toggle */}
                 <button
@@ -215,24 +233,59 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
 
                 {/* Advanced options */}
                 {showAdvanced && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Model Override
-                    </label>
-                    <input
-                      type="text"
-                      value={aiModel}
-                      onChange={(e) => setAiModel(e.target.value)}
-                      placeholder={
-                        aiProvider === 'openai' ? 'gpt-4o (default)' :
-                        aiProvider === 'anthropic' ? 'claude-sonnet-4-20250514 (default)' :
-                        'model-name'
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Leave empty to use provider's default model
-                    </p>
+                  <div className="space-y-3">
+                    {/* Base URL override for OpenAI/Anthropic */}
+                    {(aiProvider === 'openai' || aiProvider === 'anthropic') && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Base URL Override
+                        </label>
+                        <input
+                          type="text"
+                          value={aiBaseUrl}
+                          onChange={(e) => setAiBaseUrl(e.target.value)}
+                          placeholder={
+                            aiProvider === 'openai'
+                              ? 'https://api.openai.com/v1 (default)'
+                              : 'https://api.anthropic.com/v1 (default)'
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          For proxies or enterprise endpoints. Leave empty for default.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Model override */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Model Override
+                      </label>
+                      <input
+                        type="text"
+                        value={aiModel}
+                        onChange={(e) => setAiModel(e.target.value)}
+                        placeholder={
+                          aiProvider === 'openai' ? 'gpt-4o (default)' :
+                          aiProvider === 'anthropic' ? 'claude-sonnet-4-20250514 (default)' :
+                          aiProvider === 'local' ? 'llama-3, mistral, etc.' :
+                          'model-name'
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Leave empty to use provider's default model
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Internet access warning */}
+                {aiApiKey && aiProvider !== 'local' && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                    <strong>Note:</strong> This story will require internet access to use AI features.
+                    {mode === 'single-file' && ' Players opening the file locally will need to be online.'}
                   </div>
                 )}
               </div>

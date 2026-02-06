@@ -5,7 +5,7 @@
 
 import type { IAIService } from '@asaps/core';
 
-export type AIProvider = 'openai' | 'anthropic' | 'custom';
+export type AIProvider = 'openai' | 'anthropic' | 'custom' | 'local';
 
 interface StoredConfig {
   provider: AIProvider;
@@ -116,6 +116,7 @@ function showApiKeyPrompt(): Promise<StoredConfig | null> {
           <option value="openai">OpenAI</option>
           <option value="anthropic">Anthropic</option>
           <option value="custom">Custom (OpenAI-compatible)</option>
+          <option value="local">Local LLM (self-hosted)</option>
         </select>
       </div>
 
@@ -123,9 +124,10 @@ function showApiKeyPrompt(): Promise<StoredConfig | null> {
         <label style="display: block; margin-bottom: 8px; font-size: 13px; color: #999;">Base URL</label>
         <input type="text" id="ai-base-url" placeholder="https://api.example.com/v1"
           style="width: 100%; padding: 10px 12px; background: #252542; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px; box-sizing: border-box;">
+        <p id="ai-baseurl-hint" style="font-size: 11px; color: #666; margin-top: 4px;"></p>
       </div>
 
-      <div style="margin-bottom: 16px;">
+      <div id="ai-apikey-container" style="margin-bottom: 16px;">
         <label style="display: block; margin-bottom: 8px; font-size: 13px; color: #999;">API Key</label>
         <input type="password" id="ai-api-key" placeholder="Enter your API key"
           style="width: 100%; padding: 10px 12px; background: #252542; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px; box-sizing: border-box;">
@@ -154,15 +156,33 @@ function showApiKeyPrompt(): Promise<StoredConfig | null> {
     const providerSelect = modal.querySelector('#ai-provider') as HTMLSelectElement;
     const baseUrlContainer = modal.querySelector('#ai-baseurl-container') as HTMLDivElement;
     const baseUrlInput = modal.querySelector('#ai-base-url') as HTMLInputElement;
+    const baseUrlHint = modal.querySelector('#ai-baseurl-hint') as HTMLParagraphElement;
+    const apiKeyContainer = modal.querySelector('#ai-apikey-container') as HTMLDivElement;
     const apiKeyInput = modal.querySelector('#ai-api-key') as HTMLInputElement;
     const modelInput = modal.querySelector('#ai-model') as HTMLInputElement;
     const cancelBtn = modal.querySelector('#ai-cancel') as HTMLButtonElement;
     const saveBtn = modal.querySelector('#ai-save') as HTMLButtonElement;
 
-    // Show/hide base URL field based on provider
-    providerSelect.onchange = () => {
-      baseUrlContainer.style.display = providerSelect.value === 'custom' ? 'block' : 'none';
+    // Update UI based on provider
+    const updateProviderUI = () => {
+      const provider = providerSelect.value;
+      const needsBaseUrl = provider === 'custom' || provider === 'local';
+      const needsApiKey = provider !== 'local';
+
+      baseUrlContainer.style.display = needsBaseUrl ? 'block' : 'none';
+      apiKeyContainer.style.display = needsApiKey ? 'block' : 'none';
+
+      // Update placeholder and hint
+      if (provider === 'local') {
+        baseUrlInput.placeholder = 'http://localhost:8080/v1';
+        baseUrlHint.textContent = 'URL of your local LLM server (llama.cpp, Ollama, etc.)';
+      } else {
+        baseUrlInput.placeholder = 'https://api.example.com/v1';
+        baseUrlHint.textContent = 'OpenAI-compatible API endpoint';
+      }
     };
+
+    providerSelect.onchange = updateProviderUI;
 
     cancelBtn.onclick = () => {
       document.body.removeChild(overlay);
@@ -170,22 +190,36 @@ function showApiKeyPrompt(): Promise<StoredConfig | null> {
     };
 
     saveBtn.onclick = () => {
-      const apiKey = apiKeyInput.value.trim();
-      if (!apiKey) {
-        apiKeyInput.style.borderColor = '#ef4444';
-        return;
-      }
-
       const provider = providerSelect.value as AIProvider;
-      if (provider === 'custom' && !baseUrlInput.value.trim()) {
-        baseUrlInput.style.borderColor = '#ef4444';
-        return;
+      const apiKey = apiKeyInput.value.trim();
+      const baseUrl = baseUrlInput.value.trim();
+
+      // Validate based on provider
+      if (provider === 'local') {
+        if (!baseUrl) {
+          baseUrlInput.style.borderColor = '#ef4444';
+          return;
+        }
+      } else if (provider === 'custom') {
+        if (!apiKey) {
+          apiKeyInput.style.borderColor = '#ef4444';
+          return;
+        }
+        if (!baseUrl) {
+          baseUrlInput.style.borderColor = '#ef4444';
+          return;
+        }
+      } else {
+        if (!apiKey) {
+          apiKeyInput.style.borderColor = '#ef4444';
+          return;
+        }
       }
 
       const config: StoredConfig = {
         provider,
-        apiKey,
-        baseUrl: provider === 'custom' ? baseUrlInput.value.trim() : undefined,
+        apiKey: apiKey || '',
+        baseUrl: baseUrl || undefined,
         model: modelInput.value.trim() || undefined,
       };
 
@@ -235,11 +269,13 @@ export class WebAIService implements IAIService {
     }
 
     if (config.provider === 'anthropic') {
-      return this.callAnthropic(prompt, config.apiKey, options?.maxTokens, config.model);
-    } else if (config.provider === 'custom') {
-      return this.callOpenAI(prompt, config.apiKey, options?.maxTokens, config.model, config.baseUrl);
+      return this.callAnthropic(prompt, config.apiKey, options?.maxTokens, config.model, config.baseUrl);
+    } else if (config.provider === 'custom' || config.provider === 'local') {
+      // Custom and local both use OpenAI-compatible API
+      return this.callOpenAI(prompt, config.apiKey || '', options?.maxTokens, config.model, config.baseUrl);
     } else {
-      return this.callOpenAI(prompt, config.apiKey, options?.maxTokens, config.model);
+      // OpenAI - baseUrl is optional (for proxies/enterprise endpoints)
+      return this.callOpenAI(prompt, config.apiKey, options?.maxTokens, config.model, config.baseUrl);
     }
   }
 
@@ -332,9 +368,14 @@ Respond with ONLY the category name, nothing else.`;
     prompt: string,
     apiKey: string,
     maxTokens?: number,
-    model?: string
+    model?: string,
+    baseUrl?: string
   ): Promise<string> {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const url = baseUrl
+      ? `${baseUrl.replace(/\/$/, '')}/messages`
+      : 'https://api.anthropic.com/v1/messages';
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
