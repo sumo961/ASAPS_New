@@ -46,7 +46,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [splashFading, setSplashFading] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
-  const [aiConfigured, setAiConfigured] = useState(() => getAIConfigStatus().configured);
+  const [aiStatus, setAiStatus] = useState(() => getAIConfigStatus());
 
   // Handle settings changes from PlayerUI
   const handleSettingsChange = useCallback((settings: PlayerSettings) => {
@@ -61,7 +61,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   // Handle AI settings button click
   const handleAISettings = useCallback(async () => {
     const configured = await showAISettings();
-    setAiConfigured(configured);
+    setAiStatus({ configured, embedded: false });
   }, []);
 
   // Handle splash screen timing
@@ -443,11 +443,11 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         />
       )}
 
-      {/* AI Settings button - shown when AI is enabled */}
-      {enableAI && playerReady && (
+      {/* AI Settings button - shown when AI is enabled but NOT when creator embedded the API key */}
+      {enableAI && playerReady && !aiStatus.embedded && (
         <button
           onClick={handleAISettings}
-          title={aiConfigured ? 'AI Configured - Click to change' : 'Configure AI API Key'}
+          title={aiStatus.configured ? 'AI Configured - Click to change' : 'Configure AI API Key'}
           style={{
             position: 'absolute',
             bottom: '16px',
@@ -456,7 +456,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             height: '40px',
             borderRadius: '50%',
             border: 'none',
-            background: aiConfigured
+            background: aiStatus.configured
               ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
               : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
             color: 'white',
@@ -485,7 +485,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             <path d="M12 17v5"/>
             <path d="M8 17l-2 5"/>
             <path d="M16 17l2 5"/>
-            {aiConfigured && <circle cx="19" cy="5" r="3" fill="#10b981" stroke="white"/>}
+            {aiStatus.configured && <circle cx="19" cy="5" r="3" fill="#10b981" stroke="white"/>}
           </svg>
         </button>
       )}

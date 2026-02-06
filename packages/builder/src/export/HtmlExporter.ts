@@ -10,6 +10,8 @@ import JSZip from 'jszip';
 import { getStorageManager } from '../storage/StorageManager';
 import type { StoredAsset } from '../storage/types';
 
+export type AIProvider = 'openai' | 'anthropic';
+
 // Template for standalone HTML player
 const HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
@@ -98,6 +100,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       enableAI: {{ENABLE_AI}},
       storyUrl: '{{STORY_URL}}',
       storyData: '{{STORY_DATA}}',
+      aiConfig: {{AI_CONFIG}},
     };
   </script>
 
@@ -144,6 +147,10 @@ export interface HtmlExportOptions {
   enableAI: boolean;
   /** Show API key prompt when AI is needed */
   showApiKeyPrompt: boolean;
+  /** AI provider to use (if embedding API key) */
+  aiProvider?: AIProvider;
+  /** API key to embed (if provided by creator) */
+  aiApiKey?: string;
 }
 
 export interface HtmlExportResult {
@@ -206,6 +213,11 @@ async function exportAsSingleFile(
   // For now, use a placeholder that indicates the player bundle should be included
   const playerScript = await getPlayerScript();
 
+  // Build AI config object (or null if not provided)
+  const aiConfig = options.aiProvider && options.aiApiKey
+    ? JSON.stringify({ provider: options.aiProvider, apiKey: options.aiApiKey })
+    : 'null';
+
   // Build HTML
   const html = HTML_TEMPLATE
     .replace('{{STORY_TITLE}}', escapeHtml(project.name || 'ASAPS Story'))
@@ -213,6 +225,7 @@ async function exportAsSingleFile(
     .replace('{{ENABLE_AI}}', String(options.enableAI))
     .replace("'{{STORY_URL}}'", "''")  // Empty for single-file mode
     .replace("'{{STORY_DATA}}'", `'${storyBase64}'`)
+    .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{PLAYER_SCRIPT}}', playerScript);
 
   return { html, mode: 'single-file' };
@@ -231,6 +244,11 @@ async function exportAsFolder(
   // Get player bundle
   const playerScript = await getPlayerScript();
 
+  // Build AI config object (or null if not provided)
+  const aiConfig = options.aiProvider && options.aiApiKey
+    ? JSON.stringify({ provider: options.aiProvider, apiKey: options.aiApiKey })
+    : 'null';
+
   // Build HTML that references external story file
   const html = HTML_TEMPLATE
     .replace('{{STORY_TITLE}}', escapeHtml(project.name || 'ASAPS Story'))
@@ -238,6 +256,7 @@ async function exportAsFolder(
     .replace('{{ENABLE_AI}}', String(options.enableAI))
     .replace("'{{STORY_URL}}'", "'story.asaps.zip'")
     .replace("'{{STORY_DATA}}'", "''")  // Empty for folder mode
+    .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{PLAYER_SCRIPT}}', playerScript);
 
   // Add files to ZIP

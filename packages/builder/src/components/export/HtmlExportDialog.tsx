@@ -3,8 +3,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { X, Download, FileText, FolderOpen, Info } from 'lucide-react';
-import { downloadHtmlExport, type HtmlExportOptions } from '../../export/HtmlExporter';
+import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff } from 'lucide-react';
+import { downloadHtmlExport, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
 
 interface HtmlExportDialogProps {
   isOpen: boolean;
@@ -21,6 +21,9 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
 }) => {
   const [mode, setMode] = useState<'folder' | 'single-file'>('folder');
   const [enableAI, setEnableAI] = useState(true);
+  const [aiProvider, setAiProvider] = useState<AIProvider>('openai');
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +36,9 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         mode,
         responsive: true,
         enableAI,
-        showApiKeyPrompt: enableAI,
+        showApiKeyPrompt: enableAI && !aiApiKey, // Only prompt if no key provided
+        aiProvider: enableAI && aiApiKey ? aiProvider : undefined,
+        aiApiKey: enableAI && aiApiKey ? aiApiKey : undefined,
       };
 
       await downloadHtmlExport(projectId, projectName, options);
@@ -44,7 +49,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [mode, enableAI, projectId, projectName, onClose]);
+  }, [mode, enableAI, aiProvider, aiApiKey, projectId, projectName, onClose]);
 
   if (!isOpen) return null;
 
@@ -103,7 +108,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
           </div>
 
           {/* AI Settings */}
-          <div>
+          <div className="space-y-4">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -114,10 +119,63 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
               <div>
                 <div className="font-medium text-gray-900">Enable AI Features</div>
                 <div className="text-sm text-gray-500">
-                  Players will be prompted for API key if story uses AI beats
+                  {aiApiKey
+                    ? 'API key will be embedded in export'
+                    : 'Players will be prompted for API key if story uses AI beats'
+                  }
                 </div>
               </div>
             </label>
+
+            {/* AI Configuration - shown when AI is enabled */}
+            {enableAI && (
+              <div className="ml-7 space-y-3 border-l-2 border-blue-200 pl-4">
+                <div className="text-sm text-gray-600 mb-2">
+                  Optionally embed your API key so players don't need to configure it:
+                </div>
+
+                {/* Provider Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    AI Provider
+                  </label>
+                  <select
+                    value={aiProvider}
+                    onChange={(e) => setAiProvider(e.target.value as AIProvider)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="openai">OpenAI (GPT-4o)</option>
+                    <option value="anthropic">Anthropic (Claude)</option>
+                  </select>
+                </div>
+
+                {/* API Key Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    API Key (optional)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={aiApiKey}
+                      onChange={(e) => setAiApiKey(e.target.value)}
+                      placeholder={`Enter ${aiProvider === 'openai' ? 'OpenAI' : 'Anthropic'} API key`}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                    >
+                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Warning: API key will be visible in the exported HTML source code
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Info Box */}

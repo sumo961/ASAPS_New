@@ -1,6 +1,6 @@
 /**
  * Web AI Provider for HTML-exported stories
- * Prompts user for API key on first use and stores in localStorage
+ * Uses embedded API key if provided by creator, otherwise prompts user
  */
 
 import type { IAIService } from '@asaps/core';
@@ -13,12 +13,40 @@ interface StoredConfig {
   model?: string;
 }
 
+// Embedded config from creator (set in window.ASAPS_CONFIG.aiConfig)
+interface EmbeddedConfig {
+  provider: AIProvider;
+  apiKey: string;
+}
+
 const STORAGE_KEY = 'asaps-player-ai-config';
 
 /**
- * Load stored AI configuration
+ * Get embedded AI config from creator (if provided during export)
+ */
+function getEmbeddedConfig(): EmbeddedConfig | null {
+  try {
+    const asapsConfig = (window as any).ASAPS_CONFIG;
+    if (asapsConfig?.aiConfig) {
+      return asapsConfig.aiConfig;
+    }
+  } catch (e) {
+    // Not in a context with ASAPS_CONFIG
+  }
+  return null;
+}
+
+/**
+ * Load stored AI configuration from localStorage
  */
 function loadConfig(): StoredConfig | null {
+  // First check for embedded config from creator
+  const embedded = getEmbeddedConfig();
+  if (embedded) {
+    return embedded;
+  }
+
+  // Otherwise check localStorage
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -292,10 +320,20 @@ export function isAIConfigured(): boolean {
 /**
  * Get current AI configuration (without API key for display)
  */
-export function getAIConfigStatus(): { configured: boolean; provider?: AIProvider } {
-  const config = loadConfig();
-  if (config) {
-    return { configured: true, provider: config.provider };
+export function getAIConfigStatus(): { configured: boolean; provider?: AIProvider; embedded?: boolean } {
+  const embedded = getEmbeddedConfig();
+  if (embedded) {
+    return { configured: true, provider: embedded.provider, embedded: true };
+  }
+
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const config = JSON.parse(stored);
+      return { configured: true, provider: config.provider, embedded: false };
+    }
+  } catch (e) {
+    // Ignore
   }
   return { configured: false };
 }
