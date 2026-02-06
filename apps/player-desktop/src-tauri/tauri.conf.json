@@ -66,5 +66,7 @@
       }
     ]
   },
-  "plugins": {}
+  "plugins": {
+    "store": {}
+  }
 }
