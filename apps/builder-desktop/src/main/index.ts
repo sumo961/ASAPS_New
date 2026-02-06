@@ -75,19 +75,40 @@ function setupAutoUpdater(): void {
   // Event: Update available
   autoUpdater.on('update-available', (info: UpdateInfo) => {
     console.log('[AutoUpdater] Update available:', info.version);
-    dialog.showMessageBox(mainWindow!, {
-      type: 'info',
-      title: 'Update Available',
-      message: `A new version (${info.version}) is available!`,
-      detail: 'Would you like to download it now?',
-      buttons: ['Download Now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    }).then((result) => {
-      if (result.response === 0) {
-        autoUpdater.downloadUpdate();
-      }
-    });
+
+    // On macOS, skip download and go straight to releases page (download often fails for unsigned apps)
+    if (process.platform === 'darwin') {
+      dialog.showMessageBox(mainWindow!, {
+        type: 'info',
+        title: 'Update Available',
+        message: `A new version (${info.version}) is available!`,
+        detail: 'Click "Download Update" to open the releases page and download the latest DMG.',
+        buttons: ['Download Update', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+      }).then((result) => {
+        if (result.response === 0) {
+          const releaseUrl = `https://github.com/sumo961/ASAPS_New/releases/tag/v${info.version}`;
+          console.log('[AutoUpdater] Opening release page:', releaseUrl);
+          shell.openExternal(releaseUrl);
+        }
+      });
+    } else {
+      // On Windows, use the built-in download mechanism
+      dialog.showMessageBox(mainWindow!, {
+        type: 'info',
+        title: 'Update Available',
+        message: `A new version (${info.version}) is available!`,
+        detail: 'Would you like to download it now?',
+        buttons: ['Download Now', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+      }).then((result) => {
+        if (result.response === 0) {
+          autoUpdater.downloadUpdate();
+        }
+      });
+    }
   });
 
   // Event: Update not available
@@ -149,6 +170,21 @@ function setupAutoUpdater(): void {
     console.error('[AutoUpdater] Error:', error);
     console.error('[AutoUpdater] Error message:', error.message);
     console.error('[AutoUpdater] Error stack:', error.stack);
+
+    // Show error to user with option to manually download
+    dialog.showMessageBox(mainWindow!, {
+      type: 'error',
+      title: 'Update Error',
+      message: 'Failed to download update',
+      detail: `${error.message}\n\nYou can download the update manually from the releases page.`,
+      buttons: ['Open Releases Page', 'OK'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then((result) => {
+      if (result.response === 0) {
+        shell.openExternal('https://github.com/sumo961/ASAPS_New/releases/latest');
+      }
+    });
   });
 
   // Log when update is being installed
