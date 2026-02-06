@@ -27,7 +27,7 @@ export interface AIProviderConfig {
 
   /**
    * Reasoning effort for GPT-5 class reasoning models.
-   * Supported values vary by model; gpt-5.1 defaults to 'none'.
+   * Supported values vary by model; gpt-5.2 defaults to 'none'.
    */
   reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 

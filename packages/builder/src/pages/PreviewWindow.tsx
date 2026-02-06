@@ -178,7 +178,7 @@ function createAIServiceAdapter(): IAIService | null {
         const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.`;
         const requestBody = {
           model,
-          max_tokens: 4096,
+          max_tokens: 8192,
           system: systemPrompt,
           messages: [{ role: 'user' as const, content: request.prompt }],
         };
@@ -225,7 +225,7 @@ function createAIServiceAdapter(): IAIService | null {
     };
   } else {
     // OpenAI provider (also used for local/Ollama)
-    const model = savedConfig.model || 'gpt-4';
+    const model = savedConfig.model || 'gpt-5.2';
 
     // Create client - for local URLs, include baseURL; for remote custom URLs, we use proxy
     const client = !useProxy ? new OpenAI({
@@ -261,7 +261,7 @@ function createAIServiceAdapter(): IAIService | null {
             { role: 'system' as const, content: systemPrompt },
             { role: 'user' as const, content: request.prompt },
           ],
-          4096
+          8192
         );
 
         let content: string;

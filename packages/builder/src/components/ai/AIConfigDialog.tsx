@@ -37,7 +37,7 @@ const PROVIDER_PRESETS: Record<ProviderType, ProviderPreset> = {
     name: 'OpenAI',
     description: 'GPT-5 (reasoning capable)',
     defaultBaseUrl: '',
-    defaultModel: 'gpt-5.1',
+    defaultModel: 'gpt-5.2',
     apiKeyRequired: true,
     apiKeyPlaceholder: 'Enter your OpenAI API key',
     apiKeyHelp: 'Get your API key from platform.openai.com',
@@ -255,7 +255,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
               >
                 <div className="text-center">
                   <p className="font-medium text-gray-900">OpenAI</p>
-                  <p className="text-xs text-gray-500 mt-1">GPT-5</p>
+                  <p className="text-xs text-gray-500 mt-1">GPT-5.2</p>
                 </div>
               </button>
 
@@ -333,7 +333,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
                 <option value="xhigh">X-High (max depth)</option>
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                GPT-5 reasoning uses max_completion_tokens and ignores temperature. Leave blank to use the model default (gpt-5.1 defaults to none).
+                GPT-5 reasoning uses max_completion_tokens and ignores temperature. Leave blank to use the model default (gpt-5.2 defaults to none).
               </p>
             </div>
           )}

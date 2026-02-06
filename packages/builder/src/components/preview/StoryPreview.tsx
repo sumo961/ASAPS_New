@@ -252,7 +252,7 @@ function createAIServiceAdapter(): IAIService | null {
     };
   } else {
     // OpenAI provider (also used for local/compatible APIs)
-    const model = savedConfig.model || 'gpt-4';
+    const model = savedConfig.model || 'gpt-5.2';
 
     // Only create direct client if not using proxy
     const client = !useProxy ? new OpenAI({

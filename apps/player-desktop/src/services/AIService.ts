@@ -39,39 +39,30 @@ export class DesktopAIService implements IAIService {
     format: 'dialogTree';
     maxTurns?: number;
   }): Promise<any> {
-    // Generate dialog structure using JSON mode
-    const systemPrompt = `You are a dialog writer for interactive fiction. Generate a dialog tree in JSON format.
-The structure should be:
-{
-  "nodes": [
-    {
-      "id": "start",
-      "speaker": "Character Name",
-      "text": "What they say",
-      "choices": [
-        { "text": "Player option 1", "nextId": "node2" },
-        { "text": "Player option 2", "nextId": "node3" }
-      ]
-    },
-    ...
-  ]
-}
-Maximum turns: ${request.maxTurns || 5}`;
+    // Pass the prompt directly - AIDialogTreeBeat provides detailed format instructions
+    const { provider, apiKey, model } = this.settings;
+    const baseUrl = getProviderBaseUrl(this.settings);
+    const modelToUse = model || getDefaultModel(provider);
+    const systemPrompt = 'You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.';
+    const maxTokens = 8192;
 
-    const response = await this.generateContent(`${systemPrompt}\n\nDialog prompt: ${request.prompt}`, {
-      maxTokens: 2000,
-    });
+    let response: string;
+    if (provider === 'anthropic') {
+      response = await this.callAnthropicWithSystem(systemPrompt, request.prompt, modelToUse, apiKey, maxTokens);
+    } else {
+      response = await this.callOpenAIWithSystem(systemPrompt, request.prompt, baseUrl, modelToUse, apiKey, maxTokens);
+    }
+
+    // Strip thinking blocks that some models produce
+    response = response.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
     try {
-      // Extract JSON from response
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error('No valid JSON found in response');
+      const jsonStr = this.extractJSON(response);
+      return JSON.parse(jsonStr);
     } catch (e) {
       console.error('[AIService] Failed to parse dialog response:', e);
-      throw e;
+      console.error('[AIService] Raw response:', response.substring(0, 500));
+      throw new Error('No valid JSON found in response');
     }
   }
 
@@ -146,5 +137,107 @@ Respond with ONLY the category name, nothing else.`;
 
     const data = await response.json();
     return data.content?.[0]?.text || '';
+  }
+
+  private async callOpenAIWithSystem(
+    systemPrompt: string,
+    userPrompt: string,
+    baseUrl: string,
+    model: string,
+    apiKey: string,
+    maxTokens: number
+  ): Promise<string> {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_tokens: maxTokens,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+
+  private async callAnthropicWithSystem(
+    systemPrompt: string,
+    userPrompt: string,
+    model: string,
+    apiKey: string,
+    maxTokens: number
+  ): Promise<string> {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Anthropic API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text || '';
+  }
+
+  private extractJSON(text: string): string {
+    let cleaned = text.trim();
+    if (cleaned.startsWith('```')) {
+      const lines = cleaned.split('\n');
+      lines.shift();
+      while (lines.length > 0 && lines[lines.length - 1].trim().startsWith('```')) {
+        lines.pop();
+      }
+      cleaned = lines.join('\n').trim();
+    }
+
+    const jsonStart = cleaned.indexOf('{');
+    if (jsonStart === -1) {
+      throw new Error('No JSON object found in response');
+    }
+
+    let braceCount = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = jsonStart; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      if (escaped) { escaped = false; continue; }
+      if (char === '\\') { escaped = true; continue; }
+      if (char === '"') { inString = !inString; continue; }
+      if (!inString) {
+        if (char === '{') braceCount++;
+        if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) return cleaned.substring(jsonStart, i + 1);
+        }
+      }
+    }
+
+    return cleaned.substring(jsonStart);
   }
 }

@@ -284,37 +284,46 @@ export class WebAIService implements IAIService {
     format: 'dialogTree';
     maxTurns?: number;
   }): Promise<any> {
-    const systemPrompt = `You are a dialog writer for interactive fiction. Generate a dialog tree in JSON format.
-The structure should be:
-{
-  "nodes": [
-    {
-      "id": "start",
-      "speaker": "Character Name",
-      "text": "What they say",
-      "choices": [
-        { "text": "Player option 1", "nextId": "node2" },
-        { "text": "Player option 2", "nextId": "node3" }
-      ]
-    },
-    ...
-  ]
-}
-Maximum turns: ${request.maxTurns || 5}`;
+    // Pass the prompt directly - AIDialogTreeBeat provides detailed format instructions
+    // Using a minimal system prompt to avoid conflicting format requirements
+    const config = await this.ensureConfig();
+    if (!config) {
+      throw new Error('AI not configured - skipping AI content');
+    }
 
-    const response = await this.generateContent(`${systemPrompt}\n\nDialog prompt: ${request.prompt}`, {
-      maxTokens: 2000,
-    });
+    let response: string;
+    const maxTokens = 8192; // Dialog trees with nested nodes need ample room
+
+    if (config.provider === 'anthropic') {
+      response = await this.callAnthropicWithSystem(
+        'You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.',
+        request.prompt,
+        maxTokens,
+        config.model,
+        config.baseUrl,
+        config.apiKey
+      );
+    } else {
+      response = await this.callOpenAIWithSystem(
+        'You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.',
+        request.prompt,
+        maxTokens,
+        config.model,
+        config.baseUrl,
+        config.apiKey
+      );
+    }
+
+    // Strip thinking blocks (e.g. <think>...</think>) that some models produce
+    response = response.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
     try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error('No valid JSON found in response');
+      const jsonStr = this.extractJSON(response);
+      return JSON.parse(jsonStr);
     } catch (e) {
       console.error('[WebAIService] Failed to parse dialog response:', e);
-      throw e;
+      console.error('[WebAIService] Raw response:', response.substring(0, 500));
+      throw new Error('No valid JSON found in response');
     }
   }
 
@@ -397,6 +406,137 @@ Respond with ONLY the category name, nothing else.`;
 
     const data = await response.json();
     return data.content?.[0]?.text || '';
+  }
+
+  private async callOpenAIWithSystem(
+    systemPrompt: string,
+    userPrompt: string,
+    maxTokens: number,
+    model?: string,
+    baseUrl?: string,
+    apiKey?: string
+  ): Promise<string> {
+    const url = baseUrl
+      ? `${baseUrl.replace(/\/$/, '')}/chat/completions`
+      : 'https://api.openai.com/v1/chat/completions';
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey || ''}`,
+      },
+      body: JSON.stringify({
+        model: model || 'gpt-5.2',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_completion_tokens: maxTokens,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+
+  private async callAnthropicWithSystem(
+    systemPrompt: string,
+    userPrompt: string,
+    maxTokens: number,
+    model?: string,
+    baseUrl?: string,
+    apiKey?: string
+  ): Promise<string> {
+    const url = baseUrl
+      ? `${baseUrl.replace(/\/$/, '')}/messages`
+      : 'https://api.anthropic.com/v1/messages';
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey || '',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: model || 'claude-sonnet-4-20250514',
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Anthropic API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text || '';
+  }
+
+  /**
+   * Extract JSON object from text, handling markdown code blocks and extra content
+   */
+  private extractJSON(text: string): string {
+    // Strip markdown code blocks
+    let cleaned = text.trim();
+    if (cleaned.startsWith('```')) {
+      const lines = cleaned.split('\n');
+      lines.shift(); // Remove opening ```json or ```
+      while (lines.length > 0 && lines[lines.length - 1].trim().startsWith('```')) {
+        lines.pop();
+      }
+      cleaned = lines.join('\n').trim();
+    }
+
+    const jsonStart = cleaned.indexOf('{');
+    if (jsonStart === -1) {
+      throw new Error('No JSON object found in response');
+    }
+
+    let braceCount = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = jsonStart; i < cleaned.length; i++) {
+      const char = cleaned[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (!inString) {
+        if (char === '{') braceCount++;
+        if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            return cleaned.substring(jsonStart, i + 1);
+          }
+        }
+      }
+    }
+
+    // If we didn't find a complete match, return from jsonStart to end
+    return cleaned.substring(jsonStart);
   }
 }
 

@@ -33,7 +33,7 @@ import { requiresMaxCompletionTokens, isReasoningModel } from './openai-utils';
 export class OpenAIProvider extends BaseAIProvider {
   readonly name = 'openai';
   private client: OpenAI | null = null;
-  private model: string = 'gpt-5.1';
+  private model: string = 'gpt-5.2';
   private useJsonFormat: boolean = true;
   private useProxy: boolean = false;
   private proxyEndpoint: string = 'http://localhost:3001/api/ai/openai';
@@ -75,7 +75,7 @@ export class OpenAIProvider extends BaseAIProvider {
         });
       }
 
-      this.model = config.model || 'gpt-5.1';
+      this.model = config.model || 'gpt-5.2';
 
       // Disable response_format for third-party providers that may not support it
       // (e.g., Moonshot, DeepSeek, local Ollama, etc.)
