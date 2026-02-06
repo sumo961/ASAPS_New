@@ -351,7 +351,7 @@ Respond with ONLY the category name, nothing else.`;
       body: JSON.stringify({
         model: model || 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: maxTokens || 1000,
+        max_completion_tokens: maxTokens || 1000,
       }),
     });
 

@@ -66,7 +66,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Export as HTML</h2>
@@ -79,7 +79,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         </div>
 
         {/* Content */}
-        <div className="px-6 py-5 space-y-6">
+        <div className="px-6 py-5 space-y-6 overflow-y-auto flex-1">
           {/* Export Mode */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
