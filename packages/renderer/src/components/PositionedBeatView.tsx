@@ -188,19 +188,30 @@ function calculateSmartTextBoxDimensions(
 
       newWidth = testWidth;
 
-      // Calculate xOffset: prefer growing right, then left if right is exhausted
+      // Calculate xOffset: split growth evenly to keep box centered
       const widthIncrease = newWidth - location.width;
       let xOffset = 0;
       if (widthIncrease > 0) {
-        // How much can we grow right?
-        const rightGrowthUsed = Math.min(widthIncrease, Math.max(0, maxRightGrowth));
-        // Remaining growth goes left
-        const leftGrowthUsed = widthIncrease - rightGrowthUsed;
-        // xOffset is negative when growing left
-        xOffset = -leftGrowthUsed;
+        // Split growth evenly between left and right to maintain centering
+        const halfIncrease = widthIncrease / 2;
 
-        if (leftGrowthUsed > 0) {
-          console.log(`[SmartTextBox] Growing: right=${rightGrowthUsed.toFixed(1)}, left=${leftGrowthUsed.toFixed(1)}, xOffset=${xOffset.toFixed(1)}`);
+        // Check if we can grow evenly on both sides
+        if (halfIncrease <= Math.max(0, maxLeftGrowth) && halfIncrease <= Math.max(0, maxRightGrowth)) {
+          // Even growth possible - shift left by half to maintain center
+          xOffset = halfIncrease;
+        } else {
+          // Can't grow evenly - use asymmetric growth
+          const leftGrowthPossible = Math.max(0, maxLeftGrowth);
+          const rightGrowthPossible = Math.max(0, maxRightGrowth);
+
+          // Distribute growth based on available space
+          const leftGrowthUsed = Math.min(halfIncrease, leftGrowthPossible);
+          const rightGrowthUsed = Math.min(widthIncrease - leftGrowthUsed, rightGrowthPossible);
+
+          // xOffset is positive (shift left by this amount)
+          xOffset = leftGrowthUsed;
+
+          console.log(`[SmartTextBox] Asymmetric growth: left=${leftGrowthUsed.toFixed(1)}, right=${rightGrowthUsed.toFixed(1)}, xOffset=${xOffset.toFixed(1)}`);
         }
       }
 
@@ -217,13 +228,22 @@ function calculateSmartTextBoxDimensions(
     newWidth = maxWidth;
   }
 
-  // Calculate final xOffset
+  // Calculate final xOffset: split growth evenly to keep box centered
   const finalWidthIncrease = newWidth - location.width;
   let finalXOffset = 0;
   if (finalWidthIncrease > 0) {
-    const rightGrowthUsed = Math.min(finalWidthIncrease, Math.max(0, maxRightGrowth));
-    const leftGrowthUsed = finalWidthIncrease - rightGrowthUsed;
-    finalXOffset = -leftGrowthUsed;
+    const halfIncrease = finalWidthIncrease / 2;
+    const leftGrowthPossible = Math.max(0, maxLeftGrowth);
+    const rightGrowthPossible = Math.max(0, maxRightGrowth);
+
+    // Try even split first
+    if (halfIncrease <= leftGrowthPossible && halfIncrease <= rightGrowthPossible) {
+      finalXOffset = halfIncrease;
+    } else {
+      // Asymmetric: distribute based on available space
+      const leftGrowthUsed = Math.min(halfIncrease, leftGrowthPossible);
+      finalXOffset = leftGrowthUsed;
+    }
   }
 
   // Step 3: Calculate needed height at max width
