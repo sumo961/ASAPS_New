@@ -234,15 +234,18 @@ pub fn llm_delete_model(model_id: String) -> Result<(), String> {
 #[cfg(feature = "embedded-ai")]
 #[tauri::command]
 pub async fn llm_generate(
-    state: State<'_, LlmState>,
+    _state: State<'_, LlmState>,
     model_id: String,
     prompt: String,
     max_tokens: u32,
 ) -> Result<String, String> {
     use llama_cpp_2::llama_backend::LlamaBackend;
     use llama_cpp_2::model::LlamaModel;
+    use llama_cpp_2::model::AddBos;
+    use llama_cpp_2::model::Special;
     use llama_cpp_2::context::params::LlamaContextParams;
-    use llama_cpp_2::model::params::LlamaModelParams;
+    use llama_cpp_2::llama_batch::LlamaBatch;
+    use llama_cpp_2::sampling::LlamaSampler;
 
     let models_dir = get_models_dir()?;
     let model_path = models_dir.join(format!("{}.gguf", model_id));
@@ -256,8 +259,7 @@ pub async fn llm_generate(
         .map_err(|e| format!("Failed to initialize LLM backend: {}", e))?;
 
     // Load model
-    let model_params = LlamaModelParams::default();
-    let model = LlamaModel::load_from_file(&backend, &model_path, &model_params)
+    let model = LlamaModel::load_from_file(&backend, &model_path, &Default::default())
         .map_err(|e| format!("Failed to load model: {}", e))?;
 
     // Create context
@@ -267,30 +269,51 @@ pub async fn llm_generate(
         .map_err(|e| format!("Failed to create context: {}", e))?;
 
     // Tokenize prompt
-    let tokens = model.str_to_token(&prompt, true)
+    let tokens = model.str_to_token(&prompt, AddBos::Always)
         .map_err(|e| format!("Failed to tokenize: {}", e))?;
 
-    // Run inference
-    ctx.decode(&tokens, true)
+    // Create batch and add tokens
+    let mut batch = LlamaBatch::new(2048, 1);
+    for (i, token) in tokens.iter().enumerate() {
+        let is_last = i == tokens.len() - 1;
+        batch.add(*token, i as i32, &[0], is_last)
+            .map_err(|e| format!("Failed to add token to batch: {}", e))?;
+    }
+
+    // Decode the prompt
+    ctx.decode(&mut batch)
         .map_err(|e| format!("Failed to decode: {}", e))?;
 
-    // Sample tokens
-    let mut output = String::new();
-    for _ in 0..max_tokens {
-        let token = ctx.sample_token(None)
-            .map_err(|e| format!("Failed to sample: {}", e))?;
+    // Create sampler for greedy sampling
+    let mut sampler = LlamaSampler::greedy();
 
+    // Generate tokens
+    let mut output = String::new();
+    let mut n_cur = tokens.len();
+
+    for _ in 0..max_tokens {
+        // Sample next token
+        let token = sampler.sample(&ctx, -1);
+
+        // Check for end of generation
         if model.is_eog_token(token) {
             break;
         }
 
-        let piece = model.token_to_str(token, true)
+        // Convert token to string
+        let piece = model.token_to_str(token, Special::Tokenize)
             .map_err(|e| format!("Failed to decode token: {}", e))?;
-
         output.push_str(&piece);
 
-        ctx.decode(&[token], false)
+        // Prepare next batch
+        batch.clear();
+        batch.add(token, n_cur as i32, &[0], true)
+            .map_err(|e| format!("Failed to add token: {}", e))?;
+
+        ctx.decode(&mut batch)
             .map_err(|e| format!("Failed to decode: {}", e))?;
+
+        n_cur += 1;
     }
 
     Ok(output)
