@@ -5,18 +5,21 @@
 
 import type { IAIService } from '@asaps/core';
 
-export type AIProvider = 'openai' | 'anthropic';
+export type AIProvider = 'openai' | 'anthropic' | 'custom';
 
 interface StoredConfig {
   provider: AIProvider;
   apiKey: string;
-  model?: string;
+  baseUrl?: string;  // For custom providers
+  model?: string;    // Model override
 }
 
 // Embedded config from creator (set in window.ASAPS_CONFIG.aiConfig)
 interface EmbeddedConfig {
   provider: AIProvider;
   apiKey: string;
+  baseUrl?: string;
+  model?: string;
 }
 
 const STORAGE_KEY = 'asaps-player-ai-config';
@@ -112,12 +115,25 @@ function showApiKeyPrompt(): Promise<StoredConfig | null> {
         <select id="ai-provider" style="width: 100%; padding: 10px 12px; background: #252542; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px;">
           <option value="openai">OpenAI</option>
           <option value="anthropic">Anthropic</option>
+          <option value="custom">Custom (OpenAI-compatible)</option>
         </select>
+      </div>
+
+      <div id="ai-baseurl-container" style="margin-bottom: 16px; display: none;">
+        <label style="display: block; margin-bottom: 8px; font-size: 13px; color: #999;">Base URL</label>
+        <input type="text" id="ai-base-url" placeholder="https://api.example.com/v1"
+          style="width: 100%; padding: 10px 12px; background: #252542; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px; box-sizing: border-box;">
       </div>
 
       <div style="margin-bottom: 16px;">
         <label style="display: block; margin-bottom: 8px; font-size: 13px; color: #999;">API Key</label>
         <input type="password" id="ai-api-key" placeholder="Enter your API key"
+          style="width: 100%; padding: 10px 12px; background: #252542; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px; box-sizing: border-box;">
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 8px; font-size: 13px; color: #999;">Model (optional)</label>
+        <input type="text" id="ai-model" placeholder="Leave empty for default"
           style="width: 100%; padding: 10px 12px; background: #252542; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px; box-sizing: border-box;">
       </div>
 
@@ -136,9 +152,17 @@ function showApiKeyPrompt(): Promise<StoredConfig | null> {
 
     // Handle interactions
     const providerSelect = modal.querySelector('#ai-provider') as HTMLSelectElement;
+    const baseUrlContainer = modal.querySelector('#ai-baseurl-container') as HTMLDivElement;
+    const baseUrlInput = modal.querySelector('#ai-base-url') as HTMLInputElement;
     const apiKeyInput = modal.querySelector('#ai-api-key') as HTMLInputElement;
+    const modelInput = modal.querySelector('#ai-model') as HTMLInputElement;
     const cancelBtn = modal.querySelector('#ai-cancel') as HTMLButtonElement;
     const saveBtn = modal.querySelector('#ai-save') as HTMLButtonElement;
+
+    // Show/hide base URL field based on provider
+    providerSelect.onchange = () => {
+      baseUrlContainer.style.display = providerSelect.value === 'custom' ? 'block' : 'none';
+    };
 
     cancelBtn.onclick = () => {
       document.body.removeChild(overlay);
@@ -152,9 +176,17 @@ function showApiKeyPrompt(): Promise<StoredConfig | null> {
         return;
       }
 
+      const provider = providerSelect.value as AIProvider;
+      if (provider === 'custom' && !baseUrlInput.value.trim()) {
+        baseUrlInput.style.borderColor = '#ef4444';
+        return;
+      }
+
       const config: StoredConfig = {
-        provider: providerSelect.value as AIProvider,
+        provider,
         apiKey,
+        baseUrl: provider === 'custom' ? baseUrlInput.value.trim() : undefined,
+        model: modelInput.value.trim() || undefined,
       };
 
       saveConfig(config);
@@ -203,9 +235,11 @@ export class WebAIService implements IAIService {
     }
 
     if (config.provider === 'anthropic') {
-      return this.callAnthropic(prompt, config.apiKey, options?.maxTokens);
+      return this.callAnthropic(prompt, config.apiKey, options?.maxTokens, config.model);
+    } else if (config.provider === 'custom') {
+      return this.callOpenAI(prompt, config.apiKey, options?.maxTokens, config.model, config.baseUrl);
     } else {
-      return this.callOpenAI(prompt, config.apiKey, options?.maxTokens);
+      return this.callOpenAI(prompt, config.apiKey, options?.maxTokens, config.model);
     }
   }
 
@@ -261,15 +295,25 @@ Respond with ONLY the category name, nothing else.`;
     return match || categories[0];
   }
 
-  private async callOpenAI(prompt: string, apiKey: string, maxTokens?: number): Promise<string> {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  private async callOpenAI(
+    prompt: string,
+    apiKey: string,
+    maxTokens?: number,
+    model?: string,
+    baseUrl?: string
+  ): Promise<string> {
+    const url = baseUrl
+      ? `${baseUrl.replace(/\/$/, '')}/chat/completions`
+      : 'https://api.openai.com/v1/chat/completions';
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: model || 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: maxTokens || 1000,
       }),
@@ -284,7 +328,12 @@ Respond with ONLY the category name, nothing else.`;
     return data.choices?.[0]?.message?.content || '';
   }
 
-  private async callAnthropic(prompt: string, apiKey: string, maxTokens?: number): Promise<string> {
+  private async callAnthropic(
+    prompt: string,
+    apiKey: string,
+    maxTokens?: number,
+    model?: string
+  ): Promise<string> {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -294,7 +343,7 @@ Respond with ONLY the category name, nothing else.`;
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: model || 'claude-sonnet-4-20250514',
         max_tokens: maxTokens || 1000,
         messages: [{ role: 'user', content: prompt }],
       }),

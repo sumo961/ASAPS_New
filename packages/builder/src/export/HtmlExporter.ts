@@ -10,7 +10,7 @@ import JSZip from 'jszip';
 import { getStorageManager } from '../storage/StorageManager';
 import type { StoredAsset } from '../storage/types';
 
-export type AIProvider = 'openai' | 'anthropic';
+export type AIProvider = 'openai' | 'anthropic' | 'custom';
 
 // Template for standalone HTML player
 const HTML_TEMPLATE = `<!DOCTYPE html>
@@ -151,6 +151,10 @@ export interface HtmlExportOptions {
   aiProvider?: AIProvider;
   /** API key to embed (if provided by creator) */
   aiApiKey?: string;
+  /** Custom base URL for API (OpenAI-compatible endpoints) */
+  aiBaseUrl?: string;
+  /** Model override (e.g., 'gpt-4o', 'claude-sonnet-4-20250514') */
+  aiModel?: string;
 }
 
 export interface HtmlExportResult {
@@ -215,7 +219,12 @@ async function exportAsSingleFile(
 
   // Build AI config object (or null if not provided)
   const aiConfig = options.aiProvider && options.aiApiKey
-    ? JSON.stringify({ provider: options.aiProvider, apiKey: options.aiApiKey })
+    ? JSON.stringify({
+        provider: options.aiProvider,
+        apiKey: options.aiApiKey,
+        baseUrl: options.aiBaseUrl || undefined,
+        model: options.aiModel || undefined,
+      })
     : 'null';
 
   // Build HTML
@@ -246,7 +255,12 @@ async function exportAsFolder(
 
   // Build AI config object (or null if not provided)
   const aiConfig = options.aiProvider && options.aiApiKey
-    ? JSON.stringify({ provider: options.aiProvider, apiKey: options.aiApiKey })
+    ? JSON.stringify({
+        provider: options.aiProvider,
+        apiKey: options.aiApiKey,
+        baseUrl: options.aiBaseUrl || undefined,
+        model: options.aiModel || undefined,
+      })
     : 'null';
 
   // Build HTML that references external story file

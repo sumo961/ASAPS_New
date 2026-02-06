@@ -23,7 +23,10 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   const [enableAI, setEnableAI] = useState(true);
   const [aiProvider, setAiProvider] = useState<AIProvider>('openai');
   const [aiApiKey, setAiApiKey] = useState('');
+  const [aiBaseUrl, setAiBaseUrl] = useState('');
+  const [aiModel, setAiModel] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +42,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         showApiKeyPrompt: enableAI && !aiApiKey, // Only prompt if no key provided
         aiProvider: enableAI && aiApiKey ? aiProvider : undefined,
         aiApiKey: enableAI && aiApiKey ? aiApiKey : undefined,
+        aiBaseUrl: enableAI && aiApiKey && aiBaseUrl ? aiBaseUrl : undefined,
+        aiModel: enableAI && aiApiKey && aiModel ? aiModel : undefined,
       };
 
       await downloadHtmlExport(projectId, projectName, options);
@@ -49,7 +54,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [mode, enableAI, aiProvider, aiApiKey, projectId, projectName, onClose]);
+  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose]);
 
   if (!isOpen) return null;
 
@@ -146,8 +151,28 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                   >
                     <option value="openai">OpenAI (GPT-4o)</option>
                     <option value="anthropic">Anthropic (Claude)</option>
+                    <option value="custom">Custom (OpenAI-compatible)</option>
                   </select>
                 </div>
+
+                {/* Base URL - shown for custom provider */}
+                {aiProvider === 'custom' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Base URL
+                    </label>
+                    <input
+                      type="text"
+                      value={aiBaseUrl}
+                      onChange={(e) => setAiBaseUrl(e.target.value)}
+                      placeholder="https://api.example.com/v1"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      OpenAI-compatible API endpoint (e.g., local LLM, Azure OpenAI)
+                    </p>
+                  </div>
+                )}
 
                 {/* API Key Input */}
                 <div>
@@ -159,7 +184,11 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                       type={showApiKey ? 'text' : 'password'}
                       value={aiApiKey}
                       onChange={(e) => setAiApiKey(e.target.value)}
-                      placeholder={`Enter ${aiProvider === 'openai' ? 'OpenAI' : 'Anthropic'} API key`}
+                      placeholder={
+                        aiProvider === 'openai' ? 'sk-...' :
+                        aiProvider === 'anthropic' ? 'sk-ant-...' :
+                        'Enter API key'
+                      }
                       className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                     <button
@@ -174,6 +203,38 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     Warning: API key will be visible in the exported HTML source code
                   </p>
                 </div>
+
+                {/* Advanced toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="text-xs text-blue-600 hover:text-blue-700"
+                >
+                  {showAdvanced ? '− Hide advanced options' : '+ Show advanced options'}
+                </button>
+
+                {/* Advanced options */}
+                {showAdvanced && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Model Override
+                    </label>
+                    <input
+                      type="text"
+                      value={aiModel}
+                      onChange={(e) => setAiModel(e.target.value)}
+                      placeholder={
+                        aiProvider === 'openai' ? 'gpt-4o (default)' :
+                        aiProvider === 'anthropic' ? 'claude-sonnet-4-20250514 (default)' :
+                        'model-name'
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave empty to use provider's default model
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
