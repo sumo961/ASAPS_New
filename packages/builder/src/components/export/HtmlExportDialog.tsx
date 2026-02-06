@@ -267,7 +267,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                         value={aiModel}
                         onChange={(e) => setAiModel(e.target.value)}
                         placeholder={
-                          aiProvider === 'openai' ? 'gpt-4o (default)' :
+                          aiProvider === 'openai' ? 'gpt-5.2 (default)' :
                           aiProvider === 'anthropic' ? 'claude-sonnet-4-20250514 (default)' :
                           aiProvider === 'local' ? 'llama-3, mistral, etc.' :
                           'model-name'

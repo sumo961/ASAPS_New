@@ -349,7 +349,7 @@ Respond with ONLY the category name, nothing else.`;
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || 'gpt-4o',
+        model: model || 'gpt-5.2',
         messages: [{ role: 'user', content: prompt }],
         max_completion_tokens: maxTokens || 1000,
       }),

@@ -153,7 +153,7 @@ export interface HtmlExportOptions {
   aiApiKey?: string;
   /** Custom base URL for API (OpenAI-compatible endpoints) */
   aiBaseUrl?: string;
-  /** Model override (e.g., 'gpt-4o', 'claude-sonnet-4-20250514') */
+  /** Model override (e.g., 'gpt-5.2', 'claude-sonnet-4-20250514') */
   aiModel?: string;
 }
 

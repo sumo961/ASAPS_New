@@ -124,7 +124,7 @@ export function getProviderBaseUrl(settings: AISettings): string {
 export function getDefaultModel(provider: AIProvider): string {
   switch (provider) {
     case 'openai':
-      return 'gpt-4o';
+      return 'gpt-5.2';
     case 'anthropic':
       return 'claude-sonnet-4-20250514';
     case 'local':
