@@ -155,7 +155,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     onChange={(e) => setAiProvider(e.target.value as AIProvider)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="openai">OpenAI (GPT-4o)</option>
+                    <option value="openai">OpenAI (GPT-5.2)</option>
                     <option value="anthropic">Anthropic (Claude)</option>
                     <option value="custom">Custom (OpenAI-compatible)</option>
                     <option value="local">Local LLM (self-hosted server)</option>
