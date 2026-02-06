@@ -95,6 +95,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('preview:closed', callback);
   },
 
+  // Story injection from MCP server
+  onStoryInject: (callback: (data: any) => void) => {
+    const handler = (_: unknown, data: any) => callback(data);
+    ipcRenderer.on('story:inject', handler);
+    return () => ipcRenderer.removeListener('story:inject', handler);
+  },
+
   // Platform info
   platform: process.platform,
   isElectron: true,
@@ -145,6 +152,7 @@ declare global {
       };
       onPreviewMessage: (callback: (message: any) => void) => () => void;
       onPreviewClosed: (callback: () => void) => () => void;
+      onStoryInject: (callback: (data: any) => void) => () => void;
       platform: NodeJS.Platform;
       isElectron: boolean;
     };

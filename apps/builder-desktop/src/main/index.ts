@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import * as fs from 'fs/promises';
-import { getEmbeddedAPIServer } from './api-server';
+import { getEmbeddedAPIServer, setStoryInjectionCallback } from './api-server';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
 
 // Track if we're in the process of installing an update
@@ -660,6 +660,16 @@ app.whenReady().then(async () => {
   try {
     await apiServer.start();
     console.log('[Main] API server started:', apiServer.getStatus());
+
+    // Set up story injection callback to forward to renderer
+    setStoryInjectionCallback((data) => {
+      console.log('[Main] Story injection received, forwarding to renderer');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('story:inject', data);
+      } else {
+        console.warn('[Main] Cannot inject story - main window not available');
+      }
+    });
   } catch (error) {
     console.error('[Main] Failed to start API server:', error);
     // Continue anyway - the app can work without the proxy server

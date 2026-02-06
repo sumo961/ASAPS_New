@@ -27,6 +27,13 @@ export interface EmbeddedAPIServerConfig {
   host?: string;
 }
 
+// Callback for story injection (set by main process)
+let storyInjectionCallback: ((data: any) => void) | null = null;
+
+export function setStoryInjectionCallback(callback: (data: any) => void): void {
+  storyInjectionCallback = callback;
+}
+
 /**
  * Lightweight embedded API server for Electron
  * Uses only Node.js built-in modules to avoid bundling issues
@@ -142,9 +149,13 @@ export class EmbeddedAPIServer {
     try {
       // Route handling
       if (path === '/health') {
-        this.sendJson(res, 200, { status: 'ok', timestamp: new Date().toISOString() });
+        this.sendJson(res, 200, { status: 'ok', timestamp: new Date().toISOString(), websocket: false });
       } else if (path === '/api/schema/beats' && req.method === 'GET') {
         this.handleGetBeatSchema(res);
+      } else if (path === '/api/schema/example' && req.method === 'GET') {
+        this.handleGetExampleStory(res);
+      } else if (path === '/api/stories/inject' && req.method === 'POST') {
+        await this.handleStoryInject(req, res);
       } else if (path === '/api/ai/claude' && req.method === 'POST') {
         await this.handleClaudeProxy(req, res);
       } else if (path === '/api/ai/openai' && req.method === 'POST') {
@@ -293,6 +304,152 @@ export class EmbeddedAPIServer {
   private handleGetBeatSchema(res: ServerResponse): void {
     const schema = this.loadBeatSchema();
     this.sendJson(res, 200, schema);
+  }
+
+  /**
+   * Handle GET /api/schema/example - return example story structure
+   */
+  private handleGetExampleStory(res: ServerResponse): void {
+    const exampleStory = {
+      metadata: {
+        title: 'The Crossroads Decision',
+        author: 'Claude Desktop',
+        description: 'A short interactive narrative demonstrating ASAPS beat types',
+      },
+      beats: [
+        {
+          id: 'beat_0',
+          type: 'titleScreen',
+          name: 'Title',
+          parameters: {
+            title: 'The Crossroads Decision',
+            author: 'Claude Desktop',
+            buttonText: 'Begin',
+          },
+          x: 100,
+          y: 200,
+        },
+        {
+          id: 'beat_1',
+          type: 'infoText',
+          name: 'Introduction',
+          parameters: {
+            text: 'You stand at a crossroads. The morning mist swirls around your feet as you consider your options.',
+            buttonText: 'Look around',
+          },
+          x: 400,
+          y: 200,
+        },
+        {
+          id: 'beat_2',
+          type: 'movementChoice',
+          name: 'The Choice',
+          parameters: {
+            question: 'Which path will you take?',
+            choices: [
+              { id: 'c1', text: 'Take the forest path', location: 'Dark Forest', target: 'beat_3' },
+              { id: 'c2', text: 'Follow the mountain road', location: 'Mountain Pass', target: 'beat_4' },
+            ],
+          },
+          x: 700,
+          y: 200,
+        },
+        {
+          id: 'beat_3',
+          type: 'infoText',
+          name: 'Forest Path',
+          parameters: {
+            text: 'The forest path leads you through ancient trees. Shafts of sunlight pierce the canopy above.',
+            buttonText: 'Continue',
+          },
+          x: 550,
+          y: 400,
+        },
+        {
+          id: 'beat_4',
+          type: 'infoText',
+          name: 'Mountain Road',
+          parameters: {
+            text: 'The mountain road climbs steadily upward. The air grows thin but the view is breathtaking.',
+            buttonText: 'Continue',
+          },
+          x: 850,
+          y: 400,
+        },
+        {
+          id: 'beat_5',
+          type: 'endScreen',
+          name: 'Journey End',
+          parameters: {
+            message: 'Your journey continues...\n\nThank you for exploring this demonstration.',
+            showRestart: true,
+          },
+          x: 700,
+          y: 600,
+        },
+      ],
+      connections: [
+        { source: 'beat_0', target: 'beat_1', label: 'Begin' },
+        { source: 'beat_1', target: 'beat_2', label: 'Continue' },
+        { source: 'beat_3', target: 'beat_5', label: 'Continue' },
+        { source: 'beat_4', target: 'beat_5', label: 'Continue' },
+      ],
+    };
+
+    this.sendJson(res, 200, exampleStory);
+  }
+
+  /**
+   * Handle POST /api/stories/inject - inject story into the running Builder
+   */
+  private async handleStoryInject(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const body = await this.readBody(req);
+      const { metadata, beats, connections, characters, environment, suggestedTheme } = JSON.parse(body);
+
+      // Validate required fields
+      if (!beats || !Array.isArray(beats)) {
+        this.sendJson(res, 400, {
+          error: 'Invalid request: beats array is required',
+        });
+        return;
+      }
+
+      const injectionId = `inject_${Date.now()}`;
+      console.log(`[API Server] Injecting story: "${metadata?.title || 'Untitled'}" with ${beats.length} beats (id: ${injectionId})`);
+
+      // Send to main window via callback
+      if (storyInjectionCallback) {
+        storyInjectionCallback({
+          metadata: metadata || { title: 'Injected Story', author: 'Claude Desktop' },
+          beats,
+          connections: connections || [],
+          characters: characters || [],
+          environment: environment || { props: [], nodes: [] },
+          suggestedTheme: suggestedTheme || undefined,
+          injectedAt: new Date().toISOString(),
+        });
+
+        this.sendJson(res, 200, {
+          success: true,
+          message: `Story "${metadata?.title || 'Untitled'}" injected successfully`,
+          beatsCount: beats.length,
+          connectionsCount: connections?.length || 0,
+        });
+      } else {
+        console.warn('[API Server] No injection callback registered - main window may not be ready');
+        this.sendJson(res, 503, {
+          error: 'Service not ready',
+          message: 'The ASAPS Builder window is not ready to receive stories. Please wait and try again.',
+        });
+      }
+    } catch (error) {
+      console.error('[API Server] Story injection failed:', error);
+      this.sendJson(res, 500, {
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }
 
   /**

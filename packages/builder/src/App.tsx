@@ -65,6 +65,7 @@ declare global {
       onMcpSettingChanged?: (callback: (enabled: boolean) => void) => () => void;
       onProjectOpen: (callback: (path: string) => void) => () => void;
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
+      onStoryInject?: (callback: (data: any) => void) => () => void;
       isElectron: boolean;
     };
   }
@@ -1167,6 +1168,20 @@ function App() {
       });
     }
 
+    // Listen for story injection from Electron IPC (when running as desktop app)
+    let unsubscribeStoryInject: (() => void) | undefined;
+    if (window.electronAPI?.onStoryInject) {
+      unsubscribeStoryInject = window.electronAPI.onStoryInject((data) => {
+        console.log('[App] Story injection received via IPC:', data.metadata?.title);
+        if (handleStoryGeneratedRef.current) {
+          handleStoryGeneratedRef.current(data);
+        } else {
+          console.warn('[App] handleStoryGeneratedRef.current is null, cannot process injected story');
+        }
+      });
+      console.log('[App] Registered IPC listener for story injection');
+    }
+
     // Start initialization
     initMcpConnection();
 
@@ -1179,6 +1194,9 @@ function App() {
       }
       if (unsubscribeMcpSetting) {
         unsubscribeMcpSetting();
+      }
+      if (unsubscribeStoryInject) {
+        unsubscribeStoryInject();
       }
     };
   }, []); // Only run once on mount
