@@ -1,6 +1,9 @@
 use tauri::{Emitter, Manager, LogicalSize};
 use std::env;
 
+mod llm;
+use llm::LlmState;
+
 /// Resize the window to match the story's stage dimensions
 #[tauri::command]
 fn resize_window(app: tauri::AppHandle, width: u32, height: u32) -> Result<(), String> {
@@ -107,7 +110,22 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![resize_window, get_working_directory, get_executable_directory, get_search_directories, get_cli_args])
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .manage(LlmState::default())
+        .invoke_handler(tauri::generate_handler![
+            resize_window,
+            get_working_directory,
+            get_executable_directory,
+            get_search_directories,
+            get_cli_args,
+            llm::llm_is_available,
+            llm::llm_list_available_models,
+            llm::llm_check_model,
+            llm::llm_get_model_path,
+            llm::llm_download_model,
+            llm::llm_delete_model,
+            llm::llm_generate
+        ])
         .setup(|app| {
             // Set up single instance on desktop platforms
             #[cfg(desktop)]

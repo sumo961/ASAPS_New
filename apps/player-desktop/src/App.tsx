@@ -1,6 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PlayerEngine, PlayerUI } from '@asaps/player';
 import { ReactRenderer, type RenderContext } from '@asaps/renderer';
+import { SettingsModal } from './components/SettingsModal';
+import { DesktopAIService } from './services/AIService';
+import { LocalLLMService } from './services/LocalLLMProvider';
+import { loadAISettings, type AISettings } from './services/AIConfig';
 
 type AppState = 'scanning' | 'selecting' | 'loading' | 'playing' | 'error';
 
@@ -13,10 +17,39 @@ const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('scanning');
   const [error, setError] = useState<string | null>(null);
   const [storyFiles, setStoryFiles] = useState<StoryFile[]>([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [aiSettings, setAISettings] = useState<AISettings | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<PlayerEngine | null>(null);
   const rendererRef = useRef<ReactRenderer | null>(null);
+
+  // Load AI settings on startup
+  useEffect(() => {
+    loadAISettings().then(setAISettings);
+  }, []);
+
+  // Create AI service based on settings
+  const createAIService = useCallback((settings: AISettings) => {
+    if (settings.provider === 'local') {
+      return new LocalLLMService(settings.localModelId || 'gemma-3-4b');
+    } else if (settings.apiKey) {
+      return new DesktopAIService(settings);
+    }
+    return null;
+  }, []);
+
+  // Update AI service when settings change
+  const handleSettingsChange = useCallback((settings: AISettings) => {
+    setAISettings(settings);
+    // Update the AI service on the current renderer if playing
+    if (rendererRef.current) {
+      const aiService = createAIService(settings);
+      if (aiService) {
+        rendererRef.current.setState('aiService', aiService);
+      }
+    }
+  }, [createAIService]);
 
   // Scan for story files on startup
   useEffect(() => {
@@ -153,6 +186,14 @@ const App: React.FC = () => {
       const renderer = new ReactRenderer(context);
       rendererRef.current = renderer;
 
+      // Set up AI service if configured
+      if (aiSettings) {
+        const aiService = createAIService(aiSettings);
+        if (aiService) {
+          renderer.setState('aiService', aiService);
+        }
+      }
+
       // Create player
       const player = new PlayerEngine({
         container: containerRef.current,
@@ -217,6 +258,22 @@ const App: React.FC = () => {
 
   return (
     <div className="app-container">
+      {/* Settings button - shown on all screens */}
+      <button
+        className="settings-trigger"
+        onClick={() => setShowSettings(true)}
+        title="Settings"
+      >
+        ⚙️
+      </button>
+
+      {/* Settings modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onSettingsChange={handleSettingsChange}
+      />
+
       {appState === 'scanning' && (
         <div className="loading-screen">
           <div className="spinner" />
