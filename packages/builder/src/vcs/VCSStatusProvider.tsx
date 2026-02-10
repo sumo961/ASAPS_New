@@ -1,0 +1,574 @@
+/**
+ * VCSStatusProvider - React context for VCS state
+ *
+ * Provides VCS information to the UI: branch name, changed files,
+ * conflict status, and VCS type (Git/Perforce/none).
+ *
+ * Only active for directory-format projects in Electron.
+ */
+
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { detectVCS, type VCSType } from './VCSDetector';
+import {
+  getGitStatus, getChangedFiles,
+  gitInit, gitAddRemote,
+  gitStage, gitUnstage, gitCommit, gitPush, gitPull, gitFetch,
+  gitStash, gitStashPop, gitRevertFiles, gitGetConflicts,
+  type GitFileStatus, type GitOperationResult,
+} from './GitAdapter';
+import {
+  getP4Status, getP4Locks,
+  p4Submit, p4Sync, p4Edit, p4Revert, p4Lock, p4Unlock,
+  type P4OperationResult,
+} from './PerforceAdapter';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export type BeatVCSStatus = 'added' | 'modified' | 'deleted' | 'conflict' | 'locked' | 'unchanged';
+
+/** Event emitted after VCS operations for toast notifications */
+export interface VCSEvent {
+  type: 'success' | 'error' | 'info';
+  message: string;
+}
+
+export interface VCSState {
+  /** Whether VCS detection is complete */
+  initialized: boolean;
+  /** Detected VCS type */
+  type: VCSType;
+  /** Current branch name */
+  branch: string | null;
+  /** Set of file paths that have been modified since last commit */
+  changedFiles: Set<string>;
+  /** Number of changed files */
+  changedFileCount: number;
+  /** Commits ahead of remote (Git) */
+  ahead: number;
+  /** Commits behind remote (Git) */
+  behind: number;
+  /** Whether there are any uncommitted changes */
+  isDirty: boolean;
+  /** Perforce-specific: files currently checked out */
+  p4OpenedFiles: string[];
+  /** Files with detected conflicts */
+  conflictFiles: Set<string>;
+  /** Project directory path */
+  projectPath: string | null;
+  /** Staged files (Git) */
+  stagedFiles: GitFileStatus[];
+  /** Unstaged/untracked files (Git) */
+  unstagedFiles: GitFileStatus[];
+  /** Perforce lock map: depotPath -> user@workspace */
+  p4Locks: Map<string, string>;
+}
+
+export interface VCSContextValue extends VCSState {
+  /** Refresh VCS status (re-query git/p4) */
+  refresh: () => Promise<void>;
+  /** Check if a specific file path has been modified */
+  isFileChanged: (relativePath: string) => boolean;
+  /** Check if a beat file has been modified, given its beat ID */
+  isBeatChanged: (beatId: string) => boolean;
+  /** Get the VCS status for a beat */
+  getBeatStatus: (beatId: string) => BeatVCSStatus;
+  /** Get who has a beat locked (Perforce only) */
+  getLockedBy: (beatId: string) => string | null;
+  /** Initialize VCS tracking for a project directory */
+  initialize: (projectPath: string) => Promise<void>;
+  /** Clear VCS state (when closing project or switching to non-directory format) */
+  clear: () => void;
+  /** Initialize a new Git repository and optionally add a remote */
+  initRepo: (remoteUrl?: string) => Promise<GitOperationResult>;
+
+  // --- Git Operations ---
+  /** Stage files */
+  stage: (filePaths: string[]) => Promise<GitOperationResult>;
+  /** Unstage files */
+  unstage: (filePaths: string[]) => Promise<GitOperationResult>;
+  /** Commit staged changes */
+  commit: (message: string) => Promise<GitOperationResult>;
+  /** Push to remote */
+  push: () => Promise<GitOperationResult>;
+  /** Pull from remote */
+  pull: (rebase?: boolean) => Promise<GitOperationResult>;
+  /** Fetch from remote */
+  fetch: () => Promise<GitOperationResult>;
+  /** Stash changes */
+  stash: (message?: string) => Promise<GitOperationResult>;
+  /** Pop stash */
+  stashPop: () => Promise<GitOperationResult>;
+  /** Revert files to last committed state */
+  revertFiles: (filePaths: string[]) => Promise<GitOperationResult>;
+
+  // --- Perforce Operations ---
+  /** Submit changelist (P4) */
+  p4SubmitChanges: (description: string, filePaths?: string[]) => Promise<P4OperationResult>;
+  /** Sync to latest (P4) */
+  p4SyncLatest: () => Promise<P4OperationResult>;
+  /** Check out file for editing (P4) */
+  p4EditFile: (filePath: string) => Promise<boolean>;
+  /** Revert file (P4) */
+  p4RevertFile: (filePath: string) => Promise<boolean>;
+  /** Lock file (P4) */
+  p4LockFile: (filePath: string) => Promise<P4OperationResult>;
+  /** Unlock file (P4) */
+  p4UnlockFile: (filePath: string) => Promise<P4OperationResult>;
+
+  // --- Event system ---
+  /** Subscribe to VCS events (for toasts). Returns unsubscribe fn. */
+  onEvent: (handler: (event: VCSEvent) => void) => () => void;
+}
+
+const defaultState: VCSState = {
+  initialized: false,
+  type: 'none',
+  branch: null,
+  changedFiles: new Set(),
+  changedFileCount: 0,
+  ahead: 0,
+  behind: 0,
+  isDirty: false,
+  p4OpenedFiles: [],
+  conflictFiles: new Set(),
+  projectPath: null,
+  stagedFiles: [],
+  unstagedFiles: [],
+  p4Locks: new Map(),
+};
+
+const VCSContext = createContext<VCSContextValue | null>(null);
+
+// ============================================================================
+// Provider
+// ============================================================================
+
+/** Refresh interval for VCS status polling (ms) */
+const POLL_INTERVAL = 30000;
+
+interface VCSProviderProps {
+  children: ReactNode;
+  /** Optional callback to flush pending saves before VCS refresh */
+  onBeforeRefresh?: () => Promise<void>;
+}
+
+export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBeforeRefresh }) => {
+  const [state, setState] = useState<VCSState>(defaultState);
+  const pollTimerRef = useRef<number | null>(null);
+  const projectPathRef = useRef<string | null>(null);
+  const eventHandlersRef = useRef<Set<(event: VCSEvent) => void>>(new Set());
+  const onBeforeRefreshRef = useRef(onBeforeRefresh);
+  onBeforeRefreshRef.current = onBeforeRefresh;
+
+  const emitEvent = useCallback((event: VCSEvent) => {
+    for (const handler of eventHandlersRef.current) {
+      try { handler(event); } catch { /* ignore handler errors */ }
+    }
+  }, []);
+
+  const onEvent = useCallback((handler: (event: VCSEvent) => void) => {
+    eventHandlersRef.current.add(handler);
+    return () => { eventHandlersRef.current.delete(handler); };
+  }, []);
+
+  /**
+   * Refresh VCS status from disk.
+   * Flushes pending in-memory saves first so Git sees the latest edits.
+   */
+  const refresh = useCallback(async () => {
+    const path = projectPathRef.current;
+    if (!path) return;
+
+    // Flush pending saves so files on disk reflect latest edits
+    if (onBeforeRefreshRef.current) {
+      try { await onBeforeRefreshRef.current(); } catch { /* ok — untitled projects may throw */ }
+    }
+
+    try {
+      const vcsInfo = await detectVCS(path);
+
+      if (vcsInfo.type === 'git') {
+        const status = await getGitStatus(path);
+        const changed = await getChangedFiles(path);
+        const conflicts = await gitGetConflicts(path);
+
+        // Separate staged and unstaged files
+        const stagedFiles = status.files.filter(f => f.staged);
+        const unstagedFiles = status.files.filter(f => !f.staged);
+
+        setState(prev => ({
+          ...prev,
+          type: 'git',
+          branch: status.branch,
+          changedFiles: new Set(changed),
+          changedFileCount: status.files.length,
+          ahead: status.ahead,
+          behind: status.behind,
+          isDirty: status.isDirty,
+          conflictFiles: new Set(conflicts),
+          stagedFiles,
+          unstagedFiles,
+        }));
+      } else if (vcsInfo.type === 'perforce') {
+        const status = await getP4Status(path);
+        let locks = new Map<string, string>();
+        try {
+          locks = await getP4Locks(path);
+        } catch { /* ignore lock fetch failure */ }
+
+        setState(prev => ({
+          ...prev,
+          type: 'perforce',
+          branch: status.clientName,
+          p4OpenedFiles: status.openedFiles.map(f => f.depotFile),
+          isDirty: status.openedFiles.length > 0,
+          changedFileCount: status.openedFiles.length,
+          p4Locks: locks,
+        }));
+      } else {
+        setState(prev => ({
+          ...prev,
+          type: 'none',
+          branch: null,
+          changedFiles: new Set(),
+          changedFileCount: 0,
+          isDirty: false,
+          stagedFiles: [],
+          unstagedFiles: [],
+        }));
+      }
+    } catch (error) {
+      console.error('[VCSStatusProvider] Refresh failed:', error);
+    }
+  }, []);
+
+  /**
+   * Initialize VCS tracking for a directory project
+   */
+  const initialize = useCallback(async (projectPath: string) => {
+    projectPathRef.current = projectPath;
+
+    setState(prev => ({
+      ...prev,
+      projectPath,
+      initialized: false,
+    }));
+
+    await refresh();
+
+    setState(prev => ({
+      ...prev,
+      initialized: true,
+    }));
+
+    // Start polling
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+    }
+    pollTimerRef.current = window.setInterval(refresh, POLL_INTERVAL);
+  }, [refresh]);
+
+  /**
+   * Clear VCS state
+   */
+  const clear = useCallback(() => {
+    projectPathRef.current = null;
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    setState(defaultState);
+  }, []);
+
+  /**
+   * Check if a file path is in the changed set
+   */
+  const isFileChanged = useCallback((relativePath: string): boolean => {
+    return state.changedFiles.has(relativePath);
+  }, [state.changedFiles]);
+
+  /**
+   * Find the file path matching a beat ID from the changed/staged/unstaged files
+   */
+  const findBeatFile = useCallback((beatId: string): string | null => {
+    const allFiles = [
+      ...state.stagedFiles.map(f => f.path),
+      ...state.unstagedFiles.map(f => f.path),
+      ...state.changedFiles,
+    ];
+    const safeBeatId = beatId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    for (const file of allFiles) {
+      if (file.includes(`_${beatId}.json`) || file.includes(`_${safeBeatId}.json`)) {
+        return file;
+      }
+    }
+    return null;
+  }, [state.stagedFiles, state.unstagedFiles, state.changedFiles]);
+
+  /**
+   * Check if a beat has been modified (by checking for beat filename patterns)
+   */
+  const isBeatChanged = useCallback((beatId: string): boolean => {
+    return findBeatFile(beatId) !== null;
+  }, [findBeatFile]);
+
+  /**
+   * Get detailed VCS status for a beat
+   */
+  const getBeatStatus = useCallback((beatId: string): BeatVCSStatus => {
+    const safeBeatId = beatId.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // Check conflicts first
+    for (const file of state.conflictFiles) {
+      if (file.includes(`_${beatId}.json`) || file.includes(`_${safeBeatId}.json`)) {
+        return 'conflict';
+      }
+    }
+
+    // Check Perforce locks
+    if (state.type === 'perforce') {
+      for (const [depotPath] of state.p4Locks) {
+        if (depotPath.includes(`_${beatId}.json`) || depotPath.includes(`_${safeBeatId}.json`)) {
+          return 'locked';
+        }
+      }
+    }
+
+    // Check staged/unstaged files for specific status
+    const allFiles = [...state.stagedFiles, ...state.unstagedFiles];
+    for (const file of allFiles) {
+      if (file.path.includes(`_${beatId}.json`) || file.path.includes(`_${safeBeatId}.json`)) {
+        if (file.status === 'A' || file.status === '?') return 'added';
+        if (file.status === 'D') return 'deleted';
+        return 'modified';
+      }
+    }
+
+    return 'unchanged';
+  }, [state.conflictFiles, state.stagedFiles, state.unstagedFiles, state.p4Locks, state.type]);
+
+  /**
+   * Get who has a beat locked (Perforce only)
+   */
+  const getLockedBy = useCallback((beatId: string): string | null => {
+    if (state.type !== 'perforce') return null;
+    const safeBeatId = beatId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    for (const [depotPath, user] of state.p4Locks) {
+      if (depotPath.includes(`_${beatId}.json`) || depotPath.includes(`_${safeBeatId}.json`)) {
+        return user;
+      }
+    }
+    return null;
+  }, [state.type, state.p4Locks]);
+
+  // ---- Git operation wrappers (delegate + refresh + emit) ----
+
+  const requirePath = () => {
+    const path = projectPathRef.current;
+    if (!path) throw new Error('No project path set');
+    return path;
+  };
+
+  const initRepo = useCallback(async (remoteUrl?: string) => {
+    const path = requirePath();
+    const result = await gitInit(path);
+    if (!result.success) {
+      emitEvent({ type: 'error', message: result.message });
+      return result;
+    }
+    if (remoteUrl) {
+      const remoteResult = await gitAddRemote(path, 'origin', remoteUrl);
+      if (!remoteResult.success) {
+        emitEvent({ type: 'error', message: remoteResult.message });
+        return remoteResult;
+      }
+    }
+    // Re-detect VCS and refresh state now that git is initialized
+    await refresh();
+    emitEvent({ type: 'success', message: remoteUrl ? 'Initialized Git repository with remote' : 'Initialized Git repository' });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const stage = useCallback(async (filePaths: string[]) => {
+    const result = await gitStage(requirePath(), filePaths);
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    // Delay refresh to avoid rapid re-render cascade that disrupts ReactFlow
+    setTimeout(() => refresh(), 150);
+    return result;
+  }, [refresh, emitEvent]);
+
+  const unstage = useCallback(async (filePaths: string[]) => {
+    const result = await gitUnstage(requirePath(), filePaths);
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    setTimeout(() => refresh(), 150);
+    return result;
+  }, [refresh, emitEvent]);
+
+  const commit = useCallback(async (message: string) => {
+    const result = await gitCommit(requirePath(), message);
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    // Delay refresh slightly so the commit result propagates through React
+    // before the VCS state update triggers re-renders in the graph editor.
+    // Without this delay, rapid state updates can cause ReactFlow to lose nodes.
+    setTimeout(() => refresh(), 150);
+    return result;
+  }, [refresh, emitEvent]);
+
+  const push = useCallback(async () => {
+    const result = await gitPush(requirePath());
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const pull = useCallback(async (rebase = false) => {
+    const result = await gitPull(requirePath(), rebase);
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const fetchRemote = useCallback(async () => {
+    const result = await gitFetch(requirePath());
+    await refresh();
+    if (result.success) {
+      emitEvent({ type: 'success', message: result.message });
+    } else {
+      emitEvent({ type: 'error', message: result.message });
+    }
+    return result;
+  }, [refresh, emitEvent]);
+
+  const stashChanges = useCallback(async (message?: string) => {
+    const result = await gitStash(requirePath(), message);
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const stashPopChanges = useCallback(async () => {
+    const result = await gitStashPop(requirePath());
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const revertFilesOp = useCallback(async (filePaths: string[]) => {
+    const result = await gitRevertFiles(requirePath(), filePaths);
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  // ---- Perforce operation wrappers ----
+
+  const p4SubmitChanges = useCallback(async (description: string, filePaths?: string[]) => {
+    const result = await p4Submit(requirePath(), description, filePaths);
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const p4SyncLatest = useCallback(async () => {
+    const result = await p4Sync(requirePath());
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const p4EditFile = useCallback(async (filePath: string) => {
+    const result = await p4Edit(filePath, requirePath());
+    await refresh();
+    emitEvent({ type: result ? 'success' : 'error', message: result ? `Opened ${filePath} for edit` : 'Failed to open for edit' });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const p4RevertFile = useCallback(async (filePath: string) => {
+    const result = await p4Revert(filePath, requirePath());
+    await refresh();
+    emitEvent({ type: result ? 'success' : 'error', message: result ? `Reverted ${filePath}` : 'Failed to revert' });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const p4LockFile = useCallback(async (filePath: string) => {
+    const result = await p4Lock(requirePath(), filePath);
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const p4UnlockFile = useCallback(async (filePath: string) => {
+    const result = await p4Unlock(requirePath(), filePath);
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+      }
+    };
+  }, []);
+
+  const value: VCSContextValue = {
+    ...state,
+    refresh,
+    isFileChanged,
+    isBeatChanged,
+    getBeatStatus,
+    getLockedBy,
+    initialize,
+    clear,
+    initRepo,
+    stage,
+    unstage,
+    commit,
+    push,
+    pull,
+    fetch: fetchRemote,
+    stash: stashChanges,
+    stashPop: stashPopChanges,
+    revertFiles: revertFilesOp,
+    p4SubmitChanges,
+    p4SyncLatest,
+    p4EditFile,
+    p4RevertFile,
+    p4LockFile,
+    p4UnlockFile,
+    onEvent,
+  };
+
+  return (
+    <VCSContext.Provider value={value}>
+      {children}
+    </VCSContext.Provider>
+  );
+};
+
+// ============================================================================
+// Hook
+// ============================================================================
+
+/**
+ * Hook to access VCS status. Returns null if not within a VCSStatusProvider.
+ */
+export function useVCSStatus(): VCSContextValue | null {
+  return useContext(VCSContext);
+}
+
+/**
+ * Hook that requires VCS status (throws if not in provider).
+ * Use this in components that always render within the VCS provider.
+ */
+export function useRequiredVCSStatus(): VCSContextValue {
+  const context = useContext(VCSContext);
+  if (!context) {
+    throw new Error('useRequiredVCSStatus must be used within a VCSStatusProvider');
+  }
+  return context;
+}

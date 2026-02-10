@@ -41,6 +41,10 @@ export interface AutoSaveOptions {
 
   /** Enable debug logging */
   debug?: boolean;
+
+  /** Called after a successful save with the saved project data.
+   *  Use this to persist to additional backends (e.g. filesystem). */
+  onAfterSave?: (project: Project) => Promise<void>;
 }
 
 /**
@@ -114,6 +118,7 @@ export function useAutoSave(
     saveDrafts = true,
     maxDrafts = 10,
     debug = false,
+    onAfterSave,
   } = options;
 
   const [status, setStatus] = useState<SaveStatus>('idle');
@@ -126,6 +131,8 @@ export function useAutoSave(
   const savedTimeoutRef = useRef<number | null>(null);
   const pendingChangesDuringSavedRef = useRef(false);
   const isPausedRef = useRef(false);
+  const onAfterSaveRef = useRef(onAfterSave);
+  onAfterSaveRef.current = onAfterSave;
 
   /**
    * Debug logging
@@ -186,6 +193,16 @@ export function useAutoSave(
 
       if (!saveResult.success) {
         throw saveResult.error || new Error('Failed to save project');
+      }
+
+      // Call onAfterSave callback (e.g. write to filesystem for directory projects)
+      if (onAfterSaveRef.current) {
+        try {
+          await onAfterSaveRef.current(project);
+        } catch (err) {
+          log('onAfterSave callback failed:', err);
+          // Non-fatal — IndexedDB save already succeeded
+        }
       }
 
       // Save draft if enabled

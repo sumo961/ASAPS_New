@@ -41,6 +41,11 @@ import { HtmlExportDialog } from './components/export/HtmlExportDialog';
 import { getThemeService } from './services/ThemeService';
 import { themeToGlobalSettings } from './themes/migration/GlobalSettingsAdapter';
 import { BUILT_IN_THEMES } from '@asaps/core';
+import { useVCSStatus } from './vcs/VCSStatusProvider';
+import { VCSPanel } from './components/vcs/VCSPanel';
+import { DiffViewer } from './components/vcs/DiffViewer';
+import { VCSToast } from './components/vcs/VCSToast';
+import { GitInitDialog } from './components/vcs/GitInitDialog';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -49,6 +54,14 @@ declare global {
       fs: {
         readFile: (path: string) => Promise<ArrayBuffer>;
         writeFile: (path: string, data: ArrayBuffer | Uint8Array | string) => Promise<void>;
+        readDir: (path: string) => Promise<Array<{ name: string; isDirectory: boolean | (() => boolean) }>>;
+        mkdir: (path: string) => Promise<void>;
+        exists: (path: string) => Promise<boolean>;
+        unlink: (path: string) => Promise<void>;
+        copyFile: (src: string, dst: string) => Promise<void>;
+        stat: (path: string) => Promise<{ size: number; mtime: string; isDirectory: boolean }>;
+        watchDir: (path: string, callback: (changedFiles: string[]) => void) => () => void;
+        runCommand: (command: string, args: string[], cwd?: string) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
       };
       dialog?: {
         save: (options: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePath?: string }>;
@@ -65,7 +78,16 @@ declare global {
       onMcpSettingChanged?: (callback: (enabled: boolean) => void) => () => void;
       onProjectOpen: (callback: (path: string) => void) => () => void;
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
+      onProjectOpenFolder?: (callback: (path: string) => void) => () => void;
+      onProjectSaveAsFolder?: (callback: (path: string) => void) => () => void;
       onStoryInject?: (callback: (data: any) => void) => () => void;
+      onVCSCommit?: (callback: () => void) => () => void;
+      onVCSPush?: (callback: () => void) => () => void;
+      onVCSPull?: (callback: () => void) => () => void;
+      onVCSStash?: (callback: () => void) => () => void;
+      onVCSStashPop?: (callback: () => void) => () => void;
+      onVCSTogglePanel?: (callback: () => void) => () => void;
+      onVCSRefresh?: (callback: () => void) => () => void;
       isElectron: boolean;
     };
   }
@@ -139,6 +161,11 @@ function App() {
 
   // Import Twine dialog state
   const [showImportTwineDialog, setShowImportTwineDialog] = useState(false);
+
+  // VCS Panel state
+  const [vcsPanelOpen, setVcsPanelOpen] = useState(false);
+  const [diffViewerFile, setDiffViewerFile] = useState<string | null>(null);
+  const [showGitInitDialog, setShowGitInitDialog] = useState(false);
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -407,7 +434,8 @@ function App() {
   // Persistence hooks
   const { markChanged, saveNow } = useSave();
   const { updateStory, updateGlobalSettings, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled } = useProject();
-  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback, pauseAutoSave, resumeAutoSave, initialized: storageInitialized } = usePersistence();
+  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback, pauseAutoSave, resumeAutoSave, initialized: storageInitialized, openDirectoryProject, saveAsDirectory, projectFormat, projectPath } = usePersistence();
+  const vcs = useVCSStatus();
 
   // Electron integration - set up menu event listeners
   useEffect(() => {
@@ -515,6 +543,47 @@ function App() {
       discardUntitled();
     });
 
+    // Handle Open Project Folder from File menu (directory format)
+    const unsubscribeOpenFolder = window.electronAPI.onProjectOpenFolder?.(async (folderPath: string) => {
+      console.log('[Electron] Opening project folder:', folderPath);
+      try {
+        const success = await openDirectoryProject(folderPath);
+        if (success) {
+          console.log('[Electron] Directory project opened successfully');
+          // Initialize VCS tracking for the directory
+          if (vcs) {
+            await vcs.initialize(folderPath);
+          }
+        } else {
+          alert('Failed to open project folder. Make sure it contains a valid ASAPS project.');
+        }
+      } catch (error) {
+        console.error('[Electron] Failed to open project folder:', error);
+        alert(`Failed to open project folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    });
+
+    // Handle Save As Folder from File menu (directory format)
+    const unsubscribeSaveAsFolder = window.electronAPI.onProjectSaveAsFolder?.(async (folderPath: string) => {
+      console.log('[Electron] Saving project as folder:', folderPath);
+      try {
+        const success = await saveAsDirectory(folderPath);
+        if (success) {
+          console.log('[Electron] Project saved as directory successfully');
+          alert(`Project saved to folder: ${folderPath}`);
+          // Initialize VCS tracking for the new directory
+          if (vcs) {
+            await vcs.initialize(folderPath);
+          }
+        } else {
+          alert('Failed to save project as folder.');
+        }
+      } catch (error) {
+        console.error('[Electron] Failed to save as folder:', error);
+        alert(`Failed to save project as folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    });
+
     // Cleanup
     return () => {
       unsubscribeOpen();
@@ -522,8 +591,20 @@ function App() {
       unsubscribeExport();
       unsubscribeSaveAs();
       unsubscribeNew();
+      unsubscribeOpenFolder?.();
+      unsubscribeSaveAsFolder?.();
     };
-  }, [loadProject, saveNow, currentProject, state.title, discardUntitled, saveCurrent]);
+  }, [loadProject, saveNow, currentProject, state.title, discardUntitled, saveCurrent, openDirectoryProject, saveAsDirectory, vcs]);
+
+  // Auto-initialize VCS when project format changes to directory
+  useEffect(() => {
+    if (projectFormat === 'directory' && projectPath && vcs && !vcs.initialized) {
+      console.log('[App] Auto-initializing VCS for directory project:', projectPath);
+      vcs.initialize(projectPath);
+    } else if (projectFormat !== 'directory' && vcs?.initialized) {
+      vcs.clear();
+    }
+  }, [projectFormat, projectPath, vcs]);
 
   /**
    * Sync current story state to project before saving
@@ -1868,6 +1949,46 @@ function App() {
     markChanged();
   }, [actions, beatClipboard, markChanged]);
 
+  // VCS context menu handlers
+  const vcsCtx = useVCSStatus();
+  const handleViewBeatDiff = useCallback((beatId: string) => {
+    // Find the file path for this beat from VCS changed files
+    if (!vcsCtx) return;
+    const allFiles = [
+      ...vcsCtx.stagedFiles.map(f => f.path),
+      ...vcsCtx.unstagedFiles.map(f => f.path),
+      ...vcsCtx.changedFiles,
+    ];
+    const safeBeatId = beatId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const file = allFiles.find(f => f.includes(`_${beatId}.json`) || f.includes(`_${safeBeatId}.json`));
+    if (file) {
+      setDiffViewerFile(file);
+    }
+  }, [vcsCtx]);
+
+  const handleViewBeatHistory = useCallback((beatId: string) => {
+    // Open VCS panel to History tab, filtered to this beat's file
+    // For now just open the panel - the HistoryTab will show all history
+    setVcsPanelOpen(true);
+  }, []);
+
+  const handleRevertBeat = useCallback(async (beatId: string) => {
+    if (!vcsCtx) return;
+    const allFiles = [
+      ...vcsCtx.stagedFiles.map(f => f.path),
+      ...vcsCtx.unstagedFiles.map(f => f.path),
+      ...vcsCtx.changedFiles,
+    ];
+    const safeBeatId = beatId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const file = allFiles.find(f => f.includes(`_${beatId}.json`) || f.includes(`_${safeBeatId}.json`));
+    if (file) {
+      const confirmed = window.confirm(`Revert changes to "${file}"? This cannot be undone.`);
+      if (confirmed) {
+        await vcsCtx.revertFiles([file]);
+      }
+    }
+  }, [vcsCtx]);
+
   // Auto-layout handler - rearranges all beats using the tree layout algorithm
   const handleAutoLayout = useCallback(() => {
     if (state.beats.length === 0) return;
@@ -2397,6 +2518,37 @@ function App() {
     });
     return unsubscribe;
   }, [handleAutoLayout]);
+
+  // Electron integration - Version Control menu items
+  useEffect(() => {
+    if (!isElectron()) return;
+    const api = window.electronAPI;
+    const unsubs: (() => void)[] = [];
+
+    if (api?.onVCSTogglePanel) {
+      unsubs.push(api.onVCSTogglePanel(() => setVcsPanelOpen(prev => !prev)));
+    }
+    if (api?.onVCSCommit) {
+      unsubs.push(api.onVCSCommit(() => { setVcsPanelOpen(true); /* focus commit input */ }));
+    }
+    if (api?.onVCSPush && vcsCtx) {
+      unsubs.push(api.onVCSPush(() => { vcsCtx.push(); }));
+    }
+    if (api?.onVCSPull && vcsCtx) {
+      unsubs.push(api.onVCSPull(() => { vcsCtx.pull(); }));
+    }
+    if (api?.onVCSStash && vcsCtx) {
+      unsubs.push(api.onVCSStash(() => { vcsCtx.stash(); }));
+    }
+    if (api?.onVCSStashPop && vcsCtx) {
+      unsubs.push(api.onVCSStashPop(() => { vcsCtx.stashPop(); }));
+    }
+    if (api?.onVCSRefresh && vcsCtx) {
+      unsubs.push(api.onVCSRefresh(() => { vcsCtx.refresh(); }));
+    }
+
+    return () => unsubs.forEach(u => u());
+  }, [vcsCtx]);
 
   const handleExport = useCallback(async () => {
     try {
@@ -3816,6 +3968,9 @@ function App() {
         onMergeDialogTrees={() => setShowMergeDialogTrees(true)}
         onHelperCommands={() => setShowHelperCommands(true)}
         onExportHtml={() => setShowHtmlExportDialog(true)}
+        vcsPanelOpen={vcsPanelOpen}
+        onToggleVCSPanel={() => setVcsPanelOpen(prev => !prev)}
+        onInitRepo={() => setShowGitInitDialog(true)}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -3966,6 +4121,9 @@ function App() {
             onBeatCopy={handleBeatCopy}
             onBeatPaste={handleBeatPaste}
             hasBeatClipboard={beatClipboard !== null}
+            onViewBeatDiff={handleViewBeatDiff}
+            onViewBeatHistory={handleViewBeatHistory}
+            onRevertBeat={handleRevertBeat}
           />
 
           {selectedBeat && (
@@ -3986,6 +4144,13 @@ function App() {
           )}
         </div>
       </div>
+
+      {/* VCS Panel (bottom panel for directory projects under version control) */}
+      <VCSPanel
+        isOpen={vcsPanelOpen}
+        onToggle={() => setVcsPanelOpen(prev => !prev)}
+        onViewDiff={(filePath) => setDiffViewerFile(filePath)}
+      />
 
       {/* Preview Modal */}
       {showPreview && (
@@ -4226,6 +4391,26 @@ function App() {
           projectName={currentProject.name}
         />
       )}
+
+      {/* Git Init Dialog */}
+      {showGitInitDialog && vcsCtx && (
+        <GitInitDialog
+          onInit={async (remoteUrl) => {
+            await vcsCtx.initRepo(remoteUrl);
+          }}
+          onClose={() => setShowGitInitDialog(false)}
+        />
+      )}
+
+      {/* VCS Diff Viewer Modal */}
+      <DiffViewer
+        filePath={diffViewerFile || ''}
+        isOpen={!!diffViewerFile}
+        onClose={() => setDiffViewerFile(null)}
+      />
+
+      {/* VCS Toast Notifications */}
+      <VCSToast />
     </div>
   );
 }

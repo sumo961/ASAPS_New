@@ -12,6 +12,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     mkdir: (path: string) => ipcRenderer.invoke('fs:mkdir', path),
     exists: (path: string) => ipcRenderer.invoke('fs:exists', path),
     unlink: (path: string) => ipcRenderer.invoke('fs:unlink', path),
+    copyFile: (src: string, dst: string) => ipcRenderer.invoke('fs:copy-file', src, dst),
+    stat: (path: string) => ipcRenderer.invoke('fs:stat', path),
+    watchDir: (path: string, callback: (changedFiles: string[]) => void) => {
+      const handler = (_: unknown, files: string[]) => callback(files);
+      ipcRenderer.on('fs:dir-changed', handler);
+      ipcRenderer.invoke('fs:watch-dir', path);
+      return () => {
+        ipcRenderer.removeListener('fs:dir-changed', handler);
+        ipcRenderer.invoke('fs:unwatch-dir');
+      };
+    },
+    runCommand: (command: string, args: string[], cwd?: string) =>
+      ipcRenderer.invoke('fs:run-command', command, args, cwd),
   },
 
   // Dialog operations
@@ -77,6 +90,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu:auto-arrange', callback);
     return () => ipcRenderer.removeListener('menu:auto-arrange', callback);
   },
+  onProjectOpenFolder: (callback: (path: string) => void) => {
+    const handler = (_: unknown, path: string) => callback(path);
+    ipcRenderer.on('project:open-folder', handler);
+    return () => ipcRenderer.removeListener('project:open-folder', handler);
+  },
+  onProjectSaveAsFolder: (callback: (path: string) => void) => {
+    const handler = (_: unknown, path: string) => callback(path);
+    ipcRenderer.on('project:save-as-folder', handler);
+    return () => ipcRenderer.removeListener('project:save-as-folder', handler);
+  },
 
   // Preview window operations
   preview: {
@@ -102,6 +125,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('story:inject', handler);
   },
 
+  // VCS menu events
+  onVCSCommit: (callback: () => void) => {
+    ipcRenderer.on('vcs:commit', callback);
+    return () => ipcRenderer.removeListener('vcs:commit', callback);
+  },
+  onVCSPush: (callback: () => void) => {
+    ipcRenderer.on('vcs:push', callback);
+    return () => ipcRenderer.removeListener('vcs:push', callback);
+  },
+  onVCSPull: (callback: () => void) => {
+    ipcRenderer.on('vcs:pull', callback);
+    return () => ipcRenderer.removeListener('vcs:pull', callback);
+  },
+  onVCSStash: (callback: () => void) => {
+    ipcRenderer.on('vcs:stash', callback);
+    return () => ipcRenderer.removeListener('vcs:stash', callback);
+  },
+  onVCSStashPop: (callback: () => void) => {
+    ipcRenderer.on('vcs:stash-pop', callback);
+    return () => ipcRenderer.removeListener('vcs:stash-pop', callback);
+  },
+  onVCSTogglePanel: (callback: () => void) => {
+    ipcRenderer.on('vcs:toggle-panel', callback);
+    return () => ipcRenderer.removeListener('vcs:toggle-panel', callback);
+  },
+  onVCSRefresh: (callback: () => void) => {
+    ipcRenderer.on('vcs:refresh', callback);
+    return () => ipcRenderer.removeListener('vcs:refresh', callback);
+  },
+
   // Platform info
   platform: process.platform,
   isElectron: true,
@@ -118,6 +171,10 @@ declare global {
         mkdir: (path: string) => Promise<void>;
         exists: (path: string) => Promise<boolean>;
         unlink: (path: string) => Promise<void>;
+        copyFile: (src: string, dst: string) => Promise<void>;
+        stat: (path: string) => Promise<{ size: number; mtime: string; isDirectory: boolean }>;
+        watchDir: (path: string, callback: (changedFiles: string[]) => void) => () => void;
+        runCommand: (command: string, args: string[], cwd?: string) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
       };
       dialog: {
         open: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
@@ -144,6 +201,8 @@ declare global {
       onMenuAutoArrange: (callback: () => void) => () => void;
       onProjectOpen: (callback: (path: string) => void) => () => void;
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
+      onProjectOpenFolder: (callback: (path: string) => void) => () => void;
+      onProjectSaveAsFolder: (callback: (path: string) => void) => () => void;
       preview: {
         open: () => Promise<boolean>;
         close: () => Promise<boolean>;
@@ -153,6 +212,13 @@ declare global {
       onPreviewMessage: (callback: (message: any) => void) => () => void;
       onPreviewClosed: (callback: () => void) => () => void;
       onStoryInject: (callback: (data: any) => void) => () => void;
+      onVCSCommit: (callback: () => void) => () => void;
+      onVCSPush: (callback: () => void) => () => void;
+      onVCSPull: (callback: () => void) => () => void;
+      onVCSStash: (callback: () => void) => () => void;
+      onVCSStashPop: (callback: () => void) => () => void;
+      onVCSTogglePanel: (callback: () => void) => () => void;
+      onVCSRefresh: (callback: () => void) => () => void;
       platform: NodeJS.Platform;
       isElectron: boolean;
     };

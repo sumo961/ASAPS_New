@@ -4,6 +4,8 @@ import { join } from 'path';
 import * as fs from 'fs/promises';
 import { getEmbeddedAPIServer, setStoryInjectionCallback } from './api-server';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
+import { startWatching, stopWatching } from './fileWatcher';
+import { execFile } from 'child_process';
 
 // Track if we're in the process of installing an update
 let isUpdating = false;
@@ -167,9 +169,13 @@ function setupAutoUpdater(): void {
 
   // Event: Error
   autoUpdater.on('error', (error) => {
-    console.error('[AutoUpdater] Error:', error);
-    console.error('[AutoUpdater] Error message:', error.message);
-    console.error('[AutoUpdater] Error stack:', error.stack);
+    console.error('[AutoUpdater] Error:', error.message);
+
+    // Silently ignore ENOENT errors (e.g., missing app-update.yml in --dir builds)
+    if (error.message?.includes('ENOENT') || error.message?.includes('app-update.yml')) {
+      console.log('[AutoUpdater] Ignoring file-not-found error (expected for unpacked builds)');
+      return;
+    }
 
     // Show error to user with option to manually download
     dialog.showMessageBox(mainWindow!, {
@@ -372,6 +378,10 @@ function createMenu(): void {
           accelerator: 'CmdOrCtrl+O',
           click: () => handleOpenProject(),
         },
+        {
+          label: 'Open Project Folder...',
+          click: () => handleOpenProjectFolder(),
+        },
         { type: 'separator' },
         {
           label: 'Save',
@@ -382,6 +392,10 @@ function createMenu(): void {
           label: 'Save As...',
           accelerator: 'CmdOrCtrl+Shift+S',
           click: () => handleSaveAs(),
+        },
+        {
+          label: 'Save As Folder...',
+          click: () => handleSaveAsFolder(),
         },
         { type: 'separator' },
         {
@@ -429,6 +443,47 @@ function createMenu(): void {
         },
         { type: 'separator' },
         { role: 'togglefullscreen' },
+      ],
+    },
+
+    // Version Control menu
+    {
+      label: 'Version Control',
+      submenu: [
+        {
+          label: 'Commit...',
+          accelerator: 'CmdOrCtrl+K',
+          click: () => mainWindow?.webContents.send('vcs:commit'),
+        },
+        {
+          label: 'Push',
+          accelerator: 'CmdOrCtrl+Shift+K',
+          click: () => mainWindow?.webContents.send('vcs:push'),
+        },
+        {
+          label: 'Pull',
+          accelerator: 'CmdOrCtrl+Shift+L',
+          click: () => mainWindow?.webContents.send('vcs:pull'),
+        },
+        { type: 'separator' },
+        {
+          label: 'Stash Changes',
+          click: () => mainWindow?.webContents.send('vcs:stash'),
+        },
+        {
+          label: 'Pop Stash',
+          click: () => mainWindow?.webContents.send('vcs:stash-pop'),
+        },
+        { type: 'separator' },
+        {
+          label: 'Toggle VCS Panel',
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => mainWindow?.webContents.send('vcs:toggle-panel'),
+        },
+        {
+          label: 'Refresh Status',
+          click: () => mainWindow?.webContents.send('vcs:refresh'),
+        },
       ],
     },
 
@@ -489,6 +544,34 @@ async function handleOpenProject(): Promise<void> {
   }
 }
 
+// Handle open project folder (directory format)
+async function handleOpenProjectFolder(): Promise<void> {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openDirectory'],
+    title: 'Open Project Folder',
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    const folderPath = result.filePaths[0];
+    currentProjectPath = folderPath;
+    mainWindow?.webContents.send('project:open-folder', folderPath);
+  }
+}
+
+// Handle save as folder (directory format)
+async function handleSaveAsFolder(): Promise<void> {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openDirectory', 'createDirectory'],
+    title: 'Save Project As Folder',
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    const folderPath = result.filePaths[0];
+    currentProjectPath = folderPath;
+    mainWindow?.webContents.send('project:save-as-folder', folderPath);
+  }
+}
+
 // Handle save as
 async function handleSaveAs(): Promise<void> {
   const result = await dialog.showSaveDialog(mainWindow!, {
@@ -514,7 +597,9 @@ ipcMain.handle('fs:write-file', async (_, path: string, data: Buffer | string) =
 });
 
 ipcMain.handle('fs:read-dir', async (_, path: string) => {
-  return await fs.readdir(path, { withFileTypes: true });
+  const entries = await fs.readdir(path, { withFileTypes: true });
+  // Serialize Dirent objects to plain objects (methods are lost over IPC)
+  return entries.map(e => ({ name: e.name, isDirectory: e.isDirectory(), isFile: e.isFile() }));
 });
 
 ipcMain.handle('fs:mkdir', async (_, path: string) => {
@@ -532,6 +617,69 @@ ipcMain.handle('fs:exists', async (_, path: string) => {
 
 ipcMain.handle('fs:unlink', async (_, path: string) => {
   await fs.unlink(path);
+});
+
+ipcMain.handle('fs:copy-file', async (_, src: string, dst: string) => {
+  await fs.copyFile(src, dst);
+});
+
+ipcMain.handle('fs:stat', async (_, path: string) => {
+  const stat = await fs.stat(path);
+  return {
+    size: stat.size,
+    mtime: stat.mtime.toISOString(),
+    isDirectory: stat.isDirectory(),
+  };
+});
+
+ipcMain.handle('fs:watch-dir', async (event, dirPath: string) => {
+  startWatching(dirPath, (changedFiles) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fs:dir-changed', changedFiles);
+    }
+  });
+});
+
+ipcMain.handle('fs:unwatch-dir', async () => {
+  stopWatching();
+});
+
+ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?: string) => {
+  // Augment PATH so Homebrew-installed tools are found
+  // when Electron is launched from Finder (which has a minimal PATH)
+  const extraPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
+  const currentPath = process.env.PATH || '';
+  const augmentedPath = [...new Set([...currentPath.split(':'), ...extraPaths])].join(':');
+
+  // If git-lfs is configured globally but not installed, git operations fail.
+  // Disable LFS filters entirely (empty string = no filter, no process spawned).
+  // Uses GIT_CONFIG_COUNT/KEY/VALUE env vars (Git 2.31+).
+  const lfsEnv: Record<string, string> = {};
+  if (command === 'git') {
+    lfsEnv.GIT_CONFIG_COUNT = '4';
+    lfsEnv.GIT_CONFIG_KEY_0 = 'filter.lfs.required';
+    lfsEnv.GIT_CONFIG_VALUE_0 = 'false';
+    lfsEnv.GIT_CONFIG_KEY_1 = 'filter.lfs.clean';
+    lfsEnv.GIT_CONFIG_VALUE_1 = '';
+    lfsEnv.GIT_CONFIG_KEY_2 = 'filter.lfs.smudge';
+    lfsEnv.GIT_CONFIG_VALUE_2 = '';
+    lfsEnv.GIT_CONFIG_KEY_3 = 'filter.lfs.process';
+    lfsEnv.GIT_CONFIG_VALUE_3 = '';
+  }
+
+  return new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve) => {
+    execFile(command, args, {
+      cwd: cwd || undefined,
+      timeout: 30000,
+      env: { ...process.env, PATH: augmentedPath, ...lfsEnv },
+    }, (error, stdout, stderr) => {
+      resolve({
+        stdout: stdout || '',
+        stderr: stderr || '',
+        exitCode: error?.code !== undefined ? (typeof error.code === 'number' ? error.code : 1) : 0,
+      });
+    });
+  });
 });
 
 ipcMain.handle('dialog:open', async (_, options: Electron.OpenDialogOptions) => {

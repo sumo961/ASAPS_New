@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Beat } from '@asaps/core';
+import { FileChangeIndicator } from '../vcs/FileChangeIndicator';
 
 interface BeatNodeData {
   beat: Beat;
@@ -155,6 +156,11 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
           zIndex: 1,
         }}
       />
+
+      {/* VCS status overlay */}
+      {data.beat?.id && (
+        <FileChangeIndicator beatId={data.beat.id} position="top-right" size={10} />
+      )}
     </div>
   );
 });

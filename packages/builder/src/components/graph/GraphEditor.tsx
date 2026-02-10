@@ -23,6 +23,7 @@ import { BeatNode } from './BeatNode';
 import { CustomEdge } from './CustomEdge';
 import { ClusterContainerNode } from './ClusterContainerNode';
 import { ContainerConnectionEdge } from './ContainerConnectionEdge';
+import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -63,6 +64,10 @@ interface GraphEditorProps {
   onBeatCopy?: (beatId: string) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
   hasBeatClipboard?: boolean;
+  // VCS context menu actions
+  onViewBeatDiff?: (beatId: string) => void;
+  onViewBeatHistory?: (beatId: string) => void;
+  onRevertBeat?: (beatId: string) => void;
 }
 
 const nodeTypes: NodeTypes = {
@@ -119,8 +124,13 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onBeatCopy,
   onBeatPaste,
   hasBeatClipboard = false,
+  onViewBeatDiff,
+  onViewBeatHistory,
+  onRevertBeat,
 }) => {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const vcs = useVCSStatus();
+  const vcsActive = vcs && vcs.initialized && vcs.type !== 'none';
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -700,14 +710,28 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Track previous beats count to detect when project is loaded
   const prevBeatsLengthRef = useRef(beats.length);
 
+  // Track node IDs to avoid unnecessary setNodes calls that disrupt ReactFlow.
+  // When App.tsx re-renders (e.g. from VCS state changes), callback props get new
+  // references, causing the nodes useMemo to recalculate. The new node array has
+  // the same beat content but new object references. Calling setNodes() with these
+  // "identical" nodes disrupts ReactFlow's internal state, causing nodes to vanish.
+  const prevNodeIdsRef = useRef('');
+
   // Update nodes when beats change
   useEffect(() => {
-    console.log('[GraphEditor] useEffect - setting nodes TRIGGERED. Nodes length:', nodes.length, 'NodesState length:', nodesState.length, 'TIMESTAMP:', Date.now());
+    // Build a fingerprint of the nodes: IDs + positions + selection state
+    const fingerprint = nodes.map(n =>
+      `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}`
+    ).join('|');
+
+    if (fingerprint === prevNodeIdsRef.current) {
+      // Nodes haven't meaningfully changed — skip setNodes to protect ReactFlow state
+      return;
+    }
+    prevNodeIdsRef.current = fingerprint;
 
     if (nodes.length > 0) {
-      console.log('[GraphEditor] Creating nodes from beats:', nodes.length, 'beats');
-    } else {
-      console.log('[GraphEditor] nodes array is empty - beats length:', beats.length, 'clusters length:', clusters.length);
+      console.log('[GraphEditor] setNodes: updating', nodes.length, 'nodes');
     }
 
     setNodes(nodes);
@@ -1119,6 +1143,57 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
                 <span className="text-gray-500">⌘C</span>
                 <span>Copy</span>
               </button>
+              {/* VCS actions */}
+              {vcsActive && contextMenu.beatId && (
+                <>
+                  <div className="h-px bg-gray-200 my-1" />
+                  {onViewBeatDiff && (
+                    <button
+                      onClick={() => { onViewBeatDiff(contextMenu.beatId!); closeContextMenu(); }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <span className="text-gray-500 text-xs font-mono">D</span>
+                      <span>Show Diff</span>
+                    </button>
+                  )}
+                  {onViewBeatHistory && (
+                    <button
+                      onClick={() => { onViewBeatHistory(contextMenu.beatId!); closeContextMenu(); }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <span className="text-gray-500 text-xs font-mono">H</span>
+                      <span>Show History</span>
+                    </button>
+                  )}
+                  {onRevertBeat && vcs!.isBeatChanged(contextMenu.beatId) && (
+                    <button
+                      onClick={() => { onRevertBeat(contextMenu.beatId!); closeContextMenu(); }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-orange-50 text-orange-600 flex items-center gap-2"
+                    >
+                      <span className="text-orange-400">{'\u21A9'}</span>
+                      <span>Revert Changes</span>
+                    </button>
+                  )}
+                  {vcs!.type === 'perforce' && (
+                    <>
+                      <button
+                        onClick={async () => { await vcs!.p4EditFile(contextMenu.beatId!); closeContextMenu(); }}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <span className="text-gray-500">{'\u270E'}</span>
+                        <span>Check Out (P4)</span>
+                      </button>
+                      <button
+                        onClick={async () => { await vcs!.p4LockFile(contextMenu.beatId!); closeContextMenu(); }}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <span className="text-gray-500">{'\u{1F512}'}</span>
+                        <span>Lock (P4)</span>
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
               <div className="h-px bg-gray-200 my-1" />
               <button
                 onClick={() => handleContextMenuAction('delete')}

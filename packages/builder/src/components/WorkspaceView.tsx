@@ -59,6 +59,10 @@ interface WorkspaceViewProps {
   onBeatCopy?: (beatId: string) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
   hasBeatClipboard?: boolean;
+  // VCS context menu actions
+  onViewBeatDiff?: (beatId: string) => void;
+  onViewBeatHistory?: (beatId: string) => void;
+  onRevertBeat?: (beatId: string) => void;
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
@@ -106,6 +110,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onBeatCopy,
   onBeatPaste,
   hasBeatClipboard = false,
+  onViewBeatDiff,
+  onViewBeatHistory,
+  onRevertBeat,
 }) => {
   const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
 
@@ -229,6 +236,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onBeatCopy={onBeatCopy}
               onBeatPaste={onBeatPaste}
               hasBeatClipboard={hasBeatClipboard}
+              onViewBeatDiff={onViewBeatDiff}
+              onViewBeatHistory={onViewBeatHistory}
+              onRevertBeat={onRevertBeat}
             />
           </div>
         ) : (

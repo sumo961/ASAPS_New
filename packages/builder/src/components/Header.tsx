@@ -9,6 +9,7 @@ import { AIConfigDialog } from './ai/AIConfigDialog';
 import { StoryGenerator } from './ai/StoryGenerator';
 import { NaturalLanguageBeatCreator } from './ai/NaturalLanguageBeatCreator';
 import { useSave, useProject, usePersistence } from '../contexts/PersistenceContext';
+import { VCSStatusBar } from './vcs/VCSStatusBar';
 
 interface HeaderProps {
   title: string;
@@ -39,6 +40,9 @@ interface HeaderProps {
   onHelperCommands?: () => void;
   onExportHtml?: () => void;
   previewWindowOpen?: boolean;
+  vcsPanelOpen?: boolean;
+  onToggleVCSPanel?: () => void;
+  onInitRepo?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -70,6 +74,9 @@ export const Header: React.FC<HeaderProps> = ({
   onHelperCommands,
   onExportHtml,
   previewWindowOpen,
+  vcsPanelOpen,
+  onToggleVCSPanel,
+  onInitRepo,
 }) => {
   const { status, lastSaved, error: saveError } = useSave();
   const { load } = useProject();
@@ -177,6 +184,9 @@ export const Header: React.FC<HeaderProps> = ({
             showText={true}
             compact={false}
           />
+
+          {/* VCS Status (shown when project is under version control) */}
+          <VCSStatusBar panelOpen={vcsPanelOpen} onTogglePanel={onToggleVCSPanel} onInitRepo={onInitRepo} />
 
           <div className="w-px h-6 bg-gray-300 mx-1" />
 

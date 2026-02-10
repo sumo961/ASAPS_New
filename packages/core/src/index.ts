@@ -12,6 +12,7 @@ export * from './layout';
 export * from './twine';
 export * from './renpy';
 export * from './utils';
+export * from './persistence';
 
 // Package info
 export const version = '2.0.0';

@@ -45,6 +45,10 @@ interface CanvasProps {
   onBeatCopy?: (beatId: string) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
   hasBeatClipboard?: boolean;
+  // VCS context menu actions
+  onViewBeatDiff?: (beatId: string) => void;
+  onViewBeatHistory?: (beatId: string) => void;
+  onRevertBeat?: (beatId: string) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -80,6 +84,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   onBeatCopy,
   onBeatPaste,
   hasBeatClipboard = false,
+  onViewBeatDiff,
+  onViewBeatHistory,
+  onRevertBeat,
 }) => {
   const handleBeatMove = (beatId: string, x: number, y: number) => {
     onBeatMove(beatId, { x, y });
@@ -147,6 +154,9 @@ export const Canvas: React.FC<CanvasProps> = ({
           onBeatCopy={onBeatCopy}
           onBeatPaste={onBeatPaste}
           hasBeatClipboard={hasBeatClipboard}
+          onViewBeatDiff={onViewBeatDiff}
+          onViewBeatHistory={onViewBeatHistory}
+          onRevertBeat={onRevertBeat}
         />
       </div>
       

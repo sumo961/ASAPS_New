@@ -57,7 +57,8 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
       onClose();
     } catch (err) {
       console.error('[NewProjectDialog] Failed to create project:', err);
-      setError('Failed to create project. Please try again.');
+      const message = err instanceof Error ? err.message : String(err);
+      setError(`Failed to create project: ${message}`);
       setCreating(false);
     }
   };

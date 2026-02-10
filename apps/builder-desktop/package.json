@@ -23,6 +23,7 @@
     "@asaps/builder": "^2.0.0",
     "@asaps/core": "^2.0.0",
     "@asaps/renderer": "^2.0.0",
+    "chokidar": "^3.6.0",
     "electron-updater": "^6.3.0"
   },
   "devDependencies": {
@@ -53,8 +54,18 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
-        { "target": "zip", "arch": ["universal"] },
-        { "target": "dmg", "arch": ["universal"] }
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "icon": "build/icon.png",
       "hardenedRuntime": true,
@@ -62,8 +73,16 @@
     },
     "dmg": {
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ],
       "window": {
         "width": 540,
@@ -74,7 +93,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
