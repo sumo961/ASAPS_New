@@ -81,6 +81,23 @@ export interface PersistenceContextValue {
 const PersistenceContext = createContext<PersistenceContextValue | null>(null);
 
 /**
+ * Validate that a directory path still exists and contains a valid project.
+ * Returns true if the directory and project.json are both present.
+ */
+async function validateDirectoryPath(dirPath: string): Promise<boolean> {
+  const api = window.electronAPI;
+  if (!api?.fs?.exists) return false;
+  try {
+    const dirExists = await api.fs.exists(dirPath);
+    if (!dirExists) return false;
+    const projectJsonExists = await api.fs.exists(dirPath + '/project.json');
+    return projectJsonExists;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Check if a project is a default/empty project (3 default beats: titleScreen, infoText, endScreen)
  * These shouldn't be auto-saved as they clutter the project library
  * EXCEPTION: If the project has a custom name (not "Untitled Project"), it's saveable
@@ -408,16 +425,56 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         return false;
       }
 
-      currentProjectRef.current = result.data;
-      setCurrentProject(result.data);
+      const loadedProject = result.data;
+      currentProjectRef.current = loadedProject;
+      setCurrentProject(loadedProject);
       setProjectId(projectId);
 
       // CRITICAL: Set isUntitledProject based on the LOADED project's name
       // This ensures a saved project with a real name doesn't show "Cannot auto-save"
-      const isUntitled = result.data.name === 'Untitled Project';
+      const isUntitled = loadedProject.name === 'Untitled Project';
       isUntitledProjectRef.current = isUntitled;
       setIsUntitledProject(isUntitled);
       console.log('[PersistenceProvider] Project loaded, isUntitledProject:', isUntitled);
+
+      // Restore directory-format state if the project was previously saved as a directory
+      if (loadedProject.storageFormat === 'directory' && loadedProject.directoryPath && isElectronWithFS()) {
+        const dirPath = loadedProject.directoryPath;
+        const pathValid = await validateDirectoryPath(dirPath);
+
+        if (pathValid) {
+          console.log('[PersistenceProvider] Restoring directory project state:', dirPath);
+          const adapter = new DirectoryAdapter();
+          adapter.setProjectPath(dirPath);
+          directoryAdapterRef.current = adapter;
+          savedAssetIdsRef.current = new Set();
+          setProjectFormat('directory');
+          setProjectPath(dirPath);
+        } else {
+          // Directory no longer exists — fall back to IndexedDB mode
+          console.warn('[PersistenceProvider] Directory path stale, falling back to IndexedDB:', dirPath);
+          loadedProject.directoryPath = null;
+          loadedProject.storageFormat = 'indexeddb';
+          currentProjectRef.current = loadedProject;
+          setCurrentProject(loadedProject);
+          setProjectFormat('indexeddb');
+          setProjectPath(null);
+          directoryAdapterRef.current = null;
+          // Persist the cleared fields
+          try {
+            await storage.updateProject(loadedProject);
+          } catch (e) {
+            console.warn('[PersistenceProvider] Failed to clear stale directory metadata:', e);
+          }
+          // Emit a custom event so App.tsx can show a warning toast
+          window.dispatchEvent(new CustomEvent('asaps:stale-directory', { detail: { dirPath } }));
+        }
+      } else {
+        // Not a directory project — ensure state is clean
+        setProjectFormat('indexeddb');
+        setProjectPath(null);
+        directoryAdapterRef.current = null;
+      }
 
       // Update command manager
       commandManager.setProjectId(projectId);
@@ -780,6 +837,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       const adapter = new DirectoryAdapter();
       const project = await adapter.openProject(dirPath);
 
+      // Stamp directory metadata on the project for session persistence
+      project.directoryPath = dirPath;
+      project.storageFormat = 'directory';
+
       directoryAdapterRef.current = adapter;
       savedAssetIdsRef.current = new Set(); // Reset saved asset tracking for new project
       currentProjectRef.current = project;
@@ -790,7 +851,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       isUntitledProjectRef.current = false;
       setIsUntitledProject(false);
 
-      // Also save to IndexedDB so existing flows work
+      // Also save to IndexedDB so existing flows work (including directory metadata)
       try {
         const result = await storage.getProject(project.id);
         if (result.success && result.data) {
@@ -850,6 +911,21 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       savedAssetIdsRef.current = new Set(assets?.map((a) => a.id) || []);
       setProjectFormat('directory');
       setProjectPath(dirPath);
+
+      // Stamp directory metadata on the project and persist to IndexedDB
+      const updatedProject = {
+        ...projectToSave,
+        directoryPath: dirPath,
+        storageFormat: 'directory' as const,
+        modifiedAt: new Date(),
+      };
+      currentProjectRef.current = updatedProject;
+      setCurrentProject(updatedProject);
+      try {
+        await storage.updateProject(updatedProject);
+      } catch (e) {
+        console.warn('[PersistenceProvider] Failed to persist directory metadata to IndexedDB:', e);
+      }
 
       console.log('[PersistenceProvider] Saved project as directory:', dirPath);
       return true;

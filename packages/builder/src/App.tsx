@@ -566,11 +566,21 @@ function App() {
     // Handle Save As Folder from File menu (directory format)
     const unsubscribeSaveAsFolder = window.electronAPI.onProjectSaveAsFolder?.(async (folderPath: string) => {
       console.log('[Electron] Saving project as folder:', folderPath);
+      const wasDirectory = projectFormat === 'directory';
       try {
         const success = await saveAsDirectory(folderPath);
         if (success) {
           console.log('[Electron] Project saved as directory successfully');
-          alert(`Project saved to folder: ${folderPath}`);
+          // Show conversion notification if this was not already a directory project
+          if (!wasDirectory && vcs) {
+            vcs.onEvent(() => {})(); // no-op to ensure event system is wired
+            // Use a brief timeout so the VCS provider is ready for the toast
+            setTimeout(() => {
+              alert('Project converted to folder format \u2014 version control is now available.');
+            }, 200);
+          } else {
+            alert(`Project saved to folder: ${folderPath}`);
+          }
           // Initialize VCS tracking for the new directory
           if (vcs) {
             await vcs.initialize(folderPath);
@@ -600,11 +610,36 @@ function App() {
   useEffect(() => {
     if (projectFormat === 'directory' && projectPath && vcs && !vcs.initialized) {
       console.log('[App] Auto-initializing VCS for directory project:', projectPath);
-      vcs.initialize(projectPath);
+      vcs.initialize(projectPath).then(async () => {
+        // Opportunistically detect remote URL and persist it
+        try {
+          const { gitListRemotes } = await import('./vcs/GitAdapter');
+          const remotes = await gitListRemotes(projectPath);
+          const origin = remotes.find(r => r.name === 'origin');
+          if (origin?.url && currentProject && origin.url !== currentProject.vcsRemoteUrl) {
+            console.log('[App] Detected VCS remote URL:', origin.url);
+            const updatedProject = { ...currentProject, vcsRemoteUrl: origin.url };
+            await storage.updateProject(updatedProject);
+          }
+        } catch (e) {
+          // Non-fatal — remote URL detection is best-effort
+          console.debug('[App] Could not detect VCS remote URL:', e);
+        }
+      });
     } else if (projectFormat !== 'directory' && vcs?.initialized) {
       vcs.clear();
     }
-  }, [projectFormat, projectPath, vcs]);
+  }, [projectFormat, projectPath, vcs, currentProject, storage]);
+
+  // Listen for stale-directory events from PersistenceContext (path no longer exists on reload)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const dirPath = (e as CustomEvent).detail?.dirPath;
+      alert(`The project folder could not be found:\n${dirPath}\n\nThe project has been reverted to local storage mode. Re-open the folder to restore version control.`);
+    };
+    window.addEventListener('asaps:stale-directory', handler);
+    return () => window.removeEventListener('asaps:stale-directory', handler);
+  }, []);
 
   /**
    * Sync current story state to project before saving

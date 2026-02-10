@@ -119,6 +119,15 @@ export interface Project {
   /** Per-project theme overrides (optional, allows customizing theme values) */
   themeOverrides?: Partial<ThemeDefinition>;
 
+  /** Filesystem path for directory-format projects (Electron only) */
+  directoryPath?: string | null;
+
+  /** Storage format: 'directory' for folder-based, 'indexeddb' (default) for browser storage */
+  storageFormat?: 'directory' | 'indexeddb';
+
+  /** Origin remote URL, opportunistically detected from Git */
+  vcsRemoteUrl?: string | null;
+
   /** Metadata */
   createdAt: Date;
   modifiedAt: Date;

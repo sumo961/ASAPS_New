@@ -39,6 +39,8 @@ export interface VCSState {
   initialized: boolean;
   /** Detected VCS type */
   type: VCSType;
+  /** True when git binary is not found on the system */
+  gitNotInstalled: boolean;
   /** Current branch name */
   branch: string | null;
   /** Set of file paths that have been modified since last commit */
@@ -125,6 +127,7 @@ export interface VCSContextValue extends VCSState {
 const defaultState: VCSState = {
   initialized: false,
   type: 'none',
+  gitNotInstalled: false,
   branch: null,
   changedFiles: new Set(),
   changedFileCount: 0,
@@ -231,6 +234,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
         setState(prev => ({
           ...prev,
           type: 'none',
+          gitNotInstalled: !!vcsInfo.gitMissing,
           branch: null,
           changedFiles: new Set(),
           changedFileCount: 0,

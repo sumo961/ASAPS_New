@@ -24,6 +24,42 @@ interface VCSStatusBarProps {
 export const VCSStatusBar: React.FC<VCSStatusBarProps> = ({ panelOpen, onTogglePanel, onInitRepo }) => {
   const vcs = useVCSStatus();
 
+  // Show "Git not found" warning when git binary is missing for a directory project
+  if (vcs && vcs.initialized && vcs.gitNotInstalled && vcs.projectPath) {
+    return (
+      <div
+        className="vcs-status-bar"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '2px 8px',
+          fontSize: '12px',
+          color: '#fbbf24',
+          borderLeft: '1px solid #334155',
+        }}
+      >
+        <span style={{ fontSize: '11px' }} title="Git is not installed on this system">
+          {'\u26A0'} Git not found
+        </span>
+        <a
+          href="https://git-scm.com/downloads"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: '#60a5fa',
+            fontSize: '11px',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          Install Git
+        </a>
+      </div>
+    );
+  }
+
   // Show "Set up Version Control" when project is open but no VCS detected
   if (vcs && vcs.initialized && vcs.type === 'none' && vcs.projectPath) {
     return (

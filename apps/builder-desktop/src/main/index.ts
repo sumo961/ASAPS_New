@@ -379,7 +379,7 @@ function createMenu(): void {
           click: () => handleOpenProject(),
         },
         {
-          label: 'Open Project Folder...',
+          label: 'Open Project Folder (VCS)...',
           click: () => handleOpenProjectFolder(),
         },
         { type: 'separator' },
@@ -394,7 +394,7 @@ function createMenu(): void {
           click: () => handleSaveAs(),
         },
         {
-          label: 'Save As Folder...',
+          label: 'Save As Folder (VCS)...',
           click: () => handleSaveAsFolder(),
         },
         { type: 'separator' },

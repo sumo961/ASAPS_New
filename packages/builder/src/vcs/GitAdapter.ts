@@ -476,9 +476,9 @@ export async function gitInit(projectPath: string): Promise<GitOperationResult> 
   try {
     const api = window.electronAPI;
     const gitignorePath = `${projectPath}/.gitignore`;
-    const exists = await api.fs.exists(gitignorePath);
+    const exists = await api!.fs.exists(gitignorePath);
     if (!exists) {
-      await api.fs.writeFile(gitignorePath, [
+      await api!.fs.writeFile(gitignorePath, [
         '# OS-generated files',
         '.DS_Store',
         'Thumbs.db',

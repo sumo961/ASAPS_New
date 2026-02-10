@@ -13,6 +13,8 @@ export interface VCSInfo {
   branch?: string;
   /** Repository root path */
   repoRoot?: string;
+  /** True when git was expected but the binary was not found on the system */
+  gitMissing?: boolean;
 }
 
 /**
@@ -39,8 +41,13 @@ export async function detectVCS(projectPath: string): Promise<VCSInfo> {
         return await getGitInfo(projectPath);
       }
     }
-  } catch {
-    // Git not available, continue
+  } catch (err: any) {
+    // Detect if git binary itself is not installed
+    const msg = String(err?.message || err?.stderr || '');
+    if (msg.includes('ENOENT') || msg.includes('command not found') || msg.includes('not recognized')) {
+      return { type: 'none', gitMissing: true };
+    }
+    // Git not available for other reasons, continue
   }
 
   // Check for Perforce
