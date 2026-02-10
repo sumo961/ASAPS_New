@@ -548,6 +548,177 @@ export async function gitConfigGet(projectPath: string, key: string): Promise<st
   return result.exitCode === 0 ? result.stdout.trim() : null;
 }
 
+/** Abort an in-progress merge */
+export async function gitAbortMerge(projectPath: string): Promise<GitOperationResult> {
+  const run = getRunCommand();
+  const result = await run('git', ['merge', '--abort'], projectPath);
+  return {
+    success: result.exitCode === 0,
+    message: result.exitCode === 0 ? 'Merge aborted' : result.stderr.trim(),
+  };
+}
+
+/** Abort an in-progress rebase */
+export async function gitAbortRebase(projectPath: string): Promise<GitOperationResult> {
+  const run = getRunCommand();
+  const result = await run('git', ['rebase', '--abort'], projectPath);
+  return {
+    success: result.exitCode === 0,
+    message: result.exitCode === 0 ? 'Rebase aborted' : result.stderr.trim(),
+  };
+}
+
+/** Detect whether we're in a merge or rebase state */
+export async function gitDetectMergeState(projectPath: string): Promise<'merge' | 'rebase' | null> {
+  const run = getRunCommand();
+  // Use `git status` as the authoritative source — it explicitly reports in-progress operations
+  // and avoids false positives from stale REBASE_HEAD/MERGE_HEAD files.
+  const statusResult = await run('git', ['status'], projectPath);
+  if (statusResult.exitCode === 0) {
+    const output = statusResult.stdout;
+    if (output.includes('rebase in progress') || output.includes('interactive rebase') || output.includes('currently rebasing')) {
+      return 'rebase';
+    }
+    if (output.includes('unmerged paths') || output.includes('you are still merging') || output.includes('All conflicts fixed but you are still merging')) {
+      return 'merge';
+    }
+  }
+  // Fall back to ref checks for edge cases where `git status` might not be explicit
+  const mergeCheck = await run('git', ['rev-parse', '--verify', 'MERGE_HEAD'], projectPath);
+  if (mergeCheck.exitCode === 0) return 'merge';
+  return null;
+}
+
+/**
+ * Resolve all merge conflicts by choosing one side for all files.
+ *
+ * `keepMine` = true means keep local changes, false means accept remote.
+ * Note: In rebase, git's ours/theirs are swapped relative to the user's
+ * mental model, so `isRebase` controls the flag mapping.
+ */
+export async function gitResolveAllConflicts(
+  projectPath: string,
+  keepMine: boolean,
+  isRebase: boolean,
+): Promise<GitOperationResult> {
+  const run = getRunCommand();
+
+  // Get conflict file list
+  const conflicts = await gitGetConflicts(projectPath);
+  if (conflicts.length === 0) {
+    return { success: true, message: 'No conflicts to resolve' };
+  }
+
+  // In merge: mine = ours, remote = theirs
+  // In rebase: mine = theirs (replayed commits), remote = ours (target branch)
+  const useOurs = (keepMine && !isRebase) || (!keepMine && isRebase);
+  const flag = useOurs ? '--ours' : '--theirs';
+
+  for (const file of conflicts) {
+    const checkout = await run('git', ['checkout', flag, '--', file], projectPath);
+    if (checkout.exitCode !== 0) {
+      return { success: false, message: `Failed to resolve ${file}: ${checkout.stderr.trim()}` };
+    }
+    const add = await run('git', ['add', '--', file], projectPath);
+    if (add.exitCode !== 0) {
+      return { success: false, message: `Failed to stage ${file}: ${add.stderr.trim()}` };
+    }
+  }
+
+  const label = keepMine ? 'local' : 'remote';
+  return { success: true, message: `Resolved ${conflicts.length} conflict(s) using ${label} version` };
+}
+
+/**
+ * Continue a merge or rebase after conflicts have been resolved.
+ * For merge: commits with the default merge message.
+ * For rebase: continues to the next step.
+ */
+export async function gitContinueMergeOrRebase(
+  projectPath: string,
+  isRebase: boolean,
+): Promise<GitOperationResult> {
+  const run = getRunCommand();
+  if (isRebase) {
+    // Use -c core.editor=true to prevent editor from opening in non-interactive context
+    const result = await run('git', ['-c', 'core.editor=true', 'rebase', '--continue'], projectPath);
+    return {
+      success: result.exitCode === 0,
+      message: result.exitCode === 0 ? 'Rebase completed' : result.stderr.trim(),
+    };
+  } else {
+    const result = await run('git', ['commit', '--no-edit'], projectPath);
+    return {
+      success: result.exitCode === 0,
+      message: result.exitCode === 0 ? 'Merge committed' : result.stderr.trim(),
+    };
+  }
+}
+
+/**
+ * Resolve all conflicts and complete the entire merge/rebase in a loop.
+ *
+ * For rebases, each replayed commit may create new conflicts. This function
+ * loops: resolve → continue → resolve → continue → ... until done.
+ * For merges, resolves once and commits.
+ *
+ * Reports progress via optional callback.
+ */
+export async function gitResolveAllAndComplete(
+  projectPath: string,
+  keepMine: boolean,
+  isRebase: boolean,
+  onProgress?: (step: number, message: string) => void,
+): Promise<GitOperationResult> {
+  let step = 0;
+  const maxSteps = 500; // safety limit
+  let totalResolved = 0;
+
+  while (step < maxSteps) {
+    step++;
+
+    // Check for conflicts
+    const conflicts = await gitGetConflicts(projectPath);
+    if (conflicts.length > 0) {
+      onProgress?.(step, `Resolving ${conflicts.length} conflicts (step ${step})...`);
+      const resolveResult = await gitResolveAllConflicts(projectPath, keepMine, isRebase);
+      if (!resolveResult.success) return resolveResult;
+      totalResolved += conflicts.length;
+    }
+
+    // Continue the merge/rebase
+    onProgress?.(step, isRebase ? `Continuing rebase (step ${step})...` : 'Committing merge...');
+    const continueResult = await gitContinueMergeOrRebase(projectPath, isRebase);
+
+    if (continueResult.success) {
+      // Check if we're truly done
+      const state = await gitDetectMergeState(projectPath);
+      if (!state) {
+        return {
+          success: true,
+          message: `${isRebase ? 'Rebase' : 'Merge'} completed (${totalResolved} conflict${totalResolved !== 1 ? 's' : ''} resolved)`,
+        };
+      }
+      // Still in rebase — more commits to replay, loop continues
+      continue;
+    }
+
+    // Continue failed — check if there are new conflicts (next rebase step)
+    if (isRebase) {
+      const newConflicts = await gitGetConflicts(projectPath);
+      if (newConflicts.length > 0) {
+        // More conflicts — loop will resolve them on next iteration
+        continue;
+      }
+    }
+
+    // No conflicts but continue failed — genuine error
+    return continueResult;
+  }
+
+  return { success: false, message: `Resolution exceeded ${maxSteps} steps — aborting` };
+}
+
 /** Resolve a merge conflict by accepting ours or theirs */
 export async function gitResolveConflict(
   projectPath: string,

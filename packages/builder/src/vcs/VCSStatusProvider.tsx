@@ -14,6 +14,7 @@ import {
   gitInit, gitAddRemote,
   gitStage, gitUnstage, gitCommit, gitPush, gitPull, gitFetch,
   gitStash, gitStashPop, gitRevertFiles, gitGetConflicts,
+  gitDetectMergeState,
   type GitFileStatus, type GitOperationResult,
 } from './GitAdapter';
 import {
@@ -32,6 +33,20 @@ export type BeatVCSStatus = 'added' | 'modified' | 'deleted' | 'conflict' | 'loc
 export interface VCSEvent {
   type: 'success' | 'error' | 'info';
   message: string;
+}
+
+/** Persistent log entry for VCS operations */
+export interface VCSLogEntry {
+  id: number;
+  timestamp: number;
+  type: VCSEvent['type'];
+  message: string;
+}
+
+/** Check if a git error message indicates a push rejection (remote has newer commits) */
+export function isPushRejected(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes('rejected') || lower.includes('fetch first') || lower.includes('non-fast-forward');
 }
 
 export interface VCSState {
@@ -65,6 +80,10 @@ export interface VCSState {
   unstagedFiles: GitFileStatus[];
   /** Perforce lock map: depotPath -> user@workspace */
   p4Locks: Map<string, string>;
+  /** Persistent log of VCS operation messages */
+  messageLog: VCSLogEntry[];
+  /** Whether repo is currently mid-merge or mid-rebase */
+  mergeState: 'merge' | 'rebase' | null;
 }
 
 export interface VCSContextValue extends VCSState {
@@ -122,6 +141,8 @@ export interface VCSContextValue extends VCSState {
   // --- Event system ---
   /** Subscribe to VCS events (for toasts). Returns unsubscribe fn. */
   onEvent: (handler: (event: VCSEvent) => void) => () => void;
+  /** Clear the persistent message log */
+  clearMessageLog: () => void;
 }
 
 const defaultState: VCSState = {
@@ -140,6 +161,8 @@ const defaultState: VCSState = {
   stagedFiles: [],
   unstagedFiles: [],
   p4Locks: new Map(),
+  messageLog: [],
+  mergeState: null,
 };
 
 const VCSContext = createContext<VCSContextValue | null>(null);
@@ -162,13 +185,30 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   const pollTimerRef = useRef<number | null>(null);
   const projectPathRef = useRef<string | null>(null);
   const eventHandlersRef = useRef<Set<(event: VCSEvent) => void>>(new Set());
+  const logIdRef = useRef(0);
   const onBeforeRefreshRef = useRef(onBeforeRefresh);
   onBeforeRefreshRef.current = onBeforeRefresh;
 
   const emitEvent = useCallback((event: VCSEvent) => {
+    // Append to persistent message log (capped at 50 entries, newest first)
+    const entry: VCSLogEntry = {
+      id: ++logIdRef.current,
+      timestamp: Date.now(),
+      type: event.type,
+      message: event.message,
+    };
+    setState(prev => ({
+      ...prev,
+      messageLog: [entry, ...prev.messageLog].slice(0, 50),
+    }));
+
     for (const handler of eventHandlersRef.current) {
       try { handler(event); } catch { /* ignore handler errors */ }
     }
+  }, []);
+
+  const clearMessageLog = useCallback(() => {
+    setState(prev => ({ ...prev, messageLog: [] }));
   }, []);
 
   const onEvent = useCallback((handler: (event: VCSEvent) => void) => {
@@ -196,6 +236,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
         const status = await getGitStatus(path);
         const changed = await getChangedFiles(path);
         const conflicts = await gitGetConflicts(path);
+        const mergeState = await gitDetectMergeState(path);
 
         // Separate staged and unstaged files
         const stagedFiles = status.files.filter(f => f.staged);
@@ -213,6 +254,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
           conflictFiles: new Set(conflicts),
           stagedFiles,
           unstagedFiles,
+          mergeState,
         }));
       } else if (vcsInfo.type === 'perforce') {
         const status = await getP4Status(path);
@@ -545,6 +587,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     p4LockFile,
     p4UnlockFile,
     onEvent,
+    clearMessageLog,
   };
 
   return (

@@ -2,10 +2,11 @@
  * VCSPanel - Bottom panel with VCS tabs (Pending Changes, Incoming, History, Branches)
  *
  * Resizable via drag handle on top edge. Toggle with VCSStatusBar or keyboard shortcut.
+ * Includes a collapsible Activity Log showing persistent VCS operation messages.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useVCSStatus } from '../../vcs/VCSStatusProvider';
+import { useVCSStatus, type VCSLogEntry } from '../../vcs/VCSStatusProvider';
 import { PendingChangesTab } from './PendingChangesTab';
 import { IncomingChangesTab } from './IncomingChangesTab';
 import { HistoryTab } from './HistoryTab';
@@ -48,10 +49,22 @@ function loadPersistedState(): { activeTab: TabId; height: number } {
   return { activeTab: 'pending', height: DEFAULT_HEIGHT };
 }
 
+function formatTime(timestamp: number): string {
+  const d = new Date(timestamp);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+const dotColors: Record<VCSLogEntry['type'], string> = {
+  success: '#22c55e',
+  error: '#ef4444',
+  info: '#3b82f6',
+};
+
 export const VCSPanel: React.FC<VCSPanelProps> = ({ isOpen, onToggle, onViewDiff, onViewFileHistory }) => {
   const vcs = useVCSStatus();
   const [activeTab, setActiveTab] = useState<TabId>(() => loadPersistedState().activeTab);
   const [height, setHeight] = useState(() => loadPersistedState().height);
+  const [logOpen, setLogOpen] = useState(false);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
   // Persist state on changes
@@ -87,6 +100,9 @@ export const VCSPanel: React.FC<VCSPanelProps> = ({ isOpen, onToggle, onViewDiff
   if (!vcs || !vcs.initialized || vcs.type === 'none' || !isOpen) {
     return null;
   }
+
+  const logEntries = vcs.messageLog;
+  const hasErrors = logEntries.some(e => e.type === 'error');
 
   return (
     <div
@@ -166,11 +182,43 @@ export const VCSPanel: React.FC<VCSPanelProps> = ({ isOpen, onToggle, onViewDiff
           </button>
         ))}
 
+        {/* Log toggle button */}
+        <button
+          onClick={() => setLogOpen(prev => !prev)}
+          style={{
+            marginLeft: 'auto',
+            padding: '4px 10px',
+            background: logOpen ? '#0f172a' : 'none',
+            border: 'none',
+            borderBottom: logOpen ? '2px solid #8b5cf6' : '2px solid transparent',
+            color: logOpen ? '#e2e8f0' : '#64748b',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: logOpen ? 600 : 400,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+          title="Toggle Activity Log"
+        >
+          Log
+          {logEntries.length > 0 && (
+            <span style={{
+              padding: '1px 5px',
+              borderRadius: 8,
+              backgroundColor: hasErrors ? '#991b1b' : '#334155',
+              color: hasErrors ? '#fca5a5' : '#94a3b8',
+              fontSize: '10px',
+            }}>
+              {logEntries.length}
+            </span>
+          )}
+        </button>
+
         {/* Close button */}
         <button
           onClick={onToggle}
           style={{
-            marginLeft: 'auto',
             padding: '4px 10px',
             background: 'none',
             border: 'none',
@@ -184,12 +232,94 @@ export const VCSPanel: React.FC<VCSPanelProps> = ({ isOpen, onToggle, onViewDiff
         </button>
       </div>
 
-      {/* Tab content */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        {activeTab === 'pending' && <PendingChangesTab onViewDiff={onViewDiff} />}
-        {activeTab === 'incoming' && <IncomingChangesTab />}
-        {activeTab === 'history' && <HistoryTab onViewDiff={onViewDiff} filterFile={undefined} />}
-        {activeTab === 'branches' && <BranchesTab />}
+      {/* Tab content + optional log */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Tab content */}
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          {activeTab === 'pending' && <PendingChangesTab onViewDiff={onViewDiff} />}
+          {activeTab === 'incoming' && <IncomingChangesTab />}
+          {activeTab === 'history' && <HistoryTab onViewDiff={onViewDiff} filterFile={undefined} />}
+          {activeTab === 'branches' && <BranchesTab />}
+        </div>
+
+        {/* Activity Log (collapsible) */}
+        {logOpen && (
+          <div style={{
+            maxHeight: '40%',
+            borderTop: '1px solid #334155',
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0,
+          }}>
+            {/* Log header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '4px 12px',
+              backgroundColor: '#1e293b',
+              flexShrink: 0,
+            }}>
+              <span style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>Activity Log</span>
+              <button
+                onClick={() => vcs.clearMessageLog()}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  padding: '2px 6px',
+                }}
+              >
+                Clear
+              </button>
+            </div>
+
+            {/* Log entries */}
+            <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+              {logEntries.length === 0 ? (
+                <div style={{ padding: '12px', color: '#475569', fontSize: 12, textAlign: 'center' }}>
+                  No activity yet
+                </div>
+              ) : (
+                logEntries.map(entry => (
+                  <div
+                    key={entry.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                      padding: '3px 12px',
+                      fontSize: 11,
+                      borderBottom: '1px solid #1e293b',
+                    }}
+                  >
+                    <span style={{ color: '#475569', fontFamily: 'monospace', flexShrink: 0, fontSize: 10 }}>
+                      {formatTime(entry.timestamp)}
+                    </span>
+                    <span style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      backgroundColor: dotColors[entry.type],
+                      flexShrink: 0,
+                      marginTop: 4,
+                    }} />
+                    <span style={{
+                      color: '#cbd5e1',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      flex: 1,
+                    }}>
+                      {entry.message}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,10 +7,14 @@
  *
  * When no VCS is detected but a directory project is open, shows a
  * "Set up Version Control" button to initialize a Git repository.
+ *
+ * When a merge/rebase is in progress, shows a prominent warning with
+ * a button to open the MergeConflictDialog.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
+import { MergeConflictDialog } from './MergeConflictDialog';
 
 interface VCSStatusBarProps {
   /** Whether the VCS panel is currently open */
@@ -23,6 +27,7 @@ interface VCSStatusBarProps {
 
 export const VCSStatusBar: React.FC<VCSStatusBarProps> = ({ panelOpen, onTogglePanel, onInitRepo }) => {
   const vcs = useVCSStatus();
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
 
   // Show "Git not found" warning when git binary is missing for a directory project
   if (vcs && vcs.initialized && vcs.gitNotInstalled && vcs.projectPath) {
@@ -117,137 +122,168 @@ export const VCSStatusBar: React.FC<VCSStatusBarProps> = ({ panelOpen, onToggleP
   };
 
   return (
-    <div
-      className="vcs-status-bar"
-      onClick={onTogglePanel}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '2px 8px',
-        fontSize: '12px',
-        color: '#94a3b8',
-        borderLeft: '1px solid #334155',
-        cursor: onTogglePanel ? 'pointer' : 'default',
-      }}
-    >
-      {/* Panel open indicator */}
-      {onTogglePanel && (
-        <span style={{ fontSize: '8px', color: '#64748b' }}>
-          {panelOpen ? '\u25BC' : '\u25B6'}
-        </span>
+    <>
+      {showConflictDialog && (
+        <MergeConflictDialog
+          errorMessage=""
+          onClose={() => setShowConflictDialog(false)}
+        />
       )}
-
-      {/* VCS type icon */}
-      <span style={{ opacity: 0.7 }}>
-        {vcs.type === 'git' ? 'Git' : 'P4'}
-      </span>
-
-      {/* Branch name */}
-      {vcs.branch && (
-        <span
-          style={{
-            padding: '1px 6px',
-            borderRadius: '3px',
-            backgroundColor: '#1e293b',
-            color: '#60a5fa',
-            fontFamily: 'monospace',
-            fontSize: '11px',
-          }}
-        >
-          {vcs.branch}
-        </span>
-      )}
-
-      {/* Changed files count */}
-      {vcs.isDirty && (
-        <span
-          style={{
-            padding: '1px 5px',
-            borderRadius: '3px',
-            backgroundColor: vcs.changedFileCount > 0 ? '#854d0e' : 'transparent',
-            color: '#fbbf24',
-            fontSize: '11px',
-          }}
-          title={`${vcs.changedFileCount} changed file${vcs.changedFileCount !== 1 ? 's' : ''}`}
-        >
-          {vcs.changedFileCount} changed
-        </span>
-      )}
-
-      {/* Ahead/behind (Git only) */}
-      {vcs.type === 'git' && (vcs.ahead > 0 || vcs.behind > 0) && (
-        <span style={{ fontSize: '11px' }}>
-          {vcs.ahead > 0 && (
-            <span style={{ color: '#4ade80' }} title={`${vcs.ahead} commits ahead of remote`}>
-              {'\u2191'}{vcs.ahead}
-            </span>
-          )}
-          {vcs.behind > 0 && (
-            <span style={{ color: '#f87171', marginLeft: vcs.ahead > 0 ? '4px' : 0 }} title={`${vcs.behind} commits behind remote`}>
-              {'\u2193'}{vcs.behind}
-            </span>
-          )}
-        </span>
-      )}
-
-      {/* Conflict indicator */}
-      {vcs.conflictFiles.size > 0 && (
-        <span
-          style={{
-            padding: '1px 5px',
-            borderRadius: '3px',
-            backgroundColor: '#7f1d1d',
-            color: '#fca5a5',
-            fontSize: '11px',
-          }}
-          title={`${vcs.conflictFiles.size} conflict${vcs.conflictFiles.size !== 1 ? 's' : ''}`}
-        >
-          {vcs.conflictFiles.size} conflicts
-        </span>
-      )}
-
-      {/* Quick action buttons (Git only) */}
-      {vcs.type === 'git' && (
-        <>
-          {vcs.behind > 0 && (
-            <button
-              onClick={handlePull}
-              style={quickBtnStyle}
-              title="Pull from remote"
-            >
-              {'\u2193'}
-            </button>
-          )}
-          {vcs.ahead > 0 && (
-            <button
-              onClick={handlePush}
-              style={quickBtnStyle}
-              title="Push to remote"
-            >
-              {'\u2191'}
-            </button>
-          )}
-        </>
-      )}
-
-      {/* Refresh button */}
-      <button
-        onClick={handleRefresh}
+      <div
+        className="vcs-status-bar"
+        onClick={onTogglePanel}
         style={{
-          background: 'none',
-          border: 'none',
-          color: '#64748b',
-          cursor: 'pointer',
-          padding: '2px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '2px 8px',
           fontSize: '12px',
-          lineHeight: 1,
+          color: '#94a3b8',
+          borderLeft: '1px solid #334155',
+          cursor: onTogglePanel ? 'pointer' : 'default',
         }}
-        title="Refresh VCS status"
       >
-        {'\u21BB'}
-      </button>
-    </div>
+        {/* Panel open indicator */}
+        {onTogglePanel && (
+          <span style={{ fontSize: '8px', color: '#64748b' }}>
+            {panelOpen ? '\u25BC' : '\u25B6'}
+          </span>
+        )}
+
+        {/* VCS type icon */}
+        <span style={{ opacity: 0.7 }}>
+          {vcs.type === 'git' ? 'Git' : 'P4'}
+        </span>
+
+        {/* Merge/rebase in progress warning */}
+        {vcs.mergeState && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowConflictDialog(true);
+            }}
+            style={{
+              padding: '1px 6px',
+              borderRadius: '3px',
+              backgroundColor: '#7f1d1d',
+              color: '#fca5a5',
+              border: '1px solid #991b1b',
+              fontSize: '11px',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+            title={`${vcs.mergeState === 'rebase' ? 'Rebase' : 'Merge'} in progress — click to resolve or abort`}
+          >
+            {vcs.mergeState === 'rebase' ? 'REBASING' : 'MERGING'}
+          </button>
+        )}
+
+        {/* Branch name */}
+        {vcs.branch && !vcs.mergeState && (
+          <span
+            style={{
+              padding: '1px 6px',
+              borderRadius: '3px',
+              backgroundColor: '#1e293b',
+              color: '#60a5fa',
+              fontFamily: 'monospace',
+              fontSize: '11px',
+            }}
+          >
+            {vcs.branch}
+          </span>
+        )}
+
+        {/* Changed files count */}
+        {vcs.isDirty && (
+          <span
+            style={{
+              padding: '1px 5px',
+              borderRadius: '3px',
+              backgroundColor: vcs.changedFileCount > 0 ? '#854d0e' : 'transparent',
+              color: '#fbbf24',
+              fontSize: '11px',
+            }}
+            title={`${vcs.changedFileCount} changed file${vcs.changedFileCount !== 1 ? 's' : ''}`}
+          >
+            {vcs.changedFileCount} changed
+          </span>
+        )}
+
+        {/* Ahead/behind (Git only) */}
+        {vcs.type === 'git' && (vcs.ahead > 0 || vcs.behind > 0) && (
+          <span style={{ fontSize: '11px' }}>
+            {vcs.ahead > 0 && (
+              <span style={{ color: '#4ade80' }} title={`${vcs.ahead} commits ahead of remote`}>
+                {'\u2191'}{vcs.ahead}
+              </span>
+            )}
+            {vcs.behind > 0 && (
+              <span style={{ color: '#f87171', marginLeft: vcs.ahead > 0 ? '4px' : 0 }} title={`${vcs.behind} commits behind remote`}>
+                {'\u2193'}{vcs.behind}
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* Conflict indicator */}
+        {vcs.conflictFiles.size > 0 && (
+          <span
+            style={{
+              padding: '1px 5px',
+              borderRadius: '3px',
+              backgroundColor: '#7f1d1d',
+              color: '#fca5a5',
+              fontSize: '11px',
+            }}
+            title={`${vcs.conflictFiles.size} conflict${vcs.conflictFiles.size !== 1 ? 's' : ''}`}
+          >
+            {vcs.conflictFiles.size} conflicts
+          </span>
+        )}
+
+        {/* Quick action buttons (Git only) */}
+        {vcs.type === 'git' && !vcs.mergeState && (
+          <>
+            {vcs.behind > 0 && (
+              <button
+                onClick={handlePull}
+                style={quickBtnStyle}
+                title="Pull from remote"
+              >
+                {'\u2193'}
+              </button>
+            )}
+            {vcs.ahead > 0 && (
+              <button
+                onClick={handlePush}
+                style={quickBtnStyle}
+                title="Push to remote"
+              >
+                {'\u2191'}
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Refresh button */}
+        <button
+          onClick={handleRefresh}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#64748b',
+            cursor: 'pointer',
+            padding: '2px',
+            fontSize: '12px',
+            lineHeight: 1,
+          }}
+          title="Refresh VCS status"
+        >
+          {'\u21BB'}
+        </button>
+      </div>
+    </>
   );
 };
 
