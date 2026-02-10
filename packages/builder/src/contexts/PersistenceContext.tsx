@@ -12,6 +12,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { getStorageManager, getStorageAdapter, type Project, type StorageManager, type GlobalSettings } from '../storage';
 import { CommandManager, type Command } from '../commands';
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave';
+import type { ProjectFormat } from '../storage/adapters/PersistenceAdapter';
+import { DirectoryAdapter, isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
 
 // ============================================================================
 // Context Types
@@ -64,6 +66,12 @@ export interface PersistenceContextValue {
   // Data sync callback registration
   registerSyncCallback: (callback: () => void) => void;
   unregisterSyncCallback: () => void;
+
+  // Directory format support
+  projectFormat: ProjectFormat;
+  projectPath: string | null;
+  openDirectoryProject: (dirPath: string) => Promise<boolean>;
+  saveAsDirectory: (dirPath: string) => Promise<boolean>;
 
   // Initialization
   initialized: boolean;
@@ -146,6 +154,12 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   const [initialized, setInitialized] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
   const [isUntitledProject, setIsUntitledProject] = useState(false);
+  const [projectFormat, setProjectFormat] = useState<ProjectFormat>('indexeddb');
+  const [projectPath, setProjectPath] = useState<string | null>(null);
+  const directoryAdapterRef = useRef<DirectoryAdapter | null>(null);
+  // Track which asset IDs have already been written to the filesystem
+  // so we can skip unchanged assets on subsequent saves
+  const savedAssetIdsRef = useRef<Set<string>>(new Set());
   // CRITICAL: Ref for immediate synchronous access to isUntitledProject
   // This solves the async state update timing issue where getProjectData
   // would check stale state before React state update propagated
@@ -230,6 +244,51 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   }, [currentProject, syncCallback, debug]);
 
   /**
+   * Callback to also persist to the filesystem for directory-format projects.
+   * Called by useAutoSave after each successful IndexedDB save.
+   * Loads project assets from IndexedDB and writes them alongside the JSON files.
+   */
+  const handleAfterSave = useCallback(async (project: Project) => {
+    const adapter = directoryAdapterRef.current;
+    if (!adapter || !adapter.getProjectPath()) return;
+
+    try {
+      // Load assets from IndexedDB for this project
+      let assetsToSave: import('../storage').StoredAsset[] | undefined;
+      try {
+        const assetsResult = await storage.getProjectAssets(project.id);
+        if (assetsResult.success && assetsResult.data && assetsResult.data.length > 0) {
+          // Only include assets that haven't been saved yet (optimization)
+          const newAssets = assetsResult.data.filter(
+            (a) => !savedAssetIdsRef.current.has(a.id)
+          );
+
+          if (newAssets.length > 0) {
+            assetsToSave = newAssets;
+            // Mark them as saved after successful write
+            for (const a of newAssets) {
+              savedAssetIdsRef.current.add(a.id);
+            }
+            if (debug) {
+              console.log(`[PersistenceContext] Writing ${newAssets.length} new asset(s) to filesystem`);
+            }
+          }
+        }
+      } catch (assetErr) {
+        console.warn('[PersistenceContext] Failed to load assets for filesystem save:', assetErr);
+        // Continue — JSON files still get written
+      }
+
+      await adapter.saveProject(project, assetsToSave);
+      if (debug) {
+        console.log('[PersistenceContext] Directory project saved to filesystem');
+      }
+    } catch (err) {
+      console.error('[PersistenceContext] Failed to save to filesystem:', err);
+    }
+  }, [storage, debug]);
+
+  /**
    * Auto-save hook
    */
   const {
@@ -246,6 +305,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     enabled: autoSave && !!currentProject,
     delay: autoSaveDelay,
     debug,
+    onAfterSave: handleAfterSave,
   });
 
   // Expose pause/resume for auto-save
@@ -705,6 +765,101 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   }, [currentProject, storage, commandManager, saveNow, syncCallback]);
 
   /**
+   * Open a directory-format project from the filesystem (Electron only)
+   */
+  const openDirectoryProject = useCallback(async (dirPath: string): Promise<boolean> => {
+    if (!isElectronWithFS()) {
+      console.error('[PersistenceProvider] Directory projects require Electron');
+      return false;
+    }
+
+    try {
+      // Cancel any pending auto-save
+      cancelPending();
+
+      const adapter = new DirectoryAdapter();
+      const project = await adapter.openProject(dirPath);
+
+      directoryAdapterRef.current = adapter;
+      savedAssetIdsRef.current = new Set(); // Reset saved asset tracking for new project
+      currentProjectRef.current = project;
+      setCurrentProject(project);
+      setProjectId(project.id);
+      setProjectFormat('directory');
+      setProjectPath(dirPath);
+      isUntitledProjectRef.current = false;
+      setIsUntitledProject(false);
+
+      // Also save to IndexedDB so existing flows work
+      try {
+        const result = await storage.getProject(project.id);
+        if (result.success && result.data) {
+          await storage.updateProject(project);
+        } else {
+          await storage.createProject(project);
+        }
+      } catch (e) {
+        console.warn('[PersistenceProvider] Failed to sync directory project to IndexedDB:', e);
+      }
+
+      commandManager.setProjectId(project.id);
+      commandManager.clear();
+
+      console.log('[PersistenceProvider] Opened directory project:', dirPath);
+      return true;
+    } catch (error) {
+      console.error('[PersistenceProvider] Failed to open directory project:', error);
+      return false;
+    }
+  }, [storage, commandManager, cancelPending]);
+
+  /**
+   * Save the current project as a directory-format project (Electron only)
+   */
+  const saveAsDirectory = useCallback(async (dirPath: string): Promise<boolean> => {
+    if (!isElectronWithFS()) {
+      console.error('[PersistenceProvider] Directory projects require Electron');
+      return false;
+    }
+
+    // Sync current state
+    syncCallback?.();
+    const projectToSave = currentProjectRef.current;
+    if (!projectToSave) {
+      console.error('[PersistenceProvider] No project to save');
+      return false;
+    }
+
+    try {
+      // Load all assets so they're included in the initial directory save
+      let assets: import('../storage').StoredAsset[] | undefined;
+      try {
+        const assetsResult = await storage.getProjectAssets(projectToSave.id);
+        if (assetsResult.success && assetsResult.data && assetsResult.data.length > 0) {
+          assets = assetsResult.data;
+        }
+      } catch (assetErr) {
+        console.warn('[PersistenceProvider] Failed to load assets for saveAsDirectory:', assetErr);
+      }
+
+      const adapter = new DirectoryAdapter();
+      adapter.setProjectPath(dirPath);
+      await adapter.saveProject(projectToSave, assets);
+
+      directoryAdapterRef.current = adapter;
+      savedAssetIdsRef.current = new Set(assets?.map((a) => a.id) || []);
+      setProjectFormat('directory');
+      setProjectPath(dirPath);
+
+      console.log('[PersistenceProvider] Saved project as directory:', dirPath);
+      return true;
+    } catch (error) {
+      console.error('[PersistenceProvider] Failed to save as directory:', error);
+      return false;
+    }
+  }, [storage, syncCallback]);
+
+  /**
    * Clear untitled project state (mark as not untitled)
    */
   const clearUntitledState = useCallback(() => {
@@ -810,6 +965,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     discardUntitledProject,
     registerSyncCallback,
     unregisterSyncCallback,
+    projectFormat,
+    projectPath,
+    openDirectoryProject,
+    saveAsDirectory,
     initialized,
     initError,
   };
