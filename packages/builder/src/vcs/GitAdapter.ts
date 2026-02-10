@@ -259,15 +259,37 @@ export async function gitPush(projectPath: string): Promise<GitOperationResult> 
   return { success: false, message: errMsg };
 }
 
-/** Pull from remote, optionally with rebase */
+/** Pull from remote, optionally with rebase. Automatically sets upstream when missing. */
 export async function gitPull(projectPath: string, rebase = false): Promise<GitOperationResult> {
   const run = getRunCommand();
   const args = rebase ? ['pull', '--rebase'] : ['pull'];
   const result = await run('git', args, projectPath);
-  return {
-    success: result.exitCode === 0,
-    message: result.exitCode === 0 ? result.stdout.trim() : result.stderr.trim(),
-  };
+  if (result.exitCode === 0) {
+    return { success: true, message: result.stdout.trim() || 'Already up to date' };
+  }
+
+  // If no upstream tracking is set, retry with explicit origin/<branch>
+  const errMsg = (result.stderr + ' ' + result.stdout).trim();
+  if (errMsg.includes('no tracking information') || errMsg.includes('no upstream')) {
+    const branchResult = await run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
+    const branch = branchResult.stdout.trim() || 'main';
+
+    // Set upstream tracking so future pulls work without specifying the remote
+    await run('git', ['branch', '--set-upstream-to', `origin/${branch}`, branch], projectPath);
+
+    const retryArgs = rebase
+      ? ['pull', '--rebase', 'origin', branch]
+      : ['pull', 'origin', branch];
+    const retryResult = await run('git', retryArgs, projectPath);
+    return {
+      success: retryResult.exitCode === 0,
+      message: retryResult.exitCode === 0
+        ? retryResult.stdout.trim() || `Pulled from origin/${branch} and set upstream`
+        : retryResult.stderr.trim(),
+    };
+  }
+
+  return { success: false, message: errMsg };
 }
 
 /** Fetch from remote */
