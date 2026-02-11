@@ -1,5 +1,67 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-10: Git VCS Integration & Clone Repository (v0.9.14)
+
+### Overview
+
+This release adds **full Git version control integration** to the desktop app, enabling collaborative story authoring. Authors can now initialize repos, commit, push, pull, manage branches, resolve merge conflicts, and clone repositories — all from within the app.
+
+### Git VCS Support (Major Feature)
+
+Complete Git integration for directory-based projects in the Electron desktop app:
+
+- **Directory-format persistence**: Projects saved as human-readable JSON files (one file per beat, organized by cluster) for clean diffs and merge-friendly collaboration
+- **VCS panel**: Sidebar panel showing pending changes, commit history, and branch info
+- **Commit & push/pull**: Stage changes, write commit messages, push to remote, pull updates
+- **Branch management**: Create, switch, and manage branches from the UI
+- **Merge conflict resolution**: Detect and display merge conflicts with resolution UI
+- **Activity log**: Scrollable log of all VCS operations with timestamps
+- **Push rejection dialog**: Clear guidance when push is rejected (remote has new commits)
+- **Sticky error toasts**: Non-blocking error notifications for VCS operations
+- **Session persistence**: Directory path and VCS state preserved across app restarts
+- **Git-missing UX**: Friendly guidance when git is not installed on the system
+
+### Clone Repository (New Feature)
+
+New **"Clone Repository..."** menu item in the File menu:
+
+- Enter a remote URL and pick a local destination folder
+- Auto-extracts repository name from URL for the target path
+- Clones the repo and auto-opens the project with VCS active
+- Detects merge conflicts in cloned repos and warns before opening
+- 5-minute timeout for large repositories (configurable via IPC)
+
+### Sound Asset Serialization (Enhancement)
+
+Extended blob URL stripping (already done for images) to sound assets for VCS-friendly output:
+
+- Beat `sound.file` blob URLs stripped during serialization
+- `soundEffect` in dialog choices/options sanitized across all beat types
+- Global `backgroundMusic` blob URL in settings stripped on save
+- Ensures clean, diffable JSON files without transient blob references
+
+### Bug Fixes
+
+- **Asset manifest overwrite fix**: Fixed critical bug where `_manifest.json` was overwritten with empty content during incremental auto-saves — manifest now only written when assets are explicitly provided
+- **VCS helper file preservation**: `.gitignore`, `.p4ignore`, `.gitattributes` files are no longer overwritten on save if they already exist (preserves user customizations)
+- **.DS_Store filtering**: OS metadata files (`.DS_Store`, `Thumbs.db`, `Desktop.ini`) filtered from VCS pending changes display and added to default `.gitignore` template
+- **Git pull upstream fix**: Fixed git pull failing when branch has no upstream tracking reference
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/vcs/GitAdapter.ts` | Added `gitClone()`, OS file filtering in `getGitStatus()` |
+| `packages/builder/src/components/vcs/CloneRepoDialog.tsx` | New clone dialog component |
+| `apps/builder-desktop/src/main/index.ts` | "Clone Repository..." menu item, configurable command timeout |
+| `apps/builder-desktop/src/preload/index.ts` | IPC event for clone menu, timeout parameter, type declarations |
+| `packages/builder/src/App.tsx` | Clone dialog wiring, conflict detection on clone |
+| `packages/core/src/persistence/BeatSerializer.ts` | Sound blob URL sanitization (`sanitizeSound`, `sanitizeParameters`) |
+| `packages/core/src/persistence/DirectoryFormat.ts` | Settings blob sanitization, manifest overwrite fix, `.gitignore` update |
+| `packages/builder/src/storage/adapters/DirectoryAdapter.ts` | VCS helper file preservation |
+
+---
+
 ## 2026-02-06: AI Dialog Fix & Model Defaults Update (v0.9.13)
 
 ### Overview

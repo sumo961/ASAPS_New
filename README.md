@@ -16,13 +16,14 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.13)
+## ⚠️ Development Status (v0.9.14)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
-| **AI Dialog Fix** | **NEW in v0.9.13**: Fixed AIDialogTree generation across all players, updated OpenAI defaults to GPT-5.2 |
+| **Git VCS Integration** | **NEW in v0.9.14**: Full Git version control — commit, push, pull, branch, merge conflicts, clone repository |
+| **AI Dialog Fix** | Fixed AIDialogTree generation across all players, updated OpenAI defaults to GPT-5.2 (v0.9.13) |
 | **HTML Export** | Export stories as standalone HTML files with splash screen, counter HUD, and inventory icons (v0.9.12) |
 | **Unified Rendering** | WYSIWYG alignment between visual editor and preview (v0.9.12) |
 | **Independent Preview Window** | Preview in separate window with path-based presets and InputText value entry (v0.9.11) |
@@ -46,6 +47,16 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Path Analysis | StateSimulationAnalyzer for accurate hub-and-spoke patterns (v0.9.10) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
+
+### 🔀 Git Version Control (v0.9.14)
+
+Collaborative story authoring with built-in Git support in the desktop app:
+
+- **VCS panel**: View pending changes, commit history, and branch info in the sidebar
+- **Full Git workflow**: Commit, push, pull, branch, and merge — all from within the app
+- **Clone Repository**: Clone a remote repo directly from the File menu
+- **Merge conflict resolution**: Detect and resolve conflicts with guided UI
+- **Directory format**: Projects saved as individual JSON files for clean diffs
 
 ### 📦 HTML Export (v0.9.12)
 
