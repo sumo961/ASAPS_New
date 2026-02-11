@@ -46,6 +46,7 @@ import { VCSPanel } from './components/vcs/VCSPanel';
 import { DiffViewer } from './components/vcs/DiffViewer';
 import { VCSToast } from './components/vcs/VCSToast';
 import { GitInitDialog } from './components/vcs/GitInitDialog';
+import { CloneRepoDialog } from './components/vcs/CloneRepoDialog';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -61,7 +62,7 @@ declare global {
         copyFile: (src: string, dst: string) => Promise<void>;
         stat: (path: string) => Promise<{ size: number; mtime: string; isDirectory: boolean }>;
         watchDir: (path: string, callback: (changedFiles: string[]) => void) => () => void;
-        runCommand: (command: string, args: string[], cwd?: string) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
+        runCommand: (command: string, args: string[], cwd?: string, timeout?: number) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
       };
       dialog?: {
         save: (options: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePath?: string }>;
@@ -88,6 +89,7 @@ declare global {
       onVCSStashPop?: (callback: () => void) => () => void;
       onVCSTogglePanel?: (callback: () => void) => () => void;
       onVCSRefresh?: (callback: () => void) => () => void;
+      onMenuCloneRepo?: (callback: () => void) => () => void;
       isElectron: boolean;
     };
   }
@@ -166,6 +168,7 @@ function App() {
   const [vcsPanelOpen, setVcsPanelOpen] = useState(false);
   const [diffViewerFile, setDiffViewerFile] = useState<string | null>(null);
   const [showGitInitDialog, setShowGitInitDialog] = useState(false);
+  const [showCloneRepoDialog, setShowCloneRepoDialog] = useState(false);
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -2581,6 +2584,9 @@ function App() {
     if (api?.onVCSRefresh && vcsCtx) {
       unsubs.push(api.onVCSRefresh(() => { vcsCtx.refresh(); }));
     }
+    if (api?.onMenuCloneRepo) {
+      unsubs.push(api.onMenuCloneRepo(() => setShowCloneRepoDialog(true)));
+    }
 
     return () => unsubs.forEach(u => u());
   }, [vcsCtx]);
@@ -4434,6 +4440,56 @@ function App() {
             await vcsCtx.initRepo(remoteUrl);
           }}
           onClose={() => setShowGitInitDialog(false)}
+        />
+      )}
+
+      {/* Clone Repository Dialog */}
+      {showCloneRepoDialog && (
+        <CloneRepoDialog
+          onCloned={async (clonedPath) => {
+            console.log('[App] Repository cloned to:', clonedPath);
+            try {
+              // Check for merge conflicts before trying to open
+              const api = window.electronAPI;
+              let hasConflicts = false;
+              if (api?.fs?.runCommand) {
+                const conflictCheck = await api.fs.runCommand(
+                  'git', ['diff', '--check', 'HEAD'], clonedPath
+                );
+                // Also check for conflict markers in tracked files
+                const grepCheck = await api.fs.runCommand(
+                  'git', ['grep', '-l', '<<<<<<<'], clonedPath
+                );
+                hasConflicts = grepCheck.exitCode === 0 && grepCheck.stdout.trim().length > 0;
+              }
+
+              if (hasConflicts) {
+                alert('The cloned repository contains unresolved merge conflicts.\n\nThe project will be opened with Version Control so you can resolve the conflicts.');
+                // Initialize VCS so user can resolve conflicts
+                if (vcs) {
+                  await vcs.initialize(clonedPath);
+                }
+              } else {
+                const success = await openDirectoryProject(clonedPath);
+                if (success) {
+                  console.log('[App] Cloned project opened successfully');
+                } else {
+                  alert('Repository cloned, but it does not appear to be a valid ASAPS project.');
+                }
+                // Always initialize VCS for the cloned repo
+                if (vcs) {
+                  await vcs.initialize(clonedPath);
+                }
+              }
+            } catch (error) {
+              console.error('[App] Failed to open cloned project:', error);
+              alert(`Failed to open cloned project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              if (vcs) {
+                try { await vcs.initialize(clonedPath); } catch { /* ignore */ }
+              }
+            }
+          }}
+          onClose={() => setShowCloneRepoDialog(false)}
         />
       )}
 

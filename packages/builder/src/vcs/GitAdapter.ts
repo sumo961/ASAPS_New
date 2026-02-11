@@ -63,6 +63,9 @@ export async function getGitStatus(projectPath: string): Promise<GitStatus> {
     'git', ['status', '--porcelain'], projectPath
   );
 
+  // OS-generated files to hide from the VCS panel
+  const OS_IGNORED = new Set(['.DS_Store', 'Thumbs.db', 'Desktop.ini']);
+
   const files: GitFileStatus[] = [];
   if (statusResult.exitCode === 0 && statusResult.stdout.trim()) {
     // IMPORTANT: Do NOT trim() stdout before splitting — the leading space
@@ -75,6 +78,10 @@ export async function getGitStatus(projectPath: string): Promise<GitStatus> {
       const indexStatus = line[0];
       const workStatus = line[1];
       const path = line.substring(3).trim();
+
+      // Skip OS-generated files (check basename)
+      const basename = path.split('/').pop() || path;
+      if (OS_IGNORED.has(basename)) continue;
 
       // Determine if staged or not
       const staged = indexStatus !== ' ' && indexStatus !== '?';
@@ -717,6 +724,25 @@ export async function gitResolveAllAndComplete(
   }
 
   return { success: false, message: `Resolution exceeded ${maxSteps} steps — aborting` };
+}
+
+/** Clone a remote repository into a target directory */
+export async function gitClone(
+  remoteUrl: string,
+  targetDir: string,
+): Promise<GitOperationResult> {
+  const api = window.electronAPI;
+  if (!api?.fs?.runCommand) {
+    throw new Error('Git clone requires Electron runCommand API');
+  }
+  // Use a 5-minute timeout for clone (repos can be large)
+  const result = await api.fs.runCommand('git', ['clone', remoteUrl, targetDir], undefined, 300000);
+  return {
+    success: result.exitCode === 0,
+    message: result.exitCode === 0
+      ? result.stderr.trim() || `Cloned into ${targetDir}`
+      : result.stderr.trim() || result.stdout.trim(),
+  };
 }
 
 /** Resolve a merge conflict by accepting ours or theirs */

@@ -23,8 +23,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('fs:unwatch-dir');
       };
     },
-    runCommand: (command: string, args: string[], cwd?: string) =>
-      ipcRenderer.invoke('fs:run-command', command, args, cwd),
+    runCommand: (command: string, args: string[], cwd?: string, timeout?: number) =>
+      ipcRenderer.invoke('fs:run-command', command, args, cwd, timeout),
   },
 
   // Dialog operations
@@ -155,6 +155,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('vcs:refresh', callback);
   },
 
+  // Clone repository menu event
+  onMenuCloneRepo: (callback: () => void) => {
+    ipcRenderer.on('menu:clone-repo', callback);
+    return () => ipcRenderer.removeListener('menu:clone-repo', callback);
+  },
+
   // Platform info
   platform: process.platform,
   isElectron: true,
@@ -174,7 +180,7 @@ declare global {
         copyFile: (src: string, dst: string) => Promise<void>;
         stat: (path: string) => Promise<{ size: number; mtime: string; isDirectory: boolean }>;
         watchDir: (path: string, callback: (changedFiles: string[]) => void) => () => void;
-        runCommand: (command: string, args: string[], cwd?: string) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
+        runCommand: (command: string, args: string[], cwd?: string, timeout?: number) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
       };
       dialog: {
         open: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
@@ -219,6 +225,7 @@ declare global {
       onVCSStashPop: (callback: () => void) => () => void;
       onVCSTogglePanel: (callback: () => void) => () => void;
       onVCSRefresh: (callback: () => void) => () => void;
+      onMenuCloneRepo: (callback: () => void) => () => void;
       platform: NodeJS.Platform;
       isElectron: boolean;
     };

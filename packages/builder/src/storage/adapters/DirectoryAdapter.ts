@@ -133,9 +133,18 @@ export class DirectoryAdapter implements PersistenceAdapter {
     const input = this.projectToSerializeInput(project, assets);
     const { files, assetFiles } = serializeToDirectory(input);
 
+    // VCS helper files that should only be created, never overwritten
+    const VCS_HELPER_FILES = new Set(['.gitignore', '.p4ignore', '.gitattributes']);
+
     // Write all JSON files (includes the manifest with asset entries)
     for (const file of files) {
       const fullPath = `${this.projectPath}/${file.path}`;
+
+      // Don't overwrite VCS helper files — they may have user customizations
+      if (VCS_HELPER_FILES.has(file.path) && await api.fs.exists(fullPath)) {
+        continue;
+      }
+
       // Ensure parent directory exists
       const parentDir = fullPath.substring(0, fullPath.lastIndexOf('/'));
       await api.fs.mkdir(parentDir);

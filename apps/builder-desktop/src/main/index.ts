@@ -382,6 +382,10 @@ function createMenu(): void {
           label: 'Open Project Folder (VCS)...',
           click: () => handleOpenProjectFolder(),
         },
+        {
+          label: 'Clone Repository...',
+          click: () => mainWindow?.webContents.send('menu:clone-repo'),
+        },
         { type: 'separator' },
         {
           label: 'Save',
@@ -644,7 +648,7 @@ ipcMain.handle('fs:unwatch-dir', async () => {
   stopWatching();
 });
 
-ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?: string) => {
+ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?: string, timeout?: number) => {
   // Augment PATH so Homebrew-installed tools are found
   // when Electron is launched from Finder (which has a minimal PATH)
   const extraPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
@@ -670,7 +674,7 @@ ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?
   return new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve) => {
     execFile(command, args, {
       cwd: cwd || undefined,
-      timeout: 30000,
+      timeout: timeout || 30000,
       env: { ...process.env, PATH: augmentedPath, ...lfsEnv },
     }, (error, stdout, stderr) => {
       resolve({
