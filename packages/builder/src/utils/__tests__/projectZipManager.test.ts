@@ -21,6 +21,18 @@ vi.mock('../../storage/StorageManager', () => ({
   getStorageManager: vi.fn(() => mockStorageInstance)
 }));
 
+// Polyfill Blob.prototype.arrayBuffer for jsdom (not implemented in jsdom)
+if (typeof Blob.prototype.arrayBuffer !== 'function') {
+  Blob.prototype.arrayBuffer = function () {
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(this);
+    });
+  };
+}
+
 describe('projectZipManager', () => {
   const mockStorage = mockStorageInstance;
   let testProject: Project;
@@ -381,7 +393,8 @@ describe('projectZipManager', () => {
       const result = await importProjectFromZip(zipFile, { overwrite: false });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('already exists');
+      expect(result.conflict).toBeDefined();
+      expect(result.conflict!.existingProjectId).toBe('existing-id');
     });
 
     it('should update existing project with overwrite option', async () => {

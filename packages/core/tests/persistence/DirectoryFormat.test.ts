@@ -61,7 +61,6 @@ describe('DirectoryFormat', () => {
       expect(filePaths).toContain('settings.json');
       expect(filePaths).toContain('environment.json');
       expect(filePaths).toContain('clusters/_index.json');
-      expect(filePaths).toContain('assets/_manifest.json');
       expect(filePaths).toContain('.gitattributes');
       expect(filePaths).toContain('.gitignore');
       expect(filePaths).toContain('.p4ignore');

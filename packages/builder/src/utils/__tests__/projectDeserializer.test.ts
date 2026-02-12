@@ -213,7 +213,8 @@ describe('projectDeserializer', () => {
 
       const result = loadProjectData(project);
 
-      expect(result.title).toBe('Test Story');
+      // Project name takes precedence over story metadata title
+      expect(result.title).toBe('Test Project');
       expect(result.author).toBe('Test Author');
       expect(result.beats).toHaveLength(1);
       expect(result.settings).toEqual({ width: 1024, height: 768 });
@@ -251,7 +252,8 @@ describe('projectDeserializer', () => {
 
       const result = loadProjectData(project);
 
-      expect(result.title).toBe('Serialized Story');
+      // Project name takes precedence over story metadata title
+      expect(result.title).toBe('Test Project');
       expect(result.author).toBe('Serialized Author');
       expect(result.beats).toHaveLength(1);
       expect(result.beats[0].id).toBe('beat_1');

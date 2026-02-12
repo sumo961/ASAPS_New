@@ -118,6 +118,53 @@ Server address: perforce:1666
     expect(result.type).toBe('none');
   });
 
+  it('returns gitMissing when git binary is not found (ENOENT)', async () => {
+    (window as any).electronAPI = createMockElectronAPI({
+      exists: vi.fn().mockRejectedValue(new Error('ENOENT: no such file or directory')),
+      runCommand: vi.fn().mockRejectedValue(new Error('ENOENT: no such file or directory')),
+    });
+
+    const result = await detectVCS('/test/project');
+    expect(result.type).toBe('none');
+    expect(result.gitMissing).toBe(true);
+  });
+
+  it('returns gitMissing when git command not found (no .git dir)', async () => {
+    // .git dir doesn't exist, rev-parse also fails with ENOENT
+    (window as any).electronAPI = createMockElectronAPI({
+      exists: vi.fn().mockResolvedValue(false),
+      runCommand: vi.fn().mockRejectedValue(new Error('command not found: git')),
+    });
+
+    const result = await detectVCS('/test/project');
+    expect(result.type).toBe('none');
+    expect(result.gitMissing).toBe(true);
+  });
+
+  it('returns gitMissing when git not recognized on Windows', async () => {
+    (window as any).electronAPI = createMockElectronAPI({
+      exists: vi.fn().mockResolvedValue(false),
+      runCommand: vi.fn().mockRejectedValue(new Error("'git' is not recognized as an internal or external command")),
+    });
+
+    const result = await detectVCS('/test/project');
+    expect(result.type).toBe('none');
+    expect(result.gitMissing).toBe(true);
+  });
+
+  it('returns git type when .git exists but git binary is missing (graceful degradation)', async () => {
+    // When .git dir exists, detectVCS enters the gitDirExists path and calls getGitInfo
+    // even if git binary is missing. getGitInfo catches errors silently and returns { type: 'git' }
+    (window as any).electronAPI = createMockElectronAPI({
+      exists: vi.fn().mockImplementation(async (path: string) => path.endsWith('.git')),
+      runCommand: vi.fn().mockRejectedValue(new Error('command not found: git')),
+    });
+
+    const result = await detectVCS('/test/project');
+    expect(result.type).toBe('git');
+    expect(result.branch).toBeUndefined();
+  });
+
   it('returns git type even when branch/root commands fail', async () => {
     const runCommand = vi.fn()
       .mockRejectedValueOnce(new Error('branch error')) // branch

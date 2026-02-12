@@ -29,6 +29,7 @@ vi.mock('../GitAdapter', () => ({
   gitStash: vi.fn().mockResolvedValue({ success: true }),
   gitStashPop: vi.fn().mockResolvedValue({ success: true }),
   gitRevertFiles: vi.fn().mockResolvedValue({ success: true }),
+  gitDetectMergeState: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../PerforceAdapter', () => ({
