@@ -833,21 +833,22 @@ export class ASMLGenerator {
 
     // NOTE: Sound is stored on locations, not on choices - no buttonsound attribute needed
 
-    // Add counter effect as attributes with proper operation and val
-    if (choice.counter) {
-      attrs.push(`counter="${this.escapeXml(choice.counter)}"`);
-      if (choice.counterOperation) {
-        attrs.push(`operation="${choice.counterOperation}"`);
-      } else {
-        // Default to 'change' if operation not specified
-        attrs.push(`operation="change"`);
-      }
-      if (choice.counterValue !== undefined) {
-        attrs.push(`val="${choice.counterValue}"`);
+    // Add counter effect as ASML attributes — read from effects array first, flat fields as fallback
+    const counterEffect = choice.effects?.find((e: any) => e.type === 'incrementCounter' || e.type === 'setCounter');
+    const counterName = counterEffect?.target || choice.counter;
+    const counterOp = counterEffect ? (counterEffect.type === 'setCounter' ? 'set' : 'change') : (choice.counterOperation || 'change');
+    const counterVal = counterEffect?.value ?? choice.counterValue;
+    if (counterName) {
+      attrs.push(`counter="${this.escapeXml(counterName)}"`);
+      attrs.push(`operation="${counterOp}"`);
+      if (counterVal !== undefined) {
+        attrs.push(`val="${counterVal}"`);
       }
     }
 
-    const hasChildren = hasNestedDialog || choice.conditions || choice.effects;
+    // Filter out counter effects from the effects array for child element export (already exported as attributes)
+    const nonCounterEffects = choice.effects?.filter((e: any) => e.type !== 'incrementCounter' && e.type !== 'setCounter') || [];
+    const hasChildren = hasNestedDialog || choice.conditions || nonCounterEffects.length > 0;
 
     if (hasChildren) {
       lines.push(`${indent}<choice ${attrs.join(' ')}>`);
@@ -864,11 +865,9 @@ export class ASMLGenerator {
         this.generateNestedDialogTree(nestedDialogNode, lines, indent + this.indent);
       }
 
-      // Effects
-      if (choice.effects) {
-        for (const effect of choice.effects) {
-          this.generateEffect(effect, lines, indent + this.indent);
-        }
+      // Effects (non-counter effects — counter effects already exported as ASML attributes)
+      for (const effect of nonCounterEffects) {
+        this.generateEffect(effect, lines, indent + this.indent);
       }
 
       lines.push(`${indent}</choice>`);
@@ -999,35 +998,34 @@ export class ASMLGenerator {
 
     // NOTE: Sound is stored on locations, not on choices - no buttonsound attribute needed
 
-    // Add counter effect as attributes (for movementChoice)
-    if (choice.counter) {
-      attrs.push(`counter="${this.escapeXml(choice.counter)}"`);
-      // Always include operation, default to 'change' if not specified
-      if (choice.counterOperation) {
-        attrs.push(`operation="${choice.counterOperation}"`);
-      } else {
-        attrs.push(`operation="change"`);
-      }
-      if (choice.counterValue !== undefined) {
-        attrs.push(`val="${choice.counterValue}"`);
+    // Add counter effect as ASML attributes — read from effects array first, flat fields as fallback
+    const mcCounterEffect = choice.effects?.find((e: any) => e.type === 'incrementCounter' || e.type === 'setCounter');
+    const mcCounterName = mcCounterEffect?.target || choice.counter;
+    const mcCounterOp = mcCounterEffect ? (mcCounterEffect.type === 'setCounter' ? 'set' : 'change') : (choice.counterOperation || 'change');
+    const mcCounterVal = mcCounterEffect?.value ?? choice.counterValue;
+    if (mcCounterName) {
+      attrs.push(`counter="${this.escapeXml(mcCounterName)}"`);
+      attrs.push(`operation="${mcCounterOp}"`);
+      if (mcCounterVal !== undefined) {
+        attrs.push(`val="${mcCounterVal}"`);
       }
     }
-    
-    const hasChildren = choice.conditions || choice.effects;
-    
+
+    // Filter out counter effects from the effects array (already exported as attributes)
+    const mcNonCounterEffects = choice.effects?.filter((e: any) => e.type !== 'incrementCounter' && e.type !== 'setCounter') || [];
+    const hasChildren = choice.conditions || mcNonCounterEffects.length > 0;
+
     if (hasChildren) {
       lines.push(`${indent}<choice ${attrs.join(' ')}>`);
-      
+
       if (choice.conditions) {
         for (const condition of choice.conditions) {
           this.generateCondition(condition, lines, indent + this.indent);
         }
       }
-      
-      if (choice.effects) {
-        for (const effect of choice.effects) {
-          this.generateEffect(effect, lines, indent + this.indent);
-        }
+
+      for (const effect of mcNonCounterEffects) {
+        this.generateEffect(effect, lines, indent + this.indent);
       }
       
       lines.push(`${indent}</choice>`);
@@ -1048,37 +1046,36 @@ export class ASMLGenerator {
 
     // NOTE: Sound is stored on locations, not on props - no buttonsound attribute needed
 
-    // Add counter effect as attributes (for pickProp)
-    if (prop.counter) {
-      attrs.push(`counter="${this.escapeXml(prop.counter)}"`);
-      // Always include operation, default to 'change' if not specified
-      if (prop.counterOperation) {
-        attrs.push(`operation="${prop.counterOperation}"`);
-      } else {
-        attrs.push(`operation="change"`);
-      }
-      if (prop.counterValue !== undefined) {
-        attrs.push(`val="${prop.counterValue}"`);
+    // Add counter effect as ASML attributes — read from effects array first, flat fields as fallback
+    const ppCounterEffect = prop.effects?.find((e: any) => e.type === 'incrementCounter' || e.type === 'setCounter');
+    const ppCounterName = ppCounterEffect?.target || prop.counter;
+    const ppCounterOp = ppCounterEffect ? (ppCounterEffect.type === 'setCounter' ? 'set' : 'change') : (prop.counterOperation || 'change');
+    const ppCounterVal = ppCounterEffect?.value ?? prop.counterValue;
+    if (ppCounterName) {
+      attrs.push(`counter="${this.escapeXml(ppCounterName)}"`);
+      attrs.push(`operation="${ppCounterOp}"`);
+      if (ppCounterVal !== undefined) {
+        attrs.push(`val="${ppCounterVal}"`);
       }
     }
-    
-    const hasChildren = prop.conditions || prop.effects;
-    
+
+    // Filter out counter effects from the effects array (already exported as attributes)
+    const ppNonCounterEffects = prop.effects?.filter((e: any) => e.type !== 'incrementCounter' && e.type !== 'setCounter') || [];
+    const hasChildren = prop.conditions || ppNonCounterEffects.length > 0;
+
     if (hasChildren) {
       lines.push(`${indent}<prop ${attrs.join(' ')}>`);
-      
+
       if (prop.conditions) {
         for (const condition of prop.conditions) {
           this.generateCondition(condition, lines, indent + this.indent);
         }
       }
-      
-      if (prop.effects) {
-        for (const effect of prop.effects) {
-          this.generateEffect(effect, lines, indent + this.indent);
-        }
+
+      for (const effect of ppNonCounterEffects) {
+        this.generateEffect(effect, lines, indent + this.indent);
       }
-      
+
       lines.push(`${indent}</prop>`);
     } else {
       lines.push(`${indent}<prop ${attrs.join(' ')} />`);

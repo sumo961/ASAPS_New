@@ -139,14 +139,15 @@ export class BackwardAnalyzer {
         }
       }
 
-      // Also check for effects on choices that set variables
+      // Also check for effects on choices that set variables/counters
       const params = beat.getParameters();
       const choices = params.choices || params.options || params.props || [];
       for (const choice of choices) {
         if (choice.effects) {
           for (const effect of choice.effects) {
-            if (effect.type === 'setVariable' || effect.type === 'counter') {
-              const varName = effect.variable || effect.variableName || effect.counterName;
+            // Handle canonical effect types
+            if (effect.type === 'setVariable') {
+              const varName = effect.target || effect.variable || effect.variableName;
               if (varName) {
                 if (!this.variableSetters.has(varName)) {
                   this.variableSetters.set(varName, []);
@@ -154,24 +155,42 @@ export class BackwardAnalyzer {
                 this.variableSetters.get(varName)!.push({
                   beatId: beat.id,
                   beatName: beat.name,
-                  operation: effect.operation || 'change',
+                  operation: 'set',
+                  value: effect.value ?? '',
+                });
+              }
+            } else if (effect.type === 'incrementCounter' || effect.type === 'setCounter' || effect.type === 'counter') {
+              const varName = effect.target || effect.counter || effect.counterName;
+              if (varName) {
+                if (!this.variableSetters.has(varName)) {
+                  this.variableSetters.set(varName, []);
+                }
+                this.variableSetters.get(varName)!.push({
+                  beatId: beat.id,
+                  beatName: beat.name,
+                  operation: effect.type === 'setCounter' ? 'set' : (effect.operation || 'change'),
                   value: effect.value ?? 1,
                 });
               }
             }
           }
         }
-        // Direct counter fields on choices
+        // Fallback: direct counter fields on choices (legacy)
         if (choice.counter) {
-          if (!this.variableSetters.has(choice.counter)) {
-            this.variableSetters.set(choice.counter, []);
+          const alreadyProcessed = choice.effects?.some((e: any) =>
+            (e.type === 'incrementCounter' || e.type === 'setCounter') && e.target === choice.counter
+          );
+          if (!alreadyProcessed) {
+            if (!this.variableSetters.has(choice.counter)) {
+              this.variableSetters.set(choice.counter, []);
+            }
+            this.variableSetters.get(choice.counter)!.push({
+              beatId: beat.id,
+              beatName: beat.name,
+              operation: choice.counterOperation || 'change',
+              value: choice.counterValue ?? 1,
+            });
           }
-          this.variableSetters.get(choice.counter)!.push({
-            beatId: beat.id,
-            beatName: beat.name,
-            operation: choice.counterOperation || 'change',
-            value: choice.counterValue ?? 1,
-          });
         }
       }
     }

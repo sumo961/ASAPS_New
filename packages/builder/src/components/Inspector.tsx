@@ -12,7 +12,10 @@ import { BeatSuggestions } from './ai/BeatSuggestions';
 import type { BeatDefinition } from './SchemaFormGenerator';
 import type { Asset } from './assets/AssetManager';
 import type { Character } from '../types/character';
-import { useAvailableCounters, useAvailableVariables } from '../hooks/useAvailableCountersAndVariables';
+import { useAvailableCounters, useAvailableVariables, useAvailableInventoryItems } from '../hooks/useAvailableCountersAndVariables';
+import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
+import { SmartNameDropdown } from '../editors/SmartNameDropdown';
+import { TextFieldWithVariables } from '../editors/TextFieldWithVariables';
 
 // Type definitions
 interface ChoiceWithCounter {
@@ -21,9 +24,7 @@ interface ChoiceWithCounter {
   location?: string;
   locationName?: string;  // References a hotspot/prop from beat.locations by name
   target?: string;
-  counter?: string;
-  counterOperation?: string;
-  counterValue?: number;
+  effects?: any[];
   soundEffect?: string;
 }
 
@@ -32,9 +33,7 @@ interface PropWithEffect {
   name: string;
   description: string;
   target?: string;
-  counter?: string;
-  counterOperation?: string;
-  counterValue?: number;
+  effects?: any[];
   soundEffect?: string;
   effect?: {
     type: string;
@@ -148,9 +147,10 @@ export const Inspector: React.FC<InspectorProps> = ({
     };
   }, [isResizing, maxWidth, onWidthChange, externalWidth, internalWidth]);
 
-  // Get available counters and variables for dropdowns
+  // Get available counters, variables, and inventory items for dropdowns
   const availableCounters = useAvailableCounters(characters);
   const availableVariables = useAvailableVariables(globalSettings || null);
+  const availableInventoryItems = useAvailableInventoryItems(characters);
 
   // Force re-render trigger for when we modify beat.locations directly
   const [locationUpdateTrigger, setLocationUpdateTrigger] = useState(0);
@@ -1320,12 +1320,18 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Counter Name
                           </label>
-                          <input
-                            type="text"
+                          <SmartNameDropdown
                             value={localBeat.parameters?.variableName || localBeat.parameters?.left || ''}
-                            onChange={(e) => handleParameterChange('variableName', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            onChange={(val) => handleParameterChange('variableName', val || '')}
+                            options={availableCounters.map(c => ({
+                              name: c.name,
+                              displayName: c.displayName,
+                              characterName: c.characterName,
+                            }))}
                             placeholder="e.g., courage"
+                            newItemLabel="+ New counter..."
+                            noSelectionLabel="Select counter..."
+                            className="w-full"
                           />
                         </div>
                         <div>
@@ -1366,12 +1372,18 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             First Counter
                           </label>
-                          <input
-                            type="text"
+                          <SmartNameDropdown
                             value={localBeat.parameters?.counter1 || ''}
-                            onChange={(e) => handleParameterChange('counter1', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            onChange={(val) => handleParameterChange('counter1', val || '')}
+                            options={availableCounters.map(c => ({
+                              name: c.name,
+                              displayName: c.displayName,
+                              characterName: c.characterName,
+                            }))}
                             placeholder="e.g., courage"
+                            newItemLabel="+ New counter..."
+                            noSelectionLabel="Select counter..."
+                            className="w-full"
                           />
                         </div>
                         <div>
@@ -1395,12 +1407,18 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Second Counter
                           </label>
-                          <input
-                            type="text"
+                          <SmartNameDropdown
                             value={localBeat.parameters?.counter2 || ''}
-                            onChange={(e) => handleParameterChange('counter2', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            onChange={(val) => handleParameterChange('counter2', val || '')}
+                            options={availableCounters.map(c => ({
+                              name: c.name,
+                              displayName: c.displayName,
+                              characterName: c.characterName,
+                            }))}
                             placeholder="e.g., wisdom"
+                            newItemLabel="+ New counter..."
+                            noSelectionLabel="Select counter..."
+                            className="w-full"
                           />
                         </div>
                       </>
@@ -1461,12 +1479,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             <Variable className="w-4 h-4 inline mr-1" />
                             Variable Name
                           </label>
-                          <input
-                            type="text"
+                          <SmartNameDropdown
                             value={localBeat.parameters?.variableName || localBeat.parameters?.variable || localBeat.parameters?.left || ''}
-                            onChange={(e) => handleParameterChange('variableName', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            onChange={(val) => handleParameterChange('variableName', val || '')}
+                            options={availableVariables.map(v => ({
+                              name: v.name,
+                              displayName: v.description ? `${v.name} (${v.description})` : v.name,
+                            }))}
                             placeholder="e.g., playerName"
+                            newItemLabel="+ New variable..."
+                            noSelectionLabel="Select variable..."
+                            className="w-full"
                           />
                         </div>
                         <div>
@@ -1510,12 +1533,18 @@ export const Inspector: React.FC<InspectorProps> = ({
                             <Box className="w-4 h-4 inline mr-1" />
                             Item Name
                           </label>
-                          <input
-                            type="text"
+                          <SmartNameDropdown
                             value={localBeat.parameters?.item || ''}
-                            onChange={(e) => handleParameterChange('item', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            onChange={(val) => handleParameterChange('item', val || '')}
+                            options={availableInventoryItems.map(i => ({
+                              name: i.name,
+                              displayName: i.displayName,
+                              characterName: i.characterName,
+                            }))}
                             placeholder="e.g., magic_key"
+                            newItemLabel="+ New item..."
+                            noSelectionLabel="Select item..."
+                            className="w-full"
                           />
                         </div>
                         <div>
@@ -1891,6 +1920,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                       allBeats={availableTargets}
                       counters={availableCounters.map(c => ({ name: c.name, displayName: c.displayName, characterName: c.characterName }))}
                       variables={availableVariables.map(v => v.name)}
+                      availableCounters={availableCounters}
+                      availableVariables={availableVariables}
+                      availableInventoryItems={availableInventoryItems}
                     />
 
                     {showAdvanced && (
@@ -1937,10 +1969,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
-                      <input
-                        type="text"
+                      <TextFieldWithVariables
                         value={localBeat.parameters?.question || 'Where do you want to go?'}
-                        onChange={(e) => handleParameterChange('question', e.target.value)}
+                        onChange={(val) => handleParameterChange('question', val)}
+                        availableVariables={availableVariables}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
@@ -2089,36 +2121,15 @@ export const Inspector: React.FC<InspectorProps> = ({
                           
                           {showAdvanced && (
                             <div className="p-2 bg-blue-50 rounded space-y-2">
-                              <div className="text-xs font-medium text-blue-700">Counter Effect (Optional)</div>
-                              <input
-                                type="text"
-                                value={choice.counter || ''}
-                                onChange={(e) => handleUpdateChoice(index, 'counter', e.target.value)}
-                                placeholder="Counter name (e.g., courage)"
-                                className="w-full px-2 py-1 text-xs border rounded"
+                              <div className="text-xs font-medium text-blue-700">Effects (Optional)</div>
+                              <ChoiceEffectsEditor
+                                effects={choice.effects || []}
+                                onChange={(newEffects) => handleUpdateChoice(index, 'effects', newEffects)}
+                                availableCounters={availableCounters}
+                                availableVariables={availableVariables}
+                                availableInventoryItems={availableInventoryItems}
+                                compact
                               />
-                              <div className="flex gap-2">
-                                <select
-                                  value={choice.counterOperation || 'change'}
-                                  onChange={(e) => handleUpdateChoice(index, 'counterOperation', e.target.value)}
-                                  className="flex-1 px-2 py-1 text-xs border rounded"
-                                >
-                                  <option value="change">Change by</option>
-                                  <option value="set">Set to</option>
-                                </select>
-                                <input
-                                  type="number"
-                                  value={choice.counterValue || 0}
-                                  onChange={(e) => handleUpdateChoice(index, 'counterValue', parseInt(e.target.value))}
-                                  placeholder="Value"
-                                  className="w-20 px-2 py-1 text-xs border rounded"
-                                />
-                              </div>
-                              {choice.counterOperation === 'change' && (
-                                <div className="text-xs text-gray-600">
-                                  Use negative values to decrease
-                                </div>
-                              )}
                               <div className="mt-2 pt-2 border-t border-blue-200">
                                 <div className="text-xs font-medium text-blue-700 mb-1">Sound Effect (Optional)</div>
                                 <input
@@ -2142,10 +2153,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
-                      <input
-                        type="text"
+                      <TextFieldWithVariables
                         value={localBeat.parameters?.question || 'What do you want to pick up?'}
-                        onChange={(e) => handleParameterChange('question', e.target.value)}
+                        onChange={(val) => handleParameterChange('question', val)}
+                        availableVariables={availableVariables}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
@@ -2312,52 +2323,28 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ))}
                           </select>
                           
-                          {/* Counter Effect */}
+                          {/* Effects (counter/variable only — inventory handled inherently by pickProp) */}
                           <div className="p-2 bg-blue-50 rounded space-y-2">
-                            <div className="text-xs font-medium text-blue-700">Counter Effect (Optional)</div>
-                            <input
-                              type="text"
-                              value={prop.counter || ''}
-                              onChange={(e) => handleUpdateProp(index, 'counter', e.target.value)}
-                              placeholder="Counter name (e.g., courage)"
-                              className="w-full px-2 py-1 text-sm border rounded"
+                            <div className="text-xs font-medium text-blue-700">Effects (Optional)</div>
+                            <ChoiceEffectsEditor
+                              effects={prop.effects || []}
+                              onChange={(newEffects) => handleUpdateProp(index, 'effects', newEffects)}
+                              availableCounters={availableCounters}
+                              availableVariables={availableVariables}
+                              availableInventoryItems={availableInventoryItems}
+                              hideInventory
+                              compact
                             />
-                            {prop.counter && (
-                              <>
-                                <div className="flex gap-2">
-                                  <select
-                                    value={prop.counterOperation || 'change'}
-                                    onChange={(e) => handleUpdateProp(index, 'counterOperation', e.target.value)}
-                                    className="flex-1 px-2 py-1 text-sm border rounded"
-                                  >
-                                    <option value="change">Change by</option>
-                                    <option value="set">Set to</option>
-                                  </select>
-                                  <input
-                                    type="number"
-                                    value={prop.counterValue || 0}
-                                    onChange={(e) => handleUpdateProp(index, 'counterValue', parseInt(e.target.value))}
-                                    placeholder="Value"
-                                    className="w-20 px-2 py-1 text-sm border rounded"
-                                  />
-                                </div>
-                                {prop.counterOperation === 'change' && (
-                                  <div className="text-xs text-gray-600">
-                                    Use negative values to decrease
-                                  </div>
-                                )}
-                                <div className="mt-2 pt-2 border-t border-blue-200">
-                                  <div className="text-xs font-medium text-blue-700 mb-1">Sound Effect (Optional)</div>
-                                  <input
-                                    type="text"
-                                    value={prop.soundEffect || ''}
-                                    onChange={(e) => handleUpdateProp(index, 'soundEffect', e.target.value)}
-                                    placeholder="Sound file (e.g., pickup.mp3)"
-                                    className="w-full px-2 py-1 text-xs border rounded"
-                                  />
-                                </div>
-                              </>
-                            )}
+                            <div className="mt-2 pt-2 border-t border-blue-200">
+                              <div className="text-xs font-medium text-blue-700 mb-1">Sound Effect (Optional)</div>
+                              <input
+                                type="text"
+                                value={prop.soundEffect || ''}
+                                onChange={(e) => handleUpdateProp(index, 'soundEffect', e.target.value)}
+                                placeholder="Sound file (e.g., pickup.mp3)"
+                                className="w-full px-2 py-1 text-xs border rounded"
+                              />
+                            </div>
                           </div>
 
                           {/* Note: Picking a prop automatically adds it to inventory */}

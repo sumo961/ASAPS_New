@@ -2287,18 +2287,12 @@ export class ASMLParser {
             const [counterName, counterVal] = counterAttr.split(',');
             if (counterName && counterName !== 'undefined') {
               const counterValue = parseInt(counterVal) || 0;
-              // Set both formats for compatibility:
-              // - effects array (for execution/export)
-              // - direct fields (for DialogTreeEditor UI)
+              // Use canonical effect format (processed by applyEffect)
               choice.effects = [{
-                type: 'counter',
-                counter: counterName,
-                operation: 'add',
+                type: 'incrementCounter',
+                target: counterName,
                 value: counterValue
               }];
-              choice.counter = counterName;
-              choice.counterOperation = 'change';
-              choice.counterValue = counterValue;
             }
           }
 

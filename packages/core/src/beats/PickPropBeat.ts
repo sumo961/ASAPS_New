@@ -3,6 +3,7 @@ import type { BeatConfig, Effect } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { PickPropParameters, PropOption } from '../generated/beat-types';
+import { migrateChoiceEffects } from '../migration/effectsMigration';
 
 export class PickPropBeat extends Beat {
   public question: string;
@@ -18,6 +19,9 @@ export class PickPropBeat extends Beat {
     this.props = config.props || config.parameters?.props || [];
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
+
+    // Migrate flat counter fields → canonical effects on all props
+    this.props.forEach(p => migrateChoiceEffects(p as any));
   }
 
   getParameters(): Record<string, any> {
@@ -148,7 +152,7 @@ export class PickPropBeat extends Beat {
         choiceContext: this.question,
       });
 
-      // Apply prop effects (e.g., add to inventory)
+      // Apply prop effects (canonical effects array, migrated from flat counter fields)
       if (selectedProp.effects) {
         selectedProp.effects.forEach(effect => context.applyEffect(effect));
       }
@@ -157,18 +161,7 @@ export class PickPropBeat extends Beat {
       const inventoryItemName = selectedProp.inventoryName || selectedProp.locationName || selectedProp.name;
       context.addToInventory(inventoryItemName);
 
-      // Apply direct counter fields (new feature)
-      if (selectedProp.counter) {
-        const operation = selectedProp.counterOperation || 'change';
-        const value = selectedProp.counterValue ?? 1;
-        if (operation === 'set') {
-          context.setCounter(selectedProp.counter, value);
-        } else {
-          context.incrementCounter(selectedProp.counter, value);
-        }
-      }
-
-      // Play sound effect (new feature)
+      // Play sound effect
       if (selectedProp.soundEffect && renderer.playSound) {
         await renderer.playSound({ file: selectedProp.soundEffect });
       }

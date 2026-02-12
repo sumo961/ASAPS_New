@@ -354,24 +354,7 @@ export class ReachabilityAnalyzer {
         const choices = params.choices || params.props || [];
 
         for (const choice of choices) {
-          // Support both counterEffect object and direct counter/counterValue properties
-          const counterName = choice.counterEffect?.counter || choice.counter;
-          const counterValue = choice.counterEffect?.value ?? choice.counterValue;
-
-          if (counterName && counterValue !== undefined) {
-            const value = Number(counterValue) || 0;
-
-            if (!this.counterModifications.has(counterName)) {
-              this.counterModifications.set(counterName, { min: 0, max: 0 });
-            }
-
-            const range = this.counterModifications.get(counterName)!;
-            if (value > 0) {
-              range.max += value;
-            } else {
-              range.min += value;
-            }
-          }
+          this.analyzeChoiceCounterEffects(choice);
         }
       }
 
@@ -385,32 +368,60 @@ export class ReachabilityAnalyzer {
   /**
    * Recursively analyze dialog tree for counter modifications
    */
+  /**
+   * Extract counter modifications from a choice's effects array or flat counter fields
+   */
+  private analyzeChoiceCounterEffects(choice: any): void {
+    // Check effects array first (canonical format)
+    if (choice.effects && Array.isArray(choice.effects)) {
+      for (const effect of choice.effects) {
+        if (effect.type === 'incrementCounter' || effect.type === 'setCounter') {
+          const counterName = effect.target;
+          const value = Number(effect.value) || 0;
+          if (counterName) {
+            if (!this.counterModifications.has(counterName)) {
+              this.counterModifications.set(counterName, { min: 0, max: 0 });
+            }
+            const range = this.counterModifications.get(counterName)!;
+            if (value > 0) range.max += value;
+            else range.min += value;
+          }
+        }
+      }
+    }
+
+    // Fallback: flat counter fields (legacy)
+    const counterName = choice.counterEffect?.counter || choice.counter;
+    const counterValue = choice.counterEffect?.value ?? choice.counterValue;
+    if (counterName && counterValue !== undefined) {
+      // Only process if not already handled via effects array
+      const alreadyProcessed = choice.effects?.some((e: any) =>
+        (e.type === 'incrementCounter' || e.type === 'setCounter') && e.target === counterName
+      );
+      if (!alreadyProcessed) {
+        const value = Number(counterValue) || 0;
+        if (!this.counterModifications.has(counterName)) {
+          this.counterModifications.set(counterName, { min: 0, max: 0 });
+        }
+        const range = this.counterModifications.get(counterName)!;
+        if (value > 0) range.max += value;
+        else range.min += value;
+      }
+    }
+  }
+
   private analyzeDialogTreeForCounters(node: any): void {
     if (!node) return;
 
     if (node.choices) {
       for (const choice of node.choices) {
-        // Support both counterEffect object and direct counter/counterValue properties
-        const counterName = choice.counterEffect?.counter || choice.counter;
-        const counterValue = choice.counterEffect?.value ?? choice.counterValue;
-
-        if (counterName && counterValue !== undefined) {
-          const value = Number(counterValue) || 0;
-
-          if (!this.counterModifications.has(counterName)) {
-            this.counterModifications.set(counterName, { min: 0, max: 0 });
-          }
-
-          const range = this.counterModifications.get(counterName)!;
-          if (value > 0) {
-            range.max += value;
-          } else {
-            range.min += value;
-          }
-        }
+        this.analyzeChoiceCounterEffects(choice);
 
         if (choice.nextNode) {
           this.analyzeDialogTreeForCounters(choice.nextNode);
+        }
+        if (choice.dialogNode) {
+          this.analyzeDialogTreeForCounters(choice.dialogNode);
         }
       }
     }

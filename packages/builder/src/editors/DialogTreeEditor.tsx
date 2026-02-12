@@ -21,9 +21,12 @@ import {
   Sparkles,
   Loader2
 } from 'lucide-react';
-import type { Beat } from '@asaps/core';
+import type { Beat, Effect } from '@asaps/core';
 import { useAI } from '../hooks/useAI';
 import type { DialogGenerationRequest } from '../types/ai';
+import { ChoiceEffectsEditor } from './ChoiceEffectsEditor';
+import { TextFieldWithVariables } from './TextFieldWithVariables';
+import type { AvailableCounter, AvailableVariable, AvailableInventoryItem } from '../hooks/useAvailableCountersAndVariables';
 
 interface DialogNode {
   id: string;
@@ -43,9 +46,6 @@ interface DialogChoice {
   conditions?: Condition[];
   effects?: Effect[];
   visible?: boolean;
-  counter?: string;
-  counterOperation?: 'change' | 'set';
-  counterValue?: number;
   soundEffect?: string;  // Sound to play when choice is selected
 }
 
@@ -54,13 +54,6 @@ interface Condition {
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=';
   left: string;
   right: any;
-}
-
-interface Effect {
-  type: 'setVariable' | 'setCounter' | 'addInventory' | 'removeInventory';
-  target: string;
-  value: any;
-  operation?: 'add' | 'subtract' | 'set';
 }
 
 interface CounterOption {
@@ -75,6 +68,9 @@ interface DialogTreeEditorProps {
   characters?: string[];
   variables?: string[];
   counters?: (string | CounterOption)[];  // Can be string (backward compat) or object
+  availableCounters?: AvailableCounter[];
+  availableVariables?: AvailableVariable[];
+  availableInventoryItems?: AvailableInventoryItem[];
   allBeats?: Beat[];
   expanded?: boolean;
 }
@@ -109,6 +105,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   characters = ['Narrator', 'NPC'],
   variables = [],
   counters = [],
+  availableCounters: availableCountersProp,
+  availableVariables: availableVariablesProp,
+  availableInventoryItems: availableInventoryItemsProp,
   allBeats = [],
   expanded = false
 }) => {
@@ -140,15 +139,21 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         : c)
     : [];
 
-  // Group counters by character for the dropdown
-  const countersByCharacter = availableCounters.reduce((acc, counter) => {
-    const charName = counter.characterName || 'Other';
-    if (!acc[charName]) {
-      acc[charName] = [];
-    }
-    acc[charName].push(counter);
-    return acc;
-  }, {} as Record<string, CounterOption[]>);
+  // Build AvailableCounter[] from legacy props if new props not provided
+  const effectCounters: AvailableCounter[] = availableCountersProp || availableCounters.map(c => ({
+    name: c.name,
+    displayName: c.displayName,
+    characterId: '',
+    characterName: c.characterName,
+    fullName: c.characterName ? `${c.characterName}: ${c.displayName}` : c.displayName,
+  }));
+
+  const effectVariables: AvailableVariable[] = availableVariablesProp || variables.map(v => ({
+    name: v,
+    type: 'string' as const,
+  }));
+
+  const effectInventoryItems: AvailableInventoryItem[] = availableInventoryItemsProp || [];
 
   // Deep clone helper
   const cloneNode = (node: DialogNode): DialogNode => {
@@ -526,23 +531,25 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                           </span>
                         )}
                       </div>
-                      <textarea
+                      <TextFieldWithVariables
                         value={displayText}
-                        onChange={(e) => {
+                        onChange={(val) => {
                           if (isCollapsible) {
                             // Update the nested choice's text
                             const updatedDialogNode = {
                               ...choice.dialogNode!,
                               choices: [{
                                 ...choice.dialogNode!.choices[0],
-                                text: e.target.value
+                                text: val
                               }]
                             };
                             updateChoiceAtPath(path, index, { dialogNode: updatedDialogNode });
                           } else {
-                            updateChoiceAtPath(path, index, { text: e.target.value });
+                            updateChoiceAtPath(path, index, { text: val });
                           }
                         }}
+                        availableVariables={effectVariables}
+                        multiline
                         rows={2}
                         className={`w-full px-2 py-1 text-sm border rounded resize-y min-h-[36px] ${
                           needsTextReplacement
@@ -557,98 +564,17 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                         </p>
                       )}
 
-                      {/* Counter effect controls */}
-                      <div className="mt-2 space-y-1.5">
-                        <div className="flex flex-wrap gap-1.5 items-center">
-                          <span className="text-xs text-gray-600 flex-shrink-0">Counter:</span>
-                          {/* Check if current value is custom (not in availableCounters list) */}
-                          {choice.counter && !availableCounters.some(c => c.name === choice.counter) ? (
-                            // Show text input for custom counter with option to switch back
-                            <div className="flex-1 flex gap-1 items-center min-w-[120px]">
-                              <input
-                                type="text"
-                                value={choice.counter}
-                                onChange={(e) => updateChoiceAtPath(path, index, {
-                                  counter: e.target.value || undefined,
-                                  counterOperation: e.target.value ? (choice.counterOperation || 'change') : undefined,
-                                  counterValue: e.target.value ? (choice.counterValue ?? 0) : undefined
-                                })}
-                                placeholder="Custom counter name"
-                                className="flex-1 min-w-0 px-2 py-1 text-xs border rounded"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => updateChoiceAtPath(path, index, {
-                                  counter: undefined,
-                                  counterOperation: undefined,
-                                  counterValue: undefined
-                                })}
-                                className="px-1.5 py-0.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded flex-shrink-0"
-                                title="Clear custom counter"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ) : (
-                            // Show dropdown for selecting from available counters
-                            <select
-                              value={choice.counter || ''}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                if (value === '__custom__') {
-                                  // Switch to custom input mode with empty value
-                                  updateChoiceAtPath(path, index, {
-                                    counter: 'custom_counter',
-                                    counterOperation: choice.counterOperation || 'change',
-                                    counterValue: choice.counterValue ?? 0
-                                  });
-                                } else {
-                                  updateChoiceAtPath(path, index, {
-                                    counter: value || undefined,
-                                    counterOperation: value ? (choice.counterOperation || 'change') : undefined,
-                                    counterValue: value ? (choice.counterValue ?? 0) : undefined
-                                  });
-                                }
-                              }}
-                              className="flex-1 min-w-[100px] max-w-full px-2 py-1 text-xs border rounded bg-white"
-                            >
-                              <option value="">No counter effect</option>
-                              <option value="__custom__">+ New counter...</option>
-                              {Object.entries(countersByCharacter).map(([charName, charCounters]) => (
-                                <optgroup key={charName} label={charName}>
-                                  {charCounters.map(counter => (
-                                    <option key={counter.name} value={counter.name}>
-                                      {counter.displayName}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                        {choice.counter && (
-                          <div className="flex flex-wrap gap-1.5 items-center ml-[52px]">
-                            <select
-                              value={choice.counterOperation || 'change'}
-                              onChange={(e) => updateChoiceAtPath(path, index, {
-                                counterOperation: e.target.value as 'change' | 'set'
-                              })}
-                              className="px-2 py-1 text-xs border rounded bg-white flex-shrink-0"
-                            >
-                              <option value="change">Change by</option>
-                              <option value="set">Set to</option>
-                            </select>
-                            <input
-                              type="number"
-                              value={choice.counterValue || 0}
-                              onChange={(e) => updateChoiceAtPath(path, index, {
-                                counterValue: parseInt(e.target.value) || 0
-                              })}
-                              className="w-16 px-2 py-1 text-xs border rounded flex-shrink-0"
-                              placeholder="0"
-                            />
-                          </div>
-                        )}
+                      {/* Effects editor (counters, variables, inventory) */}
+                      <div className="mt-2">
+                        <span className="text-xs text-gray-600">Effects:</span>
+                        <ChoiceEffectsEditor
+                          effects={choice.effects || []}
+                          onChange={(newEffects) => updateChoiceAtPath(path, index, { effects: newEffects })}
+                          availableCounters={effectCounters}
+                          availableVariables={effectVariables}
+                          availableInventoryItems={effectInventoryItems}
+                          compact
+                        />
                       </div>
 
                       {/* Sound effect control */}
@@ -809,13 +735,15 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             {/* Text */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Dialog Text</label>
-              <textarea
+              <TextFieldWithVariables
                 value={node.text}
-                onChange={(e) => {
-                  const updated = { ...node, text: e.target.value };
+                onChange={(val) => {
+                  const updated = { ...node, text: val };
                   setEditingNode({ node: updated, path });
                 }}
+                availableVariables={effectVariables}
                 className="w-full px-2 py-1 border rounded text-sm"
+                multiline
                 rows={4}
                 placeholder="What does the NPC say?"
               />

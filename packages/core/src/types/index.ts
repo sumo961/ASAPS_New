@@ -100,7 +100,7 @@ export interface Condition {
 }
 
 export interface Effect {
-  type: 'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter';
+  type: 'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter';
   target: string;
   value?: any;
 }

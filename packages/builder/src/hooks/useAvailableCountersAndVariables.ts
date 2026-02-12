@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react';
-import type { Character, CharacterCounter } from '../types/character';
+import type { Character, CharacterCounter, InventoryItem } from '../types/character';
 
 /**
  * Represents a counter from a character, with character context
@@ -84,6 +84,42 @@ export function useAvailableVariables(globalSettings: GlobalSettingsForVariables
       description: v.description,
     }));
   }, [globalSettings]);
+}
+
+/**
+ * Represents an inventory item from a character
+ */
+export interface AvailableInventoryItem {
+  name: string;
+  displayName: string;
+  characterId: string;
+  characterName: string;
+  fullName: string; // "characterName: displayName"
+}
+
+/**
+ * Collect all inventory items from all characters
+ */
+export function useAvailableInventoryItems(characters: Character[]): AvailableInventoryItem[] {
+  return useMemo(() => {
+    const items: AvailableInventoryItem[] = [];
+
+    characters.forEach((character) => {
+      if (character.inventory && Array.isArray(character.inventory)) {
+        character.inventory.forEach((item: InventoryItem) => {
+          items.push({
+            name: item.name,
+            displayName: item.displayName || item.name,
+            characterId: character.id,
+            characterName: character.displayName || character.name,
+            fullName: `${character.displayName || character.name}: ${item.displayName || item.name}`,
+          });
+        });
+      }
+    });
+
+    return items;
+  }, [characters]);
 }
 
 /**

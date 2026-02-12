@@ -439,6 +439,9 @@ export class StoryContext extends EventEmitter {
       case 'incrementCounter':
         this.incrementCounter(effect.target, effect.value || 1);
         break;
+      case 'setCounter':
+        this.setCounter(effect.target, effect.value ?? 0);
+        break;
     }
   }
 

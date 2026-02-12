@@ -7,6 +7,7 @@ export * from './types/animation';
 export * from './audio/presetSounds';
 export * from './generated/beat-types';
 export * from './analysis';
+export * from './migration/effectsMigration';
 export * from './themes/presets';
 export * from './layout';
 export * from './twine';

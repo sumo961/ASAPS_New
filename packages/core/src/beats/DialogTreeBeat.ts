@@ -4,6 +4,7 @@ import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { DialogTreeParameters, DialogNode, DialogChoice } from '../generated/beat-types';
 import { computeDialogTreeLayout, type DialogTreeLayoutTheme } from '../layout';
+import { migrateDialogTreeEffects } from '../migration/effectsMigration';
 
 /**
  * Phase layout override - stores position adjustments for elements that
@@ -99,7 +100,7 @@ export class DialogTreeBeat extends Beat {
           visible: choice.visible
         };
 
-        // Preserve counter effects (used in editor)
+        // Preserve counter fields temporarily (migrateDialogTreeEffects will convert them)
         if (choice.counter) (migratedChoice as any).counter = choice.counter;
         if (choice.counterOperation) (migratedChoice as any).counterOperation = choice.counterOperation;
         if (choice.counterValue !== undefined) (migratedChoice as any).counterValue = choice.counterValue;
@@ -143,6 +144,9 @@ export class DialogTreeBeat extends Beat {
         });
       }
     }
+
+    // Migrate flat counter fields → canonical effects on all choices
+    migrateDialogTreeEffects(migrated);
 
     return migrated;
   }
@@ -493,34 +497,15 @@ export class DialogTreeBeat extends Beat {
               : this.name || 'Dialog choice',
           });
 
-          // Apply effects from the selected choice
+          // Apply effects from the selected choice (canonical effects array, migrated from flat counter fields)
           if (selectedChoice.effects) {
             selectedChoice.effects.forEach(effect => context.applyEffect(effect));
           }
 
-          // Apply direct counter fields (used by editor) if present
-          const choiceWithCounter = selectedChoice as any;
-          if (choiceWithCounter.counter) {
-            const counterName = choiceWithCounter.counter;
-            const operation = choiceWithCounter.counterOperation || 'change';
-            const value = choiceWithCounter.counterValue ?? 1;
-
-            console.log(`[DialogTreeBeat] Applying counter effect: ${counterName} ${operation} ${value}`);
-
-            switch (operation) {
-              case 'set':
-                context.setCounter(counterName, value);
-                break;
-              case 'change':
-              default:
-                context.incrementCounter(counterName, value);
-                break;
-            }
-          }
-
-          // Play sound effect (new feature)
-          if (choiceWithCounter.soundEffect && renderer.playSound) {
-            await renderer.playSound({ file: choiceWithCounter.soundEffect });
+          // Play sound effect
+          const choiceWithSound = selectedChoice as any;
+          if (choiceWithSound.soundEffect && renderer.playSound) {
+            await renderer.playSound({ file: choiceWithSound.soundEffect });
           }
 
           // New format: target is beat ID to exit, dialogNode continues conversation

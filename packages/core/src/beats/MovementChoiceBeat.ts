@@ -3,6 +3,7 @@ import type { BeatConfig } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { MovementChoiceParameters, MovementOption } from '../generated/beat-types';
+import { migrateChoiceEffects } from '../migration/effectsMigration';
 
 export class MovementChoiceBeat extends Beat {
   public question: string;
@@ -20,6 +21,9 @@ export class MovementChoiceBeat extends Beat {
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
     this.showTextOnHover = config.showTextOnHover ?? config.parameters?.showTextOnHover ?? false;
+
+    // Migrate flat counter fields → canonical effects on all choices
+    this.choices.forEach(c => migrateChoiceEffects(c as any));
 
     console.log(`[MovementChoiceBeat constructor] config.node: ${(config as any).node}`);
     console.log(`[MovementChoiceBeat constructor] config.parameters.node: ${config.parameters?.node}`);
@@ -187,23 +191,12 @@ export class MovementChoiceBeat extends Beat {
         context.setVariable('currentLocation', selectedChoice.location);
       }
 
-      // BUG FIX: Apply effects from choice (was missing!)
+      // Apply effects from choice (canonical effects array, migrated from flat counter fields)
       if (selectedChoice.effects) {
         selectedChoice.effects.forEach(effect => context.applyEffect(effect));
       }
 
-      // Apply direct counter fields (new feature)
-      if (selectedChoice.counter) {
-        const operation = selectedChoice.counterOperation || 'change';
-        const value = selectedChoice.counterValue ?? 1;
-        if (operation === 'set') {
-          context.setCounter(selectedChoice.counter, value);
-        } else {
-          context.incrementCounter(selectedChoice.counter, value);
-        }
-      }
-
-      // Play sound effect (new feature)
+      // Play sound effect
       if (selectedChoice.soundEffect && renderer.playSound) {
         await renderer.playSound({ file: selectedChoice.soundEffect });
       }
