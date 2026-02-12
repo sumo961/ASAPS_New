@@ -760,6 +760,10 @@ export class ReactRenderer extends BaseRenderer {
   private characterAvatarResolver: ((characterId: string) => string | undefined) | null = null;  // NEW: Character avatar resolver
   protected timerState: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined;  // NEW: Timer state for progress bar
   private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
+  protected timerHudConfig: import('../components/TimerHudDisplay').TimerHudConfig | undefined;  // Timer HUD config from global settings
+  protected timerHudOverrideText: string | undefined;  // Per-beat static time display override
+  protected countdownMeterConfig: import('../components/CountdownMeterHud').CountdownMeterConfig | undefined;  // Countdown meter HUD config
+  protected countdownMeterValue: { value: number; min: number; max: number } | undefined;  // Current countdown meter value
 
   private get root(): ReactDOM.Root | null {
     return this._root;
@@ -1105,6 +1109,34 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Set the timer HUD configuration from global settings
+   */
+  setTimerHudConfig(config: import('../components/TimerHudDisplay').TimerHudConfig | undefined): void {
+    this.timerHudConfig = config;
+  }
+
+  /**
+   * Set per-beat override text for static timer HUD mode
+   */
+  setTimerHudOverrideText(text: string | undefined): void {
+    this.timerHudOverrideText = text;
+  }
+
+  /**
+   * Set the countdown meter HUD configuration from global settings
+   */
+  setCountdownMeterConfig(config: import('../components/CountdownMeterHud').CountdownMeterConfig | undefined): void {
+    this.countdownMeterConfig = config;
+  }
+
+  /**
+   * Set the current countdown meter value
+   */
+  setCountdownMeterValue(value: { value: number; min: number; max: number } | undefined): void {
+    this.countdownMeterValue = value;
+  }
+
+  /**
    * Subscribe to timer state changes
    * Returns an unsubscribe function
    */
@@ -1210,6 +1242,10 @@ export class ReactRenderer extends BaseRenderer {
               timerState={this.timerState}
               onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
               beatType={beatType}
+              timerHudConfig={this.timerHudConfig}
+              timerHudOverrideText={this.timerHudOverrideText}
+              countdownMeterConfig={this.countdownMeterConfig}
+              countdownMeterValue={this.countdownMeterValue}
             />
           </ScaledStage>
         </div>
@@ -1713,6 +1749,64 @@ export class ReactRenderer extends BaseRenderer {
       };
 
       this.renderPositionedBeat('inputText', content, effectiveLocations, true);
+    });
+  }
+
+  async renderKeypad(
+    prompt: string,
+    options: {
+      layout: 'numeric' | 'phone' | 'pin';
+      maxDigits: number;
+      minDigits: number;
+      correctCode?: string;
+      failTarget?: string;
+      maxAttempts: number;
+      maskInput: boolean;
+      buttonText: string;
+      clearButtonText: string;
+      showDisplay: boolean;
+      skinId?: string;
+    },
+    locations?: Location[]
+  ): Promise<string> {
+    const backgroundAssetId = this.getState('backgroundAssetId');
+    this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+
+    const content = {
+      prompt,
+      ...options,
+    };
+
+    // Generate default locations if none provided
+    // Filter out 'display' and 'submitButton' locations - KeypadElement handles those internally
+    const effectiveLocations: Location[] = locations && locations.length > 0
+      ? locations
+          .filter(loc => {
+            const name = (loc.name || '').toLowerCase();
+            return name !== 'display' && name !== 'submitbutton';
+          })
+          .map(loc => {
+            // Ensure keypadGrid location has kind 'keypad' (may be 'text' from legacy or initial creation)
+            if (loc.name && loc.name.toLowerCase().includes('keypad')) {
+              return { ...loc, kind: 'keypad' as const };
+            }
+            return loc;
+          })
+      : [
+          // Prompt text
+          { kind: 'text' as const, name: 'prompt', x: 212, y: 30, width: 600, height: 60 },
+          // Keypad grid
+          { kind: 'keypad' as const, name: 'keypadGrid', x: 392, y: 120, width: 240, height: 360 },
+        ];
+
+    return new Promise<string>(resolve => {
+      const originalHandleAction = this.handleAction;
+      this.handleAction = (value: string) => {
+        this.handleAction = originalHandleAction;
+        resolve(value);
+      };
+
+      this.renderPositionedBeat('keypad', content, effectiveLocations, true);
     });
   }
 

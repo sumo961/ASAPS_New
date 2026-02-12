@@ -7,6 +7,9 @@ import { getAnimationManager } from '../animation/AnimationEngine';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
 import { CharacterInventoryFrame, type InventoryFrameConfig, type InventoryItemData } from './CharacterInventoryFrame';
 import { TimerProgressBar } from './TimerProgressBar';
+import { TimerHudDisplay } from './TimerHudDisplay';
+import { CountdownMeterHud } from './CountdownMeterHud';
+import { KeypadElement } from './KeypadElement';
 import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
 
 // Default stage dimensions (can be overridden by project settings)
@@ -331,6 +334,16 @@ export interface PositionedElementData {
   counterValue?: number;
   counterMin?: number;
   counterMax?: number;
+  /** Keypad-specific fields (for kind='keypad') */
+  keypadLayout?: 'numeric' | 'phone' | 'pin';
+  keypadMaxDigits?: number;
+  keypadMinDigits?: number;
+  keypadCorrectCode?: string;
+  keypadMaxAttempts?: number;
+  keypadMaskInput?: boolean;
+  keypadButtonText?: string;
+  keypadClearButtonText?: string;
+  keypadShowDisplay?: boolean;
 }
 
 /**
@@ -467,6 +480,14 @@ export interface PositionedBeatViewProps {
   beatType?: string;
   /** Editor mode - disables smart text box sizing to match selection handles */
   editorMode?: boolean;
+  /** Timer HUD configuration from global settings */
+  timerHudConfig?: import('./TimerHudDisplay').TimerHudConfig;
+  /** Per-beat override text for static timer HUD mode */
+  timerHudOverrideText?: string;
+  /** Countdown meter HUD configuration from global settings */
+  countdownMeterConfig?: import('./CountdownMeterHud').CountdownMeterConfig;
+  /** Current counter value for countdown meter HUD */
+  countdownMeterValue?: { value: number; min: number; max: number };
 }
 
 /**
@@ -770,6 +791,10 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   onSubscribeTimerState,
   beatType,
   editorMode = false,
+  timerHudConfig,
+  timerHudOverrideText,
+  countdownMeterConfig,
+  countdownMeterValue,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -1404,6 +1429,26 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           label={timerState.label}
         />
       )}
+      {/* Timer HUD overlay */}
+      {timerHudConfig && timerHudConfig.enabled && (
+        <TimerHudDisplay
+          config={timerHudConfig}
+          visible={true}
+          remainingTime={timerState?.remainingTime}
+          totalTime={timerState?.totalTime}
+          displayText={timerHudOverrideText}
+        />
+      )}
+      {/* Countdown Meter HUD overlay */}
+      {countdownMeterConfig && countdownMeterConfig.enabled && countdownMeterValue && (
+        <CountdownMeterHud
+          config={countdownMeterConfig}
+          visible={true}
+          counterValue={countdownMeterValue.value}
+          counterMin={countdownMeterValue.min}
+          counterMax={countdownMeterValue.max}
+        />
+      )}
       {adjustedElements.map((element, index) => (
         <PositionedElement
           key={`element-${index}-${element.location.name}`}
@@ -1978,6 +2023,27 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           counterMax={element.counterMax ?? 100}
           theme={theme}
         />
+      );
+
+    case 'keypad':
+      return (
+        <div style={{ ...baseStyle, pointerEvents: interactive ? 'auto' : 'none' }}>
+          <KeypadElement
+            layout={(element as any).keypadLayout || 'numeric'}
+            maxDigits={(element as any).keypadMaxDigits || 4}
+            minDigits={(element as any).keypadMinDigits || 1}
+            correctCode={(element as any).keypadCorrectCode}
+            maxAttempts={(element as any).keypadMaxAttempts || 0}
+            maskInput={(element as any).keypadMaskInput ?? true}
+            buttonText={(element as any).keypadButtonText || 'Enter'}
+            clearButtonText={(element as any).keypadClearButtonText || 'Clear'}
+            showDisplay={(element as any).keypadShowDisplay ?? true}
+            onSubmit={(code) => onAction?.(code)}
+            onFail={() => onAction?.('__keypad_fail__')}
+            width={location.width}
+            height={location.height}
+          />
+        </div>
       );
 
     default:
@@ -3951,17 +4017,48 @@ export function createPositionedElementData(
       }
     }
 
+    // Pass keypad options through for keypad elements
+    let keypadLayout: 'numeric' | 'phone' | 'pin' | undefined;
+    let keypadMaxDigits: number | undefined;
+    let keypadMinDigits: number | undefined;
+    let keypadCorrectCode: string | undefined;
+    let keypadMaxAttempts: number | undefined;
+    let keypadMaskInput: boolean | undefined;
+    let keypadButtonText: string | undefined;
+    let keypadClearButtonText: string | undefined;
+    let keypadShowDisplay: boolean | undefined;
+    if (location.kind === 'keypad' && beatType === 'keypad') {
+      keypadLayout = content.layout || 'numeric';
+      keypadMaxDigits = content.maxDigits || 4;
+      keypadMinDigits = content.minDigits || 1;
+      keypadCorrectCode = content.correctCode;
+      keypadMaxAttempts = content.maxAttempts || 0;
+      keypadMaskInput = content.maskInput ?? true;
+      keypadButtonText = content.buttonText || 'Enter';
+      keypadClearButtonText = content.clearButtonText || 'Clear';
+      keypadShowDisplay = content.showDisplay ?? true;
+    }
+
     return {
       location,
       content: elementContent,
       assetUrl: resolvedAssetUrl,
       spriteSheet,
       actionId,
-      targetBeatId, // Include target beat ID for visited marking
+      targetBeatId,
       hyperlinks,
       counterValue,
       counterMin,
       counterMax,
+      keypadLayout,
+      keypadMaxDigits,
+      keypadMinDigits,
+      keypadCorrectCode,
+      keypadMaxAttempts,
+      keypadMaskInput,
+      keypadButtonText,
+      keypadClearButtonText,
+      keypadShowDisplay,
     };
   });
 }

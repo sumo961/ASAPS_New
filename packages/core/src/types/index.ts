@@ -5,7 +5,7 @@ export * from './animation';
 import type { AnimationPath } from './animation';
 
 export interface Location {
-  kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input' | 'meter';
+  kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input' | 'meter' | 'keypad';
   name: string;
   id?: string;  // Unique element ID for animation targeting
   x: number;
@@ -233,6 +233,21 @@ export interface IRenderer {
     allowMultiple: boolean;
   }, locations?: Location[]): Promise<string>;
   
+  // Keypad beat
+  renderKeypad?(prompt: string, options: {
+    layout: 'numeric' | 'phone' | 'pin';
+    maxDigits: number;
+    minDigits: number;
+    correctCode?: string;
+    failTarget?: string;
+    maxAttempts: number;
+    maskInput: boolean;
+    buttonText: string;
+    clearButtonText: string;
+    showDisplay: boolean;
+    skinId?: string;
+  }, locations?: Location[]): Promise<string>;
+
   // Transition and effects
   prepareTransition?(transition: Transition): void;  // Set up initial hidden state before rendering
   applyTransition(transition: Transition): Promise<void>;  // Animate to visible after rendering

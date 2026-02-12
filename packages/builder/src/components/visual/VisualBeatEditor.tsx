@@ -67,7 +67,7 @@ function resolveCharacterImageUrl(
 
 export interface VisualElement {
   id: string;
-  type: 'character' | 'prop' | 'text' | 'hotspot' | 'dialog' | 'button' | 'meter';
+  type: 'character' | 'prop' | 'text' | 'hotspot' | 'dialog' | 'button' | 'meter' | 'keypad';
   assetId?: string;
   assetUrl?: string; // Resolved URL from assetId or character state (for rendering)
   imageUrl?: string; // Direct image URL (for base64 data or when assetId is not available)

@@ -90,6 +90,45 @@ export interface GlobalSettings {
     maxTokens?: number;
     reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
   };
+  hudOverlays?: {
+    timerHud?: {
+      enabled: boolean;
+      mode: 'timer' | 'static';
+      timerName: string;
+      staticText: string;
+      position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+      style: 'digital' | 'minimal';
+      fontSize: number;
+      textColor: string;
+      backgroundColor: string;
+      backgroundOpacity: number;
+      borderRadius: number;
+      padding: number;
+      showLabel: boolean;
+      label: string;
+      showWhenInactive: boolean;
+    };
+    countdownMeter?: {
+      enabled: boolean;
+      counterName: string;
+      position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top-center' | 'bottom-center';
+      label: string;
+      showLabel: boolean;
+      showNumericValue: boolean;
+      numericFormat: 'value' | 'fraction' | 'percentage';
+      meterColor: string;
+      meterBackgroundColor: string;
+      meterHeight: number;
+      meterWidth: number;
+      backgroundColor: string;
+      backgroundOpacity: number;
+      borderRadius: number;
+      warningThreshold: number;
+      warningColor: string;
+      criticalThreshold: number;
+      criticalColor: string;
+    };
+  };
 }
 
 // ============================================================================

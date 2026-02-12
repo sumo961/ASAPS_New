@@ -954,6 +954,15 @@ export const PreviewWindow: React.FC = () => {
         width: previewData.projectSettings?.width || 1024,
         height: previewData.projectSettings?.height || 768,
       });
+
+      // Set HUD overlay configs from global settings
+      const hudOverlays = settings?.hudOverlays;
+      if (hudOverlays?.timerHud) {
+        (rendererRef.current as any).setTimerHudConfig?.(hudOverlays.timerHud);
+      }
+      if (hudOverlays?.countdownMeter) {
+        (rendererRef.current as any).setCountdownMeterConfig?.(hudOverlays.countdownMeter);
+      }
     }
 
     return () => {
@@ -1054,6 +1063,13 @@ export const PreviewWindow: React.FC = () => {
           setCurrentBeat(beat || null);
           // Update debug info when beat changes
           updateDebugInfo();
+
+          // Set per-beat timer HUD override text (for static mode)
+          if (rendererRef.current) {
+            const params = beat?.getParameters?.() || {};
+            const overrideText = params.timeDisplayText || undefined;
+            (rendererRef.current as any).setTimerHudOverrideText?.(overrideText);
+          }
         }
       });
 
@@ -1102,9 +1118,66 @@ export const PreviewWindow: React.FC = () => {
         }
       };
 
+      // Also update timer HUD state for named timers (not just defaultTarget)
+      const updateTimerHud = () => {
+        if (!rendererRef.current) return;
+        const hudConfig = (rendererRef.current as any).timerHudConfig;
+        if (!hudConfig?.enabled || hudConfig.mode !== 'timer') return;
+
+        const timers = timerManager.getActiveTimers();
+        // Find the matching timer by name, or first active if timerName is empty
+        const timerName = hudConfig.timerName;
+        const timer = timerName
+          ? timers.find((t: any) => t.name === timerName)
+          : timers.find((t: any) => !t.name?.startsWith('defaultTarget_'));
+
+        if (timer) {
+          (rendererRef.current as any).setTimerState?.({
+            totalTime: timer.totalTime || timer.remainingTime + 1,
+            remainingTime: timer.remainingTime,
+            visible: true,
+            label: timer.name,
+          });
+        }
+      };
+
+      // Update countdown meter when counters change
+      const updateCountdownMeter = () => {
+        if (!rendererRef.current) return;
+        const meterConfig = (rendererRef.current as any).countdownMeterConfig;
+        if (!meterConfig?.enabled || !meterConfig.counterName) return;
+
+        const counterName = meterConfig.counterName;
+        const value = context.getCounter(counterName) ?? 0;
+        // Try to get min/max from character definitions
+        let min = 0;
+        let max = 100;
+        if (previewData.characters) {
+          for (const char of previewData.characters) {
+            const counter = char.counters?.find((c: any) => c.name === counterName);
+            if (counter) {
+              min = counter.min ?? 0;
+              max = counter.max ?? 100;
+              break;
+            }
+          }
+        }
+        (rendererRef.current as any).setCountdownMeterValue?.({ value, min, max });
+      };
+
       timerManager.on('timerStarted', updateTimers);
       timerManager.on('timerTick', updateTimers);
       timerManager.on('timerStopped', updateTimers);
+
+      // Wire timer HUD updates to timer events
+      timerManager.on('timerStarted', updateTimerHud);
+      timerManager.on('timerTick', updateTimerHud);
+      timerManager.on('timerStopped', updateTimerHud);
+
+      // Wire countdown meter updates to counter events
+      context.on('counterChanged', updateCountdownMeter);
+      // Initial counter meter state
+      updateCountdownMeter();
 
       // Handle timer expiration - navigate to target beat
       timerManager.on('timerExpired', async ({ name, targetBeat }: { name: string; targetBeat?: string }) => {

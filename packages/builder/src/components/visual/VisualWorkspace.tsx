@@ -421,13 +421,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         return;
       }
 
-      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter';
+      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad';
       if (el.type === 'character') kind = 'character';
       else if (el.type === 'prop') kind = 'prop';
       else if (el.type === 'dialog') kind = 'dialog';
       else if (el.type === 'button') kind = 'button';
       else if (el.type === 'hotspot') kind = 'hotspot';
       else if (el.type === 'meter') kind = 'meter';
+      else if (el.type === 'keypad') kind = 'keypad';
       else kind = 'text';
 
       const location: any = {
@@ -514,13 +515,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           return;
         }
 
-        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter';
+        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad';
         if (el.type === 'character') kind = 'character';
         else if (el.type === 'prop') kind = 'prop';
         else if (el.type === 'dialog') kind = 'dialog';
         else if (el.type === 'button') kind = 'button';
         else if (el.type === 'hotspot') kind = 'hotspot';
         else if (el.type === 'meter') kind = 'meter';
+        else if (el.type === 'keypad') kind = 'keypad';
         else kind = 'text';
 
         const location: any = {
@@ -966,6 +968,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 loc.kind === 'dialog' ? 'dialog' :
                 loc.kind === 'hotspot' ? 'hotspot' :
                 loc.kind === 'meter' ? 'meter' :
+                loc.kind === 'keypad' ? 'keypad' :
                 'text',
           name: loc.name,
           text: '', // Will be populated below from params
@@ -1168,6 +1171,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 loc.kind === 'text' ? 'dialog' : // Convert remaining text to dialog
                 loc.kind === 'inputfield' ? 'hotspot' :
                 loc.kind === 'meter' ? 'meter' :
+                loc.kind === 'keypad' ? 'keypad' :
                 loc.kind,
           name: loc.name,
           text: loc.text, // Will be populated below if missing
@@ -1317,13 +1321,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // CRITICAL FIX: Also populate beat.locations Map from loaded data
       beat.locations.clear();
       elements.forEach((el: VisualElement) => {
-        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' = el.type as any;
+        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad' = el.type as any;
         if (el.type === 'character') kind = 'character';
         else if (el.type === 'prop') kind = 'prop';
         else if (el.type === 'dialog') kind = 'dialog';
         else if (el.type === 'button') kind = 'button';
         else if (el.type === 'hotspot') kind = 'hotspot';
         else if (el.type === 'meter') kind = 'meter';
+        else if (el.type === 'keypad') kind = 'keypad';
         else if (el.type === 'text') kind = 'text';
 
         const location: any = {
@@ -1930,7 +1935,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         return;
       }
 
-      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' = el.type as any;
+      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad' = el.type as any;
 
       if (el.type === 'character') kind = 'character';
       else if (el.type === 'prop') kind = 'prop';
@@ -1939,6 +1944,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       else if (el.type === 'hotspot') kind = 'hotspot';
       else if (el.type === 'text') kind = 'text';
       else if (el.type === 'meter') kind = 'meter';
+      else if (el.type === 'keypad') kind = 'keypad';
 
       const location: any = {
         kind,

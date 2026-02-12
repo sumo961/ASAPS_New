@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-02-12T13:51:43.307Z
+ * Generated: 2026-02-12T22:09:47.689Z
  */
 
 // ============================================
@@ -339,6 +339,46 @@ export interface InputTextParameters {
 }
 
 /**
+ * Keypad - Numeric keypad for phone, safe lock, PIN entry
+ * Category: visible
+ * Connection Type: single
+ */
+export interface KeypadParameters {
+  /** Prompt text displayed above the keypad */
+  prompt: string;
+  /** Keypad layout: numeric (1-9,←,0,✓), phone (1-9,*,0,#), pin (1-9,C,0,✓) */
+  layout?: string | undefined;
+  /** Maximum number of digits */
+  maxDigits?: number | undefined;
+  /** Minimum number of digits */
+  minDigits?: number | undefined;
+  /** Expected code (empty = accept any input) */
+  correctCode?: string | undefined;
+  /** Beat to navigate to on wrong code */
+  failTarget?: string | undefined;
+  /** Maximum attempts (0 = unlimited) */
+  maxAttempts?: number | undefined;
+  /** Show * instead of digits */
+  maskInput?: boolean | undefined;
+  /** Save input to: variable or counter */
+  saveToType?: string | undefined;
+  /** Variable name to store the entered code */
+  variable?: string | undefined;
+  /** Counter name to store numeric input */
+  counter?: string | undefined;
+  /** Counter operation: set or change */
+  counterOperation?: string | undefined;
+  /** Submit button text */
+  buttonText?: string | undefined;
+  /** Clear button text */
+  clearButtonText?: string | undefined;
+  /** Show digit display area above keypad */
+  showDisplay?: boolean | undefined;
+  /** Target beat after code is entered */
+  connection: Connection;
+}
+
+/**
  * Hyper Text - Text with clickable hyperlinked words that branch to different beats
  * Category: visible
  * Connection Type: multiple
@@ -560,6 +600,7 @@ export type BeatType =
   | 'setTimer'
   | 'addRemoveInventory'
   | 'inputText'
+  | 'keypad'
   | 'hyperText'
   | 'onlineContent'
   | 'aiCondition'
@@ -586,6 +627,7 @@ export interface BeatParameterMap {
   'setTimer': SetTimerParameters;
   'addRemoveInventory': AddRemoveInventoryParameters;
   'inputText': InputTextParameters;
+  'keypad': KeypadParameters;
   'hyperText': HyperTextParameters;
   'onlineContent': OnlineContentParameters;
   'aiCondition': AiConditionParameters;

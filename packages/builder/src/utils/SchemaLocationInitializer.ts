@@ -87,6 +87,10 @@ const LOCATION_TYPE_MAP: Record<string, Partial<LocationDefinition>> = {
   // Video/media
   'video': { type: 'hotspot', defaultWidth: 800, defaultHeight: 600 },
   'controls': { type: 'hotspot', defaultWidth: 800, defaultHeight: 50 },
+
+  // Keypad
+  'keypadGrid': { type: 'keypad' as any, defaultWidth: 240, defaultHeight: 360 },
+  'display': { type: 'text', defaultWidth: 240, defaultHeight: 50 },
 };
 
 /**

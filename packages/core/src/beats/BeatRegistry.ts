@@ -16,6 +16,7 @@ import { SetTimerBeat } from './SetTimerBeat';
 import { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
 import { InputTextBeat } from './InputTextBeat';
 import { HyperTextBeat } from './HyperTextBeat';
+import { KeypadBeat } from './KeypadBeat';
 // AI-powered beats
 import { OnlineContentBeat } from './OnlineContentBeat';
 import { AIConditionBeat } from './AIConditionBeat';
@@ -69,6 +70,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('SWFBeat', SWFBeat); // Legacy
     this.registerBeatType('inputText', InputTextBeat);
     this.registerBeatType('hyperText', HyperTextBeat);
+    this.registerBeatType('keypad', KeypadBeat);
 
     // Invisible beats
     this.registerBeatType('setVariable', SetVariableBeat);

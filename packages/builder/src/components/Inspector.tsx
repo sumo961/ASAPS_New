@@ -232,7 +232,8 @@ export const Inspector: React.FC<InspectorProps> = ({
       'aiDialogTree',
       'aiSummary',
       'aiInfoText',
-      'aiDurScreen'
+      'aiDurScreen',
+      'keypad'
     ];
     return visualBeatTypes.includes(beatType);
   };
@@ -1280,7 +1281,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 {beat.type !== 'dialogTree' && beat.type !== 'movementChoice' &&
                  beat.type !== 'pickProp' && getCanonicalBeatType(beat.type) !== 'conditionBeat' &&
                  beat.type !== 'setTimer' && beat.type !== 'randomTarget' &&
-                 beat.type !== 'hyperText' && (
+                 beat.type !== 'hyperText' && beat.type !== 'keypad' && (
                   <SchemaFormGenerator
                     beatType={beat.type}
                     beatDefinition={getBeatDefinition(beat.type)}
@@ -1770,6 +1771,21 @@ export const Inspector: React.FC<InspectorProps> = ({
                         ))}
                       </select>
                     </div>
+                    {/* Timer HUD override */}
+                    <div className="border-t pt-3 mt-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={localBeat.parameters?.showTimerHud || false}
+                          onChange={(e) => handleParameterChange('showTimerHud', e.target.checked)}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-gray-700">Show Timer HUD</span>
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Enable the timer HUD display for this timer, even if disabled globally.
+                      </p>
+                    </div>
                   </>
                 )}
 
@@ -1902,6 +1918,228 @@ export const Inspector: React.FC<InspectorProps> = ({
                         <span className="text-xs text-gray-500">Color when hovering</span>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Keypad Beat Editor */}
+                {beat.type === 'keypad' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Prompt Text
+                      </label>
+                      <TextFieldWithVariables
+                        value={localBeat.parameters?.prompt || ''}
+                        onChange={(val) => handleParameterChange('prompt', val)}
+                        placeholder="Enter the code..."
+                        availableVariables={availableVariables}
+                        multiline
+                        rows={2}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Layout
+                      </label>
+                      <select
+                        value={localBeat.parameters?.layout || 'numeric'}
+                        onChange={(e) => handleParameterChange('layout', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="numeric">Numeric (1-9, ←, 0, ✓)</option>
+                        <option value="phone">Phone (1-9, *, 0, #)</option>
+                        <option value="pin">PIN (1-9, C, 0, ✓)</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Min Digits
+                        </label>
+                        <input
+                          type="number"
+                          value={localBeat.parameters?.minDigits ?? 1}
+                          onChange={(e) => handleParameterChange('minDigits', parseInt(e.target.value) || 1)}
+                          min="1"
+                          max="20"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Max Digits
+                        </label>
+                        <input
+                          type="number"
+                          value={localBeat.parameters?.maxDigits ?? 4}
+                          onChange={(e) => handleParameterChange('maxDigits', parseInt(e.target.value) || 4)}
+                          min="1"
+                          max="20"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Correct Code
+                        <span className="text-xs text-gray-500 ml-1">(leave empty to accept any)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={localBeat.parameters?.correctCode || ''}
+                        onChange={(e) => handleParameterChange('correctCode', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="e.g., 1234"
+                      />
+                    </div>
+
+                    {localBeat.parameters?.correctCode && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Max Attempts
+                            <span className="text-xs text-gray-500 ml-1">(0 = unlimited)</span>
+                          </label>
+                          <input
+                            type="number"
+                            value={localBeat.parameters?.maxAttempts ?? 0}
+                            onChange={(e) => handleParameterChange('maxAttempts', parseInt(e.target.value) || 0)}
+                            min="0"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Fail Target Beat
+                            <span className="text-xs text-gray-500 block">
+                              Beat to go to when max attempts reached
+                            </span>
+                          </label>
+                          <select
+                            value={localBeat.parameters?.failTarget || ''}
+                            onChange={(e) => handleParameterChange('failTarget', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="">None (stay on keypad)</option>
+                            {availableTargets.map(target => (
+                              <option key={target.id} value={target.id}>
+                                {target.name} ({target.type})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="keypadMaskInput"
+                        checked={localBeat.parameters?.maskInput ?? true}
+                        onChange={(e) => handleParameterChange('maskInput', e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <label htmlFor="keypadMaskInput" className="text-sm text-gray-700">
+                        Mask Input (show • instead of digits)
+                      </label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="keypadShowDisplay"
+                        checked={localBeat.parameters?.showDisplay ?? true}
+                        onChange={(e) => handleParameterChange('showDisplay', e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <label htmlFor="keypadShowDisplay" className="text-sm text-gray-700">
+                        Show Digit Display
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Submit Button Text
+                        </label>
+                        <input
+                          type="text"
+                          value={localBeat.parameters?.buttonText || 'Submit'}
+                          onChange={(e) => handleParameterChange('buttonText', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Clear Button Text
+                        </label>
+                        <input
+                          type="text"
+                          value={localBeat.parameters?.clearButtonText || 'Clear'}
+                          onChange={(e) => handleParameterChange('clearButtonText', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Save-to controls */}
+                    <div className="border-t pt-3 mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Save Input To
+                      </label>
+                      <select
+                        value={localBeat.parameters?.saveToType || 'variable'}
+                        onChange={(e) => handleParameterChange('saveToType', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="variable">Variable</option>
+                        <option value="counter">Counter</option>
+                      </select>
+                    </div>
+
+                    {localBeat.parameters?.saveToType === 'counter' ? (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Counter
+                          </label>
+                          <SmartNameDropdown
+                            value={localBeat.parameters?.counter || ''}
+                            onChange={(val) => handleParameterChange('counter', val)}
+                            options={availableCounters.map(c => ({ name: c.name, displayName: c.displayName, characterName: c.characterName }))}
+                            placeholder="Select or type counter name..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Operation
+                          </label>
+                          <select
+                            value={localBeat.parameters?.counterOperation || 'set'}
+                            onChange={(e) => handleParameterChange('counterOperation', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="set">Set to entered value</option>
+                            <option value="change">Add entered value</option>
+                          </select>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Variable Name
+                        </label>
+                        <SmartNameDropdown
+                          value={localBeat.parameters?.variable || ''}
+                          onChange={(val) => handleParameterChange('variable', val)}
+                          options={availableVariables.map(v => ({ name: v.name, displayName: v.name }))}
+                          placeholder="Select or type variable name..."
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2545,6 +2783,21 @@ export const Inspector: React.FC<InspectorProps> = ({
                         </div>
                       </>
                     )}
+
+                    {/* Time Display Override (for Timer HUD static mode) */}
+                    <div className="border-t pt-3 mt-3">
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Time Display Override</h4>
+                      <input
+                        type="text"
+                        value={localBeat.parameters?.timeDisplayText || ''}
+                        onChange={(e) => handleParameterChange('timeDisplayText', e.target.value)}
+                        placeholder="e.g. 9:00 AM, Day 3, 2h left"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Override the Timer HUD text for this beat (static mode only). Leave empty to use global default.
+                      </p>
+                    </div>
                   </div>
                 )}
 

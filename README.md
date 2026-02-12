@@ -16,13 +16,17 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.14)
+## ⚠️ Development Status (v0.9.15)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
-| **Git VCS Integration** | **NEW in v0.9.14**: Full Git version control — commit, push, pull, branch, merge conflicts, clone repository |
+| **Timer/Countdown HUD** | **NEW in v0.9.15**: Timer HUD (countdown or narrative time text) and Countdown Meter HUD overlays |
+| **Keypad Beat** | **NEW in v0.9.15**: Numeric keypad for phone, safe lock, PIN entry with code validation |
+| **Visual Editor UX** | **NEW in v0.9.15**: Multi-select, alignment/distribute tools, snap guides, element grouping |
+| **Choice Effects** | **NEW in v0.9.15**: Unified variable/counter/inventory effects on dialog and movement choices |
+| **Git VCS Integration** | Full Git version control — commit, push, pull, branch, merge conflicts, clone repository (v0.9.14) |
 | **AI Dialog Fix** | Fixed AIDialogTree generation across all players, updated OpenAI defaults to GPT-5.2 (v0.9.13) |
 | **HTML Export** | Export stories as standalone HTML files with splash screen, counter HUD, and inventory icons (v0.9.12) |
 | **Unified Rendering** | WYSIWYG alignment between visual editor and preview (v0.9.12) |
@@ -47,6 +51,33 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Path Analysis | StateSimulationAnalyzer for accurate hub-and-spoke patterns (v0.9.10) |
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
+
+### ⏱️ Timer HUD & Countdown Meter (v0.9.15)
+
+Persistent HUD overlays that display across all beats:
+
+- **Timer HUD**: Real-time countdown (MM:SS) or static narrative time text ("9:00 AM", "Day 3")
+- **Countdown Meter**: Counter-driven progress bar with warning/critical color thresholds
+- **Per-beat overrides**: Each beat can set custom time display text
+- **Configurable**: Position, colors, opacity, labels — all in the new Global Settings HUD tab
+
+### 🔢 Keypad Beat (v0.9.15)
+
+New beat type for numeric input interactions:
+
+- **3 layouts**: Numeric, Phone, PIN — each with appropriate button labels
+- **Code validation**: Set a correct code with max attempts and fail-target beat
+- **Masked input**: Show dots for PIN entry, configurable digit display
+- **Full editor support**: Interactive keypad in both visual editor and preview
+
+### 🎨 Visual Editor UX (v0.9.15)
+
+Major usability improvements to the visual beat editor:
+
+- **Multi-select**: Shift+click or rubber-band selection, alignment and distribute tools
+- **Snap guides**: Smart alignment guides when dragging elements
+- **Element grouping**: Group elements that move together
+- **Choice effects**: Set variables, counters, and inventory directly from dialog/movement choices
 
 ### 🔀 Git Version Control (v0.9.14)
 

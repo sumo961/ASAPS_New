@@ -82,6 +82,45 @@ interface GlobalSettings {
     defaultValue?: string | number | boolean;
     description?: string;
   }[];
+  hudOverlays?: {
+    timerHud?: {
+      enabled: boolean;
+      mode: 'timer' | 'static';
+      timerName: string;
+      staticText: string;
+      position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+      style: 'digital' | 'minimal';
+      fontSize: number;
+      textColor: string;
+      backgroundColor: string;
+      backgroundOpacity: number;
+      borderRadius: number;
+      padding: number;
+      showLabel: boolean;
+      label: string;
+      showWhenInactive: boolean;
+    };
+    countdownMeter?: {
+      enabled: boolean;
+      counterName: string;
+      position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top-center' | 'bottom-center';
+      label: string;
+      showLabel: boolean;
+      showNumericValue: boolean;
+      numericFormat: 'value' | 'fraction' | 'percentage';
+      meterColor: string;
+      meterBackgroundColor: string;
+      meterHeight: number;
+      meterWidth: number;
+      backgroundColor: string;
+      backgroundOpacity: number;
+      borderRadius: number;
+      warningThreshold: number;
+      warningColor: string;
+      criticalThreshold: number;
+      criticalColor: string;
+    };
+  };
 }
 
 interface GlobalSettingsInspectorProps {
@@ -106,7 +145,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   onThemeChange,
 }) => {
   const [settings, setSettings] = useState<GlobalSettings>(initialSettings);
-  const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'sound' | 'copyright' | 'variables' | 'debug'>('project');
+  const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'copyright' | 'variables' | 'debug'>('project');
   const [hasChanges, setHasChanges] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
@@ -668,6 +707,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
           >
             <Sliders className="w-4 h-4" />
             Effects
+          </button>
+          <button
+            onClick={() => setActiveTab('hud')}
+            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'hud' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
+            }`}
+            title="HUD overlays: timer display, countdown meters"
+          >
+            <Monitor className="w-4 h-4" />
+            HUD
           </button>
           <button
             onClick={() => setActiveTab('sound')}
@@ -1611,6 +1660,465 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'hud' && (
+            <div className="space-y-6">
+              <h3 className="font-medium text-gray-700 mb-3">HUD Overlays</h3>
+              <p className="text-xs text-gray-500">Configure persistent HUD elements that overlay the stage during playback.</p>
+
+              {/* Timer HUD Section */}
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-gray-700">Timer / Time Display</h4>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.hudOverlays?.timerHud?.enabled || false}
+                      onChange={(e) => {
+                        const current = settings.hudOverlays?.timerHud || {
+                          enabled: false, mode: 'timer' as const, timerName: '', staticText: '',
+                          position: 'top-right' as const, style: 'digital' as const, fontSize: 24,
+                          textColor: '#00ff00', backgroundColor: '#000000', backgroundOpacity: 80,
+                          borderRadius: 8, padding: 12, showLabel: false, label: 'Time',
+                          showWhenInactive: false,
+                        };
+                        setSettings({
+                          ...settings,
+                          hudOverlays: {
+                            ...settings.hudOverlays,
+                            timerHud: { ...current, enabled: e.target.checked },
+                          },
+                        });
+                        setHasChanges(true);
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm">Enabled</span>
+                  </label>
+                </div>
+
+                {settings.hudOverlays?.timerHud?.enabled && (() => {
+                  const timerHud = settings.hudOverlays!.timerHud!;
+                  const updateTimerHud = (updates: Partial<typeof timerHud>) => {
+                    setSettings({
+                      ...settings,
+                      hudOverlays: {
+                        ...settings.hudOverlays,
+                        timerHud: { ...timerHud, ...updates },
+                      },
+                    });
+                    setHasChanges(true);
+                  };
+                  return (
+                    <div className="space-y-3 pt-2">
+                      {/* Mode selector */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Mode</label>
+                        <select
+                          value={timerHud.mode}
+                          onChange={(e) => updateTimerHud({ mode: e.target.value as 'timer' | 'static' })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="timer">Timer Countdown (real-time)</option>
+                          <option value="static">Static Text (narrative time)</option>
+                        </select>
+                      </div>
+
+                      {/* Timer mode fields */}
+                      {timerHud.mode === 'timer' && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Timer Name</label>
+                            <input
+                              type="text"
+                              value={timerHud.timerName}
+                              onChange={(e) => updateTimerHud({ timerName: e.target.value })}
+                              placeholder="Leave empty for first active timer"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            />
+                          </div>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={timerHud.showWhenInactive}
+                              onChange={(e) => updateTimerHud({ showWhenInactive: e.target.checked })}
+                              className="rounded"
+                            />
+                            <span className="text-sm text-gray-600">Show "00:00" when no timer active</span>
+                          </label>
+                        </>
+                      )}
+
+                      {/* Static mode fields */}
+                      {timerHud.mode === 'static' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Default Text</label>
+                          <input
+                            type="text"
+                            value={timerHud.staticText}
+                            onChange={(e) => updateTimerHud({ staticText: e.target.value })}
+                            placeholder="e.g. 9:00 AM, Day 1, 2h left"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">Per-beat overrides can be set in beat inspector's Advanced section.</p>
+                        </div>
+                      )}
+
+                      {/* Position */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Position</label>
+                        <select
+                          value={timerHud.position}
+                          onChange={(e) => updateTimerHud({ position: e.target.value as typeof timerHud.position })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="top-left">Top Left</option>
+                          <option value="top-right">Top Right</option>
+                          <option value="bottom-left">Bottom Left</option>
+                          <option value="bottom-right">Bottom Right</option>
+                        </select>
+                      </div>
+
+                      {/* Style */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Style</label>
+                        <select
+                          value={timerHud.style}
+                          onChange={(e) => updateTimerHud({ style: e.target.value as 'digital' | 'minimal' })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="digital">Digital (monospace)</option>
+                          <option value="minimal">Minimal (clean)</option>
+                        </select>
+                      </div>
+
+                      {/* Font Size */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Font Size: {timerHud.fontSize}px</label>
+                        <input
+                          type="range"
+                          min="12"
+                          max="48"
+                          value={timerHud.fontSize}
+                          onChange={(e) => updateTimerHud({ fontSize: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Colors */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Text Color</label>
+                          <input
+                            type="color"
+                            value={timerHud.textColor}
+                            onChange={(e) => updateTimerHud({ textColor: e.target.value })}
+                            className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Background</label>
+                          <input
+                            type="color"
+                            value={timerHud.backgroundColor}
+                            onChange={(e) => updateTimerHud({ backgroundColor: e.target.value })}
+                            className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Background Opacity */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Background Opacity: {timerHud.backgroundOpacity}%</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={timerHud.backgroundOpacity}
+                          onChange={(e) => updateTimerHud({ backgroundOpacity: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Border Radius & Padding */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Corner Radius</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="24"
+                            value={timerHud.borderRadius}
+                            onChange={(e) => updateTimerHud({ borderRadius: parseInt(e.target.value) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Padding</label>
+                          <input
+                            type="number"
+                            min="4"
+                            max="32"
+                            value={timerHud.padding}
+                            onChange={(e) => updateTimerHud({ padding: parseInt(e.target.value) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Label */}
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={timerHud.showLabel}
+                          onChange={(e) => updateTimerHud({ showLabel: e.target.checked })}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-gray-600">Show label</span>
+                      </label>
+                      {timerHud.showLabel && (
+                        <input
+                          type="text"
+                          value={timerHud.label}
+                          onChange={(e) => updateTimerHud({ label: e.target.value })}
+                          placeholder="e.g. Time, Chapter"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Countdown Meter Section */}
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-gray-700">Countdown Meter</h4>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.hudOverlays?.countdownMeter?.enabled || false}
+                      onChange={(e) => {
+                        const current = settings.hudOverlays?.countdownMeter || {
+                          enabled: false, counterName: '', position: 'top-center' as const,
+                          label: '', showLabel: true, showNumericValue: true,
+                          numericFormat: 'fraction' as const, meterColor: '#3B82F6',
+                          meterBackgroundColor: 'rgba(255,255,255,0.3)', meterHeight: 12,
+                          meterWidth: 200, backgroundColor: '#1a1a2e', backgroundOpacity: 85,
+                          borderRadius: 8, warningThreshold: 33, warningColor: '#EAB308',
+                          criticalThreshold: 15, criticalColor: '#EF4444',
+                        };
+                        setSettings({
+                          ...settings,
+                          hudOverlays: {
+                            ...settings.hudOverlays,
+                            countdownMeter: { ...current, enabled: e.target.checked },
+                          },
+                        });
+                        setHasChanges(true);
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm">Enabled</span>
+                  </label>
+                </div>
+
+                {settings.hudOverlays?.countdownMeter?.enabled && (() => {
+                  const meter = settings.hudOverlays!.countdownMeter!;
+                  const updateMeter = (updates: Partial<typeof meter>) => {
+                    setSettings({
+                      ...settings,
+                      hudOverlays: {
+                        ...settings.hudOverlays,
+                        countdownMeter: { ...meter, ...updates },
+                      },
+                    });
+                    setHasChanges(true);
+                  };
+                  return (
+                    <div className="space-y-3 pt-2">
+                      {/* Counter Name */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Counter Name</label>
+                        <input
+                          type="text"
+                          value={meter.counterName}
+                          onChange={(e) => updateMeter({ counterName: e.target.value })}
+                          placeholder="Name of the counter to track"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+
+                      {/* Position */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Position</label>
+                        <select
+                          value={meter.position}
+                          onChange={(e) => updateMeter({ position: e.target.value as typeof meter.position })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="top-left">Top Left</option>
+                          <option value="top-center">Top Center</option>
+                          <option value="top-right">Top Right</option>
+                          <option value="bottom-left">Bottom Left</option>
+                          <option value="bottom-center">Bottom Center</option>
+                          <option value="bottom-right">Bottom Right</option>
+                        </select>
+                      </div>
+
+                      {/* Label */}
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={meter.showLabel}
+                          onChange={(e) => updateMeter({ showLabel: e.target.checked })}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-gray-600">Show label</span>
+                      </label>
+                      {meter.showLabel && (
+                        <input
+                          type="text"
+                          value={meter.label}
+                          onChange={(e) => updateMeter({ label: e.target.value })}
+                          placeholder="e.g. Health, Energy"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      )}
+
+                      {/* Numeric Value */}
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={meter.showNumericValue}
+                          onChange={(e) => updateMeter({ showNumericValue: e.target.checked })}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-gray-600">Show numeric value</span>
+                      </label>
+                      {meter.showNumericValue && (
+                        <select
+                          value={meter.numericFormat}
+                          onChange={(e) => updateMeter({ numericFormat: e.target.value as typeof meter.numericFormat })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="value">Value only (e.g. 75)</option>
+                          <option value="fraction">Fraction (e.g. 75/100)</option>
+                          <option value="percentage">Percentage (e.g. 75%)</option>
+                        </select>
+                      )}
+
+                      {/* Meter Colors */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Meter Color</label>
+                          <input
+                            type="color"
+                            value={meter.meterColor}
+                            onChange={(e) => updateMeter({ meterColor: e.target.value })}
+                            className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Background</label>
+                          <input
+                            type="color"
+                            value={meter.backgroundColor}
+                            onChange={(e) => updateMeter({ backgroundColor: e.target.value })}
+                            className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Meter Dimensions */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Width: {meter.meterWidth}px</label>
+                          <input
+                            type="range"
+                            min="100"
+                            max="400"
+                            value={meter.meterWidth}
+                            onChange={(e) => updateMeter({ meterWidth: parseInt(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Height: {meter.meterHeight}px</label>
+                          <input
+                            type="range"
+                            min="4"
+                            max="32"
+                            value={meter.meterHeight}
+                            onChange={(e) => updateMeter({ meterHeight: parseInt(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Background Opacity */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Background Opacity: {meter.backgroundOpacity}%</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={meter.backgroundOpacity}
+                          onChange={(e) => updateMeter({ backgroundOpacity: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Warning / Critical Thresholds */}
+                      <div className="border-t pt-3 mt-3">
+                        <h5 className="text-sm font-medium text-gray-600 mb-2">Color Thresholds</h5>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="color"
+                              value={meter.warningColor}
+                              onChange={(e) => updateMeter({ warningColor: e.target.value })}
+                              className="w-8 h-8 border border-gray-300 rounded cursor-pointer flex-shrink-0"
+                            />
+                            <div className="flex-1">
+                              <label className="block text-xs text-gray-500">Warning below {meter.warningThreshold}%</label>
+                              <input
+                                type="range"
+                                min="10"
+                                max="50"
+                                value={meter.warningThreshold}
+                                onChange={(e) => updateMeter({ warningThreshold: parseInt(e.target.value) })}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="color"
+                              value={meter.criticalColor}
+                              onChange={(e) => updateMeter({ criticalColor: e.target.value })}
+                              className="w-8 h-8 border border-gray-300 rounded cursor-pointer flex-shrink-0"
+                            />
+                            <div className="flex-1">
+                              <label className="block text-xs text-gray-500">Critical below {meter.criticalThreshold}%</label>
+                              <input
+                                type="range"
+                                min="5"
+                                max="30"
+                                value={meter.criticalThreshold}
+                                onChange={(e) => updateMeter({ criticalThreshold: parseInt(e.target.value) })}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

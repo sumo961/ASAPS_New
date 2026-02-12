@@ -1,5 +1,102 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-12: Timer HUD, Countdown Meter, Keypad Beat, Visual Editor UX & Choice Effects (v0.9.15)
+
+### Overview
+
+This release adds three major features — **Timer/Time HUD display**, **Countdown Meter HUD**, and a new **Keypad beat type** — plus significant visual editor UX improvements including **multi-select, alignment/distribute tools, snap guides, element grouping**, and a **unified choice effects system** for dialog trees and movement choices.
+
+### Timer HUD Display (New Feature)
+
+A configurable HUD overlay that displays time information persistently across beats:
+
+- **Timer mode**: Real-time countdown display (MM:SS) driven by active SetTimer beats, with color transitions (green → yellow → red) as time decreases
+- **Static mode**: Narrative time text (e.g. "9:00 AM", "Day 3") with per-beat overrides via `timeDisplayText` parameter
+- **Customizable**: Position (4 corners), style (digital/minimal), font size, colors, opacity, border radius, optional label
+- **Global Settings HUD tab**: New dedicated tab in Global Settings for configuring all HUD overlays
+- **Per-beat override**: Each visual beat can set a `timeDisplayText` to override the global static text
+
+### Countdown Meter HUD (New Feature)
+
+A counter-driven progress bar HUD that persists across beats:
+
+- **Counter-based**: Fills/depletes based on any character counter value
+- **Color transitions**: Normal → warning → critical thresholds with configurable colors
+- **Numeric display**: Value, fraction (e.g. "3/10"), or percentage formats
+- **6 positions**: Top-left/right/center, bottom-left/right/center
+- **Configurable**: Bar dimensions, colors, opacity, border radius, label
+
+### Keypad Beat (New Beat Type)
+
+A new `keypad` beat type for phone keypads, safe locks, PIN entry, and similar numeric input:
+
+- **3 layouts**: Numeric (1-9, ←, 0, ✓), Phone (1-9, *, 0, #), PIN (1-9, C, 0, ✓)
+- **Code validation**: Optional correct code with max attempts and fail target beat
+- **Masked input**: Show dots instead of digits for PIN entry
+- **Digit display**: Configurable display area showing entered digits
+- **Variable/counter storage**: Save entered code to variable or counter (reuses inputText pattern)
+- **Full visual editor support**: Keypad renders as interactive grid in both visual editor and preview
+- **Custom inspector**: Dedicated properties panel with all keypad settings
+
+### Unified Choice Effects System (New Feature)
+
+Dialog tree choices and movement choices now support inline effects:
+
+- **Variable effects**: Set/increment/decrement variables directly from choices
+- **Counter effects**: Modify character counters from choices
+- **Inventory effects**: Add/remove inventory items from choices
+- **SmartNameDropdown**: New reusable dropdown component for selecting variables/counters with character context
+- **TextFieldWithVariables**: New reusable text field with variable reference autocomplete
+- **Effects migration**: Automatic migration of legacy choice effect formats
+
+### Visual Editor UX Improvements (Enhancement)
+
+Major usability improvements to the visual beat editor:
+
+- **Multi-select**: Shift+click or rubber-band selection for multiple elements
+- **Alignment tools**: Align left/center/right/top/middle/bottom for selected elements
+- **Distribute tools**: Distribute horizontally/vertically with equal spacing
+- **Element grouping**: Group/ungroup elements that move together
+- **Snap guides**: Smart alignment guides when dragging elements near other elements
+- **Arrow key nudging**: Move selected elements with arrow keys (1px, Shift+arrow for 10px)
+- **Font fix**: Corrected font rendering in visual editor
+
+### Other Improvements
+
+- **AI provider persistence**: AI provider settings (API keys, model selections) now saved to project `globalSettings` for VCS-friendly storage
+- **Spritesheet optimization**: Converted spritesheet storage from base64 to blob URLs with asset ID tracking for better memory usage
+- **Test coverage**: Comprehensive test suite additions for choice effects, alignment utilities, snap guides, and effects migration
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `packages/builder/src/storage/types.ts` | Added `hudOverlays` section to `GlobalSettings` |
+| `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` | New "HUD" tab with Timer HUD and Countdown Meter configuration |
+| `packages/renderer/src/components/TimerHudDisplay.tsx` | **New**: Timer/time HUD display component |
+| `packages/renderer/src/components/CountdownMeterHud.tsx` | **New**: Countdown meter HUD component |
+| `packages/renderer/src/components/PositionedBeatView.tsx` | Integrated Timer HUD, Countdown Meter, and Keypad rendering |
+| `packages/renderer/src/renderers/ReactRenderer.tsx` | Added `renderKeypad()`, timer HUD and countdown meter wiring |
+| `packages/builder/src/pages/PreviewWindow.tsx` | Wired HUD configs and timer events to renderer |
+| `packages/core/src/beats/KeypadBeat.ts` | **New**: Keypad beat class with code validation and retry logic |
+| `packages/core/src/beats/BeatRegistry.ts` | Registered `KeypadBeat` |
+| `packages/core/src/types/index.ts` | Added `'keypad'` to Location kind, `renderKeypad` to IRenderer |
+| `packages/core/src/generated/beat-types.ts` | Added `KeypadParameters` interface |
+| `packages/renderer/src/components/KeypadElement.tsx` | **New**: Interactive keypad grid component |
+| `beat-definitions/core-beats.json` | Added `keypad` beat definition |
+| `packages/builder/src/components/Inspector.tsx` | Keypad inspector UI, visual editor support |
+| `packages/builder/src/components/WorkspaceView.tsx` | Added keypad to visual editor support |
+| `packages/builder/src/components/visual/VisualBeatEditor.tsx` | Added `'keypad'` to element type union |
+| `packages/builder/src/components/visual/VisualWorkspace.tsx` | Keypad kind-mapping in 6 locations |
+| `packages/builder/src/utils/SchemaLocationInitializer.ts` | Mapped `keypadGrid` and `display` location types |
+| `packages/builder/src/editors/ChoiceEffectsEditor.tsx` | **New**: Unified choice effects editor component |
+| `packages/builder/src/editors/SmartNameDropdown.tsx` | **New**: Reusable variable/counter name dropdown |
+| `packages/builder/src/editors/TextFieldWithVariables.tsx` | **New**: Text field with variable autocomplete |
+| `packages/builder/src/components/visual/alignmentUtils.ts` | **New**: Alignment and distribute utility functions |
+| `packages/builder/src/components/visual/snapGuides.ts` | **New**: Snap guide calculation utilities |
+
+---
+
 ## 2026-02-10: Git VCS Integration & Clone Repository (v0.9.14)
 
 ### Overview
