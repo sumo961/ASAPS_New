@@ -11,13 +11,17 @@ import {
   Music,
   User,
   Package,
-  AlignStartHorizontal,
-  AlignCenterHorizontal,
-  AlignEndHorizontal,
-  AlignStartVertical,
-  AlignCenterVertical,
-  AlignEndVertical,
+  AlignHorizontalJustifyStart,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  AlignHorizontalDistributeCenter,
+  AlignVerticalDistributeCenter,
   Magnet,
+  Group,
+  Ungroup,
 } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import type { Location } from '@asaps/core';
@@ -109,6 +113,8 @@ export interface VisualElement {
   numericFormat?: 'value' | 'fraction' | 'percentage';
   meterColor?: string;       // Bar fill color
   meterBackgroundColor?: string;  // Bar background color
+  // Grouping
+  groupId?: string;  // Elements with the same groupId are treated as a group
 }
 
 interface VisualBeatEditorProps {
@@ -786,22 +792,22 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
           <>
             <div className="w-px bg-gray-300 mx-1" />
             <button onClick={() => applyAlignment(alignLeft)} className="p-1.5 rounded hover:bg-gray-100" title="Align Left">
-              <AlignStartHorizontal className="w-4 h-4" />
+              <AlignHorizontalJustifyStart className="w-4 h-4" />
             </button>
             <button onClick={() => applyAlignment(alignCenterH)} className="p-1.5 rounded hover:bg-gray-100" title="Align Center Horizontally">
-              <AlignCenterHorizontal className="w-4 h-4" />
+              <AlignHorizontalJustifyCenter className="w-4 h-4" />
             </button>
             <button onClick={() => applyAlignment(alignRight)} className="p-1.5 rounded hover:bg-gray-100" title="Align Right">
-              <AlignEndHorizontal className="w-4 h-4" />
+              <AlignHorizontalJustifyEnd className="w-4 h-4" />
             </button>
             <button onClick={() => applyAlignment(alignTop)} className="p-1.5 rounded hover:bg-gray-100" title="Align Top">
-              <AlignStartVertical className="w-4 h-4" />
+              <AlignVerticalJustifyStart className="w-4 h-4" />
             </button>
             <button onClick={() => applyAlignment(alignCenterV)} className="p-1.5 rounded hover:bg-gray-100" title="Align Center Vertically">
-              <AlignCenterVertical className="w-4 h-4" />
+              <AlignVerticalJustifyCenter className="w-4 h-4" />
             </button>
             <button onClick={() => applyAlignment(alignBottom)} className="p-1.5 rounded hover:bg-gray-100" title="Align Bottom">
-              <AlignEndVertical className="w-4 h-4" />
+              <AlignVerticalJustifyEnd className="w-4 h-4" />
             </button>
           </>
         )}
@@ -809,12 +815,58 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         {selectedElements.length >= 3 && (
           <>
             <div className="w-px bg-gray-300 mx-1" />
-            <button onClick={() => applyAlignment(distributeH)} className="p-1.5 rounded hover:bg-gray-100 text-xs font-medium" title="Distribute Horizontally">
-              D⇔
+            <button onClick={() => applyAlignment(distributeH)} className="p-1.5 rounded hover:bg-gray-100" title="Distribute Horizontally">
+              <AlignHorizontalDistributeCenter className="w-4 h-4" />
             </button>
-            <button onClick={() => applyAlignment(distributeV)} className="p-1.5 rounded hover:bg-gray-100 text-xs font-medium" title="Distribute Vertically">
-              D⇕
+            <button onClick={() => applyAlignment(distributeV)} className="p-1.5 rounded hover:bg-gray-100" title="Distribute Vertically">
+              <AlignVerticalDistributeCenter className="w-4 h-4" />
             </button>
+          </>
+        )}
+        {/* Group/Ungroup buttons - show when 2+ elements selected */}
+        {selectedElements.length >= 2 && (
+          <>
+            <div className="w-px bg-gray-300 mx-1" />
+            {(() => {
+              const selectedEls = elements.filter(el => selectedElements.includes(el.id));
+              const allSameGroup = selectedEls.every(el => el.groupId && el.groupId === selectedEls[0].groupId);
+              const anyGrouped = selectedEls.some(el => el.groupId);
+              return (
+                <>
+                  {!allSameGroup && (
+                    <button
+                      onClick={() => {
+                        const gid = `group_${Date.now()}`;
+                        const selectedSet = new Set(selectedElements);
+                        const updated = elements.map(el =>
+                          selectedSet.has(el.id) ? { ...el, groupId: gid } : el
+                        );
+                        onElementsChange(updated);
+                      }}
+                      className="p-1.5 rounded hover:bg-gray-100"
+                      title="Group Elements"
+                    >
+                      <Group className="w-4 h-4" />
+                    </button>
+                  )}
+                  {anyGrouped && (
+                    <button
+                      onClick={() => {
+                        const selectedSet = new Set(selectedElements);
+                        const updated = elements.map(el =>
+                          selectedSet.has(el.id) ? { ...el, groupId: undefined } : el
+                        );
+                        onElementsChange(updated);
+                      }}
+                      className="p-1.5 rounded hover:bg-gray-100"
+                      title="Ungroup Elements"
+                    >
+                      <Ungroup className="w-4 h-4" />
+                    </button>
+                  )}
+                </>
+              );
+            })()}
           </>
         )}
 
@@ -1055,26 +1107,32 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         const isMeta = e.metaKey || e.ctrlKey;
                         const isShift = e.shiftKey;
 
+                        // Resolve group members for this element
+                        const groupIds = el.groupId
+                          ? elements.filter(g => g.groupId === el.groupId).map(g => g.id)
+                          : [el.id];
+
                         if (isMeta) {
-                          // Cmd/Ctrl+Click: toggle element in/out of selection
-                          if (selectedElements.includes(el.id)) {
-                            onSelectElements(selectedElements.filter(id => id !== el.id));
+                          // Cmd/Ctrl+Click: toggle element (or group) in/out of selection
+                          const allInSelection = groupIds.every(id => selectedElements.includes(id));
+                          if (allInSelection) {
+                            onSelectElements(selectedElements.filter(id => !groupIds.includes(id)));
                           } else {
-                            onSelectElements([...selectedElements, el.id]);
+                            const newSel = new Set([...selectedElements, ...groupIds]);
+                            onSelectElements([...newSel]);
                           }
                           return; // Don't start drag on toggle
                         } else if (isShift) {
-                          // Shift+Click: add to selection
-                          if (!selectedElements.includes(el.id)) {
-                            onSelectElements([...selectedElements, el.id]);
-                          }
+                          // Shift+Click: add element (or group) to selection
+                          const newSel = new Set([...selectedElements, ...groupIds]);
+                          onSelectElements([...newSel]);
                           // Don't start drag on shift-click add
                           return;
                         } else if (selectedElements.includes(el.id) && selectedElements.length > 1) {
                           // Click on already-selected element in multi-selection: start drag without changing selection
                         } else {
-                          // Plain click: replace selection
-                          onSelectElements([el.id]);
+                          // Plain click: select element's group (or just the element)
+                          onSelectElements(groupIds);
                         }
 
                         // Start drag - compute offsets for all selected elements relative to dragged element
@@ -1148,6 +1206,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   }
 
                   const isOnlySelected = selectedElements.length === 1;
+                  const isGrouped = !!el.groupId;
 
                   return (
                     <div
@@ -1158,11 +1217,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         top: `${effectiveY}px`,
                         width: `${effectiveWidth}px`,
                         height: `${effectiveHeight}px`,
-                        border: '2px solid #3b82f6',
+                        border: isGrouped ? '2px solid #8b5cf6' : '2px solid #3b82f6',
                         borderRadius: '4px',
                         pointerEvents: 'none',
                         zIndex: 10000,
-                        boxShadow: '0 0 0 1px rgba(255,255,255,0.5), 0 0 20px rgba(59,130,246,0.3)',
+                        boxShadow: isGrouped
+                          ? '0 0 0 1px rgba(255,255,255,0.5), 0 0 20px rgba(139,92,246,0.3)'
+                          : '0 0 0 1px rgba(255,255,255,0.5), 0 0 20px rgba(59,130,246,0.3)',
                         transform: transforms.length > 0 ? transforms.join(' ') : undefined,
                         transformOrigin: 'center center',
                       }}

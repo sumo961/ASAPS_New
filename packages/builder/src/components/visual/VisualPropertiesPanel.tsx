@@ -475,6 +475,9 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                           <span className="text-sm font-medium truncate">
                             {element.name}
                           </span>
+                          {element.groupId && (
+                            <span className="text-[10px] px-1 py-0.5 bg-purple-100 text-purple-600 rounded" title="Grouped">G</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-gray-500">z:{element.z}</span>
@@ -567,8 +570,17 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           <div className="border-b border-gray-200 px-4 py-3">
             <div className="text-sm font-medium text-gray-700 mb-2">
               {selectedElements.length} elements selected
+              {(() => {
+                const selEls = elements.filter(el => selectedElements.includes(el.id));
+                const grouped = selEls.filter(el => el.groupId);
+                if (grouped.length > 0) {
+                  const groups = new Set(grouped.map(el => el.groupId));
+                  return <span className="text-purple-600 ml-1">({groups.size} group{groups.size > 1 ? 's' : ''})</span>;
+                }
+                return null;
+              })()}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => {
                   selectedElements.forEach(id => {
