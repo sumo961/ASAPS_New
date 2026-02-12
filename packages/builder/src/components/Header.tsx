@@ -43,6 +43,14 @@ interface HeaderProps {
   vcsPanelOpen?: boolean;
   onToggleVCSPanel?: () => void;
   onInitRepo?: () => void;
+  onAISettingsChanged?: (settings: {
+    provider?: 'claude' | 'openai';
+    providerType?: 'claude' | 'openai' | 'local';
+    model?: string;
+    baseUrl?: string;
+    maxTokens?: number;
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  }) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -77,6 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
   vcsPanelOpen,
   onToggleVCSPanel,
   onInitRepo,
+  onAISettingsChanged,
 }) => {
   const { status, lastSaved, error: saveError } = useSave();
   const { load } = useProject();
@@ -538,6 +547,7 @@ export const Header: React.FC<HeaderProps> = ({
       <AIConfigDialog
         isOpen={showAIConfig}
         onClose={() => setShowAIConfig(false)}
+        onSettingsChanged={onAISettingsChanged}
       />
 
       {/* Story Generator Dialog */}

@@ -61,12 +61,22 @@ export interface AIConfigDialogProps {
 
   /** Close dialog callback */
   onClose: () => void;
+
+  /** Called when AI settings change (non-secret fields for project-level persistence) */
+  onSettingsChanged?: (settings: {
+    provider?: 'claude' | 'openai';
+    providerType?: 'claude' | 'openai' | 'local';
+    model?: string;
+    baseUrl?: string;
+    maxTokens?: number;
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  }) => void;
 }
 
 /**
  * AI Configuration Dialog
  */
-export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose }) => {
+export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose, onSettingsChanged }) => {
   const { isConfigured, currentProvider, configure, error: aiError } = useAI();
 
   const [provider, setProvider] = useState<ProviderType>(
@@ -154,6 +164,18 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose 
         provider // Pass the original provider type for UI display
       );
       setSuccess(true);
+
+      // Persist non-secret settings to project globalSettings for VCS
+      if (onSettingsChanged) {
+        onSettingsChanged({
+          provider: actualProvider,
+          providerType: provider,
+          ...(model ? { model } : {}),
+          ...(baseUrl ? { baseUrl } : {}),
+          ...(maxTokensNum ? { maxTokens: maxTokensNum } : {}),
+          ...(reasoningEffort ? { reasoningEffort } : {}),
+        });
+      }
 
       // Close after short delay
       setTimeout(() => {

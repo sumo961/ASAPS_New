@@ -82,6 +82,14 @@ export interface GlobalSettings {
     firstbeat: string;
     showvals: boolean;
   };
+  ai?: {
+    provider?: 'claude' | 'openai';
+    providerType?: 'claude' | 'openai' | 'local';
+    model?: string;
+    baseUrl?: string;
+    maxTokens?: number;
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  };
 }
 
 // ============================================================================
