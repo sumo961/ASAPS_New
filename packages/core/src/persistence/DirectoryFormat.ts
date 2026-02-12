@@ -233,7 +233,7 @@ export function serializeToDirectory(input: SerializeInput): SerializeResult {
         path: `characters/${charId}.json`,
         content: deterministicStringify({
           _format: DIR_FORMAT_VERSION,
-          ...character,
+          ...sanitizeCharacter(character),
         }),
       });
     }
@@ -595,6 +595,55 @@ export async function isDirectoryProject(
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Helper to check if a URL is non-portable (blob: or data:)
+ */
+function isNonPortableUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return url.startsWith('blob:') || url.startsWith('data:');
+}
+
+/**
+ * Sanitize character data for directory-based storage.
+ * Strips non-portable URLs (blob: and data:) while preserving asset IDs
+ * so images can be reconstructed on reload.
+ */
+function sanitizeCharacter(character: any): any {
+  const sanitized = JSON.parse(JSON.stringify(character));
+
+  if (sanitized.visual) {
+    // Strip non-portable defaultImage (keep defaultAssetId)
+    if (isNonPortableUrl(sanitized.visual.defaultImage)) {
+      delete sanitized.visual.defaultImage;
+    }
+
+    // Strip non-portable spriteSheet URL (keep assetId)
+    if (sanitized.visual.spriteSheet && isNonPortableUrl(sanitized.visual.spriteSheet.url)) {
+      sanitized.visual.spriteSheet.url = '';
+    }
+  }
+
+  // Strip non-portable state images (keep assetId)
+  if (sanitized.states && Array.isArray(sanitized.states)) {
+    for (const state of sanitized.states) {
+      if (state.visual && isNonPortableUrl(state.visual.image)) {
+        delete state.visual.image;
+      }
+    }
+  }
+
+  // Strip non-portable inventory icons (keep assetId)
+  if (sanitized.inventory && Array.isArray(sanitized.inventory)) {
+    for (const item of sanitized.inventory) {
+      if (isNonPortableUrl(item.icon)) {
+        item.icon = '';
+      }
+    }
+  }
+
+  return sanitized;
+}
 
 /**
  * Extract story data from either a Story instance or serialized data

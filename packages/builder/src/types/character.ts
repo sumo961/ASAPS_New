@@ -16,6 +16,7 @@ export interface Character {
     defaultAssetId?: string; // Asset ID for persistence (resolves to URL after reload)
     spriteSheet?: {
       url: string;
+      assetId?: string;    // Asset ID for persistence (resolves to URL after reload)
       frameWidth: number;
       frameHeight: number;
       imageWidth?: number;  // Full sprite sheet image width (for frame position calculation)

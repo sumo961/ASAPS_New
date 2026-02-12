@@ -34,6 +34,7 @@ import { validateStoryLogic, formatLogicValidationResult } from './utils/storyLo
 import { preloadFonts } from './utils/fontRegistry';
 import { useThemes, type ThemeAssetUrls } from './hooks/useThemes';
 import { useAIDebug } from './hooks/useAIDebug';
+import { getSavedAIConfig } from './hooks/useAI';
 import { useCommandManager } from './hooks/useCommandManager';
 import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
@@ -103,6 +104,30 @@ const isPreviewWindowRoute = () => typeof window !== 'undefined' && window.locat
 
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
+
+/**
+ * Apply project-level AI settings as localStorage defaults when no local config exists.
+ * This lets collaborators inherit provider/model preferences from the project without
+ * sharing API keys (which must always be supplied individually).
+ */
+function applyProjectAIDefaults(globalSettings: any): void {
+  if (!globalSettings?.ai) return;
+  if (getSavedAIConfig()?.apiKey) return; // User already has their own config with a key
+  const ai = globalSettings.ai;
+  try {
+    const config = {
+      provider: ai.provider || 'openai',
+      apiKey: '',
+      model: ai.model,
+      baseUrl: ai.baseUrl,
+      maxTokens: ai.maxTokens,
+      reasoningEffort: ai.reasoningEffort,
+      providerType: ai.providerType,
+    };
+    localStorage.setItem('asaps_ai_config', JSON.stringify(config));
+    console.log('[App] Applied project-level AI defaults:', ai.providerType || ai.provider);
+  } catch { /* ignore localStorage errors */ }
+}
 
 function App() {
   // If we're in the preview window route, render the standalone preview
@@ -1640,6 +1665,7 @@ function App() {
         if (currentProject.globalSettings) {
           console.log('[App] >>> Restoring globalSettings from project');
           setGlobalSettings(currentProject.globalSettings);
+          applyProjectAIDefaults(currentProject.globalSettings);
         }
 
         // ALWAYS set theme ID from project (clear if undefined to prevent bleed between projects)
@@ -1789,13 +1815,38 @@ function App() {
                   };
                 });
 
+                // Update spritesheet URL
+                const spriteSheet = char.visual?.spriteSheet;
+                let updatedSpriteSheet = spriteSheet;
+                if (spriteSheet?.assetId) {
+                  const ssUrl = assetUrlMap.get(spriteSheet.assetId);
+                  if (ssUrl) {
+                    updatedSpriteSheet = { ...spriteSheet, url: ssUrl };
+                    console.log(`[App] >>>   SpriteSheet assetId=${spriteSheet.assetId}, resolved=${!!ssUrl}`);
+                  }
+                }
+
+                // Update inventory icons
+                const updatedInventory = (char.inventory || []).map((item: any) => {
+                  if (item.assetId) {
+                    const iconUrl = assetUrlMap.get(item.assetId);
+                    if (iconUrl) {
+                      console.log(`[App] >>>   Inventory "${item.name}": assetId=${item.assetId}, resolved=true`);
+                      return { ...item, icon: iconUrl };
+                    }
+                  }
+                  return item;
+                });
+
                 return {
                   ...char,
                   visual: {
                     ...char.visual,
-                    defaultImage: defaultUrl || char.visual?.defaultImage
+                    defaultImage: defaultUrl || char.visual?.defaultImage,
+                    ...(updatedSpriteSheet ? { spriteSheet: updatedSpriteSheet } : {})
                   },
-                  states: updatedStates
+                  states: updatedStates,
+                  inventory: updatedInventory
                 };
               });
 
@@ -1812,6 +1863,7 @@ function App() {
         if (currentProject.globalSettings) {
           console.log('[App] >>> Restoring globalSettings from project');
           setGlobalSettings(currentProject.globalSettings);
+          applyProjectAIDefaults(currentProject.globalSettings);
         }
 
         // ALWAYS set theme ID from project (clear if undefined to prevent bleed between projects)
@@ -4012,6 +4064,9 @@ function App() {
         vcsPanelOpen={vcsPanelOpen}
         onToggleVCSPanel={() => setVcsPanelOpen(prev => !prev)}
         onInitRepo={() => setShowGitInitDialog(true)}
+        onAISettingsChanged={(aiSettings) => {
+          setGlobalSettings(prev => ({ ...prev, ai: aiSettings }));
+        }}
       />
 
       <div className="flex flex-1 overflow-hidden">

@@ -733,6 +733,18 @@ function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any
           }
         }
       }
+      // Update spriteSheet assetId
+      if (character.visual?.spriteSheet?.assetId && assetIdMap.has(character.visual.spriteSheet.assetId)) {
+        character.visual.spriteSheet.assetId = assetIdMap.get(character.visual.spriteSheet.assetId);
+      }
+      // Update inventory item assetIds
+      if (character.inventory && Array.isArray(character.inventory)) {
+        for (const item of character.inventory) {
+          if (item.assetId && assetIdMap.has(item.assetId)) {
+            item.assetId = assetIdMap.get(item.assetId);
+          }
+        }
+      }
     }
   }
 
@@ -831,6 +843,14 @@ function extractAssetIdsFromStory(story: any): string[] {
       if (character.states && Array.isArray(character.states)) {
         for (const state of character.states) {
           if (state.visual?.assetId) addIfUuid(state.visual.assetId);
+        }
+      }
+      // Scan spriteSheet assetId
+      if (character.visual?.spriteSheet?.assetId) addIfUuid(character.visual.spriteSheet.assetId);
+      // Scan inventory item assetIds
+      if (character.inventory && Array.isArray(character.inventory)) {
+        for (const item of character.inventory) {
+          if (item.assetId) addIfUuid(item.assetId);
         }
       }
     }

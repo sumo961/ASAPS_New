@@ -327,19 +327,20 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             
             {/* Sprite Sheet Upload */}
             <div className="space-y-3">
-              {!editedCharacter.visual.spriteSheet?.url ? (
+              {!resolveImageUrl(editedCharacter.visual.spriteSheet?.assetId, editedCharacter.visual.spriteSheet?.url, assets) ? (
                 <DirectAssetUpload
                   onAssetSelect={(url, metadata) => {
                     const newVisual = { ...editedCharacter.visual };
                     if (!newVisual.spriteSheet) {
                       newVisual.spriteSheet = {
                         url: url,
+                        assetId: metadata?.id || undefined,
                         frameWidth: 32,
                         frameHeight: 32,
                         animations: []
                       };
                     } else {
-                      newVisual.spriteSheet.url = url;
+                      newVisual.spriteSheet = { ...newVisual.spriteSheet, url: url, assetId: metadata?.id || undefined };
                     }
                     setEditedCharacter({ ...editedCharacter, visual: newVisual });
                   }}
@@ -353,7 +354,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                   <div className="border-2 border-gray-300 rounded-lg overflow-hidden"
                        style={{ maxHeight: '100px', maxWidth: '200px', backgroundImage: 'repeating-conic-gradient(#f0f0f0 0% 25%, white 0% 50%)', backgroundSize: '10px 10px' }}>
                     <img
-                      src={editedCharacter.visual.spriteSheet.url}
+                      src={resolveImageUrl(editedCharacter.visual.spriteSheet?.assetId, editedCharacter.visual.spriteSheet?.url, assets)}
                       alt="Sprite Sheet"
                       className="max-w-full max-h-[100px] object-contain"
                       style={{ imageRendering: 'pixelated' }}
@@ -363,7 +364,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                     onClick={() => {
                       const newVisual = { ...editedCharacter.visual };
                       if (newVisual.spriteSheet) {
-                        newVisual.spriteSheet.url = '';
+                        newVisual.spriteSheet = { ...newVisual.spriteSheet, url: '', assetId: undefined };
                       }
                       setEditedCharacter({ ...editedCharacter, visual: newVisual });
                     }}
@@ -375,7 +376,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
               )}
               
               {/* Browse existing option for sprite sheets */}
-              {assets.length > 0 && !editedCharacter.visual.spriteSheet?.url && (
+              {assets.length > 0 && !resolveImageUrl(editedCharacter.visual.spriteSheet?.assetId, editedCharacter.visual.spriteSheet?.url, assets) && (
                 <button
                   onClick={() => setShowAssetPicker('spritesheet')}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
@@ -387,13 +388,13 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             </div>
 
             {/* Sprite Sheet Editor */}
-            {editedCharacter.visual.spriteSheet?.url && (
+            {resolveImageUrl(editedCharacter.visual.spriteSheet?.assetId, editedCharacter.visual.spriteSheet?.url, assets) && (
               <div className="mt-4">
                 <SpriteSheetEditor
-                  spriteSheetUrl={editedCharacter.visual.spriteSheet.url}
-                  frameWidth={editedCharacter.visual.spriteSheet.frameWidth || 32}
-                  frameHeight={editedCharacter.visual.spriteSheet.frameHeight || 32}
-                  animations={editedCharacter.visual.spriteSheet.animations || []}
+                  spriteSheetUrl={resolveImageUrl(editedCharacter.visual.spriteSheet?.assetId, editedCharacter.visual.spriteSheet?.url, assets) || ''}
+                  frameWidth={editedCharacter.visual.spriteSheet?.frameWidth || 32}
+                  frameHeight={editedCharacter.visual.spriteSheet?.frameHeight || 32}
+                  animations={editedCharacter.visual.spriteSheet?.animations || []}
                   onChange={(config) => {
                     const newVisual = { ...editedCharacter.visual };
                     if (newVisual.spriteSheet) {
@@ -1703,12 +1704,13 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                       if (!newVisual.spriteSheet) {
                         newVisual.spriteSheet = {
                           url: asset.url,
+                          assetId: asset.id,
                           frameWidth: 32,
                           frameHeight: 32,
                           animations: []
                         };
                       } else {
-                        newVisual.spriteSheet.url = asset.url;
+                        newVisual.spriteSheet = { ...newVisual.spriteSheet, url: asset.url, assetId: asset.id };
                       }
                       setEditedCharacter({ ...editedCharacter, visual: newVisual });
                     } else if (showAssetPicker?.startsWith('state_')) {

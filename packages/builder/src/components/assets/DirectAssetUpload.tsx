@@ -69,18 +69,9 @@ export const DirectAssetUpload: React.FC<DirectAssetUploadProps> = ({
     setUploadError(null);
 
     try {
-      // Convert to base64 for local preview
-      // In production, you'd upload to a server/CDN here
-      const url = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          resolve(e.target?.result as string);
-        };
-        reader.onerror = () => {
-          reject(new Error('Failed to read file'));
-        };
-        reader.readAsDataURL(file);
-      });
+      // Create blob URL for local preview (lightweight, no base64 bloat)
+      // The File object itself is stored in IndexedDB via the asset system
+      const url = URL.createObjectURL(file);
 
       // Create asset metadata
       const asset = {
