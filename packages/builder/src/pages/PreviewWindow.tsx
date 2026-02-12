@@ -1172,7 +1172,27 @@ export const PreviewWindow: React.FC = () => {
       // Wire timer HUD updates to timer events
       timerManager.on('timerStarted', updateTimerHud);
       timerManager.on('timerTick', updateTimerHud);
-      timerManager.on('timerStopped', updateTimerHud);
+
+      // When timer expires, show 00:00 instead of hiding — the HUD should persist
+      // until the story restarts (clear() resets it)
+      timerManager.on('timerExpired', ({ name }: { name: string }) => {
+        if (!rendererRef.current) return;
+        const hudConfig = (rendererRef.current as any).timerHudConfig;
+        if (!hudConfig?.enabled || hudConfig.mode !== 'timer') return;
+        const matchesName = !hudConfig.timerName || hudConfig.timerName === name;
+        if (matchesName) {
+          const currentState = (rendererRef.current as any).timerHudState;
+          (rendererRef.current as any).setTimerHudState?.({
+            totalTime: currentState?.totalTime || 1,
+            remainingTime: 0,
+          });
+        }
+      });
+
+      // On timerStopped (manual stop or cleanup), don't clear if timer just expired
+      // — the timerExpired handler above already set remainingTime to 0
+      // Only clear if the stop is from a restart (which also calls renderer.clear())
+      // So we intentionally do NOT call updateTimerHud on timerStopped.
 
       // Wire countdown meter updates to counter events
       context.on('counterChanged', updateCountdownMeter);

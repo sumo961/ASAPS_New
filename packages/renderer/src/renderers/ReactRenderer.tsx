@@ -1953,9 +1953,15 @@ export class ReactRenderer extends BaseRenderer {
     if (this.root) {
       this.root.render(<></>);
     }
-    
+
     // Clear background
     this.backgroundImageUrl = null;
+
+    // Reset HUD overlay state (config is kept — only live state resets)
+    this.timerHudState = undefined;
+    this.timerHudStateListeners.forEach(listener => listener(undefined));
+    this.timerHudOverrideText = undefined;
+    this.countdownMeterValue = undefined;
     
     // Stop all sounds (copied from BaseRenderer)
     this.assetCache.sounds.forEach((audio: HTMLAudioElement) => {
