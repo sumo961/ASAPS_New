@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Move,
   Square,
@@ -11,6 +11,13 @@ import {
   Music,
   User,
   Package,
+  AlignStartHorizontal,
+  AlignCenterHorizontal,
+  AlignEndHorizontal,
+  AlignStartVertical,
+  AlignCenterVertical,
+  AlignEndVertical,
+  Magnet,
 } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import type { Location } from '@asaps/core';
@@ -23,6 +30,11 @@ import {
   type PositionedElementData
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
+import {
+  alignLeft, alignRight, alignTop, alignBottom,
+  alignCenterH, alignCenterV, distributeH, distributeV,
+} from './alignmentUtils';
+import { computeSnap, type SnapLine } from './snapGuides';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -118,8 +130,8 @@ interface VisualBeatEditorProps {
     choices?: Array<{ text: string; target?: string }>;
   };
   beatType?: string;
-  selectedElement?: string | null;
-  onSelectElement?: (elementId: string | null) => void;
+  selectedElements: string[];
+  onSelectElements: (elementIds: string[]) => void;
   projectSettings?: {
     width: number;
     height: number;
@@ -143,8 +155,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   onOpenCharacterManager,
   beatContent,
   beatType,
-  selectedElement,
-  onSelectElement,
+  selectedElements,
+  onSelectElements,
   projectSettings,
   boxVisibility,
   globalSettings,
@@ -158,6 +170,16 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const [resizingElement, setResizingElement] = useState<string | null>(null);
   const [resizeCorner, setResizeCorner] = useState<'nw' | 'ne' | 'sw' | 'se' | null>(null);
   const [resizeStart, setResizeStart] = useState({ mouseX: 0, mouseY: 0, x: 0, y: 0, width: 0, height: 0 });
+
+  // Marquee (rubber band) selection state
+  const [marquee, setMarquee] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
+
+  // Snap guides state
+  const [activeGuides, setActiveGuides] = useState<SnapLine[]>([]);
+  const [snappingEnabled, setSnappingEnabled] = useState(true);
+
+  // Multi-drag offset tracking: stores offsets for all selected elements during drag
+  const dragOffsetsRef = useRef<Map<string, { dx: number; dy: number }>>(new Map());
 
   // Use stage size from project settings, with fallback to 1024×768
   const stageWidth = projectSettings?.width || 1024;
@@ -174,14 +196,66 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Get stage background color from global settings (used when no background image is set)
   const stageBackgroundColor = globalSettings?.colors?.bgColor || 'transparent';
 
+  // Convenience: first selected element (for single-select operations like resize)
+  const selectedElement = selectedElements.length > 0 ? selectedElements[0] : null;
+
+  // Keyboard handler for arrow key nudge and delete
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if typing in an input field
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (selectedElements.length === 0) return;
+
+      const step = e.shiftKey ? 10 : 1;
+      let dx = 0, dy = 0;
+      switch (e.key) {
+        case 'ArrowUp': dy = -step; break;
+        case 'ArrowDown': dy = step; break;
+        case 'ArrowLeft': dx = -step; break;
+        case 'ArrowRight': dx = step; break;
+        case 'Delete': case 'Backspace': {
+          e.preventDefault();
+          const selectedSet = new Set(selectedElements);
+          const updated = elements.filter(el => !selectedSet.has(el.id) || el.locked);
+          onElementsChange(updated);
+          onSelectElements([]);
+          return;
+        }
+        // Select all with Cmd/Ctrl+A
+        case 'a': case 'A':
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            const allIds = elements.filter(el => el.visible && !el.locked).map(el => el.id);
+            onSelectElements(allIds);
+            return;
+          }
+          return;
+        default: return;
+      }
+      e.preventDefault();
+
+      const selectedSet = new Set(selectedElements);
+      const updated = elements.map(el => {
+        if (!selectedSet.has(el.id) || el.locked) return el;
+        return {
+          ...el,
+          x: Math.max(0, Math.min(stageWidth - el.width, el.x + dx)),
+          y: Math.max(0, Math.min(stageHeight - el.height, el.y + dy)),
+        };
+      });
+      onElementsChange(updated);
+    };
+
+    el.addEventListener('keydown', handleKeyDown);
+    return () => el.removeEventListener('keydown', handleKeyDown);
+  }, [selectedElements, elements, stageWidth, stageHeight, onElementsChange, onSelectElements]);
+
   // Debug logging for background
   console.log(`[VisualBeatEditor] backgroundAssetId="${backgroundAssetId}", found=${!!backgroundAsset}, url="${resolvedBackgroundUrl?.substring(0, 80) || 'none'}", assets.length=${assets.length}`);
-
-  // Debug logging for element positions - compare input elements vs what renderer receives
-  console.log(`[VisualBeatEditor] ====== ELEMENT POSITIONS (bounding boxes) ======`);
-  elements.filter(el => el.visible).forEach(el => {
-    console.log(`[VisualBeatEditor] "${el.name}" (${el.type}): x=${el.x}, y=${el.y}, w=${el.width}, h=${el.height}, z=${el.z}`);
-  });
 
   // Convert VisualElements to Location objects for the renderer
   const locationsForRenderer: Location[] = elements
@@ -207,12 +281,12 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       characterName: el.characterName,
       stateId: el.stateId,
       size: el.size,
-      // Include font properties directly in Location
-      font: el.font,
-      fontSize: el.fontSize,
+      // Include font properties directly in Location (only if explicitly overridden)
+      font: el.fontOverridden ? el.font : undefined,
+      fontSize: el.fontOverridden ? el.fontSize : undefined,
       textAlign: el.textAlign,
-      // Only autosize if fontSize is not explicitly set
-      autosize: el.fontSize === undefined,
+      // Only autosize if font is not explicitly overridden
+      autosize: !el.fontOverridden || el.fontSize === undefined,
       // Pass content directly from visual element (for phase-aware rendering)
       // Use el.content if explicitly set, otherwise fall back to el.text
       content: el.content || el.text,
@@ -242,12 +316,6 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     beatType || 'unknown',
     assetResolver
   );
-
-  // Debug logging - compare renderer positions with bounding box positions
-  console.log(`[VisualBeatEditor] ====== RENDERER POSITIONS (positionedElements) ======`);
-  positionedElements.forEach(el => {
-    console.log(`[VisualBeatEditor] "${el.location.name}" (${el.location.kind}): x=${el.location.x}, y=${el.location.y}, w=${el.location.width}, h=${el.location.height}`);
-  });
 
   // Add asset URLs to elements (keeping this for backwards compatibility)
   positionedElements.forEach(el => {
@@ -344,6 +412,38 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
     const rect = canvasRef.current.getBoundingClientRect();
 
+    // Handle marquee selection
+    if (marquee) {
+      const currentX = (e.clientX - rect.left) / zoom;
+      const currentY = (e.clientY - rect.top) / zoom;
+      setMarquee(prev => prev ? { ...prev, currentX, currentY } : null);
+
+      // Calculate marquee bounds in stage coordinates
+      // We need to find the stage offset within the canvas
+      const stageEl = canvasRef.current.querySelector('[data-stage]') as HTMLElement;
+      if (stageEl) {
+        const stageRect = stageEl.getBoundingClientRect();
+        const stageOffsetX = (stageRect.left - rect.left) / zoom;
+        const stageOffsetY = (stageRect.top - rect.top) / zoom;
+
+        const mx1 = Math.min(marquee.startX, currentX) - stageOffsetX;
+        const my1 = Math.min(marquee.startY, currentY) - stageOffsetY;
+        const mx2 = Math.max(marquee.startX, currentX) - stageOffsetX;
+        const my2 = Math.max(marquee.startY, currentY) - stageOffsetY;
+
+        const intersecting = elements
+          .filter(el => el.visible && !el.locked)
+          .filter(el => {
+            return el.x < mx2 && el.x + el.width > mx1 &&
+                   el.y < my2 && el.y + el.height > my1;
+          })
+          .map(el => el.id);
+
+        onSelectElements(intersecting);
+      }
+      return;
+    }
+
     // Handle resizing
     if (resizingElement && resizeCorner) {
       const deltaX = (e.clientX - resizeStart.mouseX) / zoom;
@@ -380,7 +480,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       return;
     }
 
-    // Handle dragging
+    // Handle dragging (supports multi-element drag)
     if (!draggedElement) return;
 
     const draggedEl = elements.find(el => el.id === draggedElement);
@@ -404,21 +504,79 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     const effectiveHeight = baseHeight * scale;
 
     // Calculate the new effective position (where user is dragging to)
-    const newEffectiveX = Math.max(0, Math.min(stageWidth - effectiveWidth,
+    let newEffectiveX = Math.max(0, Math.min(stageWidth - effectiveWidth,
       (e.clientX - rect.left) / zoom - dragOffset.x));
-    const newEffectiveY = Math.max(0, Math.min(stageHeight - effectiveHeight,
+    let newEffectiveY = Math.max(0, Math.min(stageHeight - effectiveHeight,
       (e.clientY - rect.top) / zoom - dragOffset.y));
 
     // Convert effective position back to base position
-    // effectiveX = baseX + (baseWidth - effectiveWidth) / 2
-    // baseX = effectiveX - (baseWidth - effectiveWidth) / 2
-    const x = newEffectiveX - (baseWidth - effectiveWidth) / 2;
-    const y = newEffectiveY - (baseHeight - effectiveHeight) / 2;
+    let newX = newEffectiveX - (baseWidth - effectiveWidth) / 2;
+    let newY = newEffectiveY - (baseHeight - effectiveHeight) / 2;
 
-    const updatedElements = elements.map(el =>
-      el.id === draggedElement ? { ...el, x, y } : el
-    );
-    onElementsChange(updatedElements);
+    // Snap guides
+    if (snappingEnabled) {
+      const selectedSet = new Set(selectedElements);
+      const otherRects = elements
+        .filter(el => el.visible && !selectedSet.has(el.id))
+        .map(el => ({ x: el.x, y: el.y, width: el.width, height: el.height }));
+
+      // If multi-selecting, compute bounding box of all selected elements
+      if (selectedElements.length > 1) {
+        const offsets = dragOffsetsRef.current;
+        const selectedEls = elements.filter(el => selectedSet.has(el.id));
+        // Compute where each element would be
+        const projectedRects = selectedEls.map(sel => {
+          const off = offsets.get(sel.id) || { dx: 0, dy: 0 };
+          return {
+            x: newX + off.dx,
+            y: newY + off.dy,
+            width: sel.width,
+            height: sel.height,
+          };
+        });
+        const bboxX = Math.min(...projectedRects.map(r => r.x));
+        const bboxY = Math.min(...projectedRects.map(r => r.y));
+        const bboxRight = Math.max(...projectedRects.map(r => r.x + r.width));
+        const bboxBottom = Math.max(...projectedRects.map(r => r.y + r.height));
+        const dragRect = { x: bboxX, y: bboxY, width: bboxRight - bboxX, height: bboxBottom - bboxY };
+        const snap = computeSnap(dragRect, otherRects, stageWidth, stageHeight);
+        const snapDx = snap.snappedX - dragRect.x;
+        const snapDy = snap.snappedY - dragRect.y;
+        newX += snapDx;
+        newY += snapDy;
+        setActiveGuides(snap.guides);
+      } else {
+        const dragRect = { x: newX, y: newY, width: draggedEl.width, height: draggedEl.height };
+        const snap = computeSnap(dragRect, otherRects, stageWidth, stageHeight);
+        newX = snap.snappedX;
+        newY = snap.snappedY;
+        setActiveGuides(snap.guides);
+      }
+    }
+
+    // Apply movement to all selected elements
+    if (selectedElements.length > 1 && selectedElements.includes(draggedElement)) {
+      const offsets = dragOffsetsRef.current;
+      const updatedElements = elements.map(el => {
+        if (!selectedElements.includes(el.id) || el.locked) return el;
+        if (el.id === draggedElement) {
+          return { ...el, x: newX, y: newY };
+        }
+        const off = offsets.get(el.id);
+        if (!off) return el;
+        return {
+          ...el,
+          x: Math.max(0, Math.min(stageWidth - el.width, newX + off.dx)),
+          y: Math.max(0, Math.min(stageHeight - el.height, newY + off.dy)),
+        };
+      });
+      onElementsChange(updatedElements);
+    } else {
+      const updatedElements = elements.map(el =>
+        el.id === draggedElement ? { ...el, x: newX, y: newY } : el
+      );
+      onElementsChange(updatedElements);
+    }
   };
 
   // Handle element drag/resize end
@@ -426,6 +584,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     setDraggedElement(null);
     setResizingElement(null);
     setResizeCorner(null);
+    setActiveGuides([]);
+    dragOffsetsRef.current.clear();
+    if (marquee) {
+      setMarquee(null);
+    }
   };
 
   // Start resize operation
@@ -447,12 +610,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     });
   };
 
-  // Handle background click (deselect) - but not from within renderer
+  // Handle background click (deselect)
   const handleBackgroundClick = useCallback(() => {
-    if (onSelectElement) {
-      onSelectElement(null);
-    }
-  }, [onSelectElement]);
+    onSelectElements([]);
+  }, [onSelectElements]);
 
   // Add new element
   const addElement = (
@@ -491,38 +652,33 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     };
     console.log('[addElement] Created element:', newElement);
     onElementsChange([...elements, newElement]);
-    if (onSelectElement) {
-      onSelectElement(newElement.id);
-    }
+    onSelectElements([newElement.id]);
   };
 
-  // Wrapper to handle element selection and dragging
-  const handleElementInteraction = (e: React.MouseEvent, elementName: string) => {
-    const element = elements.find(el => el.name === elementName);
-    if (!element || element.locked) return;
+  // Apply alignment operation
+  const applyAlignment = (alignFn: (rects: { id: string; x: number; y: number; width: number; height: number }[]) => { id: string; x: number; y: number }[]) => {
+    const selectedSet = new Set(selectedElements);
+    const selectedRects = elements
+      .filter(el => selectedSet.has(el.id) && !el.locked)
+      .map(el => ({ id: el.id, x: el.x, y: el.y, width: el.width, height: el.height }));
 
-    e.stopPropagation();
-    
-    // Select element
-    if (onSelectElement) {
-      onSelectElement(element.id);
-    }
+    if (selectedRects.length < 2) return;
 
-    // Start drag
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    setDraggedElement(element.id);
-    setDragOffset({
-      x: (e.clientX - rect.left) / zoom - element.x,
-      y: (e.clientY - rect.top) / zoom - element.y
+    const updates = alignFn(selectedRects);
+    const updateMap = new Map(updates.map(u => [u.id, u]));
+
+    const updatedElements = elements.map(el => {
+      const update = updateMap.get(el.id);
+      if (!update) return el;
+      return { ...el, x: update.x, y: update.y };
     });
+    onElementsChange(updatedElements);
   };
 
   return (
     <div className="h-full bg-gray-100 flex flex-col overflow-hidden">
       {/* Toolbar - Fixed at top */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-300 p-2 flex gap-2 items-center shadow-sm">
+      <div className="flex-shrink-0 bg-white border-b border-gray-300 p-2 flex gap-2 items-center shadow-sm flex-wrap">
         <button
           onClick={() => setTool('select')}
           className={`p-2 rounded ${tool === 'select' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}`}
@@ -546,17 +702,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         </button>
         <button
           onClick={() => {
-            console.log('[VisualBeatEditor] Character button clicked, onOpenCharacterManager:', onOpenCharacterManager);
             if (onOpenCharacterManager) {
               onOpenCharacterManager((character) => {
-                console.log('[VisualBeatEditor] Character selected:', character);
                 if (character && character.id) {
-                  // Get the default state
                   const defaultState = character.states?.find((s: { id: string }) => s.id === character.defaultState) || character.states?.[0];
-                  // Get the image from the state or character default
                   const imageUrl = defaultState?.visual?.image || character.visual?.defaultImage;
-
-                  // Add character element in the center of the canvas
                   const x = (stageWidth / 2) - 75;
                   const y = (stageHeight / 2) - 75;
                   addElement('character', x, y, undefined, {
@@ -564,12 +714,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     characterName: character.name,
                     stateId: defaultState?.id || 'default',
                     imageUrl: imageUrl,
-                    size: 100 // Default to 100%
+                    size: 100
                   });
                 }
               });
-            } else {
-              console.error('[VisualBeatEditor] onOpenCharacterManager callback not provided!');
             }
           }}
           className={`p-2 rounded ${tool === 'character' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}`}
@@ -579,11 +727,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         </button>
         <button
           onClick={() => {
-            // Open asset manager filtered to props
             if (onSelectAsset) {
               onSelectAsset('prop', (selectedAsset) => {
                 if (selectedAsset && selectedAsset.id) {
-                  // Add prop element in the center of the canvas
                   const x = (stageWidth / 2) - 75;
                   const y = (stageHeight / 2) - 75;
                   addElement('prop', x, y, selectedAsset.id);
@@ -603,6 +749,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
           title="Toggle Grid"
         >
           <Layers className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => setSnappingEnabled(!snappingEnabled)}
+          className={`p-2 rounded ${snappingEnabled ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-400'}`}
+          title={snappingEnabled ? 'Snapping On' : 'Snapping Off'}
+        >
+          <Magnet className="w-4 h-4" />
         </button>
         <div className="w-px bg-gray-300 mx-1" />
         <button
@@ -627,9 +780,46 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         >
           <RotateCcw className="w-4 h-4" />
         </button>
-        
+
+        {/* Alignment buttons - show when 2+ elements selected */}
+        {selectedElements.length >= 2 && (
+          <>
+            <div className="w-px bg-gray-300 mx-1" />
+            <button onClick={() => applyAlignment(alignLeft)} className="p-1.5 rounded hover:bg-gray-100" title="Align Left">
+              <AlignStartHorizontal className="w-4 h-4" />
+            </button>
+            <button onClick={() => applyAlignment(alignCenterH)} className="p-1.5 rounded hover:bg-gray-100" title="Align Center Horizontally">
+              <AlignCenterHorizontal className="w-4 h-4" />
+            </button>
+            <button onClick={() => applyAlignment(alignRight)} className="p-1.5 rounded hover:bg-gray-100" title="Align Right">
+              <AlignEndHorizontal className="w-4 h-4" />
+            </button>
+            <button onClick={() => applyAlignment(alignTop)} className="p-1.5 rounded hover:bg-gray-100" title="Align Top">
+              <AlignStartVertical className="w-4 h-4" />
+            </button>
+            <button onClick={() => applyAlignment(alignCenterV)} className="p-1.5 rounded hover:bg-gray-100" title="Align Center Vertically">
+              <AlignCenterVertical className="w-4 h-4" />
+            </button>
+            <button onClick={() => applyAlignment(alignBottom)} className="p-1.5 rounded hover:bg-gray-100" title="Align Bottom">
+              <AlignEndVertical className="w-4 h-4" />
+            </button>
+          </>
+        )}
+        {/* Distribution buttons - show when 3+ elements selected */}
+        {selectedElements.length >= 3 && (
+          <>
+            <div className="w-px bg-gray-300 mx-1" />
+            <button onClick={() => applyAlignment(distributeH)} className="p-1.5 rounded hover:bg-gray-100 text-xs font-medium" title="Distribute Horizontally">
+              D⇔
+            </button>
+            <button onClick={() => applyAlignment(distributeV)} className="p-1.5 rounded hover:bg-gray-100 text-xs font-medium" title="Distribute Vertically">
+              D⇕
+            </button>
+          </>
+        )}
+
         <div className="flex-1" />
-        
+
         {/* Canvas Size Indicator */}
         <div className="bg-gray-100 rounded px-3 py-1 text-sm text-gray-700">
           Stage: {stageWidth} × {stageHeight}px {projectSettings?.aspectRatio ? `(${projectSettings.aspectRatio})` : ''}
@@ -638,20 +828,37 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
       {/* Scrollable Canvas Container */}
       <div className="flex-1 overflow-auto bg-gray-100" style={{ maxWidth: '100%', maxHeight: '100%' }}>
-        <div 
+        <div
           ref={canvasRef}
+          tabIndex={0}
           className="relative flex items-center justify-center p-5"
-          style={{ 
+          style={{
             minWidth: `${stageWidth * zoom + 80}px`,
             minHeight: `${stageHeight * zoom + 80}px`,
             width: 'max-content',
-            height: 'max-content'
+            height: 'max-content',
+            outline: 'none',
+          }}
+          onMouseDown={(e) => {
+            // Focus canvas for keyboard events
+            canvasRef.current?.focus();
+            // Start marquee on background mousedown (not on elements)
+            if (tool === 'select' && e.target === e.currentTarget) {
+              const rect = canvasRef.current?.getBoundingClientRect();
+              if (rect) {
+                const x = (e.clientX - rect.left) / zoom;
+                const y = (e.clientY - rect.top) / zoom;
+                setMarquee({ startX: x, startY: y, currentX: x, currentY: y });
+                onSelectElements([]);
+              }
+            }
           }}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
-          <div 
+          <div
+            data-stage
             style={{
               transform: `scale(${zoom})`,
               transformOrigin: 'center center',
@@ -690,7 +897,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
             }}
           >
             {/* Wrapper for grid overlay */}
-            <div 
+            <div
               style={{
                 position: 'relative',
                 width: `${stageWidth}px`,
@@ -699,7 +906,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
             >
               {/* Grid overlay */}
               {showGrid && (
-                <div 
+                <div
                   style={{
                     position: 'absolute',
                     inset: 0,
@@ -740,7 +947,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
               {/* Sound Indicator */}
               {backgroundSound && (
-                <div 
+                <div
                   style={{
                     position: 'absolute',
                     top: '16px',
@@ -790,7 +997,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   };
                 })() : undefined}
               />
-              
+
               {/* Draggable overlay for each element */}
               {elements
                 .filter(el => el.visible)
@@ -839,20 +1046,58 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         if (el.locked) return;
                         e.stopPropagation();
 
+                        // Focus canvas for keyboard events
+                        canvasRef.current?.focus();
+
                         const rect = canvasRef.current?.getBoundingClientRect();
                         if (!rect) return;
 
-                        // Select element
-                        if (onSelectElement) {
-                          onSelectElement(el.id);
+                        const isMeta = e.metaKey || e.ctrlKey;
+                        const isShift = e.shiftKey;
+
+                        if (isMeta) {
+                          // Cmd/Ctrl+Click: toggle element in/out of selection
+                          if (selectedElements.includes(el.id)) {
+                            onSelectElements(selectedElements.filter(id => id !== el.id));
+                          } else {
+                            onSelectElements([...selectedElements, el.id]);
+                          }
+                          return; // Don't start drag on toggle
+                        } else if (isShift) {
+                          // Shift+Click: add to selection
+                          if (!selectedElements.includes(el.id)) {
+                            onSelectElements([...selectedElements, el.id]);
+                          }
+                          // Don't start drag on shift-click add
+                          return;
+                        } else if (selectedElements.includes(el.id) && selectedElements.length > 1) {
+                          // Click on already-selected element in multi-selection: start drag without changing selection
+                        } else {
+                          // Plain click: replace selection
+                          onSelectElements([el.id]);
                         }
 
-                        // Start drag - use effective position for offset calculation
+                        // Start drag - compute offsets for all selected elements relative to dragged element
                         setDraggedElement(el.id);
                         setDragOffset({
                           x: (e.clientX - rect.left) / zoom - effectiveX,
                           y: (e.clientY - rect.top) / zoom - effectiveY
                         });
+
+                        // For multi-drag: store offsets of other selected elements relative to this one
+                        const offsets = new Map<string, { dx: number; dy: number }>();
+                        const currentSelection = selectedElements.includes(el.id) ? selectedElements : [el.id];
+                        for (const selId of currentSelection) {
+                          if (selId === el.id) continue;
+                          const selEl = elements.find(e => e.id === selId);
+                          if (selEl && !selEl.locked) {
+                            offsets.set(selId, {
+                              dx: selEl.x - el.x,
+                              dy: selEl.y - el.y,
+                            });
+                          }
+                        }
+                        dragOffsetsRef.current = offsets;
                       }}
                     />
                   );
@@ -860,7 +1105,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
               {/* Selection indicators overlay */}
               {elements
-                .filter(el => el.visible && el.id === selectedElement)
+                .filter(el => el.visible && selectedElements.includes(el.id))
                 .map(el => {
                   const scale = el.scale || 1;
                   // `size` is percentage scale for characters/props (e.g., 90 = 90%, 115 = 115%)
@@ -878,13 +1123,6 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     }
                   }
 
-                  // For elements with `size` property (characters/props):
-                  // - Renderer uses width/height: 'auto' with scale transform from TOP-LEFT
-                  // - Position stays at el.x, el.y (no adjustment)
-                  // - Effective dimensions = baseWidth/height * sizeScale
-                  //
-                  // For elements with `scale` property (other elements):
-                  // - Uses center origin, so position needs adjustment
                   const hasSize = el.size !== undefined && (el.type === 'character' || el.type === 'prop');
 
                   let effectiveWidth: number;
@@ -893,24 +1131,23 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   let effectiveY: number;
 
                   if (hasSize) {
-                    // Size uses top-left origin - no position adjustment
                     effectiveWidth = baseWidth * sizeScale;
                     effectiveHeight = baseHeight * sizeScale;
                     effectiveX = el.x;
                     effectiveY = el.y;
                   } else {
-                    // Scale uses center origin - adjust position
                     effectiveWidth = baseWidth * scale;
                     effectiveHeight = baseHeight * scale;
                     effectiveX = el.x + (baseWidth - effectiveWidth) / 2;
                     effectiveY = el.y + (baseHeight - effectiveHeight) / 2;
                   }
 
-                  // Build transform string - only rotation, no scale (we use effective dimensions)
                   const transforms: string[] = [];
                   if (el.rotation) {
                     transforms.push(`rotate(${el.rotation}deg)`);
                   }
+
+                  const isOnlySelected = selectedElements.length === 1;
 
                   return (
                     <div
@@ -930,85 +1167,96 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         transformOrigin: 'center center',
                       }}
                     >
-                    {/* Resize handles - NW corner */}
-                    {!el.locked && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '-6px',
-                          left: '-6px',
-                          width: '12px',
-                          height: '12px',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid white',
-                          borderRadius: '50%',
-                          cursor: 'nwse-resize',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                          pointerEvents: 'auto',
-                        }}
-                        onMouseDown={(e) => startResize(e, el.id, 'nw')}
-                      />
-                    )}
-                    {/* NE corner */}
-                    {!el.locked && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '-6px',
-                          right: '-6px',
-                          width: '12px',
-                          height: '12px',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid white',
-                          borderRadius: '50%',
-                          cursor: 'nesw-resize',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                          pointerEvents: 'auto',
-                        }}
-                        onMouseDown={(e) => startResize(e, el.id, 'ne')}
-                      />
-                    )}
-                    {/* SW corner */}
-                    {!el.locked && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: '-6px',
-                          left: '-6px',
-                          width: '12px',
-                          height: '12px',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid white',
-                          borderRadius: '50%',
-                          cursor: 'nesw-resize',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                          pointerEvents: 'auto',
-                        }}
-                        onMouseDown={(e) => startResize(e, el.id, 'sw')}
-                      />
-                    )}
-                    {/* SE corner */}
-                    {!el.locked && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: '-6px',
-                          right: '-6px',
-                          width: '12px',
-                          height: '12px',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid white',
-                          borderRadius: '50%',
-                          cursor: 'nwse-resize',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                          pointerEvents: 'auto',
-                        }}
-                        onMouseDown={(e) => startResize(e, el.id, 'se')}
-                      />
+                    {/* Resize handles - only show when exactly one element is selected */}
+                    {isOnlySelected && !el.locked && (
+                      <>
+                        {/* NW corner */}
+                        <div
+                          style={{
+                            position: 'absolute', top: '-6px', left: '-6px', width: '12px', height: '12px',
+                            backgroundColor: '#3b82f6', border: '2px solid white', borderRadius: '50%',
+                            cursor: 'nwse-resize', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', pointerEvents: 'auto',
+                          }}
+                          onMouseDown={(e) => startResize(e, el.id, 'nw')}
+                        />
+                        {/* NE corner */}
+                        <div
+                          style={{
+                            position: 'absolute', top: '-6px', right: '-6px', width: '12px', height: '12px',
+                            backgroundColor: '#3b82f6', border: '2px solid white', borderRadius: '50%',
+                            cursor: 'nesw-resize', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', pointerEvents: 'auto',
+                          }}
+                          onMouseDown={(e) => startResize(e, el.id, 'ne')}
+                        />
+                        {/* SW corner */}
+                        <div
+                          style={{
+                            position: 'absolute', bottom: '-6px', left: '-6px', width: '12px', height: '12px',
+                            backgroundColor: '#3b82f6', border: '2px solid white', borderRadius: '50%',
+                            cursor: 'nesw-resize', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', pointerEvents: 'auto',
+                          }}
+                          onMouseDown={(e) => startResize(e, el.id, 'sw')}
+                        />
+                        {/* SE corner */}
+                        <div
+                          style={{
+                            position: 'absolute', bottom: '-6px', right: '-6px', width: '12px', height: '12px',
+                            backgroundColor: '#3b82f6', border: '2px solid white', borderRadius: '50%',
+                            cursor: 'nwse-resize', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', pointerEvents: 'auto',
+                          }}
+                          onMouseDown={(e) => startResize(e, el.id, 'se')}
+                        />
+                      </>
                     )}
                   </div>
                   );
                 })}
+
+              {/* Snap guide lines */}
+              {activeGuides.map((guide, i) => (
+                <div
+                  key={`guide-${i}`}
+                  style={{
+                    position: 'absolute',
+                    ...(guide.orientation === 'vertical'
+                      ? { left: `${guide.position}px`, top: 0, width: '1px', height: '100%' }
+                      : { top: `${guide.position}px`, left: 0, height: '1px', width: '100%' }),
+                    backgroundColor: guide.type === 'stage-center' ? '#f59e0b' : '#ec4899',
+                    pointerEvents: 'none',
+                    zIndex: 20001,
+                    opacity: 0.7,
+                  }}
+                />
+              ))}
+
+              {/* Marquee selection overlay */}
+              {marquee && (() => {
+                const stageEl = canvasRef.current?.querySelector('[data-stage]') as HTMLElement;
+                if (!stageEl || !canvasRef.current) return null;
+                const canvasRect = canvasRef.current.getBoundingClientRect();
+                const stageRect = stageEl.getBoundingClientRect();
+                const stageOffsetX = (stageRect.left - canvasRect.left) / zoom;
+                const stageOffsetY = (stageRect.top - canvasRect.top) / zoom;
+                const mx = Math.min(marquee.startX, marquee.currentX) - stageOffsetX;
+                const my = Math.min(marquee.startY, marquee.currentY) - stageOffsetY;
+                const mw = Math.abs(marquee.currentX - marquee.startX);
+                const mh = Math.abs(marquee.currentY - marquee.startY);
+                return (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${mx}px`,
+                      top: `${my}px`,
+                      width: `${mw}px`,
+                      height: `${mh}px`,
+                      border: '1px dashed #3b82f6',
+                      backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                      pointerEvents: 'none',
+                      zIndex: 20002,
+                    }}
+                  />
+                );
+              })()}
             </div>
           </div>
         </div>

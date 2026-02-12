@@ -33,7 +33,7 @@ type TransitionType = 'none' | 'fade' | 'slide' | 'zoom' | 'dissolve';
 interface VisualPropertiesPanelProps {
   backgroundAssetId?: string;
   elements: VisualElement[];
-  selectedElement: string | null;
+  selectedElements: string[];
   onBackgroundSelect: () => void;
   onElementSelect: (elementId: string | null) => void;
   onElementUpdate: (elementId: string, updates: Partial<VisualElement>) => void;
@@ -73,7 +73,7 @@ const formatBeatType = (beatType: string): string => {
 export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   backgroundAssetId,
   elements,
-  selectedElement,
+  selectedElements,
   onBackgroundSelect,
   onElementSelect,
   onElementUpdate,
@@ -147,7 +147,9 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   };
 
   const backgroundAsset = assets.find(a => a.id === backgroundAssetId);
-  const selected = elements.find(el => el.id === selectedElement);
+  // Derive single-select compatibility from multi-select array
+  const selectedElement = selectedElements.length === 1 ? selectedElements[0] : null;
+  const selected = selectedElement ? elements.find(el => el.id === selectedElement) : undefined;
   const sortedElements = [...elements].sort((a, b) => b.z - a.z); // Sort by z-index descending
 
   // Get audio assets for custom sound selection
@@ -461,8 +463,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       key={element.id}
                       className={`
                         p-2 rounded border transition-colors cursor-pointer
-                        ${element.id === selectedElement 
-                          ? 'border-blue-500 bg-blue-50' 
+                        ${selectedElements.includes(element.id)
+                          ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}
                       `}
                       onClick={() => onElementSelect(element.id)}
@@ -559,6 +561,47 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
             </div>
           )}
         </div>
+
+        {/* Multi-select summary */}
+        {selectedElements.length > 1 && (
+          <div className="border-b border-gray-200 px-4 py-3">
+            <div className="text-sm font-medium text-gray-700 mb-2">
+              {selectedElements.length} elements selected
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  selectedElements.forEach(id => {
+                    const el = elements.find(e => e.id === id);
+                    if (el && !el.locked) onElementUpdate(id, { locked: true });
+                  });
+                }}
+                className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200"
+              >
+                Lock All
+              </button>
+              <button
+                onClick={() => {
+                  selectedElements.forEach(id => {
+                    const el = elements.find(e => e.id === id);
+                    if (el && el.locked) onElementUpdate(id, { locked: false });
+                  });
+                }}
+                className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200"
+              >
+                Unlock All
+              </button>
+              <button
+                onClick={() => {
+                  selectedElements.forEach(id => onElementDelete(id));
+                }}
+                className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+              >
+                Delete All
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Transform Section - Only shown when element is selected */}
         {selected && (

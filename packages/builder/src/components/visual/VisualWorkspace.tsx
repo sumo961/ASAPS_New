@@ -190,7 +190,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const [backgroundUrl, setBackgroundUrl] = useState<string>(''); // Direct URL for ASML import
   const [backgroundSound, setBackgroundSound] = useState<string>('');
   const [showProperties, setShowProperties] = useState(true);
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  // Compatibility helper for single-select consumers
+  const selectedElementId = selectedElementIds.length > 0 ? selectedElementIds[0] : null;
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<'elements' | 'animations'>('elements');
   const [animations, setAnimations] = useState<AnimationPath[]>([]);
@@ -443,10 +445,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       if (el.assetId) location.assetId = el.assetId;
       if (el.imageUrl) location.imageUrl = el.imageUrl;
       if (el.sound) location.sound = el.sound;
-      if (el.font) location.font = el.font;
-      if (el.fontSize !== undefined) location.fontSize = el.fontSize;
+      if (el.fontOverridden && el.font) location.font = el.font;
+      if (el.fontOverridden && el.fontSize !== undefined) location.fontSize = el.fontSize;
       if (el.textAlign) location.textAlign = el.textAlign;
-      location.autosize = el.fontSize === undefined;
+      location.autosize = !el.fontOverridden || el.fontSize === undefined;
 
       // Add transform properties (rotation and scale)
       if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
@@ -536,10 +538,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         if (el.assetId) location.assetId = el.assetId;
         if (el.imageUrl) location.imageUrl = el.imageUrl;  // Preserve direct image URL (ASML imports)
         if (el.sound) location.sound = el.sound;
-        if (el.font) location.font = el.font;
-        if (el.fontSize !== undefined) location.fontSize = el.fontSize;
+        if (el.fontOverridden && el.font) location.font = el.font;
+        if (el.fontOverridden && el.fontSize !== undefined) location.fontSize = el.fontSize;
         if (el.textAlign) location.textAlign = el.textAlign;
-        location.autosize = el.fontSize === undefined;
+        location.autosize = !el.fontOverridden || el.fontSize === undefined;
 
         // Add transform properties (rotation and scale)
         if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
@@ -984,10 +986,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           visible: true,
           locked: false,
           sound: loc.sound,
-          // Include font properties from location
+          // Include font properties from location (mark as overridden if stored)
           font: loc.font,
           fontSize: loc.fontSize,
           textAlign: loc.textAlign,
+          fontOverridden: loc.font !== undefined || loc.fontSize !== undefined,
           // Meter-specific properties
           counterName: loc.counterName,
           meterOrientation: loc.meterOrientation,
@@ -1127,7 +1130,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Priority 2: Fall back to params.visualElements (legacy/initial load)
     else if (params.visualElements && params.visualElements.length > 0) {
       console.log('[VisualWorkspace] Loading from params.visualElements');
-      elements = params.visualElements;
+      // Clean stale fonts: strip font values from elements where fontOverridden is not true
+      elements = params.visualElements.map((el: VisualElement) => ({
+        ...el,
+        font: el.fontOverridden ? el.font : undefined,
+        fontSize: el.fontOverridden ? el.fontSize : undefined,
+      }));
     }
     // Priority 3: Convert from params.locs (ASML import)
     else if (params.locs && params.locs.length > 0) {
@@ -1181,10 +1189,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           visible: true,
           locked: false,
           sound: loc.sound,
-          // Include font properties from location
+          // Include font properties from location (mark as overridden if stored)
           font: loc.font,
           fontSize: loc.fontSize,
           textAlign: loc.textAlign,
+          fontOverridden: loc.font !== undefined || loc.fontSize !== undefined,
           // Meter-specific properties
           counterName: loc.counterName,
           meterOrientation: loc.meterOrientation,
@@ -1331,10 +1340,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         // Add optional properties
         if (el.assetId) location.assetId = el.assetId;
         if (el.sound) location.sound = el.sound;
-        if (el.font) location.font = el.font;
-        if (el.fontSize !== undefined) location.fontSize = el.fontSize;
+        if (el.fontOverridden && el.font) location.font = el.font;
+        if (el.fontOverridden && el.fontSize !== undefined) location.fontSize = el.fontSize;
         if (el.textAlign) location.textAlign = el.textAlign;
-        location.autosize = el.fontSize === undefined;
+        location.autosize = !el.fontOverridden || el.fontSize === undefined;
 
         // Add meter-specific properties
         if (el.type === 'meter') {
@@ -1951,13 +1960,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
       if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
 
-      // Add font properties
-      if (el.font) location.font = el.font;
-      if (el.fontSize !== undefined) location.fontSize = el.fontSize;
+      // Add font properties (only if explicitly overridden by user)
+      if (el.fontOverridden && el.font) location.font = el.font;
+      if (el.fontOverridden && el.fontSize !== undefined) location.fontSize = el.fontSize;
       if (el.textAlign) location.textAlign = el.textAlign;
 
-      // Set autosize - only enable if fontSize is not explicitly set
-      location.autosize = el.fontSize === undefined;
+      // Set autosize - enable if font is not explicitly overridden
+      location.autosize = !el.fontOverridden || el.fontSize === undefined;
 
       // Add character-specific properties (for kind='character')
       if (el.type === 'character') {
@@ -2229,9 +2238,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               <VisualPropertiesPanel
                 backgroundAssetId={backgroundAssetId}
                 elements={visualElements}
-                selectedElement={selectedElementId}
+                selectedElements={selectedElementIds}
                 onBackgroundSelect={handleBackgroundSelect}
-                onElementSelect={setSelectedElementId}
+                onElementSelect={(id: string | null) => setSelectedElementIds(id ? [id] : [])}
                 onElementUpdate={(elementId, updates) => {
                   // Calculate updated elements synchronously so we can also sync to beat.locations
                   const updatedElements = visualElements.map(el => {
@@ -2324,7 +2333,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
                   setVisualElements(prev => prev.filter(el => el.id !== elementId));
                   if (selectedElementId === elementId) {
-                    setSelectedElementId(null);
+                    setSelectedElementIds([]);
                   }
                   setHasChanges(true);
 
@@ -2372,7 +2381,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             size: 100 // Default to 100%
                           };
                           setVisualElements(prev => [...prev, newElement]);
-                          setSelectedElementId(newElement.id);
+                          setSelectedElementIds([newElement.id]);
                           setHasChanges(true);
 
                           // CRITICAL: Also persist to beat.locations immediately for Preview
@@ -2439,7 +2448,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                               assetId: asset.id,
                             };
                             setVisualElements(prev => [...prev, newElement]);
-                            setSelectedElementId(newElement.id);
+                            setSelectedElementIds([newElement.id]);
                             setHasChanges(true);
 
                             // CRITICAL: Also persist to beat.locations immediately for Preview
@@ -2508,7 +2517,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     textAlign: (type === 'text' || type === 'hotspot') ? 'center' : undefined,
                   };
                   setVisualElements(prev => [...prev, newElement]);
-                  setSelectedElementId(newElement.id);
+                  setSelectedElementIds([newElement.id]);
                   setHasChanges(true);
                 }}
                 onElementReorder={(elementId, direction) => {
@@ -2622,8 +2631,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           onOpenCharacterManager={onOpenCharacterManager}
           beatContent={content}
           beatType={beat.type}
-          selectedElement={selectedElementId}
-          onSelectElement={setSelectedElementId}
+          selectedElements={selectedElementIds}
+          onSelectElements={setSelectedElementIds}
           projectSettings={projectSettings}
           globalSettings={globalSettings}
           themeAssets={themeAssets}
@@ -2684,7 +2693,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         };
 
                         setVisualElements(prev => [...prev, newElement]);
-                        setSelectedElementId(newElement.id);
+                        setSelectedElementIds([newElement.id]);
                         setHasChanges(true);
 
                         // Persist to beat.locations
