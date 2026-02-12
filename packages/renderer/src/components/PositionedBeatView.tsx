@@ -484,6 +484,10 @@ export interface PositionedBeatViewProps {
   timerHudConfig?: import('./TimerHudDisplay').TimerHudConfig;
   /** Per-beat override text for static timer HUD mode */
   timerHudOverrideText?: string;
+  /** Timer HUD time state (separate from progress bar) */
+  timerHudState?: { remainingTime: number; totalTime: number };
+  /** Subscribe to timer HUD state updates */
+  onSubscribeTimerHudState?: (listener: (state: { remainingTime: number; totalTime: number } | undefined) => void) => () => void;
   /** Countdown meter HUD configuration from global settings */
   countdownMeterConfig?: import('./CountdownMeterHud').CountdownMeterConfig;
   /** Current counter value for countdown meter HUD */
@@ -793,6 +797,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   editorMode = false,
   timerHudConfig,
   timerHudOverrideText,
+  timerHudState: initialTimerHudState,
+  onSubscribeTimerHudState,
   countdownMeterConfig,
   countdownMeterValue,
 }) => {
@@ -819,6 +825,16 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       return unsubscribe;
     }
   }, [onSubscribeTimerState]);
+
+  // State for timer HUD - separate from progress bar timer
+  const [timerHudTime, setTimerHudTime] = React.useState(initialTimerHudState);
+
+  React.useEffect(() => {
+    if (onSubscribeTimerHudState) {
+      const unsubscribe = onSubscribeTimerHudState(setTimerHudTime);
+      return unsubscribe;
+    }
+  }, [onSubscribeTimerHudState]);
 
   // Animation state for button fade-in after text animation completes
   const [animationsComplete, setAnimationsComplete] = React.useState(false);
@@ -1434,8 +1450,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         <TimerHudDisplay
           config={timerHudConfig}
           visible={true}
-          remainingTime={timerState?.remainingTime}
-          totalTime={timerState?.totalTime}
+          remainingTime={timerHudTime?.remainingTime}
+          totalTime={timerHudTime?.totalTime}
           displayText={timerHudOverrideText}
         />
       )}

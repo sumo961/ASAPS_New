@@ -20,7 +20,8 @@ export class SetTimerBeat extends Beat {
     const params = config.parameters || {};
 
     // Support multiple parameter names for compatibility
-    this.timerName = params.name || config.name || config.timerName || '';
+    // Note: config.name is the beat display name, NOT the timer name - don't use it as fallback
+    this.timerName = params.name || params.timerName || config.timerName || '';
     this.timerValue = params.value ?? config.value ?? 0;
     this.timerTarget = params.timerTarget || config.target || config.timerTarget || '';
   }

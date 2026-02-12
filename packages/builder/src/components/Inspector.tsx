@@ -598,28 +598,17 @@ export const Inspector: React.FC<InspectorProps> = ({
       }
       
       
-      // FIXED: SetTimer parameter mapping - ensure consistency
+      // SetTimer parameter mapping - ensure consistency with beat's internal state
       if (beat.type === 'setTimer' && beatData.parameters) {
-        // Get parameters from beat's getParameters() method for consistency
         const beatParams = beat.getParameters ? beat.getParameters() : {};
-        
-        // Ensure both timerName and name are set
+
+        // Always sync from beat's canonical state
         if (!beatData.parameters.timerName) {
-          beatData.parameters.timerName = beatParams.timerName || beatParams.name || '';
-        }
-        if (!beatData.parameters.name) {
-          beatData.parameters.name = beatData.parameters.timerName;
-        }
-        
-        // Ensure both target and timerTarget are set
-        if (!beatData.parameters.target) {
-          beatData.parameters.target = beatParams.target || beatParams.timerTarget || '';
+          beatData.parameters.timerName = beatParams.timerName || '';
         }
         if (!beatData.parameters.timerTarget) {
-          beatData.parameters.timerTarget = beatData.parameters.target;
+          beatData.parameters.timerTarget = beatParams.timerTarget || '';
         }
-        
-        // Ensure value is set
         if (beatData.parameters.value === undefined) {
           beatData.parameters.value = beatParams.value || 60;
         }
@@ -714,7 +703,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         break;
       case 'setTimer':
         if (!localBeat.parameters?.timerName) errors.push('Timer name is required');
-        if (!localBeat.parameters?.target) errors.push('Timer target is required');
+        if (!localBeat.parameters?.timerTarget) errors.push('Timer target is required');
         const normalConnection = localBeat.connections?.find((c: any) => c.label !== 'Timer Target');
         if (!normalConnection) errors.push('Continue connection is required');
         break;
@@ -892,9 +881,9 @@ export const Inspector: React.FC<InspectorProps> = ({
 
     } else if (beat.type === 'setTimer') {
       // Timer target connection (from parameters)
-      if (beatToUpdate.parameters?.target) {
+      if (beatToUpdate.parameters?.timerTarget) {
         beat.addConnection({
-          targetId: beatToUpdate.parameters.target,
+          targetId: beatToUpdate.parameters.timerTarget,
           label: 'Timer Target'
         });
       }
@@ -1093,9 +1082,9 @@ export const Inspector: React.FC<InspectorProps> = ({
 
       } else if (beat.type === 'setTimer') {
         // Timer target connection (from parameters)
-        if (localBeat.parameters?.target) {
+        if (localBeat.parameters?.timerTarget) {
           beat.addConnection({
-            targetId: localBeat.parameters.target,
+            targetId: localBeat.parameters.timerTarget,
             label: 'Timer Target'
           });
         }
@@ -1706,23 +1695,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                         </span>
                       </label>
                       <select
-                        value={localBeat.parameters?.target || ''}
-                        //onChange={(e) => handleParameterChange('target', e.target.value)}
+                        value={localBeat.parameters?.timerTarget || ''}
                         onChange={(e) => {
                           const targetId = e.target.value;
-                          handleParameterChange('target', targetId);          // ← keep param in sync
-                          //const timerConn = localBeat.connections?.find((c) => c.label === 'Timer Target');
-                         // const timerConn = localBeat.connections?.find((c: any) => c.label === 'Timer Target');
-                          const timerConn = localBeat.connections?.find((c: { label?: string }) => c.label === 'Timer Target');
-                          const newConnections: { targetId: string; label: string }[] = [];
-                          if (timerConn) newConnections.push(timerConn);      // preserve existing timer conn
-                          if (targetId) newConnections.push({ targetId, label: '' }); // continue conn
-                          const updatedBeat = { ...localBeat, connections: newConnections };
-                          setLocalBeat(updatedBeat);
-                          setHasChanges(true);
-
-                          // Rebuild connections immediately when timer target changes
-                          rebuildConnectionsAndUpdate(updatedBeat);
+                          handleParameterChange('timerTarget', targetId);
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       >

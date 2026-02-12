@@ -1132,12 +1132,12 @@ export const PreviewWindow: React.FC = () => {
           : timers.find((t: any) => !t.name?.startsWith('defaultTarget_'));
 
         if (timer) {
-          (rendererRef.current as any).setTimerState?.({
+          (rendererRef.current as any).setTimerHudState?.({
             totalTime: timer.totalTime || timer.remainingTime + 1,
             remainingTime: timer.remainingTime,
-            visible: true,
-            label: timer.name,
           });
+        } else {
+          (rendererRef.current as any).setTimerHudState?.(undefined);
         }
       };
 

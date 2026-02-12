@@ -762,6 +762,8 @@ export class ReactRenderer extends BaseRenderer {
   private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
   protected timerHudConfig: import('../components/TimerHudDisplay').TimerHudConfig | undefined;  // Timer HUD config from global settings
   protected timerHudOverrideText: string | undefined;  // Per-beat static time display override
+  protected timerHudState: { remainingTime: number; totalTime: number } | undefined;  // Timer HUD time state (separate from progress bar)
+  private timerHudStateListeners: Set<(state: typeof this.timerHudState) => void> = new Set();
   protected countdownMeterConfig: import('../components/CountdownMeterHud').CountdownMeterConfig | undefined;  // Countdown meter HUD config
   protected countdownMeterValue: { value: number; min: number; max: number } | undefined;  // Current countdown meter value
 
@@ -1123,6 +1125,23 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Set the timer HUD time state (separate from progress bar timer state)
+   */
+  setTimerHudState(state: { remainingTime: number; totalTime: number } | undefined): void {
+    this.timerHudState = state;
+    this.timerHudStateListeners.forEach(listener => listener(state));
+  }
+
+  /**
+   * Subscribe to timer HUD state changes
+   */
+  subscribeToTimerHudState(listener: (state: { remainingTime: number; totalTime: number } | undefined) => void): () => void {
+    this.timerHudStateListeners.add(listener);
+    listener(this.timerHudState);
+    return () => this.timerHudStateListeners.delete(listener);
+  }
+
+  /**
    * Set the countdown meter HUD configuration from global settings
    */
   setCountdownMeterConfig(config: import('../components/CountdownMeterHud').CountdownMeterConfig | undefined): void {
@@ -1244,6 +1263,8 @@ export class ReactRenderer extends BaseRenderer {
               beatType={beatType}
               timerHudConfig={this.timerHudConfig}
               timerHudOverrideText={this.timerHudOverrideText}
+              timerHudState={this.timerHudState}
+              onSubscribeTimerHudState={(listener) => this.subscribeToTimerHudState(listener)}
               countdownMeterConfig={this.countdownMeterConfig}
               countdownMeterValue={this.countdownMeterValue}
             />
