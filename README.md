@@ -22,7 +22,9 @@ This is a **beta release**. Core functionality works, but some features are inco
 
 | Feature | Status |
 |---------|--------|
-| **Timer/Countdown HUD** | **NEW in v0.9.15**: Timer HUD (countdown or narrative time text) and Countdown Meter HUD overlays |
+| **Fictional Time System** | **NEW in v0.9.15**: In-story date/time tracking with set/advance/subtract, condition checking, and Timer HUD display |
+| **Timer/Countdown HUD** | **NEW in v0.9.15**: Timer HUD (countdown, fictional time, or narrative text) and Countdown Meter HUD overlays |
+| **Recursive Dialog Trees** | **NEW in v0.9.15**: `__self__` target for looping dialogs with per-choice visited tracking |
 | **Keypad Beat** | **NEW in v0.9.15**: Numeric keypad for phone, safe lock, PIN entry with code validation |
 | **Visual Editor UX** | **NEW in v0.9.15**: Multi-select, alignment/distribute tools, snap guides, element grouping |
 | **Choice Effects** | **NEW in v0.9.15**: Unified variable/counter/inventory effects on dialog and movement choices |
@@ -52,13 +54,14 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
-### ⏱️ Timer HUD & Countdown Meter (v0.9.15)
+### ⏱️ Timer HUD, Fictional Time & Countdown Meter (v0.9.15)
 
 Persistent HUD overlays that display across all beats:
 
-- **Timer HUD**: Real-time countdown (MM:SS) or static narrative time text ("9:00 AM", "Day 3")
+- **Timer HUD**: Auto-detects content — countdown timer, fictional time, manual text, or static text
+- **Fictional Time**: Track in-story date/time (e.g. "4 April 1968, 9:00 AM") with set/advance/subtract operations and condition-based branching
 - **Countdown Meter**: Counter-driven progress bar with warning/critical color thresholds
-- **Per-beat overrides**: Each beat can set custom time display text
+- **Per-beat control**: `timeDisplayMode` (fictionalTime / manual / none) on each beat
 - **Configurable**: Position, colors, opacity, labels — all in the new Global Settings HUD tab
 
 ### 🔢 Keypad Beat (v0.9.15)

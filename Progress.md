@@ -1,20 +1,22 @@
 # ASAPS Modern - Progress Log
 
-## 2026-02-12: Timer HUD, Countdown Meter, Keypad Beat, Visual Editor UX & Choice Effects (v0.9.15)
+## 2026-02-13: Timer HUD, Fictional Time, Countdown Meter, Keypad Beat, Visual Editor UX & Choice Effects (v0.9.15)
 
 ### Overview
 
-This release adds three major features — **Timer/Time HUD display**, **Countdown Meter HUD**, and a new **Keypad beat type** — plus significant visual editor UX improvements including **multi-select, alignment/distribute tools, snap guides, element grouping**, and a **unified choice effects system** for dialog trees and movement choices.
+This release adds major features — **Timer/Time HUD display**, **Fictional Time system**, **Countdown Meter HUD**, a new **Keypad beat type**, **recursive dialog trees** — plus significant visual editor UX improvements including **multi-select, alignment/distribute tools, snap guides, element grouping**, and a **unified choice effects system** for dialog trees and movement choices.
 
 ### Timer HUD Display (New Feature)
 
 A configurable HUD overlay that displays time information persistently across beats:
 
+- **Auto-detect mode**: Automatically detects whether to show countdown timer, fictional time, manual text, or static text — no manual mode selector needed
 - **Timer mode**: Real-time countdown display (MM:SS) driven by active SetTimer beats, with color transitions (green → yellow → red) as time decreases
-- **Static mode**: Narrative time text (e.g. "9:00 AM", "Day 3") with per-beat overrides via `timeDisplayText` parameter
+- **Fictional time mode**: Displays formatted fictional time (e.g. "4 April 1968, 9:00 AM") when fictional time is enabled
+- **Static mode**: Narrative time text with per-beat overrides via `timeDisplayText` parameter
+- **Per-beat display control**: `timeDisplayMode` property (fictionalTime / manual / none) lets each beat control what the Timer HUD shows
 - **Customizable**: Position (4 corners), style (digital/minimal), font size, colors, opacity, border radius, optional label
 - **Global Settings HUD tab**: New dedicated tab in Global Settings for configuring all HUD overlays
-- **Per-beat override**: Each visual beat can set a `timeDisplayText` to override the global static text
 
 ### Countdown Meter HUD (New Feature)
 
@@ -25,6 +27,26 @@ A counter-driven progress bar HUD that persists across beats:
 - **Numeric display**: Value, fraction (e.g. "3/10"), or percentage formats
 - **6 positions**: Top-left/right/center, bottom-left/right/center
 - **Configurable**: Bar dimensions, colors, opacity, border radius, label
+
+### Fictional Time System (New Feature)
+
+Track in-story date/time progression for historical fiction, day counters, and time-travel narratives:
+
+- **Set/Advance/Subtract**: Use `setVariable` beat with type `fictionalTime` to initialize, advance, or subtract (time travel) in-story time
+- **Time units**: Minutes, hours, days, months, years — with correct month-length and leap-year arithmetic
+- **Condition checking**: Use `conditionBeat` with type `fictionalTime` to branch based on date/time comparisons (before, after, exactly)
+- **Display formats**: 7 formats — time-12h ("9:00 AM"), time-24h ("21:00"), date ("4 April 1968"), datetime-12h/24h, day-number ("Day 3"), year ("1968")
+- **Timer HUD integration**: Fictional time displays automatically in the Timer HUD when enabled in global settings
+- **Per-beat override**: Each beat's `timeDisplayMode` can show fictional time, manual text, or hide the HUD entirely
+- **54 unit tests**: Comprehensive test coverage for set/advance/subtract/format/serialize/condition operations
+
+### Recursive Dialog Trees (New Feature)
+
+Dialog trees now support looping back to the same beat:
+
+- **`__self__` target**: Choices can use `target: "__self__"` to re-display the same dialogTree beat
+- **Per-choice visited tracking**: Individual choices tracked via composite keys (`beatId:choiceId`), enabling grayed-out already-selected options
+- **Use cases**: Interrogation scenes, shopping menus, multi-question NPCs where the player asks several questions before leaving
 
 ### Keypad Beat (New Beat Type)
 
@@ -65,7 +87,11 @@ Major usability improvements to the visual beat editor:
 
 - **AI provider persistence**: AI provider settings (API keys, model selections) now saved to project `globalSettings` for VCS-friendly storage
 - **Spritesheet optimization**: Converted spritesheet storage from base64 to blob URLs with asset ID tracking for better memory usage
-- **Test coverage**: Comprehensive test suite additions for choice effects, alignment utilities, snap guides, and effects migration
+- **Git clone path fix**: Fixed forward-slash in Windows paths when cloning repositories (platform-aware separator detection)
+- **Countdown meter improvements**: Percentage-based width, per-beat visibility override, configurable range
+- **Advanced settings hiding**: Logic beats (setVariable, conditionBeat, etc.) no longer show irrelevant Auto-Advance, Time Display, and Countdown Meter settings
+- **AI prompt updates**: Internal and MCP server prompts updated with fictional time, recursive dialog trees, per-choice visited tracking documentation
+- **Test coverage**: Comprehensive test suite — 54 new fictional time tests plus existing choice effects, alignment utilities, snap guides, and effects migration tests
 
 ### Files Modified
 
