@@ -25,6 +25,8 @@ export interface TimerHudDisplayProps {
   totalTime?: number;
   /** Override display text (static mode, per-beat override) */
   displayText?: string;
+  /** Formatted fictional time text */
+  fictionalTimeText?: string;
   /** Whether the HUD should be visible */
   visible: boolean;
   /** Configuration from GlobalSettings */
@@ -75,11 +77,12 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
   remainingTime,
   totalTime,
   displayText,
+  fictionalTimeText,
   visible,
   config,
 }) => {
   // Auto-detect what to display: timer countdown takes priority when running,
-  // then per-beat override text, then global static text, then hide
+  // then per-beat override text, then fictional time, then global static text, then hide
   const isTimerActive = remainingTime !== undefined && remainingTime >= 0;
 
   const content = useMemo(() => {
@@ -87,13 +90,16 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
     if (isTimerActive) {
       return formatTime(remainingTime!);
     }
-    // Per-beat override text or global static default
+    // Per-beat override text
     if (displayText) return displayText;
+    // Fictional time formatted string
+    if (fictionalTimeText) return fictionalTimeText;
+    // Global static default text
     if (config.staticText) return config.staticText;
     // Show inactive timer placeholder if configured
     if (config.showWhenInactive) return '00:00';
     return null;
-  }, [isTimerActive, config.staticText, config.showWhenInactive, remainingTime, displayText]);
+  }, [isTimerActive, config.staticText, config.showWhenInactive, remainingTime, displayText, fictionalTimeText]);
 
   // Color shift when timer is counting down: green -> yellow -> red
   const timerColor = useMemo(() => {

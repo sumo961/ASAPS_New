@@ -303,6 +303,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               >
                 <option value="variable">Variable (Text/Boolean)</option>
                 <option value="counter">Counter (Number)</option>
+                <option value="fictionalTime">Fictional Time</option>
               </select>
             </div>
           );
@@ -499,6 +500,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
 
         // Handle variable/counter name field with dropdowns for setVariable beat
         if (paramName === 'name' && beatType === 'setVariable') {
+          // Fictional time doesn't use a variable name
+          if (parameters.type === 'fictionalTime') return null;
           const isCounter = parameters.type === 'counter';
           const options = isCounter ? availableCounters : availableVariables;
           const hasOptions = options.length > 0;
@@ -656,7 +659,111 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
       case 'any':
         // For setVariable 'value' parameter, determine type based on 'type' parameter
         if (paramName === 'value' && beatType === 'setVariable') {
-          if (parameters.type === 'counter') {
+          if (parameters.type === 'fictionalTime') {
+            // Show fictional time operation and date/time fields
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+              'July', 'August', 'September', 'October', 'November', 'December'];
+            return (
+              <React.Fragment key={paramName}>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Operation
+                  </label>
+                  <select
+                    value={parameters.operation || 'set'}
+                    onChange={(e) => onParameterChange('operation', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  >
+                    <option value="set">Set to date/time</option>
+                    <option value="advance">Advance</option>
+                    <option value="subtract">Subtract (time travel)</option>
+                  </select>
+                </div>
+                {parameters.operation === 'set' || !parameters.operation ? (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          value={parameters.timeDay ?? 1}
+                          onChange={(e) => onParameterChange('timeDay', Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                          min={1} max={31}
+                          title="Day"
+                        />
+                        <select
+                          value={parameters.timeMonth ?? 1}
+                          onChange={(e) => onParameterChange('timeMonth', parseInt(e.target.value))}
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                        >
+                          {monthNames.map((name, i) => (
+                            <option key={i + 1} value={i + 1}>{name}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          value={parameters.timeYear ?? 2024}
+                          onChange={(e) => onParameterChange('timeYear', parseInt(e.target.value) || 2024)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                          title="Year"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="number"
+                          value={parameters.timeHour ?? 0}
+                          onChange={(e) => onParameterChange('timeHour', Math.max(0, Math.min(23, parseInt(e.target.value) || 0)))}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                          min={0} max={23}
+                          title="Hour (0-23)"
+                        />
+                        <span className="text-gray-500">:</span>
+                        <input
+                          type="number"
+                          value={parameters.timeMinute ?? 0}
+                          onChange={(e) => onParameterChange('timeMinute', Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                          min={0} max={59}
+                          title="Minute (0-59)"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                      <input
+                        type="number"
+                        value={value || 0}
+                        onChange={(e) => onParameterChange(paramName, parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        min={0}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                      <select
+                        value={parameters.timeUnit || 'hours'}
+                        onChange={(e) => onParameterChange('timeUnit', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                        <option value="days">Days</option>
+                        <option value="months">Months</option>
+                        <option value="years">Years</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+              </React.Fragment>
+            );
+          } else if (parameters.type === 'counter') {
             // Show operation selector for counters
             return (
               <React.Fragment key={paramName}>

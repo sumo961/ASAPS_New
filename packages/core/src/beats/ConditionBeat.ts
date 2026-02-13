@@ -1,5 +1,5 @@
 import { Beat } from './Beat';
-import type { BeatConfig, Condition } from '../types';
+import type { BeatConfig, Condition, FictionalTime } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { ConditionBeatParameters } from '../generated/beat-types';
@@ -32,6 +32,12 @@ export class ConditionBeat extends Beat {
   public compareVariable?: string; // Variable name when compareSource is 'variable'
   // VisitedBeat-specific parameter
   public beatId?: string;
+  // FictionalTime-specific parameters
+  public timeYear?: number;
+  public timeMonth?: number;
+  public timeDay?: number;
+  public timeHour?: number;
+  public timeMinute?: number;
 
   constructor(config: BeatConfig & {
     conditionType?: string;
@@ -85,6 +91,12 @@ export class ConditionBeat extends Beat {
     this.compareVariable = conditionObj.compareVariable || (params as any).compareVariable || (config as any).compareVariable;
     // VisitedBeat-specific parameter
     this.beatId = conditionObj.beatId || params.beatId || (config as any).beatId;
+    // FictionalTime-specific parameters
+    this.timeYear = conditionObj.timeYear ?? params.timeYear ?? (config as any).timeYear;
+    this.timeMonth = conditionObj.timeMonth ?? params.timeMonth ?? (config as any).timeMonth;
+    this.timeDay = conditionObj.timeDay ?? params.timeDay ?? (config as any).timeDay;
+    this.timeHour = conditionObj.timeHour ?? params.timeHour ?? (config as any).timeHour;
+    this.timeMinute = conditionObj.timeMinute ?? params.timeMinute ?? (config as any).timeMinute;
 
     // Build condition object based on type
     this.condition = this.buildCondition();
@@ -129,6 +141,15 @@ export class ConditionBeat extends Beat {
       case 'visitedBeat':
         condition.beatId = this.beatId || this.variableName;
         break;
+      case 'fictionalTime':
+        condition.compareTime = {
+          year: this.timeYear ?? 2024,
+          month: this.timeMonth ?? 1,
+          day: this.timeDay ?? 1,
+          hour: this.timeHour ?? 0,
+          minute: this.timeMinute ?? 0,
+        };
+        break;
       default:
         condition.variableName = this.variableName || this.variable;
         condition.value = this.value ?? this.val;
@@ -162,7 +183,12 @@ export class ConditionBeat extends Beat {
       quantityValue: this.quantityValue,
       compareSource: this.compareSource,
       compareVariable: this.compareVariable,
-      beatId: this.beatId
+      beatId: this.beatId,
+      timeYear: this.timeYear,
+      timeMonth: this.timeMonth,
+      timeDay: this.timeDay,
+      timeHour: this.timeHour,
+      timeMinute: this.timeMinute,
     };
   }
 
@@ -331,6 +357,33 @@ export class ConditionBeat extends Beat {
       this.beatId = conditionObj.beatId;
     }
 
+    // FictionalTime parameters
+    if (params.timeYear !== undefined) {
+      this.timeYear = params.timeYear;
+    } else if (conditionObj.timeYear !== undefined) {
+      this.timeYear = conditionObj.timeYear;
+    }
+    if (params.timeMonth !== undefined) {
+      this.timeMonth = params.timeMonth;
+    } else if (conditionObj.timeMonth !== undefined) {
+      this.timeMonth = conditionObj.timeMonth;
+    }
+    if (params.timeDay !== undefined) {
+      this.timeDay = params.timeDay;
+    } else if (conditionObj.timeDay !== undefined) {
+      this.timeDay = conditionObj.timeDay;
+    }
+    if (params.timeHour !== undefined) {
+      this.timeHour = params.timeHour;
+    } else if (conditionObj.timeHour !== undefined) {
+      this.timeHour = conditionObj.timeHour;
+    }
+    if (params.timeMinute !== undefined) {
+      this.timeMinute = params.timeMinute;
+    } else if (conditionObj.timeMinute !== undefined) {
+      this.timeMinute = conditionObj.timeMinute;
+    }
+
     // Rebuild condition object from extracted canonical values
     // This ensures the condition object always reflects the extracted fields
     this.condition = this.buildCondition();
@@ -359,6 +412,9 @@ export class ConditionBeat extends Beat {
       case 'visitedBeat':
         isValidCondition = !!(this.beatId || this.variableName);
         break;
+      case 'fictionalTime':
+        isValidCondition = true; // Always valid - compares against current fictional time
+        break;
       case 'counter':
       default:
         isValidCondition = !!(this.variableName || this.variable);
@@ -381,6 +437,8 @@ export class ConditionBeat extends Beat {
         console.log(`ConditionBeat ${this.id}: timer ${this.timer} ${this.operator} ${compareValue} = ${conditionResult}`);
       } else if (this.conditionType === 'visitedBeat') {
         console.log(`ConditionBeat ${this.id}: visitedBeat ${this.beatId || varName} = ${conditionResult}`);
+      } else if (this.conditionType === 'fictionalTime') {
+        console.log(`ConditionBeat ${this.id}: fictionalTime ${this.operator} ${this.timeDay}/${this.timeMonth}/${this.timeYear} ${this.timeHour}:${this.timeMinute} = ${conditionResult}`);
       } else {
         console.log(`ConditionBeat ${this.id}: ${varName} ${this.operator} ${compareValue} = ${conditionResult}`);
       }

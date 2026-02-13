@@ -770,6 +770,8 @@ export class ReactRenderer extends BaseRenderer {
   protected countdownMeterConfig: import('../components/CountdownMeterHud').CountdownMeterConfig | undefined;  // Countdown meter HUD config
   protected countdownMeterValue: { value: number; min: number; max: number } | undefined;  // Current countdown meter value
   protected overrideCountdownMeter: boolean = false;  // Per-beat flag to override default countdown meter visibility
+  protected fictionalTimeText: string | undefined;  // Formatted fictional time text for Timer HUD
+  private fictionalTimeTextListeners: Set<(text: string | undefined) => void> = new Set();
 
   private get root(): ReactDOM.Root | null {
     return this._root;
@@ -1198,6 +1200,23 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Set the formatted fictional time text for the Timer HUD
+   */
+  setFictionalTimeText(text: string | undefined): void {
+    this.fictionalTimeText = text;
+    this.fictionalTimeTextListeners.forEach(listener => listener(text));
+  }
+
+  /**
+   * Subscribe to fictional time text changes
+   */
+  subscribeToFictionalTimeText(listener: (text: string | undefined) => void): () => void {
+    this.fictionalTimeTextListeners.add(listener);
+    listener(this.fictionalTimeText);
+    return () => this.fictionalTimeTextListeners.delete(listener);
+  }
+
+  /**
    * Subscribe to timer state changes
    * Returns an unsubscribe function
    */
@@ -1312,6 +1331,8 @@ export class ReactRenderer extends BaseRenderer {
               countdownMeterConfig={this.countdownMeterConfig}
               countdownMeterValue={this.countdownMeterValue}
               overrideCountdownMeter={this.overrideCountdownMeter}
+              fictionalTimeText={this.fictionalTimeText}
+              onSubscribeFictionalTimeText={(listener) => this.subscribeToFictionalTimeText(listener)}
             />
           </ScaledStage>
         </div>
@@ -2015,6 +2036,8 @@ export class ReactRenderer extends BaseRenderer {
     this.timerHudOverrideText = undefined;
     this.countdownMeterValue = undefined;
     this.overrideCountdownMeter = false;
+    // Don't clear fictionalTimeText on beat change — it persists across beats
+    // It's only cleared on story restart (reset)
     
     // Stop all sounds (copied from BaseRenderer)
     this.assetCache.sounds.forEach((audio: HTMLAudioElement) => {

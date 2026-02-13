@@ -730,7 +730,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setHasChanges(true);
 
     // For fields that affect graph visualization or need immediate persistence, update immediately
-    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'timeDisplayText' || field === 'overrideCountdownMeter') {
+    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'timeDisplayMode' || field === 'timeDisplayText' || field === 'overrideCountdownMeter') {
       if (onUpdate && beat) {
         onUpdate(beat.id, { [field]: value });
       }
@@ -1303,6 +1303,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                         <option value="timer">Timer</option>
                         <option value="inventory">Inventory</option>
                         <option value="variable">Variable</option>
+                        <option value="fictionalTime">Fictional Time</option>
                       </select>
                     </div>
                     
@@ -1656,6 +1657,80 @@ export const Inspector: React.FC<InspectorProps> = ({
                             placeholder="player"
                             required
                           />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Fictional Time Condition */}
+                    {localBeat.parameters?.conditionType === 'fictionalTime' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Operator
+                          </label>
+                          <select
+                            value={localBeat.parameters?.operator || '>'}
+                            onChange={(e) => handleParameterChange('operator', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="<">Before</option>
+                            <option value=">">After</option>
+                            <option value="==">Exactly</option>
+                            <option value="!=">Not</option>
+                            <option value=">=">At or After</option>
+                            <option value="<=">At or Before</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Compare Against Date</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              value={localBeat.parameters?.timeDay ?? 1}
+                              onChange={(e) => handleParameterChange('timeDay', Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                              min={1} max={31}
+                              title="Day"
+                            />
+                            <select
+                              value={localBeat.parameters?.timeMonth ?? 1}
+                              onChange={(e) => handleParameterChange('timeMonth', parseInt(e.target.value))}
+                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              {['January','February','March','April','May','June','July','August','September','October','November','December'].map((name, i) => (
+                                <option key={i + 1} value={i + 1}>{name}</option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              value={localBeat.parameters?.timeYear ?? 2024}
+                              onChange={(e) => handleParameterChange('timeYear', parseInt(e.target.value) || 2024)}
+                              className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                              title="Year"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Compare Against Time</label>
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="number"
+                              value={localBeat.parameters?.timeHour ?? 0}
+                              onChange={(e) => handleParameterChange('timeHour', Math.max(0, Math.min(23, parseInt(e.target.value) || 0)))}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                              min={0} max={23}
+                              title="Hour (0-23)"
+                            />
+                            <span className="text-gray-500">:</span>
+                            <input
+                              type="number"
+                              value={localBeat.parameters?.timeMinute ?? 0}
+                              onChange={(e) => handleParameterChange('timeMinute', Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                              min={0} max={59}
+                              title="Minute (0-59)"
+                            />
+                          </div>
                         </div>
                       </>
                     )}
@@ -2700,8 +2775,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </div>
                 )}
 
-                {/* Auto-Advance / Timer Settings - shown when advanced is toggled */}
-                {showAdvanced && (
+                {/* Auto-Advance / Timer Settings - shown when advanced is toggled, only for visible beats */}
+                {showAdvanced && !['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition'].includes(getCanonicalBeatType(beat.type)) && (
                   <div className="border-t pt-4 space-y-3">
                     <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                       <Timer className="w-4 h-4" />
@@ -2767,18 +2842,36 @@ export const Inspector: React.FC<InspectorProps> = ({
                       </>
                     )}
 
-                    {/* Time Display Override (for Timer HUD static mode) */}
+                    {/* Time Display Override (for Timer HUD) */}
                     <div className="border-t pt-3 mt-3">
-                      <h4 className="text-sm font-medium text-gray-700 mb-1">Time Display Override</h4>
-                      <input
-                        type="text"
-                        value={localBeat.timeDisplayText || ''}
-                        onChange={(e) => handleChange('timeDisplayText', e.target.value)}
-                        placeholder="e.g. 9:00 AM, Day 3, 2h left"
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Time Display</h4>
+                      <select
+                        value={localBeat.timeDisplayMode || 'fictionalTime'}
+                        onChange={(e) => {
+                          const mode = e.target.value;
+                          handleChange('timeDisplayMode', mode);
+                          // Clear manual text when switching away from manual
+                          if (mode !== 'manual') {
+                            handleChange('timeDisplayText', '');
+                          }
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
+                      >
+                        <option value="fictionalTime">Fictional Time (default)</option>
+                        <option value="manual">Manual text</option>
+                        <option value="none">None (hide on this beat)</option>
+                      </select>
+                      {localBeat.timeDisplayMode === 'manual' && (
+                        <input
+                          type="text"
+                          value={localBeat.timeDisplayText || ''}
+                          onChange={(e) => handleChange('timeDisplayText', e.target.value)}
+                          placeholder="e.g. Meanwhile..., 2h later"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-2"
+                        />
+                      )}
                       <p className="text-xs text-gray-500 mt-1">
-                        Override the Timer HUD text for this beat (static mode only). Leave empty to use global default.
+                        Controls what the Timer HUD shows on this beat.
                       </p>
                     </div>
 

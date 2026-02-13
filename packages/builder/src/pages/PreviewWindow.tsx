@@ -963,6 +963,14 @@ export const PreviewWindow: React.FC = () => {
       if (hudOverlays?.countdownMeter) {
         (rendererRef.current as any).setCountdownMeterConfig?.(hudOverlays.countdownMeter);
       }
+
+      // Initialize fictional time from global settings
+      if (hudOverlays?.fictionalTime?.enabled) {
+        const ftConfig = hudOverlays.fictionalTime;
+        // We need the context to set fictional time - it's done after loadStory below
+        // Store config reference for use in startPreview
+        (rendererRef.current as any)._fictionalTimeConfig = ftConfig;
+      }
     }
 
     return () => {
@@ -1010,6 +1018,17 @@ export const PreviewWindow: React.FC = () => {
 
       await engineRef.current.loadStory(story);
       const context = engineRef.current.getContext();
+
+      // Initialize fictional time from global settings
+      const ftConfig = (rendererRef.current as any)?._fictionalTimeConfig;
+      if (ftConfig?.enabled && ftConfig.initialTime) {
+        context.setFictionalTime(ftConfig.initialTime);
+        // Set initial formatted text
+        if (ftConfig.showInTimerHud) {
+          const formatted = context.formatFictionalTime(ftConfig.displayFormat, ftConfig.initialTime);
+          (rendererRef.current as any).setFictionalTimeText?.(formatted);
+        }
+      }
 
       // Apply selected preset (use override if provided, otherwise use state)
       const presetToApply = overridePreset !== undefined ? overridePreset : selectedPreset;
@@ -1072,10 +1091,29 @@ export const PreviewWindow: React.FC = () => {
       const onBeatChanged = ({ beatId }: { beatId: string }) => {
         const beat = story.getBeat(beatId);
         if (rendererRef.current && beat) {
-          const overrideText = (beat as any)?.timeDisplayText || undefined;
-          (rendererRef.current as any).setTimerHudOverrideText?.(overrideText);
+          const timeDisplayMode = (beat as any)?.timeDisplayMode || 'fictionalTime';
           const overrideCountdownMeter = (beat as any)?.overrideCountdownMeter || false;
           (rendererRef.current as any).setOverrideCountdownMeter?.(overrideCountdownMeter);
+
+          const ftCfg = (rendererRef.current as any)?._fictionalTimeConfig;
+
+          if (timeDisplayMode === 'none') {
+            // Hide timer HUD content for this beat
+            (rendererRef.current as any).setTimerHudOverrideText?.(undefined);
+            (rendererRef.current as any).setFictionalTimeText?.(undefined);
+          } else if (timeDisplayMode === 'manual') {
+            // Use manual text override
+            const overrideText = (beat as any)?.timeDisplayText || undefined;
+            (rendererRef.current as any).setTimerHudOverrideText?.(overrideText);
+            (rendererRef.current as any).setFictionalTimeText?.(undefined);
+          } else {
+            // Default 'fictionalTime' mode: clear override, show fictional time
+            (rendererRef.current as any).setTimerHudOverrideText?.(undefined);
+            if (ftCfg?.enabled && ftCfg.showInTimerHud) {
+              const formatted = context.formatFictionalTime(ftCfg.displayFormat, ftCfg.initialTime);
+              (rendererRef.current as any).setFictionalTimeText?.(formatted);
+            }
+          }
         }
       };
       context.on('beatChanged', onBeatChanged);
@@ -1098,6 +1136,16 @@ export const PreviewWindow: React.FC = () => {
       context.on('variableChanged', updateDebugInfo);
       context.on('counterChanged', updateDebugInfo);
       context.on('inventoryChanged', updateDebugInfo);
+
+      // Listen for fictional time changes and update renderer
+      context.on('fictionalTimeChanged', () => {
+        if (!rendererRef.current) return;
+        const ftCfg = (rendererRef.current as any)?._fictionalTimeConfig;
+        if (ftCfg?.enabled && ftCfg.showInTimerHud) {
+          const formatted = context.formatFictionalTime(ftCfg.displayFormat, ftCfg.initialTime);
+          (rendererRef.current as any).setFictionalTimeText?.(formatted);
+        }
+      });
 
       // Set up timer manager for defaultTarget timers (used by DurScreen, timed beats)
       const timerManager = context.getTimerManager();

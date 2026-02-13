@@ -73,8 +73,19 @@ export interface Connection {
   label?: string;
 }
 
+/**
+ * Fictional time representation (avoids JS Date timezone issues)
+ */
+export interface FictionalTime {
+  year: number;   // e.g., 1929
+  month: number;  // 1-12
+  day: number;    // 1-31
+  hour: number;   // 0-23
+  minute: number; // 0-59
+}
+
 export interface Condition {
-  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat';
+  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime';
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
   // New canonical field names
   variableName?: string;
@@ -97,6 +108,8 @@ export interface Condition {
   quantityValue?: number | string; // Number or variable name (prefixed with $)
   compareSource?: 'inventory' | 'variable'; // What to compare: inventory quantity or variable value
   compareVariable?: string;        // Variable name when compareSource is 'variable'
+  // For fictionalTime conditions
+  compareTime?: FictionalTime;     // Time to compare against
 }
 
 export interface Effect {

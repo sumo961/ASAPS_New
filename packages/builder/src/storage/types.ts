@@ -108,6 +108,12 @@ export interface GlobalSettings {
       label: string;
       showWhenInactive: boolean;
     };
+    fictionalTime?: {
+      enabled: boolean;
+      initialTime: { year: number; month: number; day: number; hour: number; minute: number };
+      displayFormat: 'time-12h' | 'time-24h' | 'date' | 'datetime-12h' | 'datetime-24h' | 'day-number' | 'year';
+      showInTimerHud: boolean; // Whether the Timer HUD displays fictional time
+    };
     countdownMeter?: {
       enabled: boolean;
       counterName: string;

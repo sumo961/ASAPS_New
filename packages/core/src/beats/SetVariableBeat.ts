@@ -5,10 +5,17 @@ import { StoryContext } from '../engine/StoryContext';
 import type { SetVariableParameters } from '../generated/beat-types';
 
 export class SetVariableBeat extends Beat {
-  private variableType: string;  // 'variable' or 'counter'
+  private variableType: string;  // 'variable', 'counter', or 'fictionalTime'
   private variableName: string;
   private value: any;
   private operation: string;
+  // Fictional time properties
+  private timeUnit: string;
+  private timeYear: number;
+  private timeMonth: number;
+  private timeDay: number;
+  private timeHour: number;
+  private timeMinute: number;
 
   constructor(config: BeatConfig & {
     variable?: string;  // legacy support
@@ -24,6 +31,13 @@ export class SetVariableBeat extends Beat {
     this.variableName = config.parameters?.name || config.parameters?.variableName || config.variable || config.parameters?.variable || '';
     this.value = config.parameters?.value ?? config.value ?? '';
     this.operation = config.parameters?.operation || config.operation || 'set';
+    // Fictional time properties
+    this.timeUnit = config.parameters?.timeUnit || 'hours';
+    this.timeYear = config.parameters?.timeYear ?? 2024;
+    this.timeMonth = config.parameters?.timeMonth ?? 1;
+    this.timeDay = config.parameters?.timeDay ?? 1;
+    this.timeHour = config.parameters?.timeHour ?? 0;
+    this.timeMinute = config.parameters?.timeMinute ?? 0;
   }
 
   getParameters(): Record<string, any> {
@@ -31,7 +45,13 @@ export class SetVariableBeat extends Beat {
       type: this.variableType,
       name: this.variableName,
       value: this.value,
-      operation: this.operation
+      operation: this.operation,
+      timeUnit: this.timeUnit,
+      timeYear: this.timeYear,
+      timeMonth: this.timeMonth,
+      timeDay: this.timeDay,
+      timeHour: this.timeHour,
+      timeMinute: this.timeMinute,
     };
   }
 
@@ -42,19 +62,44 @@ export class SetVariableBeat extends Beat {
     if (params.variableName !== undefined) this.variableName = params.variableName; // AI variation
     if (params.value !== undefined) this.value = params.value;
     if (params.operation !== undefined) this.operation = params.operation;
+    if (params.timeUnit !== undefined) this.timeUnit = params.timeUnit;
+    if (params.timeYear !== undefined) this.timeYear = params.timeYear;
+    if (params.timeMonth !== undefined) this.timeMonth = params.timeMonth;
+    if (params.timeDay !== undefined) this.timeDay = params.timeDay;
+    if (params.timeHour !== undefined) this.timeHour = params.timeHour;
+    if (params.timeMinute !== undefined) this.timeMinute = params.timeMinute;
   }
 
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
-    if (!this.variableName) {
+    if (!this.variableName && this.variableType !== 'fictionalTime') {
       console.error(`SetVariableBeat ${this.id} has no variable/counter name specified`);
       return this.getNextBeat(context);
     }
 
     try {
-      if (this.variableType === 'counter') {
+      if (this.variableType === 'fictionalTime') {
+        // Handle fictional time operations
+        const unit = (this.timeUnit || 'hours') as 'minutes' | 'hours' | 'days' | 'months' | 'years';
+        if (this.operation === 'set') {
+          context.setFictionalTime({
+            year: this.timeYear ?? 2024,
+            month: this.timeMonth ?? 1,
+            day: this.timeDay ?? 1,
+            hour: this.timeHour ?? 0,
+            minute: this.timeMinute ?? 0,
+          });
+          console.log(`SetVariableBeat ${this.id}: FictionalTime set to ${this.timeDay}/${this.timeMonth}/${this.timeYear} ${this.timeHour}:${this.timeMinute}`);
+        } else if (this.operation === 'advance') {
+          context.advanceFictionalTime(Number(this.value) || 0, unit);
+          console.log(`SetVariableBeat ${this.id}: FictionalTime advance ${this.value} ${unit}`);
+        } else if (this.operation === 'subtract') {
+          context.advanceFictionalTime(-(Number(this.value) || 0), unit);
+          console.log(`SetVariableBeat ${this.id}: FictionalTime subtract ${this.value} ${unit}`);
+        }
+      } else if (this.variableType === 'counter') {
         // Handle counter operations
         const currentValue = context.getCounter(this.variableName) || 0;
         const numValue = Number(this.value) || 0;

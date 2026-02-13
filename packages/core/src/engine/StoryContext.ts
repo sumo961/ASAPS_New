@@ -1,5 +1,5 @@
 import  { EventEmitter } from 'eventemitter3';
-import type { Condition, Effect } from '../types';
+import type { Condition, Effect, FictionalTime } from '../types';
 import type { Story } from './Story';
 import { TimerManager } from './TimerManager';
 
@@ -33,6 +33,7 @@ interface StoryState {
   visitedBeats: Set<string>;
   visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
+  fictionalTime?: FictionalTime; // Fictional time for in-story time progression
 }
 
 /**
@@ -50,6 +51,7 @@ export interface SerializedStoryState {
   timers: Record<string, { value: number; target?: string }>;
   history: string[]; // Include beat history for proper restoration
   choiceHistory?: ChoiceRecord[]; // Rich choice tracking for AI context
+  fictionalTime?: FictionalTime; // Fictional time state
 }
 
 /**
@@ -275,6 +277,90 @@ export class StoryContext extends EventEmitter {
     return this.timerManager;
   }
 
+  // Fictional time methods
+  getFictionalTime(): FictionalTime | undefined {
+    return this.state.fictionalTime ? { ...this.state.fictionalTime } : undefined;
+  }
+
+  setFictionalTime(time: FictionalTime): void {
+    this.state.fictionalTime = { ...time };
+    this.emit('fictionalTimeChanged', this.state.fictionalTime);
+  }
+
+  /**
+   * Advance (or subtract with negative amount) the fictional time.
+   * Uses JS Date transiently for correct month-length/leap-year arithmetic.
+   */
+  advanceFictionalTime(amount: number, unit: 'minutes' | 'hours' | 'days' | 'months' | 'years'): void {
+    const ft = this.state.fictionalTime;
+    if (!ft) return;
+    const d = new Date(ft.year, ft.month - 1, ft.day, ft.hour, ft.minute);
+    switch (unit) {
+      case 'minutes': d.setMinutes(d.getMinutes() + amount); break;
+      case 'hours':   d.setHours(d.getHours() + amount); break;
+      case 'days':    d.setDate(d.getDate() + amount); break;
+      case 'months':  d.setMonth(d.getMonth() + amount); break;
+      case 'years':   d.setFullYear(d.getFullYear() + amount); break;
+    }
+    this.state.fictionalTime = {
+      year: d.getFullYear(), month: d.getMonth() + 1,
+      day: d.getDate(), hour: d.getHours(), minute: d.getMinutes()
+    };
+    this.emit('fictionalTimeChanged', this.state.fictionalTime);
+  }
+
+  /**
+   * Format fictional time for display.
+   * @param format One of: 'time-12h', 'time-24h', 'date', 'datetime-12h', 'datetime-24h', 'day-number', 'year'
+   * @param initialTime Optional initial time for 'day-number' calculation
+   */
+  formatFictionalTime(format: string, initialTime?: FictionalTime): string {
+    const ft = this.state.fictionalTime;
+    if (!ft) return '';
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+
+    const formatTime12h = (h: number, m: number): string => {
+      const period = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h % 12 || 12;
+      return `${hour12}:${m.toString().padStart(2, '0')} ${period}`;
+    };
+
+    const formatTime24h = (h: number, m: number): string => {
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    };
+
+    const formatDate = (): string => {
+      return `${ft.day} ${monthNames[ft.month - 1]} ${ft.year}`;
+    };
+
+    switch (format) {
+      case 'time-12h':
+        return formatTime12h(ft.hour, ft.minute);
+      case 'time-24h':
+        return formatTime24h(ft.hour, ft.minute);
+      case 'date':
+        return formatDate();
+      case 'datetime-12h':
+        return `${formatDate()}, ${formatTime12h(ft.hour, ft.minute)}`;
+      case 'datetime-24h':
+        return `${formatDate()}, ${formatTime24h(ft.hour, ft.minute)}`;
+      case 'day-number': {
+        if (!initialTime) return 'Day 1';
+        const current = new Date(ft.year, ft.month - 1, ft.day);
+        const initial = new Date(initialTime.year, initialTime.month - 1, initialTime.day);
+        const diffMs = current.getTime() - initial.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        return `Day ${diffDays + 1}`;
+      }
+      case 'year':
+        return String(ft.year);
+      default:
+        return `${formatDate()}, ${formatTime12h(ft.hour, ft.minute)}`;
+    }
+  }
+
   checkCondition(condition: Condition): boolean {
     // Handle counterCompare conditions separately
     if (condition.type === 'counterCompare') {
@@ -312,6 +398,27 @@ export class StoryContext extends EventEmitter {
         return !hasVisited;
       }
       return hasVisited;
+    }
+
+    // Handle fictionalTime conditions
+    if (condition.type === 'fictionalTime') {
+      const current = this.state.fictionalTime;
+      if (!current || !condition.compareTime) return false;
+      const currentMs = new Date(current.year, current.month - 1, current.day, current.hour, current.minute).getTime();
+      const compareMs = new Date(
+        condition.compareTime.year, condition.compareTime.month - 1,
+        condition.compareTime.day, condition.compareTime.hour, condition.compareTime.minute
+      ).getTime();
+      console.log(`[StoryContext] FictionalTime check: current=${currentMs} ${condition.operator} compare=${compareMs}`);
+      switch (condition.operator) {
+        case '>': return currentMs > compareMs;
+        case '<': return currentMs < compareMs;
+        case '==': return currentMs === compareMs;
+        case '>=': return currentMs >= compareMs;
+        case '<=': return currentMs <= compareMs;
+        case '!=': return currentMs !== compareMs;
+        default: return false;
+      }
     }
 
     // Handle inventory conditions specially - ASML uses 'character' and 'item' fields
@@ -809,6 +916,7 @@ export class StoryContext extends EventEmitter {
       timers: { ...this.state.timers },
       history: [...this.history],
       choiceHistory: this.choiceHistory.map(c => ({ ...c })),
+      fictionalTime: this.state.fictionalTime ? { ...this.state.fictionalTime } : undefined,
     };
   }
 
@@ -844,7 +952,8 @@ export class StoryContext extends EventEmitter {
       ),
       visitedBeats: new Set(serialized.visitedBeats),
       visitedChoices: new Set((serialized as any).visitedChoices || []),
-      timers: { ...serialized.timers }
+      timers: { ...serialized.timers },
+      fictionalTime: serialized.fictionalTime ? { ...serialized.fictionalTime } : undefined,
     };
 
     // Restore history

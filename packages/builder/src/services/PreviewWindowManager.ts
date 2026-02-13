@@ -18,6 +18,7 @@ export interface SerializedStoryData {
     type: string;
     x?: number;
     y?: number;
+    timeDisplayMode?: 'fictionalTime' | 'manual' | 'none';
     timeDisplayText?: string;
     overrideCountdownMeter?: boolean;
     parameters: Record<string, any>;

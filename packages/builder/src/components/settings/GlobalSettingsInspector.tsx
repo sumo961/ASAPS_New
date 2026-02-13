@@ -100,6 +100,12 @@ interface GlobalSettings {
       label: string;
       showWhenInactive: boolean;
     };
+    fictionalTime?: {
+      enabled: boolean;
+      initialTime: { year: number; month: number; day: number; hour: number; minute: number };
+      displayFormat: 'time-12h' | 'time-24h' | 'date' | 'datetime-12h' | 'datetime-24h' | 'day-number' | 'year';
+      showInTimerHud: boolean;
+    };
     countdownMeter?: {
       enabled: boolean;
       counterName: string;
@@ -1876,6 +1882,148 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                         />
                       )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Fictional Time Section */}
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-gray-700">Fictional Time</h4>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.hudOverlays?.fictionalTime?.enabled || false}
+                      onChange={(e) => {
+                        const current = settings.hudOverlays?.fictionalTime || {
+                          enabled: false,
+                          initialTime: { year: 2024, month: 1, day: 1, hour: 9, minute: 0 },
+                          displayFormat: 'datetime-12h' as const,
+                          showInTimerHud: true,
+                        };
+                        setSettings({
+                          ...settings,
+                          hudOverlays: {
+                            ...settings.hudOverlays,
+                            fictionalTime: { ...current, enabled: e.target.checked },
+                          },
+                        });
+                        setHasChanges(true);
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm">Enabled</span>
+                  </label>
+                </div>
+
+                {settings.hudOverlays?.fictionalTime?.enabled && (() => {
+                  const ft = settings.hudOverlays!.fictionalTime!;
+                  const updateFT = (updates: Partial<typeof ft>) => {
+                    setSettings({
+                      ...settings,
+                      hudOverlays: {
+                        ...settings.hudOverlays,
+                        fictionalTime: { ...ft, ...updates },
+                      },
+                    });
+                    setHasChanges(true);
+                  };
+                  const updateInitialTime = (updates: Partial<typeof ft.initialTime>) => {
+                    updateFT({ initialTime: { ...ft.initialTime, ...updates } });
+                  };
+                  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+                  return (
+                    <div className="space-y-3 pt-2">
+                      <p className="text-xs text-gray-500">
+                        Set up in-story time progression. Use SetVariable beats with type "Fictional Time" to advance or set time during the story.
+                      </p>
+
+                      {/* Initial Date & Time */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Initial Date</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            value={ft.initialTime.day}
+                            onChange={(e) => updateInitialTime({ day: Math.max(1, Math.min(31, parseInt(e.target.value) || 1)) })}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                            min={1} max={31}
+                            title="Day"
+                          />
+                          <select
+                            value={ft.initialTime.month}
+                            onChange={(e) => updateInitialTime({ month: parseInt(e.target.value) })}
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                          >
+                            {monthNames.map((name, i) => (
+                              <option key={i + 1} value={i + 1}>{name}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            value={ft.initialTime.year}
+                            onChange={(e) => updateInitialTime({ year: parseInt(e.target.value) || 2024 })}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                            title="Year"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Initial Time</label>
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="number"
+                            value={ft.initialTime.hour}
+                            onChange={(e) => updateInitialTime({ hour: Math.max(0, Math.min(23, parseInt(e.target.value) || 0)) })}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                            min={0} max={23}
+                            title="Hour (0-23)"
+                          />
+                          <span className="text-gray-500">:</span>
+                          <input
+                            type="number"
+                            value={ft.initialTime.minute}
+                            onChange={(e) => updateInitialTime({ minute: Math.max(0, Math.min(59, parseInt(e.target.value) || 0)) })}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                            min={0} max={59}
+                            title="Minute (0-59)"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Display Format */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Display Format</label>
+                        <select
+                          value={ft.displayFormat}
+                          onChange={(e) => updateFT({ displayFormat: e.target.value as typeof ft.displayFormat })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="time-12h">Time only (9:00 AM)</option>
+                          <option value="time-24h">Time only 24h (09:00)</option>
+                          <option value="date">Date only (15 January 1929)</option>
+                          <option value="datetime-12h">Date and time (15 January 1929, 9:00 AM)</option>
+                          <option value="datetime-24h">Date and time 24h (15 January 1929, 09:00)</option>
+                          <option value="day-number">Day number (Day 1, Day 2...)</option>
+                          <option value="year">Year only (1929)</option>
+                        </select>
+                      </div>
+
+                      {/* Show in Timer HUD */}
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={ft.showInTimerHud}
+                          onChange={(e) => updateFT({ showInTimerHud: e.target.checked })}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-gray-600">Show in Timer HUD</span>
+                      </label>
+                      <p className="text-xs text-gray-400">
+                        When enabled, the Timer HUD auto-displays the formatted time. Per-beat text overrides and active timer countdowns still take priority.
+                      </p>
                     </div>
                   );
                 })()}

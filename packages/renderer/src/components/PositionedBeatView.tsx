@@ -498,6 +498,10 @@ export interface PositionedBeatViewProps {
   countdownMeterValue?: { value: number; min: number; max: number };
   /** Per-beat flag to override default countdown meter visibility */
   overrideCountdownMeter?: boolean;
+  /** Formatted fictional time text for Timer HUD */
+  fictionalTimeText?: string;
+  /** Subscribe to fictional time text updates */
+  onSubscribeFictionalTimeText?: (listener: (text: string | undefined) => void) => () => void;
 }
 
 /**
@@ -810,6 +814,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   countdownMeterConfig,
   countdownMeterValue,
   overrideCountdownMeter,
+  fictionalTimeText: initialFictionalTimeText,
+  onSubscribeFictionalTimeText,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -854,6 +860,16 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       return unsubscribe;
     }
   }, [onSubscribeTimerHudOverrideText]);
+
+  // State for fictional time text - subscribes to updates
+  const [fictionalTimeText, setFictionalTimeText] = React.useState(initialFictionalTimeText);
+
+  React.useEffect(() => {
+    if (onSubscribeFictionalTimeText) {
+      const unsubscribe = onSubscribeFictionalTimeText(setFictionalTimeText);
+      return unsubscribe;
+    }
+  }, [onSubscribeFictionalTimeText]);
 
   // Animation state for button fade-in after text animation completes
   const [animationsComplete, setAnimationsComplete] = React.useState(false);
@@ -1475,6 +1491,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           remainingTime={timerHudTime?.remainingTime}
           totalTime={timerHudTime?.totalTime}
           displayText={timerHudOverrideText}
+          fictionalTimeText={fictionalTimeText}
         />
       )}
       {/* Countdown Meter HUD overlay */}

@@ -442,6 +442,7 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         transition: beatData.transition,
         sound: beatData.sound,
         notes: beatData.notes,
+        timeDisplayMode: beatData.timeDisplayMode,
         timeDisplayText: beatData.timeDisplayText,
         overrideCountdownMeter: beatData.overrideCountdownMeter,
         parameters: beatData.parameters || {}

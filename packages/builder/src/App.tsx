@@ -3129,6 +3129,7 @@ function App() {
       defaultTargetDelay: beat.defaultTargetDelay,
       showTimer: beat.showTimer,
       notes: beat.notes,
+      timeDisplayMode: beat.timeDisplayMode,
       timeDisplayText: beat.timeDisplayText,
       overrideCountdownMeter: beat.overrideCountdownMeter,
       parameters: beat.getParameters?.() || {},
