@@ -36,7 +36,8 @@ export const CloneRepoDialog: React.FC<CloneRepoDialogProps> = ({ onCloned, onCl
   const [error, setError] = useState<string | null>(null);
 
   const repoName = extractRepoName(remoteUrl);
-  const targetPath = parentDir && repoName ? `${parentDir}/${repoName}` : '';
+  const sep = parentDir.includes('\\') ? '\\' : '/';
+  const targetPath = parentDir && repoName ? `${parentDir}${sep}${repoName}` : '';
 
   const handleBrowse = async () => {
     const api = window.electronAPI;
