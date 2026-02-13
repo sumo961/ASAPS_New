@@ -17,6 +17,12 @@ export interface VCSInfo {
   gitMissing?: boolean;
 }
 
+/** Join path segments using the separator detected from the base path */
+function joinPath(base: string, ...parts: string[]): string {
+  const sep = base.includes('\\') ? '\\' : '/';
+  return [base, ...parts].join(sep);
+}
+
 /**
  * Detect which VCS (if any) manages the given project directory.
  */
@@ -29,7 +35,7 @@ export async function detectVCS(projectPath: string): Promise<VCSInfo> {
   // Check for Git
   try {
     // Check if .git directory exists (fast check)
-    const gitDirExists = await api.fs.exists(`${projectPath}/.git`);
+    const gitDirExists = await api.fs.exists(joinPath(projectPath, '.git'));
     if (gitDirExists) {
       return await getGitInfo(projectPath);
     }

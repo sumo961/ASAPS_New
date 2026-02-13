@@ -471,6 +471,12 @@ export async function gitGetConflicts(projectPath: string): Promise<string[]> {
     .map(line => line.substring(3).trim());
 }
 
+/** Join path segments using the separator detected from the base path */
+function joinPath(base: string, ...parts: string[]): string {
+  const sep = base.includes('\\') ? '\\' : '/';
+  return [base, ...parts].join(sep);
+}
+
 /** Initialize a new git repository and create a default .gitignore */
 export async function gitInit(projectPath: string): Promise<GitOperationResult> {
   const run = getRunCommand();
@@ -482,7 +488,7 @@ export async function gitInit(projectPath: string): Promise<GitOperationResult> 
   // Create .gitignore with common macOS/Windows exclusions if it doesn't exist
   try {
     const api = window.electronAPI;
-    const gitignorePath = `${projectPath}/.gitignore`;
+    const gitignorePath = joinPath(projectPath, '.gitignore');
     const exists = await api!.fs.exists(gitignorePath);
     if (!exists) {
       await api!.fs.writeFile(gitignorePath, [

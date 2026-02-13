@@ -29,6 +29,19 @@ import {
 } from '@asaps/core';
 import type { PersistenceAdapter, FileChangeEvent } from './PersistenceAdapter';
 
+/** Join path segments using the separator detected from the base path */
+function joinPath(base: string, ...parts: string[]): string {
+  const sep = base.includes('\\') ? '\\' : '/';
+  return [base, ...parts].join(sep);
+}
+
+/** Get parent directory of a path (cross-platform) */
+function parentDir(filePath: string): string {
+  // Find the last separator (either / or \)
+  const lastSep = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+  return lastSep > 0 ? filePath.substring(0, lastSep) : filePath;
+}
+
 /**
  * DirectoryAdapter implements PersistenceAdapter for filesystem-based projects.
  */
@@ -138,7 +151,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     // Write all JSON files (includes the manifest with asset entries)
     for (const file of files) {
-      const fullPath = `${this.projectPath}/${file.path}`;
+      const fullPath = joinPath(this.projectPath, ...file.path.split('/'));
 
       // Don't overwrite VCS helper files — they may have user customizations
       if (VCS_HELPER_FILES.has(file.path) && await api.fs.exists(fullPath)) {
@@ -146,8 +159,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
       }
 
       // Ensure parent directory exists
-      const parentDir = fullPath.substring(0, fullPath.lastIndexOf('/'));
-      await api.fs.mkdir(parentDir);
+      await api.fs.mkdir(parentDir(fullPath));
       await api.fs.writeFile(fullPath, file.content);
     }
 
@@ -163,9 +175,8 @@ export class DirectoryAdapter implements PersistenceAdapter {
         const blob = blobMap.get(af.assetId);
         if (!blob) continue; // skip assets without a blob (shouldn't happen)
 
-        const fullPath = `${this.projectPath}/${af.path}`;
-        const parentDir = fullPath.substring(0, fullPath.lastIndexOf('/'));
-        await api.fs.mkdir(parentDir);
+        const fullPath = joinPath(this.projectPath, ...af.path.split('/'));
+        await api.fs.mkdir(parentDir(fullPath));
         const arrayBuffer = await blob.arrayBuffer();
         await api.fs.writeFile(fullPath, new Uint8Array(arrayBuffer));
       }
@@ -190,9 +201,8 @@ export class DirectoryAdapter implements PersistenceAdapter {
       ? await this.findClusterDir(clusterId)
       : 'clusters/_unclustered';
 
-    const fullPath = `${this.projectPath}/${clusterDir}/${filename}`;
-    const parentDir = fullPath.substring(0, fullPath.lastIndexOf('/'));
-    await api.mkdir(parentDir);
+    const fullPath = joinPath(this.projectPath, ...clusterDir.split('/'), filename);
+    await api.mkdir(parentDir(fullPath));
     await api.writeFile(fullPath, deterministicStringify(serialized));
   }
 
@@ -206,7 +216,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     // Read existing settings to preserve projectSettings
     let existing: any = {};
-    const settingsPath = `${this.projectPath}/settings.json`;
+    const settingsPath = joinPath(this.projectPath!, 'settings.json');
     try {
       const reader = this.createReader();
       if (await reader.exists(settingsPath)) {
@@ -235,7 +245,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     // Read existing project.json and update fields
     const reader = this.createReader();
-    const projectPath = `${this.projectPath}/project.json`;
+    const projectPath = joinPath(this.projectPath!, 'project.json');
     let existing: any = {};
     if (await reader.exists(projectPath)) {
       existing = JSON.parse(await reader.readText(projectPath));
@@ -300,17 +310,17 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     const reader = this.createReader();
     // We need to search for the beat file across all cluster directories
-    const clustersPath = `${this.projectPath}/clusters`;
+    const clustersPath = joinPath(this.projectPath!, 'clusters');
     if (!await reader.exists(clustersPath)) return null;
 
     const dirs = await reader.listDir(clustersPath);
     for (const dir of dirs) {
       if (!dir.isDirectory) continue;
-      const dirPath = `${clustersPath}/${dir.name}`;
+      const dirPath = joinPath(clustersPath, dir.name);
       const files = await reader.listDir(dirPath);
       for (const file of files) {
         if (file.name.endsWith('.json') && file.name !== 'cluster.json' && file.name !== '_index.json') {
-          const content = await reader.readText(`${dirPath}/${file.name}`);
+          const content = await reader.readText(joinPath(dirPath, file.name));
           const beat = JSON.parse(content);
           if (beat.id === beatId) {
             const { _format, ...beatData } = beat;
@@ -332,7 +342,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
     if (!api) throw new Error('Requires Electron filesystem API');
 
     const reader = this.createReader();
-    const manifestPath = `${this.projectPath}/assets/_manifest.json`;
+    const manifestPath = joinPath(this.projectPath!, 'assets', '_manifest.json');
 
     // Read or create manifest
     let manifest: DirectoryAssetManifest;
@@ -363,11 +373,11 @@ export class DirectoryAdapter implements PersistenceAdapter {
     setManifestEntry(manifest, entry);
 
     // Write the asset binary
-    const assetDir = `${this.projectPath}/assets/${folder}`;
+    const assetDir = joinPath(this.projectPath!, 'assets', folder);
     await api.mkdir(assetDir);
     const arrayBuffer = await asset.blob.arrayBuffer();
     await api.writeFile(
-      `${assetDir}/${uniqueFilename}`,
+      joinPath(assetDir, uniqueFilename),
       new Uint8Array(arrayBuffer)
     );
 
@@ -456,7 +466,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
     if (!this.projectPath) return 'clusters/_unclustered';
 
     const reader = this.createReader();
-    const indexPath = `${this.projectPath}/clusters/_index.json`;
+    const indexPath = joinPath(this.projectPath!, 'clusters', '_index.json');
 
     if (await reader.exists(indexPath)) {
       const index = JSON.parse(await reader.readText(indexPath));

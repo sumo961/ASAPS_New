@@ -67,6 +67,16 @@ interface GlobalSettings {
     backgroundVolume: number;
     mute?: boolean;
   };
+  hudOverlays?: {
+    timerHud?: any;
+    countdownMeter?: any;
+    fictionalTime?: {
+      enabled: boolean;
+      initialTime?: any;
+      displayFormat?: string;
+      showInTimerHud?: boolean;
+    };
+  };
 }
 
 /**
@@ -1185,6 +1195,13 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
    */
   getAssetResolver(): AssetResolver {
     return this.assetResolver;
+  }
+
+  /**
+   * Get the loaded global settings (for HUD overlays, fictional time, etc.)
+   */
+  getGlobalSettings(): GlobalSettings | null {
+    return this.globalSettings;
   }
 
   /**

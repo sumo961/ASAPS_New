@@ -179,12 +179,65 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         console.log('[WebPlayer] Stage dimensions:', stageDimensions);
         renderer.setStageDimensions(stageDimensions.width, stageDimensions.height);
 
-        // Set up timer state synchronization for default target countdown display
+        // Set up timer state synchronization and fictional time display
         const engine = player.getEngine();
         if (engine) {
           const context = engine.getContext();
           const timerManager = context.getTimerManager();
           const story = engine.getStory();
+
+          // Set up fictional time from global settings
+          const gs = player.getGlobalSettings?.() || (player as any).globalSettings;
+          const hudOverlays = gs?.hudOverlays;
+          if (hudOverlays?.timerHud) {
+            (renderer as any).setTimerHudConfig?.(hudOverlays.timerHud);
+          }
+          if (hudOverlays?.countdownMeter) {
+            (renderer as any).setCountdownMeterConfig?.(hudOverlays.countdownMeter);
+          }
+          const ftConfig = hudOverlays?.fictionalTime;
+          if (ftConfig?.enabled) {
+            (renderer as any)._fictionalTimeConfig = ftConfig;
+            // Initialize fictional time on context
+            if (ftConfig.initialTime) {
+              context.setFictionalTime(ftConfig.initialTime);
+              if (ftConfig.showInTimerHud) {
+                const formatted = context.formatFictionalTime(ftConfig.displayFormat, ftConfig.initialTime);
+                (renderer as any).setFictionalTimeText?.(formatted);
+              }
+            }
+            // Listen for fictional time changes and update renderer
+            context.on('fictionalTimeChanged', () => {
+              const cfg = (renderer as any)?._fictionalTimeConfig;
+              if (cfg?.enabled && cfg.showInTimerHud) {
+                const formatted = context.formatFictionalTime(cfg.displayFormat, cfg.initialTime);
+                (renderer as any).setFictionalTimeText?.(formatted);
+              }
+            });
+          }
+
+          // Handle per-beat time display mode changes
+          context.on('beatChanged', ({ beat }: any) => {
+            if (!beat) return;
+            const cfg = (renderer as any)?._fictionalTimeConfig;
+            const timeDisplayMode = beat.timeDisplayMode || 'fictionalTime';
+            const overrideCountdownMeter = beat.overrideCountdownMeter || false;
+            (renderer as any).setOverrideCountdownMeter?.(overrideCountdownMeter);
+
+            if (timeDisplayMode === 'none') {
+              (renderer as any).setTimerHudOverrideText?.(undefined);
+              (renderer as any).setFictionalTimeText?.(undefined);
+            } else if (timeDisplayMode === 'manual') {
+              (renderer as any).setTimerHudOverrideText?.(beat.timeDisplayText || undefined);
+              (renderer as any).setFictionalTimeText?.(undefined);
+            } else {
+              (renderer as any).setTimerHudOverrideText?.(undefined);
+              if (cfg?.enabled && cfg.showInTimerHud) {
+                const formatted = context.formatFictionalTime(cfg.displayFormat, cfg.initialTime);
+                (renderer as any).setFictionalTimeText?.(formatted);
+              }
+            }
+          });
 
           const updateTimerState = () => {
             if (!rendererRef.current || !story) return;

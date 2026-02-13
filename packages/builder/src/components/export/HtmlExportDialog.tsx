@@ -3,8 +3,18 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff } from 'lucide-react';
+import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Languages, Plus } from 'lucide-react';
 import { downloadHtmlExport, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
+
+const STANDARD_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'de', label: 'German' },
+  { code: 'fr', label: 'French' },
+  { code: 'ja', label: 'Japanese' },
+  { code: 'mt', label: 'Maltese' },
+  { code: 'zh', label: 'Mandarin Chinese' },
+] as const;
 
 interface HtmlExportDialogProps {
   isOpen: boolean;
@@ -29,6 +39,10 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [enableTranslation, setEnableTranslation] = useState(false);
+  const [selectedLanguages, setSelectedLanguages] = useState<Set<string>>(new Set());
+  const [customLanguage, setCustomLanguage] = useState('');
+  const [customLanguages, setCustomLanguages] = useState<string[]>([]);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
@@ -41,6 +55,16 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         ? !!aiBaseUrl
         : !!aiApiKey;
 
+      // Collect translation languages
+      const translateLanguages: string[] = [];
+      if (enableTranslation) {
+        for (const code of selectedLanguages) {
+          const lang = STANDARD_LANGUAGES.find(l => l.code === code);
+          if (lang) translateLanguages.push(lang.label);
+        }
+        translateLanguages.push(...customLanguages);
+      }
+
       const options: HtmlExportOptions = {
         mode,
         responsive: true,
@@ -50,6 +74,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiApiKey: enableAI && hasAIConfig && aiApiKey ? aiApiKey : undefined,
         aiBaseUrl: enableAI && hasAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: enableAI && hasAIConfig && aiModel ? aiModel : undefined,
+        translateLanguages: translateLanguages.length > 0 ? translateLanguages : undefined,
       };
 
       await downloadHtmlExport(projectId, projectName, options);
@@ -286,6 +311,127 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
                     <strong>Note:</strong> This story will require internet access to use AI features.
                     {mode === 'single-file' && ' Players opening the file locally will need to be online.'}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Translation Settings */}
+          <div className="space-y-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableTranslation}
+                onChange={(e) => setEnableTranslation(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+              <div>
+                <div className="font-medium text-gray-900 flex items-center gap-2">
+                  <Languages className="w-4 h-4" />
+                  Auto-Translate Story
+                </div>
+                <div className="text-sm text-gray-500">
+                  Use AI to translate story text into additional languages at export time
+                </div>
+              </div>
+            </label>
+
+            {enableTranslation && (
+              <div className="ml-7 space-y-3 border-l-2 border-purple-200 pl-4">
+                {!enableAI || (!aiApiKey && aiProvider !== 'local') ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                    <strong>Note:</strong> Translation requires an AI provider to be configured above.
+                    {!enableAI && ' Please enable AI features first.'}
+                  </div>
+                ) : null}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Target Languages
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {STANDARD_LANGUAGES.map((lang) => (
+                      <label key={lang.code} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedLanguages.has(lang.code)}
+                          onChange={(e) => {
+                            const next = new Set(selectedLanguages);
+                            if (e.target.checked) {
+                              next.add(lang.code);
+                            } else {
+                              next.delete(lang.code);
+                            }
+                            setSelectedLanguages(next);
+                          }}
+                          className="w-3.5 h-3.5 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-700">{lang.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Custom languages */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Additional Languages
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customLanguage}
+                      onChange={(e) => setCustomLanguage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customLanguage.trim()) {
+                          e.preventDefault();
+                          setCustomLanguages([...customLanguages, customLanguage.trim()]);
+                          setCustomLanguage('');
+                        }
+                      }}
+                      placeholder="e.g., Korean, Portuguese..."
+                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-purple-500 focus:border-purple-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (customLanguage.trim()) {
+                          setCustomLanguages([...customLanguages, customLanguage.trim()]);
+                          setCustomLanguage('');
+                        }
+                      }}
+                      className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {customLanguages.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {customLanguages.map((lang, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs"
+                        >
+                          {lang}
+                          <button
+                            type="button"
+                            onClick={() => setCustomLanguages(customLanguages.filter((_, j) => j !== i))}
+                            className="hover:text-purple-900"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {(selectedLanguages.size > 0 || customLanguages.length > 0) && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-800">
+                    The story will be exported with {selectedLanguages.size + customLanguages.length} translation{selectedLanguages.size + customLanguages.length !== 1 ? 's' : ''}.
+                    Each translation creates a separate copy of the story file.
+                    Translation uses the AI provider configured above.
                   </div>
                 )}
               </div>

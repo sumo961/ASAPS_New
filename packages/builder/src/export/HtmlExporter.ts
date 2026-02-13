@@ -155,6 +155,8 @@ export interface HtmlExportOptions {
   aiBaseUrl?: string;
   /** Model override (e.g., 'gpt-5.2', 'claude-sonnet-4-20250514') */
   aiModel?: string;
+  /** Languages to translate the story into (AI-powered) */
+  translateLanguages?: string[];
 }
 
 export interface HtmlExportResult {
