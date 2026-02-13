@@ -2504,7 +2504,9 @@ const ButtonElement: React.FC<{
   showTextOnHover?: boolean; // Only show text when hovering over the hotspot
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>; // Resolver for sound blobs
   onTriggerClickAnimation?: () => Promise<void>; // Trigger onClick animations and wait for completion
-}> = ({ style, content, location, actionId, onAction, interactive, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, soundBlobResolver, onTriggerClickAnimation }) => {
+}> = ({ style, content, location, actionId, onAction, interactive: interactiveProp, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, soundBlobResolver, onTriggerClickAnimation }) => {
+  // Visited choices are non-interactive (greyed out and not clickable)
+  const interactive = interactiveProp && !isVisited;
   const [isHovered, setIsHovered] = React.useState(false);
   const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
   const buttonRef = React.useRef<HTMLButtonElement>(null);
@@ -4661,7 +4663,9 @@ const FlexButtonElement: React.FC<{
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>;
   stageWidth?: number;
   buttonCount?: number;
-}> = ({ element, onAction, interactive, hideButtonBox = false, theme, isVisited = false, soundBlobResolver, stageWidth, buttonCount = 1 }) => {
+}> = ({ element, onAction, interactive: interactiveProp, hideButtonBox = false, theme, isVisited = false, soundBlobResolver, stageWidth, buttonCount = 1 }) => {
+  // Visited choices are non-interactive (greyed out and not clickable)
+  const interactive = interactiveProp && !isVisited;
   const { location, content, actionId } = element;
   const [isHovered, setIsHovered] = React.useState(false);
 

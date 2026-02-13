@@ -2332,7 +2332,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="w-full px-2 py-1 text-sm border rounded"
                           >
                             <option value="">Select target beat...</option>
-                            <option value="__self__">↩ Return to choices</option>
+                            <option value="__self__">↩ Return to initial choices</option>
                             {availableTargets.map(target => (
                               <option key={target.id} value={target.id}>
                                 {target.name} ({target.id})

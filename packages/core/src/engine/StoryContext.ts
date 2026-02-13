@@ -385,7 +385,8 @@ export class StoryContext extends EventEmitter {
     }
 
     // Get variable name - support both new (variableName) and old (left) field names
-    const varName = condition.variableName || condition.left;
+    // Trim to handle ASML imports that may have leading/trailing whitespace in names
+    const varName = (condition.variableName || condition.left)?.trim();
 
     // Handle other condition types that use variableName/value pattern
     if (!varName) {
