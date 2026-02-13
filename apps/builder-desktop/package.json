@@ -52,6 +52,7 @@
       "repo": "ASAPS_New"
     },
     "mac": {
+      "artifactName": "ASAPS-Builder-${version}-${arch}-mac.${ext}",
       "category": "public.app-category.developer-tools",
       "target": [
         {
@@ -72,6 +73,7 @@
       "gatekeeperAssess": false
     },
     "dmg": {
+      "artifactName": "ASAPS-Builder-${version}-${arch}.${ext}",
       "contents": [
         {
           "x": 130,
@@ -100,6 +102,7 @@
       ]
     },
     "nsis": {
+      "artifactName": "ASAPS-Builder-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
