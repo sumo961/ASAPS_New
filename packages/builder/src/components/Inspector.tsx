@@ -915,7 +915,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       // Handle multiple connections for choice beats
       if (beat.type === 'movementChoice' && beatToUpdate.parameters?.choices) {
         beatToUpdate.parameters.choices.forEach((choice: any) => {
-          if (choice.target) {
+          if (choice.target && choice.target !== '__self__') {
             beat.addConnection({
               targetId: choice.target,
               label: choice.text
@@ -1114,7 +1114,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         // Handle multiple connections for choice beats
         if (beat.type === 'movementChoice' && localBeat.parameters?.choices) {
           localBeat.parameters.choices.forEach((choice: any) => {
-            if (choice.target) {
+            if (choice.target && choice.target !== '__self__') {
               beat.addConnection({
                 targetId: choice.target,
                 label: choice.text
@@ -2332,6 +2332,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="w-full px-2 py-1 text-sm border rounded"
                           >
                             <option value="">Select target beat...</option>
+                            <option value="__self__">↩ Return to choices</option>
                             {availableTargets.map(target => (
                               <option key={target.id} value={target.id}>
                                 {target.name} ({target.id})

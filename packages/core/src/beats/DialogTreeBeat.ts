@@ -182,7 +182,8 @@ export class DialogTreeBeat extends Beat {
             if (!choice) return; // Skip null/undefined choices
 
             // New format: target is always a string (beat ID) to exit
-            if (choice.target && typeof choice.target === 'string') {
+            // Skip __self__ targets - they loop back to root, not to another beat
+            if (choice.target && typeof choice.target === 'string' && choice.target !== '__self__') {
               const connectionKey = `${choice.target}-${choice.text || ''}`;
               if (!seenConnections.has(connectionKey)) {
                 seenConnections.add(connectionKey);
@@ -508,8 +509,21 @@ export class DialogTreeBeat extends Beat {
             await renderer.playSound({ file: choiceWithSound.soundEffect });
           }
 
+          // Mark this choice as visited for per-choice tracking
+          context.markChoiceVisited(this.id, selectedChoice.id);
+
+          // Update renderer's visited choice IDs so UI reflects the change
+          if (renderer.setVisitedChoiceIds) {
+            renderer.setVisitedChoiceIds(context.getVisitedChoicesForBeat(this.id));
+          }
+
           // New format: target is beat ID to exit, dialogNode continues conversation
-          if (selectedChoice.target) {
+          if (selectedChoice.target === '__self__') {
+            // Loop back to root choices - add delay so user sees their selection
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            this.currentNode = this.dialogTree;
+            // Continue the while loop (do NOT set exitTargetBeatId)
+          } else if (selectedChoice.target) {
             // Exit to another beat - add delay so user can see their choice was selected
             await new Promise(resolve => setTimeout(resolve, 1000));
             exitTargetBeatId = selectedChoice.target;

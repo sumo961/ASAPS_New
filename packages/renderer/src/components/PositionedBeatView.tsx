@@ -449,6 +449,8 @@ export interface PositionedBeatViewProps {
   previewMode?: boolean;
   /** Array of visited beat IDs (for marking visited choices) */
   visitedBeats?: string[];
+  /** Array of visited choice IDs for per-choice tracking (recursive dialogs) */
+  visitedChoiceIds?: string[];
   /** Only show choice text when hovering over the hotspot (for movementChoice) */
   showTextOnHover?: boolean;
   /** Animation paths for elements (path animations) */
@@ -788,6 +790,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   theme = DEFAULT_THEME,
   previewMode = false,
   visitedBeats = [],
+  visitedChoiceIds = [],
   showTextOnHover = false,
   soundBlobResolver,
   animations = [],
@@ -1269,6 +1272,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             theme={theme}
             previewMode={false} // Keep absolute for assets
             visitedBeats={visitedBeats}
+            visitedChoiceIds={visitedChoiceIds}
             showTextOnHover={showTextOnHover}
             animatedPosition={getAnimatedPosition(element.location.id || element.location.name, element.location.name)}
             onTriggerClickAnimation={() => triggerClickAnimation(element.location.id || element.location.name, element.location.name)}
@@ -1343,8 +1347,10 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
               pointerEvents: shouldShowButtons ? 'auto' : 'none',
             }}>
               {buttonElements.map((element, index) => {
-                // Check if this button leads to a visited beat
-                const isButtonVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
+                // Check if this button leads to a visited beat or is a visited choice
+                const isButtonVisited =
+                  (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+                  (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
                 return (
                   <FlexButtonElement
                     key={`btn-${index}-${element.location.name}`}
@@ -1496,6 +1502,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           theme={theme}
           previewMode={previewMode}
           visitedBeats={visitedBeats}
+          visitedChoiceIds={visitedChoiceIds}
           showTextOnHover={showTextOnHover}
           animationDelay={animationDelayMap.get(element.location.name) || 0}
           onAnimationComplete={handleAnimationComplete}
@@ -1537,6 +1544,7 @@ interface PositionedElementProps {
   theme: RenderThemeSettings;
   previewMode?: boolean;
   visitedBeats?: string[];
+  visitedChoiceIds?: string[];
   showTextOnHover?: boolean;
   animationDelay?: number;  // Delay in ms before starting animation
   onAnimationComplete?: () => void;  // Callback when text animation finishes
@@ -1591,6 +1599,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   theme,
   previewMode = false,
   visitedBeats = [],
+  visitedChoiceIds = [],
   showTextOnHover = false,
   animationDelay = 0,
   onAnimationComplete,
@@ -1776,8 +1785,10 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         console.log(`[Button] "${content.substring(0, 40)}..." x=${location.x}, stageW=${stageWidth}, calcW=${smartBtnDims.width}, calcH=${smartBtnDims.height}`);
       }
 
-      // Check if this button leads to a visited beat
-      const isButtonVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
+      // Check if this button leads to a visited beat or is a visited choice
+      const isButtonVisited =
+        (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+        (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
       // Wrap button in a div that handles the fade-in animation
       // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       // Combine animated opacity with button fade-in: use animated opacity if buttons are shown
@@ -1816,8 +1827,10 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
     }
 
     case 'hotspot': {
-      // Check if this hotspot leads to a visited beat
-      const isHotspotVisited = element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false;
+      // Check if this hotspot leads to a visited beat or is a visited choice
+      const isHotspotVisited =
+        (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+        (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
       // Wrap hotspot in a div that handles the fade-in animation
       // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       // Also apply scroll-to-continue logic for hotspots

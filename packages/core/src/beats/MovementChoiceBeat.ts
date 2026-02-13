@@ -64,7 +64,7 @@ export class MovementChoiceBeat extends Beat {
       // This fixes the long-standing bug where targets added later weren't reflected
       this.clearConnections();
       for (const choice of this.choices) {
-        if (choice.target) {
+        if (choice.target && choice.target !== '__self__') {
           this.addConnection({
             targetId: choice.target,
             label: choice.text || choice.id
@@ -94,10 +94,10 @@ export class MovementChoiceBeat extends Beat {
   getConnections(): Array<{ targetId: string; label?: string; condition?: any }> {
     const connections: Array<{ targetId: string; label?: string; condition?: any }> = [];
 
-    // Extract connections from each choice
+    // Extract connections from each choice (skip __self__ targets)
     if (this.choices && Array.isArray(this.choices)) {
       for (const choice of this.choices) {
-        if (choice.target) {
+        if (choice.target && choice.target !== '__self__') {
           connections.push({
             targetId: choice.target,
             label: choice.text || choice.id,
@@ -131,80 +131,98 @@ export class MovementChoiceBeat extends Beat {
     // Set showTextOnHover state for renderer to use when rendering hotspots
     renderer.setState('showTextOnHover', this.showTextOnHover || false);
 
-    // Filter choices based on conditions
-    const availableChoices = this.choices.filter(choice => {
-      if (!choice.conditions) return true;
-      return choice.conditions.every(condition => context.checkCondition(condition));
-    });
-
-    if (availableChoices.length === 0) {
-      console.warn(`No available movement choices for beat ${this.id}`);
-      return this.getNextBeat(context);
-    }
-
-    // Process text with variable interpolation
-    const processedQuestion = this.processText(this.question, context);
-
-    // Get locations array for positioned rendering
-    const locations = Array.from(this.locations.values());
-
-    // Apply delay if configured (before showing any content)
-    if (this.choiceDelay && this.choiceDelay > 0) {
-      // Wait for the delay duration before rendering
-      await new Promise(resolve => setTimeout(resolve, this.choiceDelay! * 1000));
-    }
-
-    // Render the movement interface with locations
-    const choiceId = await renderer.renderMovement(
-      processedQuestion,
-      availableChoices.map(c => ({
-        id: c.id,
-        text: this.processText(c.text, context),
-        location: c.location || '',
-        locationName: c.locationName  // Pass locationName for hotspot/prop association
-      })),
-      locations
-    );
-
-    // Find selected choice - match by id first, then by text (for choices without id)
-    let selectedChoice = availableChoices.find(c => c.id === choiceId);
-    if (!selectedChoice) {
-      // Fallback: match by text (case-insensitive)
-      const choiceIdLower = choiceId?.toLowerCase();
-      selectedChoice = availableChoices.find(c =>
-        c.text?.toLowerCase() === choiceIdLower
-      );
-    }
-
-    if (selectedChoice) {
-      // Record this choice for AI context
-      context.recordChoice({
-        beatId: this.id,
-        beatName: this.name || this.id,
-        beatType: 'movementChoice',
-        choiceText: selectedChoice.text,
-        choiceContext: this.question,
+    // While loop supports __self__ target (return to choices)
+    while (true) {
+      // Filter choices based on conditions
+      const availableChoices = this.choices.filter(choice => {
+        if (!choice.conditions) return true;
+        return choice.conditions.every(condition => context.checkCondition(condition));
       });
 
-      // Apply any location effects
-      if (selectedChoice.location) {
-        context.setVariable('currentLocation', selectedChoice.location);
+      if (availableChoices.length === 0) {
+        console.warn(`No available movement choices for beat ${this.id}`);
+        return this.getNextBeat(context);
       }
 
-      // Apply effects from choice (canonical effects array, migrated from flat counter fields)
-      if (selectedChoice.effects) {
-        selectedChoice.effects.forEach(effect => context.applyEffect(effect));
+      // Process text with variable interpolation
+      const processedQuestion = this.processText(this.question, context);
+
+      // Get locations array for positioned rendering
+      const locations = Array.from(this.locations.values());
+
+      // Apply delay if configured (before showing any content)
+      if (this.choiceDelay && this.choiceDelay > 0) {
+        // Wait for the delay duration before rendering
+        await new Promise(resolve => setTimeout(resolve, this.choiceDelay! * 1000));
       }
 
-      // Play sound effect
-      if (selectedChoice.soundEffect && renderer.playSound) {
-        await renderer.playSound({ file: selectedChoice.soundEffect });
+      // Render the movement interface with locations
+      const choiceId = await renderer.renderMovement(
+        processedQuestion,
+        availableChoices.map(c => ({
+          id: c.id,
+          text: this.processText(c.text, context),
+          location: c.location || '',
+          locationName: c.locationName  // Pass locationName for hotspot/prop association
+        })),
+        locations
+      );
+
+      // Find selected choice - match by id first, then by text (for choices without id)
+      let selectedChoice = availableChoices.find(c => c.id === choiceId);
+      if (!selectedChoice) {
+        // Fallback: match by text (case-insensitive)
+        const choiceIdLower = choiceId?.toLowerCase();
+        selectedChoice = availableChoices.find(c =>
+          c.text?.toLowerCase() === choiceIdLower
+        );
       }
 
-      return selectedChoice.target;
+      if (selectedChoice) {
+        // Mark this choice as visited for per-choice tracking
+        context.markChoiceVisited(this.id, selectedChoice.id);
+
+        // Update renderer's visited choice IDs so UI reflects the change
+        if (renderer.setVisitedChoiceIds) {
+          renderer.setVisitedChoiceIds(context.getVisitedChoicesForBeat(this.id));
+        }
+
+        // Record this choice for AI context
+        context.recordChoice({
+          beatId: this.id,
+          beatName: this.name || this.id,
+          beatType: 'movementChoice',
+          choiceText: selectedChoice.text,
+          choiceContext: this.question,
+        });
+
+        // Apply any location effects
+        if (selectedChoice.location) {
+          context.setVariable('currentLocation', selectedChoice.location);
+        }
+
+        // Apply effects from choice (canonical effects array, migrated from flat counter fields)
+        if (selectedChoice.effects) {
+          selectedChoice.effects.forEach(effect => context.applyEffect(effect));
+        }
+
+        // Play sound effect
+        if (selectedChoice.soundEffect && renderer.playSound) {
+          await renderer.playSound({ file: selectedChoice.soundEffect });
+        }
+
+        if (selectedChoice.target === '__self__') {
+          // Loop back to show choices again with updated visited state
+          continue;
+        }
+
+        return selectedChoice.target;
+      }
+
+      console.warn(`[MovementChoiceBeat] No matching choice found for "${choiceId}". Available: ${availableChoices.map(c => c.id || c.text).join(', ')}`);
+      break;
     }
 
-    console.warn(`[MovementChoiceBeat] No matching choice found for "${choiceId}". Available: ${availableChoices.map(c => c.id || c.text).join(', ')}`);
     return this.getNextBeat(context);
   }
 }

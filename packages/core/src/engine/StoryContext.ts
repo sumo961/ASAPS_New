@@ -31,6 +31,7 @@ interface StoryState {
   inventory: InventoryEntry[];
   characterInventories: Record<string, InventoryEntry[]>; // Character-specific inventories
   visitedBeats: Set<string>;
+  visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
 }
 
@@ -45,6 +46,7 @@ export interface SerializedStoryState {
   inventory: InventoryEntry[];  // Now stores entries with quantities
   characterInventories: Record<string, InventoryEntry[]>;
   visitedBeats: string[]; // Array instead of Set for JSON serialization
+  visitedChoices?: string[]; // Per-choice visited tracking (composite keys: "beatId:choiceId")
   timers: Record<string, { value: number; target?: string }>;
   history: string[]; // Include beat history for proper restoration
   choiceHistory?: ChoiceRecord[]; // Rich choice tracking for AI context
@@ -109,6 +111,7 @@ export class StoryContext extends EventEmitter {
       inventory: [],
       characterInventories: {},
       visitedBeats: new Set(),
+      visitedChoices: new Set(),
       timers: {},
       ...initialState
     };
@@ -450,6 +453,17 @@ export class StoryContext extends EventEmitter {
     this.history.push(beatId);
   }
 
+  markChoiceVisited(beatId: string, choiceId: string): void {
+    this.state.visitedChoices.add(`${beatId}:${choiceId}`);
+  }
+
+  getVisitedChoicesForBeat(beatId: string): string[] {
+    const prefix = `${beatId}:`;
+    return Array.from(this.state.visitedChoices)
+      .filter(key => key.startsWith(prefix))
+      .map(key => key.substring(prefix.length));
+  }
+
   /**
    * Record a player choice for rich AI context
    * Called by choice beats (DialogTree, MovementChoice, PickProp, HyperText)
@@ -537,6 +551,7 @@ export class StoryContext extends EventEmitter {
       inventory: [],
       characterInventories: {},
       visitedBeats: new Set(),
+      visitedChoices: new Set(),
       timers: {}
     };
     this.history = [];
@@ -777,6 +792,7 @@ export class StoryContext extends EventEmitter {
         Object.entries(this.state.characterInventories).map(([k, v]) => [k, v.map(entry => ({ ...entry }))])
       ),
       visitedBeats: Array.from(this.state.visitedBeats),
+      visitedChoices: Array.from(this.state.visitedChoices),
       timers: { ...this.state.timers },
       history: [...this.history],
       choiceHistory: this.choiceHistory.map(c => ({ ...c })),
@@ -814,6 +830,7 @@ export class StoryContext extends EventEmitter {
         Object.entries(serialized.characterInventories || {}).map(([k, v]) => [k, migrateInventory(v)])
       ),
       visitedBeats: new Set(serialized.visitedBeats),
+      visitedChoices: new Set((serialized as any).visitedChoices || []),
       timers: { ...serialized.timers }
     };
 

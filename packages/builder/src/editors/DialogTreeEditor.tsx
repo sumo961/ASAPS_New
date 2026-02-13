@@ -620,6 +620,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                             {!isCollapsible && (
                               <option value="__nested__">➕ Add NPC response...</option>
                             )}
+                            <option value="__self__">↩ Return to choices</option>
                             <optgroup label="Connect to beat">
                               {allBeats?.map(beat => (
                                 <option key={beat.id} value={beat.id}>

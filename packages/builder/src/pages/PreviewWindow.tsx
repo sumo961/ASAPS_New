@@ -1043,6 +1043,17 @@ export const PreviewWindow: React.FC = () => {
           timers,
         });
 
+        // Update renderer with visited state for marking visited choices
+        if (rendererRef.current && 'setVisitedBeats' in rendererRef.current) {
+          (rendererRef.current as any).setVisitedBeats(ctx.getVisitedBeats());
+        }
+        if (rendererRef.current && 'setVisitedChoiceIds' in rendererRef.current) {
+          const currentBeatId = ctx.getCurrentBeatId();
+          (rendererRef.current as any).setVisitedChoiceIds(
+            ctx.getVisitedChoicesForBeat(currentBeatId)
+          );
+        }
+
         // Update active timers
         const timerManager = ctx.getTimerManager();
         if (timerManager) {

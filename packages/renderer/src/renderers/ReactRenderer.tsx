@@ -755,6 +755,7 @@ export class ReactRenderer extends BaseRenderer {
   protected hideButtonBoxes: boolean = false;  // NEW: Whether to hide button box backgrounds
   protected theme: RenderThemeSettings | undefined = undefined;  // NEW: Theme settings for styling
   protected visitedBeats: string[] = [];  // NEW: Array of visited beat IDs for marking visited choices
+  protected visitedChoiceIds: string[] = [];  // Per-choice visited tracking for recursive dialogs
   protected chatMessages: ChatMessage[] = [];  // NEW: Accumulated messages for chat mode
   protected currentPresentationMode: 'positioned' | 'chat-scroll' | 'chat-bubble' = 'positioned';  // NEW: Current dialog presentation mode
   protected currentShowAvatars: boolean = true;  // NEW: Whether to show avatars in chat mode
@@ -1117,6 +1118,14 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Set the array of visited choice IDs for per-choice tracking
+   * Used by recursive dialog trees to grey out already-selected choices
+   */
+  setVisitedChoiceIds(choiceIds: string[]): void {
+    this.visitedChoiceIds = choiceIds;
+  }
+
+  /**
    * Set the timer state for the progress bar display
    * Used when a beat has showTimer: true and a defaultTargetDelay
    */
@@ -1285,6 +1294,7 @@ export class ReactRenderer extends BaseRenderer {
               theme={this.theme}
               previewMode={false}
               visitedBeats={this.visitedBeats}
+              visitedChoiceIds={this.visitedChoiceIds}
               showTextOnHover={showTextOnHover}
               soundBlobResolver={this.soundBlobResolver || undefined}
               animations={effectiveAnimations}

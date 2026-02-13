@@ -260,6 +260,9 @@ export interface IRenderer {
   // Chat mode support
   clearChatHistory?(): void;
 
+  // Per-choice visited tracking for recursive dialogs
+  setVisitedChoiceIds?(choiceIds: string[]): void;
+
   // Loading indicator for AI-powered beats
   renderLoading?(message: string, options?: {
     subMessage?: string;
