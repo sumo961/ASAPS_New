@@ -28,6 +28,7 @@ export abstract class Beat {
   public animations?: AnimationPath[]; // Path animations for elements
   public notes?: string; // Author notes (not shown to player)
   public timeDisplayText?: string; // Override Timer HUD text for this beat (static mode)
+  public overrideCountdownMeter?: boolean; // Override default countdown meter visibility on this beat
   public _version: number = 0; // Version counter incremented on parameter updates (for React change detection)
 
   constructor(config: BeatConfig) {
@@ -44,6 +45,7 @@ export abstract class Beat {
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
     this.notes = config.notes || (config.parameters as any)?.notes;
     this.timeDisplayText = (config as any).timeDisplayText || (config.parameters as any)?.timeDisplayText;
+    this.overrideCountdownMeter = (config as any).overrideCountdownMeter || (config.parameters as any)?.overrideCountdownMeter;
     this.x = config.x;
     this.y = config.y;
 
@@ -387,6 +389,7 @@ export abstract class Beat {
       node: this.node,
       notes: this.notes,
       timeDisplayText: this.timeDisplayText,
+      overrideCountdownMeter: this.overrideCountdownMeter,
       parameters: parameters
     };
     return json;

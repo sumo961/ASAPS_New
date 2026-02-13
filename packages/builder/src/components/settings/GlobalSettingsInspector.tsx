@@ -111,7 +111,7 @@ interface GlobalSettings {
       meterColor: string;
       meterBackgroundColor: string;
       meterHeight: number;
-      meterWidth: number;
+      meterWidth: number; // Percentage of stage width (10-90)
       backgroundColor: string;
       backgroundOpacity: number;
       borderRadius: number;
@@ -119,6 +119,9 @@ interface GlobalSettings {
       warningColor: string;
       criticalThreshold: number;
       criticalColor: string;
+      showByDefault?: boolean; // When true (default), meter shows on all beats unless overridden per-beat
+      counterMin?: number; // Counter minimum value (default 0)
+      counterMax?: number; // Counter maximum value (default 100)
     };
   };
 }
@@ -1892,7 +1895,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                           label: '', showLabel: true, showNumericValue: true,
                           numericFormat: 'fraction' as const, meterColor: '#3B82F6',
                           meterBackgroundColor: 'rgba(255,255,255,0.3)', meterHeight: 12,
-                          meterWidth: 200, backgroundColor: '#1a1a2e', backgroundOpacity: 85,
+                          meterWidth: 80, backgroundColor: '#1a1a2e', backgroundOpacity: 85,
                           borderRadius: 8, warningThreshold: 33, warningColor: '#EAB308',
                           criticalThreshold: 15, criticalColor: '#EF4444',
                         };
@@ -1935,6 +1938,48 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                           placeholder="Name of the counter to track"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                         />
+                      </div>
+
+                      {/* Counter Range */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Min Value</label>
+                          <input
+                            type="number"
+                            value={meter.counterMin ?? 0}
+                            onChange={(e) => updateMeter({ counterMin: parseInt(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Max Value</label>
+                          <input
+                            type="number"
+                            value={meter.counterMax ?? 100}
+                            onChange={(e) => updateMeter({ counterMax: parseInt(e.target.value) || 100 })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Range for the meter bar. E.g. 0–24 for hours in a day, 0–100 for health.
+                        Overridden by character counter definitions if they specify min/max.
+                      </p>
+
+                      {/* Default Visibility */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Default Visibility</label>
+                        <select
+                          value={meter.showByDefault !== false ? 'show' : 'hide'}
+                          onChange={(e) => updateMeter({ showByDefault: e.target.value === 'show' })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="show">Show on all beats (hide on individual beats)</option>
+                          <option value="hide">Hide on all beats (show on individual beats)</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Each beat can override this default in its Advanced settings.
+                        </p>
                       </div>
 
                       {/* Position */}
@@ -2021,11 +2066,11 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       {/* Meter Dimensions */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-sm font-medium text-gray-600 mb-1">Width: {meter.meterWidth}px</label>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Width: {meter.meterWidth}%</label>
                           <input
                             type="range"
-                            min="100"
-                            max="400"
+                            min="10"
+                            max="90"
                             value={meter.meterWidth}
                             onChange={(e) => updateMeter({ meterWidth: parseInt(e.target.value) })}
                             className="w-full"

@@ -768,6 +768,7 @@ export class ReactRenderer extends BaseRenderer {
   private timerHudOverrideTextListeners: Set<(text: string | undefined) => void> = new Set();
   protected countdownMeterConfig: import('../components/CountdownMeterHud').CountdownMeterConfig | undefined;  // Countdown meter HUD config
   protected countdownMeterValue: { value: number; min: number; max: number } | undefined;  // Current countdown meter value
+  protected overrideCountdownMeter: boolean = false;  // Per-beat flag to override default countdown meter visibility
 
   private get root(): ReactDOM.Root | null {
     return this._root;
@@ -1181,6 +1182,13 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Set per-beat override for countdown meter visibility
+   */
+  setOverrideCountdownMeter(override: boolean): void {
+    this.overrideCountdownMeter = override;
+  }
+
+  /**
    * Subscribe to timer state changes
    * Returns an unsubscribe function
    */
@@ -1293,6 +1301,7 @@ export class ReactRenderer extends BaseRenderer {
               onSubscribeTimerHudOverrideText={(listener) => this.subscribeToTimerHudOverrideText(listener)}
               countdownMeterConfig={this.countdownMeterConfig}
               countdownMeterValue={this.countdownMeterValue}
+              overrideCountdownMeter={this.overrideCountdownMeter}
             />
           </ScaledStage>
         </div>
@@ -1995,6 +2004,7 @@ export class ReactRenderer extends BaseRenderer {
     this.timerHudStateListeners.forEach(listener => listener(undefined));
     this.timerHudOverrideText = undefined;
     this.countdownMeterValue = undefined;
+    this.overrideCountdownMeter = false;
     
     // Stop all sounds (copied from BaseRenderer)
     this.assetCache.sounds.forEach((audio: HTMLAudioElement) => {

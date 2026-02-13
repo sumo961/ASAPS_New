@@ -1057,12 +1057,14 @@ export const PreviewWindow: React.FC = () => {
         stateChangeUnsubscribeRef.current = null;
       }
 
-      // Set per-beat timer HUD override text BEFORE performAction renders (beatChanged fires before render)
+      // Set per-beat timer HUD override text and countdown meter visibility BEFORE performAction renders
       const onBeatChanged = ({ beatId }: { beatId: string }) => {
         const beat = story.getBeat(beatId);
         if (rendererRef.current && beat) {
           const overrideText = (beat as any)?.timeDisplayText || undefined;
           (rendererRef.current as any).setTimerHudOverrideText?.(overrideText);
+          const overrideCountdownMeter = (beat as any)?.overrideCountdownMeter || false;
+          (rendererRef.current as any).setOverrideCountdownMeter?.(overrideCountdownMeter);
         }
       };
       context.on('beatChanged', onBeatChanged);
@@ -1152,15 +1154,15 @@ export const PreviewWindow: React.FC = () => {
 
         const counterName = meterConfig.counterName;
         const value = context.getCounter(counterName) ?? 0;
-        // Try to get min/max from character definitions
-        let min = 0;
-        let max = 100;
+        // Use config values as defaults, then try to override from character definitions
+        let min = meterConfig.counterMin ?? 0;
+        let max = meterConfig.counterMax ?? 100;
         if (previewData.characters) {
           for (const char of previewData.characters) {
             const counter = char.counters?.find((c: any) => c.name === counterName);
             if (counter) {
-              min = counter.min ?? 0;
-              max = counter.max ?? 100;
+              min = counter.min ?? min;
+              max = counter.max ?? max;
               break;
             }
           }

@@ -59,7 +59,10 @@ interface InspectorProps {
   onOpenCharacterManager?: (callback?: (character: any) => void) => void;
   // For counter/variable dropdowns
   characters?: Character[];
-  globalSettings?: { variables?: { name: string; type: 'string' | 'number' | 'boolean'; defaultValue?: any; description?: string }[] };
+  globalSettings?: {
+    variables?: { name: string; type: 'string' | 'number' | 'boolean'; defaultValue?: any; description?: string }[];
+    hudOverlays?: { countdownMeter?: { showByDefault?: boolean } };
+  };
   // Width control
   width?: number;
   onWidthChange?: (width: number) => void;
@@ -727,7 +730,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setHasChanges(true);
 
     // For fields that affect graph visualization or need immediate persistence, update immediately
-    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'timeDisplayText') {
+    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'timeDisplayText' || field === 'overrideCountdownMeter') {
       if (onUpdate && beat) {
         onUpdate(beat.id, { [field]: value });
       }
@@ -2775,6 +2778,26 @@ export const Inspector: React.FC<InspectorProps> = ({
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         Override the Timer HUD text for this beat (static mode only). Leave empty to use global default.
+                      </p>
+                    </div>
+
+                    {/* Override Countdown Meter Visibility */}
+                    <div className="border-t pt-3 mt-3">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={localBeat.overrideCountdownMeter || false}
+                          onChange={(e) => handleChange('overrideCountdownMeter', e.target.checked)}
+                          className="rounded border-gray-300"
+                        />
+                        <span>{globalSettings?.hudOverlays?.countdownMeter?.showByDefault !== false
+                          ? 'Hide countdown meter'
+                          : 'Show countdown meter'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6 mt-1">
+                        {globalSettings?.hudOverlays?.countdownMeter?.showByDefault !== false
+                          ? 'Hide the countdown meter HUD on this beat (e.g. for title screens or cutscenes).'
+                          : 'Show the countdown meter HUD on this beat (overrides the global "hide by default" setting).'}
                       </p>
                     </div>
                   </div>

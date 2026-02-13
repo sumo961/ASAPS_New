@@ -119,7 +119,7 @@ export interface GlobalSettings {
       meterColor: string;
       meterBackgroundColor: string;
       meterHeight: number;
-      meterWidth: number;
+      meterWidth: number; // Percentage of stage width (10-90)
       backgroundColor: string;
       backgroundOpacity: number;
       borderRadius: number;
@@ -127,6 +127,9 @@ export interface GlobalSettings {
       warningColor: string;
       criticalThreshold: number;
       criticalColor: string;
+      showByDefault?: boolean; // When true (default), meter shows on all beats unless overridden per-beat
+      counterMin?: number; // Counter minimum value (default 0)
+      counterMax?: number; // Counter maximum value (default 100)
     };
   };
 }

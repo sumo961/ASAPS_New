@@ -11,7 +11,7 @@ export interface CountdownMeterConfig {
   meterColor: string;
   meterBackgroundColor: string;
   meterHeight: number;
-  meterWidth: number;
+  meterWidth: number; // Percentage of stage width (10-90)
   backgroundColor: string;
   backgroundOpacity: number;
   borderRadius: number;
@@ -19,6 +19,9 @@ export interface CountdownMeterConfig {
   warningColor: string;
   criticalThreshold: number;
   criticalColor: string;
+  showByDefault?: boolean; // When true (default), meter shows on all beats unless overridden per-beat
+  counterMin?: number; // Counter minimum value (default 0)
+  counterMax?: number; // Counter maximum value (default 100)
 }
 
 export interface CountdownMeterHudProps {
@@ -68,6 +71,8 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
   config,
   visible,
 }) => {
+  // Clamp meterWidth to valid percentage range (handles migration from old pixel values)
+  const effectiveWidth = Math.min(Math.max(config.meterWidth, 10), 90);
   const percentage = useMemo(() => {
     if (counterMax <= counterMin) return 0;
     return Math.max(0, Math.min(100, ((counterValue - counterMin) / (counterMax - counterMin)) * 100));
@@ -124,6 +129,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
         padding: 8,
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
+        width: `${effectiveWidth}%`,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -137,7 +143,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            width: config.meterWidth,
+            width: '100%',
           }}
         >
           <span
@@ -168,7 +174,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
       {/* Meter bar */}
       <div
         style={{
-          width: config.meterWidth,
+          width: '100%',
           height: config.meterHeight,
           backgroundColor: meterBgColor,
           borderRadius: 3,

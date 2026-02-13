@@ -494,6 +494,8 @@ export interface PositionedBeatViewProps {
   countdownMeterConfig?: import('./CountdownMeterHud').CountdownMeterConfig;
   /** Current counter value for countdown meter HUD */
   countdownMeterValue?: { value: number; min: number; max: number };
+  /** Per-beat flag to override default countdown meter visibility */
+  overrideCountdownMeter?: boolean;
 }
 
 /**
@@ -804,6 +806,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   onSubscribeTimerHudOverrideText,
   countdownMeterConfig,
   countdownMeterValue,
+  overrideCountdownMeter,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -1469,7 +1472,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         />
       )}
       {/* Countdown Meter HUD overlay */}
-      {countdownMeterConfig && countdownMeterConfig.enabled && countdownMeterValue && (
+      {countdownMeterConfig && countdownMeterConfig.enabled && countdownMeterValue &&
+        (countdownMeterConfig.showByDefault !== false ? !overrideCountdownMeter : !!overrideCountdownMeter) && (
         <CountdownMeterHud
           config={countdownMeterConfig}
           visible={true}

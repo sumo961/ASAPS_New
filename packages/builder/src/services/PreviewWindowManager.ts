@@ -19,6 +19,7 @@ export interface SerializedStoryData {
     x?: number;
     y?: number;
     timeDisplayText?: string;
+    overrideCountdownMeter?: boolean;
     parameters: Record<string, any>;
     connections: Array<{ targetId: string; label?: string; condition?: any }>;
     locations?: any[];

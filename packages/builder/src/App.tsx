@@ -3130,6 +3130,7 @@ function App() {
       showTimer: beat.showTimer,
       notes: beat.notes,
       timeDisplayText: beat.timeDisplayText,
+      overrideCountdownMeter: beat.overrideCountdownMeter,
       parameters: beat.getParameters?.() || {},
       connections: beat.connections?.map(conn => ({
         targetId: conn.targetId,
