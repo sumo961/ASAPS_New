@@ -29,7 +29,7 @@ export class SetTimerBeat extends Beat {
   getParameters(): Record<string, any> {
     return {
       timerName: this.timerName || '',
-      value: this.timerValue || 60,
+      value: this.timerValue ?? 60,
       timerTarget: this.timerTarget || '',
       continueTarget: this.continueTarget || ''
     };
@@ -56,20 +56,21 @@ export class SetTimerBeat extends Beat {
       return this.getNextBeat(context);
     }
 
+    // If value is 0, clear the timer (no target needed)
+    if (this.timerValue === 0) {
+      context.clearTimer(this.timerName);
+      console.log(`SetTimerBeat ${this.id}: Cleared timer '${this.timerName}'`);
+      return this.getNextBeat(context);
+    }
+
     if (!this.timerTarget) {
       console.error(`SetTimerBeat ${this.id} has no timer target specified`);
       return this.getNextBeat(context);
     }
 
-    // If value is 0, clear the timer
-    if (this.timerValue === 0) {
-      context.clearTimer(this.timerName);
-      console.log(`SetTimerBeat ${this.id}: Cleared timer '${this.timerName}'`);
-    } else {
-      // Set the timer with value (in seconds) and target beat
-      context.setTimer(this.timerName, this.timerValue, this.timerTarget);
-      console.log(`SetTimerBeat ${this.id}: Set timer '${this.timerName}' to ${this.timerValue} seconds -> ${this.timerTarget}`);
-    }
+    // Set the timer with value (in seconds) and target beat
+    context.setTimer(this.timerName, this.timerValue, this.timerTarget);
+    console.log(`SetTimerBeat ${this.id}: Set timer '${this.timerName}' to ${this.timerValue} seconds -> ${this.timerTarget}`);
 
     // IMPORTANT: SetTimer should continue to next beat immediately
     // The timer runs in the background and fires when it expires

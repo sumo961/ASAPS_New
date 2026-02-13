@@ -1208,6 +1208,9 @@ export const PreviewWindow: React.FC = () => {
             if (engineRef.current) {
               engineRef.current.stop();
             }
+            // Cancel any pending action from the interrupted beat (e.g., keypad/inputText)
+            // This prevents the old beat's resolveAction from intercepting clicks on the new beat
+            (rendererRef.current as any).cancelPendingAction?.();
             context.markBeatVisited(targetBeat);
             try {
               const nextBeatId = await beat.execute(context, rendererRef.current as any);

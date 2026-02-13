@@ -610,7 +610,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           beatData.parameters.timerTarget = beatParams.timerTarget || '';
         }
         if (beatData.parameters.value === undefined) {
-          beatData.parameters.value = beatParams.value || 60;
+          beatData.parameters.value = beatParams.value ?? 60;
         }
       }
       //}
@@ -703,7 +703,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         break;
       case 'setTimer':
         if (!localBeat.parameters?.timerName) errors.push('Timer name is required');
-        if (!localBeat.parameters?.timerTarget) errors.push('Timer target is required');
+        if ((localBeat.parameters?.value ?? 60) !== 0 && !localBeat.parameters?.timerTarget) errors.push('Timer target is required');
         const normalConnection = localBeat.connections?.find((c: any) => c.label !== 'Timer Target');
         if (!normalConnection) errors.push('Continue connection is required');
         break;
@@ -727,7 +727,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setHasChanges(true);
 
     // For fields that affect graph visualization or need immediate persistence, update immediately
-    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes') {
+    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'timeDisplayText') {
       if (onUpdate && beat) {
         onUpdate(beat.id, { [field]: value });
       }
@@ -1678,20 +1678,23 @@ export const Inspector: React.FC<InspectorProps> = ({
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Duration (seconds)
+                        <span className="text-xs text-gray-500 block">
+                          Set to 0 to clear an existing timer
+                        </span>
                       </label>
                       <input
                         type="number"
-                        value={localBeat.parameters?.value || 60}
-                        onChange={(e) => handleParameterChange('value', parseInt(e.target.value))}
-                        min="1"
+                        value={localBeat.parameters?.value ?? 60}
+                        onChange={(e) => handleParameterChange('value', parseInt(e.target.value) || 0)}
+                        min="0"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
-                    <div>
+                    <div className={`${(localBeat.parameters?.value ?? 60) === 0 ? 'opacity-40 pointer-events-none' : ''}`}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Timer Target Beat <span className="text-red-500">*</span>
+                        Timer Target Beat {(localBeat.parameters?.value ?? 60) !== 0 && <span className="text-red-500">*</span>}
                         <span className="text-xs text-gray-500 block">
-                          Beat to jump to when timer expires
+                          {(localBeat.parameters?.value ?? 60) === 0 ? 'Not needed when clearing a timer' : 'Beat to jump to when timer expires'}
                         </span>
                       </label>
                       <select
@@ -2765,8 +2768,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                       <h4 className="text-sm font-medium text-gray-700 mb-1">Time Display Override</h4>
                       <input
                         type="text"
-                        value={localBeat.parameters?.timeDisplayText || ''}
-                        onChange={(e) => handleParameterChange('timeDisplayText', e.target.value)}
+                        value={localBeat.timeDisplayText || ''}
+                        onChange={(e) => handleChange('timeDisplayText', e.target.value)}
                         placeholder="e.g. 9:00 AM, Day 3, 2h left"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />

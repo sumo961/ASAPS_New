@@ -27,6 +27,7 @@ export abstract class Beat {
   public node?: string; // Background image/node reference
   public animations?: AnimationPath[]; // Path animations for elements
   public notes?: string; // Author notes (not shown to player)
+  public timeDisplayText?: string; // Override Timer HUD text for this beat (static mode)
   public _version: number = 0; // Version counter incremented on parameter updates (for React change detection)
 
   constructor(config: BeatConfig) {
@@ -42,6 +43,7 @@ export abstract class Beat {
     this.node = (config as any).node || (config.parameters as any)?.node;
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
     this.notes = config.notes || (config.parameters as any)?.notes;
+    this.timeDisplayText = (config as any).timeDisplayText || (config.parameters as any)?.timeDisplayText;
     this.x = config.x;
     this.y = config.y;
 
@@ -384,6 +386,7 @@ export abstract class Beat {
       y: this.y,
       node: this.node,
       notes: this.notes,
+      timeDisplayText: this.timeDisplayText,
       parameters: parameters
     };
     return json;

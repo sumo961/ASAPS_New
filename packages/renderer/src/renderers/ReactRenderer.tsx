@@ -740,6 +740,7 @@ const LoadingDisplay: React.FC<{
 export class ReactRenderer extends BaseRenderer {
   private _root: ReactDOM.Root | null = null;
   protected resolveAction: ((value: string) => void) | null = null;  // Changed to protected
+  private _originalHandleAction: ((id: string) => void) | null = null;  // Saved for cancellation
   private instanceId: string;
   protected backgroundImageUrl: string | null = null;  // Changed to protected
   private assetResolver: ((assetId: string) => string | undefined) | null = null;  // NEW: Asset resolver function
@@ -930,6 +931,19 @@ export class ReactRenderer extends BaseRenderer {
       console.warn(`[ReactRenderer ${this.instanceId}] handleAction called but no resolveAction pending!`);
     }
   };
+
+  /**
+   * Cancel any pending action (e.g., when a timer interrupt fires a new beat).
+   * Restores the original handleAction if it was wrapped by keypad/inputText,
+   * and nulls out resolveAction so the old beat's promise never resolves.
+   */
+  cancelPendingAction(): void {
+    if (this._originalHandleAction) {
+      this.handleAction = this._originalHandleAction;
+      this._originalHandleAction = null;
+    }
+    this.resolveAction = null;
+  }
 
   /**
    * Set the asset resolver function
@@ -1762,9 +1776,11 @@ export class ReactRenderer extends BaseRenderer {
     return new Promise<string>(resolve => {
       // Store the original resolveAction so we can call it with the input value
       const originalHandleAction = this.handleAction;
+      this._originalHandleAction = originalHandleAction;  // Save for cancelPendingAction
       this.handleAction = (value: string) => {
         // Restore original handler
         this.handleAction = originalHandleAction;
+        this._originalHandleAction = null;
         // Resolve with the input value
         resolve(value);
       };
@@ -1822,8 +1838,10 @@ export class ReactRenderer extends BaseRenderer {
 
     return new Promise<string>(resolve => {
       const originalHandleAction = this.handleAction;
+      this._originalHandleAction = originalHandleAction;  // Save for cancelPendingAction
       this.handleAction = (value: string) => {
         this.handleAction = originalHandleAction;
+        this._originalHandleAction = null;
         resolve(value);
       };
 
@@ -1956,6 +1974,9 @@ export class ReactRenderer extends BaseRenderer {
 
     // Clear background
     this.backgroundImageUrl = null;
+
+    // Cancel any pending action from a previous beat
+    this.cancelPendingAction();
 
     // Reset HUD overlay state (config is kept — only live state resets)
     this.timerHudState = undefined;
