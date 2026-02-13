@@ -128,6 +128,9 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               ASAPS
             </span>
+            <span className="text-xs text-gray-400 font-normal">
+              v{__APP_VERSION__}
+            </span>
           </div>
 
           {/* Story Title - More prominent, no-drag so it's editable */}

@@ -68,6 +68,26 @@ Respond with JSON in this exact structure:
 5. When conversation ends, the FINAL choice text is the player's last line + target to exit
 6. DO NOT create extra nesting just for continuation - keep trees as flat as possible
 
+## Presentation Modes
+The dialogTree supports different presentation styles via "presentationMode" parameter:
+- "positioned" (default): Traditional positioned text boxes at fixed screen locations
+- "chat-scroll": Scrollable chat history like a messaging app
+- "chat-bubble": Single message bubble that replaces previous content
+Additional options:
+- "showAvatars": boolean (default true) - Show character avatars in chat modes
+- "responseDelay": number (seconds) - NPC typing delay before response
+- "choiceDelay": number (seconds) - Delay before choices appear
+
+## Counter Effects on Choices
+Choices can modify counters directly:
+- "counter": counter name (e.g., "trust", "fear")
+- "counterOperation": "set" or "change" (increment)
+- "counterValue": numeric value
+Example: { "text": "Be friendly", "target": "next", "counter": "trust", "counterOperation": "change", "counterValue": 1 }
+
+## Sound Effects on Choices
+Choices can trigger sounds: { "soundEffect": "click.mp3" }
+
 ## Writing Guidelines
 1. Keep dialog natural and conversational
 2. Player choices should be distinct and meaningful
