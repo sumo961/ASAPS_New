@@ -99,7 +99,7 @@ export class ConditionBeat extends Beat {
     switch (this.conditionType) {
       case 'counter':
         condition.variableName = this.variableName || this.variable;
-        condition.value = this.value ?? this.val;
+        condition.value = this.value ?? this.val ?? 0;
         break;
       case 'counterCompare':
         condition.counter1 = this.counter1;
@@ -107,7 +107,7 @@ export class ConditionBeat extends Beat {
         break;
       case 'timer':
         condition.timer = this.timer;
-        condition.value = this.value ?? this.val;
+        condition.value = this.value ?? this.val ?? 0;
         break;
       case 'inventory':
         condition.item = this.item;

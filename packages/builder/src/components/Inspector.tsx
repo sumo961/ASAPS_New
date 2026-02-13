@@ -2836,7 +2836,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                   )}
                 </div>
 
-                {/* Advanced Settings Toggle */}
+                {/* Advanced Settings Toggle - only for visible beats (not logic/invisible beats) */}
+                {!['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition'].includes(getCanonicalBeatType(beat.type)) && (
                 <div className="border-t pt-4">
                   <button
                     onClick={() => setShowAdvanced(!showAdvanced)}
@@ -2846,6 +2847,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     {showAdvanced ? 'Hide' : 'Show'} Advanced Options
                   </button>
                 </div>
+                )}
 
               </div>
             </div>

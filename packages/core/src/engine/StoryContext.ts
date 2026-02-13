@@ -396,12 +396,18 @@ export class StoryContext extends EventEmitter {
 
     let leftValue: any;
     // Support both new (value) and old (right) field names
-    const rightValue = condition.value !== undefined ? condition.value : condition.right;
+    let rightValue: any = condition.value !== undefined ? condition.value : condition.right;
 
     // Resolve left value based on condition type
     switch (condition.type) {
       case 'counter':
         leftValue = this.state.counters[varName] || 0;
+        // Ensure rightValue is numeric for counter comparisons (guards against undefined/NaN)
+        if (rightValue === undefined || rightValue === null || Number.isNaN(Number(rightValue))) {
+          rightValue = 0;
+        } else {
+          rightValue = Number(rightValue);
+        }
         console.log(`[StoryContext] Counter check: "${varName}" = ${leftValue}, comparing ${condition.operator} ${rightValue}, all counters:`, JSON.stringify(this.state.counters));
         break;
       case 'variable':
@@ -409,6 +415,12 @@ export class StoryContext extends EventEmitter {
         break;
       case 'timer':
         leftValue = this.state.timers[varName]?.value || 0;
+        // Ensure rightValue is numeric for timer comparisons
+        if (rightValue === undefined || rightValue === null || Number.isNaN(Number(rightValue))) {
+          rightValue = 0;
+        } else {
+          rightValue = Number(rightValue);
+        }
         break;
       default:
         // Fallback to the old resolveValue method for backward compatibility
