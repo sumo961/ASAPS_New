@@ -1057,19 +1057,22 @@ export const PreviewWindow: React.FC = () => {
         stateChangeUnsubscribeRef.current = null;
       }
 
+      // Set per-beat timer HUD override text BEFORE performAction renders (beatChanged fires before render)
+      const onBeatChanged = ({ beatId }: { beatId: string }) => {
+        const beat = story.getBeat(beatId);
+        if (rendererRef.current && beat) {
+          const overrideText = (beat as any)?.timeDisplayText || undefined;
+          (rendererRef.current as any).setTimerHudOverrideText?.(overrideText);
+        }
+      };
+      context.on('beatChanged', onBeatChanged);
+
       const unsubscribe = (rendererRef.current as any).onStateChange?.('currentBeatInfo', (beatInfo: { id: string; name: string; type: string } | null) => {
         if (beatInfo) {
           const beat = story.getBeat(beatInfo.id);
           setCurrentBeat(beat || null);
           // Update debug info when beat changes
           updateDebugInfo();
-
-          // Set per-beat timer HUD override text (for static mode)
-          if (rendererRef.current) {
-            const params = beat?.getParameters?.() || {};
-            const overrideText = params.timeDisplayText || undefined;
-            (rendererRef.current as any).setTimerHudOverrideText?.(overrideText);
-          }
         }
       });
 
@@ -1118,11 +1121,11 @@ export const PreviewWindow: React.FC = () => {
         }
       };
 
-      // Also update timer HUD state for named timers (not just defaultTarget)
+      // Update timer HUD state for named timers (auto-detect: always supply timer data when available)
       const updateTimerHud = () => {
         if (!rendererRef.current) return;
         const hudConfig = (rendererRef.current as any).timerHudConfig;
-        if (!hudConfig?.enabled || hudConfig.mode !== 'timer') return;
+        if (!hudConfig?.enabled) return;
 
         const timers = timerManager.getActiveTimers();
         // Find the matching timer by name, or first active if timerName is empty
@@ -1178,7 +1181,7 @@ export const PreviewWindow: React.FC = () => {
       timerManager.on('timerExpired', ({ name }: { name: string }) => {
         if (!rendererRef.current) return;
         const hudConfig = (rendererRef.current as any).timerHudConfig;
-        if (!hudConfig?.enabled || hudConfig.mode !== 'timer') return;
+        if (!hudConfig?.enabled) return;
         const matchesName = !hudConfig.timerName || hudConfig.timerName === name;
         if (matchesName) {
           const currentState = (rendererRef.current as any).timerHudState;

@@ -85,7 +85,7 @@ interface GlobalSettings {
   hudOverlays?: {
     timerHud?: {
       enabled: boolean;
-      mode: 'timer' | 'static';
+      mode?: 'timer' | 'static'; // Deprecated: HUD auto-detects
       timerName: string;
       staticText: string;
       position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -1679,7 +1679,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       checked={settings.hudOverlays?.timerHud?.enabled || false}
                       onChange={(e) => {
                         const current = settings.hudOverlays?.timerHud || {
-                          enabled: false, mode: 'timer' as const, timerName: '', staticText: '',
+                          enabled: false, timerName: '', staticText: '',
                           position: 'top-right' as const, style: 'digital' as const, fontSize: 24,
                           textColor: '#00ff00', backgroundColor: '#000000', backgroundOpacity: 80,
                           borderRadius: 8, padding: 12, showLabel: false, label: 'Time',
@@ -1714,58 +1714,43 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   };
                   return (
                     <div className="space-y-3 pt-2">
-                      {/* Mode selector */}
+                      <p className="text-xs text-gray-500">
+                        Auto-detects what to show: active timer countdown takes priority, then per-beat time text, then default text below.
+                      </p>
+
+                      {/* Timer settings */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">Mode</label>
-                        <select
-                          value={timerHud.mode}
-                          onChange={(e) => updateTimerHud({ mode: e.target.value as 'timer' | 'static' })}
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Timer Name</label>
+                        <input
+                          type="text"
+                          value={timerHud.timerName}
+                          onChange={(e) => updateTimerHud({ timerName: e.target.value })}
+                          placeholder="Leave empty for first active timer"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        >
-                          <option value="timer">Timer Countdown (real-time)</option>
-                          <option value="static">Static Text (narrative time)</option>
-                        </select>
+                        />
                       </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={timerHud.showWhenInactive}
+                          onChange={(e) => updateTimerHud({ showWhenInactive: e.target.checked })}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-gray-600">Show "00:00" when no timer active</span>
+                      </label>
 
-                      {/* Timer mode fields */}
-                      {timerHud.mode === 'timer' && (
-                        <>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Timer Name</label>
-                            <input
-                              type="text"
-                              value={timerHud.timerName}
-                              onChange={(e) => updateTimerHud({ timerName: e.target.value })}
-                              placeholder="Leave empty for first active timer"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                            />
-                          </div>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={timerHud.showWhenInactive}
-                              onChange={(e) => updateTimerHud({ showWhenInactive: e.target.checked })}
-                              className="rounded"
-                            />
-                            <span className="text-sm text-gray-600">Show "00:00" when no timer active</span>
-                          </label>
-                        </>
-                      )}
-
-                      {/* Static mode fields */}
-                      {timerHud.mode === 'static' && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-600 mb-1">Default Text</label>
-                          <input
-                            type="text"
-                            value={timerHud.staticText}
-                            onChange={(e) => updateTimerHud({ staticText: e.target.value })}
-                            placeholder="e.g. 9:00 AM, Day 1, 2h left"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          />
-                          <p className="text-xs text-gray-400 mt-1">Per-beat overrides can be set in beat inspector's Advanced section.</p>
-                        </div>
-                      )}
+                      {/* Default static text */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Default Text</label>
+                        <input
+                          type="text"
+                          value={timerHud.staticText}
+                          onChange={(e) => updateTimerHud({ staticText: e.target.value })}
+                          placeholder="e.g. 9:00 AM, Day 1, 2h left"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Shown when no timer is running. Per-beat overrides can be set in beat inspector's Advanced section.</p>
+                      </div>
 
                       {/* Position */}
                       <div>

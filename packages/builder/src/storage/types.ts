@@ -93,7 +93,7 @@ export interface GlobalSettings {
   hudOverlays?: {
     timerHud?: {
       enabled: boolean;
-      mode: 'timer' | 'static';
+      mode?: 'timer' | 'static'; // Deprecated: HUD auto-detects
       timerName: string;
       staticText: string;
       position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';

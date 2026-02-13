@@ -488,6 +488,8 @@ export interface PositionedBeatViewProps {
   timerHudState?: { remainingTime: number; totalTime: number };
   /** Subscribe to timer HUD state updates */
   onSubscribeTimerHudState?: (listener: (state: { remainingTime: number; totalTime: number } | undefined) => void) => () => void;
+  /** Subscribe to timer HUD override text updates */
+  onSubscribeTimerHudOverrideText?: (listener: (text: string | undefined) => void) => () => void;
   /** Countdown meter HUD configuration from global settings */
   countdownMeterConfig?: import('./CountdownMeterHud').CountdownMeterConfig;
   /** Current counter value for countdown meter HUD */
@@ -796,9 +798,10 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   beatType,
   editorMode = false,
   timerHudConfig,
-  timerHudOverrideText,
+  timerHudOverrideText: initialTimerHudOverrideText,
   timerHudState: initialTimerHudState,
   onSubscribeTimerHudState,
+  onSubscribeTimerHudOverrideText,
   countdownMeterConfig,
   countdownMeterValue,
 }) => {
@@ -835,6 +838,16 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       return unsubscribe;
     }
   }, [onSubscribeTimerHudState]);
+
+  // State for timer HUD override text - subscribes to updates for per-beat text changes
+  const [timerHudOverrideText, setTimerHudOverrideText] = React.useState(initialTimerHudOverrideText);
+
+  React.useEffect(() => {
+    if (onSubscribeTimerHudOverrideText) {
+      const unsubscribe = onSubscribeTimerHudOverrideText(setTimerHudOverrideText);
+      return unsubscribe;
+    }
+  }, [onSubscribeTimerHudOverrideText]);
 
   // Animation state for button fade-in after text animation completes
   const [animationsComplete, setAnimationsComplete] = React.useState(false);

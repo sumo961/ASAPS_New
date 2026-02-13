@@ -18,6 +18,7 @@ export interface SerializedStoryData {
     type: string;
     x?: number;
     y?: number;
+    timeDisplayText?: string;
     parameters: Record<string, any>;
     connections: Array<{ targetId: string; label?: string; condition?: any }>;
     locations?: any[];

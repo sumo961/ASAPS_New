@@ -3129,6 +3129,7 @@ function App() {
       defaultTargetDelay: beat.defaultTargetDelay,
       showTimer: beat.showTimer,
       notes: beat.notes,
+      timeDisplayText: beat.timeDisplayText,
       parameters: beat.getParameters?.() || {},
       connections: beat.connections?.map(conn => ({
         targetId: conn.targetId,

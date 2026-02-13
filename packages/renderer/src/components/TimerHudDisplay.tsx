@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 
 export interface TimerHudConfig {
   enabled: boolean;
-  mode: 'timer' | 'static';
+  mode?: 'timer' | 'static'; // Deprecated: HUD auto-detects
   timerName: string;
   staticText: string;
   position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -78,33 +78,33 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
   visible,
   config,
 }) => {
-  // Determine display content based on mode
-  const content = useMemo(() => {
-    if (config.mode === 'static') {
-      // Static mode: show override text or global default
-      return displayText || config.staticText || '';
-    }
-    // Timer mode: show countdown
-    if (remainingTime !== undefined && remainingTime >= 0) {
-      return formatTime(remainingTime);
-    }
-    // No active timer
-    if (config.showWhenInactive) {
-      return '00:00';
-    }
-    return null;
-  }, [config.mode, config.staticText, config.showWhenInactive, remainingTime, displayText]);
+  // Auto-detect what to display: timer countdown takes priority when running,
+  // then per-beat override text, then global static text, then hide
+  const isTimerActive = remainingTime !== undefined && remainingTime >= 0;
 
-  // Timer mode color shift: green -> yellow -> red
+  const content = useMemo(() => {
+    // Active timer countdown always takes priority
+    if (isTimerActive) {
+      return formatTime(remainingTime!);
+    }
+    // Per-beat override text or global static default
+    if (displayText) return displayText;
+    if (config.staticText) return config.staticText;
+    // Show inactive timer placeholder if configured
+    if (config.showWhenInactive) return '00:00';
+    return null;
+  }, [isTimerActive, config.staticText, config.showWhenInactive, remainingTime, displayText]);
+
+  // Color shift when timer is counting down: green -> yellow -> red
   const timerColor = useMemo(() => {
-    if (config.mode !== 'timer' || !totalTime || totalTime <= 0 || remainingTime === undefined) {
+    if (!isTimerActive || !totalTime || totalTime <= 0) {
       return config.textColor;
     }
     const ratio = remainingTime / totalTime;
     if (ratio > 0.5) return config.textColor; // Normal
     if (ratio > 0.25) return '#EAB308'; // Yellow warning
     return '#EF4444'; // Red critical
-  }, [config.mode, config.textColor, remainingTime, totalTime]);
+  }, [isTimerActive, config.textColor, remainingTime, totalTime]);
 
   if (!visible || !config.enabled || content === null || content === '') {
     return null;
@@ -165,7 +165,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
       <div
         style={{
           fontSize: config.fontSize,
-          color: config.mode === 'timer' ? timerColor : config.textColor,
+          color: timerColor,
           fontFamily: isDigital ? '"Courier New", "Consolas", monospace' : 'inherit',
           fontWeight: isDigital ? 700 : 500,
           letterSpacing: isDigital ? '0.05em' : 'normal',
