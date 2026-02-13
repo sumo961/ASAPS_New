@@ -249,6 +249,41 @@ describe('Beat Base Class', () => {
     });
   });
 
+  describe('toJSON serialization', () => {
+    it('should serialize timeDisplayMode', () => {
+      const config: BeatConfig = {
+        ...beatConfig,
+        timeDisplayMode: 'none',
+      } as any;
+      const beat = new TestBeat(config);
+      (beat as any).timeDisplayMode = 'none';
+      const json = beat.toJSON();
+      expect(json.timeDisplayMode).toBe('none');
+    });
+
+    it('should serialize timeDisplayText', () => {
+      const beat = new TestBeat(beatConfig);
+      (beat as any).timeDisplayText = 'Meanwhile...';
+      const json = beat.toJSON();
+      expect(json.timeDisplayText).toBe('Meanwhile...');
+    });
+
+    it('should serialize overrideCountdownMeter', () => {
+      const beat = new TestBeat(beatConfig);
+      (beat as any).overrideCountdownMeter = true;
+      const json = beat.toJSON();
+      expect(json.overrideCountdownMeter).toBe(true);
+    });
+
+    it('should serialize all base beat properties', () => {
+      const beat = new TestBeat(beatConfig);
+      const json = beat.toJSON();
+      expect(json.id).toBe(beatConfig.id);
+      expect(json.name).toBe(beatConfig.name);
+      expect(json.type).toBe(beatConfig.type);
+    });
+  });
+
   describe.skip('Clone', () => {
     // Clone method not yet implemented
     it('should create a deep copy of the beat', () => {

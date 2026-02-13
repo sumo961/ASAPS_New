@@ -115,7 +115,7 @@ describe('SetVariableBeat', () => {
       });
 
       const params = beat.getParameters();
-      expect(params).toEqual({
+      expect(params).toMatchObject({
         type: 'counter',
         name: 'health',
         value: 50,
@@ -542,6 +542,176 @@ describe('SetVariableBeat', () => {
 
       const result = await beat.execute(context, renderer);
       expect(result).toBeNull();
+    });
+  });
+
+  describe('fictional time operations', () => {
+    it('should set fictional time', async () => {
+      const beat = new SetVariableBeat({
+        id: 'sv1',
+        name: 'Set Time',
+        type: 'setVariable',
+        parameters: {
+          type: 'fictionalTime',
+          operation: 'set',
+          timeYear: 1929,
+          timeMonth: 1,
+          timeDay: 15,
+          timeHour: 9,
+          timeMinute: 0,
+        },
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+      const ft = context.getFictionalTime();
+      expect(ft).toEqual({ year: 1929, month: 1, day: 15, hour: 9, minute: 0 });
+    });
+
+    it('should advance fictional time', async () => {
+      context.setFictionalTime({ year: 1929, month: 1, day: 15, hour: 9, minute: 0 });
+
+      const beat = new SetVariableBeat({
+        id: 'sv1',
+        name: 'Advance Time',
+        type: 'setVariable',
+        parameters: {
+          type: 'fictionalTime',
+          operation: 'advance',
+          value: 3,
+          timeUnit: 'hours',
+        },
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+      expect(context.getFictionalTime()!.hour).toBe(12);
+    });
+
+    it('should subtract fictional time (time travel)', async () => {
+      context.setFictionalTime({ year: 1929, month: 1, day: 15, hour: 9, minute: 0 });
+
+      const beat = new SetVariableBeat({
+        id: 'sv1',
+        name: 'Subtract Time',
+        type: 'setVariable',
+        parameters: {
+          type: 'fictionalTime',
+          operation: 'subtract',
+          value: 2,
+          timeUnit: 'days',
+        },
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beat.execute(context, renderer);
+      expect(context.getFictionalTime()!.day).toBe(13);
+    });
+
+    it('should not require variableName for fictionalTime type', async () => {
+      const beat = new SetVariableBeat({
+        id: 'sv1',
+        name: 'Set Time (no name)',
+        type: 'setVariable',
+        parameters: {
+          type: 'fictionalTime',
+          operation: 'set',
+          timeYear: 2024,
+          timeMonth: 6,
+          timeDay: 15,
+          timeHour: 12,
+          timeMinute: 0,
+        },
+        connections: [{ targetId: 'next' }],
+      });
+
+      const result = await beat.execute(context, renderer);
+      expect(result).toBe('next');
+      expect(context.getFictionalTime()).toBeDefined();
+    });
+
+    it('should advance by different time units', async () => {
+      context.setFictionalTime({ year: 2024, month: 1, day: 1, hour: 0, minute: 0 });
+
+      // Advance by months
+      const beatMonths = new SetVariableBeat({
+        id: 'sv1',
+        name: 'Advance Months',
+        type: 'setVariable',
+        parameters: {
+          type: 'fictionalTime',
+          operation: 'advance',
+          value: 3,
+          timeUnit: 'months',
+        },
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beatMonths.execute(context, renderer);
+      expect(context.getFictionalTime()!.month).toBe(4);
+
+      // Advance by years
+      const beatYears = new SetVariableBeat({
+        id: 'sv2',
+        name: 'Advance Years',
+        type: 'setVariable',
+        parameters: {
+          type: 'fictionalTime',
+          operation: 'advance',
+          value: 1,
+          timeUnit: 'years',
+        },
+        connections: [{ targetId: 'next' }],
+      });
+
+      await beatYears.execute(context, renderer);
+      expect(context.getFictionalTime()!.year).toBe(2025);
+    });
+
+    it('should serialize fictional time parameters', () => {
+      const beat = new SetVariableBeat({
+        id: 'sv1',
+        name: 'FT Beat',
+        type: 'setVariable',
+        parameters: {
+          type: 'fictionalTime',
+          operation: 'set',
+          timeYear: 1968,
+          timeMonth: 4,
+          timeDay: 4,
+          timeHour: 9,
+          timeMinute: 30,
+        },
+      });
+
+      const params = beat.getParameters();
+      expect(params.type).toBe('fictionalTime');
+      expect(params.timeYear).toBe(1968);
+      expect(params.timeMonth).toBe(4);
+      expect(params.timeDay).toBe(4);
+      expect(params.timeHour).toBe(9);
+      expect(params.timeMinute).toBe(30);
+    });
+
+    it('should update fictional time parameters', () => {
+      const beat = new SetVariableBeat({
+        id: 'sv1',
+        name: 'FT Beat',
+        type: 'setVariable',
+      });
+
+      beat.updateParameters({
+        type: 'fictionalTime',
+        operation: 'advance',
+        timeUnit: 'days',
+        timeYear: 2000,
+      });
+
+      const params = beat.getParameters();
+      expect(params.type).toBe('fictionalTime');
+      expect(params.operation).toBe('advance');
+      expect(params.timeUnit).toBe('days');
+      expect(params.timeYear).toBe(2000);
     });
   });
 

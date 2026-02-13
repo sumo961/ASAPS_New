@@ -875,6 +875,270 @@ describe('StoryContext', () => {
     });
   });
 
+  describe('fictional time', () => {
+    it('should not have fictional time by default', () => {
+      expect(context.getFictionalTime()).toBeUndefined();
+    });
+
+    it('should set and get fictional time', () => {
+      context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+      const ft = context.getFictionalTime();
+      expect(ft).toEqual({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+    });
+
+    it('should return a copy (not a reference)', () => {
+      context.setFictionalTime({ year: 2024, month: 1, day: 1, hour: 0, minute: 0 });
+      const ft = context.getFictionalTime()!;
+      ft.year = 9999;
+      expect(context.getFictionalTime()!.year).toBe(2024);
+    });
+
+    it('should emit fictionalTimeChanged on set', () => {
+      const listener = vi.fn();
+      context.on('fictionalTimeChanged', listener);
+      context.setFictionalTime({ year: 1929, month: 1, day: 15, hour: 9, minute: 0 });
+      expect(listener).toHaveBeenCalledWith({ year: 1929, month: 1, day: 15, hour: 9, minute: 0 });
+    });
+
+    describe('advanceFictionalTime', () => {
+      beforeEach(() => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+      });
+
+      it('should do nothing if no fictional time is set', () => {
+        const fresh = new StoryContext();
+        fresh.advanceFictionalTime(1, 'hours');
+        expect(fresh.getFictionalTime()).toBeUndefined();
+      });
+
+      it('should advance by minutes', () => {
+        context.advanceFictionalTime(30, 'minutes');
+        expect(context.getFictionalTime()).toEqual({ year: 1968, month: 4, day: 4, hour: 9, minute: 30 });
+      });
+
+      it('should advance by hours', () => {
+        context.advanceFictionalTime(3, 'hours');
+        expect(context.getFictionalTime()).toEqual({ year: 1968, month: 4, day: 4, hour: 12, minute: 0 });
+      });
+
+      it('should advance by days', () => {
+        context.advanceFictionalTime(2, 'days');
+        expect(context.getFictionalTime()).toEqual({ year: 1968, month: 4, day: 6, hour: 9, minute: 0 });
+      });
+
+      it('should advance by months', () => {
+        context.advanceFictionalTime(1, 'months');
+        expect(context.getFictionalTime()).toEqual({ year: 1968, month: 5, day: 4, hour: 9, minute: 0 });
+      });
+
+      it('should advance by years', () => {
+        context.advanceFictionalTime(1, 'years');
+        expect(context.getFictionalTime()).toEqual({ year: 1969, month: 4, day: 4, hour: 9, minute: 0 });
+      });
+
+      it('should handle month rollover', () => {
+        context.setFictionalTime({ year: 1968, month: 12, day: 31, hour: 23, minute: 30 });
+        context.advanceFictionalTime(1, 'hours');
+        const ft = context.getFictionalTime()!;
+        expect(ft.year).toBe(1969);
+        expect(ft.month).toBe(1);
+        expect(ft.day).toBe(1);
+        expect(ft.hour).toBe(0);
+        expect(ft.minute).toBe(30);
+      });
+
+      it('should subtract time (negative amount)', () => {
+        context.advanceFictionalTime(-2, 'days');
+        expect(context.getFictionalTime()).toEqual({ year: 1968, month: 4, day: 2, hour: 9, minute: 0 });
+      });
+
+      it('should emit fictionalTimeChanged on advance', () => {
+        const listener = vi.fn();
+        context.on('fictionalTimeChanged', listener);
+        context.advanceFictionalTime(1, 'hours');
+        expect(listener).toHaveBeenCalled();
+      });
+    });
+
+    describe('formatFictionalTime', () => {
+      beforeEach(() => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+      });
+
+      it('should return empty string if no fictional time set', () => {
+        const fresh = new StoryContext();
+        expect(fresh.formatFictionalTime('date')).toBe('');
+      });
+
+      it('should format as 12h time', () => {
+        expect(context.formatFictionalTime('time-12h')).toBe('9:00 AM');
+      });
+
+      it('should format PM correctly', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 21, minute: 30 });
+        expect(context.formatFictionalTime('time-12h')).toBe('9:30 PM');
+      });
+
+      it('should format midnight as 12:00 AM', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 0, minute: 0 });
+        expect(context.formatFictionalTime('time-12h')).toBe('12:00 AM');
+      });
+
+      it('should format noon as 12:00 PM', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 12, minute: 0 });
+        expect(context.formatFictionalTime('time-12h')).toBe('12:00 PM');
+      });
+
+      it('should format as 24h time', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 21, minute: 5 });
+        expect(context.formatFictionalTime('time-24h')).toBe('21:05');
+      });
+
+      it('should format as date', () => {
+        expect(context.formatFictionalTime('date')).toBe('4 April 1968');
+      });
+
+      it('should format as datetime 12h', () => {
+        expect(context.formatFictionalTime('datetime-12h')).toBe('4 April 1968, 9:00 AM');
+      });
+
+      it('should format as datetime 24h', () => {
+        expect(context.formatFictionalTime('datetime-24h')).toBe('4 April 1968, 09:00');
+      });
+
+      it('should format as year only', () => {
+        expect(context.formatFictionalTime('year')).toBe('1968');
+      });
+
+      it('should format as day-number from initial', () => {
+        const initial = { year: 1968, month: 4, day: 1, hour: 0, minute: 0 };
+        expect(context.formatFictionalTime('day-number', initial)).toBe('Day 4');
+      });
+
+      it('should return Day 1 without initial time', () => {
+        expect(context.formatFictionalTime('day-number')).toBe('Day 1');
+      });
+    });
+
+    describe('fictionalTime condition', () => {
+      it('should return false if no fictional time set', () => {
+        const result = context.checkCondition({
+          type: 'fictionalTime',
+          operator: '>',
+          compareTime: { year: 1960, month: 1, day: 1, hour: 0, minute: 0 },
+        });
+        expect(result).toBe(false);
+      });
+
+      it('should return false if no compareTime', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+        const result = context.checkCondition({
+          type: 'fictionalTime',
+          operator: '>',
+        });
+        expect(result).toBe(false);
+      });
+
+      it('should check "after" (>) correctly', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+        expect(context.checkCondition({
+          type: 'fictionalTime',
+          operator: '>',
+          compareTime: { year: 1960, month: 1, day: 1, hour: 0, minute: 0 },
+        })).toBe(true);
+        expect(context.checkCondition({
+          type: 'fictionalTime',
+          operator: '>',
+          compareTime: { year: 1970, month: 1, day: 1, hour: 0, minute: 0 },
+        })).toBe(false);
+      });
+
+      it('should check "before" (<) correctly', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+        expect(context.checkCondition({
+          type: 'fictionalTime',
+          operator: '<',
+          compareTime: { year: 1970, month: 1, day: 1, hour: 0, minute: 0 },
+        })).toBe(true);
+      });
+
+      it('should check "exactly" (==) correctly', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+        expect(context.checkCondition({
+          type: 'fictionalTime',
+          operator: '==',
+          compareTime: { year: 1968, month: 4, day: 4, hour: 9, minute: 0 },
+        })).toBe(true);
+        expect(context.checkCondition({
+          type: 'fictionalTime',
+          operator: '==',
+          compareTime: { year: 1968, month: 4, day: 4, hour: 9, minute: 1 },
+        })).toBe(false);
+      });
+
+      it('should check "not equal" (!=) correctly', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+        expect(context.checkCondition({
+          type: 'fictionalTime',
+          operator: '!=',
+          compareTime: { year: 1970, month: 1, day: 1, hour: 0, minute: 0 },
+        })).toBe(true);
+      });
+
+      it('should check ">=" correctly', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+        expect(context.checkCondition({
+          type: 'fictionalTime',
+          operator: '>=',
+          compareTime: { year: 1968, month: 4, day: 4, hour: 9, minute: 0 },
+        })).toBe(true);
+        expect(context.checkCondition({
+          type: 'fictionalTime',
+          operator: '>=',
+          compareTime: { year: 1968, month: 4, day: 3, hour: 0, minute: 0 },
+        })).toBe(true);
+      });
+
+      it('should check "<=" correctly', () => {
+        context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+        expect(context.checkCondition({
+          type: 'fictionalTime',
+          operator: '<=',
+          compareTime: { year: 1968, month: 4, day: 4, hour: 9, minute: 0 },
+        })).toBe(true);
+      });
+    });
+
+    describe('serialization', () => {
+      it('should serialize fictional time', () => {
+        context.setFictionalTime({ year: 1929, month: 1, day: 15, hour: 9, minute: 0 });
+        const serialized = context.serialize();
+        expect(serialized.fictionalTime).toEqual({ year: 1929, month: 1, day: 15, hour: 9, minute: 0 });
+      });
+
+      it('should serialize undefined fictional time', () => {
+        const serialized = context.serialize();
+        expect(serialized.fictionalTime).toBeUndefined();
+      });
+
+      it('should restore fictional time from serialized state', () => {
+        context.setFictionalTime({ year: 1929, month: 1, day: 15, hour: 9, minute: 0 });
+        const serialized = context.serialize();
+
+        const restored = new StoryContext();
+        restored.loadFromSerialized(serialized);
+        expect(restored.getFictionalTime()).toEqual({ year: 1929, month: 1, day: 15, hour: 9, minute: 0 });
+      });
+
+      it('should handle loading serialized state without fictional time', () => {
+        const serialized = context.serialize();
+        const restored = new StoryContext();
+        restored.loadFromSerialized(serialized);
+        expect(restored.getFictionalTime()).toBeUndefined();
+      });
+    });
+  });
+
   describe('current beat management', () => {
     it('should get current beat ID', () => {
       expect(context.getCurrentBeatId()).toBe('0');

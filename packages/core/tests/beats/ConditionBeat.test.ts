@@ -792,6 +792,161 @@ describe('ConditionBeat', () => {
     });
   });
 
+  describe('fictionalTime condition', () => {
+    it('should build fictionalTime condition with compareTime', () => {
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Time Check',
+        type: 'conditionBeat',
+        parameters: {
+          conditionType: 'fictionalTime',
+          operator: '>',
+          timeYear: 1969,
+          timeMonth: 1,
+          timeDay: 1,
+          timeHour: 0,
+          timeMinute: 0,
+          trueTarget: 'after',
+          falseTarget: 'before',
+        },
+      });
+
+      expect(beat.condition.type).toBe('fictionalTime');
+      expect(beat.condition.operator).toBe('>');
+      expect(beat.condition.compareTime).toEqual({
+        year: 1969, month: 1, day: 1, hour: 0, minute: 0,
+      });
+    });
+
+    it('should route to trueTarget when time is after compareTime', async () => {
+      context.setFictionalTime({ year: 1970, month: 6, day: 15, hour: 12, minute: 0 });
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'After 1969?',
+        type: 'conditionBeat',
+        parameters: {
+          conditionType: 'fictionalTime',
+          operator: '>',
+          timeYear: 1969,
+          timeMonth: 1,
+          timeDay: 1,
+          timeHour: 0,
+          timeMinute: 0,
+          trueTarget: 'future',
+          falseTarget: 'past',
+        },
+      });
+
+      const result = await beat.execute(context, renderer);
+      expect(result).toBe('future');
+    });
+
+    it('should route to falseTarget when time is before compareTime', async () => {
+      context.setFictionalTime({ year: 1960, month: 1, day: 1, hour: 0, minute: 0 });
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'After 1969?',
+        type: 'conditionBeat',
+        parameters: {
+          conditionType: 'fictionalTime',
+          operator: '>',
+          timeYear: 1969,
+          timeMonth: 1,
+          timeDay: 1,
+          timeHour: 0,
+          timeMinute: 0,
+          trueTarget: 'future',
+          falseTarget: 'past',
+        },
+      });
+
+      const result = await beat.execute(context, renderer);
+      expect(result).toBe('past');
+    });
+
+    it('should handle exact time match with == operator', async () => {
+      context.setFictionalTime({ year: 1968, month: 4, day: 4, hour: 9, minute: 0 });
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'Exact Time?',
+        type: 'conditionBeat',
+        parameters: {
+          conditionType: 'fictionalTime',
+          operator: '==',
+          timeYear: 1968,
+          timeMonth: 4,
+          timeDay: 4,
+          timeHour: 9,
+          timeMinute: 0,
+          trueTarget: 'match',
+          falseTarget: 'no-match',
+        },
+      });
+
+      const result = await beat.execute(context, renderer);
+      expect(result).toBe('match');
+    });
+
+    it('should always be valid (no variable name needed)', async () => {
+      context.setFictionalTime({ year: 2024, month: 1, day: 1, hour: 0, minute: 0 });
+
+      const beat = new ConditionBeat({
+        id: 'cond1',
+        name: 'FT Condition',
+        type: 'conditionBeat',
+        parameters: {
+          conditionType: 'fictionalTime',
+          operator: '<',
+          timeYear: 2025,
+          timeMonth: 1,
+          timeDay: 1,
+          timeHour: 0,
+          timeMinute: 0,
+          trueTarget: 'yes',
+          falseTarget: 'no',
+        },
+      });
+
+      const result = await beat.execute(context, renderer);
+      expect(result).toBe('yes');
+    });
+
+    it('should serialize and restore fictionalTime condition', () => {
+      const original = new ConditionBeat({
+        id: 'cond1',
+        name: 'FT Serialize',
+        type: 'conditionBeat',
+        parameters: {
+          conditionType: 'fictionalTime',
+          operator: '>=',
+          timeYear: 1929,
+          timeMonth: 1,
+          timeDay: 15,
+          timeHour: 9,
+          timeMinute: 0,
+          trueTarget: 'yes',
+          falseTarget: 'no',
+        },
+      });
+
+      const json = original.toJSON();
+      const restored = new ConditionBeat(json);
+
+      expect(restored.conditionType).toBe('fictionalTime');
+      expect(restored.timeYear).toBe(1929);
+      expect(restored.timeMonth).toBe(1);
+      expect(restored.timeDay).toBe(15);
+      expect(restored.timeHour).toBe(9);
+      expect(restored.timeMinute).toBe(0);
+      expect(restored.condition.compareTime).toEqual({
+        year: 1929, month: 1, day: 15, hour: 9, minute: 0,
+      });
+    });
+  });
+
   describe('toJSON / fromConfig serialization', () => {
     it('should serialize and deserialize correctly', () => {
       const original = new ConditionBeat({

@@ -180,11 +180,14 @@ MULTIPLE CONNECTION beats (targets in PARAMETERS, NOT connections array):
 - movementChoice: Location/action choices. Parameters: { choices: [{ id, text, target }] }
 - pickProp: Prop selection. Parameters: { props: [{ name, target }] }
 - hyperText: Clickable text. Parameters: { text, hyperlinks: [{ word, targetBeatId }] }
-- conditionBeat: Conditional branch. Parameters: { variableName, operator, value, trueTarget, falseTarget }
+- conditionBeat: Conditional branch. Parameters: { condition: { type, variable/item, operator, value, compareTime? }, trueConnection: { target }, falseConnection: { target } }. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat, fictionalTime.
 - randomTarget: Random branch. Parameters: { choices: [{ id, target, weight }] }
 
 DEFAULT TARGET (Timed Auto-Advance):
-Most visible beats (EXCEPT durScreen) support optional defaultTarget and defaultTargetTimeout parameters for auto-advance if user doesn't interact within timeout (milliseconds).
+Most visible beats (EXCEPT durScreen) support optional defaultTarget and defaultTargetDelay (seconds) parameters for auto-advance if user doesn't interact within timeout.
+
+FICTIONAL TIME:
+setVariable with type "fictionalTime" can set/advance/subtract in-story date/time. conditionBeat with type "fictionalTime" can branch based on date/time comparison.
 
 CONNECTION FORMAT:
 { id, sourceId, targetId, label? }

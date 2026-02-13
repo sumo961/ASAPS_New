@@ -155,6 +155,12 @@ const BEAT_TYPE_GUIDE = `
 - SOUND EFFECTS: Choices can play a sound when selected
   { "id": "c1", "text": "I accept your offer.", "target": "beat_5", "soundEffect": "handshake.mp3" }
 - IMPORTANT: Choice text IS what the player says. Never use "[Continue]" - use actual dialogue.
+- RECURSIVE DIALOGS: A choice can use target: "__self__" to loop back to the SAME dialogTree beat:
+  - Useful for: interrogation, browsing a shop, asking multiple questions before leaving
+  - The dialog re-displays with the same speaker/text and choices
+  - Combine with per-choice visited tracking (markVisited: true) to gray out already-asked questions
+  - Example: { "id": "c_ask_name", "text": "What's your name?", "target": "__self__" }
+  - At least one choice should have a real target to exit the loop
 - Example: NPC asks question → [Player response A | Player response B] → NPC responds
 
 **movementChoice** - Location/direction selection
@@ -365,6 +371,16 @@ Good item descriptions should:
   - Increment by 1: { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" }
   - Decrement by 5: { "type": "counter", "name": "sanity", "value": 5, "operation": "subtract" }
   - Set to specific: { "type": "counter", "name": "score", "value": 100, "operation": "set" }
+- **Fictional Time** (type: "fictionalTime"): Set or advance in-story date/time
+  - Operations: "set" (initialize), "advance" (move forward), "subtract" (time travel/flashback)
+  - For "set": specify timeYear, timeMonth (1-12), timeDay (1-31), timeHour (0-23), timeMinute (0-59)
+  - For "advance"/"subtract": specify value (amount) and timeUnit ("minutes"|"hours"|"days"|"months"|"years")
+  - No variableName needed for fictionalTime
+  - Examples:
+    - Set: { "type": "fictionalTime", "operation": "set", "timeYear": 1929, "timeMonth": 1, "timeDay": 15, "timeHour": 9, "timeMinute": 0 }
+    - Advance 3 hours: { "type": "fictionalTime", "operation": "advance", "value": 3, "timeUnit": "hours" }
+    - Time travel -2 days: { "type": "fictionalTime", "operation": "subtract", "value": 2, "timeUnit": "days" }
+  - Fictional time is displayed automatically in the Timer HUD when enabled in global settings
 
 **conditionBeat** - State-based branching
 - Use: Check variables, counters, inventory, create conditional paths
@@ -387,6 +403,9 @@ Good item descriptions should:
     Note: Use quantityValue with a number OR a variable name prefixed with $ (e.g., "$requiredAmount")
   - **timer**: { type: "timer", timer: "timerName", operator: ">", value: 0 }
   - **visitedBeat**: { type: "visitedBeat", beatId: "beat_id" } - Check if player has visited a specific beat
+  - **fictionalTime**: { type: "fictionalTime", operator: ">", compareTime: { year: 1969, month: 1, day: 1, hour: 0, minute: 0 } }
+    Operators: ">" (after), "<" (before), "==" (exactly), "!=" (not), ">=", "<="
+    Use for: time-gated content, checking story progression by date/time
 - Connections: Two → one if true, one if false
 - Pattern: Reconvergence - multiple paths lead here, then branch based on accumulated state
 
@@ -420,6 +439,13 @@ Inventory condition example - quantity check (CORRECT format):
     "character": "player",   // ❌ DELETE - already in condition!
     "checkType": "has"       // ❌ DELETE - already in condition!
   }
+Fictional time condition example (CORRECT format):
+  {
+    "condition": { "type": "fictionalTime", "operator": ">", "compareTime": { "year": 1969, "month": 1, "day": 1, "hour": 0, "minute": 0 } },
+    "trueConnection": { "target": "beat_future", "label": "After 1969" },
+    "falseConnection": { "target": "beat_past", "label": "Before 1969" }
+  }
+
 - ⚠️ WRONG for inventory: { "variableName": "lantern" } - use "item" inside condition!
 
 **addRemoveInventory** - Inventory manipulation
@@ -585,6 +611,31 @@ When using defaultTarget with defaultTargetDelay, you can add visual feedback:
   }
 - Useful for: escape sequences, timed puzzles, urgent decisions
 - Note: defaultTargetDelay is in SECONDS
+
+## Fictional Time System
+
+Stories can track in-story date/time progression (separate from real-time timers):
+- **Set up**: Use setVariable with type "fictionalTime" and operation "set" to initialize
+- **Advance**: Use setVariable with operation "advance" to move time forward
+- **Subtract**: Use operation "subtract" for time travel or flashbacks (negative advancement)
+- **Check**: Use conditionBeat with type "fictionalTime" to branch based on date/time
+- **Display**: Fictional time automatically shows in the Timer HUD when enabled in global settings
+- Supports units: minutes, hours, days, months, years
+- Internal representation: { year, month, day, hour, minute } - uses JS Date for arithmetic (handles month lengths, leap years)
+- Display formats: time-12h ("9:00 AM"), time-24h ("21:00"), date ("4 April 1968"), datetime-12h/24h, day-number ("Day 3"), year ("1968")
+
+### Fictional Time Pattern:
+1. First setVariable → Set initial time (e.g., "4 April 1968, 9:00 AM")
+2. Story beats with narrative progression
+3. setVariable → Advance time (e.g., advance 3 hours)
+4. conditionBeat → Check if past deadline (e.g., after midnight?)
+5. Different paths based on time of day/date
+
+### Per-Beat Time Display Control:
+Each beat can override the Timer HUD content via timeDisplayMode:
+- "fictionalTime" (default): Show formatted fictional time
+- "manual": Show custom text from timeDisplayText field (e.g., "Meanwhile...")
+- "none": Hide the Timer HUD on this beat entirely
 
 ## Character Counters (Centralized System)
 
@@ -992,7 +1043,13 @@ Stories MUST include procedural/game-like mechanics, not just simple branching:
    - Use conditionBeat with "type": "visitedBeat", "beatId": "beat_id" to check if player has visited a beat
    - Useful for unlocking content after player has explored specific areas
 
-5. **Conditional Endings** - Endings should depend on ACCUMULATED state, not just the final choice
+5. **Fictional Time** - Track in-story date/time progression (historical fiction, day counters, time travel)
+   - Use setVariable with type "fictionalTime" to set/advance/subtract time
+   - Use conditionBeat with "type": "fictionalTime" to branch based on date/time
+   - Displayed automatically in the Timer HUD when enabled
+   - Useful for: historical fiction with dates, day counters, time-of-day mechanics, time travel stories
+
+6. **Conditional Endings** - Endings should depend on ACCUMULATED state, not just the final choice
    - Before endScreen, add conditionBeat checking counters/variables/inventory
    - Example: "If cluesFound >= 3, good ending; else bad ending"
 

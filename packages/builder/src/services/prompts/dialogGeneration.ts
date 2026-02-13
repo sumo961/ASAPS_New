@@ -61,6 +61,8 @@ Respond with JSON in this exact structure:
 ## CRITICAL Structure Rules
 1. Every dialogNode has: id, speaker, text, and choices array
 2. Each choice has text (player's line) and EITHER 'target' (beat ID) OR 'dialogNode' (NPC responds)
+   - Special target "__self__": loops back to the same dialog beat (for interrogation, shopping, multi-question conversations)
+   - Combine with markVisited to gray out already-asked questions
 3. The choice TEXT is what the player says/clicks - make it their actual dialogue
 4. NEVER use "[Continue]" or placeholder text - choices should contain meaningful player dialogue
 5. When conversation ends, the FINAL choice text is the player's last line + target to exit

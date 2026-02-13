@@ -83,10 +83,26 @@
  *
  * VISITED BEAT TRACKING:
  * - "markVisited" parameter (boolean): Show visual indication for choices leading to already-visited beats
+ * - Per-choice visited tracking: choices are individually tracked (composite key: "beatId:choiceId")
  * - Supported on: dialogTree, movementChoice, pickProp
  * - Useful for: helping players find unexplored paths, achievement hunting
  * - "visitedBeat" condition type: Check if a specific beat has been visited
  *   Example: { "type": "visitedBeat", "beatId": "some_beat_id", "operator": "==" }
+ *
+ * RECURSIVE DIALOG TREES:
+ * - DialogTree choices can use target: "__self__" to loop back to the SAME dialogTree beat
+ * - Useful for: interrogation, shopping, asking multiple questions before leaving
+ * - Combine with markVisited: true to gray out already-selected choices
+ * - At least one choice should have a real target to exit the loop
+ *
+ * FICTIONAL TIME SYSTEM:
+ * Stories can track in-story date/time progression (separate from real-time timers):
+ * - Set via setVariable with type "fictionalTime": operations "set", "advance", "subtract"
+ * - Check via conditionBeat with type "fictionalTime": compare current time against a date/time
+ * - Display: Shows automatically in Timer HUD when enabled in global settings
+ * - Supports units: minutes, hours, days, months, years
+ * - Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
+ * - Per-beat timeDisplayMode: "fictionalTime" (default), "manual" (custom text), "none" (hide HUD)
  *
  * MOVEMENT CHOICE OPTIONS:
  * - "showTextOnHover" parameter (boolean): Only show choice text when hovering over the hotspot
@@ -133,7 +149,7 @@ export const BEAT_TYPES = {
   endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true } }',
 
   // Interactive content - MULTIPLE CONNECTIONS via parameters
-  dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean). Choices can modify counters via counter/counterOperation/counterValue properties.',
+  dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean for per-choice visited tracking). Choices can modify counters via counter/counterOperation/counterValue properties. RECURSIVE DIALOGS: use target "__self__" to loop back to the same dialogTree (e.g., interrogation, shopping).',
   movementChoice: 'Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. IMPORTANT: Each choice needs { id, text, location, target } - always set "location" to same value as "text" for hover labels! Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).',
   pickProp: 'Interactive prop/item selection. MULTIPLE TARGETS: define targets in props[].target parameter. IMPORTANT: prop "name" should be ITEM NAMES ONLY (e.g., "Silver Key", "Lantern"), NOT action descriptions (e.g., "Take the key" is WRONG). For actions, use movementChoice instead. Supports: choiceDelay (seconds), markVisited (boolean).',
   hyperText: 'Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Links can have custom styling (color, underline, bold). Supports optional defaultTarget for timed auto-advance.',
@@ -144,8 +160,8 @@ export const BEAT_TYPES = {
   videoBeat: 'Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.',
 
   // Logic beats (invisible - no defaultTarget needed)
-  conditionBeat: 'Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat.',
-  setVariable: 'Set ONE variable/counter per beat. Operations: set (replace), change (add/subtract), multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.',
+  conditionBeat: 'Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat, fictionalTime (compare in-story date/time).',
+  setVariable: 'Set ONE variable/counter/fictionalTime per beat. Types: "variable" (text/boolean), "counter" (numeric ops), "fictionalTime" (set/advance/subtract in-story date/time). Operations: set, add, subtract, multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.',
   addRemoveInventory: 'Modify inventory. Actions: add, remove, or transfer (move between characters). Use "character" parameter to specify which character\'s inventory (defaults to player). Examples: { "action": "add", "item": "key", "character": "merchant" }, { "action": "transfer", "item": "sword", "fromCharacter": "player", "toCharacter": "companion" }. SINGLE CONNECTION: executes then continues to one target.',
   randomTarget: 'Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.',
   setTimer: 'Set/check timers. Beat continues immediately to SINGLE CONNECTION target while timer runs in background. Optional timerTarget parameter: where story jumps when timer expires.',
@@ -325,8 +341,15 @@ COUNTER OPERATIONS IN DIALOGTREE:
 
 VISITED TRACKING:
 - "markVisited": boolean - Show visual indicator for choices leading to visited beats
+- Per-choice visited tracking: choices are individually tracked (composite key: "beatId:choiceId")
 - Supported on dialogTree, movementChoice, pickProp
 - "visitedBeat" condition type for conditionBeat: check if beat was visited
+
+RECURSIVE DIALOG TREES:
+- DialogTree choices can use target: "__self__" to loop back to the SAME dialogTree beat
+- Useful for: interrogation, shopping, asking multiple questions before leaving
+- Combine with markVisited: true to gray out already-selected choices
+- At least one choice should have a real target to exit the loop
 
 MOVEMENT CHOICE OPTIONS:
 - "showTextOnHover": boolean - Only reveal choice text on hover (for exploration gameplay)
@@ -345,6 +368,17 @@ TIMER VISUALIZATION:
 - When using defaultTarget with defaultTargetDelay, add "showTimer": true
 - This displays a countdown bar to give players visual time pressure
 - Example: { "defaultTarget": "fail", "defaultTargetDelay": 10, "showTimer": true }
+
+FICTIONAL TIME SYSTEM:
+- Track in-story date/time progression (separate from real-time timers)
+- Set via setVariable: type "fictionalTime", operations "set"/"advance"/"subtract"
+  - Set: { "type": "fictionalTime", "operation": "set", "timeYear": 1929, "timeMonth": 1, "timeDay": 15, "timeHour": 9, "timeMinute": 0 }
+  - Advance: { "type": "fictionalTime", "operation": "advance", "value": 3, "timeUnit": "hours" }
+  - Subtract (time travel): { "type": "fictionalTime", "operation": "subtract", "value": 2, "timeUnit": "days" }
+- Check via conditionBeat: type "fictionalTime" with compareTime
+  - { "condition": { "type": "fictionalTime", "operator": ">", "compareTime": { "year": 1969, "month": 1, "day": 1, "hour": 0, "minute": 0 } } }
+- Display: Shows in Timer HUD when enabled in global settings
+- Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
 
 CHARACTER COUNTERS:
 - Define counters on characters first, then reference them in choices
@@ -689,9 +723,10 @@ Important:
 - Include character emotions and motivations
 - Create consequences for choices when appropriate
 - Use nested nodes (dialogNode) for multi-turn conversations within same beat
-- Use "target" to exit to a different beat
+- Use "target" to exit to a different beat; use "__self__" to loop back to the same dialog (interrogation, shopping)
 - Choice text IS the player's spoken dialogue - never use "[Continue]" placeholders
-- Choices can modify counters: { "counter": "trust", "counterOperation": "change", "counterValue": 1 }`;
+- Choices can modify counters: { "counter": "trust", "counterOperation": "change", "counterValue": 1 }
+- markVisited: true enables per-choice visited tracking (grays out already-selected choices)`;
 
   const userPrompt = `Create a branching dialogue for this scene:
 
