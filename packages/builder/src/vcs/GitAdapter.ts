@@ -742,12 +742,14 @@ export async function gitClone(
     throw new Error('Git clone requires Electron runCommand API');
   }
   // Use a 5-minute timeout for clone (repos can be large)
+  console.log('[GitAdapter] git clone', remoteUrl, targetDir);
   const result = await api.fs.runCommand('git', ['clone', remoteUrl, targetDir], undefined, 300000);
+  console.log('[GitAdapter] clone result: exitCode=%d stdout=%s stderr=%s', result.exitCode, result.stdout?.substring(0, 200), result.stderr?.substring(0, 200));
   return {
     success: result.exitCode === 0,
     message: result.exitCode === 0
       ? result.stderr.trim() || `Cloned into ${targetDir}`
-      : result.stderr.trim() || result.stdout.trim(),
+      : result.stderr.trim() || result.stdout.trim() || 'Clone failed (no error details from git)',
   };
 }
 

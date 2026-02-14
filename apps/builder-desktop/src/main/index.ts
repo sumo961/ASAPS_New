@@ -731,14 +731,21 @@ ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?
       env: { ...process.env, PATH: augmentedPath, ...lfsEnv },
     }, (error, stdout, stderr) => {
       const exitCode = error?.code !== undefined ? (typeof error.code === 'number' ? error.code : 1) : 0;
+      // When execFile fails (e.g. ENOENT = command not found), stderr is empty
+      // but error.message has the real error - surface it so callers can display it
+      let stderrResult = stderr || '';
+      if (exitCode !== 0 && !stderrResult.trim() && error?.message) {
+        stderrResult = error.message;
+      }
       if (exitCode !== 0) {
-        console.warn('[IPC:fs] run-command FAILED:', command, args.join(' '), `exit=${exitCode}`, stderr?.trim());
+        console.warn('[IPC:fs] run-command FAILED:', command, args.join(' '), `exit=${exitCode}`, stderrResult.trim());
+        if (error) console.warn('[IPC:fs] run-command error details:', error.message, 'code:', error.code);
       } else {
         console.log('[IPC:fs] run-command OK:', command, args.join(' '));
       }
       resolve({
         stdout: stdout || '',
-        stderr: stderr || '',
+        stderr: stderrResult,
         exitCode,
       });
     });
