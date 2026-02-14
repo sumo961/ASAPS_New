@@ -406,7 +406,12 @@ export async function deserializeFromDirectory(
   rootPath: string,
   reader: DirectoryReader
 ): Promise<DeserializeResult> {
-  const join = (...parts: string[]) => parts.join('/');
+  // Use platform-aware separator: if rootPath contains backslashes (Windows), use \
+  const isWin = rootPath.includes('\\');
+  const join = (...parts: string[]) => {
+    const combined = parts.join('/');
+    return isWin ? combined.replace(/\//g, '\\') : combined;
+  };
 
   // 1. Verify format
   const formatPath = join(rootPath, '.asaps/format.json');
@@ -569,7 +574,12 @@ export async function isDirectoryProject(
   rootPath: string,
   reader: DirectoryReader
 ): Promise<boolean> {
-  const join = (...parts: string[]) => parts.join('/');
+  // Use platform-aware separator: if rootPath contains backslashes (Windows), use \
+  const isWin = rootPath.includes('\\');
+  const join = (...parts: string[]) => {
+    const combined = parts.join('/');
+    return isWin ? combined.replace(/\//g, '\\') : combined;
+  };
 
   // Primary check: .asaps/format.json
   if (await reader.exists(join(rootPath, '.asaps/format.json'))) {
