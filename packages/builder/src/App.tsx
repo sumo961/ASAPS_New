@@ -4083,6 +4083,19 @@ function App() {
     setHighlightedBeatIds(beatIds);
   }, []);
 
+  /**
+   * Handle current project being deleted from the project library.
+   * Reset the UI to an empty/untitled state.
+   */
+  const handleCurrentProjectDeleted = useCallback(() => {
+    console.log('[App] Current project deleted - resetting to empty state');
+    actions.clearStory();
+    initializeStory();
+    setIsUntitledProject(true);
+    setSelectedBeat(null);
+    setSelectedCluster(null);
+  }, [actions, initializeStory, setIsUntitledProject]);
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
@@ -4120,6 +4133,7 @@ function App() {
         onAISettingsChanged={(aiSettings) => {
           setGlobalSettings(prev => ({ ...prev, ai: aiSettings }));
         }}
+        onCurrentProjectDeleted={handleCurrentProjectDeleted}
       />
 
       <div className="flex flex-1 overflow-hidden">

@@ -38,6 +38,9 @@ export interface ProjectLibraryProps {
 
   /** Currently active/open project ID */
   currentProjectId?: string;
+
+  /** Called after the currently open project is deleted so the host can reset */
+  onCurrentProjectDeleted?: () => void;
 }
 
 /**
@@ -385,9 +388,10 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   isModal = false,
   onClose,
   currentProjectId,
+  onCurrentProjectDeleted,
 }) => {
   const { storage } = usePersistence();
-  const { updateMetadata } = useProject();
+  const { updateMetadata, delete: deleteProjectFromContext } = useProject();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -427,10 +431,14 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
    * Handle project deletion
    */
   const handleDeleteProject = async (projectId: string) => {
+    const isDeletingCurrent = projectId === currentProjectId;
     try {
-      const result = await storage.deleteProject(projectId);
-      if (result.success) {
-        await loadProjects(); // Reload list
+      const success = await deleteProjectFromContext(projectId);
+      if (success) {
+        await loadProjects();
+        if (isDeletingCurrent && onCurrentProjectDeleted) {
+          onCurrentProjectDeleted();
+        }
       } else {
         alert('Failed to delete project');
       }
@@ -519,9 +527,10 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
     }
 
     try {
+      const deletingCurrent = currentProjectId && selectedProjects.has(currentProjectId);
       // Delete all selected projects
       const deletePromises = Array.from(selectedProjects).map(id =>
-        storage.deleteProject(id)
+        deleteProjectFromContext(id)
       );
       await Promise.all(deletePromises);
 
@@ -530,6 +539,9 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
       setShowBulkDeleteConfirm(false);
       setSelectionMode(false);
       await loadProjects();
+      if (deletingCurrent && onCurrentProjectDeleted) {
+        onCurrentProjectDeleted();
+      }
     } catch (error) {
       console.error('[ProjectLibrary] Bulk delete failed:', error);
       alert('Some projects failed to delete');

@@ -51,6 +51,7 @@ interface HeaderProps {
     maxTokens?: number;
     reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
   }) => void;
+  onCurrentProjectDeleted?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -86,6 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleVCSPanel,
   onInitRepo,
   onAISettingsChanged,
+  onCurrentProjectDeleted,
 }) => {
   const { status, lastSaved, error: saveError } = useSave();
   const { load } = useProject();
@@ -543,6 +545,7 @@ export const Header: React.FC<HeaderProps> = ({
           isModal={true}
           onClose={() => setShowProjectLibrary(false)}
           currentProjectId={currentProjectId}
+          onCurrentProjectDeleted={onCurrentProjectDeleted}
         />
       )}
 
