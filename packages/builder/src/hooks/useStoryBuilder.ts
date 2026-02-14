@@ -770,8 +770,6 @@ export function useStoryBuilder() {
 
   // Load story data from persistence (e.g., when opening a project)
   const loadStoryData = useCallback((storyData: any) => {
-    console.log('[useStoryBuilder] Loading story data:', storyData);
-
     if (!storyData) {
       console.warn('[useStoryBuilder] No story data to load');
       return;
@@ -780,6 +778,16 @@ export function useStoryBuilder() {
     // Extract beats - these should be Beat instances or beat data
     const beats = storyData.beats || [];
     const connections = storyData.connections || [];
+    const clusters = storyData.clusters || [];
+    const containerBeatPositions = storyData.containerBeatPositions || [];
+
+    console.log('[useStoryBuilder] loadStoryData:', {
+      beats: beats.length,
+      connections: connections.length,
+      clusters: clusters.length,
+      containerBeatPositions: containerBeatPositions.length,
+      clusterIds: clusters.map((c: any) => c.id),
+    });
 
     setState({
       title: storyData.title || 'Untitled Story',
@@ -790,8 +798,8 @@ export function useStoryBuilder() {
       settings: storyData.settings || {},
       environment: storyData.environment || { props: [], nodes: [] },
       characters: storyData.characters || [],
-      clusters: storyData.clusters || [],
-      containerBeatPositions: storyData.containerBeatPositions || [],
+      clusters,
+      containerBeatPositions,
     });
 
     // Update beat counter to ensure new beats get unique IDs
