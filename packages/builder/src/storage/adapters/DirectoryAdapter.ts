@@ -50,6 +50,8 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
   private projectPath: string | null = null;
   private unwatchFn: (() => void) | null = null;
+  /** Asset manifest from last openProject() — used to register assets in storage */
+  private lastManifest: DirectoryAssetManifest | null = null;
 
   /**
    * Create an Electron IPC-based DirectoryReader
@@ -99,6 +101,10 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     const result = await deserializeFromDirectory(dirPath, reader);
 
+    // Save manifest for asset registration
+    this.lastManifest = result.manifest;
+    console.log('[DirectoryAdapter] Manifest loaded with', Object.keys(result.manifest.assets).length, 'assets');
+
     // Convert deserialized data back into a Project structure
     // The story data needs to stay as a plain object (beats array, not Story instance)
     // because the builder works with serialized story data
@@ -126,6 +132,11 @@ export class DirectoryAdapter implements PersistenceAdapter {
     };
 
     return project;
+  }
+
+  /** Get the asset manifest from the last openProject() call */
+  getManifest(): DirectoryAssetManifest | null {
+    return this.lastManifest;
   }
 
   /**

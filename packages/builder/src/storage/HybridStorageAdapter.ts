@@ -50,9 +50,9 @@ export class HybridStorageAdapter implements IStorageAdapter {
       cacheLimit: config.cacheLimit ?? 52428800, // 50MB default
     };
 
-    // Detect environment
+    // Detect environment - check both old and new Electron bridge patterns
     this.isElectron = typeof window !== 'undefined' &&
-                      !!(window as any).electron;
+                      (!!(window as any).electron || !!(window as any).electronAPI);
   }
 
   // ============================================================
@@ -354,6 +354,49 @@ export class HybridStorageAdapter implements IStorageAdapter {
   }
 
   /**
+   * Register directory-format assets in the metadata store.
+   * Maps manifest entries to filesystem paths so loadAsset() can find them.
+   * Called when opening a directory project (e.g., after git clone).
+   */
+  async registerDirectoryAssets(
+    projectId: string,
+    assetsDir: string,
+    manifest: Record<string, { id: string; filename: string; type: string; mimeType: string; size: number; folder: string; uploadedAt?: string; metadata?: any }>
+  ): Promise<number> {
+    this.ensureReady();
+
+    const sep = assetsDir.includes('\\') ? '\\' : '/';
+    let registered = 0;
+
+    for (const [assetId, entry] of Object.entries(manifest)) {
+      // Build filesystem path: assetsDir / folder / filename
+      const assetPath = [assetsDir, entry.folder, entry.filename].join(sep);
+
+      const info: AssetStorageInfo = {
+        id: assetId,
+        projectId,
+        location: 'filesystem',
+        path: assetPath,
+        size: entry.size || 0,
+        mimeType: entry.mimeType,
+        filename: entry.filename,
+        uploadedAt: entry.uploadedAt || new Date().toISOString(),
+      };
+
+      // Add subType from metadata if available
+      if (entry.metadata?.subType) {
+        (info as any).subType = entry.metadata.subType;
+      }
+
+      await this.db!.put(STORES.assetMetadata, info);
+      registered++;
+    }
+
+    console.log(`[HybridStorageAdapter] Registered ${registered} directory assets for project ${projectId}`);
+    return registered;
+  }
+
+  /**
    * Get all assets for a project with blob data (compatible with StorageManager API)
    * This method combines metadata from asset-metadata store with blob data
    */
@@ -581,20 +624,28 @@ export class HybridStorageAdapter implements IStorageAdapter {
   }
 
   private async saveAssetToFilesystem(asset: StoredAsset): Promise<string> {
-    const { fs, path } = (window as any).electron;
+    const api = (window as any).electronAPI;
+    if (!api?.fs) throw new Error('Electron filesystem API not available');
+
     const cacheDir = this.expandPath(this.config.filesystemBasePath);
 
     // Determine subfolder based on asset type
     const category = this.getAssetCategory(asset.mimeType);
-    const subfolder = path.join(cacheDir, category);
+    const sep = cacheDir.includes('\\') ? '\\' : '/';
+    const subfolder = [cacheDir, category].join(sep);
 
     // Create unique filename
     const filename = `${asset.id}_${asset.filename}`;
-    const filepath = path.join(subfolder, filename);
+    const filepath = [subfolder, filename].join(sep);
 
     // Write blob to file
     const buffer = await asset.blob.arrayBuffer();
-    fs.writeFileSync(filepath, Buffer.from(buffer));
+    // Ensure directory exists
+    const dirExists = await api.fs.exists(subfolder);
+    if (!dirExists) {
+      await api.fs.mkdir(subfolder);
+    }
+    await api.fs.writeFile(filepath, Buffer.from(buffer));
 
     return filepath;
   }
@@ -617,8 +668,11 @@ export class HybridStorageAdapter implements IStorageAdapter {
   }
 
   private async loadAssetFromFilesystem(path: string): Promise<Blob> {
-    const { fs } = (window as any).electron;
-    const buffer = fs.readFileSync(path);
+    const api = (window as any).electronAPI;
+    if (!api?.fs?.readFile) {
+      throw new Error('Electron filesystem API not available');
+    }
+    const buffer = await api.fs.readFile(path);
     return new Blob([buffer]);
   }
 
@@ -632,9 +686,11 @@ export class HybridStorageAdapter implements IStorageAdapter {
   }
 
   private async deleteAssetFromFilesystem(path: string): Promise<void> {
-    const { fs } = (window as any).electron;
-    if (fs.existsSync(path)) {
-      fs.unlinkSync(path);
+    const api = (window as any).electronAPI;
+    if (!api?.fs) return;
+    const exists = await api.fs.exists(path);
+    if (exists) {
+      await api.fs.unlink(path);
     }
   }
 

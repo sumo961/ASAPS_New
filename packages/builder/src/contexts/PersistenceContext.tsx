@@ -863,6 +863,21 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         console.warn('[PersistenceProvider] Failed to sync directory project to IndexedDB:', e);
       }
 
+      // Register directory assets in HybridStorageAdapter so the UI can find them
+      const manifest = adapter.getManifest();
+      if (manifest && Object.keys(manifest.assets).length > 0) {
+        try {
+          const hybridAdapter = getStorageAdapter();
+          await hybridAdapter.initialize();
+          const sep = dirPath.includes('\\') ? '\\' : '/';
+          const assetsDir = dirPath + sep + 'assets';
+          const count = await hybridAdapter.registerDirectoryAssets(project.id, assetsDir, manifest.assets);
+          console.log('[PersistenceProvider] Registered', count, 'directory assets');
+        } catch (e) {
+          console.warn('[PersistenceProvider] Failed to register directory assets:', e);
+        }
+      }
+
       commandManager.setProjectId(project.id);
       commandManager.clear();
 
