@@ -3,7 +3,11 @@
  * Uses native filesystem APIs via the preload bridge
  */
 
-import { join } from 'path';
+/** Join path segments using the separator detected from the base path */
+function joinPath(base: string, ...parts: string[]): string {
+  const sep = base.includes('\\') ? '\\' : '/';
+  return [base, ...parts].join(sep);
+}
 
 export interface IStorageAdapter {
   saveProject(name: string, data: ArrayBuffer): Promise<void>;
@@ -25,7 +29,7 @@ export class ElectronStorageAdapter implements IStorageAdapter {
 
     try {
       const documentsPath = await window.electronAPI.app.getPath('documents');
-      this.projectsDir = join(documentsPath, 'ASAPS', 'Projects');
+      this.projectsDir = joinPath(documentsPath, 'ASAPS', 'Projects');
       console.log('[ElectronStorageAdapter] Projects dir:', this.projectsDir);
 
       // Ensure directory exists
@@ -51,7 +55,7 @@ export class ElectronStorageAdapter implements IStorageAdapter {
     }
 
     const filename = name.endsWith('.asaps.zip') ? name : `${name}.asaps.zip`;
-    const filepath = join(this.projectsDir, filename);
+    const filepath = joinPath(this.projectsDir, filename);
 
     await window.electronAPI.fs.writeFile(filepath, Buffer.from(data));
   }
@@ -62,7 +66,7 @@ export class ElectronStorageAdapter implements IStorageAdapter {
     }
 
     const filename = name.endsWith('.asaps.zip') ? name : `${name}.asaps.zip`;
-    const filepath = join(this.projectsDir, filename);
+    const filepath = joinPath(this.projectsDir, filename);
 
     try {
       const exists = await window.electronAPI.fs.exists(filepath);
@@ -82,7 +86,7 @@ export class ElectronStorageAdapter implements IStorageAdapter {
     }
 
     const filename = name.endsWith('.asaps.zip') ? name : `${name}.asaps.zip`;
-    const filepath = join(this.projectsDir, filename);
+    const filepath = joinPath(this.projectsDir, filename);
 
     try {
       await window.electronAPI.fs.unlink(filepath);
