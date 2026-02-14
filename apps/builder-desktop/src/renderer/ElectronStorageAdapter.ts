@@ -25,7 +25,7 @@ export class ElectronStorageAdapter implements IStorageAdapter {
 
     try {
       const documentsPath = await window.electronAPI.app.getPath('documents');
-      this.projectsDir = `${documentsPath}/ASAPS/Projects`;
+      this.projectsDir = join(documentsPath, 'ASAPS', 'Projects');
 
       // Ensure directory exists
       const exists = await window.electronAPI.fs.exists(this.projectsDir);
@@ -50,7 +50,7 @@ export class ElectronStorageAdapter implements IStorageAdapter {
     }
 
     const filename = name.endsWith('.asaps.zip') ? name : `${name}.asaps.zip`;
-    const filepath = `${this.projectsDir}/${filename}`;
+    const filepath = join(this.projectsDir, filename);
 
     await window.electronAPI.fs.writeFile(filepath, Buffer.from(data));
   }
@@ -61,7 +61,7 @@ export class ElectronStorageAdapter implements IStorageAdapter {
     }
 
     const filename = name.endsWith('.asaps.zip') ? name : `${name}.asaps.zip`;
-    const filepath = `${this.projectsDir}/${filename}`;
+    const filepath = join(this.projectsDir, filename);
 
     try {
       const exists = await window.electronAPI.fs.exists(filepath);
@@ -81,7 +81,7 @@ export class ElectronStorageAdapter implements IStorageAdapter {
     }
 
     const filename = name.endsWith('.asaps.zip') ? name : `${name}.asaps.zip`;
-    const filepath = `${this.projectsDir}/${filename}`;
+    const filepath = join(this.projectsDir, filename);
 
     try {
       await window.electronAPI.fs.unlink(filepath);

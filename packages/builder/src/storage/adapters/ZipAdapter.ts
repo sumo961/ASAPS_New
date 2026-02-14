@@ -38,7 +38,8 @@ export class ZipAdapter implements PersistenceAdapter {
 
     const buffer = await api.fs.readFile(zipFilePath);
     const blob = new Blob([buffer]);
-    const file = new File([blob], zipFilePath.split('/').pop() || 'project.asaps.zip');
+    const fileName = zipFilePath.replace(/^.*[/\\]/, '') || 'project.asaps.zip';
+    const file = new File([blob], fileName);
 
     const result = await importProjectFromZip(file, { generateNewId: false });
 
