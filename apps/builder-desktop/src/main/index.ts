@@ -593,47 +593,93 @@ async function handleSaveAs(): Promise<void> {
 
 // IPC handlers for filesystem operations
 ipcMain.handle('fs:read-file', async (_, path: string) => {
-  return await fs.readFile(path);
+  console.log('[IPC:fs] read-file:', path);
+  try {
+    return await fs.readFile(path);
+  } catch (error: any) {
+    console.error('[IPC:fs] read-file FAILED:', path, error.message);
+    throw error;
+  }
 });
 
 ipcMain.handle('fs:write-file', async (_, path: string, data: Buffer | string) => {
-  await fs.writeFile(path, data);
+  console.log('[IPC:fs] write-file:', path, `(${typeof data === 'string' ? data.length + ' chars' : (data as any).length + ' bytes'})`);
+  try {
+    await fs.writeFile(path, data);
+  } catch (error: any) {
+    console.error('[IPC:fs] write-file FAILED:', path, error.message);
+    throw error;
+  }
 });
 
 ipcMain.handle('fs:read-dir', async (_, path: string) => {
-  const entries = await fs.readdir(path, { withFileTypes: true });
-  // Serialize Dirent objects to plain objects (methods are lost over IPC)
-  return entries.map(e => ({ name: e.name, isDirectory: e.isDirectory(), isFile: e.isFile() }));
+  console.log('[IPC:fs] read-dir:', path);
+  try {
+    const entries = await fs.readdir(path, { withFileTypes: true });
+    // Serialize Dirent objects to plain objects (methods are lost over IPC)
+    const result = entries.map(e => ({ name: e.name, isDirectory: e.isDirectory(), isFile: e.isFile() }));
+    console.log('[IPC:fs] read-dir result:', path, `${result.length} entries`);
+    return result;
+  } catch (error: any) {
+    console.error('[IPC:fs] read-dir FAILED:', path, error.message);
+    throw error;
+  }
 });
 
 ipcMain.handle('fs:mkdir', async (_, path: string) => {
-  await fs.mkdir(path, { recursive: true });
+  console.log('[IPC:fs] mkdir:', path);
+  try {
+    await fs.mkdir(path, { recursive: true });
+  } catch (error: any) {
+    console.error('[IPC:fs] mkdir FAILED:', path, error.message);
+    throw error;
+  }
 });
 
 ipcMain.handle('fs:exists', async (_, path: string) => {
   try {
     await fs.access(path);
+    console.log('[IPC:fs] exists:', path, '-> true');
     return true;
   } catch {
+    console.log('[IPC:fs] exists:', path, '-> false');
     return false;
   }
 });
 
 ipcMain.handle('fs:unlink', async (_, path: string) => {
-  await fs.unlink(path);
+  console.log('[IPC:fs] unlink:', path);
+  try {
+    await fs.unlink(path);
+  } catch (error: any) {
+    console.error('[IPC:fs] unlink FAILED:', path, error.message);
+    throw error;
+  }
 });
 
 ipcMain.handle('fs:copy-file', async (_, src: string, dst: string) => {
-  await fs.copyFile(src, dst);
+  console.log('[IPC:fs] copy-file:', src, '->', dst);
+  try {
+    await fs.copyFile(src, dst);
+  } catch (error: any) {
+    console.error('[IPC:fs] copy-file FAILED:', src, '->', dst, error.message);
+    throw error;
+  }
 });
 
 ipcMain.handle('fs:stat', async (_, path: string) => {
-  const stat = await fs.stat(path);
-  return {
-    size: stat.size,
-    mtime: stat.mtime.toISOString(),
-    isDirectory: stat.isDirectory(),
-  };
+  console.log('[IPC:fs] stat:', path);
+  try {
+    const stat = await fs.stat(path);
+    return {
+      size: stat.size,
+      mtime: stat.mtime.toISOString(),
+      isDirectory: stat.isDirectory(),
+    };
+  } catch (error: any) {
+    console.error('[IPC:fs] stat FAILED:', path, error.message);
+    throw error;
+  }
 });
 
 ipcMain.handle('fs:watch-dir', async (event, dirPath: string) => {
@@ -649,11 +695,18 @@ ipcMain.handle('fs:unwatch-dir', async () => {
 });
 
 ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?: string, timeout?: number) => {
-  // Augment PATH so Homebrew-installed tools are found
-  // when Electron is launched from Finder (which has a minimal PATH)
-  const extraPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
+  console.log('[IPC:fs] run-command:', command, args.join(' '), cwd ? `(cwd: ${cwd})` : '');
+
+  // Augment PATH so tools are found when Electron is launched from GUI
+  // macOS: Homebrew paths (Finder has minimal PATH)
+  // Windows: Git for Windows paths (common install locations)
+  const isWin = process.platform === 'win32';
+  const pathSep = isWin ? ';' : ':';
+  const extraPaths = isWin
+    ? ['C:\\Program Files\\Git\\cmd', 'C:\\Program Files\\Git\\bin', 'C:\\Program Files (x86)\\Git\\cmd']
+    : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
   const currentPath = process.env.PATH || '';
-  const augmentedPath = [...new Set([...currentPath.split(':'), ...extraPaths])].join(':');
+  const augmentedPath = [...new Set([...currentPath.split(pathSep), ...extraPaths])].join(pathSep);
 
   // If git-lfs is configured globally but not installed, git operations fail.
   // Disable LFS filters entirely (empty string = no filter, no process spawned).
@@ -677,10 +730,16 @@ ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?
       timeout: timeout || 30000,
       env: { ...process.env, PATH: augmentedPath, ...lfsEnv },
     }, (error, stdout, stderr) => {
+      const exitCode = error?.code !== undefined ? (typeof error.code === 'number' ? error.code : 1) : 0;
+      if (exitCode !== 0) {
+        console.warn('[IPC:fs] run-command FAILED:', command, args.join(' '), `exit=${exitCode}`, stderr?.trim());
+      } else {
+        console.log('[IPC:fs] run-command OK:', command, args.join(' '));
+      }
       resolve({
         stdout: stdout || '',
         stderr: stderr || '',
-        exitCode: error?.code !== undefined ? (typeof error.code === 'number' ? error.code : 1) : 0,
+        exitCode,
       });
     });
   });

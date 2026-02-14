@@ -86,6 +86,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
    * Open a directory-based project
    */
   async openProject(dirPath: string): Promise<Project> {
+    console.log('[DirectoryAdapter] openProject:', dirPath);
     const reader = this.createReader();
 
     // Verify this is a directory project
@@ -143,6 +144,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
       throw new Error('DirectoryAdapter requires Electron filesystem API');
     }
 
+    console.log('[DirectoryAdapter] saveProject:', this.projectPath);
     const input = this.projectToSerializeInput(project, assets);
     const { files, assetFiles } = serializeToDirectory(input);
 

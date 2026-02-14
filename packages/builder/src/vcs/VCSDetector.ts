@@ -35,7 +35,9 @@ export async function detectVCS(projectPath: string): Promise<VCSInfo> {
   // Check for Git
   try {
     // Check if .git directory exists (fast check)
-    const gitDirExists = await api.fs.exists(joinPath(projectPath, '.git'));
+    const gitPath = joinPath(projectPath, '.git');
+    console.log('[VCSDetector] Checking for .git at:', gitPath);
+    const gitDirExists = await api.fs.exists(gitPath);
     if (gitDirExists) {
       return await getGitInfo(projectPath);
     }

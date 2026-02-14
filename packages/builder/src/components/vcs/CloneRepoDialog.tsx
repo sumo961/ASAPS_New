@@ -58,7 +58,9 @@ export const CloneRepoDialog: React.FC<CloneRepoDialogProps> = ({ onCloned, onCl
     setError(null);
 
     try {
+      console.log('[CloneRepoDialog] Cloning', remoteUrl.trim(), 'into', targetPath);
       const result = await gitClone(remoteUrl.trim(), targetPath);
+      console.log('[CloneRepoDialog] Clone result:', result);
       if (result.success) {
         onCloned(targetPath);
         onClose();

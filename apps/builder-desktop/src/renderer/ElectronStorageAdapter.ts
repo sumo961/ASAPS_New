@@ -26,6 +26,7 @@ export class ElectronStorageAdapter implements IStorageAdapter {
     try {
       const documentsPath = await window.electronAPI.app.getPath('documents');
       this.projectsDir = join(documentsPath, 'ASAPS', 'Projects');
+      console.log('[ElectronStorageAdapter] Projects dir:', this.projectsDir);
 
       // Ensure directory exists
       const exists = await window.electronAPI.fs.exists(this.projectsDir);
