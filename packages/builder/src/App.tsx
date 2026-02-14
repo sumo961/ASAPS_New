@@ -4507,38 +4507,23 @@ function App() {
           onCloned={async (clonedPath) => {
             console.log('[App] Repository cloned to:', clonedPath);
             try {
-              // Check for merge conflicts before trying to open
-              const api = window.electronAPI;
-              let hasConflicts = false;
-              if (api?.fs?.runCommand) {
-                const conflictCheck = await api.fs.runCommand(
-                  'git', ['diff', '--check', 'HEAD'], clonedPath
-                );
-                // Also check for conflict markers in tracked files
-                const grepCheck = await api.fs.runCommand(
-                  'git', ['grep', '-l', '<<<<<<<'], clonedPath
-                );
-                hasConflicts = grepCheck.exitCode === 0 && grepCheck.stdout.trim().length > 0;
-              }
-
-              if (hasConflicts) {
-                alert('The cloned repository contains unresolved merge conflicts.\n\nThe project will be opened with Version Control so you can resolve the conflicts.');
-                // Initialize VCS so user can resolve conflicts
-                if (vcs) {
-                  await vcs.initialize(clonedPath);
-                }
+              // A fresh clone cannot have merge conflicts, so skip the expensive
+              // git grep scan that checks every file's content (causes crashes on
+              // slow filesystems like Parallels shared folders).
+              console.log('[App] Opening cloned project as directory...');
+              const success = await openDirectoryProject(clonedPath);
+              if (success) {
+                console.log('[App] Cloned project opened successfully');
               } else {
-                const success = await openDirectoryProject(clonedPath);
-                if (success) {
-                  console.log('[App] Cloned project opened successfully');
-                } else {
-                  alert('Repository cloned, but it does not appear to be a valid ASAPS project.');
-                }
-                // Always initialize VCS for the cloned repo
-                if (vcs) {
-                  await vcs.initialize(clonedPath);
-                }
+                console.warn('[App] Not a valid ASAPS directory project:', clonedPath);
+                alert('Repository cloned successfully!\n\nNote: This does not appear to be an ASAPS directory-format project.');
               }
+              // Initialize VCS for the cloned repo
+              console.log('[App] Initializing VCS...');
+              if (vcs) {
+                await vcs.initialize(clonedPath);
+              }
+              console.log('[App] Post-clone setup complete');
             } catch (error) {
               console.error('[App] Failed to open cloned project:', error);
               alert(`Failed to open cloned project: ${error instanceof Error ? error.message : 'Unknown error'}`);
