@@ -364,41 +364,32 @@ function App() {
 
   // DEBUG HELPER: Expose function to load debug story from console
   // Usage: window.loadDebugStory() or window.loadDebugStory('/path/to/debug.json')
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
   useEffect(() => {
     (window as any).loadDebugStory = async (url = '/debug-story.json') => {
       try {
-        console.log('[Debug] Fetching debug story from:', url);
         const response = await fetch(url);
         const debugData = await response.json();
-
-        console.log('[Debug] Loaded debug file:', {
-          title: debugData.title,
-          beatCount: debugData.beatCount,
-          status: debugData.status
-        });
 
         if (!debugData.story?.beats) {
           console.error('[Debug] No beats found in debug file');
           return;
         }
 
-        // Create beats using the registry
         const { BeatTypeRegistry } = await import('@asaps/core');
         const registry = BeatTypeRegistry.getInstance();
 
         const createdBeats = debugData.story.beats.map((beatData: any) => {
-          // Pass connections to the beat constructor so they're properly initialized
           const beat = registry.createBeat(beatData.type, {
             ...beatData,
             parameters: beatData.parameters || {},
-            // Pass connections in the format the Beat class expects
             connections: beatData.connections?.map((conn: any) => ({
               targetId: conn.target || conn.targetId,
               label: conn.label,
               condition: conn.condition
             })) || []
           });
-          // Set position
           if (beatData.position) {
             beat.x = beatData.position.x;
             beat.y = beatData.position.y;
@@ -406,7 +397,6 @@ function App() {
           return beat;
         });
 
-        // Build connections array for ReactFlow edges from the beat objects
         const connections: Array<{ id: string; source: string; target: string; label?: string }> = [];
         createdBeats.forEach((beat: any) => {
           const beatConnections = beat.getConnections();
@@ -422,10 +412,7 @@ function App() {
           });
         });
 
-        console.log('[Debug] Created', createdBeats.length, 'beats and', connections.length, 'connections');
-
-        // Load into the app
-        actions.loadStoryData({
+        actionsRef.current.loadStoryData({
           title: debugData.story.metadata?.title || debugData.title || 'Debug Story',
           author: debugData.story.metadata?.author || 'Debug',
           beats: createdBeats,
@@ -435,7 +422,7 @@ function App() {
           clusters: []
         });
 
-        console.log('[Debug] Story loaded successfully!');
+        console.log('[Debug] Story loaded:', createdBeats.length, 'beats');
         return { success: true, beatCount: createdBeats.length };
       } catch (error) {
         console.error('[Debug] Failed to load debug story:', error);
@@ -448,7 +435,7 @@ function App() {
     return () => {
       delete (window as any).loadDebugStory;
     };
-  }, [actions]);
+  }, []);
 
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     project: {
@@ -524,6 +511,14 @@ function App() {
   const { updateStory, updateGlobalSettings, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled } = useProject();
   const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback, pauseAutoSave, resumeAutoSave, initialized: storageInitialized, openDirectoryProject, saveAsDirectory, projectFormat, projectPath } = usePersistence();
   const vcs = useVCSStatus();
+  const vcsRef = useRef(vcs);
+  vcsRef.current = vcs;
+  const currentProjectRef2 = useRef(currentProject);
+  currentProjectRef2.current = currentProject;
+  const stateTitleRef = useRef(state.title);
+  stateTitleRef.current = state.title;
+  const projectFormatRef = useRef(projectFormat);
+  projectFormatRef.current = projectFormat;
 
   // Electron integration - set up menu event listeners
   useEffect(() => {
@@ -592,9 +587,10 @@ function App() {
     // Handle Export from File menu
     const unsubscribeExport = window.electronAPI.onMenuExport(async () => {
       console.log('[Electron] Export requested from menu');
-      if (currentProject) {
+      const proj = currentProjectRef2.current;
+      if (proj) {
         try {
-          await downloadProjectAsZip(currentProject.id, currentProject.name || state.title);
+          await downloadProjectAsZip(proj.id, proj.name || stateTitleRef.current);
         } catch (error) {
           console.error('[Electron] Export failed:', error);
         }
@@ -654,15 +650,13 @@ function App() {
     // Handle Save As Folder from File menu (directory format)
     const unsubscribeSaveAsFolder = window.electronAPI.onProjectSaveAsFolder?.(async (folderPath: string) => {
       console.log('[Electron] Saving project as folder:', folderPath);
-      const wasDirectory = projectFormat === 'directory';
+      const wasDirectory = projectFormatRef.current === 'directory';
       try {
         const success = await saveAsDirectory(folderPath);
         if (success) {
           console.log('[Electron] Project saved as directory successfully');
-          // Show conversion notification if this was not already a directory project
-          if (!wasDirectory && vcs) {
-            vcs.onEvent(() => {})(); // no-op to ensure event system is wired
-            // Use a brief timeout so the VCS provider is ready for the toast
+          const currentVcs = vcsRef.current;
+          if (!wasDirectory && currentVcs) {
             setTimeout(() => {
               alert('Project converted to folder format \u2014 version control is now available.');
             }, 200);
@@ -670,8 +664,8 @@ function App() {
             alert(`Project saved to folder: ${folderPath}`);
           }
           // Initialize VCS tracking for the new directory
-          if (vcs) {
-            await vcs.initialize(folderPath);
+          if (currentVcs) {
+            await currentVcs.initialize(folderPath);
           }
         } else {
           alert('Failed to save project as folder.');
@@ -692,7 +686,8 @@ function App() {
       unsubscribeOpenFolder?.();
       unsubscribeSaveAsFolder?.();
     };
-  }, [loadProject, saveNow, currentProject, state.title, discardUntitled, saveCurrent, openDirectoryProject, saveAsDirectory, vcs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadProject, saveNow, discardUntitled, saveCurrent, openDirectoryProject, saveAsDirectory]);
 
   // Auto-initialize VCS when project format changes to directory.
   // IMPORTANT: We depend only on the specific primitive values we check, NOT the
@@ -1579,29 +1574,12 @@ function App() {
 
   // Load project data when currentProject changes
   useEffect(() => {
-    console.log('[App] ==========================================');
-    console.log('[App] Project LOAD EFFECT started');
-    console.log('[App] currentProject.id:', currentProject?.id);
-    console.log('[App] loadedProjectIdRef:', loadedProjectIdRef.current);
-    console.log('[App] pendingNewProjectIdRef:', pendingNewProjectIdRef.current);
-    console.log('[App] injectionSaveInProgressRef:', injectionSaveInProgressRef.current);
-    console.log('[App] state.beats.length:', state.beats.length);
-    console.log('[App] currentProject.name:', currentProject?.name);
-
-    // CRITICAL FIX: Skip if injection is in progress to prevent bleed from old project
-    // The injection handler manages its own save lifecycle
-    if (injectionSaveInProgressRef.current) {
-      console.log('[App] >>> SKIPPED loading - injection in progress (prevents project bleed)');
-      console.log('[App] ==========================================');
+    // Skip if no change or already loaded
+    if (injectionSaveInProgressRef.current || !currentProject || currentProject.id === loadedProjectIdRef.current) {
       return;
     }
 
-    // CRITICAL FIX: Only proceed if currentProject exists and isn't already loaded
-    if (!currentProject || currentProject.id === loadedProjectIdRef.current) {
-      console.log('[App] >>> SKIPPED loading - no project or already loaded');
-      console.log('[App] ==========================================');
-      return;
-    }
+    console.log('[App] Project LOAD EFFECT: loading', currentProject.name, '(', currentProject.id, ')');
 
     // CRITICAL FIX: Check if we're in the middle of a save-to-new-project transition
     // This happens when saveCurrentProject creates a new project but React hasn't
@@ -1649,7 +1627,7 @@ function App() {
       console.log('[App] beatsExist:', beatsExist, 'beats.length:', projectStory?.beats?.length);
       console.log('[App] isNewUntitledProject:', isNewUntitledProject);
       console.log('[App] isSwitchingFromAnotherProject:', isSwitchingFromAnotherProject);
-      console.log('[App] current state.beats.length:', state.beats.length);
+      console.log('[App] current beats.length:', beatsRef.current.length);
 
       if (isSwitchingFromAnotherProject) {
         // SWITCHING PROJECTS: Always load the new project's data
@@ -1664,7 +1642,7 @@ function App() {
           containerBeatPositions: projectData.containerBeatPositions?.length || 0
         });
 
-        actions.loadStoryData({
+        actionsRef.current.loadStoryData({
           title: projectData.title,
           author: projectData.author,
           beats: projectData.beats,
@@ -1679,7 +1657,7 @@ function App() {
 
         setCharacters(projectData.characters || []);
         if (projectData.settings) {
-          actions.updateSettings(projectData.settings);
+          actionsRef.current.updateSettings(projectData.settings);
         }
 
         // Load assets from storage using HybridStorageAdapter (falls back to filesystem for directory projects)
@@ -1746,17 +1724,17 @@ function App() {
         setIsUntitledProject(currentProject.name === 'Untitled Project');
         loadedProjectIdRef.current = currentProject.id;
         console.log('[App] >>> Project switch complete');
-      } else if (isNewUntitledProject && state.beats.length > 0) {
+      } else if (isNewUntitledProject && beatsRef.current.length > 0) {
         // New untitled project AND beats have been created - save current story state to it
         // This only happens when creating a NEW project in this session, not when switching
         console.log('[App] >>> SAVING beats to NEW untitled project');
 
         const storyData = {
-          title: state.title,
-          author: state.author,
-          beats: state.beats,
-          characters: characters,
-          connections: state.connections,
+          title: titleRef.current,
+          author: authorRef.current,
+          beats: beatsRef.current,
+          characters: charactersRef.current,
+          connections: connectionsRef.current,
         };
 
         console.log('[App] Story data to save:', {
@@ -1772,8 +1750,7 @@ function App() {
         setIsUntitledProject(true);
 
         console.log('[App] >>> SUCCESS: Saved beats to new untitled project');
-        console.log('[App] >>> isUntitledProject set to:', true);
-      } else if (isNewUntitledProject && state.beats.length === 0) {
+      } else if (isNewUntitledProject && beatsRef.current.length === 0) {
         // Existing untitled project with no beats - initialize default story
         console.log('[App] >>> Untitled project has no beats - initializing default story');
 
@@ -1801,7 +1778,7 @@ function App() {
           containerBeatPositions: projectData.containerBeatPositions?.length || 0
         });
 
-        actions.loadStoryData({
+        actionsRef.current.loadStoryData({
           title: projectData.title,
           author: projectData.author,
           beats: projectData.beats,
@@ -1816,7 +1793,7 @@ function App() {
 
         setCharacters(projectData.characters || []);
         if (projectData.settings) {
-          actions.updateSettings(projectData.settings);
+          actionsRef.current.updateSettings(projectData.settings);
         }
 
         // Load assets from storage using HybridStorageAdapter (falls back to filesystem for directory projects)
@@ -1953,7 +1930,8 @@ function App() {
 
     console.log('[App] >>> LOAD EFFECT completed');
     console.log('[App] ==========================================');
-  }, [currentProject, actions, setIsUntitledProject, state.beats, state.title, state.author, state.connections, characters, updateMetadata, updateStory, initializeStory]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProject, setIsUntitledProject, updateMetadata, updateStory, initializeStory]);
 
   // Handler functions
   const handleBeatSelect = useCallback((beat: Beat) => {

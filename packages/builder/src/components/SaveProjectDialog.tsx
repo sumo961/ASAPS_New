@@ -32,20 +32,14 @@ export const SaveProjectDialog: React.FC<SaveProjectDialogProps> = ({
   const [projectDescription, setProjectDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  console.log('[SaveProjectDialog] Render - isOpen:', isOpen, 'currentName:', currentName);
-
   const handleSave = async () => {
-    console.log('[SaveProjectDialog] handleSave clicked');
     if (!projectName.trim()) {
       alert('Please enter a project name');
       return;
     }
-
-    console.log('[SaveProjectDialog] Starting save:', projectName.trim());
     setIsSaving(true);
     try {
       await onSave(projectName.trim(), projectDescription.trim());
-      console.log('[SaveProjectDialog] Save successful');
       setProjectName('');
       setProjectDescription('');
       onClose();
@@ -58,7 +52,6 @@ export const SaveProjectDialog: React.FC<SaveProjectDialogProps> = ({
   };
 
   const handleCancel = () => {
-    console.log('[SaveProjectDialog] Cancel clicked');
     setProjectName(currentName);
     setProjectDescription('');
     onClose();
@@ -67,20 +60,15 @@ export const SaveProjectDialog: React.FC<SaveProjectDialogProps> = ({
   // Auto-focus name input when dialog opens
   const nameInputRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
-    console.log('[SaveProjectDialog] Dialog open state changed:', isOpen);
     if (isOpen && nameInputRef.current) {
-      console.log('[SaveProjectDialog] Focusing input');
       nameInputRef.current.focus();
       nameInputRef.current.select();
     }
   }, [isOpen]);
 
   if (!isOpen) {
-    console.log('[SaveProjectDialog] Not rendering (isOpen=false)');
     return null;
   }
-
-  console.log('[SaveProjectDialog] Rendering dialog');
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">

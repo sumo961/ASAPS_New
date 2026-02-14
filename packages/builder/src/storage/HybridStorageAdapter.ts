@@ -106,23 +106,20 @@ export class HybridStorageAdapter implements IStorageAdapter {
     if (!this.isElectron) return;
 
     try {
-      const { fs, path } = (window as any).electron;
+      const api = (window as any).electronAPI;
+      if (!api?.fs) return;
+
       const cacheDir = this.expandPath(this.config.filesystemBasePath);
+      const sep = cacheDir.includes('\\') ? '\\' : '/';
 
       // Create cache directory structure
-      const dirs = [
-        cacheDir,
-        path.join(cacheDir, 'backgrounds'),
-        path.join(cacheDir, 'characters'),
-        path.join(cacheDir, 'props'),
-        path.join(cacheDir, 'sounds'),
-        path.join(cacheDir, 'fonts'),
-        path.join(cacheDir, 'other'),
-      ];
+      const subdirs = ['backgrounds', 'characters', 'props', 'sounds', 'fonts', 'other'];
+      const dirs = [cacheDir, ...subdirs.map(s => cacheDir + sep + s)];
 
       for (const dir of dirs) {
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
+        const exists = await api.fs.exists(dir);
+        if (!exists) {
+          await api.fs.mkdir(dir);
         }
       }
     } catch (err) {
@@ -132,7 +129,8 @@ export class HybridStorageAdapter implements IStorageAdapter {
 
   private expandPath(pathStr: string): string {
     if (pathStr.startsWith('~/')) {
-      const homeDir = (window as any).electron?.os?.homedir() || '~';
+      const api = (window as any).electronAPI;
+      const homeDir = api?.getHomedir?.() || (window as any).electron?.os?.homedir() || '~';
       return pathStr.replace('~', homeDir);
     }
     return pathStr;
@@ -754,29 +752,8 @@ export class HybridStorageAdapter implements IStorageAdapter {
   private async calculateFilesystemSize(): Promise<number> {
     if (!this.isElectron) return 0;
 
-    try {
-      const { fs, path } = (window as any).electron;
-      const cacheDir = this.expandPath(this.config.filesystemBasePath);
-
-      let totalSize = 0;
-      const walkDir = (dir: string) => {
-        const files = fs.readdirSync(dir);
-        for (const file of files) {
-          const filepath = path.join(dir, file);
-          const stat = fs.statSync(filepath);
-          if (stat.isDirectory()) {
-            walkDir(filepath);
-          } else {
-            totalSize += stat.size;
-          }
-        }
-      };
-
-      walkDir(cacheDir);
-      return totalSize;
-    } catch {
-      return 0;
-    }
+    // Filesystem size calculation not supported via async IPC bridge
+    return 0;
   }
 
   private async calculateCacheSize(): Promise<number> {
