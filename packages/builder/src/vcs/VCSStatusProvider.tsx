@@ -7,7 +7,7 @@
  * Only active for directory-format projects in Electron.
  */
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { detectVCS, type VCSType } from './VCSDetector';
 import {
   getGitStatus, getChangedFiles,
@@ -188,6 +188,8 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   const cachedVCSTypeRef = useRef<VCSType | null>(null);
   /** Whether git binary was not found during detection */
   const gitMissingRef = useRef(false);
+  /** Guard against re-entrant initialize() calls */
+  const initializingRef = useRef(false);
   const eventHandlersRef = useRef<Set<(event: VCSEvent) => void>>(new Set());
   const logIdRef = useRef(0);
   const onBeforeRefreshRef = useRef(onBeforeRefresh);
@@ -308,29 +310,37 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
    * Initialize VCS tracking for a directory project
    */
   const initialize = useCallback(async (projectPath: string) => {
-    // Reset cached VCS type when switching projects
-    cachedVCSTypeRef.current = null;
-    gitMissingRef.current = false;
-    projectPathRef.current = projectPath;
+    // Prevent re-entrant calls — initialize sets state which can re-trigger
+    // the auto-init effect before the async work completes.
+    if (initializingRef.current) return;
+    initializingRef.current = true;
 
-    setState(prev => ({
-      ...prev,
-      projectPath,
-      initialized: false,
-    }));
+    try {
+      // Reset cached VCS type when switching projects
+      cachedVCSTypeRef.current = null;
+      gitMissingRef.current = false;
+      projectPathRef.current = projectPath;
 
-    await refresh();
+      setState(prev => ({
+        ...prev,
+        projectPath,
+      }));
 
-    setState(prev => ({
-      ...prev,
-      initialized: true,
-    }));
+      await refresh();
 
-    // Start polling
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
+      setState(prev => ({
+        ...prev,
+        initialized: true,
+      }));
+
+      // Start polling
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+      }
+      pollTimerRef.current = window.setInterval(refresh, POLL_INTERVAL);
+    } finally {
+      initializingRef.current = false;
     }
-    pollTimerRef.current = window.setInterval(refresh, POLL_INTERVAL);
   }, [refresh]);
 
   /**
@@ -580,7 +590,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     };
   }, []);
 
-  const value: VCSContextValue = {
+  const value: VCSContextValue = useMemo(() => ({
     ...state,
     refresh,
     isFileChanged,
@@ -607,7 +617,13 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     p4UnlockFile,
     onEvent,
     clearMessageLog,
-  };
+  }), [
+    state, refresh, isFileChanged, isBeatChanged, getBeatStatus, getLockedBy,
+    initialize, clear, initRepo, stage, unstage, commit, push, pull,
+    fetchRemote, stashChanges, stashPopChanges, revertFilesOp,
+    p4SubmitChanges, p4SyncLatest, p4EditFile, p4RevertFile, p4LockFile, p4UnlockFile,
+    onEvent, clearMessageLog,
+  ]);
 
   return (
     <VCSContext.Provider value={value}>

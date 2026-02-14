@@ -634,9 +634,13 @@ function App() {
     };
   }, [loadProject, saveNow, currentProject, state.title, discardUntitled, saveCurrent, openDirectoryProject, saveAsDirectory, vcs]);
 
-  // Auto-initialize VCS when project format changes to directory
+  // Auto-initialize VCS when project format changes to directory.
+  // IMPORTANT: We depend only on the specific primitive values we check, NOT the
+  // entire `vcs` object — that object is recreated on every VCS state change
+  // and would cause an infinite re-render loop.
+  const vcsInitialized = vcs?.initialized ?? false;
   useEffect(() => {
-    if (projectFormat === 'directory' && projectPath && vcs && !vcs.initialized) {
+    if (projectFormat === 'directory' && projectPath && vcs && !vcsInitialized) {
       console.log('[App] Auto-initializing VCS for directory project:', projectPath);
       vcs.initialize(projectPath).then(async () => {
         // Opportunistically detect remote URL and persist it
@@ -654,10 +658,11 @@ function App() {
           console.debug('[App] Could not detect VCS remote URL:', e);
         }
       });
-    } else if (projectFormat !== 'directory' && vcs?.initialized) {
-      vcs.clear();
+    } else if (projectFormat !== 'directory' && vcsInitialized) {
+      vcs?.clear();
     }
-  }, [projectFormat, projectPath, vcs, currentProject, storage]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectFormat, projectPath, vcsInitialized]);
 
   // Listen for stale-directory events from PersistenceContext (path no longer exists on reload)
   useEffect(() => {
