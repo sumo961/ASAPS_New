@@ -426,6 +426,18 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
           if (beatData.node) {
             beat.node = beatData.node;
           }
+          if (beatData.timeDisplayMode) {
+            (beat as any).timeDisplayMode = beatData.timeDisplayMode;
+          }
+          if (beatData.timeDisplayText) {
+            (beat as any).timeDisplayText = beatData.timeDisplayText;
+          }
+          if (beatData.overrideCountdownMeter !== undefined) {
+            (beat as any).overrideCountdownMeter = beatData.overrideCountdownMeter;
+          }
+          if (beatData.notes) {
+            (beat as any).notes = beatData.notes;
+          }
 
           story.addBeat(beat);
         } catch (error) {

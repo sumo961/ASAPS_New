@@ -186,8 +186,26 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           const timerManager = context.getTimerManager();
           const story = engine.getStory();
 
-          // Set up fictional time from global settings
+          // Set up global settings for layout and HUD
           const gs = player.getGlobalSettings?.() || (player as any).globalSettings;
+
+          // Set stage size state (used by DialogTreeBeat for layout)
+          renderer.setState('stageSize', {
+            width: stageDimensions.width,
+            height: stageDimensions.height,
+          });
+
+          // Set layout theme from global settings (ensures same layout as visual editor)
+          renderer.setState('layoutTheme', {
+            fontSize: gs?.fonts?.textFontSize || 16,
+            fontFamily: gs?.fonts?.textFont || 'Arial',
+            padding: gs?.textbox?.padding || 20,
+            maxTextWidthRatio: 0.8,
+            maxButtonWidthRatio: 0.6,
+            textButtonGap: 20,
+            buttonGap: 16,
+            startY: 50,
+          });
           const hudOverlays = gs?.hudOverlays;
           if (hudOverlays?.timerHud) {
             (renderer as any).setTimerHudConfig?.(hudOverlays.timerHud);
@@ -216,19 +234,24 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             });
           }
 
-          // Handle per-beat time display mode changes
-          context.on('beatChanged', ({ beat }: any) => {
+          // Handle per-beat time display mode changes and refresh countdown meter
+          context.on('beatChanged', ({ beatId }: any) => {
+            if (!beatId || !story) return;
+            const beat = story.getBeat(beatId);
             if (!beat) return;
             const cfg = (renderer as any)?._fictionalTimeConfig;
-            const timeDisplayMode = beat.timeDisplayMode || 'fictionalTime';
-            const overrideCountdownMeter = beat.overrideCountdownMeter || false;
+            const timeDisplayMode = (beat as any).timeDisplayMode || 'fictionalTime';
+            const overrideCountdownMeter = (beat as any).overrideCountdownMeter || false;
             (renderer as any).setOverrideCountdownMeter?.(overrideCountdownMeter);
+
+            // Refresh countdown meter value for the new beat
+            updateCountdownMeter();
 
             if (timeDisplayMode === 'none') {
               (renderer as any).setTimerHudOverrideText?.(undefined);
               (renderer as any).setFictionalTimeText?.(undefined);
             } else if (timeDisplayMode === 'manual') {
-              (renderer as any).setTimerHudOverrideText?.(beat.timeDisplayText || undefined);
+              (renderer as any).setTimerHudOverrideText?.((beat as any).timeDisplayText || undefined);
               (renderer as any).setFictionalTimeText?.(undefined);
             } else {
               (renderer as any).setTimerHudOverrideText?.(undefined);
@@ -238,6 +261,53 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
               }
             }
           });
+
+          // Update timer HUD state for named timers
+          const updateTimerHud = () => {
+            if (!rendererRef.current) return;
+            const hudConfig = (rendererRef.current as any).timerHudConfig;
+            if (!hudConfig?.enabled) return;
+
+            const timers = timerManager.getActiveTimers();
+            const timerName = hudConfig.timerName;
+            const timer = timerName
+              ? timers.find((t: any) => t.name === timerName)
+              : timers.find((t: any) => !t.name?.startsWith('defaultTarget_'));
+
+            if (timer) {
+              (rendererRef.current as any).setTimerHudState?.({
+                totalTime: timer.totalTime || timer.remainingTime + 1,
+                remainingTime: timer.remainingTime,
+              });
+            } else {
+              (rendererRef.current as any).setTimerHudState?.(undefined);
+            }
+          };
+
+          // Update countdown meter when counters change
+          const updateCountdownMeter = () => {
+            if (!rendererRef.current) return;
+            const meterConfig = (rendererRef.current as any).countdownMeterConfig;
+            if (!meterConfig?.enabled || !meterConfig.counterName) return;
+
+            const counterName = meterConfig.counterName;
+            const value = context.getCounter(counterName) ?? 0;
+            let min = meterConfig.counterMin ?? 0;
+            let max = meterConfig.counterMax ?? 100;
+            // Try to get min/max from character counter definitions
+            if (story) {
+              const characters = story.getCharacters?.() || [];
+              for (const char of characters) {
+                const counter = (char as any).counters?.find((c: any) => c.name === counterName);
+                if (counter) {
+                  min = counter.min ?? min;
+                  max = counter.max ?? max;
+                  break;
+                }
+              }
+            }
+            (rendererRef.current as any).setCountdownMeterValue?.({ value, min, max });
+          };
 
           const updateTimerState = () => {
             if (!rendererRef.current || !story) return;
@@ -271,6 +341,29 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           timerManager.on('timerStarted', updateTimerState);
           timerManager.on('timerTick', updateTimerState);
           timerManager.on('timerStopped', updateTimerState);
+
+          // Wire timer HUD updates to timer events
+          timerManager.on('timerStarted', updateTimerHud);
+          timerManager.on('timerTick', updateTimerHud);
+
+          // When timer expires, show 00:00 instead of hiding
+          timerManager.on('timerExpired', ({ name }: { name: string }) => {
+            if (!rendererRef.current) return;
+            const hudConfig = (rendererRef.current as any).timerHudConfig;
+            if (!hudConfig?.enabled) return;
+            const matchesName = !hudConfig.timerName || hudConfig.timerName === name;
+            if (matchesName) {
+              const currentState = (rendererRef.current as any).timerHudState;
+              (rendererRef.current as any).setTimerHudState?.({
+                totalTime: currentState?.totalTime || 1,
+                remainingTime: 0,
+              });
+            }
+          });
+
+          // Wire countdown meter updates to counter events
+          context.on('counterChanged', updateCountdownMeter);
+          updateCountdownMeter();
 
           // Handle timer expiration - navigate to target beat
           // This is crucial for defaultTarget functionality when timer expires

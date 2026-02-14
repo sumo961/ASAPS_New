@@ -578,7 +578,8 @@ function adjustElementsForCollisions(
   stageWidth: number,
   stageHeight: number,
   theme: RenderThemeSettings,
-  calculatedButtonHeight: number = 0
+  calculatedButtonHeight: number = 0,
+  hudBottomY: number = 0
 ): PositionedElementData[] {
   const padding = theme.textBox.padding || 20;
 
@@ -626,7 +627,23 @@ function adjustElementsForCollisions(
     const right = effectiveX + effectiveWidth;
     textBoxBounds.push({ bottom, left, right, name: el.location.name });
 
-    console.log(`[CollisionDetect] Text "${el.location.name}": original(${el.location.x},${el.location.y},${el.location.width}x${originalHeight}) → smart(${effectiveX},${el.location.y},${effectiveWidth}x${height}), bottom=${bottom}`);
+    console.log(`[CollisionDetect] Text "${el.location.name}": original(${el.location.x},${el.location.y},${el.location.width}x${originalHeight}) → smart(${effectiveX},${el.location.y},${effectiveWidth}x${height}), bottom=${bottom}, hudBottomY=${hudBottomY}`);
+
+    // Shift text down if it overlaps with HUD overlays at the top
+    if (hudBottomY > 0 && el.location.y < hudBottomY) {
+      const shiftedY = hudBottomY;
+      const shiftedBottom = shiftedY + height;
+      // Update bounds with shifted position
+      textBoxBounds[textBoxBounds.length - 1].bottom = shiftedBottom;
+      console.log(`[CollisionDetect] Text "${el.location.name}": shifted down from y=${el.location.y} to y=${shiftedY} to avoid HUD overlap`);
+      return {
+        ...el,
+        location: {
+          ...el.location,
+          y: shiftedY,
+        },
+      };
+    }
 
     // Return element unchanged - respect user positions
     return el;
@@ -1414,12 +1431,34 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Use calculated max or default if no buttons found
   const calculatedButtonHeight = maxButtonHeight > 0 ? maxButtonHeight : DEFAULT_BUTTON_HEIGHT;
 
+  // Calculate HUD bottom Y to prevent content from overlapping wide HUD overlays
+  // Only applies to top-center HUDs (countdown meter) that span the center of the stage
+  // Corner HUDs (top-left, top-right timer) don't overlap with centered content
+  let hudBottomY = 0;
+  if (!editorMode) {
+    const HUD_MARGIN = 12;
+    const HUD_GAP = 8; // Gap between HUD bottom and content
+    // Only check Countdown Meter HUD at top-center (wide enough to overlap centered content)
+    if (countdownMeterConfig && countdownMeterConfig.enabled && countdownMeterValue) {
+      const meterVisible = countdownMeterConfig.showByDefault !== false ? !overrideCountdownMeter : !!overrideCountdownMeter;
+      if (meterVisible) {
+        const pos = countdownMeterConfig.position || 'top-center';
+        if (pos === 'top-center') {
+          const meterHeight = countdownMeterConfig.meterHeight || 8;
+          const labelHeight = countdownMeterConfig.showLabel ? 19 : 0; // label + gap
+          const thisBottom = HUD_MARGIN + 8 + labelHeight + meterHeight + 8 + HUD_GAP;
+          hudBottomY = Math.max(hudBottomY, thisBottom);
+        }
+      }
+    }
+  }
+
   // Apply collision detection to adjust button positions when text boxes grow
   // SKIP in editor mode - we want WYSIWYG where selection handles match rendered positions exactly
   // Collision adjustment should only happen in preview/runtime mode
   const adjustedElements = editorMode
     ? elements
-    : adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight);
+    : adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY);
 
   // Calculate animation delays for sequenced typewriter effect on text elements
   const animation = theme.textEffects?.animation || 'none';

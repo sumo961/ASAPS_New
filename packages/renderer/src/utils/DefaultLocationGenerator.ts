@@ -97,8 +97,8 @@ export function generateDefaultLocations(
       currentY = y + height + 40;
     } else if (locationName.toLowerCase().includes('button')) {
       if (locationName === 'startButton' || locationName === 'continueButton' || locationName === 'submitButton') {
-        // Start/continue buttons at bottom
-        y = stageHeight - 150;
+        // Position below content with some spacing, but not further than bottom area
+        y = Math.min(currentY + 80, stageHeight - 150);
       } else if (locationName === 'restartButton') {
         // Restart button at bottom for aiSummary/endScreen
         y = stageHeight - 120;
