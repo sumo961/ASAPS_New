@@ -4518,18 +4518,11 @@ function App() {
                 console.warn('[App] Not a valid ASAPS directory project:', clonedPath);
                 alert('Repository cloned successfully!\n\nNote: This does not appear to be an ASAPS directory-format project.');
               }
-              // Initialize VCS for the cloned repo
-              console.log('[App] Initializing VCS...');
-              if (vcs) {
-                await vcs.initialize(clonedPath);
-              }
-              console.log('[App] Post-clone setup complete');
+              // VCS will be auto-initialized by the projectFormat/projectPath effect
+              console.log('[App] Post-clone setup complete (VCS auto-init will follow)');
             } catch (error) {
               console.error('[App] Failed to open cloned project:', error);
               alert(`Failed to open cloned project: ${error instanceof Error ? error.message : 'Unknown error'}`);
-              if (vcs) {
-                try { await vcs.initialize(clonedPath); } catch { /* ignore */ }
-              }
             }
           }}
           onClose={() => setShowCloneRepoDialog(false)}

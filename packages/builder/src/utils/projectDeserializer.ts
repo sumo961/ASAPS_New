@@ -593,8 +593,12 @@ export function loadProjectData(project: Project): {
   let clusters: any[] = [];
   if (story.getClusters && typeof story.getClusters === 'function') {
     clusters = story.getClusters();
+    console.log('[loadProjectData] Clusters from getClusters():', clusters.length);
   } else if (story.clusters) {
     clusters = story.clusters;
+    console.log('[loadProjectData] Clusters from story.clusters:', clusters.length);
+  } else {
+    console.log('[loadProjectData] No clusters found in story (getClusters:', !!story.getClusters, 'story.clusters:', !!story.clusters, ')');
   }
 
   // Extract container beat positions

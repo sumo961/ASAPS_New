@@ -184,6 +184,10 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   const [state, setState] = useState<VCSState>(defaultState);
   const pollTimerRef = useRef<number | null>(null);
   const projectPathRef = useRef<string | null>(null);
+  /** Cached VCS type — only re-detect when path changes */
+  const cachedVCSTypeRef = useRef<VCSType | null>(null);
+  /** Whether git binary was not found during detection */
+  const gitMissingRef = useRef(false);
   const eventHandlersRef = useRef<Set<(event: VCSEvent) => void>>(new Set());
   const logIdRef = useRef(0);
   const onBeforeRefreshRef = useRef(onBeforeRefresh);
@@ -230,13 +234,23 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     }
 
     try {
-      const vcsInfo = await detectVCS(path);
+      // Use cached VCS type if available; only detect on first refresh
+      let vcsType = cachedVCSTypeRef.current;
+      if (!vcsType) {
+        const vcsInfo = await detectVCS(path);
+        vcsType = vcsInfo.type;
+        cachedVCSTypeRef.current = vcsType;
+        gitMissingRef.current = !!vcsInfo.gitMissing;
+      }
 
-      if (vcsInfo.type === 'git') {
-        const status = await getGitStatus(path);
-        const changed = await getChangedFiles(path);
-        const conflicts = await gitGetConflicts(path);
-        const mergeState = await gitDetectMergeState(path);
+      if (vcsType === 'git') {
+        // Run git queries in parallel to minimize IPC round-trips
+        const [status, changed, conflicts, mergeState] = await Promise.all([
+          getGitStatus(path),
+          getChangedFiles(path),
+          gitGetConflicts(path),
+          gitDetectMergeState(path),
+        ]);
 
         // Separate staged and unstaged files
         const stagedFiles = status.files.filter(f => f.staged);
@@ -256,7 +270,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
           unstagedFiles,
           mergeState,
         }));
-      } else if (vcsInfo.type === 'perforce') {
+      } else if (vcsType === 'perforce') {
         const status = await getP4Status(path);
         let locks = new Map<string, string>();
         try {
@@ -276,7 +290,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
         setState(prev => ({
           ...prev,
           type: 'none',
-          gitNotInstalled: !!vcsInfo.gitMissing,
+          gitNotInstalled: gitMissingRef.current,
           branch: null,
           changedFiles: new Set(),
           changedFileCount: 0,
@@ -294,6 +308,9 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
    * Initialize VCS tracking for a directory project
    */
   const initialize = useCallback(async (projectPath: string) => {
+    // Reset cached VCS type when switching projects
+    cachedVCSTypeRef.current = null;
+    gitMissingRef.current = false;
     projectPathRef.current = projectPath;
 
     setState(prev => ({
@@ -321,6 +338,8 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
    */
   const clear = useCallback(() => {
     projectPathRef.current = null;
+    cachedVCSTypeRef.current = null;
+    gitMissingRef.current = false;
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;

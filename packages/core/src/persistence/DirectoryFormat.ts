@@ -482,23 +482,29 @@ export async function deserializeFromDirectory(
   let containerBeatPositions: ContainerBeatPosition[] = [];
 
   const clustersPath = join(rootPath, 'clusters');
+  console.log('[DirectoryFormat] Checking clusters path:', clustersPath);
   if (await reader.exists(clustersPath)) {
     // Read cluster index
     const clusterIndexPath = join(clustersPath, '_index.json');
+    console.log('[DirectoryFormat] Checking cluster index:', clusterIndexPath);
     if (await reader.exists(clusterIndexPath)) {
       const clusterIndex = JSON.parse(await reader.readText(clusterIndexPath));
       containerBeatPositions = clusterIndex.containerBeatPositions || [];
+      console.log('[DirectoryFormat] Cluster index loaded:', clusterIndex.clusters?.length, 'clusters,', containerBeatPositions.length, 'positions');
 
       // Read each cluster
       for (const clusterInfo of clusterIndex.clusters || []) {
         const slug = clusterInfo.slug || sanitizeFilename(clusterInfo.name);
         const clusterDir = join(clustersPath, slug);
         const clusterFile = join(clusterDir, 'cluster.json');
+        console.log('[DirectoryFormat] Reading cluster:', clusterInfo.name, 'from', clusterFile);
 
         if (await reader.exists(clusterFile)) {
           const clusterData = JSON.parse(await reader.readText(clusterFile));
           const { _format, ...clusterContent } = clusterData;
           clusters.push(clusterContent as Cluster);
+        } else {
+          console.warn('[DirectoryFormat] Cluster file missing:', clusterFile);
         }
 
         // Read beat files in this cluster directory
@@ -529,6 +535,11 @@ export async function deserializeFromDirectory(
         }
       }
     }
+  }
+
+  console.log('[DirectoryFormat] Deserialized:', clusters.length, 'clusters,', beats.length, 'beats,', containerBeatPositions.length, 'positions');
+  if (clusters.length > 0) {
+    console.log('[DirectoryFormat] Cluster IDs:', clusters.map(c => c.id));
   }
 
   // 8. Read asset manifest
