@@ -129,6 +129,66 @@ function applyProjectAIDefaults(globalSettings: any): void {
   } catch { /* ignore localStorage errors */ }
 }
 
+/**
+ * Load assets directly from a directory project's manifest + filesystem.
+ * Bypasses IndexedDB entirely — used when IndexedDB is unavailable (e.g. Windows Electron).
+ */
+async function loadAssetsFromDirectory(dirPath: string): Promise<Asset[]> {
+  const api = (window as any).electronAPI;
+  if (!api?.fs) return [];
+
+  const sep = dirPath.includes('\\') ? '\\' : '/';
+  const manifestPath = [dirPath, 'assets', '_manifest.json'].join(sep);
+
+  try {
+    const exists = await api.fs.exists(manifestPath);
+    if (!exists) {
+      console.log('[App] No asset manifest found at', manifestPath);
+      return [];
+    }
+
+    const raw = await api.fs.readFile(manifestPath);
+    const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+    const manifest = JSON.parse(text);
+    const assets: Asset[] = [];
+
+    for (const [assetId, entry] of Object.entries(manifest.assets || {})) {
+      const e = entry as any;
+      const assetPath = [dirPath, 'assets', e.folder, e.filename].join(sep);
+      try {
+        const fileExists = await api.fs.exists(assetPath);
+        if (!fileExists) {
+          console.warn('[App] Asset file not found:', assetPath);
+          continue;
+        }
+        const buffer = await api.fs.readFile(assetPath);
+        const blob = new Blob([buffer], { type: e.mimeType });
+        const url = URL.createObjectURL(blob);
+        assets.push({
+          id: assetId,
+          name: e.filename,
+          type: e.mimeType?.startsWith('image/') ? 'image' :
+                e.mimeType?.startsWith('audio/') ? 'audio' :
+                e.mimeType?.startsWith('video/') ? 'video' :
+                e.mimeType?.includes('font') ? 'font' : 'image',
+          subType: e.metadata?.subType,
+          url,
+          size: e.size || blob.size,
+          uploadedAt: e.uploadedAt ? new Date(e.uploadedAt) : new Date(),
+        });
+      } catch (fileErr) {
+        console.warn('[App] Failed to load asset file:', assetPath, fileErr);
+      }
+    }
+
+    console.log('[App] Loaded', assets.length, 'assets directly from directory');
+    return assets;
+  } catch (err) {
+    console.error('[App] Failed to load directory assets:', err);
+    return [];
+  }
+}
+
 function App() {
   // If we're in the preview window route, render the standalone preview
   if (isPreviewWindowRoute()) {
@@ -1622,7 +1682,7 @@ function App() {
           actions.updateSettings(projectData.settings);
         }
 
-        // Load assets from storage using HybridStorageAdapter
+        // Load assets from storage using HybridStorageAdapter (falls back to filesystem for directory projects)
         const loadAssets = async () => {
           try {
             console.log('[App] >>> Loading assets for project:', currentProject.id);
@@ -1661,7 +1721,13 @@ function App() {
             setAssets(uiAssets);
             console.log('[App] >>> Total assets loaded:', uiAssets.length);
           } catch (err) {
-            console.error('[App] >>> Error loading assets:', err);
+            console.error('[App] >>> Error loading assets from IndexedDB:', err);
+            // Fallback: load assets directly from filesystem for directory projects
+            if (projectFormat === 'directory' && projectPath) {
+              console.log('[App] >>> Falling back to direct filesystem asset loading');
+              const dirAssets = await loadAssetsFromDirectory(projectPath);
+              setAssets(dirAssets);
+            }
           }
         };
         loadAssets();
@@ -1753,8 +1819,10 @@ function App() {
           actions.updateSettings(projectData.settings);
         }
 
-        // Load assets from storage using HybridStorageAdapter
+        // Load assets from storage using HybridStorageAdapter (falls back to filesystem for directory projects)
         const loadAssets = async () => {
+          let uiAssets: Asset[] = [];
+
           try {
             console.log('[App] >>> Loading assets for project:', currentProject.id);
             const storage = getStorageAdapter();
@@ -1765,7 +1833,6 @@ function App() {
             const assetInfoList = await storage.listAssets(currentProject.id);
             console.log('[App] >>> Found', assetInfoList.length, 'assets in storage');
 
-            const uiAssets: Asset[] = [];
             for (const assetInfo of assetInfoList) {
               // Load the actual blob from storage (respects hybrid storage routing)
               const blob = await storage.loadAsset(assetInfo.id);
@@ -1789,77 +1856,77 @@ function App() {
               }
             }
 
-            setAssets(uiAssets);
-            console.log('[App] >>> Total assets loaded:', uiAssets.length);
+            console.log('[App] >>> Total assets loaded from IndexedDB:', uiAssets.length);
+          } catch (err) {
+            console.error('[App] >>> Error loading assets from IndexedDB:', err);
+            // Fallback: load assets directly from filesystem for directory projects
+            if (projectFormat === 'directory' && projectPath) {
+              console.log('[App] >>> Falling back to direct filesystem asset loading');
+              uiAssets = await loadAssetsFromDirectory(projectPath);
+            }
+          }
 
-            // CRITICAL: Reconstruct character image URLs from asset IDs
-            // Characters were saved with asset IDs, but blob URLs are invalid after reload
-            console.log('[App] >>> Checking character URL reconstruction...');
-            console.log('[App] >>> projectData.characters:', projectData.characters?.length || 0);
-            console.log('[App] >>> uiAssets:', uiAssets.length);
-            if (projectData.characters && projectData.characters.length > 0) {
-              const assetUrlMap = new Map(uiAssets.map(a => [a.id, a.url]));
-              console.log('[App] >>> Asset URL map size:', assetUrlMap.size);
-              const updatedCharacters = projectData.characters.map((char: any) => {
-                // Update default image
-                const defaultAssetId = char.visual?.defaultAssetId;
-                const defaultUrl = defaultAssetId ? assetUrlMap.get(defaultAssetId) : null;
-                console.log(`[App] >>> Character "${char.displayName}": defaultAssetId=${defaultAssetId}, resolved=${!!defaultUrl}`);
+          setAssets(uiAssets);
+          console.log('[App] >>> Total assets loaded:', uiAssets.length);
 
-                // Update state images
-                const updatedStates = (char.states || []).map((state: any) => {
-                  const stateAssetId = state.visual?.assetId;
-                  const stateUrl = stateAssetId ? assetUrlMap.get(stateAssetId) : null;
-                  console.log(`[App] >>>   State "${state.id}": assetId=${stateAssetId}, resolved=${!!stateUrl}`);
-                  return {
-                    ...state,
-                    visual: {
-                      ...state.visual,
-                      image: stateUrl || state.visual?.image // Use reconstructed URL or keep existing
-                    }
-                  };
-                });
+          // CRITICAL: Reconstruct character image URLs from asset IDs
+          // Characters were saved with asset IDs, but blob URLs are invalid after reload
+          if (uiAssets.length > 0 && projectData.characters && projectData.characters.length > 0) {
+            const assetUrlMap = new Map(uiAssets.map(a => [a.id, a.url]));
+            console.log('[App] >>> Reconstructing character URLs, asset map size:', assetUrlMap.size);
+            const updatedCharacters = projectData.characters.map((char: any) => {
+              // Update default image
+              const defaultAssetId = char.visual?.defaultAssetId;
+              const defaultUrl = defaultAssetId ? assetUrlMap.get(defaultAssetId) : null;
 
-                // Update spritesheet URL
-                const spriteSheet = char.visual?.spriteSheet;
-                let updatedSpriteSheet = spriteSheet;
-                if (spriteSheet?.assetId) {
-                  const ssUrl = assetUrlMap.get(spriteSheet.assetId);
-                  if (ssUrl) {
-                    updatedSpriteSheet = { ...spriteSheet, url: ssUrl };
-                    console.log(`[App] >>>   SpriteSheet assetId=${spriteSheet.assetId}, resolved=${!!ssUrl}`);
-                  }
-                }
-
-                // Update inventory icons
-                const updatedInventory = (char.inventory || []).map((item: any) => {
-                  if (item.assetId) {
-                    const iconUrl = assetUrlMap.get(item.assetId);
-                    if (iconUrl) {
-                      console.log(`[App] >>>   Inventory "${item.name}": assetId=${item.assetId}, resolved=true`);
-                      return { ...item, icon: iconUrl };
-                    }
-                  }
-                  return item;
-                });
-
+              // Update state images
+              const updatedStates = (char.states || []).map((state: any) => {
+                const stateAssetId = state.visual?.assetId;
+                const stateUrl = stateAssetId ? assetUrlMap.get(stateAssetId) : null;
                 return {
-                  ...char,
+                  ...state,
                   visual: {
-                    ...char.visual,
-                    defaultImage: defaultUrl || char.visual?.defaultImage,
-                    ...(updatedSpriteSheet ? { spriteSheet: updatedSpriteSheet } : {})
-                  },
-                  states: updatedStates,
-                  inventory: updatedInventory
+                    ...state.visual,
+                    image: stateUrl || state.visual?.image
+                  }
                 };
               });
 
-              setCharacters(updatedCharacters);
-              console.log('[App] >>> Character URLs reconstructed from assets');
-            }
-          } catch (err) {
-            console.error('[App] >>> Error loading assets:', err);
+              // Update spritesheet URL
+              const spriteSheet = char.visual?.spriteSheet;
+              let updatedSpriteSheet = spriteSheet;
+              if (spriteSheet?.assetId) {
+                const ssUrl = assetUrlMap.get(spriteSheet.assetId);
+                if (ssUrl) {
+                  updatedSpriteSheet = { ...spriteSheet, url: ssUrl };
+                }
+              }
+
+              // Update inventory icons
+              const updatedInventory = (char.inventory || []).map((item: any) => {
+                if (item.assetId) {
+                  const iconUrl = assetUrlMap.get(item.assetId);
+                  if (iconUrl) {
+                    return { ...item, icon: iconUrl };
+                  }
+                }
+                return item;
+              });
+
+              return {
+                ...char,
+                visual: {
+                  ...char.visual,
+                  defaultImage: defaultUrl || char.visual?.defaultImage,
+                  ...(updatedSpriteSheet ? { spriteSheet: updatedSpriteSheet } : {})
+                },
+                states: updatedStates,
+                inventory: updatedInventory
+              };
+            });
+
+            setCharacters(updatedCharacters);
+            console.log('[App] >>> Character URLs reconstructed from assets');
           }
         };
         loadAssets();
