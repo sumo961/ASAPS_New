@@ -694,6 +694,34 @@ ipcMain.handle('fs:unwatch-dir', async () => {
   stopWatching();
 });
 
+// Find the actual executable path for a command on Windows
+// Searches common install locations when the command isn't on PATH
+function findExecutable(command: string): string {
+  if (process.platform !== 'win32' || command !== 'git') return command;
+
+  const localAppData = process.env.LOCALAPPDATA || '';
+  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+  const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+
+  const candidates = [
+    join(programFiles, 'Git', 'cmd', 'git.exe'),
+    join(programFilesX86, 'Git', 'cmd', 'git.exe'),
+    join(localAppData, 'Programs', 'Git', 'cmd', 'git.exe'),
+    join(programFiles, 'Git', 'bin', 'git.exe'),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      console.log('[IPC:fs] Found git at:', candidate);
+      return candidate;
+    }
+  }
+
+  // Not found in known locations, return original and let PATH handle it
+  console.warn('[IPC:fs] git not found in common locations, trying PATH. Searched:', candidates);
+  return command;
+}
+
 ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?: string, timeout?: number) => {
   console.log('[IPC:fs] run-command:', command, args.join(' '), cwd ? `(cwd: ${cwd})` : '');
 
@@ -707,6 +735,9 @@ ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?
     : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
   const currentPath = process.env.PATH || '';
   const augmentedPath = [...new Set([...currentPath.split(pathSep), ...extraPaths])].join(pathSep);
+
+  // On Windows, try to find the actual executable path if it's git
+  const resolvedCommand = isWin ? findExecutable(command) : command;
 
   // If git-lfs is configured globally but not installed, git operations fail.
   // Disable LFS filters entirely (empty string = no filter, no process spawned).
@@ -725,7 +756,7 @@ ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?
   }
 
   return new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve) => {
-    execFile(command, args, {
+    execFile(resolvedCommand, args, {
       cwd: cwd || undefined,
       timeout: timeout || 30000,
       env: { ...process.env, PATH: augmentedPath, ...lfsEnv },
@@ -735,13 +766,18 @@ ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?
       // but error.message has the real error - surface it so callers can display it
       let stderrResult = stderr || '';
       if (exitCode !== 0 && !stderrResult.trim() && error?.message) {
-        stderrResult = error.message;
+        // Provide a user-friendly message for common errors
+        if (error.code === 'ENOENT' || error.message.includes('ENOENT')) {
+          stderrResult = `${command} is not installed or not found on PATH.\n\nPlease install Git for Windows from https://git-scm.com/download/win and restart the app.`;
+        } else {
+          stderrResult = error.message;
+        }
       }
       if (exitCode !== 0) {
-        console.warn('[IPC:fs] run-command FAILED:', command, args.join(' '), `exit=${exitCode}`, stderrResult.trim());
+        console.warn('[IPC:fs] run-command FAILED:', resolvedCommand, args.join(' '), `exit=${exitCode}`, stderrResult.substring(0, 200));
         if (error) console.warn('[IPC:fs] run-command error details:', error.message, 'code:', error.code);
       } else {
-        console.log('[IPC:fs] run-command OK:', command, args.join(' '));
+        console.log('[IPC:fs] run-command OK:', resolvedCommand, args.join(' '));
       }
       resolve({
         stdout: stdout || '',
