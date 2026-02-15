@@ -177,15 +177,39 @@ class PreviewWindowManager {
         return false;
       }
 
+      // Set up the ready listener BEFORE opening the window to avoid race condition
+      // (preview window may load and send PING before we register the listener)
+      if (initialData) {
+        this.pendingData = initialData;
+        let unsubscribe: (() => void) | null = null;
+
+        if (electronAPI.onPreviewReady) {
+          unsubscribe = electronAPI.onPreviewReady(() => {
+            console.log('[PreviewWindowManager] Preview window ready (PING received), sending initial data');
+            unsubscribe?.();
+            unsubscribe = null;
+            if (this.pendingData) {
+              this.sendUpdateElectron(this.pendingData);
+              this.pendingData = null;
+              this.notifyListeners();
+            }
+          });
+        }
+
+        // Fallback timeout in case PING is missed
+        setTimeout(() => {
+          if (this.pendingData) {
+            console.log('[PreviewWindowManager] Fallback: sending initial data after timeout');
+            unsubscribe?.();
+            this.sendUpdateElectron(this.pendingData);
+            this.pendingData = null;
+            this.notifyListeners();
+          }
+        }, 3000);
+      }
+
       await electronAPI.preview.open();
       this._electronWindowOpen = true;
-
-      // Send initial data if provided (with small delay to let window initialize)
-      if (initialData) {
-        setTimeout(() => {
-          this.sendUpdateElectron(initialData);
-        }, 500);
-      }
 
       this.notifyListeners();
       return true;

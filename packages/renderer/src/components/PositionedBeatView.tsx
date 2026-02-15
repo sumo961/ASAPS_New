@@ -1381,9 +1381,12 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             }}>
               {buttonElements.map((element, index) => {
                 // Check if this button leads to a visited beat or is a visited choice
-                const isButtonVisited =
-                  (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
-                  (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
+                // For dialogTree: only use per-choice tracking (visitedChoiceIds), NOT visitedBeats,
+                // because visitedBeats tracks beats visited via ANY path which causes false positives
+                const isButtonVisited = beatType === 'dialogTree'
+                  ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
+                  : (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+                    (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
                 return (
                   <FlexButtonElement
                     key={`btn-${index}-${element.location.name}`}
@@ -1842,9 +1845,11 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
       }
 
       // Check if this button leads to a visited beat or is a visited choice
-      const isButtonVisited =
-        (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
-        (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
+      // For dialogTree: only use per-choice tracking, not visitedBeats (avoids false positives)
+      const isButtonVisited = beatType === 'dialogTree'
+        ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
+        : (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+          (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
       // Wrap button in a div that handles the fade-in animation
       // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       // Combine animated opacity with button fade-in: use animated opacity if buttons are shown
@@ -1884,9 +1889,11 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
 
     case 'hotspot': {
       // Check if this hotspot leads to a visited beat or is a visited choice
-      const isHotspotVisited =
-        (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
-        (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
+      // For dialogTree: only use per-choice tracking, not visitedBeats (avoids false positives)
+      const isHotspotVisited = beatType === 'dialogTree'
+        ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
+        : (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+          (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
       // Wrap hotspot in a div that handles the fade-in animation
       // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       // Also apply scroll-to-continue logic for hotspots

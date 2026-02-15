@@ -107,11 +107,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: () => ipcRenderer.invoke('preview:close'),
     isOpen: () => ipcRenderer.invoke('preview:is-open'),
     sendMessage: (message: any) => ipcRenderer.invoke('preview:send-message', message),
+    ping: () => ipcRenderer.send('preview:ping'),
   },
   onPreviewMessage: (callback: (message: any) => void) => {
     const handler = (_: unknown, message: any) => callback(message);
     ipcRenderer.on('preview:message', handler);
     return () => ipcRenderer.removeListener('preview:message', handler);
+  },
+  onPreviewReady: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('preview:ready', handler);
+    return () => ipcRenderer.removeListener('preview:ready', handler);
   },
   onPreviewClosed: (callback: () => void) => {
     ipcRenderer.on('preview:closed', callback);
@@ -214,8 +220,10 @@ declare global {
         close: () => Promise<boolean>;
         isOpen: () => Promise<boolean>;
         sendMessage: (message: any) => Promise<boolean>;
+        ping: () => void;
       };
       onPreviewMessage: (callback: (message: any) => void) => () => void;
+      onPreviewReady: (callback: () => void) => () => void;
       onPreviewClosed: (callback: () => void) => () => void;
       onStoryInject: (callback: (data: any) => void) => () => void;
       onVCSCommit: (callback: () => void) => () => void;

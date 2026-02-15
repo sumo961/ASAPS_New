@@ -342,6 +342,11 @@ export class DialogTreeBeat extends Beat {
     // Track the exit target when user selects a choice with a beat ID target
     let exitTargetBeatId: string | null = null;
 
+    // Track position in the dialog tree for unique visited-choice tracking.
+    // Without this, different dialog nodes reuse simple IDs like "1", "2"
+    // causing false positives when checking visited choices.
+    let nodePath = 'root';
+
     while (this.currentNode) {
       // Build phase-specific locations by merging base locations with phaseOverrides
       // This ensures dialog/button positions from Visual Editor are respected
@@ -451,17 +456,19 @@ export class DialogTreeBeat extends Beat {
 
         // Process choice text with variable interpolation and render choices
         // Include isExit flag to indicate if choice exits to another beat (skip typing animation)
+        // Prefix choice IDs with nodePath so different dialog nodes don't share IDs
         const choiceId = await renderer.renderChoices(
           visibleChoices.map(c => ({
-            id: c.id,
+            id: `${nodePath}_${c.id}`,
             text: this.processText(c.text, context),
             isExit: !!c.target && !c.dialogNode, // Exit if has target but no nested dialog
           })),
           locations
         );
 
-        // First try to match by exact ID
-        let selectedChoice = visibleChoices.find(c => c.id === choiceId);
+        // First try to match by exact ID (strip nodePath prefix if present)
+        const rawChoiceId = choiceId?.startsWith(`${nodePath}_`) ? choiceId.substring(nodePath.length + 1) : choiceId;
+        let selectedChoice = visibleChoices.find(c => c.id === rawChoiceId || `${nodePath}_${c.id}` === choiceId);
 
         // Fallback: if choiceId looks like a button index (e.g., "button1", "button2"),
         // try to match by index. This handles cases where ASML import creates
@@ -509,8 +516,8 @@ export class DialogTreeBeat extends Beat {
             await renderer.playSound({ file: choiceWithSound.soundEffect });
           }
 
-          // Mark this choice as visited for per-choice tracking
-          context.markChoiceVisited(this.id, selectedChoice.id);
+          // Mark this choice as visited using path-prefixed ID for unique tracking
+          context.markChoiceVisited(this.id, `${nodePath}_${selectedChoice.id}`);
 
           // Update renderer's visited choice IDs so UI reflects the change
           if (renderer.setVisitedChoiceIds) {
@@ -522,6 +529,7 @@ export class DialogTreeBeat extends Beat {
             // Loop back to root choices - add delay so user sees their selection
             await new Promise(resolve => setTimeout(resolve, 1000));
             this.currentNode = this.dialogTree;
+            nodePath = 'root'; // Reset path when returning to root
             // Continue the while loop (do NOT set exitTargetBeatId)
           } else if (selectedChoice.target) {
             // Exit to another beat - add delay so user can see their choice was selected
@@ -530,6 +538,7 @@ export class DialogTreeBeat extends Beat {
             this.currentNode = null; // Exit the while loop
           } else if (selectedChoice.dialogNode) {
             // Continue with nested dialog node
+            nodePath = `${nodePath}.${selectedChoice.id}`; // Extend path for unique tracking
             this.currentNode = selectedChoice.dialogNode;
           } else {
             // No target or dialogNode - dialog ends

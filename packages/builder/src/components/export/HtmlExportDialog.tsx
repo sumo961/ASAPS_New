@@ -2,9 +2,10 @@
  * HTML Export Dialog - Configure and trigger HTML export
  */
 
-import React, { useState, useCallback } from 'react';
-import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Languages, Plus } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Languages, Plus, Settings } from 'lucide-react';
 import { downloadHtmlExport, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
+import { getSavedAIConfig } from '../../hooks/useAI';
 
 const STANDARD_LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -43,10 +44,62 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   const [selectedLanguages, setSelectedLanguages] = useState<Set<string>>(new Set());
   const [customLanguage, setCustomLanguage] = useState('');
   const [customLanguages, setCustomLanguages] = useState<string[]>([]);
+  const [translationMode, setTranslationMode] = useState<'separate' | 'bundled'>('separate');
+  const [usingGlobalConfig, setUsingGlobalConfig] = useState(false);
+  const [translationProgress, setTranslationProgress] = useState<{
+    currentLanguage: string;
+    languageIndex: number;
+    totalLanguages: number;
+    stringsTranslated: number;
+    totalStrings: number;
+  } | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const hasPopulatedRef = useRef(false);
+
+  // Pre-populate AI settings from global config on first open
+  useEffect(() => {
+    if (isOpen && !hasPopulatedRef.current) {
+      hasPopulatedRef.current = true;
+      const globalConfig = getSavedAIConfig();
+      if (globalConfig) {
+        // Map providerType to AIProvider
+        const providerMap: Record<string, AIProvider> = {
+          claude: 'anthropic',
+          openai: 'openai',
+          local: 'local',
+        };
+        const mappedProvider = providerMap[globalConfig.providerType || globalConfig.provider] || 'openai';
+        setAiProvider(mappedProvider);
+        if (globalConfig.apiKey) setAiApiKey(globalConfig.apiKey);
+        if (globalConfig.baseUrl) setAiBaseUrl(globalConfig.baseUrl);
+        if (globalConfig.model) setAiModel(globalConfig.model);
+        setUsingGlobalConfig(true);
+        // Show advanced options if model or baseUrl were set
+        if (globalConfig.model || globalConfig.baseUrl) {
+          setShowAdvanced(true);
+        }
+      }
+    }
+    if (!isOpen) {
+      hasPopulatedRef.current = false;
+    }
+  }, [isOpen]);
+
+  const handleCancel = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
     setError(null);
+    setTranslationProgress(null);
+
+    // Create abort controller for cancellation
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
       // For local provider, we need baseUrl but not apiKey
@@ -65,27 +118,39 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         translateLanguages.push(...customLanguages);
       }
 
+      // Translation needs AI config even if enableAI (for player) is off
+      const needsAIConfig = (enableAI && hasAIConfig) || translateLanguages.length > 0;
+
       const options: HtmlExportOptions = {
         mode,
         responsive: true,
         enableAI,
-        showApiKeyPrompt: enableAI && !hasAIConfig, // Only prompt if no config provided
-        aiProvider: enableAI && hasAIConfig ? aiProvider : undefined,
-        aiApiKey: enableAI && hasAIConfig && aiApiKey ? aiApiKey : undefined,
-        aiBaseUrl: enableAI && hasAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
-        aiModel: enableAI && hasAIConfig && aiModel ? aiModel : undefined,
+        showApiKeyPrompt: enableAI && !hasAIConfig,
+        aiProvider: needsAIConfig ? aiProvider : undefined,
+        aiApiKey: needsAIConfig && aiApiKey ? aiApiKey : undefined,
+        aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
+        aiModel: needsAIConfig && aiModel ? aiModel : undefined,
         translateLanguages: translateLanguages.length > 0 ? translateLanguages : undefined,
+        translationMode: translateLanguages.length > 0 ? translationMode : undefined,
+        onTranslationProgress: (progress) => setTranslationProgress(progress),
+        signal: abortController.signal,
       };
 
       await downloadHtmlExport(projectId, projectName, options);
       onClose();
     } catch (err) {
-      console.error('[HtmlExportDialog] Export failed:', err);
-      setError(err instanceof Error ? err.message : 'Export failed');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Translation cancelled');
+      } else {
+        console.error('[HtmlExportDialog] Export failed:', err);
+        setError(err instanceof Error ? err.message : 'Export failed');
+      }
     } finally {
       setExporting(false);
+      setTranslationProgress(null);
+      abortControllerRef.current = null;
     }
-  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose]);
+  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, enableTranslation, selectedLanguages, customLanguages, translationMode]);
 
   if (!isOpen) return null;
 
@@ -166,6 +231,12 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
             {/* AI Configuration - shown when AI is enabled */}
             {enableAI && (
               <div className="ml-7 space-y-3 border-l-2 border-blue-200 pl-4">
+                {usingGlobalConfig && (
+                  <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2.5 py-1.5 mb-2">
+                    <Settings className="w-3.5 h-3.5" />
+                    Pre-filled from global AI settings — edit to override
+                  </div>
+                )}
                 <div className="text-sm text-gray-600 mb-2">
                   Optionally embed your API key so players don't need to configure it:
                 </div>
@@ -177,7 +248,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                   </label>
                   <select
                     value={aiProvider}
-                    onChange={(e) => setAiProvider(e.target.value as AIProvider)}
+                    onChange={(e) => { setAiProvider(e.target.value as AIProvider); setUsingGlobalConfig(false); }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="openai">OpenAI (GPT-5.2)</option>
@@ -196,7 +267,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     <input
                       type="text"
                       value={aiBaseUrl}
-                      onChange={(e) => setAiBaseUrl(e.target.value)}
+                      onChange={(e) => { setAiBaseUrl(e.target.value); setUsingGlobalConfig(false); }}
                       placeholder={
                         aiProvider === 'local'
                           ? 'http://localhost:8080/v1'
@@ -223,7 +294,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                       <input
                         type={showApiKey ? 'text' : 'password'}
                         value={aiApiKey}
-                        onChange={(e) => setAiApiKey(e.target.value)}
+                        onChange={(e) => { setAiApiKey(e.target.value); setUsingGlobalConfig(false); }}
                         placeholder={
                           aiProvider === 'openai' ? 'sk-...' :
                           aiProvider === 'anthropic' ? 'sk-ant-...' :
@@ -268,7 +339,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                         <input
                           type="text"
                           value={aiBaseUrl}
-                          onChange={(e) => setAiBaseUrl(e.target.value)}
+                          onChange={(e) => { setAiBaseUrl(e.target.value); setUsingGlobalConfig(false); }}
                           placeholder={
                             aiProvider === 'openai'
                               ? 'https://api.openai.com/v1 (default)'
@@ -290,7 +361,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                       <input
                         type="text"
                         value={aiModel}
-                        onChange={(e) => setAiModel(e.target.value)}
+                        onChange={(e) => { setAiModel(e.target.value); setUsingGlobalConfig(false); }}
                         placeholder={
                           aiProvider === 'openai' ? 'gpt-5.2 (default)' :
                           aiProvider === 'anthropic' ? 'claude-sonnet-4-20250514 (default)' :
@@ -339,10 +410,9 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
 
             {enableTranslation && (
               <div className="ml-7 space-y-3 border-l-2 border-purple-200 pl-4">
-                {!enableAI || (!aiApiKey && aiProvider !== 'local') ? (
+                {(!aiApiKey && aiProvider !== 'local') || (aiProvider === 'local' && !aiBaseUrl) ? (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                    <strong>Note:</strong> Translation requires an AI provider to be configured above.
-                    {!enableAI && ' Please enable AI features first.'}
+                    <strong>Note:</strong> Translation requires an AI provider with API key (or local LLM) to be configured above.
                   </div>
                 ) : null}
 
@@ -428,11 +498,50 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                 </div>
 
                 {(selectedLanguages.size > 0 || customLanguages.length > 0) && (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-800">
-                    The story will be exported with {selectedLanguages.size + customLanguages.length} translation{selectedLanguages.size + customLanguages.length !== 1 ? 's' : ''}.
-                    Each translation creates a separate copy of the story file.
-                    Translation uses the AI provider configured above.
-                  </div>
+                  <>
+                    {/* Translation packaging mode */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Packaging Mode
+                      </label>
+                      <div className="space-y-2">
+                        <label className="flex items-start gap-2 text-sm cursor-pointer">
+                          <input
+                            type="radio"
+                            name="translationMode"
+                            checked={translationMode === 'separate'}
+                            onChange={() => setTranslationMode('separate')}
+                            className="mt-0.5 w-3.5 h-3.5 text-purple-600 border-gray-300 focus:ring-purple-500"
+                          />
+                          <div>
+                            <div className="text-gray-900">Separate files</div>
+                            <div className="text-xs text-gray-500">One HTML file per language, packaged in a ZIP</div>
+                          </div>
+                        </label>
+                        <label className="flex items-start gap-2 text-sm cursor-pointer">
+                          <input
+                            type="radio"
+                            name="translationMode"
+                            checked={translationMode === 'bundled'}
+                            onChange={() => setTranslationMode('bundled')}
+                            className="mt-0.5 w-3.5 h-3.5 text-purple-600 border-gray-300 focus:ring-purple-500"
+                          />
+                          <div>
+                            <div className="text-gray-900">Bundled multi-language</div>
+                            <div className="text-xs text-gray-500">Single HTML file with language selector dropdown</div>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-800">
+                      {translationMode === 'separate'
+                        ? `The story will be exported as a ZIP with ${selectedLanguages.size + customLanguages.length + 1} HTML files (original + ${selectedLanguages.size + customLanguages.length} translation${selectedLanguages.size + customLanguages.length !== 1 ? 's' : ''}).`
+                        : `The story will be exported as a single HTML file with ${selectedLanguages.size + customLanguages.length} embedded translation${selectedLanguages.size + customLanguages.length !== 1 ? 's' : ''} and a language selector.`
+                      }
+                      {' '}Translation uses the AI provider configured above.
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -470,6 +579,61 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
           )}
         </div>
 
+        {/* Translation Progress Overlay */}
+        {exporting && translationProgress && (
+          <div className="px-6 py-4 border-t border-purple-200 bg-purple-50">
+            <div className="space-y-2">
+              {translationProgress.languageIndex >= translationProgress.totalLanguages ? (
+                /* Packaging phase */
+                <>
+                  <div className="flex items-center gap-2 text-sm font-medium text-purple-900">
+                    <div className="w-4 h-4 border-2 border-purple-400 border-t-purple-700 rounded-full animate-spin" />
+                    Packaging exported files...
+                  </div>
+                  <div className="text-xs text-purple-700">
+                    All {translationProgress.totalLanguages} translations complete. Building final export.
+                  </div>
+                </>
+              ) : (
+                /* Translation phase */
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-purple-900">
+                      Translating to {translationProgress.currentLanguage}...
+                    </span>
+                    <span className="text-purple-700 text-xs">
+                      Language {translationProgress.languageIndex + 1} of {translationProgress.totalLanguages}
+                    </span>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="w-full bg-purple-200 rounded-full h-2">
+                    <div
+                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${translationProgress.totalStrings > 0
+                          ? (translationProgress.stringsTranslated / translationProgress.totalStrings) * 100
+                          : 0}%`
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-purple-700">
+                    <span>
+                      {translationProgress.stringsTranslated} / {translationProgress.totalStrings} strings
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      className="px-2 py-0.5 text-red-700 bg-red-100 hover:bg-red-200 rounded transition-colors"
+                    >
+                      Cancel Translation
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
           <button
@@ -487,7 +651,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
             {exporting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Exporting...
+                {translationProgress ? 'Translating...' : 'Exporting...'}
               </>
             ) : (
               <>

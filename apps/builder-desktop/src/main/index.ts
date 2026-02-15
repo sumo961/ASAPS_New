@@ -908,6 +908,14 @@ ipcMain.handle('preview:send-message', async (_, message: any) => {
   return false;
 });
 
+// Preview window signals it's ready to receive messages
+ipcMain.on('preview:ping', () => {
+  console.log('[Main] Preview window is ready (ping received)');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('preview:ready');
+  }
+});
+
 // App lifecycle
 app.whenReady().then(async () => {
   // Start the embedded API server for AI proxy functionality

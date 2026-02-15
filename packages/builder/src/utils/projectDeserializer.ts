@@ -542,7 +542,17 @@ export function loadProjectData(project: Project): {
     ? beatsData as Beat[]
     : deserializeBeats(beatsData);
 
-  console.log('[loadProjectData] Deserialized beats:', beats.length);
+  // Sort beats by numeric ID for consistent ordering across all storage backends.
+  // Without sorting, beat order depends on Map insertion order, filesystem readdir order,
+  // or JSON property iteration order — all of which can vary across platforms/engines.
+  beats.sort((a, b) => {
+    const aNum = parseInt(String(a.id), 10);
+    const bNum = parseInt(String(b.id), 10);
+    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  console.log('[loadProjectData] Deserialized beats:', beats.length, '(sorted by ID)');
 
   // Extract metadata
   // CRITICAL: Project name takes precedence over story metadata title

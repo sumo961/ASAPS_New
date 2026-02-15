@@ -3195,10 +3195,10 @@ function App() {
     return {
       title: state.title,
       author: state.author,
-      firstBeatId: state.beats[0]?.id || '0',
+      firstBeatId: (state.story as any)?.getFirstBeatId?.() || (state.story as any)?.metadata?.firstBeatId || (state.story as any)?.firstBeatId || state.beats[0]?.id || '0',
       beats: serializedBeats,
     };
-  }, [state.beats, state.title, state.author]);
+  }, [state.beats, state.title, state.author, state.story]);
 
   // Toggle preview window (separate window mode)
   const handleTogglePreviewWindow = useCallback(() => {
@@ -3514,7 +3514,7 @@ function App() {
     const story = new Story({
       title: state.title,
       author: state.author || 'Unknown',
-      firstBeatId: state.beats[0]?.id || '0',
+      firstBeatId: (state.story as any)?.getFirstBeatId?.() || (state.story as any)?.metadata?.firstBeatId || (state.story as any)?.firstBeatId || state.beats[0]?.id || '0',
     });
 
     state.beats.forEach(beat => {

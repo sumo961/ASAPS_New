@@ -537,6 +537,16 @@ export async function deserializeFromDirectory(
     }
   }
 
+  // Sort beats by numeric ID for consistent ordering across platforms.
+  // Filesystem readdir order is non-deterministic and varies by OS/FS,
+  // which would cause layout algorithms and firstBeatId fallbacks to differ.
+  beats.sort((a, b) => {
+    const aNum = parseInt(String(a.id), 10);
+    const bNum = parseInt(String(b.id), 10);
+    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+    return String(a.id).localeCompare(String(b.id));
+  });
+
   console.log('[DirectoryFormat] Deserialized:', clusters.length, 'clusters,', beats.length, 'beats,', containerBeatPositions.length, 'positions');
   if (clusters.length > 0) {
     console.log('[DirectoryFormat] Cluster IDs:', clusters.map(c => c.id));

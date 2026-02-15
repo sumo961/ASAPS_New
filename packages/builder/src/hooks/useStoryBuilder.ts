@@ -347,7 +347,7 @@ export function useStoryBuilder() {
     const story = new Story({
       title: state.title,
       author: state.author,
-      firstBeatId: state.beats[0]?.id || '0',
+      firstBeatId: (state.story as any)?.getFirstBeatId?.() || (state.story as any)?.metadata?.firstBeatId || (state.story as any)?.firstBeatId || state.beats[0]?.id || '0',
     });
 
     // FIXED: Always use state.settings as it contains the most up-to-date settings

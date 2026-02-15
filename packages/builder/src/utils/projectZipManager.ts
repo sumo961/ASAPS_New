@@ -139,6 +139,45 @@ export async function exportProjectAsZip(projectId: string): Promise<Blob> {
 }
 
 /**
+ * Get project data in the same JSON format used inside the ZIP's project.json.
+ * Useful for translation and other operations that need the serialized form without creating a ZIP.
+ */
+export async function getProjectDataForExport(projectId: string): Promise<any> {
+  const storage = getStorageManager();
+
+  const projectResult = await storage.getProject(projectId);
+  if (!projectResult.success || !projectResult.data) {
+    throw new Error('Project not found');
+  }
+
+  const project = projectResult.data;
+  const storyData = serializeStory(project.story);
+
+  return {
+    metadata: {
+      exportVersion: '1.1.0',
+      exportedAt: new Date().toISOString(),
+      exportedBy: 'ASAPS Builder',
+      projectId: project.id,
+      projectName: project.name,
+    },
+    project: {
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      createdAt: project.createdAt,
+      modifiedAt: project.modifiedAt,
+      version: project.version,
+      settings: project.settings,
+      globalSettings: project.globalSettings,
+      themeId: project.themeId,
+      themeOverrides: project.themeOverrides,
+      story: storyData,
+    },
+  };
+}
+
+/**
  * Result of import operation
  */
 export interface ImportResult {

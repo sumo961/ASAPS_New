@@ -356,20 +356,30 @@ export const PreviewWindow: React.FC = () => {
   const rendererRef = useRef<ReactRenderer | null>(null);
   const engineRef = useRef<StoryEngine | null>(null);
   const countersRef = useRef<Record<string, number>>({});
+  const previewDataRef = useRef<PreviewData | null>(null);
   const isElectronRef = useRef<boolean>(false);
   const stateChangeUnsubscribeRef = useRef<(() => void) | null>(null); // Cleanup previous listener
   const handleRestartRef = useRef<((beatId?: string, preset?: StatePreset | null, pauseOnStart?: boolean) => void) | null>(null);
   const navigatedBeatIdRef = useRef<string | null>(null); // Track manually navigated beat to prevent STORY_UPDATE from overwriting
 
-  // Detect if running in Electron
+  // Keep previewData ref in sync so resolver closures always access latest data
+  useEffect(() => {
+    previewDataRef.current = previewData;
+  }, [previewData]);
+
+  // Detect if running in Electron (synchronous, before effects)
   useEffect(() => {
     isElectronRef.current = typeof window !== 'undefined' &&
       !!(window as any).electronAPI?.onPreviewMessage;
   }, []);
 
-  // Listen for messages from parent window
+  // Ref-based message handler so the IPC callback always uses the latest state
+  // This avoids the need to tear down and re-register the IPC listener when state changes
+  const handleMessageRef = useRef<(event: MessageEvent) => void>();
+
+  // Update the message handler whenever relevant state changes
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    handleMessageRef.current = (event: MessageEvent) => {
       // Verify origin for security
       if (event.origin !== window.location.origin) return;
 
@@ -396,10 +406,11 @@ export const PreviewWindow: React.FC = () => {
 
             // On first load (no story running), show "waiting to start" state
             if (!hasAutoStarted.current) {
-              // Determine which beat to start from
-              const targetBeatId = payloadBeatId || firstBeatId;
-              if (targetBeatId) {
-                setStartBeatId(targetBeatId);
+              // On first load, prefer the story's first beat (not the currently selected beat in the builder)
+              // Use != null checks because beat ID "0" is valid but falsy
+              const targetBeatId = firstBeatId != null ? firstBeatId : payloadBeatId;
+              if (targetBeatId != null) {
+                setStartBeatId(String(targetBeatId));
               }
               console.log('[PreviewWindow] STORY_UPDATE: first load, showing wait state for:', targetBeatId);
               hasAutoStarted.current = true;
@@ -448,34 +459,48 @@ export const PreviewWindow: React.FC = () => {
           break;
       }
     };
+  }, [isRunning, isPaused, isWaitingToStart]);
+
+  // Register message listeners ONCE (stable across state changes)
+  // The handler ref ensures we always process with latest state
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      handleMessageRef.current?.(event);
+    };
 
     // Web: postMessage
     window.addEventListener('message', handleMessage);
 
-    // Send PING to parent to indicate we're ready
+    // Send PING to parent to indicate we're ready (web)
     if (window.opener) {
       window.opener.postMessage({ type: 'PING' }, window.location.origin);
       console.log('[PreviewWindow] Sent PING to parent');
     }
 
-    // Electron: IPC listener
-    if (isElectronRef.current) {
+    // Electron: IPC listener (registered once, never torn down until unmount)
+    const isElectron = typeof window !== 'undefined' &&
+      !!(window as any).electronAPI?.onPreviewMessage;
+    let unsubscribeIPC: (() => void) | undefined;
+
+    if (isElectron) {
       const electronAPI = (window as any).electronAPI;
       if (electronAPI?.onPreviewMessage) {
-        const unsubscribe = electronAPI.onPreviewMessage((message: PreviewMessage) => {
+        unsubscribeIPC = electronAPI.onPreviewMessage((message: PreviewMessage) => {
           handleMessage({ data: message, origin: window.location.origin } as MessageEvent);
         });
-        return () => {
-          window.removeEventListener('message', handleMessage);
-          unsubscribe?.();
-        };
+
+        // Send PING to main window (via main process relay) to indicate we're ready
+        electronAPI.preview?.ping?.();
+        console.log('[PreviewWindow] Sent PING to main window via IPC');
       }
+      isElectronRef.current = true;
     }
 
     return () => {
       window.removeEventListener('message', handleMessage);
+      unsubscribeIPC?.();
     };
-  }, [isRunning, isPaused]);
+  }, []); // Empty deps: register once, never re-register
 
   // Reconstruct story from serialized data
   useEffect(() => {
@@ -645,20 +670,19 @@ export const PreviewWindow: React.FC = () => {
       // Disable renderer's internal scaling - PreviewWindow handles scaling via CSS transforms
       (reactRenderer as any).setDisableScaling?.(true);
 
-      // Set up asset resolver
-      if (previewData.assets && previewData.assets.length > 0) {
-        reactRenderer.setAssetResolver((assetId: string) => {
-          const asset = previewData.assets?.find(a => a.id === assetId);
-          return asset ? asset.url : undefined;
-        });
-      }
+      // Set up asset resolver - uses ref so it always accesses latest assets
+      reactRenderer.setAssetResolver((assetId: string) => {
+        const asset = previewDataRef.current?.assets?.find(a => a.id === assetId);
+        return asset ? asset.url : undefined;
+      });
 
       // Set up sound blob resolver for beat sounds
       // This fetches audio from URLs and converts to blobs for the audio manager
+      // Uses ref so it always accesses latest assets
       reactRenderer.setSoundBlobResolver(async (assetIdOrUrl: string): Promise<Blob | null> => {
         try {
           // First try to find asset by ID
-          const asset = previewData.assets?.find(a => a.id === assetIdOrUrl);
+          const asset = previewDataRef.current?.assets?.find(a => a.id === assetIdOrUrl);
           const url = asset?.url || assetIdOrUrl;
 
           if (!url || (!url.startsWith('http') && !url.startsWith('blob:') && !url.startsWith('data:'))) {
@@ -680,16 +704,16 @@ export const PreviewWindow: React.FC = () => {
       });
       console.log('[PreviewWindow] Sound blob resolver set up');
 
-      // Set up character resolver
-      if (previewData.characters && previewData.characters.length > 0) {
-        (reactRenderer as any).setCharacterResolver((characterId: string, stateId?: string) => {
-          const character = previewData.characters?.find(c => c.id === characterId);
+      // Set up character resolver - uses ref so it always accesses latest data
+      (reactRenderer as any).setCharacterResolver((characterId: string, stateId?: string) => {
+          const pd = previewDataRef.current;
+          const character = pd?.characters?.find(c => c.id === characterId);
           if (!character) return undefined;
 
           const resolveImage = (visual: { assetId?: string; image?: string } | undefined): string | undefined => {
             if (!visual) return undefined;
-            if (visual.assetId && previewData.assets) {
-              const asset = previewData.assets.find(a => a.id === visual.assetId);
+            if (visual.assetId && pd?.assets) {
+              const asset = pd.assets.find(a => a.id === visual.assetId);
               if (asset?.url) return asset.url;
             }
             if (visual.image && !visual.image.startsWith('blob:')) return visual.image;
@@ -716,12 +740,11 @@ export const PreviewWindow: React.FC = () => {
 
           return resolveImage({ assetId: character.visual.defaultAssetId, image: character.visual.defaultImage });
         });
-      }
 
-      // Set up counter resolver
+      // Set up counter resolver - uses ref for latest data
       (reactRenderer as any).setCounterResolver?.((counterName: string) => {
         const value = countersRef.current[counterName] ?? 0;
-        const counterDef = previewData.characters
+        const counterDef = previewDataRef.current?.characters
           ?.flatMap(c => c.counters || [])
           .find(c => c.name === counterName);
         return {
@@ -732,43 +755,65 @@ export const PreviewWindow: React.FC = () => {
       });
 
       // Set up character meter frame resolver for HUD overlays
-      if (previewData.characters && previewData.characters.length > 0) {
-        (reactRenderer as any).setCharacterMeterFrameResolver?.((characterId: string) => {
-          const character = previewData.characters?.find(c => c.id === characterId);
-          if (!character || !character.meterFrame) {
-            return null;
-          }
+      // Uses ref so it always accesses latest data (for folder-based projects where data arrives later)
+      (reactRenderer as any).setCharacterMeterFrameResolver?.((characterId: string) => {
+        const pd = previewDataRef.current;
+        const character = pd?.characters?.find(c => c.id === characterId);
+        if (!character || !character.meterFrame) {
+          return null;
+        }
 
-          // Filter to visible counters
-          const visibleCounters = character.counters?.filter(c => c.visible) || [];
-          if (visibleCounters.length === 0) {
-            return null;
-          }
+        // Filter to visible counters
+        const visibleCounters = character.counters?.filter(c => c.visible) || [];
+        if (visibleCounters.length === 0) {
+          return null;
+        }
 
-          // Build counter data with current values
-          const counters = visibleCounters.map(counter => ({
-            name: counter.name,
-            displayName: counter.displayName,
-            value: countersRef.current[counter.name] ?? counter.value,
-            min: counter.min ?? 0,
-            max: counter.max ?? 100,
-            color: counter.color || '#3B82F6',
-            showNumericValue: counter.showNumericValue ?? false,
-            numericFormat: counter.numericFormat || 'value',
-            orientation: counter.levelMeterOrientation || 'horizontal',
-          }));
+        // Build counter data with current values
+        const counters = visibleCounters.map(counter => ({
+          name: counter.name,
+          displayName: counter.displayName,
+          value: countersRef.current[counter.name] ?? counter.value,
+          min: counter.min ?? 0,
+          max: counter.max ?? 100,
+          color: counter.color || '#3B82F6',
+          showNumericValue: counter.showNumericValue ?? false,
+          numericFormat: counter.numericFormat || 'value',
+          orientation: counter.levelMeterOrientation || 'horizontal',
+        }));
 
-          return {
-            counters,
-            config: character.meterFrame,
-          };
-        });
-        console.log('[PreviewWindow] Character meter frame resolver set up');
-      }
+        return {
+          counters,
+          config: character.meterFrame,
+        };
+      });
+      console.log('[PreviewWindow] Character meter frame resolver set up');
 
       // Set up character inventory resolver for HUD overlays
-      if (previewData.characters && previewData.characters.length > 0) {
-        // Build prop asset map from PickProp beats
+      // Uses ref so it always accesses latest data (for folder-based projects where data arrives later)
+      (reactRenderer as any).setCharacterInventoryResolver?.((characterId: string) => {
+        const pd = previewDataRef.current;
+        const character = pd?.characters?.find(c => c.id === characterId);
+        if (!character || !character.inventoryFrame) {
+          return null;
+        }
+
+        // Get current inventory from runtime context
+        const ctx = engineRef.current?.getContext();
+        if (!ctx) {
+          return null;
+        }
+
+        const isPlayer = character.role === 'player';
+        const runtimeInventory = isPlayer
+          ? ctx.getInventoryEntries()
+          : (ctx.getState().characterInventories[character.name] || []);
+
+        if (runtimeInventory.length === 0) {
+          return null;
+        }
+
+        // Build prop asset map from PickProp beats (uses fresh asset data from ref)
         const propAssetMap = new Map<string, string>();
         if (story) {
           const allBeats = story.getAllBeats();
@@ -777,7 +822,7 @@ export const PreviewWindow: React.FC = () => {
               const props = (beat as any).props || [];
               for (const prop of props) {
                 if (prop.name && prop.assetId) {
-                  const asset = previewData.assets?.find(a => a.id === prop.assetId);
+                  const asset = pd?.assets?.find(a => a.id === prop.assetId);
                   if (asset?.url) {
                     propAssetMap.set(prop.name, asset.url);
                     propAssetMap.set(prop.name.toLowerCase(), asset.url);
@@ -788,7 +833,7 @@ export const PreviewWindow: React.FC = () => {
               const locations = Array.from(beat.locations?.values?.() || []);
               for (const loc of locations) {
                 if ((loc as any).kind === 'prop' && (loc as any).name && (loc as any).assetId) {
-                  const asset = previewData.assets?.find(a => a.id === (loc as any).assetId);
+                  const asset = pd?.assets?.find(a => a.id === (loc as any).assetId);
                   if (asset?.url) {
                     propAssetMap.set((loc as any).name, asset.url);
                     propAssetMap.set((loc as any).name.toLowerCase(), asset.url);
@@ -799,88 +844,66 @@ export const PreviewWindow: React.FC = () => {
           }
         }
 
-        (reactRenderer as any).setCharacterInventoryResolver?.((characterId: string) => {
-          const character = previewData.characters?.find(c => c.id === characterId);
-          if (!character || !character.inventoryFrame) {
-            return null;
-          }
-
-          // Get current inventory from runtime context
-          const ctx = engineRef.current?.getContext();
-          if (!ctx) {
-            return null;
-          }
-
-          const isPlayer = character.role === 'player';
-          const runtimeInventory = isPlayer
-            ? ctx.getInventoryEntries()
-            : (ctx.getState().characterInventories[character.name] || []);
-
-          if (runtimeInventory.length === 0) {
-            return null;
-          }
-
-          // Build item data
-          const itemDefinitions = character.inventory || [];
-          const itemData = runtimeInventory.map((entry: { name: string; quantity: number }) => {
-            const definition = itemDefinitions.find((def: any) => def.name === entry.name);
-            if (definition) {
-              const icon = definition.icon || propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
-              return {
-                id: definition.id,
-                name: definition.name,
-                displayName: definition.displayName,
-                description: definition.description || '',
-                icon,
-                quantity: entry.quantity,
-                category: definition.category || '',
-              };
-            }
-            const propIcon = propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
+        // Build item data
+        const itemDefinitions = character.inventory || [];
+        const itemData = runtimeInventory.map((entry: { name: string; quantity: number }) => {
+          const definition = itemDefinitions.find((def: any) => def.name === entry.name);
+          if (definition) {
+            const icon = definition.icon || propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
             return {
-              id: entry.name,
-              name: entry.name,
-              displayName: entry.name,
-              description: '',
-              icon: propIcon,
+              id: definition.id,
+              name: definition.name,
+              displayName: definition.displayName,
+              description: definition.description || '',
+              icon,
               quantity: entry.quantity,
-              category: '',
+              category: definition.category || '',
             };
-          });
-
+          }
+          const propIcon = propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
           return {
-            items: itemData,
-            config: character.inventoryFrame,
+            id: entry.name,
+            name: entry.name,
+            displayName: entry.name,
+            description: '',
+            icon: propIcon,
+            quantity: entry.quantity,
+            category: '',
           };
         });
-        console.log('[PreviewWindow] Character inventory resolver set up');
-      }
+
+        return {
+          items: itemData,
+          config: character.inventoryFrame,
+        };
+      });
+      console.log('[PreviewWindow] Character inventory resolver set up');
 
       // Set up sprite data resolver for character spritesheets
-      if (previewData.characters && previewData.characters.length > 0) {
-        (reactRenderer as any).setSpriteDataResolver?.((characterId: string) => {
-          const character = previewData.characters?.find(c => c.id === characterId);
-          if (!character || character.visual.type !== 'sprite' || !character.visual.spriteSheet) {
-            return null;
-          }
+      // Uses ref so it always accesses latest data (for folder-based projects where data arrives later)
+      (reactRenderer as any).setSpriteDataResolver?.((characterId: string) => {
+        const pd = previewDataRef.current;
+        const character = pd?.characters?.find(c => c.id === characterId);
+        if (!character || character.visual.type !== 'sprite' || !character.visual.spriteSheet) {
+          return null;
+        }
 
-          const sheet = character.visual.spriteSheet;
-          return {
-            frameWidth: sheet.frameWidth,
-            frameHeight: sheet.frameHeight,
-            imageWidth: sheet.imageWidth,
-            defaultFrame: 0,
-            animations: sheet.animations?.map(a => ({
-              name: a.name,
-              frames: a.frames,
-              frameDuration: a.frameDuration,
-              loop: a.loop,
-            })),
-            activeAnimation: undefined,
-          };
-        });
-        console.log('[PreviewWindow] Sprite data resolver set up');
-      }
+        const sheet = character.visual.spriteSheet;
+        return {
+          frameWidth: sheet.frameWidth,
+          frameHeight: sheet.frameHeight,
+          imageWidth: sheet.imageWidth,
+          defaultFrame: 0,
+          animations: sheet.animations?.map(a => ({
+            name: a.name,
+            frames: a.frames,
+            frameDuration: a.frameDuration,
+            loop: a.loop,
+          })),
+          activeAnimation: undefined,
+        };
+      });
+      console.log('[PreviewWindow] Sprite data resolver set up');
 
       const engine = new StoryEngine(reactRenderer as any);
       rendererRef.current = reactRenderer;
