@@ -313,6 +313,14 @@ export class DialogTreeBeat extends Beat {
     // Set markVisited state for renderer to use when rendering choices
     renderer.setState('markVisited', this.markVisited || false);
 
+    // Reset visited choice IDs to this beat's choices (empty on first visit).
+    // Without this, stale visitedChoiceIds from a previous DialogTree beat persist
+    // on the renderer, causing false-positive "visited" dimming when two beats
+    // share generic choice IDs like "root_choice_0".
+    if (renderer.setVisitedChoiceIds) {
+      renderer.setVisitedChoiceIds(context.getVisitedChoicesForBeat(this.id));
+    }
+
     // Set presentation mode for chat-like dialogs
     renderer.setState('presentationMode', this.presentationMode || 'positioned');
     renderer.setState('showAvatars', this.showAvatars ?? true);

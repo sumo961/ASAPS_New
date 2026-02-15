@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Languages, Plus, Settings } from 'lucide-react';
+import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Settings } from 'lucide-react';
 import { downloadHtmlExport, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
 import { getSavedAIConfig } from '../../hooks/useAI';
 
@@ -16,6 +16,7 @@ const STANDARD_LANGUAGES = [
   { code: 'mt', label: 'Maltese' },
   { code: 'zh', label: 'Mandarin Chinese' },
 ] as const;
+
 
 interface HtmlExportDialogProps {
   isOpen: boolean;
@@ -388,165 +389,6 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
             )}
           </div>
 
-          {/* Translation Settings */}
-          <div className="space-y-4">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enableTranslation}
-                onChange={(e) => setEnableTranslation(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-              />
-              <div>
-                <div className="font-medium text-gray-900 flex items-center gap-2">
-                  <Languages className="w-4 h-4" />
-                  Auto-Translate Story
-                </div>
-                <div className="text-sm text-gray-500">
-                  Use AI to translate story text into additional languages at export time
-                </div>
-              </div>
-            </label>
-
-            {enableTranslation && (
-              <div className="ml-7 space-y-3 border-l-2 border-purple-200 pl-4">
-                {(!aiApiKey && aiProvider !== 'local') || (aiProvider === 'local' && !aiBaseUrl) ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                    <strong>Note:</strong> Translation requires an AI provider with API key (or local LLM) to be configured above.
-                  </div>
-                ) : null}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Target Languages
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {STANDARD_LANGUAGES.map((lang) => (
-                      <label key={lang.code} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedLanguages.has(lang.code)}
-                          onChange={(e) => {
-                            const next = new Set(selectedLanguages);
-                            if (e.target.checked) {
-                              next.add(lang.code);
-                            } else {
-                              next.delete(lang.code);
-                            }
-                            setSelectedLanguages(next);
-                          }}
-                          className="w-3.5 h-3.5 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
-                        />
-                        <span className="text-gray-700">{lang.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Custom languages */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Additional Languages
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={customLanguage}
-                      onChange={(e) => setCustomLanguage(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && customLanguage.trim()) {
-                          e.preventDefault();
-                          setCustomLanguages([...customLanguages, customLanguage.trim()]);
-                          setCustomLanguage('');
-                        }
-                      }}
-                      placeholder="e.g., Korean, Portuguese..."
-                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-purple-500 focus:border-purple-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (customLanguage.trim()) {
-                          setCustomLanguages([...customLanguages, customLanguage.trim()]);
-                          setCustomLanguage('');
-                        }
-                      }}
-                      className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {customLanguages.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {customLanguages.map((lang, i) => (
-                        <span
-                          key={i}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs"
-                        >
-                          {lang}
-                          <button
-                            type="button"
-                            onClick={() => setCustomLanguages(customLanguages.filter((_, j) => j !== i))}
-                            className="hover:text-purple-900"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {(selectedLanguages.size > 0 || customLanguages.length > 0) && (
-                  <>
-                    {/* Translation packaging mode */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Packaging Mode
-                      </label>
-                      <div className="space-y-2">
-                        <label className="flex items-start gap-2 text-sm cursor-pointer">
-                          <input
-                            type="radio"
-                            name="translationMode"
-                            checked={translationMode === 'separate'}
-                            onChange={() => setTranslationMode('separate')}
-                            className="mt-0.5 w-3.5 h-3.5 text-purple-600 border-gray-300 focus:ring-purple-500"
-                          />
-                          <div>
-                            <div className="text-gray-900">Separate files</div>
-                            <div className="text-xs text-gray-500">One HTML file per language, packaged in a ZIP</div>
-                          </div>
-                        </label>
-                        <label className="flex items-start gap-2 text-sm cursor-pointer">
-                          <input
-                            type="radio"
-                            name="translationMode"
-                            checked={translationMode === 'bundled'}
-                            onChange={() => setTranslationMode('bundled')}
-                            className="mt-0.5 w-3.5 h-3.5 text-purple-600 border-gray-300 focus:ring-purple-500"
-                          />
-                          <div>
-                            <div className="text-gray-900">Bundled multi-language</div>
-                            <div className="text-xs text-gray-500">Single HTML file with language selector dropdown</div>
-                          </div>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-800">
-                      {translationMode === 'separate'
-                        ? `The story will be exported as a ZIP with ${selectedLanguages.size + customLanguages.length + 1} HTML files (original + ${selectedLanguages.size + customLanguages.length} translation${selectedLanguages.size + customLanguages.length !== 1 ? 's' : ''}).`
-                        : `The story will be exported as a single HTML file with ${selectedLanguages.size + customLanguages.length} embedded translation${selectedLanguages.size + customLanguages.length !== 1 ? 's' : ''} and a language selector.`
-                      }
-                      {' '}Translation uses the AI provider configured above.
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* Info Box */}
           <div className="bg-blue-50 rounded-lg p-4 flex gap-3">
             <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
@@ -579,61 +421,6 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
           )}
         </div>
 
-        {/* Translation Progress Overlay */}
-        {exporting && translationProgress && (
-          <div className="px-6 py-4 border-t border-purple-200 bg-purple-50">
-            <div className="space-y-2">
-              {translationProgress.languageIndex >= translationProgress.totalLanguages ? (
-                /* Packaging phase */
-                <>
-                  <div className="flex items-center gap-2 text-sm font-medium text-purple-900">
-                    <div className="w-4 h-4 border-2 border-purple-400 border-t-purple-700 rounded-full animate-spin" />
-                    Packaging exported files...
-                  </div>
-                  <div className="text-xs text-purple-700">
-                    All {translationProgress.totalLanguages} translations complete. Building final export.
-                  </div>
-                </>
-              ) : (
-                /* Translation phase */
-                <>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-purple-900">
-                      Translating to {translationProgress.currentLanguage}...
-                    </span>
-                    <span className="text-purple-700 text-xs">
-                      Language {translationProgress.languageIndex + 1} of {translationProgress.totalLanguages}
-                    </span>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="w-full bg-purple-200 rounded-full h-2">
-                    <div
-                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${translationProgress.totalStrings > 0
-                          ? (translationProgress.stringsTranslated / translationProgress.totalStrings) * 100
-                          : 0}%`
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-purple-700">
-                    <span>
-                      {translationProgress.stringsTranslated} / {translationProgress.totalStrings} strings
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCancel}
-                      className="px-2 py-0.5 text-red-700 bg-red-100 hover:bg-red-200 rounded transition-colors"
-                    >
-                      Cancel Translation
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
           <button
@@ -651,7 +438,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
             {exporting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                {translationProgress ? 'Translating...' : 'Exporting...'}
+                Exporting...
               </>
             ) : (
               <>

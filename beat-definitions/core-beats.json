@@ -49,6 +49,7 @@
       "schema": {
         "id": "string",
         "text": "string",
+        "displayText": "string?",
         "location": "string",
         "locationName": "string?",
         "target": "string",
@@ -59,13 +60,14 @@
         "counterValue": "number?",
         "soundEffect": "string?"
       },
-      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name."
+      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name. displayText is the translated/display label; text is the internal identifier used for hotspot matching."
     },
     "propOption": {
       "description": "A prop interaction choice",
       "schema": {
         "id": "string",
         "name": "string",
+        "displayName": "string?",
         "description": "string",
         "assetId": "string?",
         "locationName": "string?",
@@ -78,7 +80,7 @@
         "counterValue": "number?",
         "soundEffect": "string?"
       },
-      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name)."
+      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name). displayName overrides the label shown on hotspots (defaults to name). Useful for translations where name must stay as internal key."
     },
     "condition": {
       "description": "Condition for beat logic",

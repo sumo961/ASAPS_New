@@ -2520,10 +2520,23 @@ export const Inspector: React.FC<InspectorProps> = ({
                             type="text"
                             value={prop.name}
                             onChange={(e) => handleUpdateProp(index, 'name', e.target.value)}
-                            placeholder="Prop name"
+                            placeholder="Prop name (internal key)"
                             className="w-full px-2 py-1 text-sm border rounded"
                           />
-                          
+
+                          <div>
+                            <input
+                              type="text"
+                              value={(prop as any).displayName || ''}
+                              onChange={(e) => handleUpdateProp(index, 'displayName', e.target.value)}
+                              placeholder={prop.name || 'Display label (defaults to name)'}
+                              className="w-full px-2 py-1 text-sm border rounded"
+                            />
+                            <span className="text-xs text-gray-400">
+                              Label shown on hotspot. Leave empty to use "{prop.name || 'name'}"
+                            </span>
+                          </div>
+
                           <input
                             type="text"
                             value={prop.description}

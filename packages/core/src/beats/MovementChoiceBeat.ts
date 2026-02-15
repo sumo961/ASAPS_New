@@ -128,6 +128,12 @@ export class MovementChoiceBeat extends Beat {
     // Set markVisited state for renderer to use when rendering choices
     renderer.setState('markVisited', this.markVisited || false);
 
+    // Reset visited choice IDs to this beat's choices (empty on first visit).
+    // Prevents stale visitedChoiceIds from a previous beat causing false-positive dimming.
+    if (renderer.setVisitedChoiceIds) {
+      renderer.setVisitedChoiceIds(context.getVisitedChoicesForBeat(this.id));
+    }
+
     // Set showTextOnHover state for renderer to use when rendering hotspots
     renderer.setState('showTextOnHover', this.showTextOnHover || false);
 
@@ -162,6 +168,7 @@ export class MovementChoiceBeat extends Beat {
         availableChoices.map(c => ({
           id: c.id,
           text: this.processText(c.text, context),
+          displayText: c.displayText ? this.processText(c.displayText, context) : undefined,
           location: c.location || '',
           locationName: c.locationName  // Pass locationName for hotspot/prop association
         })),

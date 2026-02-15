@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-02-15T05:55:02.905Z
+ * Generated: 2026-02-15T18:43:07.805Z
  */
 
 // ============================================
@@ -48,6 +48,7 @@ export interface DialogChoice {
 export interface MovementOption {
   id: string;
   text: string;
+  displayText?: string;
   location: string;
   locationName?: string;
   target: string;
@@ -65,6 +66,7 @@ export interface MovementOption {
 export interface PropOption {
   id: string;
   name: string;
+  displayName?: string;
   description: string;
   assetId?: string;
   locationName?: string;

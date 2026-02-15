@@ -31,6 +31,13 @@ type ProgressCallback = (progress: TranslationProgress) => void;
 const BATCH_SIZE = 80;
 
 /**
+ * Keys that indicate UI elements which should be translated concisely (single words where possible).
+ */
+const UI_ELEMENT_PATTERNS = [
+  'buttonText', 'restartText', 'creditsText', 'clearButtonText', 'placeholder',
+];
+
+/**
  * Extract translatable strings from project data.
  * Returns a flat map of JSON-path keys to text values.
  * Paths are rooted at the projectData object (e.g., "project.story.beats.0.parameters.text").
@@ -66,11 +73,13 @@ export function extractTranslatableStrings(projectData: any): Record<string, str
         }
       }
       // Inventory item display names and descriptions (NOT item.name — that's an internal identifier)
+      // Always create a displayName translation: use existing displayName or derive from name
       const inventory = characters[i].inventory;
       if (Array.isArray(inventory)) {
         for (let j = 0; j < inventory.length; j++) {
-          if (inventory[j].displayName) {
-            strings[`${P}.characters.${i}.inventory.${j}.displayName`] = inventory[j].displayName;
+          const displaySource = inventory[j].displayName || inventory[j].name;
+          if (displaySource) {
+            strings[`${P}.characters.${i}.inventory.${j}.displayName`] = displaySource;
           }
           if (inventory[j].description) {
             strings[`${P}.characters.${i}.inventory.${j}.description`] = inventory[j].description;
@@ -161,8 +170,11 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       if (Array.isArray(params.choices)) {
         for (let j = 0; j < params.choices.length; j++) {
           const choice = params.choices[j];
-          // Only translate display text, NOT locationName (internal identifier for Visual Editor hotspot matching)
-          if (choice.text) strings[`${prefix}.parameters.choices.${j}.text`] = choice.text;
+          // Translate into displayText (NOT text itself — it's used as a matching key
+          // for locations[].name in the renderer). Use existing displayText if author set one.
+          // Fallback chain: displayText → text → location (text can be null in ASML imports)
+          const choiceLabel = choice.displayText || choice.text || choice.location;
+          if (choiceLabel) strings[`${prefix}.parameters.choices.${j}.displayText`] = choiceLabel;
         }
       }
       break;
@@ -171,9 +183,10 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       if (Array.isArray(params.props)) {
         for (let j = 0; j < params.props.length; j++) {
           const prop = params.props[j];
-          // Translate display name and description, NOT inventoryName (inventory system identifier)
-          // and NOT locationName (Visual Editor prop reference)
-          if (prop.name) strings[`${prefix}.parameters.props.${j}.name`] = prop.name;
+          // Translate into displayName (NOT name itself — it's a matching key for
+          // locations[].name and connections[].label). Use existing displayName if author set one.
+          const propLabel = prop.displayName || prop.name;
+          if (propLabel) strings[`${prefix}.parameters.props.${j}.displayName`] = propLabel;
           if (prop.description) strings[`${prefix}.parameters.props.${j}.description`] = prop.description;
         }
       }
@@ -291,17 +304,176 @@ function setNestedValue(obj: any, path: string, value: string): void {
 }
 
 /**
+ * Analyze the story narrative to provide translation context.
+ * Makes one AI call to determine genre, tone, setting, and style.
+ */
+export async function analyzeNarrative(
+  projectData: any,
+  aiConfig: TranslationAIConfig,
+  signal?: AbortSignal
+): Promise<string> {
+  const story = projectData.project?.story;
+  if (!story) return '';
+
+  // Collect a sample of story content for analysis
+  const sampleParts: string[] = [];
+
+  if (story.metadata?.title) {
+    sampleParts.push(`Title: ${story.metadata.title}`);
+  }
+  if (story.metadata?.author) {
+    sampleParts.push(`Author: ${story.metadata.author}`);
+  }
+
+  // Character names, roles, and descriptions
+  if (Array.isArray(story.characters)) {
+    const charDescriptions = story.characters.map((c: any) => {
+      let desc = c.name || c.displayName || '(unnamed)';
+      if (c.role) desc += ` (role: ${c.role})`;
+      if (c.description) desc += ` — ${c.description}`;
+      return desc;
+    }).filter(Boolean);
+    if (charDescriptions.length > 0) {
+      sampleParts.push(`Characters:\n${charDescriptions.join('\n')}`);
+    }
+  }
+
+  // First several beat texts (narrative sample)
+  if (Array.isArray(story.beats)) {
+    let textCount = 0;
+    for (const beat of story.beats) {
+      if (textCount >= 6) break;
+      const params = beat.parameters || beat;
+      if (params.text && typeof params.text === 'string') {
+        sampleParts.push(`Beat text: ${params.text.substring(0, 300)}`);
+        textCount++;
+      }
+      if (params.message && typeof params.message === 'string') {
+        sampleParts.push(`Message: ${params.message.substring(0, 200)}`);
+        textCount++;
+      }
+    }
+  }
+
+  if (sampleParts.length < 2) {
+    return ''; // Not enough content to analyze
+  }
+
+  const systemPrompt = 'You are a literary analyst. Analyze the following sample content from an interactive story/game and provide a brief narrative profile to guide translators. Include:\n1. Genre, tone/mood, setting/time period, target audience, and writing style (2-3 sentences)\n2. For EACH character, state their gender (male/female/non-binary/unknown) and a one-line description of who they are. This is critical for languages with grammatical gender (German, French, Spanish, etc.) where pronouns, articles, and adjective endings depend on gender.\n\nBe concise and specific.';
+  const userMessage = sampleParts.join('\n\n');
+
+  try {
+    const { provider, apiKey, baseUrl, model } = aiConfig;
+    let response: string;
+    if (provider === 'anthropic') {
+      response = await callAnthropic(systemPrompt, userMessage, apiKey!, baseUrl, model, signal);
+    } else {
+      response = await callOpenAI(systemPrompt, userMessage, provider, apiKey, baseUrl, model, signal);
+    }
+    console.log('[StoryTranslator] Narrative analysis:', response.trim());
+    return response.trim();
+  } catch (e) {
+    console.warn('[StoryTranslator] Narrative analysis failed, proceeding without context:', e);
+    return '';
+  }
+}
+
+/**
+ * Check if a string key represents a UI element that should be kept concise.
+ */
+function isUIElement(key: string): boolean {
+  return UI_ELEMENT_PATTERNS.some(pattern => key.includes(pattern));
+}
+
+/**
+ * Build character context string from project data for grammatical gender guidance.
+ * The narrative analysis provides genre/tone, but this provides explicit character info
+ * directly in the translation prompt to ensure correct gender agreement.
+ */
+function buildCharacterContext(projectData: any): string {
+  const story = projectData.project?.story;
+  if (!story) return '';
+
+  const lines: string[] = [];
+
+  // Characters defined in the character system
+  if (Array.isArray(story.characters)) {
+    for (const char of story.characters) {
+      const name = char.displayName || char.name;
+      if (!name) continue;
+      let line = `- ${name}`;
+      if (char.role) line += ` (${char.role})`;
+      if (char.description) line += `: ${char.description}`;
+      lines.push(line);
+    }
+  }
+
+  // Also scan dialog tree speakers for characters not in the character list
+  const knownNames = new Set(
+    (story.characters || []).map((c: any) => (c.displayName || c.name || '').toLowerCase())
+  );
+  if (Array.isArray(story.beats)) {
+    for (const beat of story.beats) {
+      const params = beat.parameters || beat;
+      if (params.dialogTree?.speaker && !knownNames.has(params.dialogTree.speaker.toLowerCase())) {
+        knownNames.add(params.dialogTree.speaker.toLowerCase());
+        lines.push(`- ${params.dialogTree.speaker} (speaker in dialog)`);
+      }
+    }
+  }
+
+  return lines.length > 0 ? lines.join('\n') : '';
+}
+
+/**
+ * Build the translation system prompt with narrative context and conciseness guidance.
+ */
+function buildTranslationPrompt(
+  targetLanguage: string,
+  narrativeContext: string,
+  batch: Record<string, string>,
+  characterContext?: string
+): string {
+  const hasUIElements = Object.keys(batch).some(isUIElement);
+
+  let prompt = `You are a professional literary translator specializing in interactive fiction and games. Translate the following content to ${targetLanguage}.`;
+
+  // Add narrative context if available
+  if (narrativeContext) {
+    prompt += `\n\nNarrative context for this story:\n${narrativeContext}\n\nUse this context to inform your translation choices — match the tone, register, and style of the original work. Produce natural, fluent ${targetLanguage} that reads as if originally written in that language, not a word-for-word translation.`;
+  } else {
+    prompt += ` Produce natural, fluent ${targetLanguage} that reads as if originally written in that language.`;
+  }
+
+  // Add character gender/role context for grammatically gendered languages
+  if (characterContext) {
+    prompt += `\n\nCharacter reference (use correct grammatical gender for pronouns, articles, adjective endings, and prepositions):\n${characterContext}`;
+  }
+
+  // Add conciseness guidance for UI elements
+  if (hasUIElements) {
+    prompt += `\n\nIMPORTANT — Conciseness for UI elements: Keys containing "buttonText", "restartText", "creditsText", "clearButtonText", or "placeholder" are UI labels/buttons. These MUST be kept very short — use a single word where the target language allows it (e.g., "Continue" → "weiter" in German, "continuar" in Spanish; "Restart" → "Neustart"/"Reiniciar"). Do NOT use verbose multi-word phrases for buttons.`;
+  }
+
+  prompt += `\n\nRules:\n- Preserve all HTML tags exactly as they are\n- Preserve all {{variable}} references and template syntax exactly\n- Preserve any formatting markers\n- Return ONLY a valid JSON object with the same keys and translated values\n- Do not add any explanation or commentary`;
+
+  return prompt;
+}
+
+/**
  * Call AI provider to translate a batch of strings.
  */
 async function translateBatch(
   batch: Record<string, string>,
   targetLanguage: string,
   aiConfig: TranslationAIConfig,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  narrativeContext?: string,
+  characterContext?: string
 ): Promise<Record<string, string>> {
   const { provider, apiKey, baseUrl, model } = aiConfig;
 
-  const systemPrompt = `You are a professional translator. Translate the following story/game content to ${targetLanguage}. Preserve all HTML tags, {{variable}} references, template syntax, and formatting exactly as they are. Return ONLY a valid JSON object with the same keys and translated values. Do not add any explanation.`;
+  const systemPrompt = buildTranslationPrompt(targetLanguage, narrativeContext || '', batch, characterContext);
 
   const userMessage = JSON.stringify(batch, null, 2);
 
@@ -442,7 +614,8 @@ export async function translateStory(
   targetLanguage: string,
   aiConfig: TranslationAIConfig,
   onProgress?: ProgressCallback,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  narrativeContext?: string
 ): Promise<any> {
   // 1. Extract all translatable strings
   const allStrings = extractTranslatableStrings(projectData);
@@ -454,9 +627,25 @@ export async function translateStory(
     return JSON.parse(JSON.stringify(projectData));
   }
 
+  // Log extraction diagnostics for display fields
+  const displayFieldKeys = keys.filter(k => k.includes('displayText') || k.includes('displayName'));
   console.log(`[StoryTranslator] Translating ${totalStrings} strings to ${targetLanguage}`);
+  console.log(`[StoryTranslator] Display fields extracted: ${displayFieldKeys.length}`, displayFieldKeys.map(k => `${k} = "${allStrings[k]}"`));
 
-  // 2. Batch strings and translate
+  // 2. Analyze narrative context if not already provided (first language in a batch)
+  let context = narrativeContext;
+  if (context === undefined) {
+    console.log('[StoryTranslator] Analyzing narrative for translation context...');
+    context = await analyzeNarrative(projectData, aiConfig, signal);
+  }
+
+  // 2b. Build character context for grammatical gender
+  const charContext = buildCharacterContext(projectData);
+  if (charContext) {
+    console.log('[StoryTranslator] Character context:', charContext);
+  }
+
+  // 3. Batch strings and translate
   const allTranslations: Record<string, string> = {};
   let translated = 0;
 
@@ -471,7 +660,7 @@ export async function translateStory(
       batch[key] = allStrings[key];
     }
 
-    const batchTranslations = await translateBatch(batch, targetLanguage, aiConfig, signal);
+    const batchTranslations = await translateBatch(batch, targetLanguage, aiConfig, signal, context, charContext);
     Object.assign(allTranslations, batchTranslations);
 
     translated += batchKeys.length;
@@ -484,9 +673,29 @@ export async function translateStory(
     });
   }
 
-  // 3. Apply translations to a deep clone
+  // 4. Apply translations to a deep clone
+  const displayTranslations = Object.entries(allTranslations).filter(([k]) => k.includes('displayText') || k.includes('displayName'));
   console.log(`[StoryTranslator] Applying ${Object.keys(allTranslations).length} translations for ${targetLanguage}`);
+  console.log(`[StoryTranslator] Display field translations:`, displayTranslations.map(([k, v]) => `${k} = "${v}"`));
   const result = applyTranslations(projectData, allTranslations);
+
+  // Verify display fields were applied
+  const story = result.project?.story;
+  if (story?.beats) {
+    for (let i = 0; i < story.beats.length; i++) {
+      const beat = story.beats[i];
+      const params = beat.parameters;
+      if (beat.type === 'movementChoice' && params?.choices) {
+        const displayTexts = params.choices.map((c: any) => ({ text: c.text, displayText: c.displayText }));
+        console.log(`[StoryTranslator] Beat ${i} (movementChoice) choices:`, displayTexts);
+      }
+      if (beat.type === 'pickProp' && params?.props) {
+        const displayNames = params.props.map((p: any) => ({ name: p.name, displayName: p.displayName }));
+        console.log(`[StoryTranslator] Beat ${i} (pickProp) props:`, displayNames);
+      }
+    }
+  }
+
   console.log(`[StoryTranslator] Translation to ${targetLanguage} complete`);
   return result;
 }

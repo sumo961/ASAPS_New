@@ -49,6 +49,7 @@
       "schema": {
         "id": "string",
         "text": "string",
+        "displayText": "string?",
         "location": "string",
         "locationName": "string?",
         "target": "string",
@@ -59,13 +60,14 @@
         "counterValue": "number?",
         "soundEffect": "string?"
       },
-      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name."
+      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name. displayText is the translated/display label; text is the internal identifier used for hotspot matching."
     },
     "propOption": {
       "description": "A prop interaction choice",
       "schema": {
         "id": "string",
         "name": "string",
+        "displayName": "string?",
         "description": "string",
         "assetId": "string?",
         "locationName": "string?",
@@ -78,7 +80,7 @@
         "counterValue": "number?",
         "soundEffect": "string?"
       },
-      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name)."
+      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name). displayName overrides the label shown on hotspots (defaults to name). Useful for translations where name must stay as internal key."
     },
     "condition": {
       "description": "Condition for beat logic",
@@ -813,6 +815,122 @@
       "transitions": true,
       "sound": true,
       "renderer": "inputText"
+    },
+
+    "keypad": {
+      "category": "visible",
+      "displayName": "Keypad",
+      "icon": "🔢",
+      "description": "Numeric keypad for phone, safe lock, PIN entry",
+      "connectionType": "single",
+      "parameters": {
+        "prompt": {
+          "type": "string",
+          "required": true,
+          "default": "Enter the code:",
+          "description": "Prompt text displayed above the keypad"
+        },
+        "layout": {
+          "type": "string",
+          "required": false,
+          "default": "numeric",
+          "description": "Keypad layout: numeric (1-9,←,0,✓), phone (1-9,*,0,#), pin (1-9,C,0,✓)",
+          "ui": {
+            "control": "select",
+            "options": ["numeric", "phone", "pin"],
+            "label": "Layout"
+          }
+        },
+        "maxDigits": {
+          "type": "number",
+          "required": false,
+          "default": 4,
+          "description": "Maximum number of digits"
+        },
+        "minDigits": {
+          "type": "number",
+          "required": false,
+          "default": 1,
+          "description": "Minimum number of digits"
+        },
+        "correctCode": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Expected code (empty = accept any input)"
+        },
+        "failTarget": {
+          "type": "string",
+          "required": false,
+          "targetField": true,
+          "description": "Beat to navigate to on wrong code"
+        },
+        "maxAttempts": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Maximum attempts (0 = unlimited)"
+        },
+        "maskInput": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Show * instead of digits"
+        },
+        "saveToType": {
+          "type": "string",
+          "required": false,
+          "default": "variable",
+          "description": "Save input to: variable or counter"
+        },
+        "variable": {
+          "type": "string",
+          "required": false,
+          "default": "keypadInput",
+          "description": "Variable name to store the entered code"
+        },
+        "counter": {
+          "type": "string",
+          "required": false,
+          "description": "Counter name to store numeric input"
+        },
+        "counterOperation": {
+          "type": "string",
+          "required": false,
+          "default": "set",
+          "description": "Counter operation: set or change"
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Enter",
+          "description": "Submit button text"
+        },
+        "clearButtonText": {
+          "type": "string",
+          "required": false,
+          "default": "Clear",
+          "description": "Clear button text"
+        },
+        "showDisplay": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Show digit display area above keypad"
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat after code is entered"
+        }
+      },
+      "locations": ["prompt", "keypadGrid"],
+      "locationMapping": {
+        "prompt": "prompt"
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "keypad"
     },
 
     "hyperText": {

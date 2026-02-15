@@ -2445,7 +2445,7 @@ const TextElement: React.FC<{
       left: `${adjustedLeft}px`,
       width: `${smartDims.width}px`,
       height: `${smartDims.height}px`,
-      overflowY: needsScroll ? 'auto' : 'hidden',
+      overflowY: 'auto',
     };
   }
 
@@ -3190,7 +3190,7 @@ const DialogElement: React.FC<{
       left: `${adjustedLeft}px`,
       width: `${smartDims.width}px`,
       height: `${smartDims.height}px`,
-      overflowY: needsScroll ? 'auto' : 'hidden',
+      overflowY: 'auto',
     };
   }
 
@@ -4321,6 +4321,7 @@ function getContentForLocation(
   }
 
   // Movement Choice specific elements
+  // Use displayText (translated label) when available, falling back to text
   if (beatType === 'movementChoice') {
     if (nameLower.includes('question')) {
       return content.question || 'Where do you want to go?';
@@ -4332,7 +4333,7 @@ function getContentForLocation(
         c.locationName && c.locationName === loc.name
       );
       if (locationNameMatch) {
-        return locationNameMatch.text || locationNameMatch.location;
+        return locationNameMatch.displayText || locationNameMatch.text || locationNameMatch.location;
       }
       // Try exact match first (case-insensitive)
       const exactMatch = content.choices.find((c: any) =>
@@ -4340,7 +4341,7 @@ function getContentForLocation(
         (c.location && c.location.toLowerCase() === nameLower)
       );
       if (exactMatch) {
-        return exactMatch.text || exactMatch.location;
+        return exactMatch.displayText || exactMatch.text || exactMatch.location;
       }
       // Try partial match
       const partialMatch = content.choices.find((c: any) =>
@@ -4350,13 +4351,13 @@ function getContentForLocation(
         (nameLower.includes(c.location?.toLowerCase()))
       );
       if (partialMatch) {
-        return partialMatch.text || partialMatch.location;
+        return partialMatch.displayText || partialMatch.text || partialMatch.location;
       }
       // Try to match location number
       const locationNum = nameLower.match(/location\s*(\d+)/);
       if (locationNum && content.choices[parseInt(locationNum[1]) - 1]) {
         const choice = content.choices[parseInt(locationNum[1]) - 1];
-        return choice.text || choice.location || `Location ${locationNum[1]}`;
+        return choice.displayText || choice.text || choice.location || `Location ${locationNum[1]}`;
       }
     }
   }
@@ -4367,27 +4368,28 @@ function getContentForLocation(
       return content.question || 'What do you want to interact with?';
     }
     // Handle prop hotspots - match by locationName first, then by name
+    // Use displayName (translated label) when available, falling back to name
     if (content.props) {
       // FIRST: Try locationName match (hotspot/prop associated via Visual Editor)
       const locationNameMatch = content.props.find((p: any) =>
         p.locationName && p.locationName === loc.name
       );
       if (locationNameMatch) {
-        return locationNameMatch.name || locationNameMatch.description;
+        return locationNameMatch.displayName || locationNameMatch.name || locationNameMatch.description;
       }
       // Try exact name match
       const exactMatch = content.props.find((p: any) =>
         p.name && p.name === loc.name
       );
       if (exactMatch) {
-        return exactMatch.name;
+        return exactMatch.displayName || exactMatch.name;
       }
       // Try case-insensitive exact match
       const caseInsensitiveMatch = content.props.find((p: any) =>
         p.name && p.name.toLowerCase() === nameLower
       );
       if (caseInsensitiveMatch) {
-        return caseInsensitiveMatch.name;
+        return caseInsensitiveMatch.displayName || caseInsensitiveMatch.name;
       }
       // Try partial match (e.g., "Axe" matches "Axe.png" or vice versa)
       const partialMatch = content.props.find((p: any) => {
@@ -4398,7 +4400,7 @@ function getContentForLocation(
         );
       });
       if (partialMatch) {
-        return partialMatch.name;
+        return partialMatch.displayName || partialMatch.name;
       }
     }
   }
@@ -4446,7 +4448,7 @@ function getContentForLocation(
     const propNum = nameLower.match(/prop\s*(\d+)/);
     if (propNum && content.props && content.props[parseInt(propNum[1]) - 1]) {
       const prop = content.props[parseInt(propNum[1]) - 1];
-      return typeof prop === 'string' ? prop : (prop.name || prop.text || `Prop ${propNum[1]}`);
+      return typeof prop === 'string' ? prop : (prop.displayName || prop.name || prop.text || `Prop ${propNum[1]}`);
     }
   }
   

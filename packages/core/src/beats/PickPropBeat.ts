@@ -96,6 +96,12 @@ export class PickPropBeat extends Beat {
     // Set markVisited state for renderer to use when rendering choices
     renderer.setState('markVisited', this.markVisited || false);
 
+    // Reset visited choice IDs to this beat's choices (empty on first visit).
+    // Prevents stale visitedChoiceIds from a previous beat causing false-positive dimming.
+    if (renderer.setVisitedChoiceIds) {
+      renderer.setVisitedChoiceIds(context.getVisitedChoicesForBeat(this.id));
+    }
+
     // Filter props based on conditions
     const availableProps = this.props.filter(prop => {
       if (!prop.conditions) return true;
@@ -126,6 +132,7 @@ export class PickPropBeat extends Beat {
       availableProps.map(p => ({
         id: p.id,
         name: this.processText(p.name, context),
+        displayName: p.displayName ? this.processText(p.displayName, context) : undefined,
         description: this.processText(p.description, context),
         locationName: p.locationName  // For visual element association (like movementChoice)
       })),
@@ -148,7 +155,7 @@ export class PickPropBeat extends Beat {
         beatId: this.id,
         beatName: this.name || this.id,
         beatType: 'pickProp',
-        choiceText: `Picked up ${selectedProp.name}`,
+        choiceText: `Picked up ${selectedProp.displayName || selectedProp.name}`,
         choiceContext: this.question,
       });
 

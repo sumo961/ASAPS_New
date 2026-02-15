@@ -246,6 +246,8 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
   private globalSettings: GlobalSettings | null = null;
   private backgroundMusicAudio: HTMLAudioElement | null = null;
   private assetMap: Map<string, string> = new Map();
+  private currentMuted: boolean = false;
+  private currentVolume: number = 100;
 
   constructor(config: PlayerConfig) {
     super();
@@ -565,8 +567,9 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
       this.assetMap.set(asset.id, asset.url);
     }
 
-    // Build prop asset map from PickProp beats for inventory icon resolution
+    // Build prop asset map and display name map from PickProp beats
     const propAssetMap = new Map<string, string>();
+    const propDisplayNameMap = new Map<string, string>();
     const allBeats = story.getAllBeats();
     for (const beat of allBeats) {
       if (beat.type === 'pickProp') {
@@ -578,6 +581,11 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
               propAssetMap.set(prop.name, url);
               propAssetMap.set(prop.name.toLowerCase(), url);
             }
+          }
+          // Map prop name to displayName for inventory label resolution
+          if (prop.name && prop.displayName) {
+            propDisplayNameMap.set(prop.name, prop.displayName);
+            propDisplayNameMap.set(prop.name.toLowerCase(), prop.displayName);
           }
         }
         // Also check beat locations for prop graphics
@@ -822,12 +830,13 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
               category: definition.category || '',
             };
           }
-          // No definition - try prop asset map for icon
+          // No definition - try prop asset/display name maps
           const propIcon = propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
+          const propDisplayName = propDisplayNameMap.get(entry.name) || propDisplayNameMap.get(entry.name.toLowerCase());
           return {
             id: entry.name,
             name: entry.name,
-            displayName: entry.name,
+            displayName: propDisplayName || entry.name,
             description: '',
             icon: propIcon,
             quantity: entry.quantity,
@@ -965,6 +974,8 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
    * Set muted state for all audio
    */
   setMuted(muted: boolean): void {
+    this.currentMuted = muted;
+
     // Mute/unmute background music
     if (this.backgroundMusicAudio) {
       this.backgroundMusicAudio.muted = muted;
@@ -989,6 +1000,7 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
    * Set master volume for all audio (0-100)
    */
   setMasterVolume(volume: number): void {
+    this.currentVolume = volume;
     const normalizedVolume = Math.max(0, Math.min(100, volume)) / 100;
 
     // Set background music volume
@@ -1158,6 +1170,10 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
     if (this.engine) {
       console.log('[PlayerEngine] Restarting story...');
 
+      // Remember current audio settings
+      const wasMuted = this.currentMuted;
+      const savedVolume = this.currentVolume;
+
       // Stop current playback and background music
       this.engine.stop();
       this.stopBackgroundMusic();
@@ -1173,6 +1189,14 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
 
       // Start fresh
       await this.start();
+
+      // Reapply audio settings after restart
+      if (wasMuted) {
+        this.setMuted(true);
+      }
+      if (savedVolume !== 100) {
+        this.setMasterVolume(savedVolume);
+      }
     }
   }
 

@@ -556,7 +556,7 @@ export async function downloadHtmlExport(
   }
 
   // Translation export
-  const { translateStory } = await import('./StoryTranslator');
+  const { translateStory, analyzeNarrative } = await import('./StoryTranslator');
   const { exportProjectAsZip, getProjectDataForExport } = await import('../utils/projectZipManager');
 
   const languages = options.translateLanguages!;
@@ -574,6 +574,10 @@ export async function downloadHtmlExport(
   };
 
   console.log(`[HtmlExporter] Starting translation for ${languages.length} languages`);
+
+  // Analyze narrative once (shared across all languages)
+  console.log('[HtmlExporter] Analyzing story narrative for translation context...');
+  const narrativeContext = await analyzeNarrative(projectData, aiConfig, options.signal);
 
   // Translate for each language
   const translatedResults: Array<{ language: string; projectData: any; zipBlob: Blob }> = [];
@@ -593,7 +597,8 @@ export async function downloadHtmlExport(
           totalLanguages: languages.length,
         });
       },
-      options.signal
+      options.signal,
+      narrativeContext
     );
 
     console.log(`[HtmlExporter] Building ZIP for ${language}...`);

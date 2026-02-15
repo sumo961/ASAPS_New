@@ -1685,7 +1685,7 @@ export class ReactRenderer extends BaseRenderer {
     return this.renderPositionedBeat(beatType, content, defaultLocations, true);
   }
 
-  async renderMovement(question: string, choices: { id: string; text: string; location: string; locationName?: string }[], locations?: Location[]): Promise<string> {
+  async renderMovement(question: string, choices: { id: string; text: string; displayText?: string; location: string; locationName?: string }[], locations?: Location[]): Promise<string> {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
@@ -1700,7 +1700,7 @@ export class ReactRenderer extends BaseRenderer {
     return this.renderPositionedBeat('movementChoice', content, effectiveLocations, true);
   }
 
-  async renderPropSelection(question: string, props: { id: string; name: string; description: string }[], locations?: Location[]): Promise<string> {
+  async renderPropSelection(question: string, props: { id: string; name: string; displayName?: string; description: string; locationName?: string }[], locations?: Location[]): Promise<string> {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
