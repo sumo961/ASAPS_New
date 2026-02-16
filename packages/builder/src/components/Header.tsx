@@ -8,8 +8,12 @@ import { SaveStatus } from './SaveStatus';
 import { AIConfigDialog } from './ai/AIConfigDialog';
 import { StoryGenerator } from './ai/StoryGenerator';
 import { NaturalLanguageBeatCreator } from './ai/NaturalLanguageBeatCreator';
+import { LanguageSelector } from './translation/LanguageSelector';
 import { useSave, useProject, usePersistence } from '../contexts/PersistenceContext';
+import { useTranslationState, useTranslationActions } from '../contexts/TranslationContext';
 import { VCSStatusBar } from './vcs/VCSStatusBar';
+import { getProjectDataForExport } from '../utils/projectZipManager';
+import { getSavedAIConfig } from '../hooks/useAI';
 
 interface HeaderProps {
   title: string;
@@ -91,6 +95,8 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { status, lastSaved, error: saveError } = useSave();
   const { load } = useProject();
+  const translationState = useTranslationState();
+  const translationActions = useTranslationActions();
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showProjectLibrary, setShowProjectLibrary] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
@@ -131,7 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
               ASAPS
             </span>
             <span className="text-xs text-gray-400 font-normal">
-              v{__APP_VERSION__}
+              v{__APP_VERSION__}.{__BUILD_NUMBER__}
             </span>
           </div>
 
@@ -198,9 +204,6 @@ export const Header: React.FC<HeaderProps> = ({
             showText={true}
             compact={false}
           />
-
-          {/* VCS Status (shown when project is under version control) */}
-          <VCSStatusBar panelOpen={vcsPanelOpen} onTogglePanel={onToggleVCSPanel} onInitRepo={onInitRepo} />
 
           <div className="w-px h-6 bg-gray-300 mx-1" />
 
@@ -441,10 +444,31 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
+          {onPreview && (
+            <button
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                previewWindowOpen
+                  ? 'bg-green-600 text-white ring-2 ring-green-300 hover:bg-green-700'
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
+              onClick={onPreview}
+              title={previewWindowOpen ? 'Preview window open (Cmd+Shift+P to close)' : 'Open preview window (Cmd+Shift+P)'}
+            >
+              <Play className="w-4 h-4" />
+              {previewWindowOpen ? 'Preview Open' : 'Preview'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Row 3: AI, VCS, Language, Translation */}
+      <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-100">
+        {/* Left: AI + VCS */}
+        <div className="flex items-center space-x-2">
           {/* AI Menu Button */}
           <div className="relative">
             <button
-              className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1.5"
               onClick={() => setShowAIMenu(!showAIMenu)}
               title="AI Tools"
             >
@@ -460,7 +484,7 @@ export const Header: React.FC<HeaderProps> = ({
                   className="fixed inset-0 z-10"
                   onClick={() => setShowAIMenu(false)}
                 />
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
                   <button
                     onClick={() => {
                       setShowStoryGenerator(true);
@@ -500,20 +524,83 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {onPreview && (
-            <button
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                previewWindowOpen
-                  ? 'bg-green-600 text-white ring-2 ring-green-300 hover:bg-green-700'
-                  : 'bg-green-500 text-white hover:bg-green-600'
-              }`}
-              onClick={onPreview}
-              title={previewWindowOpen ? 'Preview window open (Cmd+Shift+P to close)' : 'Open preview window (Cmd+Shift+P)'}
-            >
-              <Play className="w-4 h-4" />
-              {previewWindowOpen ? 'Preview Open' : 'Preview'}
-            </button>
-          )}
+          {/* VCS Status (shown when project is under version control) */}
+          <VCSStatusBar panelOpen={vcsPanelOpen} onTogglePanel={onToggleVCSPanel} onInitRepo={onInitRepo} />
+        </div>
+
+        {/* Right: Language + Translation Progress */}
+        <div className="flex items-center space-x-2">
+          {/* Language Selector */}
+          <LanguageSelector
+            sourceLanguage="en"
+            sourceLanguageName="English"
+            activeLanguage={translationState.activeLanguage}
+            translations={translationState.translations}
+            manifest={translationState.manifest}
+            onLanguageChange={translationActions.setActiveLanguage}
+            onGenerateTranslation={async (code, name) => {
+              if (!currentProjectId) return;
+              const savedConfig = getSavedAIConfig();
+              if (!savedConfig?.apiKey) {
+                alert('Please configure an AI provider with an API key in the AI Settings first.');
+                return;
+              }
+              try {
+                const projectData = await getProjectDataForExport(currentProjectId);
+                const providerMap: Record<string, 'openai' | 'anthropic' | 'custom' | 'local'> = {
+                  'openai': 'openai',
+                  'claude': 'anthropic',
+                  'local': 'local',
+                };
+                const aiConfig = {
+                  provider: providerMap[savedConfig.providerType || savedConfig.provider] || 'openai' as const,
+                  apiKey: savedConfig.apiKey,
+                  baseUrl: savedConfig.baseUrl,
+                  model: savedConfig.model,
+                };
+                await translationActions.generateTranslation(projectData, code, name, aiConfig);
+              } catch (e) {
+                console.error('[Header] Translation generation failed:', e);
+              }
+            }}
+            onCreateManualTranslation={async (code, name) => {
+              if (!currentProjectId) return;
+              try {
+                const projectData = await getProjectDataForExport(currentProjectId);
+                translationActions.createManualTranslation(projectData, code, name);
+              } catch (e) {
+                console.error('[Header] Manual translation creation failed:', e);
+              }
+            }}
+            isGenerating={translationState.isGenerating}
+          />
+
+          {/* Translation progress indicator */}
+          {translationState.isGenerating && (() => {
+            const { stringsTranslated, totalStrings, generationProgress } = translationState;
+            const pct = totalStrings > 0 ? Math.round((stringsTranslated / totalStrings) * 100) : 0;
+            return (
+              <div className="flex items-center gap-2 px-2.5 py-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded">
+                <svg className="w-3.5 h-3.5 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <div className="flex flex-col gap-0.5 min-w-[140px]">
+                  <span className="truncate">
+                    {generationProgress || 'Translating...'}
+                  </span>
+                  {totalStrings > 0 && (
+                    <div className="w-full h-1.5 bg-blue-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

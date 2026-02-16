@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Beat } from '@asaps/core';
-import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
 import { HyperTextEditor } from '../editors/HyperTextEditor';
@@ -16,6 +16,69 @@ import { useAvailableCounters, useAvailableVariables, useAvailableInventoryItems
 import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
 import { TextFieldWithVariables } from '../editors/TextFieldWithVariables';
+import { useTranslationState, useTranslationActions } from '../contexts/TranslationContext';
+import { getAllTranslationEntriesForBeat } from '../export/StoryTranslator';
+
+// Helper to set a value at a dot-separated path in a nested object/array.
+// e.g. setNestedValue(obj, "choices.0.text", "hello") sets obj.choices[0].text = "hello"
+function setNestedValue(obj: any, path: string, value: any): void {
+  const parts = path.split('.');
+  let current = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const key = /^\d+$/.test(parts[i]) ? parseInt(parts[i]) : parts[i];
+    if (current[key] === undefined || current[key] === null) return;
+    current = current[key];
+  }
+  const lastKey = /^\d+$/.test(parts[parts.length - 1])
+    ? parseInt(parts[parts.length - 1])
+    : parts[parts.length - 1];
+  current[lastKey] = value;
+}
+
+// Walk two dialog trees and update translation entries for any text/speaker changes.
+function diffDialogTreeTranslations(
+  oldTree: any, newTree: any, pathPrefix: string,
+  resource: any, translationActions: any, langCode: string
+): void {
+  if (!oldTree || !newTree) return;
+
+  // Check speaker and text fields on this node
+  if (newTree.speaker !== oldTree.speaker) {
+    const key = `${pathPrefix}.speaker`;
+    if (resource.strings[key]) {
+      translationActions.updateTranslation(langCode, key, newTree.speaker);
+    }
+  }
+  if (newTree.text !== oldTree.text) {
+    const key = `${pathPrefix}.text`;
+    if (resource.strings[key]) {
+      translationActions.updateTranslation(langCode, key, newTree.text);
+    }
+  }
+
+  // Walk choices
+  if (Array.isArray(oldTree.choices) && Array.isArray(newTree.choices)) {
+    const len = Math.min(oldTree.choices.length, newTree.choices.length);
+    for (let i = 0; i < len; i++) {
+      const oldChoice = oldTree.choices[i];
+      const newChoice = newTree.choices[i];
+      if (newChoice.text !== oldChoice.text) {
+        const key = `${pathPrefix}.choices.${i}.text`;
+        if (resource.strings[key]) {
+          translationActions.updateTranslation(langCode, key, newChoice.text);
+        }
+      }
+      // Recurse into nested dialog nodes
+      if (oldChoice.dialogNode && newChoice.dialogNode) {
+        diffDialogTreeTranslations(
+          oldChoice.dialogNode, newChoice.dialogNode,
+          `${pathPrefix}.choices.${i}.dialogNode`,
+          resource, translationActions, langCode
+        );
+      }
+    }
+  }
+}
 
 // Type definitions
 interface ChoiceWithCounter {
@@ -100,6 +163,13 @@ export const Inspector: React.FC<InspectorProps> = ({
   const [showNotes, setShowNotes] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'properties' | 'visual'>('properties');
+
+  // Translation state
+  const translationState = useTranslationState();
+  const translationActions = useTranslationActions();
+  // Stores source (untranslated) parameter values when in translation mode,
+  // so we can show them as dimmed reference below the editable fields.
+  const sourceParametersRef = useRef<Record<string, any>>({});
 
   // Resize state
   const [internalWidth, setInternalWidth] = useState<number>(() => {
@@ -265,6 +335,40 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   // Helper functions for Dialog Tree
   const handleDialogTreeChange = (newDialogTree: any) => {
+    // In translation mode, route text/speaker changes to the translation resource
+    // while keeping the source beat data unchanged.
+    if (translationState.activeLanguage && beat) {
+      const resource = translationState.translations.find(
+        t => t.languageCode === translationState.activeLanguage
+      );
+      if (resource) {
+        // Walk both the old (translated) tree and new tree to find text/speaker changes
+        const prefix = `beat:${beat.id}.parameters.dialogTree`;
+        diffDialogTreeTranslations(
+          localBeat.parameters?.dialogTree, newDialogTree, prefix,
+          resource, translationActions, translationState.activeLanguage
+        );
+        // Update local display state with the edited tree
+        setLocalBeat((prev: any) => ({
+          ...prev,
+          parameters: { ...prev.parameters, dialogTree: newDialogTree }
+        }));
+        setHasChanges(true);
+
+        // Still rebuild connections (targets are structural, not translatable)
+        const sourceTree = sourceParametersRef.current?.dialogTree;
+        if (sourceTree) {
+          // Rebuild connections from the source tree (targets don't change with translations)
+          const updatedBeat = {
+            ...localBeat,
+            parameters: { ...localBeat.parameters, dialogTree: sourceTree }
+          };
+          rebuildConnectionsAndUpdate(updatedBeat);
+        }
+        return;
+      }
+    }
+
     handleParameterChange('dialogTree', newDialogTree);
 
     // Rebuild connections immediately when dialog tree changes
@@ -617,7 +721,95 @@ export const Inspector: React.FC<InspectorProps> = ({
         }
       }
       //}
-      
+
+      // Translation overlay: when a language is active, overlay translated values
+      // onto the parameters so form fields show translated text.
+      if (translationState.activeLanguage && beat) {
+        const resource = translationState.translations.find(
+          t => t.languageCode === translationState.activeLanguage
+        );
+        if (resource) {
+          // Store source parameters BEFORE overlay (for reference display)
+          sourceParametersRef.current = { ...beatData.parameters };
+          // Deep-clone dialogTree source so it's not affected by overlay
+          if (beatData.parameters.dialogTree) {
+            sourceParametersRef.current.dialogTree = JSON.parse(JSON.stringify(beatData.parameters.dialogTree));
+          }
+
+          const entries = getAllTranslationEntriesForBeat(resource, beat.id);
+          for (const entry of entries) {
+            if (!entry.path.includes('.')) {
+              // Simple top-level string params — overlay directly
+              beatData.parameters[entry.path] = entry.value;
+            }
+          }
+
+          // Overlay nested translations for dialogTree structures
+          if (beatData.parameters.dialogTree) {
+            const translatedTree = JSON.parse(JSON.stringify(beatData.parameters.dialogTree));
+            for (const entry of entries) {
+              if (entry.path.startsWith('dialogTree.') && entry.status === 'translated') {
+                const subPath = entry.path.substring('dialogTree.'.length);
+                setNestedValue(translatedTree, subPath, entry.value);
+              }
+            }
+            beatData.parameters.dialogTree = translatedTree;
+          }
+
+          // Overlay nested translations for movementChoice choices
+          if (beatData.parameters.choices && Array.isArray(beatData.parameters.choices)) {
+            const translatedChoices = JSON.parse(JSON.stringify(beatData.parameters.choices));
+            for (const entry of entries) {
+              if (entry.path.startsWith('choices.') && entry.status === 'translated') {
+                const subPath = entry.path.substring('choices.'.length);
+                setNestedValue(translatedChoices, subPath, entry.value);
+              }
+            }
+            beatData.parameters.choices = translatedChoices;
+          }
+
+          // Overlay nested translations for pickProp props
+          if (beatData.parameters.props && Array.isArray(beatData.parameters.props)) {
+            const translatedProps = JSON.parse(JSON.stringify(beatData.parameters.props));
+            for (const entry of entries) {
+              if (entry.path.startsWith('props.') && entry.status === 'translated') {
+                const subPath = entry.path.substring('props.'.length);
+                setNestedValue(translatedProps, subPath, entry.value);
+              }
+            }
+            beatData.parameters.props = translatedProps;
+          }
+
+          // Overlay nested translations for hyperText hyperlinks
+          if (beatData.parameters.hyperlinks && Array.isArray(beatData.parameters.hyperlinks)) {
+            const translatedLinks = JSON.parse(JSON.stringify(beatData.parameters.hyperlinks));
+            for (const entry of entries) {
+              if (entry.path.startsWith('hyperlinks.') && entry.status === 'translated') {
+                const subPath = entry.path.substring('hyperlinks.'.length);
+                setNestedValue(translatedLinks, subPath, entry.value);
+              }
+            }
+            beatData.parameters.hyperlinks = translatedLinks;
+          }
+
+          // Overlay nested translations for textVariations
+          if (beatData.parameters.textVariations && Array.isArray(beatData.parameters.textVariations)) {
+            for (const entry of entries) {
+              if (entry.path.startsWith('textVariations.') && entry.status === 'translated') {
+                const idx = parseInt(entry.path.substring('textVariations.'.length));
+                if (!isNaN(idx) && idx < beatData.parameters.textVariations.length) {
+                  beatData.parameters.textVariations[idx] = entry.value;
+                }
+              }
+            }
+          }
+        } else {
+          sourceParametersRef.current = {};
+        }
+      } else {
+        sourceParametersRef.current = {};
+      }
+
       setLocalBeat(beatData);
       setHasChanges(false);
       setValidationErrors([]);
@@ -630,7 +822,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     //}
   // Note: We need to re-sync when beat parameters change (e.g., after merging dialog trees).
   // The _version field is incremented in updateParameters() to trigger re-sync.
-  }, [beat?.id, beat?.name, (beat as any)?._version]);
+  // Also re-sync when translation language changes to overlay/remove translations.
+  }, [beat?.id, beat?.name, (beat as any)?._version, translationState.activeLanguage]);
 
   if (!beat || !localBeat) {
     return (
@@ -748,7 +941,23 @@ export const Inspector: React.FC<InspectorProps> = ({
     setLocalBeat(updatedBeat);
     setHasChanges(true);
 
-    // Immediately save parameter changes like we do for connections
+    // In translation mode, route translatable string edits to the translation resource
+    // instead of modifying the source beat data.
+    if (translationState.activeLanguage && beat && typeof value === 'string') {
+      const resource = translationState.translations.find(
+        t => t.languageCode === translationState.activeLanguage
+      );
+      if (resource) {
+        const translationKey = `beat:${beat.id}.parameters.${param}`;
+        if (resource.strings[translationKey]) {
+          // This is a translatable parameter — update translation resource, not source beat
+          translationActions.updateTranslation(translationState.activeLanguage, translationKey, value);
+          return;
+        }
+      }
+    }
+
+    // Normal mode or non-translatable param — update source beat
     rebuildConnectionsAndUpdate(updatedBeat);
   };
 
@@ -1203,6 +1412,25 @@ export const Inspector: React.FC<InspectorProps> = ({
           </div>
         )}
 
+        {/* Translation mode indicator — compact bar */}
+        {translationState.activeLanguage && beat && (() => {
+          const resource = translationState.translations.find(
+            t => t.languageCode === translationState.activeLanguage
+          );
+          if (!resource) return null;
+          const entries = getAllTranslationEntriesForBeat(resource, beat.id);
+          if (entries.length === 0) return null;
+
+          const translatedCount = entries.filter(e => e.status === 'translated').length;
+
+          return (
+            <div className="flex-shrink-0 border-b border-blue-200 bg-blue-50 px-3 py-1.5 flex items-center gap-2 text-xs font-medium text-blue-700">
+              <Globe className="w-3.5 h-3.5" />
+              <span>Editing {resource.languageName} — {translatedCount}/{entries.length} translated</span>
+            </div>
+          );
+        })()}
+
         {/* Content Area - Single Properties tab for all beats */}
         <div className="flex-1 overflow-hidden">
           <div className="h-full overflow-y-auto">
@@ -1283,6 +1511,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                     characters={getAvailableCharacters()}
                     availableCounters={availableCounters}
                     availableVariables={availableVariables}
+                    translationSourceHints={
+                      translationState.activeLanguage ? sourceParametersRef.current : undefined
+                    }
                   />
                 )}
 
