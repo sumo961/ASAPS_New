@@ -53,9 +53,11 @@ Respond with JSON in this structure:
 - After titleScreen → infoText or dialogTree (setup story)
 - After infoText → movementChoice or pickProp (give player agency)
 - After choice beats → durScreen or dialogTree (show consequences)
-- Before endScreen → climactic beats (dialogTree, conditionBeat)
+- After pickProp → infoText describing the item (MANDATORY - player needs narrative payoff)
+- Before endScreen → conditionBeat checking accumulated state (counters, variables, inventory)
 - Use setVariable before conditional branches
-- Use conditionBeat to create branching based on variables
+- Use conditionBeat to create branching based on variables, counters, inventory, or fictional time
+- Use addRemoveInventory to REMOVE items or add from non-pickProp sources (pickProp auto-adds!)
 
 ## Timing and Pressure Features
 All beats support advanced timing features to create pressure or self-running stories:
@@ -65,12 +67,39 @@ All beats support advanced timing features to create pressure or self-running st
 
 Choice beats (dialogTree, movementChoice, pickProp) also support:
 - **choiceDelay**: Delay in seconds before choices appear (creates dramatic pauses)
+- **markVisited**: Show visual indication for choices leading to already-visited beats
 
 Use these features when suggesting beats that should:
 - Create tension and urgency (e.g., escape sequences, timed decisions)
 - Build dramatic effect (delay choices for impact)
 - Create self-running story sections (cutscenes with auto-advance)
-- Force quick decisions under pressure`;
+- Force quick decisions under pressure
+
+## Counter Effects on Choices
+Choice beats (dialogTree, movementChoice, pickProp) support counter modifications:
+- "counter": name of counter to modify
+- "counterOperation": "change" (add/subtract) or "set" (replace)
+- "counterValue": numeric value
+- "soundEffect": filename to play when selected
+Suggest adding counter effects to choices when the story needs state tracking.
+
+## Fictional Time System
+Stories can track in-story date/time progression:
+- **setVariable** with type "fictionalTime" to set/advance/subtract time
+- **conditionBeat** with type "fictionalTime" to branch based on date/time
+- Supports units: minutes, hours, days, months, years
+- Useful for: historical fiction, day counters, time-of-day mechanics, time travel stories
+Suggest fictional time beats when the story involves date/time progression.
+
+## AI Runtime Beats
+When suggesting beats, consider AI-powered options:
+- **aiInfoText**: AI-generated contextual text (needs fallbackText)
+- **aiDurScreen**: AI-generated auto-advance text (needs fallbackText)
+- **aiDialogTree**: AI-generated branching dialogue
+- **aiCondition**: AI-driven branching based on accumulated player behavior
+- **aiSummary**: AI-generated narrative summary of player's journey
+- **onlineContent**: Fetch real-time data from APIs or AI search
+Suggest AI runtime beats when dynamic, context-aware content would enhance the experience.`;
 }
 
 /**

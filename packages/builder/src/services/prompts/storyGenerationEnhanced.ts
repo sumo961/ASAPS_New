@@ -403,6 +403,8 @@ Good item descriptions should:
     Note: Use quantityValue with a number OR a variable name prefixed with $ (e.g., "$requiredAmount")
   - **timer**: { type: "timer", timer: "timerName", operator: ">", value: 0 }
   - **visitedBeat**: { type: "visitedBeat", beatId: "beat_id" } - Check if player has visited a specific beat
+  - **counterCompare**: { type: "counterCompare", counter1: "strength", counter2: "threshold", operator: ">=" }
+    Compare two counters against each other. Useful for: skill checks, relationship comparisons, dynamic difficulty
   - **fictionalTime**: { type: "fictionalTime", operator: ">", compareTime: { year: 1969, month: 1, day: 1, hour: 0, minute: 0 } }
     Operators: ">" (after), "<" (before), "==" (exactly), "!=" (not), ">=", "<="
     Use for: time-gated content, checking story progression by date/time

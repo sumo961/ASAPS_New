@@ -544,7 +544,13 @@ CRITICAL ANTI-PATTERNS TO AVOID:
    ❌ WRONG: { "name": "Letter" } (no description)
    ✓ CORRECT: { "name": "Letter", "description": "A sealed envelope with a wax seal" }
 
-9. NO DUPLICATE DATA - Put beat data in parameters ONLY:
+9. MANDATORY: DESCRIBE ITEMS AFTER PICKUP!
+   Every pickProp choice MUST lead to an infoText that describes what the player learns from the item!
+   ❌ WRONG: pickProp "Old Photo" → movementChoice (photo never described!)
+   ✓ CORRECT: pickProp "Old Photo" → infoText "The photograph shows a family portrait..." → next beat
+   Good item descriptions should: reveal story details, hint at mysteries, give useful information, create atmosphere.
+
+10. NO DUPLICATE DATA - Put beat data in parameters ONLY:
    ❌ WRONG: dialogTree data at both top level AND in parameters
    ✓ CORRECT: dialogTree data ONLY inside parameters.dialogTree
 
@@ -565,7 +571,14 @@ titleScreen: { "id": "beat_0", "type": "titleScreen", "label": "Title", "paramet
 
 movementChoice: { "id": "beat_2", "type": "movementChoice", "label": "Choice", "parameters": { "choices": [{ "id": "c1", "text": "Go left", "location": "Go left", "target": "beat_3" }, { "id": "c2", "text": "Go right", "location": "Go right", "target": "beat_4" }] } }
 
-conditionBeat: { "id": "beat_5", "type": "conditionBeat", "label": "Check Clues", "parameters": { "condition": { "type": "counter", "variable": "cluesFound", "operator": ">=", "value": 3 }, "trueConnection": { "target": "beat_good_end" }, "falseConnection": { "target": "beat_bad_end" } } }
+conditionBeat (counter): { "id": "beat_5", "type": "conditionBeat", "label": "Check Clues", "parameters": { "condition": { "type": "counter", "variable": "cluesFound", "operator": ">=", "value": 3 }, "trueConnection": { "target": "beat_good_end" }, "falseConnection": { "target": "beat_bad_end" } } }
+
+conditionBeat (inventory has): { "parameters": { "condition": { "type": "inventory", "item": "lantern", "character": "player", "checkType": "has" }, "trueConnection": { "target": "beat_light" }, "falseConnection": { "target": "beat_dark" } } }
+
+conditionBeat (inventory quantity): { "parameters": { "condition": { "type": "inventory", "item": "gold_coin", "character": "player", "checkType": "quantity", "quantityOperator": ">=", "quantityValue": 10 }, "trueConnection": { "target": "beat_afford" }, "falseConnection": { "target": "beat_poor" } } }
+Note: quantityValue can also reference a variable with $ prefix: "$requiredAmount"
+
+conditionBeat (counterCompare): { "parameters": { "condition": { "type": "counterCompare", "counter1": "strength", "counter2": "threshold", "operator": ">=" }, "trueConnection": { "target": "beat_pass" }, "falseConnection": { "target": "beat_fail" } } }
 
 endScreen: { "id": "beat_end", "type": "endScreen", "label": "The End", "parameters": { "message": "Victory!", "showRestart": true } }
 

@@ -1,7 +1,10 @@
 /**
  * Story Generation Prompts
  *
- * Templates for AI story generation
+ * Lightweight templates for AI story generation.
+ * NOTE: Both ClaudeProvider and OpenAIProvider use the enhanced prompts from
+ * storyGenerationEnhanced.ts for full story generation. This module is kept
+ * as a simpler alternative for lighter-weight use cases (e.g., MCP server).
  */
 
 import type { StoryGenerationRequest } from '../../types/ai';
@@ -29,6 +32,37 @@ Generate complete interactive story structures with:
 4. Clear connections between beats
 5. Appropriate parameters for each beat
 6. Logical story progression
+7. Procedural game elements (counters, variables, inventory, conditions)
+
+## Key Beat Type Notes
+- **titleScreen**: MUST be beat_0 (first beat)
+- **infoText**: Single connection only. For branching, use movementChoice or dialogTree
+  - Supports textVariations (array of alternative texts randomly selected at runtime)
+- **durScreen**: Timed auto-advance. Supports textVariations. Does NOT support backgroundAssetId
+- **dialogTree**: Use for conversations. Supports choiceDelay, markVisited, presentationMode
+  - Choices can have counter/counterOperation/counterValue and soundEffect
+  - Use target "__self__" for recursive dialogs (interrogation, shopping)
+- **movementChoice**: For navigation. Include id, text, location, target on each choice
+  - Supports choiceDelay, markVisited, showTextOnHover
+  - Choices can have counter effects and sound effects
+- **pickProp**: For item selection (noun phrases only, no verbs!)
+  - AUTO-ADDS selected item to inventory - DO NOT follow with addRemoveInventory!
+  - MANDATORY: Every pickProp choice MUST lead to an infoText describing the item
+  - Supports choiceDelay, markVisited. Props can have counter effects and sound effects
+- **endScreen**: Use "message" (not "endMessage"). ALWAYS set showRestart: true
+  - Must be in the main "beats" array, NEVER a separate "endings" array
+- **setVariable**: Supports type "variable", "counter", and "fictionalTime"
+  - Fictional time: set/advance/subtract with timeYear/timeMonth/timeDay/timeHour/timeMinute
+- **conditionBeat**: ONLY 3 parameters: condition, trueConnection, falseConnection
+  - Condition types: counter, variable, inventory, timer, visitedBeat, fictionalTime
+- **addRemoveInventory**: Only for removing items or adding from non-pickProp sources
+- **inputText**: Use "variable" not "variableName". Connection goes inside parameters
+- **hyperText**: Word in hyperlinks must EXACTLY match text in the "text" field
+
+## Counter Effects on Choices
+dialogTree, movementChoice, and pickProp choices can modify counters:
+- "counter": counter name, "counterOperation": "change" or "set", "counterValue": number
+- "soundEffect": filename to play when choice is selected
 
 ## Output Format
 Respond with JSON in this exact structure:
@@ -39,12 +73,17 @@ Respond with JSON in this exact structure:
     "description": "Brief story description",
     "genre": "mystery|fantasy|scifi|romance|horror|adventure"
   },
+  "suggestedTheme": {
+    "themeId": "builtin-visual-novel | builtin-twine | builtin-point-and-click",
+    "reason": "Brief explanation of why this theme fits"
+  },
   "beats": [
     {
       "id": "beat_0",
       "name": "Descriptive name",
       "type": "beatType",
       "position": { "x": 100, "y": 200 },
+      "notes": "Optional author notes (not shown to player)",
       "parameters": { /* type-specific parameters */ },
       "connections": [{ "targetId": "beat_1", "label": "Continue" }],
       "cluster": "optional-cluster-name"
@@ -54,21 +93,28 @@ Respond with JSON in this exact structure:
     { "name": "clueFound", "initialValue": false, "description": "Whether player found the clue" }
   ],
   "characters": [
-    { "id": "char_1", "name": "Detective Holmes", "description": "Sharp-witted investigator" }
+    {
+      "id": "char_1", "name": "Detective Holmes", "description": "Sharp-witted investigator",
+      "counters": [{ "name": "trust", "displayName": "Trust", "value": 0, "min": 0, "max": 100 }]
+    }
   ],
   "reasoning": "Brief explanation of story structure choices"
 }
 
 ## Important Rules
-1. Always start with titleScreen beat
-2. Use proper beat types from the schema
+1. beat_0 MUST be type "titleScreen"
+2. Use proper beat types from the schema (case-sensitive!)
 3. Ensure all targetIds reference existing beat IDs
 4. Include all required parameters for each beat type
-5. Position beats logically (100px spacing between beats)
+5. Position beats logically (x += 300 for linear, y += 150 for branches)
 6. Create meaningful branching where story allows
-7. End with endScreen beat
-8. Use variables to track player choices and state
-9. **CRITICAL: Counter Threshold Reachability** - Before using a conditionBeat to check if a counter reaches a threshold (e.g., score >= 3), calculate the maximum value the counter can reach. Count ALL places where the counter is incremented (setVariable beats, choice effects). The threshold MUST be ≤ the sum of all possible increments. Example: if you have 2 choices that each add +1 to a counter, the maximum is 2, so checking >= 3 is IMPOSSIBLE and will make the true branch unreachable.`;
+7. End with endScreen beat(s) - always with showRestart: true
+8. Use variables and counters to track player choices and state
+9. If you use counters, you MUST include conditionBeat(s) to check them before endings
+10. Choice-based beats (dialogTree, movementChoice, pickProp) define targets in their choices - do NOT add a separate "connections" array
+11. Single-path beats (infoText, durScreen, setVariable, etc.) use "connections" array with "targetId"
+12. **CRITICAL: Counter Threshold Reachability** - Before using a conditionBeat to check if a counter reaches a threshold (e.g., score >= 3), calculate the maximum value the counter can reach. The threshold MUST be ≤ the sum of all possible increments.
+13. Every beat (except titleScreen) must be reachable - some other beat must connect to it`;
 }
 
 /**

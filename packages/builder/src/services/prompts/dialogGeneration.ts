@@ -79,14 +79,26 @@ Additional options:
 - "choiceDelay": number (seconds) - Delay before choices appear
 
 ## Counter Effects on Choices
-Choices can modify counters directly:
-- "counter": counter name (e.g., "trust", "fear")
-- "counterOperation": "set" or "change" (increment)
-- "counterValue": numeric value
-Example: { "text": "Be friendly", "target": "next", "counter": "trust", "counterOperation": "change", "counterValue": 1 }
+Choices can modify counters directly using these 3 properties:
+- "counter": counter name (e.g., "trust", "fear", "suspicion")
+- "counterOperation": "change" (add/subtract) or "set" (replace value)
+- "counterValue": numeric value (positive to increment, negative to decrement)
+
+Examples:
+- Friendly response: { "text": "I want to help.", "target": "next", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
+- Threatening: { "text": "Talk or else!", "target": "next", "counter": "fear", "counterOperation": "change", "counterValue": 10 }
+- Multiple effects: Different choices on the same dialog can modify different counters
 
 ## Sound Effects on Choices
-Choices can trigger sounds: { "soundEffect": "click.mp3" }
+Choices can play a sound when selected:
+- "soundEffect": filename of sound to play (e.g., "click.mp3", "gasp.wav", "door_slam.mp3")
+Example: { "text": "I accept your offer.", "target": "deal_done", "soundEffect": "handshake.mp3" }
+
+## Visited Choice Tracking
+When "markVisited" is true on the dialogTree beat:
+- Choices that lead to already-visited beats are visually dimmed
+- Useful for interrogation or shopping dialogs where player explores multiple questions
+- Combine with "__self__" targets for multi-question conversations
 
 ## Writing Guidelines
 1. Keep dialog natural and conversational
@@ -94,7 +106,9 @@ Choices can trigger sounds: { "soundEffect": "click.mp3" }
 3. Use emotions to convey character state
 4. Create branching that matters to the story
 5. Balance dialog length - not too long per node
-6. Consider adding conditions/effects for consequences
+6. Consider adding counter effects to make choices have mechanical consequences
+7. Use "__self__" with markVisited for multi-question interrogation/shopping dialogs
+8. Add sound effects to enhance emotional impact of key choices
 
 ## Example Emotions
 - neutral: Standard conversation
