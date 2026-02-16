@@ -1,5 +1,97 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-16: Windows Git Fix, Stability, Translation, Tests & Prompt Sync (v0.9.17)
+
+### Overview
+
+This release fixes **Git VCS support on Windows**, resolves numerous stability issues with directory-based projects, adds **story content translation**, and brings the internal and MCP AI generation prompts into full sync. Also adds **122 new unit tests** for previously untested beat types and the StoryTranslator.
+
+### Windows Git VCS Fix (Critical)
+
+Git version control now works reliably on Windows:
+
+- **Path separator fix**: Windows backslashes in file paths (storage adapters, core DirectoryFormat, ElectronStorageAdapter) corrected throughout the pipeline
+- **Auto-detect git.exe**: Automatically finds git.exe on Windows PATH; shows install instructions if not found
+- **Error surfacing**: Git command failures now surface actual error messages instead of failing silently
+
+### Stability Fixes
+
+- **Cluster crash fix**: Orphaned beats (not in any cluster) now render as standalone instead of crashing
+- **VCS double-init fix**: Prevented infinite re-render loop during VCS auto-initialization; parallelized git polling
+- **Asset loading fix**: Filesystem fallback when IndexedDB fails for directory-based projects
+- **UI reset on delete**: UI properly resets when deleting the currently loaded project
+- **Re-render reduction**: Eliminated excessive re-rendering from window.electron API access
+- **Electron preview fix**: Fixed preview window in Electron desktop app
+- **Beat ordering fix**: Corrected beat ordering in certain edge cases
+
+### Story Translation (New Feature)
+
+- **Translation UI**: New translation interface for translating story content to other languages
+- **StoryTranslator**: Extracts all translatable strings (beat text, dialog trees, character names, HUD labels, etc.) for batch translation
+- **Translated hotspot labels**: Movement choice and pickProp display text now translatable
+
+### HTML Export Fixes
+
+- **Timer HUD**: Fixed time HUD display in exported HTML
+- **Windows paths**: Fixed path separators in HTML export on Windows
+- **HUD overlaps**: Fixed HUD overlay positioning conflicts
+- **Default button layout**: Corrected default button layout in exported stories
+
+### AI Prompt Synchronization
+
+Brought internal (enhanced) and MCP server story generation prompts to the same level:
+
+- **counterCompare condition**: Added to enhanced prompt (was MCP-only)
+- **Inventory quantity checks**: Added to MCP prompt with `quantityOperator`/`quantityValue` and `$variable` support
+- **Item description pattern**: Added to MCP prompt (pickProp must lead to infoText describing item)
+- **Beat suggestion prompt**: Updated with fictional time, AI runtime beats, counter effects, markVisited
+- **Dialog prompt**: Updated with counter effects examples, sound effects, visited tracking
+
+### Test Coverage (122 New Tests)
+
+| Test File | Tests | Coverage |
+|-----------|-------|---------|
+| PickPropBeat.test.ts | 28 | Props, inventory, effects, sounds, markVisited, choiceDelay |
+| DurScreenBeat.test.ts | 16 | Text variations, random selection, variable interpolation |
+| TitleScreenBeat.test.ts | 9 | Constructor, params, variable interpolation |
+| EndScreenBeat.test.ts | 17 | Restart/credits detection, context reset, variable interpolation |
+| HyperTextBeat.test.ts | 15 | Hyperlinks, connections, choice recording, styling |
+| InputTextBeat.test.ts | 16 | Variable/counter storage, numeric conversion, validation |
+| StoryTranslator.test.ts | 21 | String extraction for all beat types, characters, HUD, environment |
+
+---
+
+## 2026-02-13: Auto-Update Fix, AI Generation & MCP Improvements (v0.9.16)
+
+### Overview
+
+This release fixes the **Electron auto-update 404 error** and significantly improves AI story generation quality across both internal providers and the MCP server.
+
+### Auto-Update Fix (Critical)
+
+- **Fixed 404 error**: Artifact filenames now match the URLs in `latest.yml` / `latest-mac.yml`, restoring auto-update on both Windows and macOS
+
+### AI Story Generation Improvements
+
+- **Richer generated stories**: Increased beat counts (short: 8-15, medium: 15-30, long: 30+)
+- **Theme recommendations**: AI suggests matching built-in theme based on genre
+- **Advanced branching patterns**: 9 patterns (hub-and-spoke, state accumulation, timed branching, inventory-gated puzzles, reputation systems)
+- **Procedural game elements**: Stories include counters, variables, inventory, conditional endings by default
+- **Correct parameter handling**: Fixed parameter name mismatches (endMessage→message, variableName→variable, etc.)
+- **Concrete examples**: Added beat examples and anti-pattern documentation
+- **Sound/counter effects on choices**: Choices support sound effects and counter modifications
+
+### MCP Server Fixes
+
+- **Recursive dialog extraction**: Nested dialogTree choices correctly imported
+- **ConditionBeat compatibility**: Supports nested and legacy formats
+
+### UI
+
+- **Version display**: App version shown in header
+
+---
+
 ## 2026-02-13: Timer HUD, Fictional Time, Countdown Meter, Keypad Beat, Visual Editor UX & Choice Effects (v0.9.15)
 
 ### Overview

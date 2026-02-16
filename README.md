@@ -16,18 +16,23 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.15)
+## ⚠️ Development Status (v0.9.17)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
-| **Fictional Time System** | **NEW in v0.9.15**: In-story date/time tracking with set/advance/subtract, condition checking, and Timer HUD display |
-| **Timer/Countdown HUD** | **NEW in v0.9.15**: Timer HUD (countdown, fictional time, or narrative text) and Countdown Meter HUD overlays |
-| **Recursive Dialog Trees** | **NEW in v0.9.15**: `__self__` target for looping dialogs with per-choice visited tracking |
-| **Keypad Beat** | **NEW in v0.9.15**: Numeric keypad for phone, safe lock, PIN entry with code validation |
-| **Visual Editor UX** | **NEW in v0.9.15**: Multi-select, alignment/distribute tools, snap guides, element grouping |
-| **Choice Effects** | **NEW in v0.9.15**: Unified variable/counter/inventory effects on dialog and movement choices |
+| **Windows Git VCS Fix** | **FIX in v0.9.17**: Git version control now works on Windows (path separators, auto-detect git.exe) |
+| **Story Translation** | **NEW in v0.9.17**: Translate story content to other languages with StoryTranslator |
+| **Stability Fixes** | **FIX in v0.9.17**: Cluster crash, VCS double-init, asset loading, UI reset, re-render reduction |
+| **AI Prompt Sync** | **v0.9.17**: Internal and MCP prompts fully synchronized (counterCompare, inventory quantity, item descriptions) |
+| **Test Coverage** | **v0.9.17**: 122 new tests for PickProp, DurScreen, TitleScreen, EndScreen, HyperText, InputText, StoryTranslator |
+| **Fictional Time System** | In-story date/time tracking with set/advance/subtract, condition checking, and Timer HUD display (v0.9.15) |
+| **Timer/Countdown HUD** | Timer HUD (countdown, fictional time, or narrative text) and Countdown Meter HUD overlays (v0.9.15) |
+| **Recursive Dialog Trees** | `__self__` target for looping dialogs with per-choice visited tracking (v0.9.15) |
+| **Keypad Beat** | Numeric keypad for phone, safe lock, PIN entry with code validation (v0.9.15) |
+| **Visual Editor UX** | Multi-select, alignment/distribute tools, snap guides, element grouping (v0.9.15) |
+| **Choice Effects** | Unified variable/counter/inventory effects on dialog and movement choices (v0.9.15) |
 | **Git VCS Integration** | Full Git version control — commit, push, pull, branch, merge conflicts, clone repository (v0.9.14) |
 | **AI Dialog Fix** | Fixed AIDialogTree generation across all players, updated OpenAI defaults to GPT-5.2 (v0.9.13) |
 | **HTML Export** | Export stories as standalone HTML files with splash screen, counter HUD, and inventory icons (v0.9.12) |
