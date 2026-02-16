@@ -5,7 +5,7 @@
  * The preview window auto-reloads when story changes and navigates to selected beats.
  */
 
-import type { Story, StatePreset } from '@asaps/core';
+import type { Story, StatePreset, TranslationResource } from '@asaps/core';
 
 // Serialized story data for cross-window communication
 export interface SerializedStoryData {
@@ -40,6 +40,10 @@ export interface PreviewMessage {
     assets?: any[];
     characters?: any[];
     themeAssets?: any;
+    /** Active translation resource (for preview in translated language) */
+    translationResource?: TranslationResource;
+    /** Text direction for the active language */
+    textDirection?: 'ltr' | 'rtl';
   };
 }
 

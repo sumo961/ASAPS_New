@@ -7,6 +7,20 @@
  */
 
 import type { AIProvider } from './HtmlExporter';
+import type {
+  TranslationResource,
+  TranslationEntry,
+  TranslationManifest,
+  TextDirection,
+} from '@asaps/core';
+import {
+  createEmptyResource,
+  buildManifestEntry,
+  createEmptyTranslationManifest,
+  computeSourceHash,
+  isRTLLanguage,
+  detectFontsForTranslation,
+} from '@asaps/core';
 
 export interface TranslationAIConfig {
   provider: AIProvider;
@@ -264,8 +278,9 @@ function extractDialogTreeStrings(params: any, prefix: string, strings: Record<s
 
 /**
  * Apply translated strings back to a deep clone of the project data.
+ * Uses positional keys (e.g., "project.story.beats.0.parameters.text").
  */
-function applyTranslations(projectData: any, translations: Record<string, string>): any {
+export function applyTranslations(projectData: any, translations: Record<string, string>): any {
   const translated = JSON.parse(JSON.stringify(projectData));
 
   for (const [path, value] of Object.entries(translations)) {
@@ -698,4 +713,295 @@ export async function translateStory(
 
   console.log(`[StoryTranslator] Translation to ${targetLanguage} complete`);
   return result;
+}
+
+// ============================================================================
+// ID-Based Key Generation
+// ============================================================================
+
+/**
+ * Convert positional keys (used by extractTranslatableStrings) to ID-based keys.
+ * Positional: "project.story.beats.0.parameters.text"
+ * ID-based:   "beat:{beatId}.parameters.text"
+ *
+ * Non-beat strings (characters, metadata, etc.) keep their positional keys
+ * since they don't have beat IDs.
+ *
+ * @param positionalStrings - Strings with positional keys from extractTranslatableStrings()
+ * @param projectData - The project data (needed to look up beat IDs by index)
+ * @returns Record with ID-based keys
+ */
+export function positionalToIdBased(
+  positionalStrings: Record<string, string>,
+  projectData: any
+): Record<string, string> {
+  const beats = projectData.project?.story?.beats;
+  const result: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(positionalStrings)) {
+    const idKey = convertKeyToIdBased(key, beats);
+    result[idKey] = value;
+  }
+
+  return result;
+}
+
+/**
+ * Convert ID-based keys back to positional keys for use with applyTranslations().
+ *
+ * @param idBasedStrings - Strings with ID-based keys
+ * @param projectData - The project data (needed to find beat indices)
+ * @returns Record with positional keys
+ */
+export function idBasedToPositional(
+  idBasedStrings: Record<string, string>,
+  projectData: any
+): Record<string, string> {
+  const beats = projectData.project?.story?.beats;
+  if (!Array.isArray(beats)) return { ...idBasedStrings };
+
+  // Build ID → index map
+  const idToIndex = new Map<string, number>();
+  for (let i = 0; i < beats.length; i++) {
+    const id = beats[i].id ?? String(i);
+    idToIndex.set(String(id), i);
+  }
+
+  const result: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(idBasedStrings)) {
+    const match = key.match(/^beat:([^.]+)\.(.+)$/);
+    if (match) {
+      const beatId = match[1];
+      const suffix = match[2];
+      const index = idToIndex.get(beatId);
+      if (index !== undefined) {
+        result[`project.story.beats.${index}.${suffix}`] = value;
+      }
+      // If beat not found (deleted), skip it
+    } else {
+      // Non-beat key — pass through as-is
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Convert a single positional key to ID-based format.
+ */
+function convertKeyToIdBased(key: string, beats: any[] | undefined): string {
+  if (!Array.isArray(beats)) return key;
+
+  // Match pattern: project.story.beats.{index}.{rest}
+  const match = key.match(/^project\.story\.beats\.(\d+)\.(.+)$/);
+  if (!match) return key; // Not a beat key — keep as-is
+
+  const beatIndex = parseInt(match[1], 10);
+  const suffix = match[2];
+
+  if (beatIndex < beats.length) {
+    const beatId = beats[beatIndex].id ?? String(beatIndex);
+    return `beat:${beatId}.${suffix}`;
+  }
+
+  return key; // Index out of range — keep as-is
+}
+
+// ============================================================================
+// Translation Resource Generation
+// ============================================================================
+
+/**
+ * Generate a TranslationResource by AI-translating the entire story.
+ * This is the batch AI translation path: translates all strings upfront.
+ *
+ * @param projectData - The full project JSON
+ * @param languageCode - BCP 47 language code (e.g., 'de', 'fr', 'ar')
+ * @param languageName - Human-readable language name (e.g., 'German', 'French')
+ * @param aiConfig - AI provider configuration
+ * @param onProgress - Progress callback
+ * @param signal - AbortSignal for cancellation
+ * @returns A complete TranslationResource
+ */
+export async function generateTranslationResource(
+  projectData: any,
+  languageCode: string,
+  languageName: string,
+  aiConfig: TranslationAIConfig,
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
+): Promise<TranslationResource> {
+  const direction: TextDirection = isRTLLanguage(languageCode) ? 'rtl' : 'ltr';
+
+  // 1. Extract source strings (positional keys)
+  const positionalStrings = extractTranslatableStrings(projectData);
+
+  // 2. Convert to ID-based keys
+  const idBasedSource = positionalToIdBased(positionalStrings, projectData);
+
+  // 3. AI-translate the story using existing batch infrastructure
+  // translateStory works with positional keys, so we use it and then map the results
+  const translatedData = await translateStory(
+    projectData,
+    languageName,
+    aiConfig,
+    onProgress,
+    signal
+  );
+
+  // 4. Extract translated strings from the result (positional)
+  const translatedPositional = extractTranslatableStrings(translatedData);
+
+  // 5. Convert translated positional to ID-based using ORIGINAL project data
+  //    (beat IDs haven't changed, but we need the original index→ID mapping)
+  const idBasedTranslated = positionalToIdBased(translatedPositional, projectData);
+
+  // 6. Build the TranslationResource
+  const resource = createEmptyResource(languageCode, languageName, direction);
+  resource.origin = 'ai';
+  resource.sourceHash = computeSourceHash(idBasedSource);
+  resource._sourceSnapshot = idBasedSource;
+
+  // Build entries
+  for (const [key, sourceValue] of Object.entries(idBasedSource)) {
+    const translatedValue = idBasedTranslated[key];
+    resource.strings[key] = {
+      value: translatedValue ?? sourceValue,
+      status: translatedValue ? 'translated' : 'untranslated',
+    };
+  }
+
+  // Detect required fonts from translated text
+  const translatedValues: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(resource.strings)) {
+    translatedValues[key] = entry.value;
+  }
+  resource.requiredFonts = detectFontsForTranslation(translatedValues);
+
+  console.log(`[StoryTranslator] Generated translation resource for ${languageName} (${languageCode}): ${Object.keys(resource.strings).length} strings`);
+  if (resource.requiredFonts.length > 0) {
+    console.log(`[StoryTranslator] Required fonts: ${resource.requiredFonts.join(', ')}`);
+  }
+
+  return resource;
+}
+
+/**
+ * Create a TranslationResource for manual translation.
+ * Populates all keys with source text as placeholder values, marked as 'untranslated'.
+ *
+ * @param projectData - The full project JSON
+ * @param languageCode - BCP 47 language code
+ * @param languageName - Human-readable language name
+ * @returns A TranslationResource with source text as placeholders
+ */
+export function createManualTranslationResource(
+  projectData: any,
+  languageCode: string,
+  languageName: string
+): TranslationResource {
+  const direction: TextDirection = isRTLLanguage(languageCode) ? 'rtl' : 'ltr';
+
+  // Extract and convert to ID-based keys
+  const positionalStrings = extractTranslatableStrings(projectData);
+  const idBasedSource = positionalToIdBased(positionalStrings, projectData);
+
+  const resource = createEmptyResource(languageCode, languageName, direction);
+  resource.origin = 'human';
+  resource.sourceHash = computeSourceHash(idBasedSource);
+  resource._sourceSnapshot = idBasedSource;
+
+  // All strings start as untranslated with source text as placeholder
+  for (const [key, value] of Object.entries(idBasedSource)) {
+    resource.strings[key] = {
+      value,
+      status: 'untranslated',
+    };
+  }
+
+  return resource;
+}
+
+/**
+ * Apply a TranslationResource to project data, producing a translated clone.
+ * This is the data-layer translation: beats see already-translated strings.
+ *
+ * @param projectData - The original project JSON
+ * @param resource - The TranslationResource to apply
+ * @returns A deep clone of projectData with translations applied
+ */
+export function applyTranslationResource(
+  projectData: any,
+  resource: TranslationResource
+): any {
+  // Convert ID-based translated strings to positional keys
+  const translatedValues: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(resource.strings)) {
+    if (entry.status !== 'untranslated') {
+      translatedValues[key] = entry.value;
+    }
+  }
+
+  const positional = idBasedToPositional(translatedValues, projectData);
+  return applyTranslations(projectData, positional);
+}
+
+/**
+ * Get translated parameter values for a single beat from a translation resource.
+ * Returns a flat map of parameter paths to translated values.
+ * E.g., { 'text': 'Hallo Welt', 'choices.0.displayText': 'Wähle...' }
+ */
+export function getTranslationsForBeat(
+  resource: TranslationResource,
+  beatId: string
+): Record<string, string> {
+  const prefix = `beat:${beatId}.parameters.`;
+  const result: Record<string, string> = {};
+
+  for (const [key, entry] of Object.entries(resource.strings)) {
+    if (key.startsWith(prefix) && entry.status !== 'untranslated') {
+      result[key.substring(prefix.length)] = entry.value;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Get all translation entries for a single beat (including untranslated).
+ * Returns entries with their status for display in the Inspector.
+ */
+export function getAllTranslationEntriesForBeat(
+  resource: TranslationResource,
+  beatId: string
+): { path: string; value: string; status: string }[] {
+  const prefix = `beat:${beatId}.parameters.`;
+  const result: { path: string; value: string; status: string }[] = [];
+
+  for (const [key, entry] of Object.entries(resource.strings)) {
+    if (key.startsWith(prefix)) {
+      result.push({
+        path: key.substring(prefix.length),
+        value: entry.value,
+        status: entry.status,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Build a TranslationManifest from an array of TranslationResources.
+ */
+export function buildTranslationManifest(
+  resources: TranslationResource[],
+  sourceLanguage: string = 'en'
+): TranslationManifest {
+  const manifest = createEmptyTranslationManifest(sourceLanguage);
+  manifest.languages = resources.map(buildManifestEntry);
+  manifest.modifiedAt = new Date().toISOString();
+  return manifest;
 }

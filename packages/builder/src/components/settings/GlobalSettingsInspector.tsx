@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image } from 'lucide-react';
+import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
@@ -82,6 +82,9 @@ interface GlobalSettings {
     defaultValue?: string | number | boolean;
     description?: string;
   }[];
+  translation?: {
+    sourceLanguage: string;  // BCP 47 code, default 'en'
+  };
   hudOverlays?: {
     timerHud?: {
       enabled: boolean;
@@ -154,7 +157,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   onThemeChange,
 }) => {
   const [settings, setSettings] = useState<GlobalSettings>(initialSettings);
-  const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'copyright' | 'variables' | 'debug'>('project');
+  const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'copyright' | 'variables' | 'translation' | 'debug'>('project');
   const [hasChanges, setHasChanges] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
@@ -756,6 +759,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
           >
             <Variable className="w-4 h-4" />
             Variables
+          </button>
+          <button
+            onClick={() => setActiveTab('translation')}
+            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'translation' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
+            }`}
+            title="Translation settings: source language and translation management"
+          >
+            <Languages className="w-4 h-4" />
+            Translation
           </button>
           <button
             onClick={() => setActiveTab('debug')}
@@ -2654,6 +2667,65 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'translation' && (
+            <div className="space-y-4">
+              <h3 className="font-medium text-gray-700 mb-3">Translation Settings</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    Source Language
+                  </label>
+                  <select
+                    value={settings.translation?.sourceLanguage || 'en'}
+                    onChange={(e) => {
+                      const translation = { ...(settings.translation || { sourceLanguage: 'en' }), sourceLanguage: e.target.value };
+                      handleChange('translation' as keyof GlobalSettings, undefined, translation);
+                    }}
+                    className="w-full px-3 py-2 border rounded"
+                  >
+                    <option value="en">English (en)</option>
+                    <option value="de">German (de)</option>
+                    <option value="fr">French (fr)</option>
+                    <option value="es">Spanish (es)</option>
+                    <option value="it">Italian (it)</option>
+                    <option value="pt">Portuguese (pt)</option>
+                    <option value="nl">Dutch (nl)</option>
+                    <option value="ja">Japanese (ja)</option>
+                    <option value="zh">Chinese (zh)</option>
+                    <option value="ko">Korean (ko)</option>
+                    <option value="ar">Arabic (ar)</option>
+                    <option value="he">Hebrew (he)</option>
+                    <option value="ru">Russian (ru)</option>
+                    <option value="pl">Polish (pl)</option>
+                    <option value="tr">Turkish (tr)</option>
+                    <option value="sv">Swedish (sv)</option>
+                    <option value="da">Danish (da)</option>
+                    <option value="fi">Finnish (fi)</option>
+                    <option value="nb">Norwegian (nb)</option>
+                    <option value="mt">Maltese (mt)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    The language your story is authored in. Translation resources will be
+                    generated relative to this source language.
+                  </p>
+                </div>
+
+                <div className="mt-6 p-4 bg-blue-50 rounded border border-blue-200">
+                  <h4 className="text-sm font-medium text-blue-800 mb-2">Translation Management</h4>
+                  <p className="text-xs text-blue-700 mb-3">
+                    Use the language selector in the toolbar to add translations and switch between languages.
+                    Translations can be AI-generated or created manually for human translators.
+                  </p>
+                  <div className="text-xs text-blue-600">
+                    Translation resource files (.strings.json) are stored in the <code className="bg-blue-100 px-1 rounded">translations/</code> folder
+                    of your project and can be edited with any text editor.
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

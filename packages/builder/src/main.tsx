@@ -2,6 +2,7 @@ import React, { useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { PersistenceProvider, usePersistence } from './contexts/PersistenceContext';
+import { TranslationProvider } from './contexts/TranslationContext';
 import { VCSStatusProvider } from './vcs/VCSStatusProvider';
 import './styles/main.css';
 
@@ -37,9 +38,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       autoSaveDelay={30000}
       debug={true}
     >
-      <VCSBridge>
-        <App />
-      </VCSBridge>
+      <TranslationProvider>
+        <VCSBridge>
+          <App />
+        </VCSBridge>
+      </TranslationProvider>
     </PersistenceProvider>
   </React.StrictMode>
 );

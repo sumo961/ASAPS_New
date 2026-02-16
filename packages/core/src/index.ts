@@ -14,6 +14,7 @@ export * from './twine';
 export * from './renpy';
 export * from './utils';
 export * from './persistence';
+export * from './translation';
 
 // Package info
 export const version = '2.0.0';

@@ -502,6 +502,10 @@ export interface PositionedBeatViewProps {
   fictionalTimeText?: string;
   /** Subscribe to fictional time text updates */
   onSubscribeFictionalTimeText?: (listener: (text: string | undefined) => void) => () => void;
+  /** Text direction for the active translation language ('ltr' or 'rtl') */
+  textDirection?: 'ltr' | 'rtl';
+  /** Additional Noto font families to append to font stacks for script coverage */
+  notoFontFallbacks?: string[];
 }
 
 /**
@@ -833,6 +837,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   overrideCountdownMeter,
   fictionalTimeText: initialFictionalTimeText,
   onSubscribeFictionalTimeText,
+  textDirection,
+  notoFontFallbacks,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -1514,6 +1520,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   return (
     <div
       style={containerStyle}
+      dir={textDirection === 'rtl' ? 'rtl' : undefined}
       onClick={!effectiveAnimationsComplete && animation === 'typewriter' ? handleSkipAnimations : undefined}
     >
       {/* Timer progress bar for default target countdown */}

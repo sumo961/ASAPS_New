@@ -53,6 +53,9 @@ interface SchemaFormGeneratorProps {
   availableVariables?: AvailableVariable[];
   // Callbacks for special cases
   customRenderers?: Record<string, (param: string, def: ParameterDefinition) => React.ReactNode>;
+  // Translation mode: source parameter values to show as dimmed reference below text fields.
+  // When set, indicates translation mode is active.
+  translationSourceHints?: Record<string, any>;
 }
 
 // Map alias beat types to their canonical schema types
@@ -188,6 +191,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   availableCounters = [],
   availableVariables = [],
   customRenderers = {},
+  translationSourceHints,
 }) => {
   // Map alias types to canonical types for schema lookup
   const canonicalType = BEAT_TYPE_ALIASES[beatType] || beatType;
@@ -247,6 +251,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
 
         if (isTextarea) {
           const rows = paramDef.ui?.rows || (paramName === 'message' ? 2 : 4);
+          const sourceHint = translationSourceHints?.[paramName];
+          const showSourceHint = sourceHint != null && typeof sourceHint === 'string' && sourceHint !== value;
           return (
             <div key={paramName}>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -256,10 +262,17 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 value={value || paramDef.default || ''}
                 onChange={(e) => onParameterChange(paramName, e.target.value)}
                 rows={rows}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                placeholder={paramDef.description || `Enter ${paramName}`}
+                className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                  translationSourceHints ? 'border-blue-300 bg-blue-50/30' : 'border-gray-300'
+                }`}
+                placeholder={translationSourceHints ? 'Enter translation...' : (paramDef.description || `Enter ${paramName}`)}
               />
-              {paramDef.description && (
+              {showSourceHint && (
+                <p className="text-xs text-gray-400 mt-1 italic truncate" title={sourceHint}>
+                  Source: {sourceHint}
+                </p>
+              )}
+              {!showSourceHint && paramDef.description && (
                 <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
               )}
             </div>
@@ -600,23 +613,34 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
         }
 
         // Default string input
-        return (
-          <div key={paramName}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {label} {isRequired && <span className="text-red-500">*</span>}
-            </label>
-            <input
-              type="text"
-              value={value || paramDef.default || ''}
-              onChange={(e) => onParameterChange(paramName, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              placeholder={paramDef.description || `Enter ${paramName}`}
-            />
-            {paramDef.description && (
-              <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
-            )}
-          </div>
-        );
+        {
+          const sourceHintDefault = translationSourceHints?.[paramName];
+          const showSourceHintDefault = sourceHintDefault != null && typeof sourceHintDefault === 'string' && sourceHintDefault !== value;
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {label} {isRequired && <span className="text-red-500">*</span>}
+              </label>
+              <input
+                type="text"
+                value={value || paramDef.default || ''}
+                onChange={(e) => onParameterChange(paramName, e.target.value)}
+                className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                  translationSourceHints ? 'border-blue-300 bg-blue-50/30' : 'border-gray-300'
+                }`}
+                placeholder={translationSourceHints ? 'Enter translation...' : (paramDef.description || `Enter ${paramName}`)}
+              />
+              {showSourceHintDefault && (
+                <p className="text-xs text-gray-400 mt-1 italic truncate" title={sourceHintDefault}>
+                  Source: {sourceHintDefault}
+                </p>
+              )}
+              {!showSourceHintDefault && paramDef.description && (
+                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+              )}
+            </div>
+          );
+        }
 
       case 'number':
         return (

@@ -90,6 +90,9 @@ export interface GlobalSettings {
     maxTokens?: number;
     reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
   };
+  translation?: {
+    sourceLanguage: string;  // BCP 47 code, default 'en'
+  };
   hudOverlays?: {
     timerHud?: {
       enabled: boolean;

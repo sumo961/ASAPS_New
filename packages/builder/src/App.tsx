@@ -48,6 +48,8 @@ import { DiffViewer } from './components/vcs/DiffViewer';
 import { VCSToast } from './components/vcs/VCSToast';
 import { GitInitDialog } from './components/vcs/GitInitDialog';
 import { CloneRepoDialog } from './components/vcs/CloneRepoDialog';
+import { useTranslationState, useTranslationActions } from './contexts/TranslationContext';
+import { applyTranslationResource } from './export/StoryTranslator';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -254,6 +256,10 @@ function App() {
   const [diffViewerFile, setDiffViewerFile] = useState<string | null>(null);
   const [showGitInitDialog, setShowGitInitDialog] = useState(false);
   const [showCloneRepoDialog, setShowCloneRepoDialog] = useState(false);
+
+  // Translation state
+  const translationState = useTranslationState();
+  const translationActions = useTranslationActions();
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -3192,13 +3198,28 @@ function App() {
       animations: beat.animations || [],
     }));
 
-    return {
+    const storyData = {
       title: state.title,
       author: state.author,
       firstBeatId: (state.story as any)?.getFirstBeatId?.() || (state.story as any)?.metadata?.firstBeatId || (state.story as any)?.firstBeatId || state.beats[0]?.id || '0',
       beats: serializedBeats,
     };
-  }, [state.beats, state.title, state.author, state.story]);
+
+    // Apply translations if a language is active
+    if (translationState.activeLanguage) {
+      const resource = translationState.translations.find(
+        t => t.languageCode === translationState.activeLanguage
+      );
+      if (resource) {
+        // Wrap in project structure for applyTranslationResource, then unwrap
+        const wrapped = { project: { story: storyData } };
+        const translated = applyTranslationResource(wrapped, resource);
+        return translated.project.story;
+      }
+    }
+
+    return storyData;
+  }, [state.beats, state.title, state.author, state.story, translationState.activeLanguage, translationState.translations]);
 
   // Toggle preview window (separate window mode)
   const handleTogglePreviewWindow = useCallback(() => {
@@ -3266,7 +3287,7 @@ function App() {
         clearTimeout(previewUpdateTimeoutRef.current);
       }
     };
-  }, [previewWindowOpen, state.beats, state.connections, globalSettings, assets, characters, themeAssets, getSerializedStoryData]);
+  }, [previewWindowOpen, state.beats, state.connections, globalSettings, assets, characters, themeAssets, getSerializedStoryData, translationState.activeLanguage]);
 
   // Auto-navigate preview to selected beat
   useEffect(() => {

@@ -131,6 +131,27 @@ export async function exportProjectAsZip(projectId: string): Promise<Blob> {
     zip.file(metadataFileName, JSON.stringify(assetMetadata, null, 2));
   }
 
+  // Add translation files if present in globalSettings
+  // Translations are stored alongside the project in IndexedDB via the translations key
+  if ((project as any).translations && Array.isArray((project as any).translations)) {
+    const translationsFolder = zip.folder('translations');
+    if (translationsFolder) {
+      for (const resource of (project as any).translations) {
+        translationsFolder.file(
+          `${resource.languageCode}.strings.json`,
+          JSON.stringify(resource, null, 2)
+        );
+      }
+      // Write manifest if present
+      if ((project as any).translationManifest) {
+        translationsFolder.file(
+          '_manifest.json',
+          JSON.stringify((project as any).translationManifest, null, 2)
+        );
+      }
+    }
+  }
+
   // Generate ZIP blob
   const blob = await zip.generateAsync({ type: 'blob' });
 
@@ -411,6 +432,32 @@ export async function importProjectFromZip(
       hasThemeOverrides: !!themeOverrides
     });
 
+    // Import translation files if present
+    let translations: any[] | undefined;
+    let translationManifest: any | undefined;
+    const translationsFolder = zip.folder('translations');
+    if (translationsFolder) {
+      const translationFiles = Object.keys(zip.files).filter(
+        path => path.startsWith('translations/') && path.endsWith('.strings.json')
+      );
+      if (translationFiles.length > 0) {
+        translations = [];
+        for (const filePath of translationFiles) {
+          const file = zip.file(filePath);
+          if (file) {
+            const content = await file.async('text');
+            translations.push(JSON.parse(content));
+          }
+        }
+        // Read manifest
+        const manifestFile = zip.file('translations/_manifest.json');
+        if (manifestFile) {
+          translationManifest = JSON.parse(await manifestFile.async('text'));
+        }
+        console.log('[importProjectFromZip] Imported', translations.length, 'translation(s)');
+      }
+    }
+
     // Create project
     const project: Project = {
       id: projectId,
@@ -424,8 +471,10 @@ export async function importProjectFromZip(
       assetIds: Array.from(assetIdMap.values()),
       createdAt: new Date(projectData.project.createdAt),
       modifiedAt: new Date(),
-      version: projectData.project.version || '1.0.0'
-    };
+      version: projectData.project.version || '1.0.0',
+      ...(translations ? { translations } : {}),
+      ...(translationManifest ? { translationManifest } : {}),
+    } as any;
 
     // Save or update project
     if (exists && options.overwrite) {

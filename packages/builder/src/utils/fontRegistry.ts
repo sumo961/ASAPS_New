@@ -217,3 +217,66 @@ export function loadThemeFont(fontFamily: string, blob: Blob, filename: string):
 export function isThemeFontLoaded(fontFamily: string): boolean {
   return loadedFonts.has(`theme-${fontFamily}`);
 }
+
+// ============================================================================
+// Noto Sans Font Loading (for translation script coverage)
+// ============================================================================
+
+// Track loaded Noto font variants to avoid duplicate loads
+const loadedNotoFonts = new Set<string>();
+
+// Style element for Noto font @import rules
+let notoStyleElement: HTMLStyleElement | null = null;
+
+/**
+ * Get or create the style element for Noto font imports
+ */
+function getNotoStyleElement(): HTMLStyleElement {
+  if (!notoStyleElement) {
+    notoStyleElement = document.createElement('style');
+    notoStyleElement.id = 'asaps-noto-fonts';
+    document.head.appendChild(notoStyleElement);
+  }
+  return notoStyleElement;
+}
+
+/**
+ * Load Noto Sans font variants on-demand from Google Fonts CDN.
+ * Called when a translation is loaded that requires non-Latin script support.
+ *
+ * @param fontNames - Array of Noto font family names (e.g., ['Noto Sans Arabic', 'Noto Sans Georgian'])
+ */
+export function loadNotoFonts(fontNames: string[]): void {
+  const newFonts = fontNames.filter(name => !loadedNotoFonts.has(name));
+  if (newFonts.length === 0) return;
+
+  // Build Google Fonts CSS URL
+  const families = newFonts
+    .map(f => `family=${encodeURIComponent(f)}:wght@400;700`)
+    .join('&');
+  const url = `https://fonts.googleapis.com/css2?${families}&display=swap`;
+
+  // Add @import to style element
+  const styleEl = getNotoStyleElement();
+  styleEl.textContent += `@import url('${url}');\n`;
+
+  for (const name of newFonts) {
+    loadedNotoFonts.add(name);
+  }
+
+  console.log(`[FontRegistry] Loading Noto fonts: ${newFonts.join(', ')}`);
+}
+
+/**
+ * Check if a Noto font variant has been loaded.
+ */
+export function isNotoFontLoaded(fontName: string): boolean {
+  return loadedNotoFonts.has(fontName);
+}
+
+/**
+ * Get all currently loaded Noto font names.
+ */
+export function getLoadedNotoFonts(): string[] {
+  return Array.from(loadedNotoFonts);
+}

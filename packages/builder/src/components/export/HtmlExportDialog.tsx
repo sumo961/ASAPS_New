@@ -2,21 +2,12 @@
  * HTML Export Dialog - Configure and trigger HTML export
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Settings } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Settings, Globe, Sparkles } from 'lucide-react';
 import { downloadHtmlExport, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
 import { getSavedAIConfig } from '../../hooks/useAI';
-
-const STANDARD_LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'es', label: 'Spanish' },
-  { code: 'de', label: 'German' },
-  { code: 'fr', label: 'French' },
-  { code: 'ja', label: 'Japanese' },
-  { code: 'mt', label: 'Maltese' },
-  { code: 'zh', label: 'Mandarin Chinese' },
-] as const;
-
+import { useTranslationState } from '../../contexts/TranslationContext';
+import { buildManifestEntry, type TranslationResource } from '@asaps/core';
 
 interface HtmlExportDialogProps {
   isOpen: boolean;
@@ -41,21 +32,36 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [enableTranslation, setEnableTranslation] = useState(false);
-  const [selectedLanguages, setSelectedLanguages] = useState<Set<string>>(new Set());
-  const [customLanguage, setCustomLanguage] = useState('');
-  const [customLanguages, setCustomLanguages] = useState<string[]>([]);
-  const [translationMode, setTranslationMode] = useState<'separate' | 'bundled'>('separate');
   const [usingGlobalConfig, setUsingGlobalConfig] = useState(false);
-  const [translationProgress, setTranslationProgress] = useState<{
-    currentLanguage: string;
-    languageIndex: number;
-    totalLanguages: number;
-    stringsTranslated: number;
-    totalStrings: number;
-  } | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [enableAIOnTheFly, setEnableAIOnTheFly] = useState(false);
+  const [includedTranslations, setIncludedTranslations] = useState<Set<string>>(new Set());
   const hasPopulatedRef = useRef(false);
+
+  // Access pre-made translations from context
+  const translationState = useTranslationState();
+
+  // Compute manifest entries for each translation (completeness info)
+  const translationEntries = useMemo(() => {
+    return translationState.translations.map(t => ({
+      resource: t,
+      manifest: buildManifestEntry(t),
+    }));
+  }, [translationState.translations]);
+
+  // Auto-include translations with >50% completeness on first open
+  useEffect(() => {
+    if (isOpen && translationEntries.length > 0 && includedTranslations.size === 0) {
+      const autoInclude = new Set<string>();
+      for (const { resource, manifest } of translationEntries) {
+        if (manifest.completeness > 50) {
+          autoInclude.add(resource.languageCode);
+        }
+      }
+      if (autoInclude.size > 0) {
+        setIncludedTranslations(autoInclude);
+      }
+    }
+  }, [isOpen, translationEntries, includedTranslations.size]);
 
   // Pre-populate AI settings from global config on first open
   useEffect(() => {
@@ -86,21 +92,9 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     }
   }, [isOpen]);
 
-  const handleCancel = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  }, []);
-
   const handleExport = useCallback(async () => {
     setExporting(true);
     setError(null);
-    setTranslationProgress(null);
-
-    // Create abort controller for cancellation
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
 
     try {
       // For local provider, we need baseUrl but not apiKey
@@ -109,18 +103,13 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         ? !!aiBaseUrl
         : !!aiApiKey;
 
-      // Collect translation languages
-      const translateLanguages: string[] = [];
-      if (enableTranslation) {
-        for (const code of selectedLanguages) {
-          const lang = STANDARD_LANGUAGES.find(l => l.code === code);
-          if (lang) translateLanguages.push(lang.label);
-        }
-        translateLanguages.push(...customLanguages);
-      }
+      // Collect selected pre-made translations
+      const selectedTranslations: TranslationResource[] = translationState.translations.filter(
+        t => includedTranslations.has(t.languageCode)
+      );
 
-      // Translation needs AI config even if enableAI (for player) is off
-      const needsAIConfig = (enableAI && hasAIConfig) || translateLanguages.length > 0;
+      // AI on-the-fly needs AI config
+      const needsAIConfig = (enableAI && hasAIConfig) || enableAIOnTheFly;
 
       const options: HtmlExportOptions = {
         mode,
@@ -131,27 +120,38 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiApiKey: needsAIConfig && aiApiKey ? aiApiKey : undefined,
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
-        translateLanguages: translateLanguages.length > 0 ? translateLanguages : undefined,
-        translationMode: translateLanguages.length > 0 ? translationMode : undefined,
-        onTranslationProgress: (progress) => setTranslationProgress(progress),
-        signal: abortController.signal,
+        existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
+        enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
       };
 
       await downloadHtmlExport(projectId, projectName, options);
       onClose();
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
-        setError('Translation cancelled');
+        setError('Export cancelled');
       } else {
         console.error('[HtmlExportDialog] Export failed:', err);
         setError(err instanceof Error ? err.message : 'Export failed');
       }
     } finally {
       setExporting(false);
-      setTranslationProgress(null);
-      abortControllerRef.current = null;
     }
-  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, enableTranslation, selectedLanguages, customLanguages, translationMode]);
+  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, translationState.translations]);
+
+  const toggleTranslation = useCallback((code: string) => {
+    setIncludedTranslations(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      return next;
+    });
+  }, []);
+
+  // Check if AI config is available (needed for AI on-the-fly)
+  const hasAIConfig = aiProvider === 'local' ? !!aiBaseUrl : !!aiApiKey;
 
   if (!isOpen) return null;
 
@@ -389,6 +389,100 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
             )}
           </div>
 
+          {/* Translations Section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-gray-500" />
+              <label className="text-sm font-medium text-gray-700">Translations</label>
+            </div>
+
+            {/* Pre-made Translations */}
+            {translationEntries.length > 0 ? (
+              <div className="space-y-1">
+                <div className="text-xs text-gray-500 mb-2">Pre-made translations</div>
+                <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+                  {translationEntries.map(({ resource, manifest }) => {
+                    const staleCount = Object.values(resource.strings).filter(s => s.status === 'stale').length;
+                    return (
+                      <label
+                        key={resource.languageCode}
+                        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={includedTranslations.has(resource.languageCode)}
+                          onChange={() => toggleTranslation(resource.languageCode)}
+                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              {resource.languageName}
+                            </span>
+                            {resource.direction === 'rtl' && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">
+                                RTL
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {manifest.completeness}% complete
+                            {staleCount > 0 && (
+                              <span className="text-amber-600"> ({staleCount} stale)</span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Completeness bar */}
+                        <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              manifest.completeness === 100 ? 'bg-green-500' :
+                              manifest.completeness > 50 ? 'bg-blue-500' :
+                              'bg-amber-500'
+                            }`}
+                            style={{ width: `${manifest.completeness}%` }}
+                          />
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 bg-gray-50 rounded-lg px-4 py-3">
+                No pre-made translations. Use the Language panel to add them.
+              </div>
+            )}
+
+            {/* AI On-the-Fly Translation */}
+            <label className={`flex items-start gap-3 cursor-pointer ${!hasAIConfig ? 'opacity-50' : ''}`}>
+              <input
+                type="checkbox"
+                checked={enableAIOnTheFly}
+                onChange={(e) => setEnableAIOnTheFly(e.target.checked)}
+                disabled={!hasAIConfig}
+                className="w-4 h-4 mt-0.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                  <span className="text-sm font-medium text-gray-900">
+                    Enable AI on-the-fly translation for viewers
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  Viewers can translate to any language using AI.
+                  Requires internet and an embedded API key.
+                </div>
+                {!hasAIConfig && (
+                  <div className="text-xs text-amber-600 mt-1">
+                    Configure an AI provider with API key above to enable this.
+                  </div>
+                )}
+              </div>
+            </label>
+          </div>
+
           {/* Info Box */}
           <div className="bg-blue-50 rounded-lg p-4 flex gap-3">
             <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
@@ -408,6 +502,13 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                 <p className="mt-2">
                   <strong>Single-file mode:</strong> The HTML file contains everything.
                   Note: Very large stories may have slower load times.
+                </p>
+              )}
+              {includedTranslations.size > 0 && (
+                <p className="mt-2">
+                  <strong>Translations:</strong> {includedTranslations.size} language(s) will be bundled.
+                  A language selector will appear in the exported player.
+                  {mode === 'single-file' && ' This will increase the file size.'}
                 </p>
               )}
             </div>

@@ -348,12 +348,13 @@ export const Inspector: React.FC<InspectorProps> = ({
           localBeat.parameters?.dialogTree, newDialogTree, prefix,
           resource, translationActions, translationState.activeLanguage
         );
-        // Update local display state with the edited tree
+        // Update local display state with the edited tree.
+        // Translation edits are saved immediately, so don't mark as unsaved.
         setLocalBeat((prev: any) => ({
           ...prev,
           parameters: { ...prev.parameters, dialogTree: newDialogTree }
         }));
-        setHasChanges(true);
+        setHasChanges(false);
 
         // Still rebuild connections (targets are structural, not translatable)
         const sourceTree = sourceParametersRef.current?.dialogTree;
@@ -950,8 +951,10 @@ export const Inspector: React.FC<InspectorProps> = ({
       if (resource) {
         const translationKey = `beat:${beat.id}.parameters.${param}`;
         if (resource.strings[translationKey]) {
-          // This is a translatable parameter — update translation resource, not source beat
+          // This is a translatable parameter — update translation resource, not source beat.
+          // Translation edits are saved immediately, so clear the unsaved indicator.
           translationActions.updateTranslation(translationState.activeLanguage, translationKey, value);
+          setHasChanges(false);
           return;
         }
       }

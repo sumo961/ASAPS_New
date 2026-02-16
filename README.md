@@ -23,7 +23,6 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Feature | Status |
 |---------|--------|
 | **Windows Git VCS Fix** | **FIX in v0.9.17**: Git version control now works on Windows (path separators, auto-detect git.exe) |
-| **Story Translation** | **NEW in v0.9.17**: Translate story content to other languages with StoryTranslator |
 | **Stability Fixes** | **FIX in v0.9.17**: Cluster crash, VCS double-init, asset loading, UI reset, re-render reduction |
 | **AI Prompt Sync** | **v0.9.17**: Internal and MCP prompts fully synchronized (counterCompare, inventory quantity, item descriptions) |
 | **Test Coverage** | **v0.9.17**: 122 new tests for PickProp, DurScreen, TitleScreen, EndScreen, HyperText, InputText, StoryTranslator |
