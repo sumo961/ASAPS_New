@@ -2743,24 +2743,89 @@ function App() {
     return () => unsubs.forEach(u => u());
   }, [vcsCtx]);
 
-  // Sync translations after successful VCS operations that may bring in
-  // external changes (pull, stash pop, revert, p4 sync). Debounced to avoid
-  // redundant syncs when multiple events fire in quick succession.
+  // Reload translations from disk after successful VCS operations (pull, stash pop, etc.)
+  // This handles both cases:
+  //   - Translations already loaded: sync staleness against updated source
+  //   - No translations loaded yet: load newly pulled translation files from disk
   useEffect(() => {
     if (!vcsCtx) return;
     let syncTimer: ReturnType<typeof setTimeout> | null = null;
     const unsub = vcsCtx.onEvent((event) => {
       if (event.type !== 'success') return;
-      if (translationStateRef.current.translations.length === 0) return;
       if (syncTimer) clearTimeout(syncTimer);
       syncTimer = setTimeout(async () => {
         const proj = currentProjectRef2.current;
         if (!proj?.id) return;
+        const dirPath = proj.directoryPath;
+        if (!dirPath) return;
+
+        const api = window.electronAPI;
+        if (!api?.fs) return;
+
         try {
-          const projectData = await getProjectDataForExport(proj.id);
-          translationActionsRef.current.syncAllTranslations(projectData);
+          // Read translation files from the translations/ directory on disk
+          const sep = dirPath.includes('\\') ? '\\' : '/';
+          const translationsDir = dirPath + sep + 'translations';
+          const dirExists = await api.fs.exists(translationsDir);
+          if (!dirExists) {
+            // No translations directory — if we had translations, clear them
+            if (translationStateRef.current.translations.length > 0) {
+              translationActionsRef.current.clearTranslations();
+            }
+            return;
+          }
+
+          const entries = await api.fs.readDir(translationsDir);
+          const resources: any[] = [];
+          let manifest: any = undefined;
+
+          for (const entry of entries) {
+            const name = entry.name || entry;
+            if (typeof name !== 'string') continue;
+            const filePath = translationsDir + sep + name;
+
+            if (name === '_manifest.json') {
+              try {
+                const buf = await api.fs.readFile(filePath);
+                const text = buf instanceof Uint8Array || buf instanceof ArrayBuffer
+                  ? new TextDecoder().decode(buf) : String(buf);
+                manifest = JSON.parse(text);
+              } catch { /* skip */ }
+            } else if (name.endsWith('.strings.json')) {
+              try {
+                const buf = await api.fs.readFile(filePath);
+                const text = buf instanceof Uint8Array || buf instanceof ArrayBuffer
+                  ? new TextDecoder().decode(buf) : String(buf);
+                resources.push(JSON.parse(text));
+              } catch { /* skip */ }
+            }
+          }
+
+          if (resources.length > 0) {
+            console.log('[App] Post-VCS: Loaded', resources.length, 'translation(s) from disk:',
+              resources.map((r: any) => r.languageCode));
+            translationActionsRef.current.loadTranslations(resources, manifest);
+            // Also update the project object so next save includes them
+            proj.translations = resources;
+            proj.translationManifest = manifest;
+          } else if (translationStateRef.current.translations.length > 0) {
+            // Translation files were removed (e.g., reverted)
+            translationActionsRef.current.clearTranslations();
+            delete proj.translations;
+            delete proj.translationManifest;
+          }
+
+          // If translations exist, also sync staleness against current source
+          if (translationStateRef.current.translations.length > 0) {
+            try {
+              const projectData = await getProjectDataForExport(proj.id);
+              translationActionsRef.current.syncAllTranslations(projectData);
+            } catch (e) {
+              console.error('[App] Post-VCS translation staleness sync failed:', e);
+            }
+          }
         } catch (e) {
-          console.error('[App] Post-VCS translation sync failed:', e);
+          console.error('[App] Post-VCS translation reload failed:', e);
         }
       }, 500);
     });
