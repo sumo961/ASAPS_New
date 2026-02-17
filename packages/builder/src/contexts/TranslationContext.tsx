@@ -10,12 +10,15 @@
 
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import type { TranslationResource, TranslationManifest } from '@asaps/core';
-import { buildManifestEntry, createEmptyTranslationManifest } from '@asaps/core';
+import { buildManifestEntry, createEmptyTranslationManifest, syncTranslation, applySyncResult } from '@asaps/core';
 import {
   generateTranslationResource,
   createManualTranslationResource,
   applyTranslationResource,
   buildTranslationManifest,
+  extractTranslatableStrings,
+  positionalToIdBased,
+  extractBeatSourceStrings,
 } from '../export/StoryTranslator';
 import type { TranslationAIConfig } from '../export/StoryTranslator';
 import { loadNotoFonts } from '../utils/fontRegistry';
@@ -61,6 +64,10 @@ export interface TranslationActions {
   updateTranslation: (languageCode: string, key: string, value: string) => void;
   /** Clear all translation state */
   clearTranslations: () => void;
+  /** Sync all translations against current source strings (full project) */
+  syncAllTranslations: (projectData: any) => void;
+  /** Sync translations for a single beat after source-text edits */
+  syncBeatTranslations: (beatId: string, beatData: any) => void;
 }
 
 const TranslationStateContext = createContext<TranslationState>({
@@ -81,6 +88,8 @@ const TranslationActionsContext = createContext<TranslationActions>({
   loadTranslations: () => {},
   updateTranslation: () => {},
   clearTranslations: () => {},
+  syncAllTranslations: () => {},
+  syncBeatTranslations: () => {},
 });
 
 export function useTranslationState(): TranslationState {
@@ -244,6 +253,91 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     );
   }, []);
 
+  const syncAllTranslations = useCallback((projectData: any) => {
+    setTranslations(prev => {
+      if (prev.length === 0) return prev;
+
+      const positionalStrings = extractTranslatableStrings(projectData);
+      const currentSource = positionalToIdBased(positionalStrings, projectData);
+
+      let anyChanged = false;
+      const updated = prev.map(resource => {
+        const result = syncTranslation(resource, currentSource);
+        if (!result.hasChanges) return resource;
+
+        anyChanged = true;
+        const cloned: TranslationResource = {
+          ...resource,
+          strings: { ...resource.strings },
+          _sourceSnapshot: { ...resource._sourceSnapshot },
+        };
+        applySyncResult(cloned, result, currentSource);
+        console.log(
+          `[TranslationContext] syncAll ${resource.languageName}: ${result.staleStrings.length} stale, ${result.newStrings.length} new, ${result.orphanedStrings.length} orphaned`
+        );
+        return cloned;
+      });
+
+      return anyChanged ? updated : prev;
+    });
+  }, []);
+
+  const syncBeatTranslations = useCallback((beatId: string, beatData: any) => {
+    setTranslations(prev => {
+      if (prev.length === 0) return prev;
+
+      const currentBeatStrings = extractBeatSourceStrings(beatData, beatId);
+      const beatKeyPrefix = `beat:${beatId}.`;
+
+      let anyChanged = false;
+      const updated = prev.map(resource => {
+        let resourceChanged = false;
+        const newStrings = { ...resource.strings };
+        const newSnapshot = { ...resource._sourceSnapshot };
+
+        for (const [key, currentValue] of Object.entries(currentBeatStrings)) {
+          const snapshotValue = resource._sourceSnapshot[key];
+
+          if (snapshotValue === undefined) {
+            // New string — add as untranslated
+            newStrings[key] = { value: currentValue, status: 'untranslated' };
+            newSnapshot[key] = currentValue;
+            resourceChanged = true;
+          } else if (currentValue !== snapshotValue) {
+            // Source text changed — mark as stale
+            if (newStrings[key]) {
+              newStrings[key] = { ...newStrings[key], status: 'stale' };
+            }
+            newSnapshot[key] = currentValue;
+            resourceChanged = true;
+          }
+        }
+
+        // Check for orphaned beat strings (removed from beat)
+        for (const key of Object.keys(resource._sourceSnapshot)) {
+          if (key.startsWith(beatKeyPrefix) && !(key in currentBeatStrings)) {
+            // String was removed from this beat — update snapshot
+            // Keep the translation entry (don't delete) but update snapshot
+            delete newSnapshot[key];
+            resourceChanged = true;
+          }
+        }
+
+        if (!resourceChanged) return resource;
+
+        anyChanged = true;
+        return {
+          ...resource,
+          strings: newStrings,
+          _sourceSnapshot: newSnapshot,
+          modifiedAt: new Date().toISOString(),
+        };
+      });
+
+      return anyChanged ? updated : prev;
+    });
+  }, []);
+
   const clearTranslations = useCallback(() => {
     setTranslations([]);
     setActiveLanguageRaw(null);
@@ -268,6 +362,8 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     loadTranslations,
     updateTranslation,
     clearTranslations,
+    syncAllTranslations,
+    syncBeatTranslations,
   }), [
     setActiveLanguage,
     generateTranslation,
@@ -276,6 +372,8 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     loadTranslations,
     updateTranslation,
     clearTranslations,
+    syncAllTranslations,
+    syncBeatTranslations,
   ]);
 
   return (

@@ -334,6 +334,8 @@ export interface PositionedElementData {
   counterValue?: number;
   counterMin?: number;
   counterMax?: number;
+  /** Optional tooltip/hover description for interactive elements (e.g., pickProp items) */
+  description?: string;
   /** Keypad-specific fields (for kind='keypad') */
   keypadLayout?: 'numeric' | 'phone' | 'pin';
   keypadMaxDigits?: number;
@@ -1687,7 +1689,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   onScrolledToBottom,
   scrollRequirementsMet = true,
 }) => {
-  const { location, content, assetUrl, hyperlinks } = element;
+  const { location, content, assetUrl, hyperlinks, description } = element;
 
   // Check if element should be visible (Phase 5 - Optional Text Boxes)
   // If visible is explicitly set to false, don't render the element
@@ -1887,6 +1889,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             hideButtonBox={hideButtonBoxes}
             theme={theme}
             isVisited={isButtonVisited}
+            description={description}
             soundBlobResolver={soundBlobResolver}
             onTriggerClickAnimation={onTriggerClickAnimation}
           />
@@ -1929,6 +1932,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             theme={theme}
             isVisited={isHotspotVisited}
             showTextOnHover={showTextOnHover}
+            description={description}
             soundBlobResolver={soundBlobResolver}
             onTriggerClickAnimation={onTriggerClickAnimation}
           />
@@ -2126,6 +2130,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           onAction={onAction}
           sound={(location as any).soundAssetId || location.sound}
           soundBlobResolver={soundBlobResolver}
+          description={description}
+          theme={theme}
         />
       );
 
@@ -2572,9 +2578,10 @@ const ButtonElement: React.FC<{
   theme: RenderThemeSettings;
   isVisited?: boolean; // Whether this choice leads to an already-visited beat
   showTextOnHover?: boolean; // Only show text when hovering over the hotspot
+  description?: string; // Tooltip text shown on hover (e.g., pickProp item description)
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>; // Resolver for sound blobs
   onTriggerClickAnimation?: () => Promise<void>; // Trigger onClick animations and wait for completion
-}> = ({ style, content, location, actionId, onAction, interactive: interactiveProp, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, soundBlobResolver, onTriggerClickAnimation }) => {
+}> = ({ style, content, location, actionId, onAction, interactive: interactiveProp, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, description, soundBlobResolver, onTriggerClickAnimation }) => {
   // Visited choices are non-interactive (greyed out and not clickable)
   const interactive = interactiveProp && !isVisited;
   const [isHovered, setIsHovered] = React.useState(false);
@@ -2763,15 +2770,22 @@ const ButtonElement: React.FC<{
     }
   };
 
-  // Show custom tooltip in PREVIEW mode for hotspots when labelDisplay is 'hover'
-  // Don't show tooltip when labelDisplay is 'none' or 'always' (always shows text inside)
+  // Show custom tooltip in PREVIEW mode:
+  // 1. For hotspots when labelDisplay is 'hover': show label (and description if available)
+  // 2. For any interactive element with a description: show description on hover
   const showLabels = theme.hotspot?.showLabels ?? true;
-  const showTooltip = hideButtonBox && isPreviewMode && labelDisplay === 'hover' && showLabels && content && content.length > 0 && isHovered;
+  const showLabelTooltip = hideButtonBox && isPreviewMode && labelDisplay === 'hover' && showLabels && content && content.length > 0 && isHovered;
+  const showDescriptionTooltip = isPreviewMode && description && description.length > 0 && isHovered;
+  const showTooltip = showLabelTooltip || showDescriptionTooltip;
 
   // Handle mouse move to track cursor position for tooltip
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePos({ x: e.clientX, y: e.clientY });
   };
+
+  // Build tooltip text: description takes priority, label as fallback for hotspot tooltips
+  const tooltipText = description || content;
+  const tooltipHasDescription = !!description;
 
   // Tooltip styles using theme colors
   const tooltipStyle: React.CSSProperties = {
@@ -2784,12 +2798,12 @@ const ButtonElement: React.FC<{
     borderRadius: `${theme.button.borderRadius}px`,
     fontSize: '14px',
     fontFamily: theme.fonts.buttonFont,
-    fontWeight: '600',
+    fontWeight: tooltipHasDescription ? 'normal' : '600',
     boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
     border: `1px solid ${theme.button.borderColor}`,
     pointerEvents: 'none',
     zIndex: 10000,
-    whiteSpace: 'nowrap',
+    whiteSpace: 'pre-line',
     maxWidth: '300px',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -2809,7 +2823,7 @@ const ButtonElement: React.FC<{
         {shouldShowText ? content : ''}
       </button>
       {showTooltip && ReactDOM.createPortal(
-        <div style={tooltipStyle}>{content}</div>,
+        <div style={tooltipStyle}>{tooltipText}</div>,
         document.body
       )}
     </>
@@ -3572,7 +3586,12 @@ const AssetElement: React.FC<{
   sound?: string;  // Sound to play when clicked (for PickProp)
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>; // Resolver for sound blobs
   spriteSheet?: SpriteSheetData;  // Sprite sheet configuration for character sprites
-}> = ({ style, assetUrl, assetId, name, kind, size, interactive, actionId, onAction, sound, soundBlobResolver, spriteSheet }) => {
+  description?: string;  // Tooltip text shown on hover (e.g., pickProp item description)
+  theme?: RenderThemeSettings;  // Theme for tooltip styling
+}> = ({ style, assetUrl, assetId, name, kind, size, interactive, actionId, onAction, sound, soundBlobResolver, spriteSheet, description, theme }) => {
+  const [isHovered, setIsHovered] = React.useState(false);
+  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
+  const showTooltip = interactive && description && description.length > 0 && isHovered;
   // Click handler for interactive props (PickProp beat)
   const handleClick = async () => {
     if (interactive && actionId && onAction) {
@@ -3619,6 +3638,30 @@ const AssetElement: React.FC<{
   };
 
   const isClickable = interactive && actionId && onAction;
+
+  // Tooltip portal for prop descriptions
+  const tooltipPortal = showTooltip ? ReactDOM.createPortal(
+    <div style={{
+      position: 'fixed',
+      left: mousePos.x + 12,
+      top: mousePos.y - 8,
+      backgroundColor: theme?.button?.backgroundColor || '#333',
+      color: theme?.button?.textColor || '#fff',
+      padding: '6px 12px',
+      borderRadius: `${theme?.button?.borderRadius || 4}px`,
+      fontSize: '14px',
+      fontFamily: theme?.fonts?.buttonFont || 'inherit',
+      fontWeight: 'normal',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+      border: `1px solid ${theme?.button?.borderColor || '#555'}`,
+      pointerEvents: 'none' as const,
+      zIndex: 10000,
+      whiteSpace: 'pre-line' as const,
+      maxWidth: '300px',
+    }}>{description}</div>,
+    document.body
+  ) : null;
+
   // Apply character-specific size scaling
   // size is a percentage (e.g., 90 means 90% of the original size, 115 means 115%)
   const finalStyle: React.CSSProperties = { ...style };
@@ -3712,34 +3755,40 @@ const AssetElement: React.FC<{
 
     // Standard image rendering (non-sprite)
     return (
-      <img
-        src={assetUrl}
-        alt={name}
-        style={{
-          ...finalStyle,
-          // Don't constrain image - let it render at natural size (scaled by size %)
-          objectFit: 'none',
-          maxWidth: 'none',
-          maxHeight: 'none',
-          // Make clickable props visually interactive
-          cursor: isClickable ? 'pointer' : 'default',
-          transition: isClickable ? 'transform 0.1s ease, filter 0.1s ease' : undefined,
-        }}
-        draggable={false}
-        onClick={handleClick}
-        onMouseEnter={(e) => {
-          if (isClickable) {
-            e.currentTarget.style.filter = 'brightness(1.1)';
-            e.currentTarget.style.transform = (finalStyle.transform || '') + ' scale(1.05)';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (isClickable) {
-            e.currentTarget.style.filter = '';
-            e.currentTarget.style.transform = finalStyle.transform || '';
-          }
-        }}
-      />
+      <>
+        <img
+          src={assetUrl}
+          alt={name}
+          style={{
+            ...finalStyle,
+            // Don't constrain image - let it render at natural size (scaled by size %)
+            objectFit: 'none',
+            maxWidth: 'none',
+            maxHeight: 'none',
+            // Make clickable props visually interactive
+            cursor: isClickable ? 'pointer' : 'default',
+            transition: isClickable ? 'transform 0.1s ease, filter 0.1s ease' : undefined,
+          }}
+          draggable={false}
+          onClick={handleClick}
+          onMouseEnter={(e) => {
+            setIsHovered(true);
+            if (isClickable) {
+              e.currentTarget.style.filter = 'brightness(1.1)';
+              e.currentTarget.style.transform = (finalStyle.transform || '') + ' scale(1.05)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            setIsHovered(false);
+            if (isClickable) {
+              e.currentTarget.style.filter = '';
+              e.currentTarget.style.transform = finalStyle.transform || '';
+            }
+          }}
+          onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+        />
+        {tooltipPortal}
+      </>
     );
   }
 
@@ -3962,6 +4011,7 @@ export function createPositionedElementData(
     // Only set targetBeatId when content.markVisited is true (per-beat toggle)
     let actionId: string | undefined;
     let targetBeatId: string | undefined;
+    let description: string | undefined;
     const markVisited = content.markVisited || false;
 
     // For movementChoice: match location.name to choice properties with multiple fallbacks
@@ -4089,6 +4139,7 @@ export function createPositionedElementData(
       }
       if (prop) {
         actionId = prop.id;
+        description = prop.description || undefined;
         // Only set targetBeatId when markVisited is enabled for this beat
         if (markVisited) {
           targetBeatId = prop.target;
@@ -4164,6 +4215,7 @@ export function createPositionedElementData(
       spriteSheet,
       actionId,
       targetBeatId,
+      description,
       hyperlinks,
       counterValue,
       counterMin,

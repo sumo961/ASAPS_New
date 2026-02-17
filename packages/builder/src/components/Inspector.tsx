@@ -964,6 +964,11 @@ export const Inspector: React.FC<InspectorProps> = ({
 
     // Normal mode or non-translatable param — update source beat
     rebuildConnectionsAndUpdate(updatedBeat);
+
+    // Sync translations: mark stale any translations for this beat
+    if (translationState.translations.length > 0 && beat) {
+      translationActions.syncBeatTranslations(beat.id, updatedBeat);
+    }
   };
 
   // Helper function to rebuild connections from local state and immediately update

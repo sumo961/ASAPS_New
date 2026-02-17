@@ -6,6 +6,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { gitConfigSet, gitConfigGet, gitStage, gitStageAll } from '../../vcs/GitAdapter';
 import type { GitFileStatus } from '../../vcs/GitAdapter';
+import { useTranslationState } from '../../contexts/TranslationContext';
 
 const statusIcons: Record<string, { icon: string; color: string }> = {
   M: { icon: 'M', color: '#f59e0b' },
@@ -21,6 +22,7 @@ interface PendingChangesTabProps {
 
 export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff }) => {
   const vcs = useVCSStatus();
+  const translationState = useTranslationState();
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [showIdentityForm, setShowIdentityForm] = useState(false);
@@ -158,7 +160,24 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
     const info = statusIcons[file.status] || { icon: file.status, color: '#94a3b8' };
     // Extract beat name from path if possible
     const beatMatch = file.path.match(/\/(\w+)_([^/]+)\.json$/);
-    const displayName = beatMatch ? `${beatMatch[1]} (${beatMatch[2]})` : file.path;
+    let displayName = beatMatch ? `${beatMatch[1]} (${beatMatch[2]})` : file.path;
+    let statusIcon: string | undefined;
+
+    // Semantic display for translation files
+    const translationMatch = file.path.match(/translations\/([^/]+)\.strings\.json$/);
+    if (translationMatch) {
+      const langCode = translationMatch[1];
+      const resource = translationState.translations.find(t => t.languageCode === langCode);
+      if (resource) {
+        const staleCount = Object.values(resource.strings).filter(s => s.status === 'stale').length;
+        displayName = `${resource.languageName} translation`;
+        if (staleCount > 0) displayName += ` (${staleCount} stale)`;
+        statusIcon = '\uD83C\uDF10'; // globe emoji
+      }
+    } else if (file.path.includes('translations/_manifest.json')) {
+      displayName = 'Translation manifest';
+      statusIcon = '\uD83C\uDF10';
+    }
 
     return (
       <div
@@ -178,13 +197,13 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
             width: 16,
             flexShrink: 0,
             textAlign: 'center',
-            color: info.color,
+            color: statusIcon ? undefined : info.color,
             fontWeight: 600,
-            fontFamily: 'monospace',
-            fontSize: '11px',
+            fontFamily: statusIcon ? 'inherit' : 'monospace',
+            fontSize: statusIcon ? '12px' : '11px',
           }}
         >
-          {info.icon}
+          {statusIcon || info.icon}
         </span>
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.path}>
           {displayName}

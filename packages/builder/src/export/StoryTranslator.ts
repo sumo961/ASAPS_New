@@ -151,6 +151,18 @@ export function extractTranslatableStrings(projectData: any): Record<string, str
 }
 
 /**
+ * Extract source strings for a single beat using ID-based keys.
+ * Returns a flat map like { "beat:abc123.parameters.text": "Hello" }.
+ * Used for incremental staleness detection after editing a beat.
+ */
+export function extractBeatSourceStrings(beat: any, beatId: string): Record<string, string> {
+  const strings: Record<string, string> = {};
+  const prefix = `beat:${beatId}`;
+  extractBeatStrings(beat, prefix, strings);
+  return strings;
+}
+
+/**
  * Extract translatable strings from a single beat based on its type.
  */
 function extractBeatStrings(beat: any, prefix: string, strings: Record<string, string>): void {

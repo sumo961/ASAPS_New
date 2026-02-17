@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Beat } from '@asaps/core';
 import { FileChangeIndicator } from '../vcs/FileChangeIndicator';
+import { TranslationStaleIndicator } from '../translation/TranslationStaleIndicator';
 
 interface BeatNodeData {
   beat: Beat;
@@ -160,6 +161,10 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
       {/* VCS status overlay */}
       {data.beat?.id && (
         <FileChangeIndicator beatId={data.beat.id} position="top-right" size={10} />
+      )}
+      {/* Translation staleness overlay */}
+      {data.beat?.id && (
+        <TranslationStaleIndicator beatId={data.beat.id} position="top-left" size={10} />
       )}
     </div>
   );

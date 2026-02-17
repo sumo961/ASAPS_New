@@ -5,7 +5,7 @@
  * projects, assets, command history, and auto-save drafts.
  */
 
-import type { Beat, BeatConfig, Story, ThemeDefinition } from '@asaps/core';
+import type { Beat, BeatConfig, Story, ThemeDefinition, TranslationResource, TranslationManifest } from '@asaps/core';
 
 // ============================================================================
 // Global Settings Types (per-project)
@@ -186,6 +186,12 @@ export interface Project {
 
   /** Origin remote URL, opportunistically detected from Git */
   vcsRemoteUrl?: string | null;
+
+  /** Loaded translation resources (one per target language) */
+  translations?: TranslationResource[];
+
+  /** Translation manifest with completeness info */
+  translationManifest?: TranslationManifest;
 
   /** Metadata */
   createdAt: Date;

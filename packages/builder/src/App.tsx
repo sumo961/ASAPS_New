@@ -19,7 +19,7 @@ import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
 import type { GlobalSettings } from './components/settings/GlobalSettingsInspector';
 import { loadProjectData } from './utils/projectDeserializer';
-import { downloadProjectAsZip, importProjectFromZip } from './utils/projectZipManager';
+import { downloadProjectAsZip, importProjectFromZip, getProjectDataForExport } from './utils/projectZipManager';
 import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { InputModal } from './components/InputModal';
@@ -260,6 +260,10 @@ function App() {
   // Translation state
   const translationState = useTranslationState();
   const translationActions = useTranslationActions();
+  const translationStateRef = useRef(translationState);
+  translationStateRef.current = translationState;
+  const translationActionsRef = useRef(translationActions);
+  translationActionsRef.current = translationActions;
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -1727,6 +1731,17 @@ function App() {
         console.log('[App] >>> Setting themeId from project:', currentProject.themeId || '(none)');
         setCurrentThemeId(currentProject.themeId);
 
+        // Load translations from project
+        if (currentProject.translations?.length) {
+          translationActions.loadTranslations(
+            currentProject.translations,
+            currentProject.translationManifest
+          );
+          console.log('[App] >>> Loaded', currentProject.translations.length, 'translation(s)');
+        } else {
+          translationActions.clearTranslations();
+        }
+
         setIsUntitledProject(currentProject.name === 'Untitled Project');
         loadedProjectIdRef.current = currentProject.id;
         console.log('[App] >>> Project switch complete');
@@ -1752,6 +1767,7 @@ function App() {
 
         updateMetadata({ name: 'Untitled Project', description: 'Auto-saved untitled work' });
         updateStory(storyData);
+        translationActions.clearTranslations();
         loadedProjectIdRef.current = currentProject.id;
         setIsUntitledProject(true);
 
@@ -1769,6 +1785,7 @@ function App() {
 
         // Initialize the default 3-beat story (title, intro, end)
         initializeStory();
+        translationActions.clearTranslations();
         loadedProjectIdRef.current = currentProject.id;
         console.log('[App] >>> Default story initialized for untitled project');
       } else if (!isNewUntitledProject) {
@@ -1924,6 +1941,17 @@ function App() {
         // ALWAYS set theme ID from project (clear if undefined to prevent bleed between projects)
         console.log('[App] >>> Setting themeId from project:', currentProject.themeId || '(none)');
         setCurrentThemeId(currentProject.themeId);
+
+        // Load translations from project
+        if (currentProject.translations?.length) {
+          translationActions.loadTranslations(
+            currentProject.translations,
+            currentProject.translationManifest
+          );
+          console.log('[App] >>> Loaded', currentProject.translations.length, 'translation(s)');
+        } else {
+          translationActions.clearTranslations();
+        }
 
         setIsUntitledProject(false);
         loadedProjectIdRef.current = currentProject.id;
@@ -2697,6 +2725,33 @@ function App() {
     }
 
     return () => unsubs.forEach(u => u());
+  }, [vcsCtx]);
+
+  // Sync translations after successful VCS operations that may bring in
+  // external changes (pull, stash pop, revert, p4 sync). Debounced to avoid
+  // redundant syncs when multiple events fire in quick succession.
+  useEffect(() => {
+    if (!vcsCtx) return;
+    let syncTimer: ReturnType<typeof setTimeout> | null = null;
+    const unsub = vcsCtx.onEvent((event) => {
+      if (event.type !== 'success') return;
+      if (translationStateRef.current.translations.length === 0) return;
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(async () => {
+        const proj = currentProjectRef2.current;
+        if (!proj?.id) return;
+        try {
+          const projectData = await getProjectDataForExport(proj.id);
+          translationActionsRef.current.syncAllTranslations(projectData);
+        } catch (e) {
+          console.error('[App] Post-VCS translation sync failed:', e);
+        }
+      }, 500);
+    });
+    return () => {
+      unsub();
+      if (syncTimer) clearTimeout(syncTimer);
+    };
   }, [vcsCtx]);
 
   const handleExport = useCallback(async () => {

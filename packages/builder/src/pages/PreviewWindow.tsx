@@ -406,9 +406,8 @@ export const PreviewWindow: React.FC = () => {
 
             // On first load (no story running), show "waiting to start" state
             if (!hasAutoStarted.current) {
-              // On first load, prefer the story's first beat (not the currently selected beat in the builder)
-              // Use != null checks because beat ID "0" is valid but falsy
-              const targetBeatId = firstBeatId != null ? firstBeatId : payloadBeatId;
+              // Use the selected beat if one was explicitly provided, otherwise fall back to the story's first beat
+              const targetBeatId = payloadBeatId != null ? payloadBeatId : firstBeatId;
               if (targetBeatId != null) {
                 setStartBeatId(String(targetBeatId));
               }

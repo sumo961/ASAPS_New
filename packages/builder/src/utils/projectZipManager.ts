@@ -131,22 +131,21 @@ export async function exportProjectAsZip(projectId: string): Promise<Blob> {
     zip.file(metadataFileName, JSON.stringify(assetMetadata, null, 2));
   }
 
-  // Add translation files if present in globalSettings
-  // Translations are stored alongside the project in IndexedDB via the translations key
-  if ((project as any).translations && Array.isArray((project as any).translations)) {
+  // Add translation files if present
+  if (project.translations && Array.isArray(project.translations)) {
     const translationsFolder = zip.folder('translations');
     if (translationsFolder) {
-      for (const resource of (project as any).translations) {
+      for (const resource of project.translations) {
         translationsFolder.file(
           `${resource.languageCode}.strings.json`,
           JSON.stringify(resource, null, 2)
         );
       }
       // Write manifest if present
-      if ((project as any).translationManifest) {
+      if (project.translationManifest) {
         translationsFolder.file(
           '_manifest.json',
-          JSON.stringify((project as any).translationManifest, null, 2)
+          JSON.stringify(project.translationManifest, null, 2)
         );
       }
     }

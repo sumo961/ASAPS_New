@@ -714,6 +714,18 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const [nodesState, setNodes, onNodesChange] = useNodesState(nodes);
   const [edgesState, setEdges, onEdgesChange] = useEdgesState(edges);
 
+  // When a beat inside a cluster is selected, clear ReactFlow's internal node selection
+  // to prevent both a cluster beat and an unclustered node appearing selected.
+  useEffect(() => {
+    if (selectedBeat?.cluster) {
+      setNodes((prev) =>
+        prev.some((n) => n.selected)
+          ? prev.map((n) => n.selected ? { ...n, selected: false } : n)
+          : prev
+      );
+    }
+  }, [selectedBeat, setNodes]);
+
   // Track previous beats count to detect when project is loaded
   const prevBeatsLengthRef = useRef(beats.length);
 
@@ -727,8 +739,9 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Update nodes when beats change
   useEffect(() => {
     // Build a fingerprint of the nodes: IDs + positions + selection state
+    // Include selectedBeatId for cluster nodes so beat selection across clusters propagates
     const fingerprint = nodes.map(n =>
-      `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}`
+      `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.selectedBeatId || ''}`
     ).join('|');
 
     if (fingerprint === prevNodeIdsRef.current) {
