@@ -93,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
   onAISettingsChanged,
   onCurrentProjectDeleted,
 }) => {
-  const { status, lastSaved, error: saveError } = useSave();
+  const { status, lastSaved, error: saveError, markChanged } = useSave();
   const { load } = useProject();
   const translationState = useTranslationState();
   const translationActions = useTranslationActions();
@@ -559,6 +559,8 @@ export const Header: React.FC<HeaderProps> = ({
                   model: savedConfig.model,
                 };
                 await translationActions.generateTranslation(projectData, code, name, aiConfig);
+                // Trigger save so translation files get written to disk (visible to VCS)
+                markChanged();
               } catch (e) {
                 console.error('[Header] Translation generation failed:', e);
               }
@@ -568,6 +570,8 @@ export const Header: React.FC<HeaderProps> = ({
               try {
                 const projectData = await getProjectDataForExport(currentProjectId);
                 translationActions.createManualTranslation(projectData, code, name);
+                // Trigger save so translation files get written to disk (visible to VCS)
+                markChanged();
               } catch (e) {
                 console.error('[Header] Manual translation creation failed:', e);
               }
