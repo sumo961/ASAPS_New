@@ -1,11 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 
 const rootPkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
 
-// Auto-increment build number on each dev/build start
+// Read build number (incremented by CI workflow, tracked in git)
 const buildNumberPath = resolve(__dirname, '../../build-number.json');
 let buildData: { build: number };
 try {
@@ -13,10 +13,6 @@ try {
 } catch {
   buildData = { build: 0 };
 }
-buildData.build += 1;
-try {
-  writeFileSync(buildNumberPath, JSON.stringify(buildData, null, 2) + '\n', 'utf-8');
-} catch { /* CI may have read-only filesystem */ }
 
 export default defineConfig({
   plugins: [react()],

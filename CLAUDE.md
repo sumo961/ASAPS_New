@@ -38,6 +38,17 @@ npm run test:ui -w @asaps/builder   # Open Vitest UI for builder
 npm run test:coverage -w @asaps/core # Run core tests with coverage
 ```
 
+## Build Numbering
+
+The app displays its version as `v{version}.{buildNumber}` (e.g., `v0.9.17.23`) in the header. Build numbers are auto-incremented by the CI workflow on each "Build Desktop Apps" run.
+
+- **Source of truth**: `build-number.json` in the repo root (tracked in git)
+- **Incremented by**: The `increment-build-number` job in `.github/workflows/build-desktop.yml`
+- **Read by**: `packages/builder/vite.config.ts` → injected as `__BUILD_NUMBER__` constant
+- **Displayed in**: `packages/builder/src/components/Header.tsx`
+- **Convention**: When discussing builds with the user, always reference the full version including build number (e.g., "build 0.9.17.23"). The build number identifies exactly which CI build is running.
+- **Local dev**: Local dev server reads the current value from `build-number.json` but does NOT increment it. Only CI increments.
+
 ## ⚠️ CRITICAL: Rebuild After Code Changes
 
 **This is a monorepo where packages import from compiled `dist/` folders, NOT source files. You MUST rebuild after making changes!**
