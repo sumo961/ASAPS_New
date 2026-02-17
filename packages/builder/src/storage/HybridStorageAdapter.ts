@@ -109,7 +109,8 @@ export class HybridStorageAdapter implements IStorageAdapter {
       const api = (window as any).electronAPI;
       if (!api?.fs) return;
 
-      const cacheDir = this.expandPath(this.config.filesystemBasePath);
+      const cacheDir = await this.expandPath(this.config.filesystemBasePath);
+      if (!cacheDir) return; // Could not resolve home directory
       const sep = cacheDir.includes('\\') ? '\\' : '/';
 
       // Create cache directory structure
@@ -127,11 +128,28 @@ export class HybridStorageAdapter implements IStorageAdapter {
     }
   }
 
-  private expandPath(pathStr: string): string {
-    if (pathStr.startsWith('~/')) {
+  private async expandPath(pathStr: string): Promise<string> {
+    if (pathStr.startsWith('~/') || pathStr === '~') {
       const api = (window as any).electronAPI;
-      const homeDir = api?.getHomedir?.() || (window as any).electron?.os?.homedir() || '~';
-      return pathStr.replace('~', homeDir);
+      try {
+        // Use app.getPath('home') which is exposed in the Electron preload
+        const homeDir = await api?.app?.getPath?.('home');
+        if (homeDir) {
+          return pathStr.replace('~', homeDir);
+        }
+      } catch {
+        // Fall through to fallback
+      }
+      // Fallback: try environment-based detection
+      const fallbackHome = typeof process !== 'undefined'
+        ? (process.env.HOME || process.env.USERPROFILE || '')
+        : '';
+      if (fallbackHome) {
+        return pathStr.replace('~', fallbackHome);
+      }
+      // Last resort: skip cache initialization rather than using literal '~'
+      console.warn('[HybridStorageAdapter] Cannot resolve home directory, skipping filesystem cache');
+      return '';
     }
     return pathStr;
   }
@@ -625,7 +643,8 @@ export class HybridStorageAdapter implements IStorageAdapter {
     const api = (window as any).electronAPI;
     if (!api?.fs) throw new Error('Electron filesystem API not available');
 
-    const cacheDir = this.expandPath(this.config.filesystemBasePath);
+    const cacheDir = await this.expandPath(this.config.filesystemBasePath);
+    if (!cacheDir) throw new Error('Cannot resolve home directory for filesystem cache');
 
     // Determine subfolder based on asset type
     const category = this.getAssetCategory(asset.mimeType);

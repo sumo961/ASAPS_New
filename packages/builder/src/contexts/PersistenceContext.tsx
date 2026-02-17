@@ -426,8 +426,6 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       }
 
       const loadedProject = result.data;
-      currentProjectRef.current = loadedProject;
-      setCurrentProject(loadedProject);
       setProjectId(projectId);
 
       // CRITICAL: Set isUntitledProject based on the LOADED project's name
@@ -438,6 +436,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.log('[PersistenceProvider] Project loaded, isUntitledProject:', isUntitled);
 
       // Restore directory-format state if the project was previously saved as a directory
+      // CRITICAL: Do this BEFORE setCurrentProject so translations are already on the
+      // project object when App.tsx's load effect processes it. Otherwise React sees
+      // the same object reference on the second setCurrentProject and skips the re-render,
+      // meaning translations never get loaded into TranslationContext.
       if (loadedProject.storageFormat === 'directory' && loadedProject.directoryPath && isElectronWithFS()) {
         const dirPath = loadedProject.directoryPath;
         const pathValid = await validateDirectoryPath(dirPath);
@@ -457,8 +459,6 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
             if (freshProject.translations && freshProject.translations.length > 0) {
               loadedProject.translations = freshProject.translations;
               loadedProject.translationManifest = freshProject.translationManifest;
-              currentProjectRef.current = loadedProject;
-              setCurrentProject(loadedProject);
               console.log('[PersistenceProvider] Loaded', freshProject.translations.length, 'translation(s) from disk');
             }
           } catch (e) {
@@ -469,8 +469,6 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
           console.warn('[PersistenceProvider] Directory path stale, falling back to IndexedDB:', dirPath);
           loadedProject.directoryPath = null;
           loadedProject.storageFormat = 'indexeddb';
-          currentProjectRef.current = loadedProject;
-          setCurrentProject(loadedProject);
           setProjectFormat('indexeddb');
           setProjectPath(null);
           directoryAdapterRef.current = null;
@@ -489,6 +487,11 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         setProjectPath(null);
         directoryAdapterRef.current = null;
       }
+
+      // CRITICAL: Set currentProject ONCE with fully-prepared data (including translations)
+      // This ensures App.tsx's load effect sees translations on the first render
+      currentProjectRef.current = loadedProject;
+      setCurrentProject(loadedProject);
 
       // Update command manager
       commandManager.setProjectId(projectId);
