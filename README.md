@@ -62,6 +62,17 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Cluster system (collapsible beat groups) | Implemented: collapsible flowchart clusters, folder view in sidebar, draggable beats in containers |
 | Legacy ASML import | Improved in v0.9.0; older format files should now import correctly |
 
+### 🌐 Multi-Language Translation (v0.9.18)
+
+Create interactive narratives in multiple languages with both manual and AI-assisted translation:
+
+- **AI-Generated Translations**: Tell the AI to generate a story in multiple languages (e.g., English + German + French) and it produces the full story with translations included
+- **Manual Translation Workflow**: Add target languages, translate strings in the inspector, track completion per language
+- **Staleness Detection**: When source text is edited, translations are automatically marked as stale with visual indicators on beats
+- **VCS-Aware Persistence**: Translations survive git push/pull cycles, load on startup, and integrate with the version control panel
+- **Beat-Level Indicators**: Amber triangle on beats with stale translations, alongside green/orange VCS change dots
+- **Full Round-Trip**: Generate → edit → translate → save → reload → edit — translations persist across the entire workflow
+
 ### ⏱️ Timer HUD, Fictional Time & Countdown Meter (v0.9.15)
 
 Persistent HUD overlays that display across all beats:
@@ -111,17 +122,6 @@ Export your stories as self-contained HTML files that run anywhere:
 - **Zero dependencies**: Single HTML file runs offline in any browser
 
 **Note**: AI-based beats (aiInfoText, aiDurScreen, aiSummary, aiCondition) are not yet supported in HTML export. aiDialogTree now works in the web player (v0.9.13). Stories using unsupported AI beats will show fallback text instead.
-
-### 🌐 Multi-Language Translation (v0.9.18)
-
-Create interactive narratives in multiple languages with both manual and AI-assisted translation:
-
-- **AI-Generated Translations**: Tell the AI to generate a story in multiple languages (e.g., English + German + French) and it produces the full story with translations included
-- **Manual Translation Workflow**: Add target languages, translate strings in the inspector, track completion per language
-- **Staleness Detection**: When source text is edited, translations are automatically marked as stale with visual indicators on beats
-- **VCS-Aware Persistence**: Translations survive git push/pull cycles, load on startup, and integrate with the version control panel
-- **Beat-Level Indicators**: Amber triangle on beats with stale translations, alongside green/orange VCS change dots
-- **Full Round-Trip**: Generate → edit → translate → save → reload → edit — translations persist across the entire workflow
 
 ### 🖥️ Independent Preview Window (v0.9.11)
 
