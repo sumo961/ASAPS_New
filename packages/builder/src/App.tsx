@@ -828,6 +828,22 @@ function App() {
       beatTypes: storyData.beats.map((b: any) => b.type)
     });
 
+    // Sync translations from TranslationContext onto the project object
+    // BEFORE calling updateStory, so the spread in updateProjectStory preserves them
+    // on the new project object it creates via {...projectToUpdate, story: newStory}
+    const currentTranslations = translationStateRef.current;
+    const projForTranslations = currentProjectRef2.current;
+    if (projForTranslations) {
+      if (currentTranslations.translations.length > 0) {
+        projForTranslations.translations = currentTranslations.translations;
+        projForTranslations.translationManifest = currentTranslations.manifest;
+      } else if (projForTranslations.translations) {
+        // Translations were cleared — remove from project too
+        delete projForTranslations.translations;
+        delete projForTranslations.translationManifest;
+      }
+    }
+
     updateStory(storyData);
     console.log('[App] syncProjectData - updateStory called successfully');
 

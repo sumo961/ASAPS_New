@@ -129,6 +129,8 @@ export class DirectoryAdapter implements PersistenceAdapter {
       createdAt: new Date(result.project.createdAt),
       modifiedAt: new Date(result.project.modifiedAt),
       version: result.project.version,
+      translations: result.translations.length > 0 ? result.translations : undefined,
+      translationManifest: result.translationManifest,
     };
 
     return project;
@@ -469,6 +471,8 @@ export class DirectoryAdapter implements PersistenceAdapter {
       },
       story: storyData,
       ...(inputAssets && inputAssets.length > 0 ? { assets: inputAssets } : {}),
+      ...(project.translations && project.translations.length > 0 ? { translations: project.translations } : {}),
+      ...(project.translationManifest ? { translationManifest: project.translationManifest } : {}),
     };
   }
 
