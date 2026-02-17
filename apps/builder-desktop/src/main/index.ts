@@ -22,6 +22,21 @@ try {
   // electron-squirrel-startup not installed, ignore (only needed for Windows installers)
 }
 
+// Enforce single instance — prevent duplicate windows on install/update
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  // Another instance is already running — quit this one
+  app.quit();
+} else {
+  app.on('second-instance', (_event, _commandLine, _workingDirectory) => {
+    // Someone tried to launch a second instance — focus the existing window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 // App settings management
 interface AppSettings {
   mcpEnabled: boolean;
