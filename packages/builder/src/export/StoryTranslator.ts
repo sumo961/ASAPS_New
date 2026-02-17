@@ -383,7 +383,7 @@ export async function analyzeNarrative(
     if (provider === 'anthropic') {
       response = await callAnthropic(systemPrompt, userMessage, apiKey!, baseUrl, model, signal);
     } else {
-      response = await callOpenAI(systemPrompt, userMessage, provider, apiKey, baseUrl, model, signal);
+      response = await callOpenAI(systemPrompt, userMessage, provider, apiKey, baseUrl, model, signal, false);
     }
     console.log('[StoryTranslator] Narrative analysis:', response.trim());
     return response.trim();
@@ -572,7 +572,8 @@ async function callOpenAI(
   apiKey?: string,
   baseUrl?: string,
   model?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  jsonMode: boolean = true
 ): Promise<string> {
   let url: string;
   if (baseUrl) {
@@ -590,18 +591,22 @@ async function callOpenAI(
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
+  const body: any = {
+    model: model || 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userMessage },
+    ],
+    temperature: 0.3,
+  };
+  if (jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
   const response = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      model: model || 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-      temperature: 0.3,
-      response_format: { type: 'json_object' },
-    }),
+    body: JSON.stringify(body),
     signal,
   });
 

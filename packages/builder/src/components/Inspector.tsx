@@ -2580,21 +2580,40 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </button>
                           </div>
                           
-                          <input
-                            type="text"
-                            value={choice.text}
-                            onChange={(e) => handleUpdateChoice(index, 'text', e.target.value)}
-                            placeholder="Choice text"
-                            className="w-full px-2 py-1 text-sm border rounded"
-                          />
-                          
-                          <input
-                            type="text"
-                            value={choice.location || ''}
-                            onChange={(e) => handleUpdateChoice(index, 'location', e.target.value)}
-                            placeholder="Location description"
-                            className="w-full px-2 py-1 text-sm border rounded"
-                          />
+                          {translationState.activeLanguage ? (
+                            <>
+                              <input
+                                type="text"
+                                value={choice.displayText || ''}
+                                onChange={(e) => handleUpdateChoice(index, 'displayText', e.target.value)}
+                                placeholder="Translated label"
+                                className="w-full px-2 py-1 text-sm border rounded border-blue-300"
+                              />
+                              {sourceParametersRef.current?.choices?.[index] && (
+                                <div className="text-xs text-gray-400 italic truncate">
+                                  Source: {sourceParametersRef.current.choices[index].text || sourceParametersRef.current.choices[index].location || ''}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <input
+                                type="text"
+                                value={choice.text}
+                                onChange={(e) => handleUpdateChoice(index, 'text', e.target.value)}
+                                placeholder="Choice text"
+                                className="w-full px-2 py-1 text-sm border rounded"
+                              />
+
+                              <input
+                                type="text"
+                                value={choice.location || ''}
+                                onChange={(e) => handleUpdateChoice(index, 'location', e.target.value)}
+                                placeholder="Location description"
+                                className="w-full px-2 py-1 text-sm border rounded"
+                              />
+                            </>
+                          )}
 
                           {/* Hotspot/Prop Association */}
                           <div className="flex gap-2">
@@ -2750,34 +2769,62 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </button>
                           </div>
                           
-                          <input
-                            type="text"
-                            value={prop.name}
-                            onChange={(e) => handleUpdateProp(index, 'name', e.target.value)}
-                            placeholder="Prop name (internal key)"
-                            className="w-full px-2 py-1 text-sm border rounded"
-                          />
+                          {translationState.activeLanguage ? (
+                            <>
+                              <div>
+                                <input
+                                  type="text"
+                                  value={(prop as any).displayName || ''}
+                                  onChange={(e) => handleUpdateProp(index, 'displayName', e.target.value)}
+                                  placeholder="Translated label"
+                                  className="w-full px-2 py-1 text-sm border rounded border-blue-300"
+                                />
+                                {sourceParametersRef.current?.props?.[index] && (
+                                  <div className="text-xs text-gray-400 italic truncate">
+                                    Source: {sourceParametersRef.current.props[index].displayName || sourceParametersRef.current.props[index].name || ''}
+                                  </div>
+                                )}
+                              </div>
+                              <input
+                                type="text"
+                                value={prop.description}
+                                onChange={(e) => handleUpdateProp(index, 'description', e.target.value)}
+                                placeholder="Translated description"
+                                className="w-full px-2 py-1 text-sm border rounded border-blue-300"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <input
+                                type="text"
+                                value={prop.name}
+                                onChange={(e) => handleUpdateProp(index, 'name', e.target.value)}
+                                placeholder="Prop name (internal key)"
+                                className="w-full px-2 py-1 text-sm border rounded"
+                              />
 
-                          <div>
-                            <input
-                              type="text"
-                              value={(prop as any).displayName || ''}
-                              onChange={(e) => handleUpdateProp(index, 'displayName', e.target.value)}
-                              placeholder={prop.name || 'Display label (defaults to name)'}
-                              className="w-full px-2 py-1 text-sm border rounded"
-                            />
-                            <span className="text-xs text-gray-400">
-                              Label shown on hotspot. Leave empty to use "{prop.name || 'name'}"
-                            </span>
-                          </div>
+                              <div>
+                                <input
+                                  type="text"
+                                  value={(prop as any).displayName || ''}
+                                  onChange={(e) => handleUpdateProp(index, 'displayName', e.target.value)}
+                                  placeholder={prop.name || 'Display label (defaults to name)'}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                />
+                                <span className="text-xs text-gray-400">
+                                  Label shown on hotspot. Leave empty to use "{prop.name || 'name'}"
+                                </span>
+                              </div>
 
-                          <input
-                            type="text"
-                            value={prop.description}
-                            onChange={(e) => handleUpdateProp(index, 'description', e.target.value)}
-                            placeholder="Description"
-                            className="w-full px-2 py-1 text-sm border rounded"
-                          />
+                              <input
+                                type="text"
+                                value={prop.description}
+                                onChange={(e) => handleUpdateProp(index, 'description', e.target.value)}
+                                placeholder="Description"
+                                className="w-full px-2 py-1 text-sm border rounded"
+                              />
+                            </>
+                          )}
 
                           {/* Visual Element Association - like movementChoice */}
                           <div className="flex gap-2">

@@ -3234,16 +3234,29 @@ function App() {
       // Serialize story data for the preview window
       const storyData = getSerializedStoryData();
 
+      // Apply character-level translations for preview
+      let translatedChars = characters;
+      if (translationState.activeLanguage) {
+        const resource = translationState.translations.find(
+          t => t.languageCode === translationState.activeLanguage
+        );
+        if (resource) {
+          const wrapped = { project: { story: { characters } } };
+          const translated = applyTranslationResource(wrapped, resource);
+          translatedChars = translated.project?.story?.characters ?? characters;
+        }
+      }
+
       previewWindowManager.open({
         storyData,
         settings: globalSettings,
         assets: assets,
-        characters: characters,
+        characters: translatedChars,
         themeAssets: themeAssets,
         beatId: selectedBeat?.id,
       });
     }
-  }, [state.beats, selectedBeat, assets, characters, themeAssets, getSerializedStoryData, globalSettings]);
+  }, [state.beats, selectedBeat, assets, characters, themeAssets, getSerializedStoryData, globalSettings, translationState.activeLanguage, translationState.translations]);
 
   // Keyboard shortcut for preview window (Ctrl/Cmd+Shift+P)
   useEffect(() => {
@@ -3271,12 +3284,25 @@ function App() {
     // Debounce updates to avoid flooding
     previewUpdateTimeoutRef.current = setTimeout(() => {
       const storyData = getSerializedStoryData();
+      // Apply character-level translations (counter displayNames, inventory displayNames)
+      let translatedCharacters = characters;
+      if (translationState.activeLanguage) {
+        const resource = translationState.translations.find(
+          t => t.languageCode === translationState.activeLanguage
+        );
+        if (resource) {
+          const wrapped = { project: { story: { characters } } };
+          const translated = applyTranslationResource(wrapped, resource);
+          translatedCharacters = translated.project?.story?.characters ?? characters;
+        }
+      }
+
       previewWindowManager.sendUpdate({
         storyData,
         settings: globalSettings,
         projectSettings: { width: projectSettings.width, height: projectSettings.height },
         assets: assets,
-        characters: characters,
+        characters: translatedCharacters,
         themeAssets: themeAssets,
       });
       console.log('[App] Sent auto-reload update to preview window');
