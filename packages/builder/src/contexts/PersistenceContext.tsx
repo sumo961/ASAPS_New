@@ -450,6 +450,20 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
           savedAssetIdsRef.current = new Set();
           setProjectFormat('directory');
           setProjectPath(dirPath);
+
+          // Re-read translations from disk (IndexedDB copy may be stale)
+          try {
+            const freshProject = await adapter.openProject(dirPath);
+            if (freshProject.translations && freshProject.translations.length > 0) {
+              loadedProject.translations = freshProject.translations;
+              loadedProject.translationManifest = freshProject.translationManifest;
+              currentProjectRef.current = loadedProject;
+              setCurrentProject(loadedProject);
+              console.log('[PersistenceProvider] Loaded', freshProject.translations.length, 'translation(s) from disk');
+            }
+          } catch (e) {
+            console.warn('[PersistenceProvider] Failed to re-read translations from disk:', e);
+          }
         } else {
           // Directory no longer exists — fall back to IndexedDB mode
           console.warn('[PersistenceProvider] Directory path stale, falling back to IndexedDB:', dirPath);
