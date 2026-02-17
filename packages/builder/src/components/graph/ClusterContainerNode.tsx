@@ -261,6 +261,14 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
   const [dragStartBeatPos, setDragStartBeatPos] = useState({ x: 0, y: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedBeatId, setSelectedBeatId] = useState<string | null>(null);
+
+  // Sync local selection with external selection (e.g., from sidebar click)
+  useEffect(() => {
+    if (externalSelectedBeatId !== undefined) {
+      setSelectedBeatId(externalSelectedBeatId);
+    }
+  }, [externalSelectedBeatId]);
+
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);

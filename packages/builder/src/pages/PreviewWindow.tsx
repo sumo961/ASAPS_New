@@ -2092,12 +2092,18 @@ export const PreviewWindow: React.FC = () => {
                   <div className="bg-white p-3 rounded-lg">
                     <div className="text-sm font-medium text-gray-600 mb-2">Inventory</div>
                     <div className="space-y-1">
-                      {debugInfo.inventory.map((item: { name: string; quantity: number }) => (
-                        <div key={item.name} className="text-xs text-gray-600 flex justify-between">
-                          <span>• {item.name}</span>
-                          <span className="font-mono text-gray-500">×{item.quantity}</span>
-                        </div>
-                      ))}
+                      {debugInfo.inventory.map((item: { name: string; quantity: number }) => {
+                        // Look up translated displayName from character inventory definitions
+                        const invDef = previewData?.characters
+                          ?.flatMap(c => c.inventory || [])
+                          .find((inv: any) => inv.name === item.name);
+                        return (
+                          <div key={item.name} className="text-xs text-gray-600 flex justify-between">
+                            <span>• {invDef?.displayName || item.name}</span>
+                            <span className="font-mono text-gray-500">×{item.quantity}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
