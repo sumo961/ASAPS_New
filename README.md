@@ -112,6 +112,17 @@ Export your stories as self-contained HTML files that run anywhere:
 
 **Note**: AI-based beats (aiInfoText, aiDurScreen, aiSummary, aiCondition) are not yet supported in HTML export. aiDialogTree now works in the web player (v0.9.13). Stories using unsupported AI beats will show fallback text instead.
 
+### 🌐 Multi-Language Translation (v0.9.18)
+
+Create interactive narratives in multiple languages with both manual and AI-assisted translation:
+
+- **AI-Generated Translations**: Tell the AI to generate a story in multiple languages (e.g., English + German + French) and it produces the full story with translations included
+- **Manual Translation Workflow**: Add target languages, translate strings in the inspector, track completion per language
+- **Staleness Detection**: When source text is edited, translations are automatically marked as stale with visual indicators on beats
+- **VCS-Aware Persistence**: Translations survive git push/pull cycles, load on startup, and integrate with the version control panel
+- **Beat-Level Indicators**: Amber triangle on beats with stale translations, alongside green/orange VCS change dots
+- **Full Round-Trip**: Generate → edit → translate → save → reload → edit — translations persist across the entire workflow
+
 ### 🖥️ Independent Preview Window (v0.9.11)
 
 The preview system has been completely redesigned:
@@ -159,14 +170,15 @@ Configure AI providers in **Settings → AI Configuration**. Local models via Ol
 
 ## 🎯 Features
 
+- **Multi-Language Translation**: Create interactive narratives in multiple languages with manual and AI-assisted translation support — including staleness detection, VCS-aware persistence, and full round-trip editing
 - **Visual Story Builder**: Drag-and-drop interface for creating interactive narratives
 - **Graph-based Story Editor**: See your entire story structure at a glance
 - **Multiple Beat Types**: 14+ different beat types for varied storytelling
+- **AI-Assisted Generation**: Generate complete stories from prompts with multi-language output — both within the app and via MCP server
 - **Backward Compatible**: Full support for legacy ASML story files
 - **Modern Rendering**: Canvas and React-based rendering engines
 - **Real-time Preview**: Test your stories as you build them
 - **Export/Import**: Work with standard ASML XML files
-- **AI-Assisted Generation**: Generate dialog trees and story content with AI
 - **MCP Server Integration**: Model Context Protocol support for AI tool integration
 
 ## 📥 Releases
@@ -401,11 +413,14 @@ To use the MCP server, configure it in your AI assistant's MCP settings pointing
 ## 📋 Version History
 
 ### v0.9.18 (2026-02-17)
-- **Translation Persistence**: Translations now load on startup, survive git push/pull, and persist across sessions
-- **Multi-Language AI Generation**: AI prompts support generating stories in multiple languages with translation output
+- **Multi-Language Interactive Narratives**: Support for manual and AI-based translations to create multi-language interactive narratives
+  - AI can generate complete stories in multiple languages (e.g., "Create a mystery in English, German, and French")
+  - Translation persistence: load on startup, survive git push/pull, persist across sessions
+  - Staleness detection: source edits automatically flag affected translations
+  - Internal and MCP AI prompts fully synchronized with translation key format documentation
 - **Windows Fixes**: EPERM home directory resolution, single-instance lock (no duplicate windows), translation loading on startup
-- **CI Build Numbering**: Automatic build number tracking for version identification
-- **26 New Tests**: expandPath, extractBeatSourceStrings, DirectoryAdapter translation wiring
+- **CI Build Numbering**: Automatic build number tracking for version identification (v0.9.18.{build})
+- **26 New Tests**: expandPath async resolution, extractBeatSourceStrings for all beat types, DirectoryAdapter translation wiring
 
 ### v0.9.10 (2026-01-26)
 - **Improved Path Analysis**: New StateSimulationAnalyzer for accurate hub-and-spoke story patterns
