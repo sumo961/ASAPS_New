@@ -59,6 +59,9 @@ export interface StoryGenerationRequest {
 
   /** Include AI-powered beats (onlineContent, aiCondition, aiDialogTree, aiSummary) */
   includeAIBeats?: boolean;
+
+  /** Target languages for the generated story (e.g., ["en", "de", "fr"]) */
+  languages?: string[];
 }
 
 /**

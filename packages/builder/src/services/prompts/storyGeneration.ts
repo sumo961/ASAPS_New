@@ -48,6 +48,7 @@ Generate complete interactive story structures with:
 - **pickProp**: For item selection (noun phrases only, no verbs!)
   - AUTO-ADDS selected item to inventory - DO NOT follow with addRemoveInventory!
   - MANDATORY: Every pickProp choice MUST lead to an infoText describing the item
+  - Props: {id, name, displayName, description, target} - displayName is the player-visible label (translatable)
   - Supports choiceDelay, markVisited. Props can have counter effects and sound effects
 - **endScreen**: Use "message" (not "endMessage"). ALWAYS set showRestart: true
   - Must be in the main "beats" array, NEVER a separate "endings" array
@@ -98,8 +99,25 @@ Respond with JSON in this exact structure:
       "counters": [{ "name": "trust", "displayName": "Trust", "value": 0, "min": 0, "max": 100 }]
     }
   ],
+  "translations": [
+    {
+      "languageCode": "de",
+      "languageName": "German",
+      "strings": { "project.story.metadata.title": "Translated Title", "beat:beat_0.parameters.title": "..." }
+    }
+  ],
   "reasoning": "Brief explanation of story structure choices"
 }
+
+Note: "translations" is OPTIONAL - only include when multiple languages are requested.
+
+## Multi-Language Support
+When the user requests a story in multiple languages:
+1. Write the story in the primary language (first in the list)
+2. Include a "translations" array with translations for additional languages
+3. Use "displayName" on pickProp props and "displayText" on movementChoice choices (these are the translatable labels)
+4. Translation keys use format: "beat:{beatId}.parameters.{field}" for beat text, "project.story.metadata.title" for story title
+5. Translate ALL player-visible text. Do NOT translate: beat IDs, variable names, counter internal names, conditions
 
 ## Important Rules
 1. beat_0 MUST be type "titleScreen"
@@ -154,6 +172,17 @@ export function buildStoryGenerationUserPrompt(request: StoryGenerationRequest):
   // Additional context
   if (request.context) {
     parts.push(`Additional context: ${request.context}`);
+  }
+
+  // Multi-language
+  if (request.languages && request.languages.length > 0) {
+    const primary = request.languages[0];
+    const additional = request.languages.slice(1);
+    if (additional.length > 0) {
+      parts.push(`Languages: Write story in ${primary}. Include translations for: ${additional.join(', ')}.`);
+    } else {
+      parts.push(`Language: Write all content in ${primary}.`);
+    }
   }
 
   parts.push('\nGenerate the complete story structure as JSON.');

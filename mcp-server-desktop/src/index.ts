@@ -210,6 +210,29 @@ const injectStoryTool: Tool = {
         },
         required: ['themeId', 'reason'],
       },
+      translations: {
+        type: 'array',
+        description:
+          'Optional translations for multi-language stories. Write the story in one language, ' +
+          'then provide translations for additional languages. Use "displayName" on pickProp props ' +
+          'and "displayText" on movementChoice choices for translation-safe labels.',
+        items: {
+          type: 'object',
+          properties: {
+            languageCode: { type: 'string', description: 'ISO language code (e.g., "de", "fr", "es")' },
+            languageName: { type: 'string', description: 'Human-readable language name (e.g., "German")' },
+            strings: {
+              type: 'object',
+              description:
+                'Key-value map of translation keys to translated strings. ' +
+                'Keys use format: "beat:{beatId}.parameters.{field}" for beat text, ' +
+                '"project.story.metadata.title" for story title, ' +
+                '"project.story.characters.{index}.name" for character names.',
+            },
+          },
+          required: ['languageCode', 'languageName', 'strings'],
+        },
+      },
     },
     required: ['metadata', 'beats'],
   },
@@ -348,6 +371,25 @@ async function handleGetThemes(): Promise<any> {
       'literary/experimental': 'builtin-twine',
     },
     usage: 'Include a suggestedTheme object in your story with themeId and reason fields.',
+    translationSupport: {
+      description: 'ASAPS supports multi-language stories. Write the story in one language, then provide translations.',
+      howTo: [
+        'Write the story content in the primary language',
+        'Add a "translations" array with objects for each additional language',
+        'Each translation has languageCode, languageName, and strings (key-value pairs)',
+        'Use displayName on pickProp props and displayText on movementChoice choices for translation-safe labels',
+        'Translation keys: "beat:{beatId}.parameters.{field}" for beat text, "project.story.metadata.title" for title',
+      ],
+      example: {
+        languageCode: 'de',
+        languageName: 'German',
+        strings: {
+          'project.story.metadata.title': 'Mord im Blackwood Manor',
+          'beat:beat_0.parameters.title': 'Mord im Blackwood Manor',
+          'beat:beat_1.parameters.text': 'Sie kommen als Detektiv im Blackwood Manor an...',
+        },
+      },
+    },
   };
 
   return {
@@ -359,7 +401,7 @@ async function handleGetThemes(): Promise<any> {
 }
 
 async function handleInjectStory(args: any): Promise<any> {
-  const { metadata, beats, connections, characters, suggestedTheme } = args;
+  const { metadata, beats, connections, characters, suggestedTheme, translations } = args;
 
   // Log injection attempt with timestamp for debugging duplicates
   const injectionTimestamp = new Date().toISOString();
@@ -415,6 +457,7 @@ async function handleInjectStory(args: any): Promise<any> {
         connections: connections || [],
         characters: characters || [],
         suggestedTheme: suggestedTheme || undefined,
+        translations: translations || undefined,
       }),
     });
 
@@ -425,8 +468,9 @@ async function handleInjectStory(args: any): Promise<any> {
       data: result,
       message:
         `Story "${metadata.title}" successfully injected into ASAPS Builder! ` +
-        `Created ${beats.length} beats and ${connections?.length || 0} connections. ` +
-        'Check the Builder window to see your story.',
+        `Created ${beats.length} beats and ${connections?.length || 0} connections` +
+        (translations?.length ? ` with ${translations.length} translation(s)` : '') +
+        '. Check the Builder window to see your story.',
     };
   } catch (error) {
     return {

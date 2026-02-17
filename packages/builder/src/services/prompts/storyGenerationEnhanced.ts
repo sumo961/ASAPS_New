@@ -190,9 +190,10 @@ const BEAT_TYPE_GUIDE = `
   - The player will see both "Silver Key" (from pickProp) and "silver_key" (from addRemoveInventory)
   - ✓ CORRECT: pickProp → infoText describing what you found
   - ✗ WRONG: pickProp → addRemoveInventory (creates duplicates!)
-- Parameters: question (REQUIRED!), props (array of {id, name, description, target})
+- Parameters: question (REQUIRED!), props (array of {id, name, displayName, description, target})
   - question: Text prompt asking what to pick (REQUIRED - e.g., "What do you examine?")
-  - name: The ITEM NAME ONLY - just the object name, no verbs!
+  - name: Internal identifier for the item (used in inventory conditions) - noun phrase only, no verbs!
+  - displayName: Player-visible label for the item (used for translation). If omitted, "name" is shown.
   - description: RECOMMENDED - Brief description of the item (shown to player when selecting)
   - ⚠️ WRONG names that start with verbs:
     - "Take the key" ❌
@@ -1285,9 +1286,18 @@ Generate complete, sophisticated interactive story structures that:
       ]
     }
   ],
+  "translations": [
+    {
+      "languageCode": "de",
+      "languageName": "German",
+      "strings": { "project.story.metadata.title": "Translated title", "beat:beat_0.parameters.title": "..." }
+    }
+  ],
   "reasoning": "Explain story structure, branching strategy, and how beat types work together"
 }
 \`\`\`
+
+Note: The "translations" array is OPTIONAL - only include it when the user requests multiple languages.
 
 ## Critical Requirements
 🚨 **MANDATORY: beat_0 MUST be type "titleScreen"** - NEVER start with infoText!
@@ -1312,6 +1322,52 @@ Generate complete, sophisticated interactive story structures that:
 ✓ **EVERY beat must be reachable** - some other beat must connect TO it (except titleScreen)
 ✓ **Include suggestedTheme** with a theme ID and reason based on genre/style
 ✓ **ALL endings go in the "beats" array** - NEVER create a separate "endings" array!
+
+## Multi-Language / Translation Support
+
+ASAPS supports **multi-language Interactive Digital Narratives (IDNs)**. When the user requests a story in multiple languages:
+
+1. **Write the story in the primary language** (first language in the list, or the user's language)
+2. **Include a "translations" array** in the output with translations for each additional language
+3. **Use displayName/displayText fields** for translatable labels on choice-based beats:
+   - **pickProp**: Use "displayName" on props (the "name" field is an internal ID used for inventory matching)
+   - **movementChoice**: Use "displayText" on choices (the "text" field is used as a location key)
+   - These display fields are what gets translated; the internal keys stay in the source language
+
+### Translation Output Format
+
+When languages are requested, add a "translations" array to the output:
+\`\`\`json
+{
+  "translations": [
+    {
+      "languageCode": "de",
+      "languageName": "German",
+      "strings": {
+        "project.story.metadata.title": "Mord im Blackwood Manor",
+        "beat:beat_0.parameters.title": "Mord im Blackwood Manor",
+        "beat:beat_1.parameters.text": "Sie kommen als Detektiv...",
+        "beat:beat_2.parameters.props.0.displayName": "Goldener Schlüssel",
+        "beat:beat_2.parameters.props.0.description": "Ein glänzender goldener Schlüssel"
+      }
+    }
+  ]
+}
+\`\`\`
+
+### Translation Key Format
+- Story metadata: \`project.story.metadata.title\`
+- Beat text fields: \`beat:{beatId}.parameters.{field}\`
+- Character names: \`project.story.characters.{index}.name\`
+- Choices: \`beat:{beatId}.parameters.choices.{index}.displayText\` or \`beat:{beatId}.parameters.props.{index}.displayName\`
+- DialogTree: \`beat:{beatId}.parameters.dialogTree.text\`, \`...choices.{index}.text\`
+- Counters: Counter display names on characters
+
+### Important Translation Rules
+- Translate ALL player-visible text: beat text, button labels, choice text, item names/descriptions, character names
+- Do NOT translate: beat IDs, variable names, counter internal names, connection targets, conditions
+- Keep translations natural - adapt idioms, don't translate literally
+- Maintain the same emotional tone and narrative voice in each language
 
 ## ⚠️ CRITICAL: Data Format Rules (MUST FOLLOW)
 
@@ -1634,6 +1690,21 @@ export function buildEnhancedUserPrompt(request: StoryGenerationRequest): string
 
   if (request.context) {
     parts.push(`Additional requirements: ${request.context}`);
+  }
+
+  // Multi-language section
+  if (request.languages && request.languages.length > 0) {
+    const primary = request.languages[0];
+    const additional = request.languages.slice(1);
+    if (additional.length > 0) {
+      parts.push(`🌐 MULTI-LANGUAGE STORY
+Write the story content in ${primary}.
+Include a "translations" array with complete translations for: ${additional.join(', ')}.
+Use "displayName" on pickProp props and "displayText" on movementChoice choices for translation-safe labels.
+Translate ALL player-visible text including beat text, button labels, choice text, item names/descriptions, and character names.`);
+    } else {
+      parts.push(`🌐 LANGUAGE: Write all story content in ${primary}.`);
+    }
   }
 
   // AI-powered beats section
