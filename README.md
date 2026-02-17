@@ -16,16 +16,20 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.17)
+## ⚠️ Development Status (v0.9.18)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Translation Persistence** | **v0.9.18**: Translations load on startup, survive push/pull, VCS-aware with staleness detection |
+| **Multi-Language AI** | **v0.9.18**: AI can generate stories in multiple languages with translation output |
+| **Windows Fixes** | **v0.9.18**: EPERM home dir fix, single-instance lock, translation loading on startup |
+| **Build Numbering** | **v0.9.18**: CI-driven build numbers for version tracking (v0.9.18.{build}) |
 | **Windows Git VCS Fix** | **FIX in v0.9.17**: Git version control now works on Windows (path separators, auto-detect git.exe) |
 | **Stability Fixes** | **FIX in v0.9.17**: Cluster crash, VCS double-init, asset loading, UI reset, re-render reduction |
-| **AI Prompt Sync** | **v0.9.17**: Internal and MCP prompts fully synchronized (counterCompare, inventory quantity, item descriptions) |
-| **Test Coverage** | **v0.9.17**: 122 new tests for PickProp, DurScreen, TitleScreen, EndScreen, HyperText, InputText, StoryTranslator |
+| **AI Prompt Sync** | **v0.9.18**: Internal and MCP prompts fully synchronized with translation support |
+| **Test Coverage** | **v0.9.18**: 148 new tests (122 from v0.9.17 + 26 for translation wiring, expandPath, beat extraction) |
 | **Fictional Time System** | In-story date/time tracking with set/advance/subtract, condition checking, and Timer HUD display (v0.9.15) |
 | **Timer/Countdown HUD** | Timer HUD (countdown, fictional time, or narrative text) and Countdown Meter HUD overlays (v0.9.15) |
 | **Recursive Dialog Trees** | `__self__` target for looping dialogs with per-choice visited tracking (v0.9.15) |
@@ -395,6 +399,13 @@ The project includes an MCP (Model Context Protocol) server that enables AI assi
 To use the MCP server, configure it in your AI assistant's MCP settings pointing to `mcp-server/`.
 
 ## 📋 Version History
+
+### v0.9.18 (2026-02-17)
+- **Translation Persistence**: Translations now load on startup, survive git push/pull, and persist across sessions
+- **Multi-Language AI Generation**: AI prompts support generating stories in multiple languages with translation output
+- **Windows Fixes**: EPERM home directory resolution, single-instance lock (no duplicate windows), translation loading on startup
+- **CI Build Numbering**: Automatic build number tracking for version identification
+- **26 New Tests**: expandPath, extractBeatSourceStrings, DirectoryAdapter translation wiring
 
 ### v0.9.10 (2026-01-26)
 - **Improved Path Analysis**: New StateSimulationAnalyzer for accurate hub-and-spoke story patterns

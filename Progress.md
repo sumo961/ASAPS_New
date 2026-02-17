@@ -1,5 +1,82 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-17: Translation Persistence, Multi-Language AI, Windows Fixes & Build Numbering (v0.9.18)
+
+### Overview
+
+This release makes **translation persistence fully functional** across app restart, git push/pull, and session restore. It adds **multi-language story generation** to both internal and MCP AI prompts, fixes several **Windows-specific issues** (EPERM, duplicate windows, startup translation loading), and introduces **CI-driven build numbering** for version tracking.
+
+### Translation Persistence (Critical Fix)
+
+Previously, translations generated in ASAPS Builder were lost on app restart because:
+1. `PersistenceContext.loadProject()` set `currentProject` before reading translations from disk, causing a React same-reference state skip
+2. `HybridStorageAdapter.expandPath()` failed on Windows with EPERM when trying to create `C:\Program Files\ASAPS Builder\~`
+3. VCS pull didn't reload translation files from disk
+4. Translation generation didn't trigger `markChanged()` for auto-save
+
+**Fixes applied:**
+- Restructured `loadProject()` to set `currentProject` ONCE after all data (including translations) is loaded
+- Made `expandPath()` async, using Electron's `app.getPath('home')` instead of non-existent `getHomedir()`
+- VCS event handler now reads translation files from disk after any successful operation
+- `markChanged()` called after translation generation in Header.tsx
+- DirectoryAdapter now passes translations through in both directions (open and save)
+
+**Files modified:**
+- `packages/builder/src/contexts/PersistenceContext.tsx` — Single setCurrentProject after translations loaded
+- `packages/builder/src/storage/HybridStorageAdapter.ts` — Async expandPath with proper home resolution
+- `packages/builder/src/App.tsx` — VCS event handler rewrite, translation sync in syncProjectData
+- `packages/builder/src/components/Header.tsx` — markChanged() after translation generation
+- `packages/builder/src/storage/adapters/DirectoryAdapter.ts` — Translation wiring in open/save
+
+### Multi-Language AI Generation
+
+AI prompts (both internal and MCP) now support generating stories in multiple languages:
+- New `languages` field in `StoryGenerationRequest` (e.g., `["en", "de", "fr"]`)
+- Stories are written in the primary language with a `translations` array for additional languages
+- Translation key format documented: `beat:{beatId}.parameters.{field}`
+- `displayName` on pickProp props and `displayText` on movementChoice choices for translation-safe labels
+- MCP server inject endpoint accepts translations and passes them through
+
+**Files modified:**
+- `packages/builder/src/types/ai.ts` — Added `languages` field
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts` — Translation section, output format, user prompt
+- `packages/builder/src/services/prompts/storyGeneration.ts` — Translation section, language handling
+- `mcp-server-desktop/src/index.ts` — Translation schema, pass-through, guide in themes response
+
+### Windows Fixes
+
+- **EPERM error**: `expandPath()` fell back to literal `~` on Windows because `getHomedir()` wasn't in the Electron preload. Now uses async `app.getPath('home')`.
+- **Duplicate windows**: Added `app.requestSingleInstanceLock()` to Electron main process to prevent two windows after install.
+- **Translation loading**: Translations now load on startup by reading from disk before setting React state.
+
+**Files modified:**
+- `packages/builder/src/storage/HybridStorageAdapter.ts` — Async expandPath with fallbacks
+- `apps/builder-desktop/src/main/index.ts` — Single instance lock
+
+### CI Build Numbering
+
+- `build-number.json` tracked in git, incremented by CI workflow
+- Version display in app shows format: `v0.9.18.{buildNumber}`
+- Local builds read but don't increment the build number
+
+**Files modified:**
+- `.github/workflows/build-desktop.yml` — `increment-build-number` job
+- `build-number.json` — Tracked in git
+- `packages/builder/vite.config.ts` — Read-only build number
+
+### New Tests (26 tests)
+
+- **expandPath** (8 tests): Home directory resolution via app.getPath, Windows paths, fallbacks
+- **extractBeatSourceStrings** (14 tests): All beat types, dialogTree, AI beats, edge cases
+- **DirectoryAdapter translation wiring** (4 tests): Open/save with and without translations
+
+**New test files:**
+- `packages/builder/src/storage/__tests__/expandPath.test.ts`
+- `packages/builder/src/export/__tests__/extractBeatSourceStrings.test.ts`
+- `packages/builder/src/storage/adapters/__tests__/DirectoryAdapter.translations.test.ts`
+
+---
+
 ## 2026-02-16: Windows Git Fix, Stability, Translation, Tests & Prompt Sync (v0.9.17)
 
 ### Overview
