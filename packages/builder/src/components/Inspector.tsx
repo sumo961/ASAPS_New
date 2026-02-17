@@ -84,6 +84,7 @@ function diffDialogTreeTranslations(
 interface ChoiceWithCounter {
   id: string;
   text: string;
+  displayText?: string;  // Translated label for display
   location?: string;
   locationName?: string;  // References a hotspot/prop from beat.locations by name
   target?: string;
@@ -94,6 +95,7 @@ interface ChoiceWithCounter {
 interface PropWithEffect {
   id: string;
   name: string;
+  displayName?: string;  // Translated name for display
   description: string;
   target?: string;
   effects?: any[];
@@ -2774,7 +2776,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               <div>
                                 <input
                                   type="text"
-                                  value={(prop as any).displayName || ''}
+                                  value={prop.displayName || ''}
                                   onChange={(e) => handleUpdateProp(index, 'displayName', e.target.value)}
                                   placeholder="Translated label"
                                   className="w-full px-2 py-1 text-sm border rounded border-blue-300"
@@ -2806,7 +2808,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               <div>
                                 <input
                                   type="text"
-                                  value={(prop as any).displayName || ''}
+                                  value={prop.displayName || ''}
                                   onChange={(e) => handleUpdateProp(index, 'displayName', e.target.value)}
                                   placeholder={prop.name || 'Display label (defaults to name)'}
                                   className="w-full px-2 py-1 text-sm border rounded"
