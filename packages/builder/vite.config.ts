@@ -7,9 +7,16 @@ const rootPkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json')
 
 // Auto-increment build number on each dev/build start
 const buildNumberPath = resolve(__dirname, '../../build-number.json');
-const buildData = JSON.parse(readFileSync(buildNumberPath, 'utf-8'));
+let buildData: { build: number };
+try {
+  buildData = JSON.parse(readFileSync(buildNumberPath, 'utf-8'));
+} catch {
+  buildData = { build: 0 };
+}
 buildData.build += 1;
-writeFileSync(buildNumberPath, JSON.stringify(buildData, null, 2) + '\n', 'utf-8');
+try {
+  writeFileSync(buildNumberPath, JSON.stringify(buildData, null, 2) + '\n', 'utf-8');
+} catch { /* CI may have read-only filesystem */ }
 
 export default defineConfig({
   plugins: [react()],
