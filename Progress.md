@@ -1,5 +1,58 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-18: Undo/Redo System & History Panel (v0.9.19)
+
+### Overview
+
+This release **fixes undo/redo (Ctrl+Z / Cmd+Z)** which was previously broken for all normal beat editing operations. The existing CommandManager infrastructure was in place but only AI bulk operations used it — Inspector edits, beat additions, deletions, and moves all bypassed the command system entirely. This release wires all beat mutations through the command system and adds a **history panel** to the toolbar.
+
+### Undo/Redo Wiring (Core Fix)
+
+Previously, the flow was: Inspector → `onUpdate()` → `actions.updateBeat()` (direct — no command created). Now all beat operations create proper commands:
+
+- **`handleBeatUpdate`**: Creates `UpdateBeatCommand` with deep-cloned old values via `structuredClone()` (preserves Maps, Sets, Dates unlike `JSON.parse(JSON.stringify())`)
+- **`handleBeatDelete`**: Creates `DeleteBeatCommand` with full beat snapshot for restore on undo
+- **`handleBeatAdd`**: Records `AddBeatCommand` via `pushWithoutExecute()` (beat already created by `actions.addBeat`)
+- **`handleBeatMove`**: New handler wrapping `MoveBeatCommand` (replaces direct `actions.moveBeat` prop)
+
+**Key design decision**: A `stableMutations` ref is updated every render so command undo/redo callbacks always use the latest `actions` without stale closures.
+
+**Files modified:**
+- `packages/builder/src/App.tsx` — All four beat handlers rewritten, stableMutations ref, imports, VCS history clear
+- `packages/builder/src/commands/BeatCommands.ts` — Added `MoveBeatCommand`, `moveBeat` to `BeatStateMutations`
+- `packages/builder/src/commands/CommandManager.ts` — Added `pushWithoutExecute()` method
+- `packages/builder/src/components/ai/HelperCommandInput.tsx` — Added `moveBeat` no-op to satisfy updated interface
+
+### History Panel
+
+Added a clickable history dropdown to the `UndoRedoToolbar` (in the Header):
+
+- Click the history counter (e.g., "3/5") to open the dropdown
+- Commands shown newest-first with relative timestamps ("2s ago", "1m ago")
+- Current command highlighted in blue with a dot indicator
+- Undone (redo-able) commands shown dimmed
+- Click any entry to jump to that point (multiple undo/redo calls)
+- "Clear" button to wipe history
+- Closes on outside click
+
+**Files modified:**
+- `packages/builder/src/components/UndoRedoToolbar.tsx` — Full rewrite with dropdown, History/Trash2 icons, jump-to-point
+
+### MoveBeatCommand
+
+New command class for undoable beat position changes:
+- Stores `beatId`, `oldPosition`, `newPosition`
+- 500ms merge window coalesces rapid drag events into a single history entry
+- Registered in `registerBeatCommands()` for deserialization
+
+### Additional Fixes
+
+- **`handleCommandExecuted`**: Removed `if (type === 'undo' || type === 'redo')` guard — `markChanged()` now fires for all command operations
+- **VCS history clear**: After successful VCS operations (pull, stash pop), undo history is cleared since the project state changed externally
+- **structuredClone fix**: `JSON.parse(JSON.stringify())` was destroying `Map` instances (like `beat.locations`), causing "locations.values is not a function" errors when undoing dialogTree edits
+
+---
+
 ## 2026-02-17: Translation Persistence, Multi-Language AI, Windows Fixes & Build Numbering (v0.9.18)
 
 ### Overview

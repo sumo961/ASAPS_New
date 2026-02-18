@@ -16,12 +16,14 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.18)
+## ⚠️ Development Status (v0.9.19)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Undo/Redo** | **v0.9.19**: All beat operations (edit, add, delete, move) now support Ctrl+Z / Cmd+Z undo/redo |
+| **History Panel** | **v0.9.19**: Clickable history dropdown in toolbar — view, jump to, and clear command history |
 | **Translation Persistence** | **v0.9.18**: Translations load on startup, survive push/pull, VCS-aware with staleness detection |
 | **Multi-Language AI** | **v0.9.18**: AI can generate stories in multiple languages with translation output |
 | **Windows Fixes** | **v0.9.18**: EPERM home dir fix, single-instance lock, translation loading on startup |
