@@ -83,7 +83,7 @@ const ScaledStage: React.FC<ScaledStageProps> = ({
 
   // Don't render until scale is calculated to prevent flash
   if (scale === null) {
-    return <div ref={containerRef} style={{ width, height, visibility: 'hidden' }}>{children}</div>;
+    return <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', visibility: 'hidden' }}>{children}</div>;
   }
 
   // Cover mode: two-layer architecture with viewport-filling background
@@ -134,18 +134,30 @@ const ScaledStage: React.FC<ScaledStageProps> = ({
   }
 
   // Fit mode (default): single-layer with uniform scale
+  // Use absolute positioning to prevent layout overflow clipping
   return (
     <div
       ref={containerRef}
       style={{
-        width: width,
-        height: height,
-        transform: scale !== 1 ? `scale(${scale})` : 'none',
-        transformOrigin: 'center center',
-        overflow: 'hidden',
+        position: 'relative',
+        width: '100%',
+        height: '100%',
       }}
     >
-      {children}
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          width: width,
+          height: height,
+          transform: `translate(-50%, -50%) scale(${scale})`,
+          transformOrigin: 'center center',
+          overflow: 'hidden',
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 };

@@ -130,11 +130,13 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       }
 
       // Determine mobile mode based on project settings and device detection
+      // Cover mode only activates on actual mobile devices (never on desktop)
       var mobileMode = false;
       var mobileScaling = window.ASAPS_CONFIG.mobileScalingMode || 'auto';
-      if (mobileScaling === 'cover') {
-        mobileMode = true;
-      } else if (mobileScaling === 'auto') {
+      if (mobileScaling === 'fit') {
+        mobileMode = false; // Always fit, even on mobile
+      } else {
+        // 'auto' and 'cover' both use cover on mobile, fit on desktop
         mobileMode = !!window.ASAPS_MOBILE;
       }
 
@@ -192,9 +194,18 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
     .language-panel {
       position: fixed; top: 12px; right: 12px; z-index: 9999;
       background: rgba(30, 30, 60, 0.92); border: 1px solid rgba(99, 102, 241, 0.4);
-      border-radius: 10px; padding: 10px 14px; backdrop-filter: blur(8px);
-      display: flex; flex-direction: column; gap: 8px; min-width: 220px;
+      border-radius: 10px; backdrop-filter: blur(8px);
+      display: flex; flex-direction: column; transition: all 0.2s ease;
     }
+    .language-panel.expanded { padding: 10px 14px; gap: 8px; min-width: 220px; }
+    .language-panel.collapsed { padding: 6px; min-width: auto; cursor: pointer; }
+    .language-panel .lang-toggle {
+      background: none; border: none; color: rgba(255,255,255,0.8); cursor: pointer;
+      font-size: 16px; padding: 2px 4px; display: flex; align-items: center; gap: 6px;
+    }
+    .language-panel .lang-toggle:hover { color: #fff; }
+    .language-panel .lang-content { display: flex; flex-direction: column; gap: 8px; }
+    .language-panel.collapsed .lang-content { display: none; }
     .language-panel .lang-row { display: flex; align-items: center; gap: 6px; }
     .language-panel label { color: rgba(255,255,255,0.7); font-size: 12px; white-space: nowrap; }
     .language-panel select {
@@ -227,16 +238,34 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
   </style>
 </head>
 <body>
-  <div class="language-panel">
-    <div class="lang-row">
-      <label>Language:</label>
-      <select id="lang-select">
-        <option value="original" selected>Original</option>
-        {{LANGUAGE_OPTIONS}}
-      </select>
+  <div class="language-panel expanded" id="lang-panel">
+    <button class="lang-toggle" id="lang-toggle" title="Toggle language panel">
+      &#127760; <span id="lang-toggle-label">Language</span>
+    </button>
+    <div class="lang-content">
+      <div class="lang-row">
+        <label>Language:</label>
+        <select id="lang-select">
+          <option value="original" selected>Original</option>
+          {{LANGUAGE_OPTIONS}}
+        </select>
+      </div>
+      {{AI_TRANSLATION_SECTION}}
     </div>
-    {{AI_TRANSLATION_SECTION}}
   </div>
+  <script>
+    (function() {
+      var panel = document.getElementById('lang-panel');
+      var toggle = document.getElementById('lang-toggle');
+      var label = document.getElementById('lang-toggle-label');
+      toggle.addEventListener('click', function() {
+        var isExpanded = panel.classList.contains('expanded');
+        panel.classList.toggle('expanded');
+        panel.classList.toggle('collapsed');
+        label.textContent = isExpanded ? '' : 'Language';
+      });
+    })();
+  </script>
 
   <div id="player">
     <div class="loading-screen">
@@ -317,7 +346,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
 
         // Determine mobile mode
         var mobileScaling = window.ASAPS_CONFIG.mobileScalingMode || 'auto';
-        var mobileMode = mobileScaling === 'cover' || (mobileScaling === 'auto' && window.ASAPS_MOBILE);
+        var mobileMode = mobileScaling !== 'fit' && !!window.ASAPS_MOBILE;
 
         if (typeof ASAPSPlayer !== 'undefined') {
           window._asapsPlayerInstance = ASAPSPlayer.init('#player', {
@@ -340,7 +369,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       }
       // Determine mobile mode
       var mobileScaling = window.ASAPS_CONFIG.mobileScalingMode || 'auto';
-      var mobileMode = mobileScaling === 'cover' || (mobileScaling === 'auto' && window.ASAPS_MOBILE);
+      var mobileMode = mobileScaling !== 'fit' && !!window.ASAPS_MOBILE;
 
       var storySource = 'data:application/zip;base64,' + window.ASAPS_CONFIG.storyData;
       if (typeof ASAPSPlayer !== 'undefined') {

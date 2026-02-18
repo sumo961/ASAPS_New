@@ -964,12 +964,12 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         onChange={(e) => handleChange('project', 'mobileScalingMode', e.target.value)}
                         className="w-full px-3 py-2 border rounded"
                       >
-                        <option value="auto">Auto (Cover on mobile, Fit on desktop)</option>
-                        <option value="fit">Fit (Letterbox on all devices)</option>
-                        <option value="cover">Cover (Fill viewport, crop edges)</option>
+                        <option value="auto">Auto (Fill on mobile, Fit on desktop)</option>
+                        <option value="fit">Fit (Letterbox everywhere, including mobile)</option>
+                        <option value="cover">Cover (Fill on mobile + font scale, Fit on desktop)</option>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">
-                        Cover mode fills the screen on mobile, improving text readability at the cost of cropping stage edges
+                        Auto/Cover fills the screen on mobile devices, improving text readability at the cost of cropping stage edges. Desktop always uses Fit.
                       </p>
                     </div>
 
