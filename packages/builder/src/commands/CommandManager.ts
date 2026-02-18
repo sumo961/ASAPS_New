@@ -142,6 +142,41 @@ export class CommandManager {
   }
 
   /**
+   * Record a command in history without executing it.
+   * Used when the action has already been performed (e.g., addBeat returns the beat).
+   */
+  pushWithoutExecute(command: Command): void {
+    // Clear any commands after current index
+    if (this.currentIndex < this.history.length - 1) {
+      this.history = this.history.slice(0, this.currentIndex + 1);
+    }
+
+    // Try to merge with previous command
+    if (this.history.length > 0) {
+      const lastCommand = this.history[this.history.length - 1];
+      if (lastCommand.canMergeWith(command)) {
+        lastCommand.mergeWith(command);
+        this.log('Command merged (without execute):', command.type);
+        this.notifyListeners();
+        this.scheduleAutoSave();
+        return;
+      }
+    }
+
+    this.history.push(command);
+    this.currentIndex++;
+
+    if (this.history.length > this.options.maxHistory) {
+      this.history.shift();
+      this.currentIndex--;
+    }
+
+    this.log('Command pushed (without execute):', command.type);
+    this.notifyListeners();
+    this.scheduleAutoSave();
+  }
+
+  /**
    * Check if undo is available
    */
   canUndo(): boolean {

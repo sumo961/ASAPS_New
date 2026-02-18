@@ -36,6 +36,8 @@ import { useThemes, type ThemeAssetUrls } from './hooks/useThemes';
 import { useAIDebug } from './hooks/useAIDebug';
 import { getSavedAIConfig } from './hooks/useAI';
 import { useCommandManager } from './hooks/useCommandManager';
+import { getCommandManager } from './commands/CommandManager';
+import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, type BeatStateMutations } from './commands/BeatCommands';
 import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
 import { HtmlExportDialog } from './components/export/HtmlExportDialog';
@@ -198,6 +200,22 @@ function App() {
   }
 
   const { state, actions, initializeStory } = useStoryBuilder();
+
+  // Stable mutations ref for the command system — always points to current actions
+  // so undo/redo callbacks never close over stale state
+  const stableMutations = useRef<BeatStateMutations>({
+    addBeat: () => {},
+    updateBeat: () => {},
+    deleteBeat: () => {},
+    moveBeat: () => {},
+  });
+  stableMutations.current = {
+    addBeat: (beat) => actions.addExistingBeat(beat),
+    updateBeat: (id, updates) => actions.updateBeat(id, updates as Partial<Beat>),
+    deleteBeat: (id) => actions.deleteBeat(id),
+    moveBeat: (id, pos) => actions.moveBeat(id, pos),
+  };
+
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
   const [beatRefreshKey, setBeatRefreshKey] = useState(0); // Increments to force visual editor refresh
   const [showPreview, setShowPreview] = useState(false);
@@ -2002,13 +2020,33 @@ function App() {
   }, []);
 
   const handleBeatUpdate = useCallback((beatId: string, updates: Partial<Beat>) => {
-    actions.updateBeat(beatId, updates);
-    const updatedBeat = state.beats.find(b => b.id === beatId);
-    if (updatedBeat && selectedBeat?.id === beatId) {
-      setSelectedBeat(updatedBeat);
+    const currentBeat = state.beats.find(b => b.id === beatId);
+    if (!currentBeat) return;
+
+    // Snapshot current values for the fields being updated (for undo)
+    const oldValues: Record<string, any> = {};
+    for (const key of Object.keys(updates)) {
+      const val = (currentBeat as any)[key];
+      oldValues[key] = (val && typeof val === 'object') ? JSON.parse(JSON.stringify(val)) : val;
+    }
+
+    const cmd = new UpdateBeatCommand(
+      beatId,
+      oldValues,
+      updates as any,
+      stableMutations.current
+    );
+    getCommandManager().execute(cmd);
+
+    // Update selectedBeat for immediate UI feedback
+    if (selectedBeat?.id === beatId) {
+      const updatedBeat = state.beats.find(b => b.id === beatId);
+      if (updatedBeat) {
+        setSelectedBeat(updatedBeat);
+      }
     }
     markChanged();
-  }, [actions, state.beats, selectedBeat, markChanged]);
+  }, [state.beats, selectedBeat, markChanged]);
 
   // Handle bulk transformation changes - force UI refresh for affected beats
   const handleTransformationChangesApplied = useCallback((affectedBeatIds: string[]) => {
@@ -2030,10 +2068,8 @@ function App() {
   const handleCommandExecuted = useCallback((type: 'execute' | 'undo' | 'redo') => {
     console.log(`[App] Command ${type} executed`);
 
-    // Mark as changed for undo/redo operations that modify state
-    if (type === 'undo' || type === 'redo') {
-      markChanged();
-    }
+    // All command operations modify state and should trigger save
+    markChanged();
 
     // Force visual editor to refresh by incrementing the key
     // This ensures the editor re-reads the beat data even if the object reference hasn't changed
@@ -2071,16 +2107,33 @@ function App() {
   });
 
   const handleBeatDelete = useCallback((beatId: string) => {
-    actions.deleteBeat(beatId);
+    const beatToDelete = state.beats.find(b => b.id === beatId);
+    if (!beatToDelete) return;
+
+    const cmd = new DeleteBeatCommand(beatToDelete, stableMutations.current);
+    getCommandManager().execute(cmd);
     setSelectedBeat(null);
     markChanged();
-  }, [actions, markChanged]);
+  }, [state.beats, markChanged]);
 
   const handleBeatAdd = useCallback((type: string, position: { x: number; y: number }) => {
+    // addBeat creates AND adds to state in one step, so we record the command
+    // without executing it (the beat is already in state)
     const newBeat = actions.addBeat(type, position);
+    const cmd = new AddBeatCommand(newBeat, stableMutations.current);
+    getCommandManager().pushWithoutExecute(cmd);
     setSelectedBeat(newBeat);
     markChanged();
   }, [actions, markChanged]);
+
+  const handleBeatMove = useCallback((beatId: string, position: { x: number; y: number }) => {
+    const currentBeat = state.beats.find(b => b.id === beatId);
+    if (!currentBeat) return;
+
+    const oldPos = { x: currentBeat.x || 0, y: currentBeat.y || 0 };
+    const cmd = new MoveBeatCommand(beatId, oldPos, position, stableMutations.current);
+    getCommandManager().execute(cmd);
+  }, [state.beats]);
 
   // Beat clipboard for copy/paste
   const [beatClipboard, setBeatClipboard] = useState<{
@@ -2752,6 +2805,11 @@ function App() {
     let syncTimer: ReturnType<typeof setTimeout> | null = null;
     const unsub = vcsCtx.onEvent((event) => {
       if (event.type !== 'success') return;
+
+      // Clear undo history after VCS operations (pull, stash pop, etc.)
+      // because the project state on disk has changed externally
+      getCommandManager().clear();
+
       if (syncTimer) clearTimeout(syncTimer);
       syncTimer = setTimeout(async () => {
         const proj = currentProjectRef2.current;
@@ -4357,7 +4415,7 @@ function App() {
             onBeatSelect={handleBeatSelect}
             onBeatUpdate={handleBeatUpdate}
             onClusterSelect={handleClusterSelect}
-            onBeatMove={actions.moveBeat}
+            onBeatMove={handleBeatMove}
             onConnect={actions.connectBeats}
             onBeatAdd={handleBeatAdd}
             onClusterExpandCollapse={actions.expandCollapseCluster}

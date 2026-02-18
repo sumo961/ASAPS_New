@@ -155,6 +155,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
       onUpdateBeat(beatId, updates as Partial<Beat>);
     },
     deleteBeat: onDeleteBeat || (() => { console.warn('deleteBeat not provided'); }),
+    moveBeat: () => { /* not used by AI commands */ },
   };
 
   // Focus input when opened

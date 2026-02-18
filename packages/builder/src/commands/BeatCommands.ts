@@ -21,6 +21,7 @@ export interface BeatStateMutations {
   addBeat: (beat: Beat) => void;
   updateBeat: (beatId: string, updates: Partial<BeatConfig>) => void;
   deleteBeat: (beatId: string) => void;
+  moveBeat: (beatId: string, position: { x: number; y: number }) => void;
 }
 
 // ============================================================================
@@ -204,6 +205,73 @@ export class UpdateBeatCommand extends Command {
 }
 
 // ============================================================================
+// Move Beat Command
+// ============================================================================
+
+export class MoveBeatCommand extends Command {
+  public readonly type = 'MOVE_BEAT';
+  public description: string;
+
+  private beatId: string;
+  private oldPosition: { x: number; y: number };
+  private newPosition: { x: number; y: number };
+  private mutations: BeatStateMutations;
+
+  constructor(
+    beatId: string,
+    oldPosition: { x: number; y: number },
+    newPosition: { x: number; y: number },
+    mutations: BeatStateMutations,
+    id?: string
+  ) {
+    super(id);
+    this.beatId = beatId;
+    this.oldPosition = oldPosition;
+    this.newPosition = newPosition;
+    this.mutations = mutations;
+    this.description = `Move beat`;
+  }
+
+  execute(): void {
+    this.mutations.moveBeat(this.beatId, this.newPosition);
+  }
+
+  undo(): void {
+    this.mutations.moveBeat(this.beatId, this.oldPosition);
+  }
+
+  protected serializeData(): any {
+    return {
+      beatId: this.beatId,
+      oldPosition: this.oldPosition,
+      newPosition: this.newPosition,
+    };
+  }
+
+  canMergeWith(command: Command): boolean {
+    if (!(command instanceof MoveBeatCommand)) return false;
+    if (command.beatId !== this.beatId) return false;
+    const timeDiff = command.timestamp.getTime() - this.timestamp.getTime();
+    return timeDiff <= 500;
+  }
+
+  mergeWith(command: Command): void {
+    if (!(command instanceof MoveBeatCommand)) return;
+    this.newPosition = command.newPosition;
+  }
+
+  static deserialize(data: SerializedCommand, mutations: BeatStateMutations): MoveBeatCommand {
+    return new MoveBeatCommand(
+      data.data.beatId,
+      data.data.oldPosition,
+      data.data.newPosition,
+      mutations,
+      data.id
+    );
+  }
+}
+
+// ============================================================================
 // Register Commands
 // ============================================================================
 
@@ -223,5 +291,9 @@ export function registerBeatCommands(mutations: BeatStateMutations): void {
 
   CommandRegistry.register('UPDATE_BEAT', (data) =>
     UpdateBeatCommand.deserialize(data, mutations)
+  );
+
+  CommandRegistry.register('MOVE_BEAT', (data) =>
+    MoveBeatCommand.deserialize(data, mutations)
   );
 }
