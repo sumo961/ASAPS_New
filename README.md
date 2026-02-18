@@ -16,12 +16,13 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.19)
+## ⚠️ Development Status (v0.9.20)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Translation + Undo Fix** | **v0.9.20**: Undo no longer overwrites translations when a translation language is active |
 | **Undo/Redo** | **v0.9.19**: All beat operations (edit, add, delete, move) now support Ctrl+Z / Cmd+Z undo/redo |
 | **History Panel** | **v0.9.19**: Clickable history dropdown in toolbar — view, jump to, and clear command history |
 | **Translation Persistence** | **v0.9.18**: Translations load on startup, survive push/pull, VCS-aware with staleness detection |

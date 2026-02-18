@@ -976,6 +976,44 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!beat || !onUpdate) return;
 
     const beatToUpdate = updatedLocalBeat || localBeat;
+
+    // When a translation language is active, localBeat.parameters contains
+    // translated text overlays. We must restore source text before updating
+    // the actual beat, so translations don't leak into source parameters.
+    let parametersForUpdate = beatToUpdate.parameters;
+    if (translationState.activeLanguage && sourceParametersRef.current
+        && Object.keys(sourceParametersRef.current).length > 0) {
+      parametersForUpdate = { ...beatToUpdate.parameters };
+      const resource = translationState.translations.find(
+        t => t.languageCode === translationState.activeLanguage
+      );
+      if (resource) {
+        const entries = getAllTranslationEntriesForBeat(resource, beat.id);
+        for (const entry of entries) {
+          // Restore source value for each translated top-level field
+          if (!entry.path.includes('.') && sourceParametersRef.current[entry.path] !== undefined) {
+            parametersForUpdate[entry.path] = sourceParametersRef.current[entry.path];
+          }
+        }
+        // Restore complex structures that may have nested translation overlays
+        if (sourceParametersRef.current.dialogTree) {
+          parametersForUpdate.dialogTree = sourceParametersRef.current.dialogTree;
+        }
+        if (sourceParametersRef.current.choices) {
+          parametersForUpdate.choices = sourceParametersRef.current.choices;
+        }
+        if (sourceParametersRef.current.props) {
+          parametersForUpdate.props = sourceParametersRef.current.props;
+        }
+        if (sourceParametersRef.current.hyperlinks) {
+          parametersForUpdate.hyperlinks = sourceParametersRef.current.hyperlinks;
+        }
+        if (sourceParametersRef.current.textVariations) {
+          parametersForUpdate.textVariations = sourceParametersRef.current.textVariations;
+        }
+      }
+    }
+
     const beatAny = beat as any;
 
     // Clear existing connections
@@ -994,7 +1032,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     beat.transition = beatToUpdate.transition;
 
     // Convert backgroundSound from parameters to proper Sound object
-    const backgroundSoundId = beatToUpdate.parameters?.backgroundSound;
+    const backgroundSoundId = parametersForUpdate?.backgroundSound;
     if (backgroundSoundId) {
       beat.sound = {
         file: backgroundSoundId,  // For compatibility
@@ -1006,13 +1044,13 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.sound = undefined;
     }
 
-    // Update parameters
-    if (beatToUpdate.parameters && beat.updateParameters) {
-      const parameters = { ...beatToUpdate.parameters };
+    // Update parameters (using cleaned parameters without translation overlays)
+    if (parametersForUpdate && beat.updateParameters) {
+      const parameters = { ...parametersForUpdate };
 
       // Ensure button text is saved for applicable beats
       if (['titleScreen', 'infoText', 'durScreen', 'endScreen'].includes(beat.type)) {
-        parameters.buttonText = beatToUpdate.parameters.buttonText ||
+        parameters.buttonText = parametersForUpdate.buttonText ||
           (beat.type === 'titleScreen' ? 'Start' :
            beat.type === 'endScreen' ? 'Play Again' :
            'Continue');
@@ -1056,7 +1094,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         return connections;
       };
 
-      const dialogConnections = extractConnections(beatToUpdate.parameters.dialogTree);
+      const dialogConnections = extractConnections(parametersForUpdate.dialogTree);
 
       if (beatToUpdate.connections?.length > 0) {
         const defaultConn = beatToUpdate.connections.find((c: any) => !c.label || c.label === 'Continue');

@@ -1,5 +1,30 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-18: Fix Undo Overwriting Translations (v0.9.20)
+
+### Overview
+
+This release fixes a bug where **undo would overwrite existing translations** when a translation language was active during editing.
+
+### Root Cause
+
+When a translation language (e.g., Italian) is active, the Inspector overlays translated text onto `localBeat.parameters` for display in form fields. When a non-translation edit (e.g., changing a connection target) triggered `rebuildConnectionsAndUpdate`, the function sent `localBeat.parameters` — which contained translated text overlays — to `beat.updateParameters()`. This contaminated the beat's source text with translated values. Then when the user pressed undo, the command restored the pre-edit source text, making it appear as though translations were "overwritten."
+
+### Fix
+
+Modified `rebuildConnectionsAndUpdate` in `Inspector.tsx` to strip translation overlays before updating the beat. When a translation language is active, the function now:
+
+1. Uses `sourceParametersRef.current` (which stores pre-overlay source values) to restore source text for all translated top-level fields
+2. Restores complex nested structures (`dialogTree`, `choices`, `props`, `hyperlinks`, `textVariations`) from their source values
+3. Passes the cleaned `parametersForUpdate` to `beat.updateParameters()` instead of the overlay-contaminated parameters
+
+This ensures the beat's source parameters are never polluted with translated text, and undo/redo operates correctly on source text only.
+
+**Files modified:**
+- `packages/builder/src/components/Inspector.tsx` — Strip translation overlays in `rebuildConnectionsAndUpdate`
+
+---
+
 ## 2026-02-18: Undo/Redo System & History Panel (v0.9.19)
 
 ### Overview
