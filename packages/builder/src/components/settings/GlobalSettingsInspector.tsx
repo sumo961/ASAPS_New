@@ -13,6 +13,9 @@ interface GlobalSettings {
     height: number;             // Project height in pixels
     aspectRatio: string;        // Aspect ratio (e.g., "4:3", "16:9")
     scalingMode: 'none' | 'fit' | 'fill' | 'stretch';  // How to scale content
+    mobileScalingMode?: 'auto' | 'fit' | 'cover';  // Mobile display mode
+    mobileFontScale?: number;   // Font scale multiplier for mobile (1.0-2.0)
+    showMobileSafeZone?: boolean;  // Show mobile crop safe zone overlay in editor
   };
   colors: {
     pcolor: string;         // Button/choice background color (player actions)
@@ -944,6 +947,65 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       <div className="absolute top-0 left-0 h-full w-1 bg-blue-500 opacity-50" />
                       <div className="absolute top-0 right-0 h-full w-1 bg-blue-500 opacity-50" />
                     </div>
+                  </div>
+                </div>
+
+                {/* Mobile Display Settings */}
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Mobile Display</h4>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Mobile Scaling
+                      </label>
+                      <select
+                        value={settings.project.mobileScalingMode || 'auto'}
+                        onChange={(e) => handleChange('project', 'mobileScalingMode', e.target.value)}
+                        className="w-full px-3 py-2 border rounded"
+                      >
+                        <option value="auto">Auto (Cover on mobile, Fit on desktop)</option>
+                        <option value="fit">Fit (Letterbox on all devices)</option>
+                        <option value="cover">Cover (Fill viewport, crop edges)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Cover mode fills the screen on mobile, improving text readability at the cost of cropping stage edges
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Mobile Font Scale: {(settings.project.mobileFontScale || 1.0).toFixed(1)}x
+                      </label>
+                      <input
+                        type="range"
+                        min="1.0"
+                        max="2.0"
+                        step="0.1"
+                        value={settings.project.mobileFontScale || 1.0}
+                        onChange={(e) => handleChange('project', 'mobileFontScale', parseFloat(e.target.value))}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Additional font size boost on mobile devices (1.0 = normal)
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="showMobileSafeZone"
+                        checked={settings.project.showMobileSafeZone || false}
+                        onChange={(e) => handleChange('project', 'showMobileSafeZone', e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <label htmlFor="showMobileSafeZone" className="text-sm text-gray-600">
+                        Show Mobile Safe Zone in Editor
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Highlights areas that may be cropped on mobile devices (16:9 and 19.5:9 ratios)
+                    </p>
                   </div>
                 </div>
               </div>

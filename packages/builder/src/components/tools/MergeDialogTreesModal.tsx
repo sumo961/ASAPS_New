@@ -49,7 +49,7 @@ function findMergeCandidates(beats: Beat[]): MergeCandidate[] {
   // Build a map of incoming connections for each beat
   const incomingConnections = new Map<string, { sourceId: string; sourceType: string }[]>();
   beats.forEach(beat => {
-    const connections = beat.getConnections();
+    const connections = typeof beat.getConnections === 'function' ? beat.getConnections() : [];
     connections.forEach(conn => {
       if (!incomingConnections.has(conn.targetId)) {
         incomingConnections.set(conn.targetId, []);
@@ -76,7 +76,7 @@ function findMergeCandidates(beats: Beat[]): MergeCandidate[] {
   // Helper to get DialogTree targets of a beat
   const getDialogTreeTargets = (beat: DialogTreeBeat): string[] => {
     const targets: string[] = [];
-    const connections = beat.getConnections();
+    const connections = typeof beat.getConnections === 'function' ? beat.getConnections() : [];
     connections.forEach(conn => {
       if (dialogTreeIds.has(conn.targetId)) {
         targets.push(conn.targetId);

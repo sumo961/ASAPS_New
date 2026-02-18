@@ -8,6 +8,7 @@ import type { MeterCounterData, MeterFrameConfig } from '../components/Character
 import type { InventoryItemData, InventoryFrameConfig } from '../components/CharacterInventoryFrame';
 import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
+import { isMobileDevice } from '../utils/mobileDetection';
 
 // ============= SCALED STAGE COMPONENT =============
 // Handles viewport-responsive scaling for the story stage
@@ -19,13 +20,22 @@ interface ScaledStageProps {
   height: number;
   /** When true, skip internal scaling (parent handles it) */
   disableScaling?: boolean;
+  /** Scaling strategy: 'fit' = letterbox (default), 'cover' = fill/crop */
+  scalingMode?: 'fit' | 'cover';
+  /** Background URL for the viewport-filling layer (cover mode) */
+  backgroundUrl?: string | null;
+  /** Fallback background color/gradient for the viewport-filling layer */
+  backgroundColor?: string;
 }
 
 const ScaledStage: React.FC<ScaledStageProps> = ({
   children,
   width,
   height,
-  disableScaling = false
+  disableScaling = false,
+  scalingMode = 'fit',
+  backgroundUrl,
+  backgroundColor,
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [scale, setScale] = React.useState<number | null>(disableScaling ? 1 : null);
@@ -46,9 +56,17 @@ const ScaledStage: React.FC<ScaledStageProps> = ({
           const availableHeight = parent.clientHeight;
           const scaleX = availableWidth / width;
           const scaleY = availableHeight / height;
-          // Use the smaller scale to fit entirely within viewport (allow up to 2x for larger screens)
-          let newScale = Math.min(scaleX, scaleY, 2);
-          console.log(`[ScaledStage] container: ${availableWidth}x${availableHeight}, stage: ${width}x${height}, scaleX: ${scaleX.toFixed(4)}, scaleY: ${scaleY.toFixed(4)}, scale: ${newScale.toFixed(4)}`);
+
+          let newScale: number;
+          if (scalingMode === 'cover') {
+            // Cover mode: fill viewport entirely, cropping edges
+            newScale = Math.max(scaleX, scaleY);
+          } else {
+            // Fit mode: letterbox to fit entirely within viewport (allow up to 2x for larger screens)
+            newScale = Math.min(scaleX, scaleY, 2);
+          }
+
+          console.log(`[ScaledStage] container: ${availableWidth}x${availableHeight}, stage: ${width}x${height}, mode: ${scalingMode}, scaleX: ${scaleX.toFixed(4)}, scaleY: ${scaleY.toFixed(4)}, scale: ${newScale.toFixed(4)}`);
           // If very close to 1, use exactly 1 to avoid sub-pixel letterboxing
           if (newScale > 0.99 && newScale < 1.01) {
             newScale = 1;
@@ -61,15 +79,61 @@ const ScaledStage: React.FC<ScaledStageProps> = ({
     updateScale();
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
-  }, [width, height, disableScaling]);
+  }, [width, height, disableScaling, scalingMode]);
 
   // Don't render until scale is calculated to prevent flash
   if (scale === null) {
     return <div ref={containerRef} style={{ width, height, visibility: 'hidden' }}>{children}</div>;
   }
 
-  // Always use fixed stage dimensions and apply uniform scale
-  // This ensures the stage maintains its aspect ratio
+  // Cover mode: two-layer architecture with viewport-filling background
+  if (scalingMode === 'cover') {
+    // Build background style for the viewport-filling layer
+    const bgLayerStyle: React.CSSProperties = {
+      position: 'absolute',
+      inset: 0,
+    };
+    if (backgroundUrl) {
+      bgLayerStyle.backgroundImage = `url(${backgroundUrl})`;
+      bgLayerStyle.backgroundSize = 'cover';
+      bgLayerStyle.backgroundPosition = 'center';
+      bgLayerStyle.backgroundRepeat = 'no-repeat';
+    } else if (backgroundColor) {
+      bgLayerStyle.background = backgroundColor;
+    }
+
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Layer 0: Background fills entire viewport */}
+        <div style={bgLayerStyle} />
+        {/* Layer 1: Cover-scaled content stage */}
+        <div
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: width,
+            height: height,
+            transform: `translate(-50%, -50%) scale(${scale})`,
+            transformOrigin: 'center center',
+            overflow: 'hidden',
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  // Fit mode (default): single-layer with uniform scale
   return (
     <div
       ref={containerRef}
@@ -78,7 +142,7 @@ const ScaledStage: React.FC<ScaledStageProps> = ({
         height: height,
         transform: scale !== 1 ? `scale(${scale})` : 'none',
         transformOrigin: 'center center',
-        overflow: 'hidden', // Clip any content that escapes the stage bounds
+        overflow: 'hidden',
       }}
     >
       {children}
@@ -772,6 +836,8 @@ export class ReactRenderer extends BaseRenderer {
   protected overrideCountdownMeter: boolean = false;  // Per-beat flag to override default countdown meter visibility
   protected fictionalTimeText: string | undefined;  // Formatted fictional time text for Timer HUD
   private fictionalTimeTextListeners: Set<(text: string | undefined) => void> = new Set();
+  protected mobileMode: boolean = false;  // Whether mobile display adaptation is active
+  protected mobileFontScale: number = 1.0;  // Font scale multiplier for mobile (1.0-2.0)
 
   private get root(): ReactDOM.Root | null {
     return this._root;
@@ -1217,6 +1283,30 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Set mobile display mode
+   * When true, uses cover scaling (fills viewport, crops edges) instead of fit scaling (letterboxes)
+   * Set to 'auto' via project settings to auto-detect mobile devices
+   */
+  setMobileMode(enabled: boolean): void {
+    this.mobileMode = enabled;
+  }
+
+  /**
+   * Get current mobile mode state
+   */
+  getMobileMode(): boolean {
+    return this.mobileMode;
+  }
+
+  /**
+   * Set the mobile font scale multiplier (1.0 to 2.0)
+   * Applied on top of cover scaling to further boost readability on small screens
+   */
+  setMobileFontScale(scale: number): void {
+    this.mobileFontScale = Math.max(1.0, Math.min(2.0, scale));
+  }
+
+  /**
    * Subscribe to timer state changes
    * Returns an unsubscribe function
    */
@@ -1297,9 +1387,20 @@ export class ReactRenderer extends BaseRenderer {
       const stageHeight = this.context.height;
       const disableScaling = this.getState('disableScaling') as boolean | undefined;
 
+      // Determine scaling mode for mobile
+      const scalingMode = this.mobileMode ? 'cover' as const : 'fit' as const;
+      const useMobileBg = this.mobileMode && scalingMode === 'cover';
+
       this.renderComponent(
         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          <ScaledStage width={stageWidth} height={stageHeight} disableScaling={disableScaling}>
+          <ScaledStage
+            width={stageWidth}
+            height={stageHeight}
+            disableScaling={disableScaling}
+            scalingMode={scalingMode}
+            backgroundUrl={useMobileBg ? this.backgroundImageUrl : undefined}
+            backgroundColor={useMobileBg ? backgroundColor : undefined}
+          >
             <PositionedBeatView
               stageWidth={stageWidth}
               stageHeight={stageHeight}
@@ -1333,6 +1434,8 @@ export class ReactRenderer extends BaseRenderer {
               overrideCountdownMeter={this.overrideCountdownMeter}
               fictionalTimeText={this.fictionalTimeText}
               onSubscribeFictionalTimeText={(listener) => this.subscribeToFictionalTimeText(listener)}
+              externalBackground={useMobileBg}
+              mobileFontScale={this.mobileMode ? this.mobileFontScale : 1.0}
             />
           </ScaledStage>
         </div>
@@ -1517,9 +1620,20 @@ export class ReactRenderer extends BaseRenderer {
     const stageHeight = this.context.height;
     const disableScaling = this.getState('disableScaling') as boolean | undefined;
 
+    // Determine scaling mode for mobile
+    const scalingMode = this.mobileMode ? 'cover' as const : 'fit' as const;
+    const useMobileBg = this.mobileMode && scalingMode === 'cover';
+
     this.renderComponent(
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        <ScaledStage width={stageWidth} height={stageHeight} disableScaling={disableScaling}>
+        <ScaledStage
+          width={stageWidth}
+          height={stageHeight}
+          disableScaling={disableScaling}
+          scalingMode={scalingMode}
+          backgroundUrl={useMobileBg ? this.backgroundImageUrl : undefined}
+          backgroundColor={useMobileBg ? backgroundColor : undefined}
+        >
           <ChatDialogView
             messages={[...this.chatMessages]}
             choices={choices}

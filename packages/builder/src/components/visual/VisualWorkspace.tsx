@@ -416,11 +416,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     elements.forEach((el: VisualElement) => {
       if (el.name === 'Main Text') return;
 
-      // For DialogTree beats, skip dialog and button elements (they're regenerated per phase)
-      if (targetBeat.type === 'dialogTree' && (el.type === 'dialog' || el.type === 'button')) {
-        return;
-      }
-
       let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad';
       if (el.type === 'character') kind = 'character';
       else if (el.type === 'prop') kind = 'prop';
@@ -799,21 +794,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Log z-index values for debugging
     console.log(`[VisualWorkspace] Phase elements z-values:`, phaseElements.map(el => ({ id: el.id, name: el.name, z: el.z })));
 
-    // Fix z-index ordering: if all elements have the same z value, assign incremental values
-    // This ensures reordering works for ASML imports where z-index wasn't preserved
-    // Skip this fix if any element has a non-zero z (meaning overrides were applied)
+    // Fix z-index ordering: ensure all elements have unique z values
+    // This handles ASML imports where z-index wasn't preserved (all 0) or has duplicates
     if (allElements.length > 1) {
       const zValues = allElements.map((el: VisualElement) => el.z);
-      const allSameZ = zValues.every((z: number) => z === zValues[0]);
-      const anyNonZero = zValues.some((z: number) => z !== 0);
-
-      if (allSameZ && !anyNonZero) {
-        console.log(`[VisualWorkspace] DialogTree: All ${allElements.length} elements have same z-index (${zValues[0]}), assigning incremental values`);
+      const uniqueZValues = new Set(zValues);
+      if (uniqueZValues.size < allElements.length) {
+        console.log(`[VisualWorkspace] DialogTree: Duplicate z-index values (${uniqueZValues.size} unique for ${allElements.length} elements), assigning incremental values`);
         allElements.forEach((el: VisualElement, idx: number) => {
           el.z = idx;
         });
-      } else {
-        console.log(`[VisualWorkspace] DialogTree: Keeping existing z-values (allSame=${allSameZ}, anyNonZero=${anyNonZero})`);
       }
     }
 
@@ -1091,7 +1081,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             element.text = params.fallbackText || '[AI-generated text]';
           } else if (beat.type === 'hyperText') {
             element.text = params.text || '';
-          } else if (beat.type === 'endScreen' && nameLower.includes('message')) {
+          } else if (beat.type === 'endScreen') {
+            // Any text/dialog element on endScreen is the message
             element.text = params.message || 'The End';
           } else if (beat.type === 'dialogTree') {
             // DialogTree stores text in dialogTree.text, not params.text
@@ -1121,6 +1112,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               element.text = params.restartText || params.buttonText || 'Play Again';
             } else if (nameLower.includes('credits')) {
               element.text = params.creditsText || 'Credits';
+            } else {
+              // Any other button on endScreen defaults to restart text
+              element.text = params.restartText || params.buttonText || 'Play Again';
             }
           } else {
             element.text = params.buttonText || loc.name || 'Continue';
@@ -1386,13 +1380,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Use direct backgroundUrl from ASML import (if available) - avoids asset lookup
     const bgUrl = params.backgroundUrl || '';
 
-    // Fix z-index ordering: if all elements have the same z value, assign incremental values
-    // This ensures reordering works for ASML imports where z-index wasn't preserved
+    // Fix z-index ordering: ensure all elements have unique z values
+    // This handles ASML imports where z-index wasn't preserved (all 0) or has duplicates
     if (elements.length > 1) {
       const zValues = elements.map((el: VisualElement) => el.z);
-      const allSameZ = zValues.every((z: number) => z === zValues[0]);
-      if (allSameZ) {
-        console.log(`[VisualWorkspace] All ${elements.length} elements have same z-index (${zValues[0]}), assigning incremental values`);
+      const uniqueZValues = new Set(zValues);
+      if (uniqueZValues.size < elements.length) {
+        console.log(`[VisualWorkspace] Duplicate z-index values found (${uniqueZValues.size} unique for ${elements.length} elements), assigning incremental values`);
         elements.forEach((el: VisualElement, idx: number) => {
           el.z = idx;
         });

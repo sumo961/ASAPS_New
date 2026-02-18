@@ -1050,6 +1050,118 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                 })() : undefined}
               />
 
+              {/* Mobile Safe Zone overlay - shows crop areas for common mobile aspect ratios */}
+              {globalSettings?.project?.showMobileSafeZone && (() => {
+                // Calculate crop zones for 16:9 and 19.5:9 ratios on the current stage
+                const stageAR = stageWidth / stageHeight;
+                const ratios = [
+                  { name: '16:9', ar: 16 / 9, color: 'rgba(255, 165, 0, 0.15)', borderColor: 'rgba(255, 165, 0, 0.6)' },
+                  { name: '19.5:9', ar: 19.5 / 9, color: 'rgba(255, 50, 50, 0.12)', borderColor: 'rgba(255, 50, 50, 0.5)' },
+                ];
+
+                return ratios.map(({ name, ar, color, borderColor }) => {
+                  // If the mobile device has a wider aspect ratio than the stage,
+                  // it will crop top/bottom. If narrower, it will crop left/right.
+                  if (ar > stageAR) {
+                    // Wider device: crops top and bottom
+                    const visibleHeight = stageWidth / ar;
+                    const cropPx = (stageHeight - visibleHeight) / 2;
+                    if (cropPx <= 0) return null;
+                    return (
+                      <React.Fragment key={name}>
+                        {/* Top crop zone */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: `${cropPx}px`,
+                            background: color,
+                            borderBottom: `1px dashed ${borderColor}`,
+                            pointerEvents: 'none',
+                            zIndex: 9998,
+                          }}
+                        >
+                          <span style={{
+                            position: 'absolute',
+                            bottom: 2,
+                            right: 4,
+                            fontSize: '9px',
+                            color: borderColor,
+                            fontFamily: 'monospace',
+                          }}>
+                            {name} crop ({Math.round(cropPx)}px)
+                          </span>
+                        </div>
+                        {/* Bottom crop zone */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: `${cropPx}px`,
+                            background: color,
+                            borderTop: `1px dashed ${borderColor}`,
+                            pointerEvents: 'none',
+                            zIndex: 9998,
+                          }}
+                        >
+                          <span style={{
+                            position: 'absolute',
+                            top: 2,
+                            right: 4,
+                            fontSize: '9px',
+                            color: borderColor,
+                            fontFamily: 'monospace',
+                          }}>
+                            {name} crop ({Math.round(cropPx)}px)
+                          </span>
+                        </div>
+                      </React.Fragment>
+                    );
+                  } else {
+                    // Narrower device: crops left and right
+                    const visibleWidth = stageHeight * ar;
+                    const cropPx = (stageWidth - visibleWidth) / 2;
+                    if (cropPx <= 0) return null;
+                    return (
+                      <React.Fragment key={name}>
+                        {/* Left crop zone */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            bottom: 0,
+                            width: `${cropPx}px`,
+                            background: color,
+                            borderRight: `1px dashed ${borderColor}`,
+                            pointerEvents: 'none',
+                            zIndex: 9998,
+                          }}
+                        />
+                        {/* Right crop zone */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
+                            width: `${cropPx}px`,
+                            background: color,
+                            borderLeft: `1px dashed ${borderColor}`,
+                            pointerEvents: 'none',
+                            zIndex: 9998,
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+                });
+              })()}
+
               {/* Draggable overlay for each element */}
               {elements
                 .filter(el => el.visible)

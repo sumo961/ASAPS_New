@@ -101,12 +101,21 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
   </div>
 
   <script>
+    // Mobile device detection
+    window.ASAPS_MOBILE = (function() {
+      var isNarrow = window.innerWidth <= 1024;
+      var hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      return isNarrow && hasTouch;
+    })();
+
     // Story configuration
     window.ASAPS_CONFIG = {
       enableAI: {{ENABLE_AI}},
       storyUrl: '{{STORY_URL}}',
       storyData: '{{STORY_DATA}}',
       aiConfig: {{AI_CONFIG}},
+      mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
+      mobileFontScale: {{MOBILE_FONT_SCALE}},
     };
   </script>
 
@@ -118,6 +127,15 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       // Detect iframe mode
       if (window.parent !== window) {
         document.body.classList.add('iframe-mode');
+      }
+
+      // Determine mobile mode based on project settings and device detection
+      var mobileMode = false;
+      var mobileScaling = window.ASAPS_CONFIG.mobileScalingMode || 'auto';
+      if (mobileScaling === 'cover') {
+        mobileMode = true;
+      } else if (mobileScaling === 'auto') {
+        mobileMode = !!window.ASAPS_MOBILE;
       }
 
       // Get story source
@@ -135,6 +153,8 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         ASAPSPlayer.init('#player', {
           story: storySource,
           enableAI: window.ASAPS_CONFIG.enableAI,
+          mobileMode: mobileMode,
+          mobileFontScale: window.ASAPS_CONFIG.mobileFontScale,
         });
       } else {
         console.error('ASAPS Player not loaded');
@@ -226,10 +246,19 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
   </div>
 
   <script>
+    // Mobile device detection
+    window.ASAPS_MOBILE = (function() {
+      var isNarrow = window.innerWidth <= 1024;
+      var hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      return isNarrow && hasTouch;
+    })();
+
     window.ASAPS_CONFIG = {
       enableAI: {{ENABLE_AI}},
       storyData: '{{ORIGINAL_STORY_DATA}}',
       aiConfig: {{AI_CONFIG}},
+      mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
+      mobileFontScale: {{MOBILE_FONT_SCALE}},
     };
 
     window.ASAPS_TRANSLATIONS = {
@@ -286,10 +315,16 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
         var playerEl = document.getElementById('player');
         playerEl.innerHTML = '<div class="loading-screen"><div class="spinner"></div><div>Loading story...</div></div>';
 
+        // Determine mobile mode
+        var mobileScaling = window.ASAPS_CONFIG.mobileScalingMode || 'auto';
+        var mobileMode = mobileScaling === 'cover' || (mobileScaling === 'auto' && window.ASAPS_MOBILE);
+
         if (typeof ASAPSPlayer !== 'undefined') {
           window._asapsPlayerInstance = ASAPSPlayer.init('#player', {
             story: storySource,
             enableAI: window.ASAPS_CONFIG.enableAI,
+            mobileMode: mobileMode,
+            mobileFontScale: window.ASAPS_CONFIG.mobileFontScale,
           });
         }
       };
@@ -303,11 +338,17 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       if (window.parent !== window) {
         document.body.classList.add('iframe-mode');
       }
+      // Determine mobile mode
+      var mobileScaling = window.ASAPS_CONFIG.mobileScalingMode || 'auto';
+      var mobileMode = mobileScaling === 'cover' || (mobileScaling === 'auto' && window.ASAPS_MOBILE);
+
       var storySource = 'data:application/zip;base64,' + window.ASAPS_CONFIG.storyData;
       if (typeof ASAPSPlayer !== 'undefined') {
         window._asapsPlayerInstance = ASAPSPlayer.init('#player', {
           story: storySource,
           enableAI: window.ASAPS_CONFIG.enableAI,
+          mobileMode: mobileMode,
+          mobileFontScale: window.ASAPS_CONFIG.mobileFontScale,
         });
       }
     })();
@@ -803,6 +844,10 @@ async function exportAsSingleFile(
       })
     : 'null';
 
+  // Get mobile settings from project
+  const mobileScalingMode = project.globalSettings?.project?.mobileScalingMode || 'auto';
+  const mobileFontScale = project.globalSettings?.project?.mobileFontScale || 1.0;
+
   // Build HTML
   const html = HTML_TEMPLATE
     .replace('{{STORY_TITLE}}', escapeHtml(project.name || 'ASAPS Story'))
@@ -811,6 +856,8 @@ async function exportAsSingleFile(
     .replace("'{{STORY_URL}}'", "''")  // Empty for single-file mode
     .replace("'{{STORY_DATA}}'", `'${storyBase64}'`)
     .replace('{{AI_CONFIG}}', aiConfig)
+    .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
+    .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{PLAYER_SCRIPT}}', playerScript);
 
   return { html, mode: 'single-file' };
@@ -839,6 +886,10 @@ async function exportAsFolder(
       })
     : 'null';
 
+  // Get mobile settings from project
+  const mobileScalingMode = project.globalSettings?.project?.mobileScalingMode || 'auto';
+  const mobileFontScale = project.globalSettings?.project?.mobileFontScale || 1.0;
+
   // Build HTML that references external story file
   const html = HTML_TEMPLATE
     .replace('{{STORY_TITLE}}', escapeHtml(project.name || 'ASAPS Story'))
@@ -847,6 +898,8 @@ async function exportAsFolder(
     .replace("'{{STORY_URL}}'", "'story.asaps.zip'")
     .replace("'{{STORY_DATA}}'", "''")  // Empty for folder mode
     .replace('{{AI_CONFIG}}', aiConfig)
+    .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
+    .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{PLAYER_SCRIPT}}', playerScript);
 
   // Add files to ZIP
@@ -1097,6 +1150,10 @@ export async function downloadHtmlExport(
   // Build AI section (or empty)
   const aiSectionHtml = hasAIOnTheFly ? AI_TRANSLATION_SECTION : '';
 
+  // Get mobile settings from project
+  const mobileScalingMode = project.globalSettings?.project?.mobileScalingMode || 'auto';
+  const mobileFontScale = project.globalSettings?.project?.mobileFontScale || 1.0;
+
   // Assemble the enhanced HTML
   const html = ENHANCED_MULTI_LANGUAGE_TEMPLATE
     .replace('{{STORY_TITLE}}', escapeHtml(project.name || 'ASAPS Story'))
@@ -1105,6 +1162,8 @@ export async function downloadHtmlExport(
     .replace('{{ENABLE_AI}}', String(options.enableAI))
     .replace("'{{ORIGINAL_STORY_DATA}}'", `'${originalBase64}'`)
     .replace('{{AI_CONFIG}}', aiConfig)
+    .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
+    .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{LANGUAGE_OPTIONS}}', languageOptionsHtml)
     .replace('{{AI_TRANSLATION_SECTION}}', aiSectionHtml)
     .replace('{{TRANSLATIONS_MAP}}', translationsMapJs)

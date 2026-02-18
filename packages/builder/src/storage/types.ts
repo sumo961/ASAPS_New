@@ -21,6 +21,9 @@ export interface GlobalSettings {
     height: number;             // Project height in pixels
     aspectRatio: string;        // Aspect ratio (e.g., "4:3", "16:9")
     scalingMode: 'none' | 'fit' | 'fill' | 'stretch';  // How to scale content
+    mobileScalingMode?: 'auto' | 'fit' | 'cover';  // Mobile display mode (auto = cover on mobile, fit on desktop)
+    mobileFontScale?: number;   // Font scale multiplier for mobile (1.0-2.0, default 1.0)
+    showMobileSafeZone?: boolean;  // Show mobile crop safe zone overlay in editor
   };
   colors: {
     pcolor: string;         // Button/choice background color (player actions)

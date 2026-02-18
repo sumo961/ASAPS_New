@@ -19,6 +19,10 @@ export interface WebPlayerProps {
   enableAI?: boolean;
   /** Show UI overlay with save/load/settings (default: true) */
   showUI?: boolean;
+  /** Enable mobile display mode (cover scaling + font boost) */
+  mobileMode?: boolean;
+  /** Font scale multiplier for mobile (1.0-2.0, default 1.0) */
+  mobileFontScale?: number;
   /** Callback when story ends */
   onEnd?: () => void;
   /** Callback when error occurs */
@@ -36,6 +40,8 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   height = '100%',
   enableAI = true,
   showUI = true,
+  mobileMode = false,
+  mobileFontScale = 1.0,
   onEnd,
   onError,
 }) => {
@@ -153,6 +159,14 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         };
         const renderer = new ReactRenderer(context);
         rendererRef.current = renderer;
+
+        // Configure mobile display mode
+        if (mobileMode) {
+          renderer.setMobileMode(true);
+          if (mobileFontScale !== 1.0) {
+            renderer.setMobileFontScale(mobileFontScale);
+          }
+        }
 
         // Set up AI service if enabled
         if (enableAI) {
@@ -442,7 +456,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         rendererRef.current = null;
       }
     };
-  }, [state, story, enableAI, onEnd, onError]);
+  }, [state, story, enableAI, mobileMode, mobileFontScale, onEnd, onError]);
 
   // Note: Container resize is handled internally by ScaledStage component
   // via its own ResizeObserver

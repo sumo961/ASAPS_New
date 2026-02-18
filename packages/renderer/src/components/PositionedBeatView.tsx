@@ -508,6 +508,10 @@ export interface PositionedBeatViewProps {
   textDirection?: 'ltr' | 'rtl';
   /** Additional Noto font families to append to font stacks for script coverage */
   notoFontFallbacks?: string[];
+  /** When true, skip applying background styles (parent handles background separately) */
+  externalBackground?: boolean;
+  /** Mobile font scale multiplier (1.0 = normal, up to 2.0) */
+  mobileFontScale?: number;
 }
 
 /**
@@ -841,6 +845,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   onSubscribeFictionalTimeText,
   textDirection,
   notoFontFallbacks,
+  externalBackground = false,
+  mobileFontScale = 1.0,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -1206,7 +1212,10 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   };
 
   // Apply background styles based on whether we have a background image
-  if (backgroundUrl) {
+  // When externalBackground is true, parent handles the background (cover mode Layer 0)
+  if (externalBackground) {
+    containerStyle.background = 'transparent';
+  } else if (backgroundUrl) {
     containerStyle.backgroundImage = `url(${backgroundUrl})`;
     containerStyle.backgroundSize = 'cover';
     containerStyle.backgroundPosition = 'center';
@@ -1327,6 +1336,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             stageHeight={stageHeight}
             calculatedButtonHeight={previewCalculatedButtonHeight}
             editorMode={editorMode}
+            mobileFontScale={mobileFontScale}
           />
         ))}
 
@@ -1591,6 +1601,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           editorMode={editorMode}
           onScrolledToBottom={handleElementScrolledToBottom}
           scrollRequirementsMet={allScrollRequirementsMet}
+          mobileFontScale={mobileFontScale}
         />
       ))}
     </div>
@@ -1653,6 +1664,8 @@ interface PositionedElementProps {
   onScrolledToBottom?: (elementId: string) => void;
   /** Whether all scroll-to-bottom requirements are met (for enabling buttons) */
   scrollRequirementsMet?: boolean;
+  /** Mobile font scale multiplier (1.0 = normal, up to 2.0) */
+  mobileFontScale?: number;
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -1688,6 +1701,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   editorMode = false,
   onScrolledToBottom,
   scrollRequirementsMet = true,
+  mobileFontScale = 1.0,
 }) => {
   const { location, content, assetUrl, hyperlinks, description } = element;
 
@@ -1766,6 +1780,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         inputValue={inputValue}
         setInputValue={setInputValue}
         theme={theme}
+        mobileFontScale={mobileFontScale}
       />
     );
   }
@@ -1822,6 +1837,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           calculatedButtonHeight={calculatedButtonHeight}
           editorMode={editorMode}
           onScrolledToBottom={handleScrolled}
+          mobileFontScale={mobileFontScale}
         />
       );
     }
@@ -1892,6 +1908,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             description={description}
             soundBlobResolver={soundBlobResolver}
             onTriggerClickAnimation={onTriggerClickAnimation}
+            mobileFontScale={mobileFontScale}
           />
         </div>
       );
@@ -1935,6 +1952,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             description={description}
             soundBlobResolver={soundBlobResolver}
             onTriggerClickAnimation={onTriggerClickAnimation}
+            mobileFontScale={mobileFontScale}
           />
         </div>
       );
@@ -1951,6 +1969,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           inputValue={inputValue}
           setInputValue={setInputValue}
           theme={theme}
+          mobileFontScale={mobileFontScale}
         />
       );
 
@@ -2005,6 +2024,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           calculatedButtonHeight={calculatedButtonHeight}
           editorMode={editorMode}
           onScrolledToBottom={handleDialogScrolled}
+          mobileFontScale={mobileFontScale}
         />
       );
     }
@@ -2197,7 +2217,8 @@ const TextElement: React.FC<{
   calculatedButtonHeight?: number;  // Pre-calculated button height for this beat
   editorMode?: boolean;  // Editor mode - disables smart sizing
   onScrolledToBottom?: () => void;  // Callback when user scrolls to bottom
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom }) => {
+  mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0 }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const [animationStarted, setAnimationStarted] = React.useState(false);
@@ -2380,6 +2401,11 @@ const TextElement: React.FC<{
       computedFontSize = 16;
     }
     console.log(`[PositionedBeatView] Text "${location.name}": auto-sized to fontSize=${computedFontSize} (contentLength=${contentLength})`);
+  }
+
+  // Apply mobile font scale multiplier
+  if (mobileFontScale !== 1.0) {
+    computedFontSize = Math.round(computedFontSize * mobileFontScale);
   }
 
   // In editor mode, keep text centered to match user expectations (they positioned the box)
@@ -2581,7 +2607,8 @@ const ButtonElement: React.FC<{
   description?: string; // Tooltip text shown on hover (e.g., pickProp item description)
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>; // Resolver for sound blobs
   onTriggerClickAnimation?: () => Promise<void>; // Trigger onClick animations and wait for completion
-}> = ({ style, content, location, actionId, onAction, interactive: interactiveProp, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, description, soundBlobResolver, onTriggerClickAnimation }) => {
+  mobileFontScale?: number; // Mobile font scale multiplier (1.0 = normal)
+}> = ({ style, content, location, actionId, onAction, interactive: interactiveProp, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, description, soundBlobResolver, onTriggerClickAnimation, mobileFontScale = 1.0 }) => {
   // Visited choices are non-interactive (greyed out and not clickable)
   const interactive = interactiveProp && !isVisited;
   const [isHovered, setIsHovered] = React.useState(false);
@@ -2589,7 +2616,10 @@ const ButtonElement: React.FC<{
   const buttonRef = React.useRef<HTMLButtonElement>(null);
 
   // Use stored fontSize, then theme button font size, then default to 16px
-  const computedFontSize = location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
+  let computedFontSize = location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
+  if (mobileFontScale !== 1.0) {
+    computedFontSize = Math.round(computedFontSize * mobileFontScale);
+  }
   console.log(`[PositionedBeatView] Button "${location.name}": fontSize=${computedFontSize}, location.fontSize=${location.fontSize}, theme.buttonFontSize=${theme.fonts.buttonFontSize}`);
 
   const computedTextAlign = location.textAlign || 'center';
@@ -2842,7 +2872,8 @@ const InputFieldElement: React.FC<{
   inputValue?: string;
   setInputValue?: (value: string) => void;
   theme: RenderThemeSettings;
-}> = ({ style, content, location, onAction, interactive, inputValue = '', setInputValue, theme }) => {
+  mobileFontScale?: number;
+}> = ({ style, content, location, onAction, interactive, inputValue = '', setInputValue, theme, mobileFontScale = 1.0 }) => {
 
   // Calculate font size based on autosize setting or explicit fontSize
   let computedFontSize: number;
@@ -2853,6 +2884,10 @@ const InputFieldElement: React.FC<{
     computedFontSize = Math.min(Math.floor(location.height * 0.4), 24);
   } else {
     computedFontSize = 16;
+  }
+  // Apply mobile font scale multiplier
+  if (mobileFontScale !== 1.0) {
+    computedFontSize = Math.round(computedFontSize * mobileFontScale);
   }
 
   const computedTextAlign = location.textAlign || 'left';
@@ -3002,7 +3037,8 @@ const DialogElement: React.FC<{
   calculatedButtonHeight?: number;  // Pre-calculated button height for this beat
   editorMode?: boolean;  // Editor mode - disables smart sizing
   onScrolledToBottom?: () => void;  // Callback when user scrolls to bottom
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom }) => {
+  mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0 }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const hasCalledCompleteRef = React.useRef(false);
@@ -3156,6 +3192,10 @@ const DialogElement: React.FC<{
   } else {
     // Use theme font size for consistent dialog text
     computedFontSize = theme.fonts.textFontSize ?? 18;
+  }
+  // Apply mobile font scale multiplier
+  if (mobileFontScale !== 1.0) {
+    computedFontSize = Math.round(computedFontSize * mobileFontScale);
   }
 
   const animation = theme.textEffects?.animation || 'none';

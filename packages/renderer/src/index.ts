@@ -19,3 +19,6 @@ export { AudioManager, getAudioManager, disposeAudioManager, type AudioManagerOp
 // Export animation engine
 export { AnimationEngine, AnimationManager, getAnimationManager, disposeAnimationManager } from './animation/AnimationEngine';
 export * from './animation/PathInterpolator';
+
+// Export mobile detection utilities
+export { isMobileDevice, getDeviceScalingInfo, type DeviceScalingInfo } from './utils/mobileDetection';
