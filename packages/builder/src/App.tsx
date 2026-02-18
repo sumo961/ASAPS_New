@@ -2024,10 +2024,11 @@ function App() {
     if (!currentBeat) return;
 
     // Snapshot current values for the fields being updated (for undo)
+    // structuredClone preserves Map, Set, Date etc. unlike JSON.parse(JSON.stringify())
     const oldValues: Record<string, any> = {};
     for (const key of Object.keys(updates)) {
       const val = (currentBeat as any)[key];
-      oldValues[key] = (val && typeof val === 'object') ? JSON.parse(JSON.stringify(val)) : val;
+      oldValues[key] = (val && typeof val === 'object') ? structuredClone(val) : val;
     }
 
     const cmd = new UpdateBeatCommand(
