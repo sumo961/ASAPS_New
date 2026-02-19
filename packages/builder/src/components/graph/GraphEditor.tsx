@@ -9,9 +9,6 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   useReactFlow, // Move here for children-level usage
-  addEdge,
-  Connection,
-  ConnectionMode,
   MarkerType,
   Position,
   NodeTypes,
@@ -41,7 +38,6 @@ interface GraphEditorProps {
   onBeatSelect: (beat: Beat) => void;
   onBeatMove: (beatId: string, x: number, y: number) => void;
   onClusterSelect: (cluster: Cluster | null) => void;
-  onConnect: (sourceBeatId: string, targetBeatId: string) => void;
   onBeatAdd: (type: string, position: { x: number; y: number }) => void;
   onClusterExpandCollapse: (clusterId: string) => void;
   onClusterMove: (clusterId: string, x: number, y: number) => void;
@@ -103,7 +99,6 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onBeatSelect,
   onBeatMove,
   onClusterSelect,
-  onConnect,
   onBeatAdd,
   onClusterExpandCollapse,
   onClusterMove,
@@ -1004,16 +999,6 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     [onBeatMove, onClusterMove]
   );
 
-  // Handle new connection
-  const onConnectHandler = useCallback(
-    (params: Connection) => {
-      if (params.source && params.target) {
-        onConnect(params.source, params.target);
-      }
-    },
-    [onConnect]
-  );
-
 // Handle drop to add new beats
   const onDrop = useCallback(
     (event: React.DragEvent) => {
@@ -1080,7 +1065,6 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         edges={edgesState}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnectHandler}
         onNodeClick={onNodeClick}
         onNodeDragStop={onNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
@@ -1095,7 +1079,6 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        connectionMode={ConnectionMode.Loose}
         attributionPosition="bottom-left"
         minZoom={0.05}
         maxZoom={4}

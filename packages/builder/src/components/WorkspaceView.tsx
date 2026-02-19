@@ -20,7 +20,6 @@ interface WorkspaceViewProps {
   onBeatMove: (beatId: string, position: { x: number; y: number }) => void;
   onBeatUpdate?: (beatId: string, updates: Partial<Beat>) => void;
   onClusterSelect: (cluster: Cluster | null) => void;
-  onConnect: (sourceBeatId: string, targetBeatId: string) => void;
   onBeatAdd: (type: string, position: { x: number; y: number }) => void;
   onClusterExpandCollapse: (clusterId: string) => void;
   onClusterMove: (clusterId: string, x: number, y: number) => void;
@@ -77,7 +76,6 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onBeatMove,
   onBeatUpdate,
   onClusterSelect,
-  onConnect,
   onBeatAdd,
   onClusterExpandCollapse,
   onClusterMove,
@@ -214,7 +212,6 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onBeatSelect={onBeatSelect}
               onBeatMove={onBeatMove}
               onClusterSelect={onClusterSelect}
-              onConnect={onConnect}
               onBeatAdd={onBeatAdd}
               onClusterExpandCollapse={onClusterExpandCollapse}
               onClusterMove={onClusterMove}

@@ -103,6 +103,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
       <Handle
         type="target"
         position={Position.Left}
+        isConnectable={false}
         style={{
           background: data.color || '#94a3b8',
           width: 12,
@@ -149,6 +150,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
       <Handle
         type="source"
         position={Position.Right}
+        isConnectable={false}
         style={{
           background: data.color || '#94a3b8',
           width: 12,

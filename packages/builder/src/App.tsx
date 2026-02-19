@@ -4477,7 +4477,6 @@ function App() {
             onBeatUpdate={handleBeatUpdate}
             onClusterSelect={handleClusterSelect}
             onBeatMove={handleBeatMove}
-            onConnect={actions.connectBeats}
             onBeatAdd={handleBeatAdd}
             onClusterExpandCollapse={actions.expandCollapseCluster}
             onClusterMove={(clusterId: string, x: number, y: number) => {

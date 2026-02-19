@@ -461,8 +461,8 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
   if (!isExpanded) {
     return (
       <div className="relative">
-        <Handle type="target" position={Position.Left} style={{ background: '#6366f1', border: '2px solid white', width: 12, height: 12 }} />
-        <Handle type="source" position={Position.Right} style={{ background: '#6366f1', border: '2px solid white', width: 12, height: 12 }} />
+        <Handle type="target" position={Position.Left} isConnectable={false} style={{ background: '#6366f1', border: '2px solid white', width: 12, height: 12 }} />
+        <Handle type="source" position={Position.Right} isConnectable={false} style={{ background: '#6366f1', border: '2px solid white', width: 12, height: 12 }} />
 
         <div
           className={`
