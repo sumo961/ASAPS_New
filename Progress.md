@@ -1,5 +1,64 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-19: Mobile Display Improvements & Font Scaling Fix (v0.9.21)
+
+### Overview
+
+This release **decouples mobile font scaling from cover mode**, fixing the problem where text was unreadable on mobile unless cover mode (which crops edges) was enabled. Font scaling now works independently with fit mode, and a new **Native Mobile** option is added for projects designed at mobile dimensions.
+
+### Mobile Font Scaling Decoupled from Cover Mode
+
+Previously, font scaling was gated behind `mobileMode` (cover scaling), meaning you had to accept edge cropping to get readable text. Now font scaling is computed independently in the HTML template:
+
+- **Auto** (default): Fit mode + font scaling on mobile — all elements visible, text enlarged for readability
+- **Cover**: Cover mode + font scaling — fills viewport, may crop edges
+- **Fit**: Identical behavior on all devices, no font scaling
+- **Native Mobile** (new): No mobile adaptations at all — for projects already designed at mobile dimensions
+
+The `effectiveFontScale` is now pre-computed at init time based on mobile detection and scaling mode, then passed to WebPlayer which applies it unconditionally when > 1.0.
+
+**Files modified:**
+- `packages/builder/src/export/HtmlExporter.ts` — Updated all 3 `ASAPSPlayer.init()` sites (single-file, multi-language switch, multi-language initial load) to compute `effectiveFontScale` independently of `mobileMode`
+- `packages/player-web/src/WebPlayer.tsx` — Un-gated `mobileFontScale` from `mobileMode` if-block
+- `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` — Updated dropdown labels and help text, added 'native' option
+- `packages/builder/src/storage/types.ts` — Added `'native'` to `mobileScalingMode` type union
+
+### Mobile Renderer Improvements
+
+Improved mobile-responsive rendering across HUD overlays and UI components:
+
+- Character inventory frames with mobile-adaptive sizing
+- Character meter frames with responsive layout
+- Countdown meter HUD mobile scaling
+- Timer HUD display mobile adaptation
+- Scroll indicator mobile responsiveness
+- Keypad element mobile layout improvements
+- Positioned beat view mobile font scaling
+- Chat dialog view mobile adjustments
+- Improved mobile detection utility
+
+**Files modified:**
+- `packages/renderer/src/components/CharacterInventoryFrame.tsx`
+- `packages/renderer/src/components/CharacterMeterFrame.tsx`
+- `packages/renderer/src/components/ChatDialogView.tsx`
+- `packages/renderer/src/components/CountdownMeterHud.tsx`
+- `packages/renderer/src/components/KeypadElement.tsx`
+- `packages/renderer/src/components/PositionedBeatView.tsx`
+- `packages/renderer/src/components/ScrollIndicator.tsx`
+- `packages/renderer/src/components/TimerHudDisplay.tsx`
+- `packages/renderer/src/renderers/ReactRenderer.tsx`
+- `packages/renderer/src/utils/mobileDetection.ts`
+- `packages/core/src/generated/beat-types.ts`
+- `packages/builder/public/player-web.js`
+
+### Bug Fixes
+
+- Fixed stage clipping issues
+- Fixed cover mode incorrectly activating on desktop
+- Collapsible language panel in exported HTML
+
+---
+
 ## 2026-02-18: Fix Undo Overwriting Translations (v0.9.20)
 
 ### Overview

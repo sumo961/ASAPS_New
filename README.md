@@ -16,12 +16,15 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.20)
+## ⚠️ Development Status (v0.9.21)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Mobile Font Scaling** | **v0.9.21**: Font scaling decoupled from cover mode — readable text on mobile without edge cropping |
+| **Native Mobile Mode** | **v0.9.21**: New option for projects designed at mobile dimensions — disables all mobile adaptations |
+| **Mobile Renderer** | **v0.9.21**: Improved mobile-responsive rendering for HUD overlays, inventory, meters, and dialogs |
 | **Translation + Undo Fix** | **v0.9.20**: Undo no longer overwrites translations when a translation language is active |
 | **Undo/Redo** | **v0.9.19**: All beat operations (edit, add, delete, move) now support Ctrl+Z / Cmd+Z undo/redo |
 | **History Panel** | **v0.9.19**: Clickable history dropdown in toolbar — view, jump to, and clear command history |
