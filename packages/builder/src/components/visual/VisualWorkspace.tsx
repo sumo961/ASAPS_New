@@ -1287,6 +1287,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             element.text = params.message || 'The End';
           } else if (beat.type === 'dialogTree') {
             element.text = params.dialogTree?.text || params.text;
+          } else if ((beat.type === 'movementChoice' || beat.type === 'pickProp') && loc.name?.toLowerCase().includes('question')) {
+            element.text = params.question || '';
           }
         }
 
@@ -1370,6 +1372,41 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       console.log(`[VisualWorkspace] Using SchemaLocationInitializer for ${beat.type}`);
       const schemaElements = initializeLocationsFromSchema(beat, params, projectSettings);
       elements = schemaElements;
+    }
+
+    // Supplement missing static elements for beats with dynamic locations
+    // movementChoice/pickProp may have choice/prop hotspots in beat.locations
+    // but be missing the schema-defined "question" text element
+    if (elements.length > 0 && (beat.type === 'movementChoice' || beat.type === 'pickProp')) {
+      const hasQuestion = elements.some((e: VisualElement) => e.name?.toLowerCase().includes('question'));
+      if (!hasQuestion) {
+        const questionText = params.question || (beat.type === 'movementChoice' ? 'Where do you want to go?' : 'What do you want to interact with?');
+        const stageWidth = projectSettings?.width || 1024;
+        const qWidth = 600;
+        // Find lowest z-index to place question behind choice elements
+        const minZ = Math.min(0, ...elements.map((e: VisualElement) => e.z));
+        // Find topmost element y position to place question above it
+        const topY = Math.min(...elements.map((e: VisualElement) => e.y));
+        elements.unshift({
+          id: `element_question_${Date.now()}`,
+          type: 'dialog',
+          name: 'Question',
+          text: questionText,
+          x: stageWidth / 2 - qWidth / 2,
+          y: Math.max(60, topY - 100),
+          z: minZ - 1,
+          width: qWidth,
+          height: 80,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          font: undefined,
+          fontSize: 18,
+          textAlign: 'center',
+        });
+        console.log(`[VisualWorkspace] Added missing question element for ${beat.type}`);
+      }
     }
 
     // Fallback: Auto-add beat-specific elements if not already present (legacy)
