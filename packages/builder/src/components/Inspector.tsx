@@ -18,6 +18,7 @@ import { SmartNameDropdown } from '../editors/SmartNameDropdown';
 import { TextFieldWithVariables } from '../editors/TextFieldWithVariables';
 import { useTranslationState, useTranslationActions } from '../contexts/TranslationContext';
 import { getAllTranslationEntriesForBeat } from '../export/StoryTranslator';
+import { useVCSStatus } from '../vcs/VCSStatusProvider';
 
 // Helper to set a value at a dot-separated path in a nested object/array.
 // e.g. setNestedValue(obj, "choices.0.text", "hello") sets obj.choices[0].text = "hello"
@@ -169,6 +170,9 @@ export const Inspector: React.FC<InspectorProps> = ({
   // Translation state
   const translationState = useTranslationState();
   const translationActions = useTranslationActions();
+  // VCS status — for advisory editing lock warnings
+  const vcs = useVCSStatus();
+  const editingUser = beat && vcs?.initialized && vcs.type !== 'none' ? vcs.getLockedBy(beat.id) : null;
   // Stores source (untranslated) parameter values when in translation mode,
   // so we can show them as dimmed reference below the editable fields.
   const sourceParametersRef = useRef<Record<string, any>>({});
@@ -1444,6 +1448,13 @@ export const Inspector: React.FC<InspectorProps> = ({
             {beat.type} • ID: {beat.id}
           </div>
         </div>
+
+        {/* Advisory editing lock warning */}
+        {editingUser && (
+          <div className="flex-shrink-0 px-3 py-2 bg-purple-50 border-b border-purple-200 text-sm text-purple-700">
+            <strong>{editingUser}</strong> is currently editing this beat
+          </div>
+        )}
 
         {/* Validation Errors */}
         {validationErrors.length > 0 && (

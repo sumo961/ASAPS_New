@@ -732,6 +732,15 @@ export async function gitResolveAllAndComplete(
   return { success: false, message: `Resolution exceeded ${maxSteps} steps — aborting` };
 }
 
+/** Read a file from the remote branch via git show */
+export async function gitShowRemoteFile(
+  projectPath: string, branch: string, filePath: string
+): Promise<string | null> {
+  const run = getRunCommand();
+  const result = await run('git', ['show', `origin/${branch}:${filePath}`], projectPath);
+  return result.exitCode === 0 ? result.stdout : null;
+}
+
 /** Clone a remote repository into a target directory */
 export async function gitClone(
   remoteUrl: string,

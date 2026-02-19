@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Version 0.9.10*
+*Version 0.9.21*
 
 ---
 
@@ -27,6 +27,8 @@ Think of this guide as your companion in learning to think like a system builder
 - [Part 6: AI Features](#part-6-ai-features) - AI-assisted system building
 - [Part 7: Testing & Publishing](#part-7-testing--publishing) - Sharing your creation
 - [Part 8: Advanced Techniques](#part-8-advanced-techniques) - Level up your skills
+- [Part 9: Version Control & Collaboration](#part-9-version-control--collaboration) - Git integration and team workflows
+- [Part 10: Search, Translation & Productivity](#part-10-search-translation--productivity) - Power-user tools
 - [Appendix A: Beat Reference](#appendix-a-beat-reference) - Every beat type explained
 - [Appendix B: Keyboard Shortcuts](#appendix-b-keyboard-shortcuts) - Work faster
 - [Appendix C: Glossary](#appendix-c-glossary) - Definitions
@@ -295,6 +297,10 @@ This is where interactivity shines. Present text and multiple choices, each pote
 
 **Pro Tip:** Use conditions to hide choices the player hasn't unlocked. Found a secret note? Show the "Ask about the mysterious symbol" option.
 
+**Recursive Dialogs:** Set a choice's target to `__self__` to loop back to the root of the dialog tree. This is powerful for "hub" conversations where the interactor can ask multiple questions before leaving. Combined with **per-choice visited tracking** (`markVisited`), choices the interactor has already picked can be visually dimmed or hidden.
+
+**Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, or add/remove inventory items—without needing a separate logic beat. Open the **Effects** section on any choice to configure these. This keeps simple state changes co-located with the choice that triggers them.
+
 ---
 
 ### Movement Choice
@@ -380,6 +386,38 @@ Let interactors type something—their character's name, a password, an answer t
 - **Save To** - Store the input in a variable
 
 **When to Use:** Character naming, puzzles, personalization.
+
+---
+
+### Keypad
+
+**Purpose:** Numeric input via phone-style keypad or combination lock.
+
+Present a keypad interface where interactors enter a code—a phone number, safe combination, PIN, or access code.
+
+![Keypad Beat](images/12-keypad-beat.png)
+*The Keypad beat configured as a phone dialer*
+
+**Key Settings:**
+- **Prompt Text** - Instruction shown above the keypad ("Dial the number", "Enter the code")
+- **Layout** - Phone (1-9, *, 0, #), Numeric (1-9, ←, 0, ✓), or PIN (1-9, C, 0, ✓)
+- **Min/Max Digits** - How many digits are required
+- **Correct Code** - The code that triggers success (leave empty to accept any input)
+- **Max Attempts** - How many tries before failure (0 = unlimited)
+- **Mask Input** - Show `*` instead of digits (for PIN/password entry)
+- **Save To** - Store the entered code in a variable or counter
+- **Fail Target Beat** - Where to go when max attempts are exceeded
+
+**When to Use:** Phone dialing puzzles, safe cracking, PIN entry, code doors, any numeric input scenario.
+
+**Example:**
+```
+Prompt: "Enter the vault combination"
+Layout: Simple (1-9, 0)
+Correct Code: 4815162342
+Max Attempts: 3
+Fail: "Alarm Triggered" beat
+```
 
 ---
 
@@ -1078,8 +1116,26 @@ Checks for common errors:
 |--------|-------------|----------|
 | ASAPS Project (.zip) | Complete project + all assets | Backups, sharing with collaborators |
 | ASML (.asml) | XML narrative structure only | Version control, lightweight sharing |
+| HTML (.html) | Self-contained playable file | Distribution, embedding, sharing |
 
-*Note: Standalone player and publishing features are under active development.*
+### HTML Export
+
+Export your story as a single standalone HTML file that anyone can open in a browser—no server needed.
+
+1. Click **Export → HTML**
+2. Configure options:
+   - **Title** - Page title
+   - **Include splash screen** - Show a start screen before the story begins
+   - **Embed assets** - Bundle images/audio directly into the HTML
+3. Click Export
+
+The resulting HTML file includes the full renderer, all story data, and embedded assets. Share it via email, upload it to a website, or distribute it however you like. Recipients just double-click to play.
+
+**Advanced HTML Export Options:**
+- **Mobile-responsive** - Automatic font scaling and layout adaptation on phones/tablets
+- **Bundled translations** - Include multiple language versions with a language selector
+- **Save/resume** - Interactors can save progress and resume later (via browser storage)
+- **AI translation on-the-fly** - Optionally embed an API key for runtime AI translation to any language
 
 ### Export Steps
 
@@ -1238,18 +1294,81 @@ Create and save your own themes, including:
 - UI element styling
 - Bundled fonts
 
-## Timers & Pressure
+## Timers, Countdowns & Fictional Time
 
-### Setting Up Timed Choices
+ASAPS Modern has two distinct time systems: **real-time timers** that count down in seconds, and **fictional time** that tracks an in-story date and clock.
+
+### Real-Time Timers
 
 1. Add a **Set Timer** beat before your choice
 2. Configure duration and target (what happens when time runs out)
 3. The following Dialog Tree will show a countdown
 4. If time expires, story jumps to the timer's target
 
+![Set Timer Beat](images/14-set-timer.png)
+*A SetTimer beat creating a 30-second countdown*
+
+**Key Settings:**
+- **Timer Name** - Identifier (e.g., "countdown")
+- **Duration** - Seconds until expiry
+- **Timer Target Beat** - Where to go when time runs out
+- **Countdown To Beat** - Which beat shows the countdown bar (optional)
+- **Show Timer HUD** - Display a persistent countdown overlay
+
+**Clearing Timers:** Set duration to 0 to clear a running timer. Useful after the interactor completes a challenge before time runs out.
+
+### Timer HUD
+
+The Timer HUD is a persistent overlay that appears in a corner of the screen. Configure it in **Settings → HUD Overlays**:
+
+- **Position** - Top-left, top-right, bottom-left, bottom-right
+- **Style** - Digital (clock-style) or Minimal
+- **Colors** - Text color, background color, opacity
+- **Label** - Optional label above the time display
+
+The HUD automatically shows the active countdown when a timer is running. When no timer is active, it can display fictional time or static text.
+
+### Fictional Time System
+
+Fictional time tracks an in-story date and time that's independent of real-world time. Use it for day/night cycles, appointment deadlines, or "three days later" transitions.
+
+![Fictional Time Setup](images/13-fictional-time.png)
+*Setting the fictional time to January 9, 2025*
+
+**Setting Fictional Time:** Use a **Set Variable** beat with type set to **Fictional Time**:
+
+- **Operation** - *Set to datetime* (absolute), *Advance* (add time), *Subtract* (go back)
+- **Date** - Day, month, year
+- **Time** - Hour and minute
+
+**Checking Fictional Time:** Use a **Condition Beat** with the fictional time variable:
+
+![Checking Fictional Time](images/15-check-fictional-time.png)
+*A condition beat checking whether fictional time is past a threshold*
+
+- Compare with operators: equals, greater than, less than
+- Branch your story based on what "time" it is in the narrative
+
+**Displaying Fictional Time:** When the Timer HUD is enabled and fictional time is set, the HUD automatically displays the formatted time (e.g., "9:00 AM" or "Jan 9, 2025 9:00"). This appears even when no real-time countdown is active.
+
+**Example: Day/Night Cycle**
+```
+[Set fictional time to 8:00 AM]
+    ↓
+[Morning scene - "The sun rises over the village"]
+    ↓
+[Advance time by 6 hours]
+    ↓
+[Check: time > 2:00 PM?]
+  → true: "Afternoon market" (shops are open)
+  → false: "Morning errands" (shops still closed)
+```
+
 ### Timer Strategies
 
 - **Urgency** - Force quick decisions under time pressure
+- **Narrative time** - Track in-story hours/days with fictional time
+- **Deadlines** - Combine real timers with fictional time for "you have until midnight"
 
 ## Random Elements
 
@@ -1281,6 +1400,173 @@ Merchant gives "Magic Sword" to Player
 
 ---
 
+# Part 9: Version Control & Collaboration
+
+ASAPS Modern includes built-in Git version control for team collaboration. This works with the **Desktop app** on directory-format projects.
+
+## Why Version Control?
+
+When building a complex narrative system, you need:
+- **History** - See what changed and when, roll back mistakes
+- **Collaboration** - Multiple people working on the same story
+- **Backup** - Your work is safely stored in a remote repository
+
+## Setting Up Git
+
+### New Project
+1. Open or save your story as a **directory project** (File → Save As Folder)
+2. Open the **VCS Panel** (sidebar icon or Ctrl/Cmd+Shift+G)
+3. Click **Initialize Repository**
+4. Optionally add a remote URL (GitHub, GitLab, etc.)
+
+### Existing Repository
+1. **Clone** an existing repo: File → Clone Repository
+2. Enter the remote URL and choose a local folder
+3. The project opens automatically
+
+## The VCS Panel
+
+The VCS panel (accessible from the sidebar) has several tabs:
+
+### Pending Changes
+Shows all modified, added, or deleted files since last commit:
+- **Stage** individual files or all at once
+- **Unstage** files you don't want to commit
+- **Revert** files to discard local changes
+- Click any file to see a **diff** of what changed
+
+### Commit & Push
+1. Stage your changes
+2. Write a commit message describing what you did
+3. Click **Commit**
+4. Click **Push** to send to the remote
+
+### Pull & Sync
+- **Pull** downloads changes from the remote
+- **Pull with Rebase** replays your local commits on top of remote changes
+- The header shows **↑ ahead** and **↓ behind** counts
+
+### Branches
+- View and switch between branches
+- Create new branches for features or experiments
+- Merge branches back together
+
+### History
+- Browse the full commit log
+- See which files changed in each commit
+- View diffs for any historical commit
+
+## Beat-Level Status Indicators
+
+Each beat on the canvas shows a colored dot indicating its VCS status:
+
+| Color | Meaning |
+|-------|---------|
+| Green | New (added/untracked) |
+| Orange | Modified since last commit |
+| Red | Merge conflict |
+| Blue | Locked (Perforce) |
+| Purple | Being edited by another user |
+
+## Merge Conflicts
+
+When two people edit the same beat and their changes conflict:
+
+1. The beat shows a **red dot** on the canvas
+2. The VCS panel highlights conflicting files
+3. Choose resolution: **Keep Mine** or **Accept Theirs**
+4. For rebases with multiple conflicts, ASAPS resolves them step by step
+
+## Advisory Editing Locks
+
+When collaborating via Git, ASAPS tracks which beats each team member is currently editing. This is **advisory only**—it warns you but doesn't prevent editing.
+
+**How it works:**
+- When you select a beat in the Inspector, a lock entry is written to `.asaps-editing.json`
+- This file propagates through normal git commit/push/pull
+- Other team members see a **purple dot** on beats you're editing
+- The Inspector shows a warning banner: "*Alice is currently editing this beat*"
+- Locks automatically expire after 2 hours (handles crashes and forgotten sessions)
+
+**What to do:** If you see a purple indicator, consider working on a different beat to avoid merge conflicts later.
+
+## Perforce Support
+
+ASAPS Modern also supports Perforce (P4) for studios that use it:
+- Automatic checkout on edit
+- Lock/unlock files
+- Submit changelists
+- View lock ownership
+
+---
+
+# Part 10: Search, Translation & Productivity
+
+## Undo & Redo
+
+ASAPS Modern maintains a full undo/redo history for beat operations:
+
+- **Ctrl/Cmd+Z** - Undo the last operation
+- **Ctrl/Cmd+Shift+Z** - Redo
+- The **History dropdown** (next to undo/redo buttons) shows recent operations
+
+Supported operations: edit beat properties, add beats, delete beats, move beats. The undo stack persists for the current session.
+
+## Search & Replace
+
+Find and modify content across your entire project:
+
+1. Press **Ctrl/Cmd+F** or click **Tools → Search**
+2. The Search panel appears at the bottom
+
+**Features:**
+- Search across beat names, text content, dialog choices, and properties
+- **Replace** individual matches or replace all
+- **Case-sensitive** toggle
+- **Regex** support for pattern matching
+- Results grouped by beat with context preview
+- Click a result to select that beat in the canvas
+
+**Use Cases:**
+- Rename a character across all dialog
+- Find all beats mentioning a specific location
+- Replace placeholder text throughout the story
+
+## Multi-Language Translation
+
+Create localized versions of your story with AI-assisted translation:
+
+1. Click the **language selector** (top right, shows "Source (English)")
+2. Add target languages
+3. Switch to a target language to enter translations
+
+**How Translation Mode Works:**
+- The Inspector shows translatable fields with the source text as reference
+- AI can auto-translate all strings for a beat or the entire project
+- Translations are stored alongside the story data
+- **Staleness detection** highlights translations that may be outdated when the source text changes
+
+**VCS-Aware:** Translations persist through git operations (push, pull, merge) and are saved in the directory project format.
+
+## Transformation Commands
+
+Bulk operations accessible from **Tools**:
+
+- **Merge Dialog Trees** - Combine multiple dialog beats into one
+- **Auto-Arrange** - Automatically lay out beats in the flowchart
+- **Validate Logic** - Check for missing connections, undefined variables, unreachable beats
+
+## Desktop App Features
+
+The ASAPS Desktop app (built with Electron) provides additional capabilities:
+
+- **Directory projects** - Stories saved as folders of JSON files (better for version control)
+- **Native file dialogs** - Save/open using OS file picker
+- **Git integration** - Full VCS support (see Part 9)
+- **Local file access** - Direct read/write without browser limitations
+
+---
+
 # Appendix A: Beat Reference
 
 Quick reference for all beat types.
@@ -1297,6 +1583,7 @@ Quick reference for all beat types.
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
 | Video Beat | Video playback | video asset, autoplay, controls, skip |
 | Input Text | Text entry | prompt, placeholder, validation, save target |
+| Keypad | Numeric input | prompt, layout (phone/numeric/pin), correct code, max attempts, min/max digits, mask input, save to |
 | Hyper Text | Clickable text | text with links, link targets |
 | End Screen | Story ending | text, show restart, show credits |
 | Online Content | Live web data | mode (API/AI), query, template |
@@ -1331,9 +1618,13 @@ Quick reference for all beat types.
 | Ctrl/Cmd + S | Save project |
 | Ctrl/Cmd + Z | Undo |
 | Ctrl/Cmd + Shift + Z | Redo |
+| Ctrl/Cmd + F | Search & Replace |
+| Ctrl/Cmd + Shift + G | Toggle VCS panel |
+| Ctrl/Cmd + Shift + P | Open Preview window |
 | Ctrl/Cmd + I | Toggle inventory (in preview) |
 | Delete | Delete selected beat |
 | Escape | Deselect / Close panel |
+| Shift + Click | Multi-select elements (Visual Editor) |
 
 ---
 
@@ -1379,6 +1670,14 @@ Quick reference for all beat types.
 
 **Visual Editor** - The WYSIWYG interface for designing beat appearances.
 
+**Choice Effects** - Variable, counter, or inventory changes that trigger immediately when a dialog or movement choice is selected.
+
+**Fictional Time** - An in-story date/time value independent of real-world time. Used for day/night cycles, deadlines, and time-based branching.
+
+**Timer HUD** - A heads-up display overlay showing either a real-time countdown or fictional time in a corner of the screen.
+
+**VCS** - Version Control System. Git or Perforce integration for tracking changes and collaborating.
+
 **Waypoint** - A point along an animation path.
 
 ---
@@ -1406,8 +1705,17 @@ Yes! Use Import → Twine Format. Harlowe and SugarCube are supported, though co
 ### Do AI features require an API key?
 AI features can work with cloud services (Claude or OpenAI) which require an API key and may incur costs. However, you can also use **local LLMs via Ollama** for free—story generation may not work as well with smaller local models, but it's usable for many features.
 
+### How do I share my story with others?
+Use **Export → HTML** to create a standalone playable file. Recipients just open it in any browser—no ASAPS installation needed.
+
+### How do I collaborate with a team?
+Save your project as a directory format, initialize a Git repository, and push to a shared remote (GitHub, GitLab, etc.). Team members clone the repo and use the built-in VCS panel for commit/push/pull. Advisory editing locks help avoid conflicts.
+
+### Can I translate my story to other languages?
+Yes! Use the language selector (top right) to add target languages. You can translate manually or use AI-assisted translation. Translations are saved with the project.
+
 ### What browsers are supported?
-Modern versions of Chrome, Firefox, Safari, and Edge all work. Chrome is recommended for best performance.
+Modern versions of Chrome, Firefox, Safari, and Edge all work. Chrome is recommended for best performance. The Desktop app (Electron) provides additional features like Git integration and directory projects.
 
 ---
 
@@ -1423,7 +1731,7 @@ Modern versions of Chrome, Firefox, Safari, and Edge all work. Chrome is recomme
 
 ---
 
-© 2024 ASAPS Modern Team
+© 2024–2026 ASAPS Modern Team
 
 ---
 

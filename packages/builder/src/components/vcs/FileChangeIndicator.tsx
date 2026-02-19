@@ -14,6 +14,7 @@ const statusColors: Record<BeatVCSStatus, string> = {
   deleted: '#ef4444',   // red
   conflict: '#dc2626',  // dark red
   locked: '#3b82f6',    // blue
+  editing: '#a855f7',   // purple
   unchanged: 'transparent',
 };
 
@@ -23,6 +24,7 @@ const statusTitles: Record<BeatVCSStatus, string> = {
   deleted: 'Deleted',
   conflict: 'Merge conflict',
   locked: 'Locked by another user',
+  editing: 'Being edited by another user',
   unchanged: '',
 };
 

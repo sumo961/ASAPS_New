@@ -2101,6 +2101,35 @@ function App() {
     }
   }, [beatRefreshKey]);
 
+  // Advisory editing locks — acquire/release when selected beat changes
+  const prevLockedBeatRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!vcs || !vcs.initialized || vcs.type !== 'git' || !vcs.projectPath) return;
+
+    const prevBeatId = prevLockedBeatRef.current;
+    const newBeatId = selectedBeat?.id ?? null;
+
+    // Release previous lock
+    if (prevBeatId && prevBeatId !== newBeatId) {
+      vcs.releaseEditingLock(prevBeatId);
+    }
+    // Acquire new lock
+    if (newBeatId && newBeatId !== prevBeatId) {
+      const beatName = selectedBeat?.name || selectedBeat?.type || newBeatId;
+      vcs.acquireEditingLock(newBeatId, String(beatName));
+    }
+    prevLockedBeatRef.current = newBeatId;
+
+    // On unmount, release all locks
+    return () => {
+      if (prevLockedBeatRef.current) {
+        vcs.releaseAllEditingLocks();
+        prevLockedBeatRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBeat?.id, vcs?.initialized, vcs?.type, vcs?.projectPath]);
+
   // Command manager hook - provides global Ctrl+Z/Ctrl+Shift+Z keyboard shortcuts for undo/redo
   // Must be called after handleCommandExecuted is defined
   useCommandManager({

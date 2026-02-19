@@ -14,9 +14,14 @@ import {
   gitInit, gitAddRemote,
   gitStage, gitUnstage, gitCommit, gitPush, gitPull, gitFetch,
   gitStash, gitStashPop, gitRevertFiles, gitGetConflicts,
-  gitDetectMergeState,
+  gitDetectMergeState, gitConfigGet,
   type GitFileStatus, type GitOperationResult,
 } from './GitAdapter';
+import {
+  readRemoteLocks, acquireLock, releaseLock, releaseAllLocks,
+  getRemoteLocksForOthers,
+  type EditingLock,
+} from './EditingLocks';
 import {
   getP4Status, getP4Locks,
   p4Submit, p4Sync, p4Edit, p4Revert, p4Lock, p4Unlock,
@@ -27,7 +32,7 @@ import {
 // Types
 // ============================================================================
 
-export type BeatVCSStatus = 'added' | 'modified' | 'deleted' | 'conflict' | 'locked' | 'unchanged';
+export type BeatVCSStatus = 'added' | 'modified' | 'deleted' | 'conflict' | 'locked' | 'editing' | 'unchanged';
 
 /** Event emitted after VCS operations for toast notifications */
 export interface VCSEvent {
@@ -84,6 +89,8 @@ export interface VCSState {
   messageLog: VCSLogEntry[];
   /** Whether repo is currently mid-merge or mid-rebase */
   mergeState: 'merge' | 'rebase' | null;
+  /** Remote editing locks from other users (beatId → lock) */
+  editingLocks: Map<string, EditingLock>;
 }
 
 export interface VCSContextValue extends VCSState {
@@ -138,6 +145,14 @@ export interface VCSContextValue extends VCSState {
   /** Unlock file (P4) */
   p4UnlockFile: (filePath: string) => Promise<P4OperationResult>;
 
+  // --- Editing Locks ---
+  /** Acquire an advisory editing lock for a beat */
+  acquireEditingLock: (beatId: string, beatName: string) => Promise<void>;
+  /** Release an advisory editing lock for a beat */
+  releaseEditingLock: (beatId: string) => Promise<void>;
+  /** Release all advisory editing locks owned by this user */
+  releaseAllEditingLocks: () => Promise<void>;
+
   // --- Event system ---
   /** Subscribe to VCS events (for toasts). Returns unsubscribe fn. */
   onEvent: (handler: (event: VCSEvent) => void) => () => void;
@@ -163,6 +178,7 @@ const defaultState: VCSState = {
   p4Locks: new Map(),
   messageLog: [],
   mergeState: null,
+  editingLocks: new Map(),
 };
 
 const VCSContext = createContext<VCSContextValue | null>(null);
@@ -191,6 +207,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   /** Guard against re-entrant initialize() calls */
   const initializingRef = useRef(false);
   const eventHandlersRef = useRef<Set<(event: VCSEvent) => void>>(new Set());
+  const localUserNameRef = useRef<string | null>(null);
   const logIdRef = useRef(0);
   const onBeforeRefreshRef = useRef(onBeforeRefresh);
   onBeforeRefreshRef.current = onBeforeRefresh;
@@ -254,6 +271,17 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
           gitDetectMergeState(path),
         ]);
 
+        // Fetch remote editing locks (non-blocking — don't fail refresh on error)
+        let editingLocks = new Map<string, EditingLock>();
+        if (status.branch && status.branch !== 'unknown' && localUserNameRef.current) {
+          try {
+            const remoteLockFile = await readRemoteLocks(path, status.branch);
+            editingLocks = getRemoteLocksForOthers(remoteLockFile, localUserNameRef.current);
+          } catch {
+            // Ignore — remote may not exist yet
+          }
+        }
+
         // Separate staged and unstaged files
         const stagedFiles = status.files.filter(f => f.staged);
         const unstagedFiles = status.files.filter(f => !f.staged);
@@ -271,6 +299,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
           stagedFiles,
           unstagedFiles,
           mergeState,
+          editingLocks,
         }));
       } else if (vcsType === 'perforce') {
         const status = await getP4Status(path);
@@ -320,6 +349,13 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
       cachedVCSTypeRef.current = null;
       gitMissingRef.current = false;
       projectPathRef.current = projectPath;
+
+      // Cache git user.name for editing lock identity
+      try {
+        localUserNameRef.current = await gitConfigGet(projectPath, 'user.name');
+      } catch {
+        localUserNameRef.current = null;
+      }
 
       setState(prev => ({
         ...prev,
@@ -411,6 +447,11 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
       }
     }
 
+    // Check advisory editing locks from other users
+    if (state.editingLocks.has(beatId)) {
+      return 'editing';
+    }
+
     // Check staged/unstaged files for specific status
     const allFiles = [...state.stagedFiles, ...state.unstagedFiles];
     for (const file of allFiles) {
@@ -422,12 +463,16 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     }
 
     return 'unchanged';
-  }, [state.conflictFiles, state.stagedFiles, state.unstagedFiles, state.p4Locks, state.type]);
+  }, [state.conflictFiles, state.stagedFiles, state.unstagedFiles, state.p4Locks, state.type, state.editingLocks]);
 
   /**
    * Get who has a beat locked (Perforce only)
    */
   const getLockedBy = useCallback((beatId: string): string | null => {
+    // Check advisory editing locks first (works for both git and perforce)
+    const editingLock = state.editingLocks.get(beatId);
+    if (editingLock) return editingLock.user;
+
     if (state.type !== 'perforce') return null;
     const safeBeatId = beatId.replace(/[^a-zA-Z0-9_-]/g, '_');
     for (const [depotPath, user] of state.p4Locks) {
@@ -436,7 +481,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
       }
     }
     return null;
-  }, [state.type, state.p4Locks]);
+  }, [state.type, state.p4Locks, state.editingLocks]);
 
   // ---- Git operation wrappers (delegate + refresh + emit) ----
 
@@ -537,6 +582,41 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     return result;
   }, [refresh, emitEvent]);
 
+  // ---- Editing lock wrappers ----
+
+  const acquireEditingLockOp = useCallback(async (beatId: string, beatName: string) => {
+    const path = projectPathRef.current;
+    const userName = localUserNameRef.current;
+    if (!path || !userName || cachedVCSTypeRef.current !== 'git') return;
+    try {
+      await acquireLock(path, beatId, beatName, userName);
+    } catch (e) {
+      console.warn('[VCSStatusProvider] Failed to acquire editing lock:', e);
+    }
+  }, []);
+
+  const releaseEditingLockOp = useCallback(async (beatId: string) => {
+    const path = projectPathRef.current;
+    const userName = localUserNameRef.current;
+    if (!path || !userName || cachedVCSTypeRef.current !== 'git') return;
+    try {
+      await releaseLock(path, beatId, userName);
+    } catch (e) {
+      console.warn('[VCSStatusProvider] Failed to release editing lock:', e);
+    }
+  }, []);
+
+  const releaseAllEditingLocksOp = useCallback(async () => {
+    const path = projectPathRef.current;
+    const userName = localUserNameRef.current;
+    if (!path || !userName || cachedVCSTypeRef.current !== 'git') return;
+    try {
+      await releaseAllLocks(path, userName);
+    } catch (e) {
+      console.warn('[VCSStatusProvider] Failed to release all editing locks:', e);
+    }
+  }, []);
+
   // ---- Perforce operation wrappers ----
 
   const p4SubmitChanges = useCallback(async (description: string, filePaths?: string[]) => {
@@ -615,6 +695,9 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     p4RevertFile,
     p4LockFile,
     p4UnlockFile,
+    acquireEditingLock: acquireEditingLockOp,
+    releaseEditingLock: releaseEditingLockOp,
+    releaseAllEditingLocks: releaseAllEditingLocksOp,
     onEvent,
     clearMessageLog,
   }), [
@@ -622,6 +705,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     initialize, clear, initRepo, stage, unstage, commit, push, pull,
     fetchRemote, stashChanges, stashPopChanges, revertFilesOp,
     p4SubmitChanges, p4SyncLatest, p4EditFile, p4RevertFile, p4LockFile, p4UnlockFile,
+    acquireEditingLockOp, releaseEditingLockOp, releaseAllEditingLocksOp,
     onEvent, clearMessageLog,
   ]);
 
