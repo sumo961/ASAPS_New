@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-02-19T12:41:41.178Z
+ * Generated: 2026-02-19T19:36:33.008Z
  */
 
 // ============================================
@@ -200,8 +200,22 @@ export interface EndScreenParameters {
   showRestart?: boolean | undefined;
   /** Show credits button */
   showCredits?: boolean | undefined;
-  /** Reset all values (counters, variables, timers) on restart */
+  /** Reset all values on restart */
   reset?: boolean | undefined;
+  /** Clear all variables */
+  resetVariables?: boolean | undefined;
+  /** Clear all counters */
+  resetCounters?: boolean | undefined;
+  /** Clear inventory */
+  resetInventory?: boolean | undefined;
+  /** Clear all timers */
+  resetTimers?: boolean | undefined;
+  /** Clear fictional time */
+  resetFictionalTime?: boolean | undefined;
+  /** Clear visited beat tracking */
+  resetVisitedTracking?: boolean | undefined;
+  /** Clear beat history */
+  resetHistory?: boolean | undefined;
   /** Text for restart button */
   restartText?: string | undefined;
   /** Text for credits button */

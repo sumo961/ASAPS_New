@@ -555,6 +555,16 @@ export class ASMLGenerator {
         if (params.showRestart !== undefined) attrs.push(`showRestart="${params.showRestart}"`);
         if (params.showCredits !== undefined) attrs.push(`showCredits="${params.showCredits}"`);
         if (params.reset !== undefined) attrs.push(`reset="${params.reset}"`);
+        // Export selective reset sub-options only when reset is true and a sub-option differs from default (true)
+        if (params.reset) {
+          if (params.resetVariables === false) attrs.push(`resetVariables="false"`);
+          if (params.resetCounters === false) attrs.push(`resetCounters="false"`);
+          if (params.resetInventory === false) attrs.push(`resetInventory="false"`);
+          if (params.resetTimers === false) attrs.push(`resetTimers="false"`);
+          if (params.resetFictionalTime === false) attrs.push(`resetFictionalTime="false"`);
+          if (params.resetVisitedTracking === false) attrs.push(`resetVisitedTracking="false"`);
+          if (params.resetHistory === false) attrs.push(`resetHistory="false"`);
+        }
         break;
         
       case 'setVariable':

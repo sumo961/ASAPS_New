@@ -28,6 +28,10 @@ interface ParameterDefinition {
     itemLabel?: string;
     // Help text shown below the field
     help?: string;
+    // Conditional visibility - only show when another field has the specified value
+    dependsOn?: { field: string; value: any };
+    // Visual grouping - fields sharing the same group render inside a bordered container
+    group?: string;
   };
 }
 
@@ -1146,11 +1150,52 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
     );
   }
 
+  // Build render list: skip dependsOn fields whose condition isn't met, group fields sharing a group key
+  const entries = Object.entries(beatDefinition.parameters);
+  const rendered: React.ReactNode[] = [];
+  const groupsRendered = new Set<string>();
+
+  for (const [paramName, paramDef] of entries) {
+    // Check dependsOn condition
+    if (paramDef.ui?.dependsOn) {
+      const { field, value } = paramDef.ui.dependsOn;
+      if (parameters[field] !== value) continue;
+    }
+
+    const groupKey = paramDef.ui?.group;
+
+    if (groupKey) {
+      // Only render the group container once
+      if (groupsRendered.has(groupKey)) continue;
+      groupsRendered.add(groupKey);
+
+      // Collect all visible fields in this group
+      const groupFields = entries.filter(([, def]) => {
+        if (def.ui?.group !== groupKey) return false;
+        if (def.ui?.dependsOn) {
+          const { field, value } = def.ui.dependsOn;
+          if (parameters[field] !== value) return false;
+        }
+        return true;
+      });
+
+      // Render group label from the group key
+      const groupLabel = groupKey.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+
+      rendered.push(
+        <div key={`group-${groupKey}`} className="border border-gray-200 rounded-lg p-3 space-y-2">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{groupLabel}</span>
+          {groupFields.map(([name, def]) => renderField(name, def))}
+        </div>
+      );
+    } else {
+      rendered.push(renderField(paramName, paramDef));
+    }
+  }
+
   return (
     <div className="space-y-4">
-      {Object.entries(beatDefinition.parameters).map(([paramName, paramDef]) =>
-        renderField(paramName, paramDef)
-      )}
+      {rendered}
     </div>
   );
 };

@@ -472,7 +472,56 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Reset all values (counters, variables, timers) on restart"
+          "description": "Reset all values on restart"
+        },
+        "resetVariables": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear all variables",
+          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Variables" }
+        },
+        "resetCounters": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear all counters",
+          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Counters" }
+        },
+        "resetInventory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear inventory",
+          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Inventory" }
+        },
+        "resetTimers": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear all timers",
+          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Timers" }
+        },
+        "resetFictionalTime": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear fictional time",
+          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Fictional Time" }
+        },
+        "resetVisitedTracking": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear visited beat tracking",
+          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Visited Tracking" }
+        },
+        "resetHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear beat history",
+          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "History" }
         },
         "restartText": {
           "type": "string",

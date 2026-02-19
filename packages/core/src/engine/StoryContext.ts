@@ -24,6 +24,20 @@ export interface ChoiceRecord {
   timestamp: number;
 }
 
+/**
+ * Options for selective reset - each flag controls whether that category is cleared.
+ * All default to true for backward compatibility with full reset.
+ */
+export interface ResetOptions {
+  variables?: boolean;
+  counters?: boolean;
+  inventory?: boolean;
+  timers?: boolean;
+  fictionalTime?: boolean;
+  visitedTracking?: boolean;
+  history?: boolean;
+}
+
 interface StoryState {
   currentBeatId: string;
   variables: Record<string, any>;
@@ -677,6 +691,40 @@ export class StoryContext extends EventEmitter {
     this.history = [];
     this.choiceHistory = [];
     this.emit('reset');
+  }
+
+  /**
+   * Selective reset - only clear the categories set to true.
+   * Allows EndScreen beats to preserve certain state (e.g. keep variables but reset counters).
+   */
+  selectiveReset(options: ResetOptions): void {
+    if (options.variables) {
+      this.state.variables = {};
+    }
+    if (options.counters) {
+      this.state.counters = {};
+    }
+    if (options.inventory) {
+      this.state.inventory = [];
+      this.state.characterInventories = {};
+    }
+    if (options.timers) {
+      this.timerManager.stopAllTimers();
+      this.state.timers = {};
+    }
+    if (options.fictionalTime) {
+      delete this.state.fictionalTime;
+    }
+    if (options.visitedTracking) {
+      this.state.visitedBeats = new Set();
+      this.state.visitedChoices = new Set();
+    }
+    if (options.history) {
+      this.history = [];
+      this.choiceHistory = [];
+    }
+    this.state.currentBeatId = '0';
+    this.emit('selectiveReset', options);
   }
 
   getStory(): Story {

@@ -13,6 +13,15 @@ export class EndScreenBeat extends Beat {
   public creditsText?: string;
   public buttonText?: string;
 
+  // Selective reset sub-options (all default true for backward compatibility)
+  public resetVariables: boolean;
+  public resetCounters: boolean;
+  public resetInventory: boolean;
+  public resetTimers: boolean;
+  public resetFictionalTime: boolean;
+  public resetVisitedTracking: boolean;
+  public resetHistory: boolean;
+
   constructor(config: BeatConfig & {
     node?: string;
     buttonText?: string;  // Legacy support
@@ -26,6 +35,14 @@ export class EndScreenBeat extends Beat {
     this.restartText = config.restartText || config.parameters?.restartText;
     this.creditsText = config.creditsText || config.parameters?.creditsText;
     this.buttonText = config.buttonText || config.parameters?.buttonText;
+    // Selective reset sub-options default to true
+    this.resetVariables = config.resetVariables ?? config.parameters?.resetVariables ?? true;
+    this.resetCounters = config.resetCounters ?? config.parameters?.resetCounters ?? true;
+    this.resetInventory = config.resetInventory ?? config.parameters?.resetInventory ?? true;
+    this.resetTimers = config.resetTimers ?? config.parameters?.resetTimers ?? true;
+    this.resetFictionalTime = config.resetFictionalTime ?? config.parameters?.resetFictionalTime ?? true;
+    this.resetVisitedTracking = config.resetVisitedTracking ?? config.parameters?.resetVisitedTracking ?? true;
+    this.resetHistory = config.resetHistory ?? config.parameters?.resetHistory ?? true;
     // node is now handled by Beat base class
   }
 
@@ -35,6 +52,13 @@ export class EndScreenBeat extends Beat {
       showRestart: this.showRestart,
       showCredits: this.showCredits,
       reset: this.reset,
+      resetVariables: this.resetVariables,
+      resetCounters: this.resetCounters,
+      resetInventory: this.resetInventory,
+      resetTimers: this.resetTimers,
+      resetFictionalTime: this.resetFictionalTime,
+      resetVisitedTracking: this.resetVisitedTracking,
+      resetHistory: this.resetHistory,
       restartText: this.restartText,
       creditsText: this.creditsText,
       buttonText: this.buttonText,
@@ -47,6 +71,13 @@ export class EndScreenBeat extends Beat {
     if (params.showRestart !== undefined) this.showRestart = params.showRestart;
     if (params.showCredits !== undefined) this.showCredits = params.showCredits;
     if (params.reset !== undefined) this.reset = params.reset;
+    if (params.resetVariables !== undefined) this.resetVariables = params.resetVariables;
+    if (params.resetCounters !== undefined) this.resetCounters = params.resetCounters;
+    if (params.resetInventory !== undefined) this.resetInventory = params.resetInventory;
+    if (params.resetTimers !== undefined) this.resetTimers = params.resetTimers;
+    if (params.resetFictionalTime !== undefined) this.resetFictionalTime = params.resetFictionalTime;
+    if (params.resetVisitedTracking !== undefined) this.resetVisitedTracking = params.resetVisitedTracking;
+    if (params.resetHistory !== undefined) this.resetHistory = params.resetHistory;
     if (params.restartText !== undefined) this.restartText = params.restartText;
     if (params.creditsText !== undefined) this.creditsText = params.creditsText;
     if (params.buttonText !== undefined) this.buttonText = params.buttonText;
@@ -58,7 +89,22 @@ export class EndScreenBeat extends Beat {
     renderer: IRenderer
   ): Promise<string | null> {
     if (this.reset) {
-      context.reset();
+      // If all sub-options are true, use full reset for efficiency
+      const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
+        this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
+      if (allTrue) {
+        context.reset();
+      } else {
+        context.selectiveReset({
+          variables: this.resetVariables,
+          counters: this.resetCounters,
+          inventory: this.resetInventory,
+          timers: this.resetTimers,
+          fictionalTime: this.resetFictionalTime,
+          visitedTracking: this.resetVisitedTracking,
+          history: this.resetHistory,
+        });
+      }
     }
 
     // Background is now handled centrally in Beat.execute()
