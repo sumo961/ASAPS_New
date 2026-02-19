@@ -1676,6 +1676,18 @@ function App() {
       if (isSwitchingFromAnotherProject) {
         // SWITCHING PROJECTS: Always load the new project's data
         console.log('[App] >>> SWITCHING to different project - loading its data');
+
+        // CRITICAL: Clear UI selections before loading new project data
+        // This prevents stale beat/cluster references from leaking across projects
+        setSelectedBeat(null);
+        setSelectedCluster(null);
+
+        // Close overlay panels that show project-specific data
+        setShowCharacterManager(false);
+        setShowAssetManager(false);
+        setShowSettings(false);
+        setShowDebugPanel(false);
+        setShowSearchPanel(false);
         const projectData = loadProjectData(currentProject);
         console.log('[App] >>> Loaded data:', {
           title: projectData.title,
@@ -1698,6 +1710,13 @@ function App() {
           clusters: projectData.clusters,
           containerBeatPositions: projectData.containerBeatPositions || []
         });
+
+        // Immediately update refs to prevent syncProjectData from reading stale data
+        // before the useEffect that normally syncs these fires
+        beatsRef.current = projectData.beats;
+        connectionsRef.current = projectData.connections || [];
+        clustersRef.current = projectData.clusters || [];
+        containerBeatPositionsRef.current = projectData.containerBeatPositions || [];
 
         setCharacters(projectData.characters || []);
         if (projectData.settings) {
@@ -1783,6 +1802,8 @@ function App() {
         // New untitled project AND beats have been created - save current story state to it
         // This only happens when creating a NEW project in this session, not when switching
         console.log('[App] >>> SAVING beats to NEW untitled project');
+        setSelectedBeat(null);
+        setSelectedCluster(null);
 
         const storyData = {
           title: titleRef.current,
@@ -1809,6 +1830,8 @@ function App() {
       } else if (isNewUntitledProject && beatsRef.current.length === 0) {
         // Existing untitled project with no beats - initialize default story
         console.log('[App] >>> Untitled project has no beats - initializing default story');
+        setSelectedBeat(null);
+        setSelectedCluster(null);
 
         // CRITICAL FIX: Even when waiting for beats, restore globalSettings immediately
         // This ensures hotspot settings (showInPreview, labelDisplay) are applied
@@ -1825,6 +1848,8 @@ function App() {
       } else if (!isNewUntitledProject) {
         // This is an existing saved project - load its data
         console.log('[App] >>> REPLACING state with loaded project data');
+        setSelectedBeat(null);
+        setSelectedCluster(null);
         const projectData = loadProjectData(currentProject);
         console.log('[App] >>> Loaded data:', {
           title: projectData.title,
@@ -1847,6 +1872,12 @@ function App() {
           clusters: projectData.clusters,
           containerBeatPositions: projectData.containerBeatPositions || []
         });
+
+        // Immediately update refs to prevent syncProjectData from reading stale data
+        beatsRef.current = projectData.beats;
+        connectionsRef.current = projectData.connections || [];
+        clustersRef.current = projectData.clusters || [];
+        containerBeatPositionsRef.current = projectData.containerBeatPositions || [];
 
         setCharacters(projectData.characters || []);
         if (projectData.settings) {
