@@ -79,6 +79,8 @@ export interface CharacterMeterFrameProps {
   characterDimensions: { width: number; height: number };
   /** Container/viewport dimensions (required for screen docking) */
   containerDimensions?: { width: number; height: number };
+  /** Font scale multiplier (default 1.0) */
+  fontScale?: number;
 }
 
 /**
@@ -193,7 +195,8 @@ const MeterBar: React.FC<{
   showLabel: boolean;
   height: number;
   width: number;
-}> = ({ counter, showLabel, height, width }) => {
+  fontScale?: number;
+}> = ({ counter, showLabel, height, width, fontScale = 1.0 }) => {
   const { value, min, max, color, showNumericValue, numericFormat, orientation } = counter;
   const percentage = max > min
     ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
@@ -224,7 +227,7 @@ const MeterBar: React.FC<{
       {showLabel && (
         <div
           style={{
-            fontSize: '10px',
+            fontSize: `${Math.round(10 * fontScale)}px`,
             fontWeight: 'bold',
             color: 'white',
             marginBottom: '2px',
@@ -236,7 +239,7 @@ const MeterBar: React.FC<{
         >
           <span>{counter.displayName}</span>
           {numericDisplay && (
-            <span style={{ fontSize: '9px', opacity: 0.9 }}>{numericDisplay}</span>
+            <span style={{ fontSize: `${Math.round(9 * fontScale)}px`, opacity: 0.9 }}>{numericDisplay}</span>
           )}
         </div>
       )}
@@ -280,7 +283,7 @@ const MeterBar: React.FC<{
         {!showLabel && numericDisplay && (
           <span
             style={{
-              fontSize: '10px',
+              fontSize: `${Math.round(10 * fontScale)}px`,
               fontWeight: 'bold',
               color: 'white',
               textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -309,6 +312,7 @@ export const CharacterMeterFrame: React.FC<CharacterMeterFrameProps> = ({
   characterPosition,
   characterDimensions,
   containerDimensions,
+  fontScale = 1.0,
 }) => {
   // Counters are pre-filtered by the resolver (visible && showLevelMeter)
   if (counters.length === 0) {
@@ -328,7 +332,7 @@ export const CharacterMeterFrame: React.FC<CharacterMeterFrameProps> = ({
   const frameWidth = meterWidth + style.padding * 2;
 
   // Calculate position based on dock mode
-  const position = dockMode === 'screen' && containerDimensions
+  const rawPosition = dockMode === 'screen' && containerDimensions
     ? calculateScreenPosition(
         config.screenPosition ?? 'screen-top-left',
         containerDimensions,
@@ -344,6 +348,14 @@ export const CharacterMeterFrame: React.FC<CharacterMeterFrameProps> = ({
         frameWidth,
         frameHeight
       );
+
+  // Clamp position to stay within stage bounds (prevent clipping by overflow:hidden)
+  const stageW = containerDimensions?.width ?? 1024;
+  const stageH = containerDimensions?.height ?? 768;
+  const position = {
+    x: Math.max(0, Math.min(rawPosition.x, stageW - frameWidth)),
+    y: Math.max(0, Math.min(rawPosition.y, stageH - frameHeight)),
+  };
 
   const frameStyle: React.CSSProperties = {
     position: 'absolute',
@@ -372,6 +384,7 @@ export const CharacterMeterFrame: React.FC<CharacterMeterFrameProps> = ({
           showLabel={showLabels}
           height={meterHeight}
           width={meterWidth}
+          fontScale={fontScale}
         />
       ))}
     </div>

@@ -13,7 +13,7 @@ interface GlobalSettings {
     height: number;             // Project height in pixels
     aspectRatio: string;        // Aspect ratio (e.g., "4:3", "16:9")
     scalingMode: 'none' | 'fit' | 'fill' | 'stretch';  // How to scale content
-    mobileScalingMode?: 'auto' | 'fit' | 'cover';  // Mobile display mode
+    mobileScalingMode?: 'auto' | 'fit' | 'cover' | 'native';  // Mobile display mode
     mobileFontScale?: number;   // Font scale multiplier for mobile (1.0-2.0)
     showMobileSafeZone?: boolean;  // Show mobile crop safe zone overlay in editor
   };
@@ -964,12 +964,13 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         onChange={(e) => handleChange('project', 'mobileScalingMode', e.target.value)}
                         className="w-full px-3 py-2 border rounded"
                       >
-                        <option value="auto">Auto (Fill on mobile, Fit on desktop)</option>
-                        <option value="fit">Fit (Letterbox everywhere, including mobile)</option>
-                        <option value="cover">Cover (Fill on mobile + font scale, Fit on desktop)</option>
+                        <option value="auto">Auto (Fit + font scaling on mobile)</option>
+                        <option value="fit">Fit (Same on all devices, no font scaling)</option>
+                        <option value="cover">Cover (Fill on mobile, may crop edges)</option>
+                        <option value="native">Native Mobile (No mobile adaptations)</option>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">
-                        Auto/Cover fills the screen on mobile devices, improving text readability at the cost of cropping stage edges. Desktop always uses Fit.
+                        Auto uses fit mode with enlarged text on mobile for readability. Cover fills the mobile screen but may crop stage edges. Fit keeps identical behavior on all devices. Native is for projects already designed at mobile dimensions — disables all mobile detection.
                       </p>
                     </div>
 
@@ -987,7 +988,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         className="w-full"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Additional font size boost on mobile devices (1.0 = normal)
+                        Enlarge text on mobile devices for better readability (1.0 = normal). Only applies when mobile is detected.
                       </p>
                     </div>
 

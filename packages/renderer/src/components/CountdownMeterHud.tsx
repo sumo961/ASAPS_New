@@ -35,6 +35,8 @@ export interface CountdownMeterHudProps {
   config: CountdownMeterConfig;
   /** Whether the HUD should be visible */
   visible: boolean;
+  /** Font scale multiplier (default 1.0) */
+  fontScale?: number;
 }
 
 /**
@@ -70,6 +72,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
   counterMax,
   config,
   visible,
+  fontScale = 1.0,
 }) => {
   // Clamp meterWidth to valid percentage range (handles migration from old pixel values)
   const effectiveWidth = Math.min(Math.max(config.meterWidth, 10), 90);
@@ -148,7 +151,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
         >
           <span
             style={{
-              fontSize: 10,
+              fontSize: Math.round(10 * fontScale),
               fontWeight: 'bold',
               color: 'white',
               textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -159,7 +162,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
           {numericDisplay && (
             <span
               style={{
-                fontSize: 9,
+                fontSize: Math.round(9 * fontScale),
                 color: 'white',
                 opacity: 0.9,
                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -199,7 +202,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
       {!config.showLabel && numericDisplay && (
         <span
           style={{
-            fontSize: 10,
+            fontSize: Math.round(10 * fontScale),
             fontWeight: 'bold',
             color: 'white',
             textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',

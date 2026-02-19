@@ -6,6 +6,8 @@ interface ScrollIndicatorProps {
   message?: string;
   /** Whether to show the text message (default: true in preview, false in editor) */
   showMessage?: boolean;
+  /** Font scale multiplier (default 1.0) */
+  fontScale?: number;
 }
 
 /**
@@ -16,6 +18,7 @@ export const ScrollIndicator: React.FC<ScrollIndicatorProps> = ({
   position,
   message,
   showMessage = true,
+  fontScale = 1.0,
 }) => {
   const defaultMessage = position === 'bottom' ? '↓ Scroll for more' : '↑ Scroll up';
   const displayMessage = message ?? defaultMessage;
@@ -44,7 +47,7 @@ export const ScrollIndicator: React.FC<ScrollIndicatorProps> = ({
       {showMessage && (
         <span
           style={{
-            fontSize: 11,
+            fontSize: Math.round(11 * fontScale),
             color: 'white',
             textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
             fontFamily: 'system-ui, sans-serif',
@@ -61,7 +64,7 @@ export const ScrollIndicator: React.FC<ScrollIndicatorProps> = ({
  * Small badge indicator for editor mode showing that content is scrollable.
  * Less intrusive than the full gradient overlay.
  */
-export const ScrollBadge: React.FC<{ visible: boolean }> = ({ visible }) => {
+export const ScrollBadge: React.FC<{ visible: boolean; fontScale?: number }> = ({ visible, fontScale = 1.0 }) => {
   if (!visible) return null;
 
   return (
@@ -74,7 +77,7 @@ export const ScrollBadge: React.FC<{ visible: boolean }> = ({ visible }) => {
         color: 'white',
         padding: '2px 6px',
         borderRadius: 4,
-        fontSize: 10,
+        fontSize: Math.round(10 * fontScale),
         fontFamily: 'system-ui, sans-serif',
         pointerEvents: 'none',
         zIndex: 10,

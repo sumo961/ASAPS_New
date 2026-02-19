@@ -41,6 +41,8 @@ export interface ChatDialogViewProps {
   characterAvatarResolver?: (characterId: string) => string | undefined;
   /** Show typing indicator (NPC is "thinking") */
   showTypingIndicator?: boolean;
+  /** Font scale multiplier (default 1.0) */
+  fontScale?: number;
 }
 
 /**
@@ -62,6 +64,7 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
   stageWidth = 800,
   stageHeight = 600,
   showTypingIndicator = false,
+  fontScale = 1.0,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [animatedMessages, setAnimatedMessages] = useState<Set<string>>(new Set());
@@ -214,7 +217,7 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
               borderTopRightRadius: isPlayer && !showAvatars ? 4 : textBox.borderRadius || 16,
               color: colors.textColor,
               fontFamily: fonts.textFont,
-              fontSize: 15,
+              fontSize: Math.round(15 * fontScale),
               lineHeight: 1.5,
               boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
             }}
@@ -251,7 +254,7 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
               borderRadius: button.borderRadius || 20,
               padding: '8px 16px',
               fontFamily: fonts.buttonFont,
-              fontSize: 14,
+              fontSize: Math.round(14 * fontScale),
               cursor: 'pointer',
               opacity: choicesVisible ? 1 : 0,
               transform: choicesVisible ? 'translateY(0)' : 'translateY(10px)',

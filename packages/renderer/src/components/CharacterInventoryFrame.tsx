@@ -80,6 +80,10 @@ export interface CharacterInventoryFrameProps {
   assetResolver?: (itemName: string) => string | undefined;
   /** Optional title for the inventory frame */
   title?: string;
+  /** Font scale multiplier (default 1.0) */
+  fontScale?: number;
+  /** Auto-minimize on load (shows collapsed badge, click to expand) */
+  autoMinimize?: boolean;
 }
 
 /**
@@ -193,7 +197,8 @@ const InventoryItem: React.FC<{
   item: InventoryItemData;
   size: number;
   showLabel: boolean;
-}> = ({ item, size, showLabel }) => {
+  fontScale?: number;
+}> = ({ item, size, showLabel, fontScale = 1.0 }) => {
   const [showTooltip, setShowTooltip] = React.useState(false);
   const [tooltipPosition, setTooltipPosition] = React.useState<'above' | 'below'>('above');
   const itemRef = React.useRef<HTMLDivElement>(null);
@@ -283,7 +288,7 @@ const InventoryItem: React.FC<{
               right: 2,
               backgroundColor: 'rgba(0, 0, 0, 0.8)',
               color: 'white',
-              fontSize: 10,
+              fontSize: Math.round(10 * fontScale),
               fontWeight: 'bold',
               padding: '1px 4px',
               borderRadius: 4,
@@ -301,7 +306,7 @@ const InventoryItem: React.FC<{
         <span
           style={{
             marginTop: 2,
-            fontSize: 9,
+            fontSize: Math.round(9 * fontScale),
             color: 'white',
             textShadow: '0 1px 1px rgba(0, 0, 0, 0.5)',
             maxWidth: size + 10,
@@ -349,15 +354,15 @@ const InventoryItem: React.FC<{
               [tooltipPosition === 'above' ? 'borderTop' : 'borderBottom']: '6px solid rgba(20, 20, 30, 0.95)',
             }}
           />
-          <div style={{ fontWeight: 'bold', color: 'white', marginBottom: 4, fontSize: 12 }}>
+          <div style={{ fontWeight: 'bold', color: 'white', marginBottom: 4, fontSize: Math.round(12 * fontScale) }}>
             {item.displayName}
           </div>
           {item.description && (
-            <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 11, marginBottom: 4 }}>
+            <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: Math.round(11 * fontScale), marginBottom: 4 }}>
               {item.description}
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: Math.round(10 * fontScale) }}>
             {item.category && (
               <span style={{ color: 'rgba(150, 150, 255, 0.9)', fontStyle: 'italic' }}>
                 {item.category}
@@ -389,7 +394,11 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
   isVisible = true,
   assetResolver,
   title = 'Inventory',
+  fontScale = 1.0,
+  autoMinimize = false,
 }) => {
+  const [minimized, setMinimized] = React.useState(autoMinimize);
+
   // Hide if no items or not visible
   if (items.length === 0 || !isVisible) {
     return null;
@@ -421,7 +430,7 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
   const frameHeight = frameContentHeight + style.padding * 2 + headerHeight;
 
   // Calculate position based on dock mode
-  const position = dockMode === 'screen' && containerDimensions
+  const rawPosition = dockMode === 'screen' && containerDimensions
     ? calculateScreenPosition(
         config.screenPosition ?? 'screen-bottom-right',
         containerDimensions,
@@ -437,6 +446,80 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
         frameWidth,
         frameHeight
       );
+
+  // Clamp position to stay within stage bounds (prevent clipping by overflow:hidden)
+  const stageW = containerDimensions?.width ?? 1024;
+  const stageH = containerDimensions?.height ?? 768;
+  const position = {
+    x: Math.max(0, Math.min(rawPosition.x, stageW - frameWidth)),
+    y: Math.max(0, Math.min(rawPosition.y, stageH - frameHeight)),
+  };
+
+  // Minimized badge: small grid icon that looks like inventory slots + item count
+  if (minimized) {
+    const badgeWidth = Math.round(44 * fontScale);
+    const badgeHeight = Math.round(36 * fontScale);
+    const slotSize = Math.round(8 * fontScale);
+    const slotGap = Math.round(2 * fontScale);
+    // Show up to 2x2 grid of colored slots representing items
+    const previewItems = resolvedItems.slice(0, 4);
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: position.x,
+          top: position.y,
+          width: badgeWidth,
+          height: badgeHeight,
+          backgroundColor: style.backgroundColor,
+          border: `${style.borderWidth}px solid ${style.borderColor}`,
+          borderRadius: style.borderRadius,
+          opacity: style.opacity / 100,
+          display: 'flex',
+          alignItems: 'center',
+          gap: Math.round(4 * fontScale),
+          padding: `${Math.round(4 * fontScale)}px ${Math.round(6 * fontScale)}px`,
+          pointerEvents: 'auto',
+          cursor: 'pointer',
+          zIndex: 1000,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+        }}
+        onClick={() => setMinimized(false)}
+        title={`${title} (${items.length} items) - click to expand`}
+      >
+        {/* Mini grid icon */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(2, ${slotSize}px)`,
+            gap: slotGap,
+          }}
+        >
+          {[0, 1, 2, 3].map((i) => {
+            const item = previewItems[i];
+            const hasItem = !!item;
+            const itemColor = hasItem && item.icon ? 'rgba(255, 255, 255, 0.6)' : hasItem ? `hsl(${Math.abs(item.name.split('').reduce((h, c) => c.charCodeAt(0) + ((h << 5) - h), 0) % 360)}, 60%, 50%)` : 'rgba(255, 255, 255, 0.15)';
+            return (
+              <div
+                key={i}
+                style={{
+                  width: slotSize,
+                  height: slotSize,
+                  borderRadius: 2,
+                  backgroundColor: itemColor,
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                }}
+              />
+            );
+          })}
+        </div>
+        {/* Item count */}
+        <span style={{ fontSize: Math.round(11 * fontScale), fontWeight: 'bold', color: 'white', textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' }}>
+          {items.length}
+        </span>
+      </div>
+    );
+  }
 
   const frameStyle: React.CSSProperties = {
     position: 'absolute',
@@ -457,7 +540,7 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
   };
 
   const headerStyle: React.CSSProperties = {
-    fontSize: 12,
+    fontSize: Math.round(12 * fontScale),
     fontWeight: 'bold',
     color: 'white',
     textAlign: 'center',
@@ -465,6 +548,7 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
     paddingBottom: 4,
     borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
     textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+    cursor: autoMinimize ? 'pointer' : undefined,
   };
 
   const gridStyle: React.CSSProperties = {
@@ -475,7 +559,9 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
 
   return (
     <div style={frameStyle}>
-      <div style={headerStyle}>{title}</div>
+      <div style={headerStyle} onClick={autoMinimize ? () => setMinimized(true) : undefined}>
+        {title}{autoMinimize ? ' \u25BC' : ''}
+      </div>
       <div style={gridStyle}>
         {resolvedItems.map((item) => (
           <InventoryItem
@@ -483,6 +569,7 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
             item={item}
             size={itemSize}
             showLabel={showLabels}
+            fontScale={fontScale}
           />
         ))}
       </div>

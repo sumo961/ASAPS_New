@@ -1447,7 +1447,7 @@ export class ReactRenderer extends BaseRenderer {
               fictionalTimeText={this.fictionalTimeText}
               onSubscribeFictionalTimeText={(listener) => this.subscribeToFictionalTimeText(listener)}
               externalBackground={useMobileBg}
-              mobileFontScale={this.mobileMode ? this.mobileFontScale : 1.0}
+              mobileFontScale={this.mobileFontScale}
             />
           </ScaledStage>
         </div>
@@ -1659,6 +1659,7 @@ export class ReactRenderer extends BaseRenderer {
             stageHeight={stageHeight}
             characterAvatarResolver={this.characterAvatarResolver || undefined}
             showTypingIndicator={showTypingIndicator}
+            fontScale={this.mobileFontScale}
           />
         </ScaledStage>
       </div>

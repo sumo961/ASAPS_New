@@ -31,6 +31,8 @@ export interface TimerHudDisplayProps {
   visible: boolean;
   /** Configuration from GlobalSettings */
   config: TimerHudConfig;
+  /** Font scale multiplier (default 1.0) */
+  fontScale?: number;
 }
 
 /**
@@ -80,6 +82,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
   fictionalTimeText,
   visible,
   config,
+  fontScale = 1.0,
 }) => {
   // Auto-detect what to display: timer countdown takes priority when running,
   // then per-beat override text, then fictional time, then global static text, then hide
@@ -154,7 +157,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
       {config.showLabel && config.label && (
         <div
           style={{
-            fontSize: Math.max(10, config.fontSize * 0.5),
+            fontSize: Math.round(Math.max(10, config.fontSize * 0.5) * fontScale),
             color: config.textColor,
             opacity: 0.7,
             marginBottom: 2,
@@ -170,7 +173,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
       {/* Main display */}
       <div
         style={{
-          fontSize: config.fontSize,
+          fontSize: Math.round(config.fontSize * fontScale),
           color: timerColor,
           fontFamily: isDigital ? '"Courier New", "Consolas", monospace' : 'inherit',
           fontWeight: isDigital ? 700 : 500,

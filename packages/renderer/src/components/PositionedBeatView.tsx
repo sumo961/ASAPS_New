@@ -1377,6 +1377,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                 animationDelay={animationDelays[index] || 0}
                 onAnimationComplete={handleAnimationComplete}
                 skipAnimation={effectiveSkipAnimation}
+                mobileFontScale={mobileFontScale}
               />
             </div>
             );
@@ -1417,6 +1418,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                     soundBlobResolver={soundBlobResolver}
                     stageWidth={stageWidth}
                     buttonCount={buttonElements.length}
+                    mobileFontScale={mobileFontScale}
                   />
                 );
               })}
@@ -1553,6 +1555,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           totalTime={timerHudTime?.totalTime}
           displayText={timerHudOverrideText}
           fictionalTimeText={fictionalTimeText}
+          fontScale={mobileFontScale}
         />
       )}
       {/* Countdown Meter HUD overlay */}
@@ -1564,6 +1567,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           counterValue={countdownMeterValue.value}
           counterMin={countdownMeterValue.min}
           counterMax={countdownMeterValue.max}
+          fontScale={mobileFontScale}
         />
       )}
       {adjustedElements.map((element, index) => (
@@ -2120,6 +2124,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
               characterPosition={{ x: effectiveX, y: effectiveY }}
               characterDimensions={{ width: location.width, height: location.height }}
               containerDimensions={containerDimensions}
+              fontScale={mobileFontScale}
             />
           )}
           {shouldShowInventory && inventoryData && (
@@ -2130,6 +2135,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
               characterDimensions={{ width: location.width, height: location.height }}
               containerDimensions={containerDimensions}
               isVisible={true}
+              fontScale={mobileFontScale}
+              autoMinimize={mobileFontScale > 1.0}
             />
           )}
         </>
@@ -2164,6 +2171,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           counterMin={element.counterMin ?? 0}
           counterMax={element.counterMax ?? 100}
           theme={theme}
+          fontScale={mobileFontScale}
         />
       );
 
@@ -2184,6 +2192,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             onFail={() => onAction?.('__keypad_fail__')}
             width={location.width}
             height={location.height}
+            fontScale={mobileFontScale}
           />
         </div>
       );
@@ -2561,9 +2570,9 @@ const TextElement: React.FC<{
           </span>
           {/* Scroll indicators - only show when scrolling is enabled, hide once user starts scrolling */}
           {editorMode ? (
-            <ScrollBadge visible={hasOverflow} />
+            <ScrollBadge visible={hasOverflow} fontScale={mobileFontScale} />
           ) : (
-            needsScroll && hasOverflow && !hasScrolled && <ScrollIndicator position="bottom" />
+            needsScroll && hasOverflow && !hasScrolled && <ScrollIndicator position="bottom" fontScale={mobileFontScale} />
           )}
         </div>
       </div>
@@ -3341,9 +3350,9 @@ const DialogElement: React.FC<{
         </span>
         {/* Scroll indicators - only show when scrolling is enabled, hide once user starts scrolling */}
         {editorMode ? (
-          <ScrollBadge visible={hasOverflow} />
+          <ScrollBadge visible={hasOverflow} fontScale={mobileFontScale} />
         ) : (
-          needsScroll && hasOverflow && !hasScrolled && <ScrollIndicator position="bottom" />
+          needsScroll && hasOverflow && !hasScrolled && <ScrollIndicator position="bottom" fontScale={mobileFontScale} />
         )}
       </div>
     </div>
@@ -3874,7 +3883,8 @@ const MeterElement: React.FC<{
   counterMin: number;
   counterMax: number;
   theme: RenderThemeSettings;
-}> = ({ style, location, counterValue, counterMin, counterMax, theme }) => {
+  fontScale?: number;
+}> = ({ style, location, counterValue, counterMin, counterMax, theme, fontScale = 1.0 }) => {
   const isHorizontal = location.meterOrientation !== 'vertical';
   const percentage = counterMax > counterMin
     ? Math.min(100, Math.max(0, ((counterValue - counterMin) / (counterMax - counterMin)) * 100))
@@ -3943,7 +3953,7 @@ const MeterElement: React.FC<{
         {numericDisplay && (
           <span
             style={{
-              fontSize: '12px',
+              fontSize: `${Math.round(12 * fontScale)}px`,
               fontWeight: 'bold',
               color: theme.colors.textColor,
               textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
@@ -4615,7 +4625,8 @@ const FlexTextElement: React.FC<{
   animationDelay?: number;  // Delay in ms before starting animation
   onAnimationComplete?: () => void;  // Callback when animation finishes
   skipAnimation?: boolean;  // When true, immediately show full text
-}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false }) => {
+  mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
+}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, mobileFontScale = 1.0 }) => {
   const { location, content, hyperlinks } = element;
 
   // Typewriter animation state
@@ -4729,6 +4740,11 @@ const FlexTextElement: React.FC<{
     }
   }
 
+  // Apply mobile font scale multiplier
+  if (mobileFontScale !== 1.0) {
+    computedFontSize = Math.round(computedFontSize * mobileFontScale);
+  }
+
   const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
   const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
   // Use element's font if set (user override), otherwise use theme default
@@ -4827,7 +4843,8 @@ const FlexButtonElement: React.FC<{
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>;
   stageWidth?: number;
   buttonCount?: number;
-}> = ({ element, onAction, interactive: interactiveProp, hideButtonBox = false, theme, isVisited = false, soundBlobResolver, stageWidth, buttonCount = 1 }) => {
+  mobileFontScale?: number;
+}> = ({ element, onAction, interactive: interactiveProp, hideButtonBox = false, theme, isVisited = false, soundBlobResolver, stageWidth, buttonCount = 1, mobileFontScale = 1.0 }) => {
   // Visited choices are non-interactive (greyed out and not clickable)
   const interactive = interactiveProp && !isVisited;
   const { location, content, actionId } = element;
@@ -4841,6 +4858,11 @@ const FlexButtonElement: React.FC<{
     computedFontSize = theme.fonts.buttonFontSize;
   } else {
     computedFontSize = 18;
+  }
+
+  // Apply mobile font scale multiplier
+  if (mobileFontScale !== 1.0) {
+    computedFontSize = Math.round(computedFontSize * mobileFontScale);
   }
 
   const computedTextAlign = location.textAlign || 'center';

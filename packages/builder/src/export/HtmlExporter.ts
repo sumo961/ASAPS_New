@@ -103,10 +103,17 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
   <script>
     // Mobile device detection
     window.ASAPS_MOBILE = (function() {
-      var isNarrow = window.innerWidth <= 1024;
+      // URL override for testing: append ?mobile=1 to force mobile mode
+      try { if (new URLSearchParams(window.location.search).get('mobile') === '1') return true; } catch(e) {}
       var hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      return isNarrow && hasTouch;
+      var smallScreen = Math.min(screen.width, screen.height) <= 768;
+      var smallViewport = Math.min(window.innerWidth, window.innerHeight) <= 768;
+      var mobileUA = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // Real device: touch + (small screen OR mobile UA)
+      // DevTools sim: touch + small viewport
+      return (hasTouch && (smallScreen || mobileUA)) || (hasTouch && smallViewport);
     })();
+    console.log('[ASAPS] Mobile:', window.ASAPS_MOBILE, '| touch:', ('ontouchstart' in window || navigator.maxTouchPoints > 0), '| screen:', screen.width + 'x' + screen.height, '| viewport:', window.innerWidth + 'x' + window.innerHeight);
 
     // Story configuration
     window.ASAPS_CONFIG = {
@@ -130,15 +137,12 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       }
 
       // Determine mobile mode based on project settings and device detection
-      // Cover mode only activates on actual mobile devices (never on desktop)
-      var mobileMode = false;
+      // Cover mode only activates when explicitly chosen (never for 'auto')
       var mobileScaling = window.ASAPS_CONFIG.mobileScalingMode || 'auto';
-      if (mobileScaling === 'fit') {
-        mobileMode = false; // Always fit, even on mobile
-      } else {
-        // 'auto' and 'cover' both use cover on mobile, fit on desktop
-        mobileMode = !!window.ASAPS_MOBILE;
-      }
+      var mobileMode = (mobileScaling === 'cover') && !!window.ASAPS_MOBILE;
+      // Font scale is independent of cover mode: active on mobile for 'auto' and 'cover'
+      var effectiveFontScale = ((mobileScaling === 'auto' || mobileScaling === 'cover') && window.ASAPS_MOBILE)
+        ? window.ASAPS_CONFIG.mobileFontScale : 1.0;
 
       // Get story source
       var storySource;
@@ -156,7 +160,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
           story: storySource,
           enableAI: window.ASAPS_CONFIG.enableAI,
           mobileMode: mobileMode,
-          mobileFontScale: window.ASAPS_CONFIG.mobileFontScale,
+          mobileFontScale: effectiveFontScale,
         });
       } else {
         console.error('ASAPS Player not loaded');
@@ -277,10 +281,17 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
   <script>
     // Mobile device detection
     window.ASAPS_MOBILE = (function() {
-      var isNarrow = window.innerWidth <= 1024;
+      // URL override for testing: append ?mobile=1 to force mobile mode
+      try { if (new URLSearchParams(window.location.search).get('mobile') === '1') return true; } catch(e) {}
       var hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      return isNarrow && hasTouch;
+      var smallScreen = Math.min(screen.width, screen.height) <= 768;
+      var smallViewport = Math.min(window.innerWidth, window.innerHeight) <= 768;
+      var mobileUA = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // Real device: touch + (small screen OR mobile UA)
+      // DevTools sim: touch + small viewport
+      return (hasTouch && (smallScreen || mobileUA)) || (hasTouch && smallViewport);
     })();
+    console.log('[ASAPS] Mobile:', window.ASAPS_MOBILE, '| touch:', ('ontouchstart' in window || navigator.maxTouchPoints > 0), '| screen:', screen.width + 'x' + screen.height, '| viewport:', window.innerWidth + 'x' + window.innerHeight);
 
     window.ASAPS_CONFIG = {
       enableAI: {{ENABLE_AI}},
@@ -344,16 +355,18 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
         var playerEl = document.getElementById('player');
         playerEl.innerHTML = '<div class="loading-screen"><div class="spinner"></div><div>Loading story...</div></div>';
 
-        // Determine mobile mode
+        // Determine mobile mode: cover only when explicitly chosen
         var mobileScaling = window.ASAPS_CONFIG.mobileScalingMode || 'auto';
-        var mobileMode = mobileScaling !== 'fit' && !!window.ASAPS_MOBILE;
+        var mobileMode = (mobileScaling === 'cover') && !!window.ASAPS_MOBILE;
+        var effectiveFontScale = ((mobileScaling === 'auto' || mobileScaling === 'cover') && window.ASAPS_MOBILE)
+          ? window.ASAPS_CONFIG.mobileFontScale : 1.0;
 
         if (typeof ASAPSPlayer !== 'undefined') {
           window._asapsPlayerInstance = ASAPSPlayer.init('#player', {
             story: storySource,
             enableAI: window.ASAPS_CONFIG.enableAI,
             mobileMode: mobileMode,
-            mobileFontScale: window.ASAPS_CONFIG.mobileFontScale,
+            mobileFontScale: effectiveFontScale,
           });
         }
       };
@@ -367,9 +380,11 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       if (window.parent !== window) {
         document.body.classList.add('iframe-mode');
       }
-      // Determine mobile mode
+      // Determine mobile mode: cover only when explicitly chosen
       var mobileScaling = window.ASAPS_CONFIG.mobileScalingMode || 'auto';
-      var mobileMode = mobileScaling !== 'fit' && !!window.ASAPS_MOBILE;
+      var mobileMode = (mobileScaling === 'cover') && !!window.ASAPS_MOBILE;
+      var effectiveFontScale = ((mobileScaling === 'auto' || mobileScaling === 'cover') && window.ASAPS_MOBILE)
+        ? window.ASAPS_CONFIG.mobileFontScale : 1.0;
 
       var storySource = 'data:application/zip;base64,' + window.ASAPS_CONFIG.storyData;
       if (typeof ASAPSPlayer !== 'undefined') {
@@ -377,7 +392,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
           story: storySource,
           enableAI: window.ASAPS_CONFIG.enableAI,
           mobileMode: mobileMode,
-          mobileFontScale: window.ASAPS_CONFIG.mobileFontScale,
+          mobileFontScale: effectiveFontScale,
         });
       }
     })();

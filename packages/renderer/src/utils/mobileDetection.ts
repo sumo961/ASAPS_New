@@ -12,15 +12,22 @@
 export function isMobileDevice(): boolean {
   if (typeof window === 'undefined') return false;
 
-  const isNarrowViewport = window.innerWidth <= 1024;
+  // URL override for testing: ?mobile=1
+  try {
+    if (new URLSearchParams(window.location.search).get('mobile') === '1') return true;
+  } catch { /* ignore */ }
+
   const hasTouch =
     'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const smallScreen = Math.min(screen.width, screen.height) <= 768;
+  const smallViewport = Math.min(window.innerWidth, window.innerHeight) <= 768;
   const mobileUA = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
     navigator.userAgent
   );
 
-  // Require narrow viewport AND at least one touch/UA signal
-  return isNarrowViewport && (hasTouch || mobileUA);
+  // Real device: touch + (small screen OR mobile UA)
+  // DevTools sim: touch + small viewport
+  return (hasTouch && (smallScreen || mobileUA)) || (hasTouch && smallViewport);
 }
 
 /**

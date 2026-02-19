@@ -36,6 +36,8 @@ export interface KeypadElementProps {
   width?: number;
   /** Height of the keypad area */
   height?: number;
+  /** Font scale multiplier (default 1.0) */
+  fontScale?: number;
 }
 
 /**
@@ -87,6 +89,7 @@ export const KeypadElement: React.FC<KeypadElementProps> = ({
   theme,
   width = 240,
   height = 360,
+  fontScale = 1.0,
 }) => {
   const [digits, setDigits] = useState('');
   const [attempts, setAttempts] = useState(0);
@@ -220,7 +223,7 @@ export const KeypadElement: React.FC<KeypadElementProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             fontFamily: '"Courier New", monospace',
-            fontSize: Math.min(28, displayHeight * 0.5),
+            fontSize: Math.round(Math.min(28, displayHeight * 0.5) * fontScale),
             fontWeight: 700,
             color: error ? '#EF4444' : dispText,
             letterSpacing: '0.2em',
@@ -239,7 +242,7 @@ export const KeypadElement: React.FC<KeypadElementProps> = ({
         <div
           style={{
             textAlign: 'center',
-            fontSize: 11,
+            fontSize: Math.round(11 * fontScale),
             color: attempts >= maxAttempts - 1 ? '#EF4444' : 'rgba(255, 255, 255, 0.5)',
           }}
         >
@@ -270,7 +273,7 @@ export const KeypadElement: React.FC<KeypadElementProps> = ({
                 color: btnText,
                 border: `1px solid ${btnBorder}`,
                 borderRadius: 8,
-                fontSize: Math.min(20, btnHeight * 0.4),
+                fontSize: Math.round(Math.min(20, btnHeight * 0.4) * fontScale),
                 fontWeight: 600,
                 cursor: 'pointer',
                 display: 'flex',
@@ -310,7 +313,7 @@ export const KeypadElement: React.FC<KeypadElementProps> = ({
             color: 'rgba(255, 255, 255, 0.7)',
             border: `1px solid ${btnBorder}`,
             borderRadius: 8,
-            fontSize: 13,
+            fontSize: Math.round(13 * fontScale),
             fontWeight: 500,
             cursor: 'pointer',
           }}
@@ -326,7 +329,7 @@ export const KeypadElement: React.FC<KeypadElementProps> = ({
             color: '#ffffff',
             border: 'none',
             borderRadius: 8,
-            fontSize: 14,
+            fontSize: Math.round(14 * fontScale),
             fontWeight: 600,
             cursor: digits.length >= minDigits ? 'pointer' : 'not-allowed',
             opacity: digits.length >= minDigits ? 1 : 0.5,

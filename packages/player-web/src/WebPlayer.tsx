@@ -19,9 +19,9 @@ export interface WebPlayerProps {
   enableAI?: boolean;
   /** Show UI overlay with save/load/settings (default: true) */
   showUI?: boolean;
-  /** Enable mobile display mode (cover scaling + font boost) */
+  /** Enable mobile cover scaling (fills viewport, may crop edges) */
   mobileMode?: boolean;
-  /** Font scale multiplier for mobile (1.0-2.0, default 1.0) */
+  /** Font scale multiplier (pre-computed: > 1.0 on mobile, 1.0 on desktop) */
   mobileFontScale?: number;
   /** Callback when story ends */
   onEnd?: () => void;
@@ -160,12 +160,13 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         const renderer = new ReactRenderer(context);
         rendererRef.current = renderer;
 
-        // Configure mobile display mode
+        // Configure mobile display mode (cover scaling)
         if (mobileMode) {
           renderer.setMobileMode(true);
-          if (mobileFontScale !== 1.0) {
-            renderer.setMobileFontScale(mobileFontScale);
-          }
+        }
+        // Font scale is pre-computed by HTML template (> 1.0 on mobile, 1.0 on desktop)
+        if (mobileFontScale !== 1.0) {
+          renderer.setMobileFontScale(mobileFontScale);
         }
 
         // Set up AI service if enabled
