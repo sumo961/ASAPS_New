@@ -59,6 +59,10 @@ export function generateDefaultLocations(
   console.log(`[DefaultLocationGenerator] Generating locations for ${beatType}:`, beatDef.locations);
 
   beatDef.locations.forEach((locationName: string, index: number) => {
+    // Skip static locations that are handled dynamically
+    if ((beatType === 'movementChoice' || beatType === 'dialogTree') && locationName === 'choices') return;
+    if (beatType === 'pickProp' && locationName === 'props') return;
+
     const typeInfo = LOCATION_TYPE_MAP[locationName] || { kind: 'text' as const };
 
     // Determine dimensions based on type

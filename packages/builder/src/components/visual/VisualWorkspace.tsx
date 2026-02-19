@@ -1755,6 +1755,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         });
       }
 
+      // Update movementChoice/pickProp question text
+      if (beat.type === 'movementChoice' || beat.type === 'pickProp') {
+        updated = updated.map((e: VisualElement) => {
+          if ((e.type === 'dialog' || e.type === 'text') && e.name?.toLowerCase().includes('question')) {
+            if (e.text !== params.question) {
+              changed = true;
+              return { ...e, text: params.question || '' };
+            }
+          }
+          return e;
+        });
+      }
+
       if (changed) {
         console.log('[VisualWorkspace] Visual elements updated');
         setHasChanges(true); // Mark as changed so Save button appears
@@ -1804,7 +1817,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           text: params.text || params.dialogTree?.text || '',
           choices: params.dialogTree?.choices || []
         };
-      case 'movement':
+      case 'movementChoice':
         return {
           question: params.question || 'Where do you want to go?',
           choices: params.choices || []
