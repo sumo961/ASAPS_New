@@ -16,12 +16,16 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.21)
+## ⚠️ Development Status (v0.9.22)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Project Switch Fix** | **v0.9.22**: Clear UI state on project switch to prevent cross-project beat leakage |
+| **Advisory Editing Locks** | **v0.9.22**: Beat-level editing locks for Git collaboration — purple canvas indicators + Inspector warnings |
+| **EndScreen Variables** | **v0.9.22**: `${variable}` interpolation now works in EndScreen button text |
+| **MovementChoice/PickProp** | **v0.9.22**: Question text now appears correctly in the Visual Editor |
 | **Mobile Font Scaling** | **v0.9.21**: Font scaling decoupled from cover mode — readable text on mobile without edge cropping |
 | **Native Mobile Mode** | **v0.9.21**: New option for projects designed at mobile dimensions — disables all mobile adaptations |
 | **Mobile Renderer** | **v0.9.21**: Improved mobile-responsive rendering for HUD overlays, inventory, meters, and dialogs |
@@ -54,7 +58,7 @@ This is a **beta release**. Core functionality works, but some features are inco
 | **AI-Based Beats** | AI Summary, Online Content, AI Condition, AI Dialog Tree beats for dynamic content |
 | Assets (graphics, sounds, sprite animations) | Fully implemented |
 | Visual dialog editor | Supports all phases of dialog trees (v0.9.4) |
-| Project switching | Occasional issues; reload interface to resolve |
+| Project switching | Fixed in v0.9.22 — UI state properly cleared on switch |
 | Animation system | Fully implemented with visual path editor (v0.9.1) |
 | Character meter frames | HUD overlays for counters (v0.9.2) |
 | Chat-style dialog mode | New presentation modes for DialogTree (v0.9.3) |

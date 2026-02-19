@@ -1,5 +1,59 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-19: Bug Fixes & Advisory Editing Locks (v0.9.22)
+
+### Overview
+
+This release fixes several bugs — **cross-project beat leakage** when switching projects with the Inspector open, **EndScreen variable interpolation** in button text, and **movementChoice/pickProp question text** not appearing in the Visual Editor. It also adds **advisory editing locks** for Git-based team collaboration and a comprehensive **user guide update** covering v0.9.10–v0.9.21.
+
+### Cross-Project Beat Leakage Fix
+
+When switching projects, `selectedBeat`, `selectedCluster`, and overlay panel state were never cleared. This allowed a beat from Project A to leak into Project B if the Inspector was still open during the switch. The fix:
+
+- Clears `selectedBeat` and `selectedCluster` at the start of every project-load branch (switching, new untitled, existing project)
+- Closes overlay panels (Character Manager, Asset Manager, Settings, Debug, Search) on project switch
+- Immediately syncs `beatsRef`, `connectionsRef`, `clustersRef`, and `containerBeatPositionsRef` after `loadStoryData()` to prevent `syncProjectData` from reading stale data during the window before the useEffect fires
+
+**Files modified:**
+- `packages/builder/src/App.tsx` — Clear UI selections and sync refs on project switch
+
+### EndScreen Variable Interpolation & MovementChoice Question Text
+
+- EndScreen `restartText`, `creditsText`, and `buttonText` now process through `processText()` so `${variable}` interpolation works
+- Fixed `getBeatContent()` mapping `'movement'` → `'movementChoice'` so question text appears in the Visual Editor
+- Added param sync for movementChoice/pickProp question text updates from the visual editor
+- Skip static `choices`/`props` locations in `DefaultLocationGenerator` for beats that generate them dynamically
+- When `beat.locations` already has choice hotspots, `SchemaLocationInitializer` was skipped entirely — now supplements the missing "Question" text element and populates its text on reload
+
+**Files modified:**
+- `packages/core/src/beats/EndScreenBeat.ts` — Process button text through `processText()`
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — Fix getBeatContent mapping, add question text element supplementing
+- `packages/renderer/src/utils/DefaultLocationGenerator.ts` — Skip static choice/prop locations for dynamic beats
+- `packages/core/src/generated/beat-types.ts` — Type updates
+- `packages/builder/public/player-web.js` — Updated player bundle
+
+### Advisory Editing Locks for Git Collaboration
+
+New advisory beat editing locks that track which beats are being edited by team members via `.asaps-editing.json`. Locks propagate through normal git workflow and show purple indicators on the canvas plus warning banners in the Inspector. Stale locks older than 2 hours are automatically ignored.
+
+**Files modified:**
+- `packages/builder/src/vcs/EditingLocks.ts` — New editing lock management module
+- `packages/builder/src/vcs/GitAdapter.ts` — Git integration for lock files
+- `packages/builder/src/vcs/VCSStatusProvider.tsx` — Lock status UI integration
+- `packages/builder/src/components/Inspector.tsx` — Lock warning banner
+- `packages/builder/src/components/vcs/FileChangeIndicator.tsx` — Lock indicator styling
+- `packages/builder/src/App.tsx` — Lock lifecycle integration
+
+### User Guide Update (v0.9.10 → v0.9.21)
+
+Comprehensive user guide update covering 11 minor releases of new features: Keypad beat, Fictional Time system, Timer HUD, recursive dialog trees, choice effects, HTML export, Git VCS integration, search & replace, multi-language translation, undo/redo, and advisory editing locks. Adds 5 new screenshots.
+
+**Files modified:**
+- `docs/USER_GUIDE.md` — Major content update
+- `docs/images/12-keypad-beat.png` through `docs/images/16-dials-countdowns-flowchart.png` — New screenshots
+
+---
+
 ## 2026-02-19: Mobile Display Improvements & Font Scaling Fix (v0.9.21)
 
 ### Overview
