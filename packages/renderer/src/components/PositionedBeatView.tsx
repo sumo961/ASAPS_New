@@ -328,6 +328,8 @@ export interface PositionedElementData {
   actionId?: string;
   /** Optional target beat ID for checking if this choice leads to a visited beat */
   targetBeatId?: string;
+  /** Whether visited-choice dimming is enabled for this beat */
+  markVisited?: boolean;
   /** Optional hyperlinks for HyperText beat type - words in the text that are clickable */
   hyperlinks?: HyperlinkData[];
   /** Counter meter value (for kind='meter') */
@@ -1875,10 +1877,13 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
 
       // Check if this button leads to a visited beat or is a visited choice
       // For dialogTree: only use per-choice tracking, not visitedBeats (avoids false positives)
+      // For other beats: only apply visited styling when markVisited is enabled
       const isButtonVisited = beatType === 'dialogTree'
         ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
-        : (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
-          (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
+        : element.markVisited
+          ? (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+            (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
+          : false;
       // Wrap button in a div that handles the fade-in animation
       // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       // Combine animated opacity with button fade-in: use animated opacity if buttons are shown
@@ -1921,10 +1926,13 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
     case 'hotspot': {
       // Check if this hotspot leads to a visited beat or is a visited choice
       // For dialogTree: only use per-choice tracking, not visitedBeats (avoids false positives)
+      // For other beats: only apply visited styling when markVisited is enabled
       const isHotspotVisited = beatType === 'dialogTree'
         ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
-        : (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
-          (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
+        : element.markVisited
+          ? (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+            (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
+          : false;
       // Wrap hotspot in a div that handles the fade-in animation
       // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       // Also apply scroll-to-continue logic for hotspots
@@ -4058,7 +4066,6 @@ export function createPositionedElementData(
     }
 
     // Extract actionId and targetBeatId for beats that have choice/option mappings
-    // Only set targetBeatId when content.markVisited is true (per-beat toggle)
     let actionId: string | undefined;
     let targetBeatId: string | undefined;
     let description: string | undefined;
@@ -4114,10 +4121,7 @@ export function createPositionedElementData(
       }
       if (choice) {
         actionId = choice.id;
-        // Only set targetBeatId when markVisited is enabled for this beat
-        if (markVisited) {
-          targetBeatId = choice.target;
-        }
+        targetBeatId = choice.target;
         console.log(`[createPositionedElementData] MovementChoice: location "${location.name}" (kind=${location.kind}) → choice ID "${actionId}", target "${targetBeatId}", markVisited=${markVisited}`);
       } else if (location.kind === 'hotspot' || location.kind === 'prop') {
         // Only warn for interactive element types that should have been matched
@@ -4190,10 +4194,7 @@ export function createPositionedElementData(
       if (prop) {
         actionId = prop.id;
         description = prop.description || undefined;
-        // Only set targetBeatId when markVisited is enabled for this beat
-        if (markVisited) {
-          targetBeatId = prop.target;
-        }
+        targetBeatId = prop.target;
         console.log(`[createPositionedElementData] PickProp: location "${location.name}" → prop ID "${actionId}" (via ${prop.locationName === location.name ? 'locationName' : prop.name === location.name ? 'exact name' : 'partial match'}), target "${targetBeatId}", markVisited=${markVisited}`);
       }
     }
@@ -4265,6 +4266,7 @@ export function createPositionedElementData(
       spriteSheet,
       actionId,
       targetBeatId,
+      markVisited,
       description,
       hyperlinks,
       counterValue,
