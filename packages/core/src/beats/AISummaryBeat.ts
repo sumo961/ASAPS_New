@@ -211,7 +211,7 @@ export class AISummaryBeat extends Beat {
       if (this.resetOnRestart) {
         context.reset();
       }
-      return this.restartTarget || '0'; // Return to first beat
+      return this.restartTarget || context.getStory().getFirstBeatId();
     }
 
     // Handle credits (if implemented)

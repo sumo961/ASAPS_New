@@ -148,6 +148,8 @@ interface GlobalSettingsInspectorProps {
   themeId?: string;
   /** Callback when theme is changed */
   onThemeChange?: (themeId: string | undefined) => void;
+  /** Available beats for the first beat dropdown */
+  beats?: Array<{ id: string; name: string; type: string }>;
 }
 
 export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = ({
@@ -158,6 +160,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   assets = [],
   themeId: initialThemeId,
   onThemeChange,
+  beats = [],
 }) => {
   const [settings, setSettings] = useState<GlobalSettings>(initialSettings);
   const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'copyright' | 'variables' | 'translation' | 'debug'>('project');
@@ -2799,15 +2802,20 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    First Beat ID (for testing)
+                    First Beat (for testing)
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={settings.debug.firstbeat}
                     onChange={(e) => handleChange('debug', 'firstbeat', e.target.value)}
                     className="w-full px-3 py-2 border rounded"
-                    placeholder="0"
-                  />
+                  >
+                    <option value="">Story default (auto-detect)</option>
+                    {beats.map(beat => (
+                      <option key={beat.id} value={beat.id}>
+                        {beat.name || beat.id} ({beat.type})
+                      </option>
+                    ))}
+                  </select>
                   <p className="text-xs text-gray-500 mt-1">
                     Override the starting beat for testing specific sections
                   </p>

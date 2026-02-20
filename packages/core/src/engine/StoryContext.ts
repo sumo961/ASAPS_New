@@ -679,7 +679,7 @@ export class StoryContext extends EventEmitter {
   reset(): void {
     this.timerManager.stopAllTimers();
     this.state = {
-      currentBeatId: '0',
+      currentBeatId: this.story?.getFirstBeatId() || '0',
       variables: {},
       counters: {},
       inventory: [],
@@ -723,7 +723,7 @@ export class StoryContext extends EventEmitter {
       this.history = [];
       this.choiceHistory = [];
     }
-    this.state.currentBeatId = '0';
+    this.state.currentBeatId = this.story?.getFirstBeatId() || '0';
     this.emit('selectiveReset', options);
   }
 

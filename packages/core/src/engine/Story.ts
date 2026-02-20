@@ -29,7 +29,17 @@ export class Story {
   }
 
   getFirstBeatId(): string {
-    return this.metadata.firstBeatId;
+    // If explicitly set and exists, use it
+    if (this.metadata.firstBeatId && this.beats.has(this.metadata.firstBeatId)) {
+      return this.metadata.firstBeatId;
+    }
+    // Auto-detect: prefer titleScreen beats
+    for (const [id, beat] of this.beats) {
+      if (beat.type === 'titleScreen') return id;
+    }
+    // Fallback: first beat in the map
+    const first = this.beats.keys().next().value;
+    return first || '0';
   }
 
   setFirstBeatId(id: string): void {

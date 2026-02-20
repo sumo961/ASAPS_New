@@ -71,12 +71,12 @@ export class StoryEngine extends EventEmitter {
         const nextBeatId = await beat.execute(this.context, this.renderer);
         console.log(`[StoryEngine] Beat ${this.currentBeatId} returned nextBeatId:`, JSON.stringify(nextBeatId));
 
-        // Check for restart signal from EndScreen
+        // Check for restart signal (backward compatibility)
         if (nextBeatId === '__restart__') {
-          console.log('[StoryEngine] Restart requested from EndScreen - emitting restartRequested event');
-          this.running = false;
-          this.emit('restartRequested');
-          return;
+          console.log('[StoryEngine] Restart signal - restarting from first beat');
+          this.currentBeatId = this.story.getFirstBeatId();
+          this.context.setCurrentBeatId(this.currentBeatId);
+          continue;
         }
 
         // Check again for timer interrupt after beat execution

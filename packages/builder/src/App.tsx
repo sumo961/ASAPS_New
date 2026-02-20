@@ -4749,6 +4749,7 @@ function App() {
           assets={assets}
           themeId={currentThemeId}
           onThemeChange={setCurrentThemeId}
+          beats={state.beats.map(b => ({ id: b.id, name: b.name, type: b.type }))}
         />
       )}
 

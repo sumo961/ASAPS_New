@@ -140,8 +140,9 @@ export class EndScreenBeat extends Beat {
 
     // Check for explicit restart patterns
     if (actionLower.includes('restart') || actionLower.includes('play') || actionLower.includes('again')) {
-      console.log('[EndScreenBeat] User requested restart (explicit pattern) - returning __restart__');
-      return '__restart__';  // Special signal for engine to restart
+      const restartTarget = this.getNextBeat(context) || context.getStory().getFirstBeatId();
+      console.log('[EndScreenBeat] User requested restart (explicit pattern) - navigating to:', restartTarget);
+      return restartTarget;
     }
 
     // Check for credits patterns
@@ -158,8 +159,9 @@ export class EndScreenBeat extends Beat {
     // button1 is typically restart, button2 is typically credits
     if (actionLower === 'button1' || actionLower === 'button 1') {
       if (this.showRestart) {
-        console.log('[EndScreenBeat] User clicked button1 with showRestart=true - returning __restart__');
-        return '__restart__';
+        const restartTarget = this.getNextBeat(context) || context.getStory().getFirstBeatId();
+        console.log('[EndScreenBeat] User clicked button1 with showRestart=true - navigating to:', restartTarget);
+        return restartTarget;
       }
     }
 
@@ -174,8 +176,9 @@ export class EndScreenBeat extends Beat {
 
     // If only one button exists and showRestart is true, any button click should restart
     if (this.showRestart && !this.showCredits) {
-      console.log('[EndScreenBeat] Single button with showRestart=true - returning __restart__');
-      return '__restart__';
+      const restartTarget = this.getNextBeat(context) || context.getStory().getFirstBeatId();
+      console.log('[EndScreenBeat] Single button with showRestart=true - navigating to:', restartTarget);
+      return restartTarget;
     }
 
     console.log('[EndScreenBeat] No restart detected, returning null');

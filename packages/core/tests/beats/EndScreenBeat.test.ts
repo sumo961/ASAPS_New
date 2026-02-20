@@ -5,6 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EndScreenBeat } from '../../src/beats/EndScreenBeat';
 import { StoryContext } from '../../src/engine/StoryContext';
+import { Story } from '../../src/engine/Story';
+import { InfoTextBeat } from '../../src/beats/InfoTextBeat';
 import type { IRenderer } from '../../src/types';
 
 function createMockRenderer(): IRenderer {
@@ -29,12 +31,26 @@ function createMockRenderer(): IRenderer {
   } as unknown as IRenderer;
 }
 
+function createStoryWithFirstBeat(): Story {
+  const story = new Story({ firstBeatId: 'beat_0' });
+  const firstBeat = new InfoTextBeat({
+    id: 'beat_0',
+    name: 'Start',
+    type: 'infoText',
+    text: 'Welcome!',
+  });
+  story.addBeat(firstBeat);
+  return story;
+}
+
 describe('EndScreenBeat', () => {
   let context: StoryContext;
   let renderer: IRenderer;
+  let story: Story;
 
   beforeEach(() => {
-    context = new StoryContext();
+    story = createStoryWithFirstBeat();
+    context = new StoryContext({}, story);
     renderer = createMockRenderer();
   });
 
@@ -185,7 +201,7 @@ describe('EndScreenBeat', () => {
       );
     });
 
-    it('should return __restart__ when user clicks restart', async () => {
+    it('should navigate to first beat when user clicks restart (no outgoing connection)', async () => {
       (renderer.renderEndScreen as any).mockResolvedValue('restart');
 
       const beat = new EndScreenBeat({
@@ -197,10 +213,11 @@ describe('EndScreenBeat', () => {
 
       const result = await beat.execute(context, renderer);
 
-      expect(result).toBe('__restart__');
+      // With no outgoing connection, navigates to story's first beat
+      expect(result).toBe('beat_0');
     });
 
-    it('should return __restart__ for Play Again action', async () => {
+    it('should navigate to first beat for Play Again action', async () => {
       (renderer.renderEndScreen as any).mockResolvedValue('Play Again');
 
       const beat = new EndScreenBeat({
@@ -212,10 +229,10 @@ describe('EndScreenBeat', () => {
 
       const result = await beat.execute(context, renderer);
 
-      expect(result).toBe('__restart__');
+      expect(result).toBe('beat_0');
     });
 
-    it('should return __restart__ for button1 when showRestart is true', async () => {
+    it('should navigate to first beat for button1 when showRestart is true', async () => {
       (renderer.renderEndScreen as any).mockResolvedValue('button1');
 
       const beat = new EndScreenBeat({
@@ -227,7 +244,24 @@ describe('EndScreenBeat', () => {
 
       const result = await beat.execute(context, renderer);
 
-      expect(result).toBe('__restart__');
+      expect(result).toBe('beat_0');
+    });
+
+    it('should navigate to outgoing connection target when available', async () => {
+      (renderer.renderEndScreen as any).mockResolvedValue('restart');
+
+      const beat = new EndScreenBeat({
+        id: 'end1',
+        name: 'Ending',
+        type: 'endScreen',
+        showRestart: true,
+      });
+      // Add an outgoing connection to a specific beat
+      beat.connections = [{ targetId: 'beat_5' }];
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('beat_5');
     });
 
     it('should return null for unknown action with both buttons', async () => {
@@ -304,7 +338,7 @@ describe('EndScreenBeat', () => {
       expect(renderer.setState).toHaveBeenCalledWith('creditsText', 'See Credits');
     });
 
-    it('should return __restart__ when single button with showRestart', async () => {
+    it('should navigate to first beat when single button with showRestart', async () => {
       (renderer.renderEndScreen as any).mockResolvedValue('anything');
 
       const beat = new EndScreenBeat({
@@ -317,7 +351,7 @@ describe('EndScreenBeat', () => {
 
       const result = await beat.execute(context, renderer);
 
-      expect(result).toBe('__restart__');
+      expect(result).toBe('beat_0');
     });
   });
 });
