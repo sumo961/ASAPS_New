@@ -1332,6 +1332,9 @@
         }
       },
       "locations": ["dialog", "choices"],
+      "locationMapping": {
+        "dialog": "scenario"
+      },
       "transitions": true,
       "sound": true,
       "renderer": "dialogTree",
@@ -1435,12 +1438,7 @@
       },
       "locations": ["title", "summary", "restartButton"],
       "locationMapping": {
-        "title": "title",
-        "summary": "summary",
-        "restart": "restartText",
-        "play": "restartText",
-        "button": "restartText",
-        "credits": "creditsText"
+        "title": "title"
       },
       "transitions": true,
       "sound": true,
@@ -1544,7 +1542,7 @@
       },
       "locations": ["text", "continueButton"],
       "locationMapping": {
-        "text": "text",
+        "text": "fallbackText",
         "continueButton": "buttonText"
       },
       "transitions": true,
@@ -1681,7 +1679,7 @@
       },
       "locations": ["text"],
       "locationMapping": {
-        "text": "text"
+        "text": "fallbackText"
       },
       "transitions": true,
       "sound": true,

@@ -320,7 +320,7 @@ describe('Schema Location Mapping', () => {
       const beatTypes = Object.entries(beatDefinitions.beatTypes);
 
       // Parameters that can be required without defaults (paths, IDs, etc.)
-      const allowedWithoutDefaults = ['videoFile', 'dialogTree'];
+      const allowedWithoutDefaults = ['videoFile', 'dialogTree', 'scenario'];
 
       for (const [beatType, beatDef] of beatTypes) {
         const def = beatDef as any;

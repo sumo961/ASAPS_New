@@ -220,13 +220,15 @@ describe('VCSStatusProvider', () => {
       await value.initialize('/project');
     });
 
-    const callsBefore = vi.mocked(detectVCS).mock.calls.length;
+    const callsBefore = vi.mocked(getGitStatus).mock.calls.length;
 
     await act(async () => {
       await value.refresh();
     });
 
-    expect(vi.mocked(detectVCS).mock.calls.length).toBe(callsBefore + 1);
+    // VCS type is cached after first detection, but git status adapters
+    // should be called on every refresh
+    expect(vi.mocked(getGitStatus).mock.calls.length).toBe(callsBefore + 1);
   });
 });
 

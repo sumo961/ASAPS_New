@@ -38,6 +38,26 @@ npm run test:ui -w @asaps/builder   # Open Vitest UI for builder
 npm run test:coverage -w @asaps/core # Run core tests with coverage
 ```
 
+### ⚠️ CRITICAL: How to Run Tests Correctly
+
+**NEVER run `npx vitest run` from the monorepo root.** There is no root-level `vitest.config` file, so vitest will run all test files without the per-workspace environment settings. This causes 200+ phantom failures because builder and renderer tests need `jsdom` environment (set in their own `vitest.config.ts` files) but vitest defaults to `node` when run from root.
+
+**Always use workspace-scoped commands:**
+```bash
+npm run test                         # Runs tests in ALL workspaces (correct)
+npm run test -w @asaps/builder       # Builder tests only (correct)
+npm run test -w @asaps/core          # Core tests only (correct)
+npm run test -w @asaps/renderer      # Renderer tests only (correct)
+```
+
+Or run from within the package directory:
+```bash
+cd packages/builder && npx vitest run   # Also correct (uses local vitest.config.ts)
+cd packages/core && npx vitest run      # Also correct
+```
+
+**Do NOT run workspace tests in parallel** — they can deadlock. Run them sequentially.
+
 ## Build Numbering
 
 The app displays its version as `v{version}.{buildNumber}` (e.g., `v0.9.17.23`) in the header. Build numbers are auto-incremented by the CI workflow on each "Build Desktop Apps" run.

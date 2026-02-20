@@ -57,8 +57,8 @@ describe('SetTimerBeat', () => {
       });
 
       const params = beat.getParameters();
-      expect(params.timerName).toBe('Timer Beat'); // Uses beat name as fallback
-      expect(params.value).toBe(60); // Default value in getParameters
+      expect(params.timerName).toBe(''); // No timer name specified, defaults to empty
+      expect(params.value).toBe(0); // Default from constructor (0 means no timer)
       expect(params.timerTarget).toBe('');
     });
 
@@ -92,8 +92,8 @@ describe('SetTimerBeat', () => {
       });
 
       const params = beat.getParameters();
-      // config.name is used as timer name fallback
-      expect(params.timerName).toBe('Timer Beat');
+      // config.name is NOT used as timer name fallback (it's the beat display name)
+      expect(params.timerName).toBe('');
       expect(params.value).toBe(45);
       expect(params.timerTarget).toBe('legacy_target');
     });

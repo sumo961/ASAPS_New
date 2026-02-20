@@ -316,7 +316,7 @@ describe('DialogTreeBeat', () => {
       const choicesCalls = mockRenderer.getChoicesCalls();
       expect(choicesCalls.length).toBe(1);
       expect(choicesCalls[0].choices.length).toBe(2);
-      expect(choicesCalls[0].choices.map(c => c.id)).toEqual(['c1', 'c3']);
+      expect(choicesCalls[0].choices.map(c => c.id)).toEqual(['root_c1', 'root_c3']);
     });
   });
 
