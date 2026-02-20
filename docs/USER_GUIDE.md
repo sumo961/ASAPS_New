@@ -1465,7 +1465,7 @@ Each beat on the canvas shows a colored dot indicating its VCS status:
 | Green | New (added/untracked) |
 | Orange | Modified since last commit |
 | Red | Merge conflict |
-| Blue | Locked (Perforce) |
+//| Blue | Locked (Perforce) |
 | Purple | Being edited by another user |
 
 ## Merge Conflicts
@@ -1490,13 +1490,13 @@ When collaborating via Git, ASAPS tracks which beats each team member is current
 
 **What to do:** If you see a purple indicator, consider working on a different beat to avoid merge conflicts later.
 
-## Perforce Support
+//## Perforce Support
 
-ASAPS Modern also supports Perforce (P4) for studios that use it:
-- Automatic checkout on edit
-- Lock/unlock files
-- Submit changelists
-- View lock ownership
+//ASAPS Modern also supports Perforce (P4) for studios that use it:
+//- Automatic checkout on edit
+//- Lock/unlock files
+//- Submit changelists
+//- View lock ownership
 
 ---
 
