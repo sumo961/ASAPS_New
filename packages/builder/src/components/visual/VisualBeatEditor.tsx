@@ -147,6 +147,8 @@ interface VisualBeatEditorProps {
   boxVisibility?: 'all' | 'hideText' | 'hideAll';
   globalSettings?: GlobalSettings;
   themeAssets?: ThemeAssetUrls | null;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
@@ -167,6 +169,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   boxVisibility,
   globalSettings,
   themeAssets,
+  onInteractionStart,
+  onInteractionEnd,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedElement, setDraggedElement] = useState<string | null>(null);
@@ -587,6 +591,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
   // Handle element drag/resize end
   const handleMouseUp = () => {
+    if (draggedElement || resizingElement) {
+      onInteractionEnd?.();
+    }
     setDraggedElement(null);
     setResizingElement(null);
     setResizeCorner(null);
@@ -604,6 +611,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     const element = elements.find(el => el.id === elementId);
     if (!element) return;
 
+    onInteractionStart?.();
     setResizingElement(elementId);
     setResizeCorner(corner);
     setResizeStart({
@@ -1248,6 +1256,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         }
 
                         // Start drag - compute offsets for all selected elements relative to dragged element
+                        onInteractionStart?.();
                         setDraggedElement(el.id);
                         setDragOffset({
                           x: (e.clientX - rect.left) / zoom - effectiveX,

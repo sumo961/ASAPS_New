@@ -17,7 +17,7 @@ import type { SerializedCommand } from '../storage/types';
  */
 export interface VisualElement {
   id: string;
-  type: 'character' | 'prop' | 'text' | 'hotspot' | 'dialog' | 'button';
+  type: 'character' | 'prop' | 'text' | 'hotspot' | 'dialog' | 'button' | 'meter' | 'keypad';
   assetId?: string;
   imageUrl?: string;
   characterId?: string;
@@ -326,6 +326,79 @@ export class MoveElementCommand extends Command {
 }
 
 // ============================================================================
+// Visual Elements Snapshot Command
+// ============================================================================
+
+/**
+ * Snapshot-based command that stores before/after copies of the full
+ * elements array. Handles multi-element drags, alignment, and any
+ * bulk changes as a single undo step.
+ *
+ * Uses `unknown[]` internally so it works with any VisualElement definition
+ * (the command never inspects individual element properties).
+ */
+export class VisualElementsSnapshotCommand extends Command {
+  public readonly type = 'UPDATE_VISUAL_ELEMENTS';
+  public description: string;
+  private oldElements: unknown[];
+  private newElements: unknown[];
+  private applyFn: (elements: any[]) => void;
+
+  constructor(
+    oldElements: unknown[],
+    newElements: unknown[],
+    applyFn: (elements: any[]) => void,
+    description: string,
+    id?: string
+  ) {
+    super(id);
+    this.oldElements = oldElements;
+    this.newElements = newElements;
+    this.applyFn = applyFn;
+    this.description = description;
+  }
+
+  execute(): void {
+    this.applyFn(this.newElements);
+  }
+
+  undo(): void {
+    this.applyFn(this.oldElements);
+  }
+
+  protected serializeData(): any {
+    return {
+      oldElements: this.oldElements,
+      newElements: this.newElements,
+      description: this.description,
+    };
+  }
+
+  canMergeWith(command: Command): boolean {
+    if (!(command instanceof VisualElementsSnapshotCommand)) {
+      return false;
+    }
+    // Only merge commands with the same description within 2 seconds
+    if (command.description !== this.description) {
+      return false;
+    }
+    const timeDiff = command.timestamp.getTime() - this.timestamp.getTime();
+    if (timeDiff > 2000) {
+      return false;
+    }
+    return true;
+  }
+
+  mergeWith(command: Command): void {
+    if (!(command instanceof VisualElementsSnapshotCommand)) {
+      return;
+    }
+    // Keep original oldElements, update to latest newElements
+    this.newElements = command.newElements;
+  }
+}
+
+// ============================================================================
 // Register Commands
 // ============================================================================
 
@@ -348,4 +421,12 @@ export function registerElementCommands(mutations: ElementStateMutations): void 
   CommandRegistry.register('MOVE_ELEMENT', (data) =>
     MoveElementCommand.deserialize(data, mutations)
   );
+
+  // VisualElementsSnapshotCommand does not support deserialization
+  // (applyFn cannot be serialized) but register the type so CommandRegistry
+  // doesn't warn about unknown types if history is loaded.
+  CommandRegistry.register('UPDATE_VISUAL_ELEMENTS', () => {
+    console.warn('[CommandRegistry] UPDATE_VISUAL_ELEMENTS cannot be deserialized');
+    return null as any;
+  });
 }

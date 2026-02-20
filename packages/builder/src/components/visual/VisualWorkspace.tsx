@@ -17,6 +17,8 @@ import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
 import type { Character } from '../../types/character';
 import type { ThemeAssetUrls } from '../../hooks/useThemes';
+import { getCommandManager } from '../../commands/CommandManager';
+import { VisualElementsSnapshotCommand } from '../../commands/ElementCommands';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -239,6 +241,42 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   useEffect(() => {
     charactersRef.current = characters;
   }, [characters]);
+
+  // ---- Undo/Redo snapshot tracking for visual element changes ----
+  const snapshotRef = useRef<VisualElement[] | null>(null);
+  const commitTimeoutRef = useRef<number | null>(null);
+  // Ref to hold syncElementsToBeatLocations (defined later) so applyElements can call it
+  const syncElementsRef = useRef<((elements: VisualElement[], beat: Beat) => void) | null>(null);
+
+  // Unified function for applying element state (used by undo/redo)
+  const applyElements = useCallback((elements: VisualElement[]) => {
+    setVisualElements(elements);
+    setHasChanges(true);
+    if (beatRef.current && syncElementsRef.current) {
+      syncElementsRef.current(elements, beatRef.current);
+    }
+  }, []);
+
+  // Creates a command from snapshot vs current state
+  const commitSnapshot = useCallback((description: string) => {
+    if (!snapshotRef.current) return;
+    const oldEls = snapshotRef.current;
+    const newEls = visualElementsRef.current.map(el => ({ ...el }));
+    snapshotRef.current = null;
+    // Skip if no actual change
+    if (JSON.stringify(oldEls) === JSON.stringify(newEls)) return;
+    const cmd = new VisualElementsSnapshotCommand(oldEls, newEls, applyElements, description);
+    getCommandManager().pushWithoutExecute(cmd);
+  }, [applyElements]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (commitTimeoutRef.current) {
+        clearTimeout(commitTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle panel resize dragging
   useEffect(() => {
@@ -486,6 +524,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
     console.log(`[VisualWorkspace] Synced ${targetBeat.locations.size} locations to beat.locations`);
   }, []);
+
+  // Keep sync ref up to date for undo/redo applyElements
+  syncElementsRef.current = syncElementsToBeatLocations;
 
   // Save changes when switching to a different beat - MUST run before load
   const prevBeatIdRef = useRef(beat?.id);
@@ -2292,6 +2333,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 onBackgroundSelect={handleBackgroundSelect}
                 onElementSelect={(id: string | null) => setSelectedElementIds(id ? [id] : [])}
                 onElementUpdate={(elementId, updates) => {
+                  // Capture snapshot for undo before first property change
+                  if (!snapshotRef.current) {
+                    snapshotRef.current = visualElements.map(el => ({ ...el }));
+                  }
                   // Calculate updated elements synchronously so we can also sync to beat.locations
                   const updatedElements = visualElements.map(el => {
                     if (el.id === elementId) {
@@ -2376,12 +2421,23 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   if (beat) {
                     syncElementsToBeatLocations(updatedElements, beat);
                   }
+
+                  // Debounced commit for property panel changes
+                  if (commitTimeoutRef.current) clearTimeout(commitTimeoutRef.current);
+                  commitTimeoutRef.current = window.setTimeout(() => {
+                    commitSnapshot('Update element properties');
+                    commitTimeoutRef.current = null;
+                  }, 800);
                 }}
                 onElementDelete={(elementId) => {
+                  // Capture snapshot before deletion for undo
+                  const beforeSnapshot = visualElements.map(el => ({ ...el }));
+
                   // Find the element before removing it so we can remove from beat.locations
                   const elementToDelete = visualElements.find(el => el.id === elementId);
 
-                  setVisualElements(prev => prev.filter(el => el.id !== elementId));
+                  const afterElements = visualElements.filter(el => el.id !== elementId);
+                  setVisualElements(afterElements);
                   if (selectedElementId === elementId) {
                     setSelectedElementIds([]);
                   }
@@ -2395,10 +2451,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       console.log(`[VisualWorkspace] Removed "${locationKey}" from beat.locations (now ${beat.locations.size} locations)`);
                     }
                   }
+
+                  // Commit immediately for delete
+                  const cmd = new VisualElementsSnapshotCommand(
+                    beforeSnapshot,
+                    afterElements.map(el => ({ ...el })),
+                    applyElements,
+                    `Delete ${elementToDelete?.type || 'element'}`
+                  );
+                  getCommandManager().pushWithoutExecute(cmd);
                 }}
                 onElementAdd={(type) => {
                   const stageWidth = projectSettings?.width || 1024;
                   const stageHeight = projectSettings?.height || 768;
+                  // Capture snapshot before add for undo
+                  const beforeSnapshot = visualElements.map(el => ({ ...el }));
 
                   // For character type, use Character Manager instead of Asset Manager
                   if (type === 'character' && onOpenCharacterManager) {
@@ -2430,7 +2497,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             imageUrl: imageUrl,
                             size: 100 // Default to 100%
                           };
-                          setVisualElements(prev => [...prev, newElement]);
+                          const afterElements = [...visualElementsRef.current, newElement];
+                          setVisualElements(afterElements);
                           setSelectedElementIds([newElement.id]);
                           setHasChanges(true);
 
@@ -2451,6 +2519,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             });
                             console.log(`[VisualWorkspace] Added character "${locationName}" to beat.locations (now ${beat.locations.size} locations)`);
                           }
+
+                          // Commit add for undo
+                          const cmd = new VisualElementsSnapshotCommand(
+                            beforeSnapshot, afterElements.map(el => ({ ...el })),
+                            applyElements, 'Add character'
+                          );
+                          getCommandManager().pushWithoutExecute(cmd);
                         };
 
                         // Try to load image to get natural dimensions
@@ -2497,7 +2572,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                               locked: false,
                               assetId: asset.id,
                             };
-                            setVisualElements(prev => [...prev, newElement]);
+                            const afterElements = [...visualElementsRef.current, newElement];
+                            setVisualElements(afterElements);
                             setSelectedElementIds([newElement.id]);
                             setHasChanges(true);
 
@@ -2517,6 +2593,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                               });
                               console.log(`[VisualWorkspace] Added prop "${locationName}" to beat.locations (now ${beat.locations.size} locations)`);
                             }
+
+                            // Commit add for undo
+                            const cmd = new VisualElementsSnapshotCommand(
+                              beforeSnapshot, afterElements.map(el => ({ ...el })),
+                              applyElements, 'Add prop'
+                            );
+                            getCommandManager().pushWithoutExecute(cmd);
                           };
 
                           // Try to load image to get natural dimensions
@@ -2566,15 +2649,25 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     fontSize: (type === 'text' || type === 'hotspot') ? 16 : undefined,
                     textAlign: (type === 'text' || type === 'hotspot') ? 'center' : undefined,
                   };
-                  setVisualElements(prev => [...prev, newElement]);
+                  const afterElements = [...visualElements, newElement];
+                  setVisualElements(afterElements);
                   setSelectedElementIds([newElement.id]);
                   setHasChanges(true);
+
+                  // Commit add for undo
+                  const cmd = new VisualElementsSnapshotCommand(
+                    beforeSnapshot, afterElements.map(el => ({ ...el })),
+                    applyElements, `Add ${type}`
+                  );
+                  getCommandManager().pushWithoutExecute(cmd);
                 }}
                 onElementReorder={(elementId, direction) => {
+                  const beforeSnapshot = visualElements.map(el => ({ ...el }));
                   const sortedElements = [...visualElements].sort((a, b) => b.z - a.z);
                   const index = sortedElements.findIndex(el => el.id === elementId);
                   if (index === -1) return;
 
+                  let reordered = false;
                   if (direction === 'up' && index > 0) {
                     // Swap z values
                     const currentZ = sortedElements[index].z;
@@ -2585,6 +2678,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       return el;
                     }));
                     setHasChanges(true);
+                    reordered = true;
                   } else if (direction === 'down' && index < sortedElements.length - 1) {
                     // Swap z values
                     const currentZ = sortedElements[index].z;
@@ -2595,6 +2689,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       return el;
                     }));
                     setHasChanges(true);
+                    reordered = true;
+                  }
+
+                  // Commit reorder for undo (use timeout to capture state after React update)
+                  if (reordered) {
+                    window.setTimeout(() => {
+                      const cmd = new VisualElementsSnapshotCommand(
+                        beforeSnapshot,
+                        visualElementsRef.current.map(el => ({ ...el })),
+                        applyElements,
+                        'Reorder elements'
+                      );
+                      getCommandManager().pushWithoutExecute(cmd);
+                    }, 0);
                   }
                 }}
                 assets={assets}
@@ -2667,13 +2775,35 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           backgroundUrl={backgroundUrl}
           backgroundSound={backgroundSound}
           elements={visualElements}
+          onInteractionStart={() => {
+            if (commitTimeoutRef.current) {
+              clearTimeout(commitTimeoutRef.current);
+              commitTimeoutRef.current = null;
+            }
+            if (!snapshotRef.current) {
+              snapshotRef.current = visualElements.map(el => ({ ...el }));
+            }
+          }}
+          onInteractionEnd={() => {
+            commitSnapshot('Move/resize element');
+          }}
           onElementsChange={(elements) => {
+            // Capture snapshot if not already in an interaction
+            if (!snapshotRef.current) {
+              snapshotRef.current = visualElements.map(el => ({ ...el }));
+            }
             setVisualElements(elements);
             setHasChanges(true);
             // CRITICAL: Sync to beat.locations immediately so preview has latest positions
             if (beat) {
               syncElementsToBeatLocations(elements, beat);
             }
+            // Debounced commit for non-drag changes (arrow keys, alignment, etc.)
+            if (commitTimeoutRef.current) clearTimeout(commitTimeoutRef.current);
+            commitTimeoutRef.current = window.setTimeout(() => {
+              commitSnapshot('Update elements');
+              commitTimeoutRef.current = null;
+            }, 800);
           }}
           assets={assets}
           characters={characters}
