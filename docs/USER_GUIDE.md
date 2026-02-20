@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Version 0.9.21*
+*Version 0.9.22*
 
 ---
 
@@ -52,7 +52,7 @@ In interactive digital narrative, you create a **dynamic system**. Your audience
 
 This means:
 - You're no longer an author—you're a **system builder**
-- Your audience aren't interactors—they're **interactors**
+- Your audience aren't passive viewers—they're **interactors**
 - You don't create finished stories—you create **protostories** (systems containing potential narratives)
 - The experience isn't consumed—it's **instantiated** through participation
 
@@ -148,21 +148,36 @@ Let's take a tour of your system-building workspace. Don't worry about memorizin
 
 ## The Header Bar
 
-Running across the top of the screen, the header contains your main controls:
+The header spans the top of the screen in three rows:
+
+**Row 1 -- Branding and Title:**
+The ASAPS logo, version number, and a large text field where you can type or edit your project's title directly.
+
+**Row 2 -- Main Controls:**
+
+| Left Side | What it Does |
+|-----------|--------------|
+| **Project Selector** | Dropdown to switch projects, create new, or open the project library |
+| **Undo/Redo** | Fix mistakes (Ctrl/Cmd+Z works too!) |
+| **Save** | Save your project (green button) |
+| **Import** | Dropdown: import ASML, ZIP, or Twine files |
+| **Export** | Dropdown: export as ASML, ZIP, or standalone HTML |
+| **Tools** | Dropdown: Transformations, Merge DialogTrees |
+
+| Right Side | What it Does |
+|------------|--------------|
+| **Characters** | Create and manage your cast (blue button) |
+| **Assets** | Manage images, sounds, videos, fonts (orange button) |
+| **Settings** | Global configuration (purple button) |
+| **Debug** | Testing and troubleshooting tools (gray button) |
+| **Preview** | Test your system (green button) |
+
+**Row 3 -- AI and Language:**
 
 | Button | What it Does |
 |--------|--------------|
-| **Project Title** | Click to rename your project |
-| **Project** | Save, load, create new projects |
-| **Undo/Redo** | Fix mistakes (Ctrl/Cmd+Z works too!) |
-| **Import/Export** | Load existing projects or save your work |
-| **Tools** | Analysis tools, merge utilities |
-| **Characters** | Create and manage your cast |
-| **Assets** | Manage images, sounds, videos, fonts |
-| **Settings** | Global configuration |
-| **Debug** | Testing and troubleshooting tools |
-| **AI** | AI-assisted content generation |
-| **Preview** | Test your system |
+| **AI** | Dropdown: Generate Story, Create Beat from Description, Configure AI |
+| **Source (English)** | Language selector for translations (far right) |
 
 ## The Left Sidebar: Beat List
 
@@ -215,14 +230,14 @@ The Inspector changes based on what you've selected. Select a Dialog Tree and yo
 ![Inspector Panel](images/05-inspector-panel.png)
 *The Inspector panel shows properties of the selected beat*
 
-## The Beat Palette (Bottom Right)
+## The Beat Palette (Right Side)
 
-Your beat shopping catalog. Drag any beat type onto the flowchart to add it to your system.
+Your beat shopping catalog, docked to the right edge of the flowchart. Drag any beat type onto the canvas to add it to your system. Click the collapse arrow to hide it when you need more canvas space.
 
-The palette is organized into categories:
-- **Visible Beats** - Moments the interactor encounters
-- **Logic Beats** - Behind-the-scenes processing
-- **AI Beats** - AI-powered dynamic content
+The palette is organized into three categories:
+- **Visible Beats** - Moments the interactor encounters (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Video Beat, End Screen, Duration Screen, Input Text, Keypad, Hyper Text)
+- **Logic Beats** - Behind-the-scenes processing (Set Variable/Counter, Condition Check, Random Target, Set Timer, Inventory Management)
+- **AI Beats** - AI-powered dynamic content (Online Content, AI Condition, AI Dialog Tree, AI Summary, AI Info Text, AI Duration Screen)
 
 We'll explore every beat type in detail in [Part 3](#part-3-understanding-beats).
 
@@ -543,7 +558,7 @@ Start a countdown. When it expires, the story can jump to a specific beat.
 
 ---
 
-### Add/Remove Inventory
+### Inventory Management
 
 **Purpose:** Manage items.
 
@@ -805,19 +820,21 @@ ASAPS Modern includes AI assistance to help you build narrative systems. Think o
 
 ## Setting Up AI
 
-1. Click **AI** in the header
-2. Configure your provider:
+1. Click **AI** in the header (bottom-left, purple gradient button)
+2. Select **Configure AI** from the dropdown
+3. Choose your provider:
    - **Claude** - Anthropic's AI (recommended)
    - **OpenAI** - GPT models
-3. Enter your API key
-4. Adjust settings (temperature, model, etc.)
+   - **Ollama** - Local models (free, no API key needed)
+4. Enter your API key (for cloud providers)
+5. Adjust settings (model, temperature, etc.)
 
 ## AI Story Generation
 
 Start with a concept, get a complete story structure:
 
-1. Open AI panel
-2. Click **Generate Story**
+1. Click **AI** in the header
+2. Select **Generate Story** from the dropdown
 3. Describe your story idea:
    ```
    A mystery set in a 1920s speakeasy where the player
@@ -835,21 +852,16 @@ AI creates a complete story structure with beats, characters, and connections. Y
 
 Stuck on what should happen next?
 
-1. Select a beat
-2. Click **Suggest Next Beat**
-3. AI analyzes your story context and offers options:
-   ```
-   Suggested: Dialog Tree
-   "Elena confronts the mysterious stranger"
-   Confidence: 85%
-   ```
-4. Accept the suggestion or ask for alternatives
+1. Select a beat in the flowchart
+2. In the Inspector panel (right side), find the **AI Suggestions** section at the bottom
+3. Click **Get Suggestions** -- AI analyzes your story context and offers options
+4. Accept a suggestion or ask for alternatives
 
 ## Natural Language Beat Creation
 
 Describe what you want in plain English:
 
-1. Click **Add Beat with AI**
+1. Click **AI** in the header, then select **Create Beat from Description**
 2. Type: "A tense conversation where the detective accuses the butler"
 3. AI creates the appropriate beat type with content filled in
 
@@ -1078,15 +1090,13 @@ Perfect for regression testing—create presets for critical game states and ver
 
 ## Debug Tools
 
+Click the **Debug** button in the header to open the Debug Panel. It has three tabs:
+
 ### Reachability Analysis
 
-**Tools → Analyze Reachability**
-
-Finds beats that can never be reached—orphaned content with no paths leading to it.
+Finds beats that can never be reached -- orphaned content with no paths leading to it.
 
 ### Path Analysis
-
-**Tools → Analyze Paths**
 
 Traces all possible routes through your story:
 - Identifies dead ends
@@ -1094,8 +1104,6 @@ Traces all possible routes through your story:
 - Validates that all endings are reachable
 
 ### Logic Validation
-
-**Tools → Validate Logic**
 
 Checks for common errors:
 - Missing connections
@@ -1122,7 +1130,7 @@ Checks for common errors:
 
 Export your story as a single standalone HTML file that anyone can open in a browser—no server needed.
 
-1. Click **Export → HTML**
+1. Click **Export → Export as HTML**
 2. Configure options:
    - **Title** - Page title
    - **Include splash screen** - Show a start screen before the story begins
@@ -1139,10 +1147,10 @@ The resulting HTML file includes the full renderer, all story data, and embedded
 
 ### Export Steps
 
-1. Click **Export**
-2. Choose format
-3. Configure options
-4. Download
+1. Click **Export** in the header to open the dropdown
+2. Choose format: ASML (XML only), ASML with Assets, Project (ZIP), or HTML
+3. Configure options if prompted
+4. Download the file
 
 ## Importing Projects
 
@@ -1150,14 +1158,16 @@ The resulting HTML file includes the full renderer, all story data, and embedded
 
 - **ASAPS Project (.zip)** - Full project restore
 - **ASML (.asml)** - Story structure (may need asset re-linking)
-- **Twine/Twee** - Import from Twine (Harlowe/SugarCube)
-- **Ren'Py Themes** - Import visual styling
+- **Twine/Twee** - Import from Twine (SugarCube format)
+
+*Note: Ren'Py theme import is available in **Settings** via the "Import Ren'Py" button.*
 
 ### Import Steps
 
-1. Click **Import**
-2. Select file
-3. For asset-heavy imports, you'll be guided through asset mapping
+1. Click **Import** in the header to open the dropdown
+2. Choose format: ASML (XML), Project (ZIP), or Twine (HTML)
+3. Select the file
+4. For asset-heavy imports, you'll be guided through asset mapping
 
 ---
 
@@ -1256,20 +1266,41 @@ Use sprite sheets for frame-by-frame animation:
 ![Settings Panel](images/02-settings-panel.png)
 *The Settings panel*
 
-**Settings → Stage Settings:**
-- Stage dimensions
-- Aspect ratio (4:3, 16:9, etc.)
+**Settings → Project:**
+- Stage dimensions and aspect ratio (4:3, 16:9, etc.)
 - Scaling mode
-
-**Settings → Typography:**
-- Default fonts for titles, body, buttons
-- Font sizes
-- Line height
+- Mobile display settings (font scaling, safe zone preview)
 
 **Settings → Colors:**
 - Button colors
 - Text box colors
 - Background color
+
+**Settings → Fonts:**
+- Default fonts for titles, body, buttons
+- Font sizes
+- Line height
+
+**Settings → Text Box:**
+- Text box appearance: corners, padding, borders, position
+
+**Settings → Effects:**
+- Text animations (typewriter, fade) and hotspot visibility
+
+**Settings → HUD:**
+- Timer display and countdown meter overlays
+
+**Settings → Sound:**
+- Background music and volume settings
+
+**Settings → Variables:**
+- Define global variables for tracking story state
+
+**Settings → Translation:**
+- Source language and translation management
+
+**Settings → Debug:**
+- Testing options: start beat override, variable display
 
 ### Text Effects
 
@@ -1319,7 +1350,7 @@ ASAPS Modern has two distinct time systems: **real-time timers** that count down
 
 ### Timer HUD
 
-The Timer HUD is a persistent overlay that appears in a corner of the screen. Configure it in **Settings → HUD Overlays**:
+The Timer HUD is a persistent overlay that appears in a corner of the screen. Configure it in **Settings → HUD**:
 
 - **Position** - Top-left, top-right, bottom-left, bottom-right
 - **Style** - Digital (clock-style) or Minimal
@@ -1333,7 +1364,7 @@ The HUD automatically shows the active countdown when a timer is running. When n
 Fictional time tracks an in-story date and time that's independent of real-world time. Use it for day/night cycles, appointment deadlines, or "three days later" transitions.
 
 ![Fictional Time Setup](images/13-fictional-time.png)
-*Setting the fictional time to January 9, 2025*
+*Setting the fictional time to January 31, 2025 at 9:00*
 
 **Setting Fictional Time:** Use a **Set Variable** beat with type set to **Fictional Time**:
 
@@ -1349,7 +1380,7 @@ Fictional time tracks an in-story date and time that's independent of real-world
 - Compare with operators: equals, greater than, less than
 - Branch your story based on what "time" it is in the narrative
 
-**Displaying Fictional Time:** When the Timer HUD is enabled and fictional time is set, the HUD automatically displays the formatted time (e.g., "9:00 AM" or "Jan 9, 2025 9:00"). This appears even when no real-time countdown is active.
+**Displaying Fictional Time:** When the Timer HUD is enabled and fictional time is set, the HUD automatically displays the formatted time (e.g., "9:00 AM" or "Jan 31, 2025 9:00"). This appears even when no real-time countdown is active.
 
 **Example: Day/Night Cycle**
 ```
@@ -1541,11 +1572,12 @@ Create localized versions of your story with AI-assisted translation:
 
 ## Transformation Commands
 
-Bulk operations accessible from **Tools**:
+Bulk operations accessible from the **Tools** dropdown in the header:
 
-- **Merge Dialog Trees** - Combine multiple dialog beats into one
-- **Auto-Arrange** - Automatically lay out beats in the flowchart
-- **Validate Logic** - Check for missing connections, undefined variables, unreachable beats
+- **Transformations** - Bulk transformation commands (also accessible via Ctrl/Cmd+Shift+K)
+- **Merge DialogTrees** - Combine multiple DialogTree beats into a nested conversation
+
+The **Auto-Arrange** button is available directly on the flowchart canvas (bottom-left controls). The **Debug** button in the header provides reachability analysis, path analysis, and logic validation.
 
 ## Desktop App Features
 
@@ -1583,12 +1615,11 @@ Quick reference for all beat types.
 
 | Beat | Purpose | Key Settings |
 |------|---------|--------------|
-| Set Variable | Change state | variable name, value (true/false), operation |
-| Set Counter | Change numbers | counter name, value, operation (set/add/subtract) |
-| Condition | Branching | condition type, comparison, true target, false target |
+| Set Variable/Counter | Change state | variable name, value (true/false), counter operations, or fictional time |
+| Condition Check | Branching | condition type, comparison, true target, false target |
 | Random Target | Randomization | targets with optional weights |
 | Set Timer | Timed events | timer name, duration, expiration target |
-| Inventory | Item management | action (add/remove/transfer), item, quantity, character |
+| Inventory Management | Item management | action (add/remove/transfer), item, quantity, character |
 
 ## AI Runtime Beats
 
@@ -1597,7 +1628,7 @@ Quick reference for all beat types.
 | AI Info Text | Dynamic narrative text | prompt, fallbackText, buttonText, includeVariables, includeInventory, includeHistory, maxSentences |
 | AI Duration Screen | Dynamic timed text | prompt, fallbackText, wordsPerMinute, minDuration, maxDuration, context options |
 | AI Condition | AI branching | prompt, categories, fallback |
-| AI Dialog | AI conversation | personality, context, max turns |
+| AI Dialog Tree | AI conversation | personality, context, max turns |
 | AI Summary | Journey recap | style, length, include options |
 
 ---
@@ -1691,13 +1722,13 @@ Check file format compatibility. MP3 and MP4 have the broadest support. Also ver
 Export regularly as ASAPS Project (.zip). These files contain everything needed to restore your project.
 
 ### Can I import from Twine?
-Yes! Use Import → Twine Format. Harlowe and SugarCube are supported, though complex macros may need manual adjustment.
+Yes! Use Import → Import Twine (HTML). SugarCube format is supported, though complex macros may need manual adjustment.
 
 ### Do AI features require an API key?
 AI features can work with cloud services (Claude or OpenAI) which require an API key and may incur costs. However, you can also use **local LLMs via Ollama** for free—story generation may not work as well with smaller local models, but it's usable for many features.
 
 ### How do I share my story with others?
-Use **Export → HTML** to create a standalone playable file. Recipients just open it in any browser—no ASAPS installation needed.
+Use **Export → Export as HTML** to create a standalone playable file. Recipients just open it in any browser—no ASAPS installation needed.
 
 ### How do I collaborate with a team?
 Save your project as a directory format, initialize a Git repository, and push to a shared remote (GitHub, GitLab, etc.). Team members clone the repo and use the built-in VCS panel for commit/push/pull. Advisory editing locks help avoid conflicts.
