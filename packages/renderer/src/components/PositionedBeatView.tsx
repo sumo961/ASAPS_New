@@ -1402,12 +1402,13 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             }}>
               {buttonElements.map((element, index) => {
                 // Check if this button leads to a visited beat or is a visited choice
-                // For dialogTree: only use per-choice tracking (visitedChoiceIds), NOT visitedBeats,
-                // because visitedBeats tracks beats visited via ANY path which causes false positives
-                const isButtonVisited = beatType === 'dialogTree'
-                  ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
-                  : (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
-                    (element.actionId ? visitedChoiceIds.includes(element.actionId) : false);
+                // Only apply visited styling when markVisited is enabled for the beat
+                const isButtonVisited = element.markVisited
+                  ? beatType === 'dialogTree'
+                    ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
+                    : (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+                      (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
+                  : false;
                 return (
                   <FlexButtonElement
                     key={`btn-${index}-${element.location.name}`}
@@ -1876,14 +1877,13 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
       }
 
       // Check if this button leads to a visited beat or is a visited choice
-      // For dialogTree: only use per-choice tracking, not visitedBeats (avoids false positives)
-      // For other beats: only apply visited styling when markVisited is enabled
-      const isButtonVisited = beatType === 'dialogTree'
-        ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
-        : element.markVisited
-          ? (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+      // Only apply visited styling when markVisited is enabled for the beat
+      const isButtonVisited = element.markVisited
+        ? beatType === 'dialogTree'
+          ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
+          : (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
             (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
-          : false;
+        : false;
       // Wrap button in a div that handles the fade-in animation
       // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       // Combine animated opacity with button fade-in: use animated opacity if buttons are shown
@@ -1925,14 +1925,13 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
 
     case 'hotspot': {
       // Check if this hotspot leads to a visited beat or is a visited choice
-      // For dialogTree: only use per-choice tracking, not visitedBeats (avoids false positives)
-      // For other beats: only apply visited styling when markVisited is enabled
-      const isHotspotVisited = beatType === 'dialogTree'
-        ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
-        : element.markVisited
-          ? (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
+      // Only apply visited styling when markVisited is enabled for the beat
+      const isHotspotVisited = element.markVisited
+        ? beatType === 'dialogTree'
+          ? (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
+          : (element.targetBeatId ? visitedBeats.includes(element.targetBeatId) : false) ||
             (element.actionId ? visitedChoiceIds.includes(element.actionId) : false)
-          : false;
+        : false;
       // Wrap hotspot in a div that handles the fade-in animation
       // (ButtonElement has its own opacity/transition that would overwrite if passed directly)
       // Also apply scroll-to-continue logic for hotspots
