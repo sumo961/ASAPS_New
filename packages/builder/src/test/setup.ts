@@ -1,17 +1,12 @@
 import { vi } from 'vitest';
 import '@testing-library/jest-dom';
-import React from 'react';
 
 // Import fake-indexeddb for proper IndexedDB testing
 import 'fake-indexeddb/auto';
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => {
-  const mockIcon = (props: any) => React.createElement('svg', props, null);
-  return new Proxy({}, {
-    get: () => mockIcon
-  });
-});
+// lucide-react barrel imports are transformed to direct icon imports by the
+// lucideDirectImports plugin in vitest.config.ts. Without this, vitest hangs
+// trying to resolve 1700+ icon modules from the barrel export file.
 
 // Mock ReactFlow
 (global as any).ReactFlow = {

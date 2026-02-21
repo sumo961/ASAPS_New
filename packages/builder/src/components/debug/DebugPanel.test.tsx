@@ -49,25 +49,30 @@ describe('DebugPanel', () => {
     return story;
   };
 
-  it('should render debug panel with reachability tab active by default', () => {
+  it('should render debug panel with tabs', () => {
     const story = createTestStory();
     const onClose = vi.fn();
 
     render(<DebugPanel story={story} onClose={onClose} />);
 
     expect(screen.getByText('Debug Tools')).toBeInTheDocument();
-    expect(screen.getByText('Reachability Analysis')).toBeInTheDocument();
-    expect(screen.getByText('Path Analysis')).toBeInTheDocument();
+    // Use getByRole to target tab buttons specifically (avoids duplicate text in child component headings)
+    expect(screen.getByRole('button', { name: /reachability analysis/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /path analysis/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /story logic/i })).toBeInTheDocument();
   });
 
   it('should call onClose when close button is clicked', () => {
     const story = createTestStory();
     const onClose = vi.fn();
 
-    render(<DebugPanel story={story} onClose={onClose} />);
+    const { container } = render(<DebugPanel story={story} onClose={onClose} />);
 
-    const closeButton = screen.getByRole('button', { name: /close/i });
-    fireEvent.click(closeButton);
+    // Close button is in the header, contains an X icon
+    const header = container.querySelector('.rounded-t-lg');
+    const closeButton = header?.querySelector('button');
+    expect(closeButton).toBeTruthy();
+    fireEvent.click(closeButton!);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -78,7 +83,6 @@ describe('DebugPanel', () => {
 
     render(<DebugPanel story={story} onClose={onClose} />);
 
-    // Initially on reachability tab
     const reachabilityTab = screen.getByRole('button', { name: /reachability analysis/i });
     const pathTab = screen.getByRole('button', { name: /path analysis/i });
 
@@ -105,9 +109,7 @@ describe('DebugPanel', () => {
       />
     );
 
-    // The ReachabilityReport component should receive the callback
-    // This is tested implicitly by the component rendering without errors
-    expect(screen.getByText('Reachability Analysis')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /reachability analysis/i })).toBeInTheDocument();
   });
 
   it('should pass onHighlightPath callback to PathVisualization', () => {
@@ -123,12 +125,10 @@ describe('DebugPanel', () => {
       />
     );
 
-    // Switch to path tab
     const pathTab = screen.getByRole('button', { name: /path analysis/i });
     fireEvent.click(pathTab);
 
-    // The PathVisualization component should receive the callback
-    expect(screen.getByText('Path Analysis')).toBeInTheDocument();
+    expect(pathTab).toHaveClass('text-blue-600');
   });
 
   it('should display tip in footer', () => {
@@ -138,7 +138,7 @@ describe('DebugPanel', () => {
     render(<DebugPanel story={story} onClose={onClose} />);
 
     expect(
-      screen.getByText(/click on any beat or path to highlight it in the graph editor/i)
+      screen.getByText(/click on any beat or path to highlight it in the graph/i)
     ).toBeInTheDocument();
   });
 });
