@@ -1285,32 +1285,14 @@ export const PreviewWindow: React.FC = () => {
       // Initial counter meter state
       updateCountdownMeter();
 
-      // Handle timer expiration - navigate to target beat
-      timerManager.on('timerExpired', async ({ name, targetBeat }: { name: string; targetBeat?: string }) => {
+      // Handle timer expiration - cancel pending action so the engine can process the interrupt.
+      // The engine's built-in timerInterruptBeat mechanism handles navigation to the target beat.
+      // cancelPendingAction resolves the pending promise so beat.execute() returns,
+      // and the engine loop picks up timerInterruptBeat for the next beat.
+      timerManager.on('timerExpired', ({ name, targetBeat }: { name: string; targetBeat?: string }) => {
         if (targetBeat && rendererRef.current) {
-          console.log(`[PreviewWindow] Timer "${name}" expired, navigating to: ${targetBeat}`);
-          const beat = story.getBeat(targetBeat);
-          if (beat) {
-            if (engineRef.current) {
-              engineRef.current.stop();
-            }
-            // Cancel any pending action from the interrupted beat (e.g., keypad/inputText)
-            // This prevents the old beat's resolveAction from intercepting clicks on the new beat
-            (rendererRef.current as any).cancelPendingAction?.();
-            context.markBeatVisited(targetBeat);
-            try {
-              const nextBeatId = await beat.execute(context, rendererRef.current as any);
-              if (nextBeatId) {
-                const nextBeat = story.getBeat(nextBeatId);
-                if (nextBeat) {
-                  context.markBeatVisited(nextBeatId);
-                  await nextBeat.execute(context, rendererRef.current as any);
-                }
-              }
-            } catch (error) {
-              console.error('[PreviewWindow] Error executing timer target beat:', error);
-            }
-          }
+          console.log(`[PreviewWindow] Timer "${name}" expired → target: ${targetBeat}. Cancelling pending action for engine interrupt.`);
+          (rendererRef.current as any).cancelPendingAction?.();
         }
       });
 

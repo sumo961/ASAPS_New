@@ -1018,12 +1018,18 @@ export class ReactRenderer extends BaseRenderer {
   /**
    * Cancel any pending action (e.g., when a timer interrupt fires a new beat).
    * Restores the original handleAction if it was wrapped by keypad/inputText,
-   * and nulls out resolveAction so the old beat's promise never resolves.
+   * and resolves the pending promise so the engine's beat loop can continue
+   * (the engine will check timerInterruptBeat and use the timer's target instead).
    */
   cancelPendingAction(): void {
     if (this._originalHandleAction) {
       this.handleAction = this._originalHandleAction;
       this._originalHandleAction = null;
+    }
+    if (this.resolveAction) {
+      // Resolve (not just null) so the engine's beat.execute() can return
+      // and the engine loop can process the timer interrupt
+      this.resolveAction('__timer_interrupt__');
     }
     this.resolveAction = null;
   }
