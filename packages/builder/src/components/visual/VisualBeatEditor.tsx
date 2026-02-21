@@ -31,7 +31,9 @@ import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import {
   PositionedBeatView,
   createPositionedElementData,
-  type PositionedElementData
+  ChatDialogView,
+  type PositionedElementData,
+  type ChatMessage,
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import {
@@ -149,6 +151,8 @@ interface VisualBeatEditorProps {
   themeAssets?: ThemeAssetUrls | null;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
+  /** DialogTree presentation mode - when chat mode, show ChatDialogView preview */
+  presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble';
 }
 
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
@@ -171,6 +175,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   themeAssets,
   onInteractionStart,
   onInteractionEnd,
+  presentationMode,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedElement, setDraggedElement] = useState<string | null>(null);
@@ -1028,35 +1033,125 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                 </div>
               )}
 
-              {/* Use shared PositionedBeatView */}
-              <PositionedBeatView
-                stageWidth={stageWidth}
-                stageHeight={stageHeight}
-                backgroundUrl={resolvedBackgroundUrl}
-                backgroundColor={stageBackgroundColor}
-                elements={positionedElements}
-                interactive={false}
-                hideTextBoxes={activeBoxVisibility === 'hideText' || activeBoxVisibility === 'hideAll'}
-                hideButtonBoxes={activeBoxVisibility === 'hideAll'}
-                editorMode={true}
-                theme={globalSettings ? (() => {
-                  const baseTheme = convertGlobalSettingsToTheme(globalSettings);
-                  return {
-                    ...baseTheme,
-                    // Disable text animations in visual editor - they should only appear in preview
-                    textEffects: {
-                      animation: 'none' as const,
-                      typewriterSpeed: baseTheme.textEffects?.typewriterSpeed ?? 30,
-                      fadeInDuration: baseTheme.textEffects?.fadeInDuration ?? 500,
-                    },
-                    // Add theme asset URLs for button/textbox graphics
-                    textboxFrameUrl: themeAssets?.textboxFrame,
-                    buttonNormalUrl: themeAssets?.buttonNormal,
-                    buttonHoverUrl: themeAssets?.buttonHover,
-                    buttonLayout: themeAssets?.buttonLayout,
-                  };
-                })() : undefined}
-              />
+              {/* Chat mode: show ChatDialogView preview instead of PositionedBeatView */}
+              {(presentationMode === 'chat-scroll' || presentationMode === 'chat-bubble') ? (
+                <>
+                  {/* Chat dialog preview layer */}
+                  <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
+                    <ChatDialogView
+                      messages={(() => {
+                        // Build preview messages from beat content
+                        const msgs: ChatMessage[] = [];
+                        const dialogElement = elements.find(el => el.type === 'dialog' || (el.type === 'text' && el.name?.toLowerCase().includes('dialog')));
+                        const speakerName = beatContent?.speaker || 'Character';
+                        if (dialogElement?.text || beatContent?.text) {
+                          msgs.push({
+                            id: 'preview-1',
+                            text: dialogElement?.text || beatContent?.text || '',
+                            speaker: speakerName,
+                            isPlayer: false,
+                          });
+                        }
+                        return msgs;
+                      })()}
+                      choices={beatContent?.choices?.map((c, i) => ({
+                        id: `choice-${i}`,
+                        text: c.text,
+                        target: c.target,
+                      })) || []}
+                      mode={presentationMode as 'chat-scroll' | 'chat-bubble'}
+                      theme={globalSettings ? (() => {
+                        const baseTheme = convertGlobalSettingsToTheme(globalSettings);
+                        return {
+                          ...baseTheme,
+                          textEffects: {
+                            animation: 'none' as const,
+                            typewriterSpeed: baseTheme.textEffects?.typewriterSpeed ?? 30,
+                            fadeInDuration: baseTheme.textEffects?.fadeInDuration ?? 500,
+                          },
+                        };
+                      })() : undefined}
+                      backgroundUrl={resolvedBackgroundUrl}
+                      backgroundColor={stageBackgroundColor}
+                      stageWidth={stageWidth}
+                      stageHeight={stageHeight}
+                    />
+                  </div>
+                  {/* Chat mode label */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    background: 'rgba(0,0,0,0.5)',
+                    color: 'rgba(255,255,255,0.8)',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                  }}>
+                    Chat Mode
+                  </div>
+                  {/* Character/prop elements rendered via PositionedBeatView (overlay) */}
+                  {(() => {
+                    const overlayElements = positionedElements.filter(
+                      el => el.location.kind === 'character' || el.location.kind === 'prop'
+                    );
+                    if (overlayElements.length === 0) return null;
+                    return (
+                      <PositionedBeatView
+                        stageWidth={stageWidth}
+                        stageHeight={stageHeight}
+                        elements={overlayElements}
+                        interactive={false}
+                        editorMode={true}
+                        theme={globalSettings ? (() => {
+                          const baseTheme = convertGlobalSettingsToTheme(globalSettings);
+                          return {
+                            ...baseTheme,
+                            textEffects: {
+                              animation: 'none' as const,
+                              typewriterSpeed: baseTheme.textEffects?.typewriterSpeed ?? 30,
+                              fadeInDuration: baseTheme.textEffects?.fadeInDuration ?? 500,
+                            },
+                          };
+                        })() : undefined}
+                      />
+                    );
+                  })()}
+                </>
+              ) : (
+                /* Positioned mode: use shared PositionedBeatView */
+                <PositionedBeatView
+                  stageWidth={stageWidth}
+                  stageHeight={stageHeight}
+                  backgroundUrl={resolvedBackgroundUrl}
+                  backgroundColor={stageBackgroundColor}
+                  elements={positionedElements}
+                  interactive={false}
+                  hideTextBoxes={activeBoxVisibility === 'hideText' || activeBoxVisibility === 'hideAll'}
+                  hideButtonBoxes={activeBoxVisibility === 'hideAll'}
+                  editorMode={true}
+                  theme={globalSettings ? (() => {
+                    const baseTheme = convertGlobalSettingsToTheme(globalSettings);
+                    return {
+                      ...baseTheme,
+                      // Disable text animations in visual editor
+                      textEffects: {
+                        animation: 'none' as const,
+                        typewriterSpeed: baseTheme.textEffects?.typewriterSpeed ?? 30,
+                        fadeInDuration: baseTheme.textEffects?.fadeInDuration ?? 500,
+                      },
+                      // Add theme asset URLs for button/textbox graphics
+                      textboxFrameUrl: themeAssets?.textboxFrame,
+                      buttonNormalUrl: themeAssets?.buttonNormal,
+                      buttonHoverUrl: themeAssets?.buttonHover,
+                      buttonLayout: themeAssets?.buttonLayout,
+                    };
+                  })() : undefined}
+                />
+              )}
 
               {/* Mobile Safe Zone overlay - shows crop areas for common mobile aspect ratios */}
               {globalSettings?.project?.showMobileSafeZone && (() => {

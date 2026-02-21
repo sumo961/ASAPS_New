@@ -34,7 +34,7 @@ const BUTTON_PADDING_PERCENT = 0.05; // 5% padding above button
  * @param stageWidth - Stage width from project settings
  * @param stageHeight - Stage height from project settings
  */
-function calculateSmartButtonDimensions(
+export function calculateSmartButtonDimensions(
   content: string,
   fontSize: number,
   location: { x: number; y: number; width: number; height: number },
@@ -98,7 +98,7 @@ function calculateSmartButtonDimensions(
  * @param stageWidth - Stage width from project settings
  * @param stageHeight - Stage height from project settings
  */
-function calculateSmartTextBoxDimensions(
+export function calculateSmartTextBoxDimensions(
   content: string,
   fontSize: number,
   location: { x: number; y: number; width: number; height: number },
@@ -585,13 +585,14 @@ function calculateTextBoxDimensions(
  * - Text boxes: Keep original x position, only expand width if needed
  * - Buttons: Keep original x position and width, only adjust y if colliding
  */
-function adjustElementsForCollisions(
+export function adjustElementsForCollisions(
   elements: PositionedElementData[],
   stageWidth: number,
   stageHeight: number,
   theme: RenderThemeSettings,
   calculatedButtonHeight: number = 0,
-  hudBottomY: number = 0
+  hudBottomY: number = 0,
+  beatType?: string
 ): PositionedElementData[] {
   const padding = theme.textBox.padding || 20;
 
@@ -663,6 +664,29 @@ function adjustElementsForCollisions(
 
   if (buttonElements.length === 0) {
     return [...otherElements, ...adjustedTextElements];
+  }
+
+  // For endScreen, endScreenCredits, and aiSummary: respect user-positioned button layout
+  // These beats have action buttons (restart, credits) that users position intentionally
+  // Only do minimal collision avoidance with text, don't force vertical stacking
+  const preserveButtonLayout = beatType === 'endScreen' || beatType === 'endScreenCredits' || beatType === 'aiSummary';
+
+  if (preserveButtonLayout) {
+    // Only push buttons down if they overlap text boxes, keep X and relative Y intact
+    const adjustedButtonElements = buttonElements.map(el => {
+      let newY = el.location.y;
+      const buttonTop = el.location.y;
+      const overlapsText = textBoxBounds.some(tb => buttonTop < tb.bottom + 10);
+      if (overlapsText) {
+        const lowestTextBottom = Math.max(...textBoxBounds.map(b => b.bottom));
+        newY = Math.max(el.location.y, lowestTextBottom + 35);
+      }
+      if (newY !== el.location.y) {
+        return { ...el, location: { ...el.location, y: newY } };
+      }
+      return el;
+    });
+    return [...otherElements, ...adjustedTextElements, ...adjustedButtonElements];
   }
 
   // Process buttons - align all buttons into a vertical list
@@ -1484,7 +1508,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Collision adjustment should only happen in preview/runtime mode
   const adjustedElements = editorMode
     ? elements
-    : adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY);
+    : adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY, beatType);
 
   // Calculate animation delays for sequenced typewriter effect on text elements
   const animation = theme.textEffects?.animation || 'none';
@@ -1816,10 +1840,10 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         ...baseStyle,
         left: `${effectiveLeft}px`,
         width: `${effectiveWidth}px`,
-        // In editor mode, use exact height to match selection handles
-        // In preview mode, use auto height so content can expand naturally
-        height: editorMode ? `${location.height}px` : 'auto',
-        minHeight: editorMode ? undefined : `${location.height}px`,
+        // Unified height: auto with minHeight ensures content fits in both modes
+        // Smart sizing pre-computes dimensions, so auto naturally matches
+        height: 'auto',
+        minHeight: `${location.height}px`,
       };
       // Create callback for this specific element
       const elementId = location.id || location.name;
@@ -2004,10 +2028,9 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         ...baseStyle,
         left: `${dialogEffectiveLeft}px`,
         width: `${dialogEffectiveWidth}px`,
-        // In editor mode, use exact height to match selection handles
-        // In preview mode, use auto height so content can expand naturally
-        height: editorMode ? `${location.height}px` : 'auto',
-        minHeight: editorMode ? undefined : `${location.height}px`,
+        // Unified height: auto with minHeight ensures content fits in both modes
+        height: 'auto',
+        minHeight: `${location.height}px`,
       };
 
       // Create callback for this specific element
@@ -2424,9 +2447,8 @@ const TextElement: React.FC<{
     computedFontSize = Math.round(computedFontSize * mobileFontScale);
   }
 
-  // In editor mode, keep text centered to match user expectations (they positioned the box)
-  // In preview mode, auto-switch to left alignment for long content (better readability)
-  const computedTextAlign = location.textAlign || (editorMode ? 'center' : (isLongContent ? 'left' : 'center'));
+  // Use stored textAlign (set by smart sizing or user override), fall back to auto-alignment
+  const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
   // Apply font mapping: use element's font if explicitly set, otherwise use theme default
   // Title/author elements use titleFont, others use textFont
   const defaultFont = isTitleElement ? theme.fonts.titleFont : theme.fonts.textFont;
@@ -2460,21 +2482,13 @@ const TextElement: React.FC<{
     : {};
 
   // Smart text box sizing: grow horizontally first, then vertically, scroll only as last resort
-  // SKIP smart sizing in editor mode - use original dimensions to match selection handles
+  // Both editor and preview use the same path — editor pre-applies smart sizing at load time,
+  // so stored dimensions already include expansion. Running smart sizing again converges.
   let dimensionStyle: React.CSSProperties;
   let needsScroll = false;
-  if (editorMode) {
-    // Editor mode: use exact stored dimensions to match selection handles
-    dimensionStyle = {
-      width: `${location.width}px`,
-      height: `${location.height}px`,
-      overflowY: 'auto',
-    };
-    needsScroll = true; // Assume scrollable in editor mode
-  } else {
-    // Runtime/preview mode: use smart sizing
+  {
     // Use pre-calculated button height if provided, otherwise use default
-    const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true; // Default to having button
+    const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
     const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
     const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
       ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
@@ -2499,7 +2513,10 @@ const TextElement: React.FC<{
     dimensionStyle = {
       left: `${adjustedLeft}px`,
       width: `${smartDims.width}px`,
-      height: `${smartDims.height}px`,
+      // Use auto height with minHeight — smart sizing already computed the right height,
+      // so auto will naturally match. In editor mode, selection handles track location dimensions.
+      height: editorMode ? `${smartDims.height}px` : 'auto',
+      minHeight: editorMode ? undefined : `${smartDims.height}px`,
       overflowY: 'auto',
     };
   }
@@ -3215,9 +3232,8 @@ const DialogElement: React.FC<{
   }
 
   const animation = theme.textEffects?.animation || 'none';
-  // Smart text alignment: center for short content, left for long content (better readability)
-  // In editor mode, keep centered to match user expectations
-  const computedTextAlign = location.textAlign || (editorMode ? 'center' : (isLongContent ? 'left' : 'center'));
+  // Use stored textAlign (set by smart sizing or user override), fall back to auto-alignment
+  const computedTextAlign = location.textAlign || (isLongContent ? 'left' : 'center');
   // Use element's font if set (user override), otherwise use theme default
   const computedFont = location.font ? getFontFamily(location.font) : theme.fonts.textFont;
 
@@ -3227,21 +3243,10 @@ const DialogElement: React.FC<{
   const totalPadding = Math.max(paddingHorizontal, paddingVertical);
 
   // Smart text box sizing: grow horizontally first, then vertically, scroll only as last resort
-  // SKIP smart sizing in editor mode - use original dimensions to match selection handles
+  // Both editor and preview use the same path — editor pre-applies smart sizing at load time.
   let dimensionStyle: React.CSSProperties;
   let needsScroll = false;
-
-  if (editorMode) {
-    // Editor mode: use exact stored dimensions to match selection handles
-    dimensionStyle = {
-      width: `${location.width}px`,
-      height: `${location.height}px`,
-      overflowY: 'auto',
-    };
-    needsScroll = true; // Assume scrollable in editor mode
-  } else {
-    // Runtime/preview mode: use smart sizing
-    // Use pre-calculated button height if provided, otherwise use default
+  {
     const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
     const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
     const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
@@ -3261,12 +3266,12 @@ const DialogElement: React.FC<{
     console.log(`[DialogElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
 
     needsScroll = smartDims.needsScroll;
-    // Adjust left position to keep box centered when width expands
     const adjustedLeft = location.x - smartDims.xOffset;
     dimensionStyle = {
       left: `${adjustedLeft}px`,
       width: `${smartDims.width}px`,
-      height: `${smartDims.height}px`,
+      height: editorMode ? `${smartDims.height}px` : 'auto',
+      minHeight: editorMode ? undefined : `${smartDims.height}px`,
       overflowY: 'auto',
     };
   }
@@ -3311,11 +3316,9 @@ const DialogElement: React.FC<{
         wordWrap: 'break-word',
         overflowWrap: 'break-word',
         boxSizing: 'border-box',
-        // Use flexbox for centering when content fits without scrolling
-        // Only switch to block display when actually needing to scroll
-        display: needsScroll ? 'block' : 'flex',
-        alignItems: needsScroll ? undefined : 'center',
-        justifyContent: needsScroll ? undefined : 'center',
+        // Dialog elements use top-aligned text (block display) to match visual editor behavior
+        // This ensures consistency between editor and preview for multi-line content
+        display: 'block',
         lineHeight: '1.5',
       }}
     >
@@ -3323,7 +3326,7 @@ const DialogElement: React.FC<{
       <div style={{
         position: 'relative',
         width: '100%',
-        // Only set height for scrollable content; for centered content, let it be natural
+        // Only set height for scrollable content
         height: needsScroll ? '100%' : undefined,
       }}>
         <span style={{ display: 'block', width: '100%', textAlign: computedTextAlign }}>
@@ -4391,6 +4394,23 @@ function getContentForLocation(
       // Any text on endScreen is likely the message
       return content.message || 'The End';
     }
+  }
+
+  // EndScreen Credits page specific elements
+  if (beatType === 'endScreenCredits') {
+    if (nameLower.includes('title')) {
+      return content.creditsTitle || 'Credits';
+    }
+    if (nameLower.includes('body') || nameLower.includes('text') || nameLower.includes('dialog')) {
+      return content.creditsBody || '';
+    }
+    if (nameLower.includes('close') || nameLower.includes('button')) {
+      return content.creditsCloseText || 'Close';
+    }
+    // Fallback based on element kind
+    if (loc.kind === 'dialog') return content.creditsBody || '';
+    if (loc.kind === 'button') return content.creditsCloseText || 'Close';
+    if (loc.kind === 'text') return content.creditsTitle || 'Credits';
   }
 
   // AI Summary specific elements - separate title from summary

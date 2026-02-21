@@ -8,9 +8,19 @@ export type { RenderContext, RenderOptions, RenderTheme, AssetCache } from './ty
 export {
   PositionedBeatView,
   createPositionedElementData,
+  calculateSmartTextBoxDimensions,
+  calculateSmartButtonDimensions,
+  adjustElementsForCollisions,
   type PositionedBeatViewProps,
   type PositionedElementData,
   type RenderThemeSettings
+} from './components';
+
+// Export chat dialog view
+export {
+  ChatDialogView,
+  type ChatDialogViewProps,
+  type ChatMessage
 } from './components';
 
 // Export audio manager

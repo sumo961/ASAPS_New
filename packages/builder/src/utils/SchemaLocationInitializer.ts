@@ -56,6 +56,11 @@ interface ProjectSettings {
  * Maps location names from schema to element types and properties
  */
 const LOCATION_TYPE_MAP: Record<string, Partial<LocationDefinition>> = {
+  // Credits page elements
+  'creditsTitle': { type: 'text', fontSize: 28, defaultHeight: 60 },
+  'creditsBody': { type: 'dialog', fontSize: 16, defaultHeight: 400, defaultWidth: 700 },
+  'creditsCloseButton': { type: 'button', defaultWidth: 180, defaultHeight: 50, fontSize: 18 },
+
   // Buttons
   'startButton': { type: 'button', defaultWidth: 180, defaultHeight: 50, fontSize: 18 },
   'continueButton': { type: 'button', defaultWidth: 180, defaultHeight: 50, fontSize: 18 },
@@ -104,8 +109,8 @@ function autoSizeText(
   maxWidth: number,
   isButton: boolean = false
 ): { width: number; height: number } {
-  // Approximate character width (varies by font, this is a reasonable estimate)
-  const charWidth = fontSize * 0.6;
+  // Approximate character width - use 0.42 to match renderer's proportional font measurement
+  const charWidth = fontSize * 0.42;
   // Padding to match renderer: buttons 24 horizontal (12*2), text 40 (20*2)
   const horizontalPadding = isButton ? 24 : 40;
   // Border width: 2px per side × 2 = 4px total (renderer uses box-sizing: border-box)
@@ -552,6 +557,19 @@ export function initializeLocationsFromSchema(
         });
       }
     });
+  }
+
+  // Post-process: EndScreen with both restart and credits buttons → place side by side
+  if (beat.type === 'endScreen') {
+    const restartBtn = elements.find(e => e.name?.toLowerCase().includes('restart'));
+    const creditsBtn = elements.find(e => e.name?.toLowerCase().includes('credits') && e.type === 'button');
+    if (restartBtn && creditsBtn) {
+      const spacing = 20;
+      const totalWidth = restartBtn.width + creditsBtn.width + spacing;
+      restartBtn.x = centerX - totalWidth / 2;
+      creditsBtn.x = centerX - totalWidth / 2 + restartBtn.width + spacing;
+      creditsBtn.y = restartBtn.y; // Same row
+    }
   }
 
   console.log(`[SchemaLocationInitializer] Created ${elements.length} elements`);

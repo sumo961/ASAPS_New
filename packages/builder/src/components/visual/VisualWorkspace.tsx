@@ -11,6 +11,8 @@ import { AnimationPanel } from './AnimationPanel';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
+import { applySmartSizing } from '../../utils/smartSizing';
+import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
 
@@ -242,6 +244,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     charactersRef.current = characters;
   }, [characters]);
 
+  // Memoized render theme for smart sizing - converts GlobalSettings to RenderThemeSettings
+  const renderTheme = useMemo(() => {
+    if (!globalSettings) return null;
+    return convertGlobalSettingsToTheme(globalSettings);
+  }, [globalSettings]);
+
   // ---- Undo/Redo snapshot tracking for visual element changes ----
   const snapshotRef = useRef<VisualElement[] | null>(null);
   const commitTimeoutRef = useRef<number | null>(null);
@@ -338,6 +346,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const isDialogTreeBeat = beat?.type === 'dialogTree' && flattenedPhases.length > 1;
   console.log('[VisualWorkspace] isDialogTreeBeat:', isDialogTreeBeat, 'phases:', flattenedPhases.length);
 
+  // EndScreen with credits phase detection
+  const isEndScreenWithCredits = useMemo(() => {
+    if (beat?.type !== 'endScreen') return false;
+    const params = beat.getParameters ? beat.getParameters() : {};
+    return params.showCredits === true;
+  }, [beat?.type, beat?.id, beatVersion]);
+
+  const endScreenPhases = useMemo(() => {
+    if (!isEndScreenWithCredits) return [];
+    return [
+      { id: 'main', label: 'End Screen' },
+      { id: 'credits', label: 'Credits' },
+    ];
+  }, [isEndScreenWithCredits]);
+
   // Get the current phase's DialogNode for phase-aware editing
   // Must depend on dialogTreeParams to recalculate when dialog tree is modified (e.g., adding choices)
   const selectedPhase = useMemo(() => {
@@ -353,14 +376,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Reset selected phase when beat changes
   useEffect(() => {
     if (beat?.id) {
-      // Default to root phase when switching beats
-      const rootPhase = phaseTree?.id || null;
-      setSelectedPhaseId(rootPhase);
+      if (beat.type === 'endScreen') {
+        // Default to 'main' phase for EndScreen
+        setSelectedPhaseId('main');
+      } else {
+        // Default to root phase when switching beats
+        const rootPhase = phaseTree?.id || null;
+        setSelectedPhaseId(rootPhase);
+      }
       // Set prevPhaseIdRef to null so the phase effect knows to reload
       // (if we set it to rootPhase, the phase effect would skip loading)
       prevPhaseIdRef.current = null;
     }
-  }, [beat?.id, phaseTree?.id]);
+  }, [beat?.id, beat?.type, phaseTree?.id]);
 
   // Helper functions to auto-size text elements based on content and font
   // These use the improved textSizeCalculator utility with font awareness
@@ -454,6 +482,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     elements.forEach((el: VisualElement) => {
       if (el.name === 'Main Text') return;
 
+      // Skip credits-phase elements — they are persisted via phaseOverrides, not beat.locations
+      if (el.id === 'credits_title' || el.id === 'credits_body' || el.id === 'credits_close') return;
+
       let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad';
       if (el.type === 'character') kind = 'character';
       else if (el.type === 'prop') kind = 'prop';
@@ -546,6 +577,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       visualElementsRef.current.forEach((el: VisualElement) => {
         if (el.name === 'Main Text') return;
 
+        // Skip credits-phase elements — they are persisted via phaseOverrides, not beat.locations
+        if (el.id === 'credits_title' || el.id === 'credits_body' || el.id === 'credits_close') return;
+
         // For DialogTree beats, skip dialog and button elements (they're regenerated per phase)
         if (prevBeat.type === 'dialogTree' && (el.type === 'dialog' || el.type === 'button')) {
           return;
@@ -614,11 +648,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         prevBeat.locations.set(el.name || el.id, location);
       });
 
-      // For DialogTree beats: save phase-specific element positions to phaseOverrides
+      // For DialogTree and EndScreen beats: save phase-specific element positions to phaseOverrides
       // This preserves dialog/button positions when switching beats
       // Use selectedPhaseId as fallback if prevPhaseIdRef.current is null (e.g., after HMR re-mount)
       const phaseKeyToSave = prevPhaseIdRef.current || selectedPhaseId;
-      if (prevBeat.type === 'dialogTree' && phaseKeyToSave) {
+      if ((prevBeat.type === 'dialogTree' || prevBeat.type === 'endScreen') && phaseKeyToSave) {
         const phaseKey = phaseKeyToSave;
         const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number; z: number }>> = {};
 
@@ -670,7 +704,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
    * Save current phase overrides before switching to a new phase
    */
   const saveCurrentPhaseOverrides = useCallback(() => {
-    if (!beat || beat.type !== 'dialogTree' || !prevPhaseIdRef.current) return;
+    if (!beat || !prevPhaseIdRef.current) return;
+    if (beat.type !== 'dialogTree' && beat.type !== 'endScreen') return;
     if (!hasChanges) return; // No changes to save
 
     const params = beat.getParameters ? beat.getParameters() : {};
@@ -693,13 +728,25 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
     // Save to phaseOverrides
     const existingOverrides = params.phaseOverrides || {};
-    beat.updateParameters({
+    const updatedParams: any = {
       ...params,
       phaseOverrides: {
         ...existingOverrides,
         [phaseKey]: overrides,
       },
-    });
+    };
+
+    // Also sync credits text when leaving credits phase
+    if (beat.type === 'endScreen' && phaseKey === 'credits') {
+      const titleEl = visualElements.find(el => el.id === 'credits_title');
+      const bodyEl = visualElements.find(el => el.id === 'credits_body');
+      const closeEl = visualElements.find(el => el.id === 'credits_close');
+      if (titleEl?.text !== undefined) updatedParams.creditsPageTitle = titleEl.text;
+      if (bodyEl?.text !== undefined) updatedParams.creditsPageBody = bodyEl.text;
+      if (closeEl?.text !== undefined) updatedParams.creditsCloseText = closeEl.text;
+    }
+
+    beat.updateParameters(updatedParams);
 
     console.log(`[VisualWorkspace] Saved phase overrides for phase: ${phaseKey}`, overrides);
   }, [beat, hasChanges, visualElements]);
@@ -848,13 +895,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       }
     }
 
-    setVisualElements(allElements);
+    // Apply smart sizing to DialogTree phase elements
+    const smartSizedElements = renderTheme
+      ? applySmartSizing(allElements, projectSettings?.width || 1024, projectSettings?.height || 768, renderTheme, beat.type)
+      : allElements;
+
+    setVisualElements(smartSizedElements);
     setHasChanges(false);
     prevPhaseIdRef.current = selectedPhaseId;
     prevBeatIdRef.current = beat.id;
     prevChoicesCountRef.current = currentChoicesCount;
 
-    console.log(`[VisualWorkspace] Loaded ${allElements.length} elements for phase: ${selectedPhaseId} (${persistedElements.length} persisted + ${phaseElements.length} phase, ${currentChoicesCount} choices)`);
+    console.log(`[VisualWorkspace] Loaded ${smartSizedElements.length} elements for phase: ${selectedPhaseId} (${persistedElements.length} persisted + ${phaseElements.length} phase, ${currentChoicesCount} choices)`);
 
     // Update character/prop element dimensions based on actual image size
     // This ensures the selection box matches the actual rendered graphic
@@ -907,9 +959,240 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     updateDialogTreeImageDimensions();
   }, [beat, selectedPhaseId, selectedPhase, projectSettings, generatePhaseElements, characters, assets]);
 
+  /**
+   * Load phase-specific elements when phase changes (for EndScreen credits beats)
+   */
+  useEffect(() => {
+    if (!beat || beat.type !== 'endScreen' || !isEndScreenWithCredits || !selectedPhaseId) {
+      return;
+    }
+
+    // Skip if same beat + same phase and we already have elements
+    const beatChanged = prevBeatIdRef.current !== beat.id;
+    if (!beatChanged && prevPhaseIdRef.current === selectedPhaseId && visualElements.length > 0) {
+      return;
+    }
+
+    // If main phase, reload from beat.locations (the normal EndScreen elements)
+    if (selectedPhaseId === 'main') {
+      console.log('[VisualWorkspace] Switching back to EndScreen main phase, reloading elements from beat.locations');
+      const params = beat.getParameters ? beat.getParameters() : {};
+
+      // Rebuild elements from beat.locations (main phase elements)
+      let elements: VisualElement[] = [];
+      if (beat.locations.size > 0) {
+        elements = Array.from(beat.locations.values()).map((loc: Location) => {
+          const nameLower = loc.name?.toLowerCase() || '';
+          const isButtonByName = nameLower.includes('button') ||
+                                 nameLower.includes('start') ||
+                                 nameLower.includes('continue') ||
+                                 nameLower.includes('restart') ||
+                                 nameLower.includes('credits') ||
+                                 nameLower.includes('submit') ||
+                                 nameLower.includes('skip');
+
+          const element: VisualElement = {
+            id: (loc as any).id || `element_${Date.now()}_${Math.random()}`,
+            type: loc.kind === 'character' ? 'character' :
+                  loc.kind === 'prop' ? 'prop' :
+                  loc.kind === 'button' ? 'button' :
+                  loc.kind === 'dialog' ? 'dialog' :
+                  loc.kind === 'hotspot' ? 'hotspot' :
+                  loc.kind === 'meter' ? 'meter' :
+                  loc.kind === 'keypad' ? 'keypad' :
+                  (isButtonByName ? 'button' : 'text'),
+            name: loc.name,
+            text: '',
+            x: loc.x,
+            y: loc.y,
+            z: loc.zIndex || 0,
+            width: loc.width,
+            height: loc.height,
+            rotation: (loc as any).rotation || 0,
+            scale: (loc as any).scale || 1,
+            visible: true,
+            locked: false,
+            assetId: loc.assetId,
+            imageUrl: (loc as any).imageUrl,
+            sound: loc.sound,
+            font: loc.font,
+            fontSize: loc.fontSize,
+            fontOverridden: !!(loc.font || loc.fontSize),
+            textAlign: loc.textAlign,
+            characterId: loc.characterId,
+            characterName: loc.characterName,
+            stateId: loc.stateId,
+            size: loc.size,
+          };
+          return element;
+        });
+      }
+
+      // If no elements from locations, use schema-driven initialization
+      if (elements.length === 0) {
+        elements = initializeLocationsFromSchema(beat, params, projectSettings);
+      }
+
+      // Populate text from beat parameters
+      elements.forEach(el => {
+        const nameLower = el.name?.toLowerCase() || '';
+        if (nameLower.includes('message') || (el.type === 'text' && !nameLower.includes('restart') && !nameLower.includes('credits'))) {
+          el.text = params.message || 'The End';
+        } else if (nameLower.includes('restart') || nameLower.includes('again')) {
+          el.text = params.restartText || params.buttonText || 'Play Again';
+        } else if (nameLower.includes('credits')) {
+          el.text = params.creditsText || 'Credits';
+        }
+      });
+
+      // Ensure restart + credits buttons are side by side
+      const stageWidth = projectSettings?.width || 1024;
+      const ctrX = stageWidth / 2;
+      const restartBtn = elements.find(el => el.type === 'button' && (el.name?.toLowerCase().includes('restart') || el.name?.toLowerCase().includes('again')));
+      const creditsBtn = elements.find(el => el.type === 'button' && el.name?.toLowerCase().includes('credits'));
+      if (restartBtn && creditsBtn) {
+        const spacing = 20;
+        const totalWidth = restartBtn.width + creditsBtn.width + spacing;
+        restartBtn.x = ctrX - totalWidth / 2;
+        creditsBtn.x = ctrX - totalWidth / 2 + restartBtn.width + spacing;
+        creditsBtn.y = restartBtn.y;
+      }
+
+      // Apply smart sizing to EndScreen elements
+      if (renderTheme) {
+        elements = applySmartSizing(elements, stageWidth, projectSettings?.height || 768, renderTheme, beat.type);
+      }
+
+      setVisualElements(elements);
+      setHasChanges(false);
+      prevPhaseIdRef.current = selectedPhaseId;
+      prevBeatIdRef.current = beat.id;
+      return;
+    }
+
+    // Credits phase: generate credits elements
+    if (selectedPhaseId === 'credits') {
+      console.log('[VisualWorkspace] Loading EndScreen credits phase elements');
+      const params = beat.getParameters ? beat.getParameters() : {};
+      const stageWidth = projectSettings?.width || 1024;
+      const stageHeight = projectSettings?.height || 768;
+      const centerX = stageWidth / 2;
+
+      // Check for saved overrides
+      const overrides = params.phaseOverrides?.['credits'];
+
+      // Generate credits elements
+      const creditsElements: VisualElement[] = [
+        {
+          id: 'credits_title',
+          type: 'text',
+          name: 'Credits Title',
+          text: params.creditsPageTitle || 'Credits',
+          x: overrides?.credits_title?.x ?? Math.round(centerX - 300),
+          y: overrides?.credits_title?.y ?? 60,
+          z: overrides?.credits_title?.z ?? 0,
+          width: overrides?.credits_title?.width ?? 600,
+          height: overrides?.credits_title?.height ?? 60,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          fontSize: 28,
+          textAlign: 'center',
+        },
+        {
+          id: 'credits_body',
+          type: 'dialog',
+          name: 'Credits Body',
+          text: params.creditsPageBody || '',
+          x: overrides?.credits_body?.x ?? Math.round(centerX - 350),
+          y: overrides?.credits_body?.y ?? 150,
+          z: overrides?.credits_body?.z ?? 1,
+          width: overrides?.credits_body?.width ?? 700,
+          height: overrides?.credits_body?.height ?? 400,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          fontSize: 16,
+          textAlign: 'center',
+        },
+        {
+          id: 'credits_close',
+          type: 'button',
+          name: 'Credits Close Button',
+          text: params.creditsCloseText || 'Close',
+          x: overrides?.credits_close?.x ?? Math.round(centerX - 90),
+          y: overrides?.credits_close?.y ?? (stageHeight - 120),
+          z: overrides?.credits_close?.z ?? 2,
+          width: overrides?.credits_close?.width ?? 180,
+          height: overrides?.credits_close?.height ?? 50,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          fontSize: 18,
+          textAlign: 'center',
+        },
+      ];
+
+      // Also load characters/props from beat.locations (shared across phases)
+      const persistedElements: VisualElement[] = [];
+      if (beat.locations.size > 0) {
+        beat.locations.forEach((loc: Location) => {
+          if (loc.kind === 'character' || loc.kind === 'prop') {
+            const element: VisualElement = {
+              id: `element_${Date.now()}_${Math.random()}`,
+              type: loc.kind as 'character' | 'prop',
+              name: loc.name,
+              text: '',
+              assetId: loc.assetId,
+              imageUrl: loc.imageUrl,
+              characterId: loc.characterId,
+              characterName: loc.characterName,
+              stateId: loc.stateId,
+              size: loc.size,
+              x: loc.x,
+              y: loc.y,
+              z: loc.zIndex || 0,
+              width: loc.width,
+              height: loc.height,
+              rotation: loc.rotation || 0,
+              scale: loc.scale || 1,
+              visible: true,
+              locked: false,
+              sound: loc.sound,
+            };
+            persistedElements.push(element);
+          }
+        });
+      }
+
+      const allElements = [...persistedElements, ...creditsElements];
+      setVisualElements(allElements);
+      setHasChanges(false);
+      prevPhaseIdRef.current = selectedPhaseId;
+      prevBeatIdRef.current = beat.id;
+
+      console.log(`[VisualWorkspace] Loaded ${allElements.length} elements for EndScreen credits phase`);
+    }
+  }, [beat, selectedPhaseId, isEndScreenWithCredits, projectSettings, visualElements.length]);
+
   // Initialize from beat parameters
   useEffect(() => {
     if (!beat) return;
+
+    // For EndScreen credits phase: skip normal init, elements handled by phase-aware loading
+    if (beat.type === 'endScreen' && isEndScreenWithCredits && selectedPhaseId === 'credits') {
+      const params = beat.getParameters ? beat.getParameters() : {};
+      const bgId = params.node || params.backgroundAssetId || '';
+      const bgUrl = params.backgroundUrl || '';
+      setBackgroundAssetId(bgId);
+      setBackgroundUrl(bgUrl);
+      setBackgroundSound(params.backgroundSound || '');
+      setAnimations(beat.animations || params.animations || []);
+      return;
+    }
 
     // For DialogTree beats: load background/animations but skip element loading
     // Elements are handled by phase-aware loading effect (which runs before this effect)
@@ -1471,6 +1754,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       }
     }
 
+    // Apply smart sizing to non-manually-resized elements
+    // This ensures the editor shows the same dimensions as the preview
+    if (renderTheme) {
+      const sw = projectSettings?.width || 1024;
+      const sh = projectSettings?.height || 768;
+      elements = applySmartSizing(elements, sw, sh, renderTheme, beat.type);
+    }
+
     console.warn(`[VisualWorkspace] ★★★ Setting ${elements.length} elements for ${beat.type} ★★★`);
     console.warn(`[VisualWorkspace] ========== ELEMENT POSITIONS BEING SET ==========`);
     elements.forEach((e, idx) => {
@@ -1596,9 +1887,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             if (e.text !== params.text) {
               changed = true;
               console.log('[VisualWorkspace] Updating text element, fontSize:', e.fontSize);
-              // Auto-resize the textbox based on new text and font properties
+              // Use smart sizing for non-manually-resized elements, fallback to autoSizeTextBox
+              if (!e.manuallyResized && renderTheme) {
+                const sized = applySmartSizing(
+                  [{ ...e, text: params.text }],
+                  projectSettings?.width || 1024, projectSettings?.height || 768,
+                  renderTheme, beat.type
+                );
+                return sized[0];
+              }
               const { width, height } = autoSizeTextBox(e, params.text);
-              console.log('[VisualWorkspace] Auto-resizing textbox to:', { width, height });
               return { ...e, text: params.text, width, height };
             }
           }
@@ -1613,6 +1911,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             if (e.text !== params.fallbackText) {
               changed = true;
               console.log('[VisualWorkspace] Updating AI beat text element');
+              if (!e.manuallyResized && renderTheme) {
+                const sized = applySmartSizing(
+                  [{ ...e, text: params.fallbackText }],
+                  projectSettings?.width || 1024, projectSettings?.height || 768,
+                  renderTheme, beat.type
+                );
+                return sized[0];
+              }
               const { width, height } = autoSizeTextBox(e, params.fallbackText);
               return { ...e, text: params.fallbackText, width, height };
             }
@@ -1621,8 +1927,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         });
       }
 
-      // Update EndScreen button texts and visibility
-      if (beat.type === 'endScreen') {
+      // Update EndScreen button texts and visibility (only in main phase, not credits phase)
+      if (beat.type === 'endScreen' && selectedPhaseId !== 'credits') {
         console.log('[VisualWorkspace] EndScreen detected, checking buttons:', {
           buttons: updated.filter(e => e.type === 'button').map(e => ({ name: e.name, text: e.text })),
           restartText: params.restartText,
@@ -1784,6 +2090,32 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         });
       }
 
+      // Update EndScreen credits phase text elements
+      if (beat.type === 'endScreen' && selectedPhaseId === 'credits') {
+        updated = updated.map((e: VisualElement) => {
+          if (e.id === 'credits_title') {
+            const newText = params.creditsPageTitle || 'Credits';
+            if (e.text !== newText) {
+              changed = true;
+              return { ...e, text: newText };
+            }
+          } else if (e.id === 'credits_body') {
+            const newText = params.creditsPageBody || '';
+            if (e.text !== newText) {
+              changed = true;
+              return { ...e, text: newText };
+            }
+          } else if (e.id === 'credits_close') {
+            const newText = params.creditsCloseText || 'Close';
+            if (e.text !== newText) {
+              changed = true;
+              return { ...e, text: newText };
+            }
+          }
+          return e;
+        });
+      }
+
       // Update TitleScreen text elements and button
       if (beat.type === 'titleScreen') {
         updated = updated.map((e: VisualElement) => {
@@ -1801,7 +2133,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               if (e.text !== newText) {
                 console.log(`[VisualWorkspace] Updating Title text from "${e.text}" to "${newText}"`);
                 changed = true;
-                // Auto-size the element based on new text and font properties
+                if (!e.manuallyResized && renderTheme) {
+                  const sized = applySmartSizing([{ ...e, text: newText }], projectSettings?.width || 1024, projectSettings?.height || 768, renderTheme, beat.type);
+                  return sized[0];
+                }
                 const sizeFunc = e.type === 'dialog' ? autoSizeDialog : autoSizeTextBox;
                 const { width, height } = sizeFunc(e, newText);
                 return { ...e, text: newText, width, height };
@@ -1811,7 +2146,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               if (e.text !== newText) {
                 console.log(`[VisualWorkspace] Updating Author text from "${e.text}" to "${newText}"`);
                 changed = true;
-                // Auto-size the element based on new text and font properties
+                if (!e.manuallyResized && renderTheme) {
+                  const sized = applySmartSizing([{ ...e, text: newText }], projectSettings?.width || 1024, projectSettings?.height || 768, renderTheme, beat.type);
+                  return sized[0];
+                }
                 const sizeFunc = e.type === 'dialog' ? autoSizeDialog : autoSizeTextBox;
                 const { width, height } = sizeFunc(e, newText);
                 return { ...e, text: newText, width, height };
@@ -1822,7 +2160,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               if (e.text !== newText) {
                 console.log(`[VisualWorkspace] Updating message text from "${e.text}" to "${newText}"`);
                 changed = true;
-                // Auto-size the element based on new text and font properties
+                if (!e.manuallyResized && renderTheme) {
+                  const sized = applySmartSizing([{ ...e, text: newText }], projectSettings?.width || 1024, projectSettings?.height || 768, renderTheme, beat.type);
+                  return sized[0];
+                }
                 const sizeFunc = e.type === 'dialog' ? autoSizeDialog : autoSizeTextBox;
                 const { width, height } = sizeFunc(e, newText);
                 return { ...e, text: newText, width, height };
@@ -1856,7 +2197,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
     // Update previous parameters ref
     prevParamsRef.current = paramsJson;
-  }, [beat, beat?.id, projectSettings]); // Depend on beat, beat.id, and projectSettings
+  }, [beat, beat?.id, beatVersion, selectedPhaseId, projectSettings, renderTheme]); // beatVersion triggers on param changes, selectedPhaseId for phase-aware sync
 
   // Get beat content for display
   const getBeatContent = () => {
@@ -1881,6 +2222,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           // DurScreen should NOT have a button - it auto-advances
         };
       case 'endScreen':
+        // If in credits phase, return credits page content
+        if (selectedPhaseId === 'credits') {
+          return {
+            creditsTitle: params.creditsPageTitle || 'Credits',
+            creditsBody: params.creditsPageBody || '',
+            creditsCloseText: params.creditsCloseText || 'Close',
+          };
+        }
         return {
           message: params.message || 'The End',
           showRestart: params.showRestart !== false,
@@ -2015,6 +2364,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         return;
       }
 
+      // For EndScreen credits phase, skip credits-specific elements (they're saved as phaseOverrides)
+      if (beat.type === 'endScreen' && selectedPhaseId === 'credits' &&
+          (el.id === 'credits_title' || el.id === 'credits_body' || el.id === 'credits_close')) {
+        return;
+      }
+
       // For DialogTree beats, skip dialog and button elements (they're regenerated per phase)
       if (beat.type === 'dialogTree' && (el.type === 'dialog' || el.type === 'button')) {
         return;
@@ -2090,15 +2445,37 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     
     console.log(`[VisualWorkspace] Saved ${beat.locations.size} locations to beat`);
 
-    // Save visual data to parameters
-    beat.updateParameters({
+    // For EndScreen credits phase, save phase overrides and credits text
+    const updatedParams: any = {
       ...params,
       visualElements,
       backgroundAssetId,
       node: backgroundAssetId,
       backgroundSound,
       animations
-    });
+    };
+
+    if (beat.type === 'endScreen' && selectedPhaseId === 'credits') {
+      // Save credits element positions as phaseOverrides
+      const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number; z: number }>> = {};
+      visualElements.forEach(el => {
+        if (el.id === 'credits_title' || el.id === 'credits_body' || el.id === 'credits_close') {
+          overrides[el.id] = { x: el.x, y: el.y, width: el.width, height: el.height, z: el.z };
+        }
+      });
+      updatedParams.phaseOverrides = { ...params.phaseOverrides, credits: overrides };
+
+      // Also sync credits text back to parameters
+      const titleEl = visualElements.find(el => el.id === 'credits_title');
+      const bodyEl = visualElements.find(el => el.id === 'credits_body');
+      const closeEl = visualElements.find(el => el.id === 'credits_close');
+      if (titleEl?.text !== undefined) updatedParams.creditsPageTitle = titleEl.text;
+      if (bodyEl?.text !== undefined) updatedParams.creditsPageBody = bodyEl.text;
+      if (closeEl?.text !== undefined) updatedParams.creditsCloseText = closeEl.text;
+    }
+
+    // Save visual data to parameters
+    beat.updateParameters(updatedParams);
 
     // Also set animations directly on beat (updateParameters doesn't handle base Beat properties)
     beat.animations = animations;
@@ -2299,6 +2676,27 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             </div>
           )}
 
+          {/* EndScreen Credits Phase Navigator */}
+          {isEndScreenWithCredits && (
+            <div className="border-b border-gray-200 bg-amber-50">
+              <div className="px-3 py-1.5 flex items-center gap-1">
+                {endScreenPhases.map((phase) => (
+                  <button
+                    key={phase.id}
+                    onClick={() => handlePhaseSelect(phase.id)}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                      selectedPhaseId === phase.id
+                        ? 'bg-amber-200 text-amber-900 ring-1 ring-amber-400'
+                        : 'hover:bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {phase.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Tab Buttons */}
           <div className="flex border-b border-gray-200">
             <button
@@ -2420,6 +2818,22 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   // CRITICAL: Sync to beat.locations immediately so effects don't overwrite with stale data
                   if (beat) {
                     syncElementsToBeatLocations(updatedElements, beat);
+                  }
+
+                  // Sync credits phase text changes back to beat parameters
+                  if (beat?.type === 'endScreen' && selectedPhaseId === 'credits' && updates.text !== undefined) {
+                    const updatedEl = updatedElements.find(el => el.id === elementId);
+                    if (updatedEl && beat.updateParameters) {
+                      const params = beat.getParameters ? beat.getParameters() : {};
+                      const nameLower = updatedEl.name?.toLowerCase() || '';
+                      if (nameLower.includes('title')) {
+                        beat.updateParameters({ ...params, creditsPageTitle: updates.text });
+                      } else if (nameLower.includes('body')) {
+                        beat.updateParameters({ ...params, creditsPageBody: updates.text });
+                      } else if (nameLower.includes('close')) {
+                        beat.updateParameters({ ...params, creditsCloseText: updates.text });
+                      }
+                    }
                   }
 
                   // Debounced commit for property panel changes
@@ -2810,12 +3224,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           onSelectAsset={handleAssetSelection}
           onOpenCharacterManager={onOpenCharacterManager}
           beatContent={content}
-          beatType={beat.type}
+          beatType={beat.type === 'endScreen' && selectedPhaseId === 'credits' ? 'endScreenCredits' : beat.type}
           selectedElements={selectedElementIds}
           onSelectElements={setSelectedElementIds}
           projectSettings={projectSettings}
           globalSettings={globalSettings}
           themeAssets={themeAssets}
+          presentationMode={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).presentationMode || 'positioned') : undefined}
         />
       </div>
 

@@ -2,6 +2,9 @@
 export {
   PositionedBeatView,
   createPositionedElementData,
+  calculateSmartTextBoxDimensions,
+  calculateSmartButtonDimensions,
+  adjustElementsForCollisions,
   type PositionedBeatViewProps,
   type PositionedElementData,
   type RenderThemeSettings
