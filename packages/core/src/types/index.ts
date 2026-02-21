@@ -219,6 +219,7 @@ export interface IRenderer {
     restartText?: string;
     creditsText?: string;
   }, locations?: Location[]): Promise<string>;
+  renderCreditsPage?(content: { creditsTitle: string; creditsBody: string; creditsCloseText: string }, locations?: Location[]): Promise<string>;
   renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void>;
 
   // Show choices with optional fade-in animation

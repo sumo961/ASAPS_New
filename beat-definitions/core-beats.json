@@ -535,6 +535,28 @@
           "default": "Credits",
           "description": "Text for credits button"
         },
+        "creditsPageTitle": {
+          "type": "string",
+          "required": false,
+          "default": "Credits",
+          "description": "Title text for the credits page"
+        },
+        "creditsPageBody": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Body text for the credits page (auto-populated from metadata if empty)",
+          "ui": {
+            "control": "textarea",
+            "rows": 6
+          }
+        },
+        "creditsCloseText": {
+          "type": "string",
+          "required": false,
+          "default": "Close",
+          "description": "Text for the close button on credits page"
+        },
         "restartConnection": {
           "type": "connection",
           "required": false,
@@ -546,6 +568,12 @@
         "message": "message",
         "restartButton": "restartText",
         "creditsButton": "creditsText"
+      },
+      "creditsLocations": ["creditsTitle", "creditsBody", "creditsCloseButton"],
+      "creditsLocationMapping": {
+        "creditsTitle": "creditsPageTitle",
+        "creditsBody": "creditsPageBody",
+        "creditsCloseButton": "creditsCloseText"
       },
       "transitions": true,
       "sound": true,

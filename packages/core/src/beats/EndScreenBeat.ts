@@ -13,6 +13,12 @@ export class EndScreenBeat extends Beat {
   public creditsText?: string;
   public buttonText?: string;
 
+  // Credits page properties
+  public creditsPageTitle: string;
+  public creditsPageBody: string;
+  public creditsCloseText: string;
+  public phaseOverrides?: Record<string, Record<string, Partial<{ x: number; y: number; width: number; height: number; z: number }>>>;
+
   // Selective reset sub-options (all default true for backward compatibility)
   public resetVariables: boolean;
   public resetCounters: boolean;
@@ -25,7 +31,10 @@ export class EndScreenBeat extends Beat {
   constructor(config: BeatConfig & {
     node?: string;
     buttonText?: string;  // Legacy support
-    parameters?: Partial<EndScreenParameters>;
+    parameters?: Partial<EndScreenParameters> & {
+      phaseOverrides?: Record<string, Record<string, Partial<{ x: number; y: number; width: number; height: number; z: number }>>>;
+    };
+    phaseOverrides?: Record<string, Record<string, Partial<{ x: number; y: number; width: number; height: number; z: number }>>>;
   } & Partial<EndScreenParameters>) {
     super(config);
     this.message = config.message || config.parameters?.message || 'The End';
@@ -35,6 +44,11 @@ export class EndScreenBeat extends Beat {
     this.restartText = config.restartText || config.parameters?.restartText;
     this.creditsText = config.creditsText || config.parameters?.creditsText;
     this.buttonText = config.buttonText || config.parameters?.buttonText;
+    // Credits page properties
+    this.creditsPageTitle = config.creditsPageTitle || config.parameters?.creditsPageTitle || 'Credits';
+    this.creditsPageBody = config.creditsPageBody || config.parameters?.creditsPageBody || '';
+    this.creditsCloseText = config.creditsCloseText || config.parameters?.creditsCloseText || 'Close';
+    this.phaseOverrides = config.parameters?.phaseOverrides || (config as any).phaseOverrides;
     // Selective reset sub-options default to true
     this.resetVariables = config.resetVariables ?? config.parameters?.resetVariables ?? true;
     this.resetCounters = config.resetCounters ?? config.parameters?.resetCounters ?? true;
@@ -62,6 +76,10 @@ export class EndScreenBeat extends Beat {
       restartText: this.restartText,
       creditsText: this.creditsText,
       buttonText: this.buttonText,
+      creditsPageTitle: this.creditsPageTitle,
+      creditsPageBody: this.creditsPageBody,
+      creditsCloseText: this.creditsCloseText,
+      phaseOverrides: this.phaseOverrides,
       node: this.node
     };
   }
@@ -81,7 +99,12 @@ export class EndScreenBeat extends Beat {
     if (params.restartText !== undefined) this.restartText = params.restartText;
     if (params.creditsText !== undefined) this.creditsText = params.creditsText;
     if (params.buttonText !== undefined) this.buttonText = params.buttonText;
+    if (params.creditsPageTitle !== undefined) this.creditsPageTitle = params.creditsPageTitle;
+    if (params.creditsPageBody !== undefined) this.creditsPageBody = params.creditsPageBody;
+    if (params.creditsCloseText !== undefined) this.creditsCloseText = params.creditsCloseText;
+    if (params.phaseOverrides !== undefined) this.phaseOverrides = params.phaseOverrides;
     if (params.node !== undefined) this.node = params.node;
+    this._version++;
   }
 
   protected async performAction(
@@ -149,7 +172,7 @@ export class EndScreenBeat extends Beat {
     if (actionLower.includes('credit')) {
       if (this.showCredits) {
         console.log('[EndScreenBeat] User requested credits');
-        await this.showCreditsScreen(context, renderer);
+        await this.showCreditsPage(context, renderer);
       }
       console.log('[EndScreenBeat] Credits clicked, returning null');
       return null;
@@ -168,7 +191,7 @@ export class EndScreenBeat extends Beat {
     if (actionLower === 'button2' || actionLower === 'button 2') {
       if (this.showCredits) {
         console.log('[EndScreenBeat] User clicked button2 with showCredits=true - showing credits');
-        await this.showCreditsScreen(context, renderer);
+        await this.showCreditsPage(context, renderer);
       }
       console.log('[EndScreenBeat] Button2/credits clicked, returning null');
       return null;
@@ -185,16 +208,52 @@ export class EndScreenBeat extends Beat {
     return null;
   }
 
-  private async showCreditsScreen(context: StoryContext, renderer: IRenderer): Promise<void> {
+  private async showCreditsPage(context: StoryContext, renderer: IRenderer): Promise<void> {
     const story = context.getStory();
     const metadata = story.getMetadata();
-    const creditsText = `
-      ${metadata.title || 'Untitled Story'}
-      
-      Created by: ${metadata.author || 'Anonymous'}
-      
-      Thank you for playing!
-    `;
-    await renderer.renderText(creditsText, 'Close', []);
+
+    // Auto-populate body from metadata if empty
+    let body = this.creditsPageBody;
+    if (!body) {
+      body = `${metadata.title || 'Untitled Story'}\n\nCreated by: ${metadata.author || 'Anonymous'}\n\nThank you for playing!`;
+    }
+
+    const creditsContent = {
+      creditsTitle: this.processText(this.creditsPageTitle, context),
+      creditsBody: this.processText(body, context),
+      creditsCloseText: this.processText(this.creditsCloseText, context),
+    };
+
+    // Get credits-specific locations from beat locations
+    const creditsLocations = this.getCreditsLocations();
+
+    if (renderer.renderCreditsPage) {
+      await renderer.renderCreditsPage(creditsContent, creditsLocations);
+    } else {
+      // Fallback for renderers that don't support renderCreditsPage
+      await renderer.renderText(
+        `${creditsContent.creditsTitle}\n\n${creditsContent.creditsBody}`,
+        creditsContent.creditsCloseText,
+        []
+      );
+    }
+  }
+
+  /**
+   * Get Location[] for credits page elements from beat.locations
+   * Filters for credits-phase elements (creditsTitle, creditsBody, creditsCloseButton)
+   */
+  private getCreditsLocations(): import('../types').Location[] {
+    const creditsLocationNames = ['creditstitle', 'creditsbody', 'creditsclosebutton'];
+    const locations: import('../types').Location[] = [];
+
+    this.locations.forEach((loc) => {
+      const nameLower = loc.name?.toLowerCase().replace(/\s+/g, '') || '';
+      if (creditsLocationNames.some(n => nameLower.includes(n))) {
+        locations.push(loc);
+      }
+    });
+
+    return locations;
   }
 }

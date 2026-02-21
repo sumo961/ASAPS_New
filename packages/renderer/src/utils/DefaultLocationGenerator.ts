@@ -13,6 +13,9 @@ import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 const LOCATION_TYPE_MAP: Record<string, { kind: 'text' | 'button' | 'dialog' | 'hotspot'; fontSize?: number }> = {
   // Text elements
   'title': { kind: 'text', fontSize: 32 },
+  'creditsTitle': { kind: 'text', fontSize: 28 },
+  'creditsBody': { kind: 'dialog', fontSize: 16 },
+  'creditsCloseButton': { kind: 'button', fontSize: 18 },
   'author': { kind: 'text', fontSize: 20 },
   'text': { kind: 'dialog', fontSize: 18 },
   'summary': { kind: 'dialog', fontSize: 16 },  // For AI Summary beat
@@ -46,6 +49,43 @@ export function generateDefaultLocations(
   stageWidth: number = 1024,
   stageHeight: number = 768
 ): Location[] {
+  // Handle virtual beat type for EndScreen credits page
+  if (beatType === 'endScreenCredits') {
+    const centerX = stageWidth / 2;
+    return [
+      {
+        kind: 'text' as const,
+        name: 'Credits Title',
+        x: Math.round(centerX - 300),
+        y: 60,
+        width: 600,
+        height: 60,
+        zIndex: 0,
+        fontSize: 28,
+      },
+      {
+        kind: 'dialog' as const,
+        name: 'Credits Body',
+        x: Math.round(centerX - 350),
+        y: 150,
+        width: 700,
+        height: 400,
+        zIndex: 1,
+        fontSize: 16,
+      },
+      {
+        kind: 'button' as const,
+        name: 'Credits Close Button',
+        x: Math.round(centerX - 90),
+        y: stageHeight - 120,
+        width: 180,
+        height: 50,
+        zIndex: 2,
+        fontSize: 18,
+      },
+    ];
+  }
+
   const beatDef = (beatDefinitions as any).beatTypes[beatType];
   if (!beatDef || !beatDef.locations) {
     console.warn(`[DefaultLocationGenerator] No schema for beat type: ${beatType}`);

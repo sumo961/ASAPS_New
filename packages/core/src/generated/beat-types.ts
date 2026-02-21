@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-02-20T22:28:38.311Z
+ * Generated: 2026-02-21T16:57:18.549Z
  */
 
 // ============================================
@@ -220,6 +220,12 @@ export interface EndScreenParameters {
   restartText?: string | undefined;
   /** Text for credits button */
   creditsText?: string | undefined;
+  /** Title text for the credits page */
+  creditsPageTitle?: string | undefined;
+  /** Body text for the credits page (auto-populated from metadata if empty) */
+  creditsPageBody?: string | undefined;
+  /** Text for the close button on credits page */
+  creditsCloseText?: string | undefined;
   /** Target beat for restart (usually beat 0) */
   restartConnection?: Connection | undefined;
 }

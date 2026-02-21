@@ -565,6 +565,16 @@ export class ASMLGenerator {
           if (params.resetVisitedTracking === false) attrs.push(`resetVisitedTracking="false"`);
           if (params.resetHistory === false) attrs.push(`resetHistory="false"`);
         }
+        // Credits page attributes
+        if (params.creditsPageTitle && params.creditsPageTitle !== 'Credits') {
+          attrs.push(`creditsPageTitle="${this.escapeXml(params.creditsPageTitle)}"`);
+        }
+        if (params.creditsPageBody) {
+          attrs.push(`creditsPageBody="${this.escapeXml(params.creditsPageBody)}"`);
+        }
+        if (params.creditsCloseText && params.creditsCloseText !== 'Close') {
+          attrs.push(`creditsCloseText="${this.escapeXml(params.creditsCloseText)}"`);
+        }
         break;
         
       case 'setVariable':

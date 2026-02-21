@@ -1917,6 +1917,17 @@ export class ReactRenderer extends BaseRenderer {
     return this.renderPositionedBeat('aiSummary', content, effectiveLocations);
   }
 
+  async renderCreditsPage(content: { creditsTitle: string; creditsBody: string; creditsCloseText: string }, locations?: Location[]): Promise<string> {
+    // Keep same background as current beat
+    const backgroundAssetId = this.getState('backgroundAssetId');
+    this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+
+    // Use provided locations or generate default locations for credits
+    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('endScreenCredits', content);
+
+    return this.renderPositionedBeat('endScreenCredits', content, effectiveLocations);
+  }
+
   async renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);

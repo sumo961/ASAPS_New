@@ -242,8 +242,10 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         ) : (
           <div className="h-full w-full">
             <VisualWorkspace
-              // Key includes refreshKey and _version to force re-render when beat changes (e.g., after undo/redo)
-              key={`${selectedBeat?.id}-${refreshKey}-${(selectedBeat as any)?._version || 0}`}
+              // Key includes refreshKey to force re-render on undo/redo
+              // NOTE: Do NOT include _version here — it changes on every Inspector edit,
+              // which remounts the component and resets phase selection (breaks credits phase editing)
+              key={`${selectedBeat?.id}-${refreshKey}`}
               beat={selectedBeat}
               beats={beats}
               assets={assets}
