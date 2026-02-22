@@ -44,6 +44,8 @@ export interface PreviewMessage {
     translationResource?: TranslationResource;
     /** Text direction for the active language */
     textDirection?: 'ltr' | 'rtl';
+    /** Active language code for AI response generation (e.g., 'es', 'de') */
+    activeLanguage?: string | null;
   };
 }
 

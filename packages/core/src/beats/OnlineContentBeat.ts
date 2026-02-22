@@ -152,10 +152,11 @@ export class OnlineContentBeat extends Beat {
         content = await this.fetchAIContent(context, renderer);
       }
 
-      // Generate title if not provided (derive from query)
+      // Generate title: author-set > AI-generated > derived from query
       let title = this.title;
-      if (!title && this.query) {
-        // Create a short title from the query
+      if (!title && this.aiGeneratedTitle) {
+        title = this.aiGeneratedTitle;
+      } else if (!title && this.query) {
         const processedQuery = this.processText(this.query, context);
         title = this.deriveTitle(processedQuery);
       }
@@ -361,6 +362,8 @@ export class OnlineContentBeat extends Beat {
   /**
    * Fetch content using AI query
    */
+  private aiGeneratedTitle: string | null = null;
+
   private async fetchAIContent(context: StoryContext, renderer: IRenderer): Promise<string> {
     if (!this.query) {
       throw new Error('Query is required for ai-query source type');
@@ -376,6 +379,9 @@ export class OnlineContentBeat extends Beat {
     const processedQuery = this.processText(this.query, context);
 
     console.log(`[OnlineContentBeat ${this.id}] AI Query: ${processedQuery}`);
+
+    // Reset AI-generated title
+    this.aiGeneratedTitle = null;
 
     // Call AI service with conversational prompt
     const result = await aiService.generateContent(
@@ -393,7 +399,12 @@ Write a brief, engaging response that:
 - Does NOT include citations, URLs, or "According to..." attributions
 - Is approximately ${this.maxWords} words (${Math.round(this.maxWords * 0.8)}-${Math.round(this.maxWords * 1.2)} words acceptable)
 
-Start directly with the interesting information - no preamble:`,
+IMPORTANT: Start your response with a short, descriptive title on its own line (no formatting prefix, no colon, no quotes), followed by an empty line, then the content. The title should summarize the topic.
+
+Example format:
+Transportation and Urban Life in Example City
+
+The city's transportation network features...`,
       { enableWebSearch: true, maxTokens: Math.max(1000, this.maxWords * 4) }
     );
 
@@ -421,6 +432,18 @@ Start directly with the interesting information - no preamble:`,
       // Only remove if separator is in first 80% (not at the very end)
       cleaned = cleaned.slice(separatorMatch[0].length).trim();
       console.log(`[OnlineContentBeat] Removed content before separator`);
+    }
+
+    // Extract AI-generated title from first line (if separated by blank line)
+    const titleSplit = cleaned.match(/^([^\n]{5,100})\n\s*\n([\s\S]+)$/);
+    if (titleSplit) {
+      const potentialTitle = titleSplit[1].trim();
+      // Accept as title if it's short, has no periods (not a sentence), and no formatting
+      if (!potentialTitle.includes('.') && !potentialTitle.startsWith('#') && !potentialTitle.startsWith('*')) {
+        this.aiGeneratedTitle = potentialTitle;
+        cleaned = titleSplit[2].trim();
+        console.log(`[OnlineContentBeat ${this.id}] Extracted AI title: "${this.aiGeneratedTitle}"`);
+      }
     }
 
     // Remove echoed query from the beginning - AI sometimes repeats the question

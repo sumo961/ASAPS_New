@@ -22,6 +22,7 @@ import {
   Magnet,
   Group,
   Ungroup,
+  Eye,
 } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import type { Location } from '@asaps/core';
@@ -192,6 +193,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Snap guides state
   const [activeGuides, setActiveGuides] = useState<SnapLine[]>([]);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
+  const [showHud, setShowHud] = useState(false);
 
   // Multi-drag offset tracking: stores offsets for all selected elements during drag
   const dragOffsetsRef = useRef<Map<string, { dx: number; dy: number }>>(new Map());
@@ -804,6 +806,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         >
           <Magnet className="w-4 h-4" />
         </button>
+        <button
+          onClick={() => setShowHud(!showHud)}
+          className={`p-2 rounded ${showHud ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-400'}`}
+          title={showHud ? 'HUD Overlays On' : 'HUD Overlays Off'}
+        >
+          <Eye className="w-4 h-4" />
+        </button>
         <div className="w-px bg-gray-300 mx-1" />
         <button
           onClick={() => setZoom(Math.max(0.25, zoom - 0.1))}
@@ -1180,6 +1189,17 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                       buttonLayout: themeAssets?.buttonLayout,
                     };
                   })() : undefined}
+                  timerHudConfig={showHud ? globalSettings?.hudOverlays?.timerHud : undefined}
+                  timerHudState={showHud && globalSettings?.hudOverlays?.timerHud?.enabled ? {
+                    remainingTime: 45, totalTime: 60
+                  } : undefined}
+                  countdownMeterConfig={showHud ? globalSettings?.hudOverlays?.countdownMeter : undefined}
+                  countdownMeterValue={showHud && globalSettings?.hudOverlays?.countdownMeter?.enabled ? {
+                    value: Math.round(((globalSettings.hudOverlays!.countdownMeter!.counterMax ?? 100) - (globalSettings.hudOverlays!.countdownMeter!.counterMin ?? 0)) * 0.65 + (globalSettings.hudOverlays!.countdownMeter!.counterMin ?? 0)),
+                    min: globalSettings.hudOverlays!.countdownMeter!.counterMin ?? 0,
+                    max: globalSettings.hudOverlays!.countdownMeter!.counterMax ?? 100,
+                  } : undefined}
+                  fictionalTimeText={showHud && globalSettings?.hudOverlays?.fictionalTime?.enabled && globalSettings?.hudOverlays?.fictionalTime?.showInTimerHud ? '12:00 PM' : undefined}
                 />
               )}
 

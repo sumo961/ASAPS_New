@@ -315,6 +315,145 @@ interface PreviewData {
   assets?: Asset[];
   characters?: Character[];
   themeAssets?: any;
+  activeLanguage?: string | null;
+}
+
+/** Convert a BCP 47 language code to a readable language name (e.g., 'es' → 'Spanish') */
+function getLanguageName(code: string): string {
+  try {
+    const names = new Intl.DisplayNames(['en'], { type: 'language' });
+    return names.of(code) || code;
+  } catch {
+    return code;
+  }
+}
+
+/** Wrap an IAIService adapter to append language directives to all prompts */
+function createLanguageAwareAdapter(
+  adapter: IAIService,
+  targetLanguageCode: string,
+  sourceLanguageCode: string
+): IAIService {
+  const targetLang = getLanguageName(targetLanguageCode);
+  const sourceLang = getLanguageName(sourceLanguageCode);
+
+  return {
+    async generateContent(prompt, options) {
+      const directive = `\n\nYou MUST write your response entirely in ${targetLang}. The author's instructions are in ${sourceLang} — follow them but respond in ${targetLang}.`;
+      return adapter.generateContent(prompt + directive, options);
+    },
+
+    async generateDialog(request) {
+      const directive = `\n\nGenerate ALL dialog text, NPC speech, and player choice options in ${targetLang}.`;
+      return adapter.generateDialog({
+        ...request,
+        prompt: request.prompt + directive,
+      });
+    },
+
+    async classifyContent(prompt, categories) {
+      const directive = `\n\nThe player's context may be in ${targetLang}. The category names are in ${sourceLang}. Evaluate regardless of language. Respond with ONLY the category name.`;
+      return adapter.classifyContent(prompt + directive, categories);
+    },
+  };
+}
+
+/**
+ * All known loading message templates from core AI beats.
+ * Templates use {name} as a placeholder for dynamic NPC names.
+ * Organized as [mainMessages, subMessages] for batch translation.
+ */
+const LOADING_TEMPLATES = {
+  main: [
+    'Preparing conversation with {name}...',
+    '{name} is getting ready to speak...',
+    'Setting up the conversation...',
+    'Let me connect you with {name}...',
+    'Thinking...',
+    'Fetching data...',
+    'Let me search for that...',
+    'Searching the internet for you...',
+    'Let me find out more...',
+    'Looking that up for you...',
+    'Let me reflect on your journey...',
+    'Summarizing your experience...',
+    'Reviewing your choices...',
+    'Creating your personal summary...',
+  ],
+  sub: [
+    'Generating personalized dialog',
+    'Generating response',
+    'Please wait while I retrieve the information',
+    'This may take a moment',
+    'This will just take a moment',
+  ],
+  /** Common beat UI strings (button labels, defaults) */
+  ui: [
+    'Play Again',
+    'Credits',
+    'Continue',
+    'Your Journey',
+  ],
+};
+
+/** Regex patterns for matching messages with dynamic NPC names */
+const LOADING_NAME_PATTERNS = [
+  { pattern: /^Preparing conversation with (.+)\.\.\.$/, template: 'Preparing conversation with {name}...' },
+  { pattern: /^(.+) is getting ready to speak\.\.\.$/, template: '{name} is getting ready to speak...' },
+  { pattern: /^Let me connect you with (.+)\.\.\.$/, template: 'Let me connect you with {name}...' },
+];
+
+/** Pre-translate all loading messages and UI strings via a single batch AI call */
+async function preTranslateLoadingMessages(
+  aiService: IAIService,
+  targetLanguage: string,
+): Promise<Map<string, string>> {
+  const allMessages = [...LOADING_TEMPLATES.main, ...LOADING_TEMPLATES.sub, ...LOADING_TEMPLATES.ui];
+  const targetLang = getLanguageName(targetLanguage);
+
+  try {
+    const response = await aiService.generateContent(
+      `Translate these UI loading messages to ${targetLang}. Keep {name} placeholders exactly as {name}. Return ONLY a JSON array of translated strings in the same order, nothing else.\n\n${JSON.stringify(allMessages)}`,
+      { maxTokens: 500 },
+    );
+
+    // Extract JSON array from response
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return new Map();
+
+    const translations: string[] = JSON.parse(jsonMatch[0]);
+    const map = new Map<string, string>();
+    allMessages.forEach((msg, i) => {
+      if (translations[i] && typeof translations[i] === 'string') {
+        map.set(msg, translations[i]);
+      }
+    });
+
+    console.log(`[PreviewWindow] Pre-translated ${map.size}/${allMessages.length} loading messages to ${targetLang}`);
+    return map;
+  } catch (error) {
+    console.warn('[PreviewWindow] Failed to pre-translate loading messages:', error);
+    return new Map();
+  }
+}
+
+/** Look up a translated loading message, handling {name} substitution */
+function translateLoadingMessage(message: string, translations: Map<string, string>): string {
+  // Direct match (no name placeholder)
+  if (translations.has(message)) {
+    return translations.get(message)!;
+  }
+
+  // Try pattern match for messages with dynamic NPC names
+  for (const { pattern, template } of LOADING_NAME_PATTERNS) {
+    const match = message.match(pattern);
+    if (match && translations.has(template)) {
+      const translated = translations.get(template)!;
+      return translated.replace('{name}', match[1]);
+    }
+  }
+
+  return message;
 }
 
 export const PreviewWindow: React.FC = () => {
@@ -357,6 +496,7 @@ export const PreviewWindow: React.FC = () => {
   const engineRef = useRef<StoryEngine | null>(null);
   const countersRef = useRef<Record<string, number>>({});
   const previewDataRef = useRef<PreviewData | null>(null);
+  const loadingTranslationsRef = useRef<Map<string, string>>(new Map());
   const isElectronRef = useRef<boolean>(false);
   const stateChangeUnsubscribeRef = useRef<(() => void) | null>(null); // Cleanup previous listener
   const handleRestartRef = useRef<((beatId?: string, preset?: StatePreset | null, pauseOnStart?: boolean) => void) | null>(null);
@@ -911,8 +1051,13 @@ export const PreviewWindow: React.FC = () => {
 
     // Set up AI service for AI-powered beats (update on every previewData change)
     if (rendererRef.current) {
-      const aiServiceAdapter = createAIServiceAdapter();
+      let aiServiceAdapter = createAIServiceAdapter();
       if (aiServiceAdapter) {
+        if (previewData.activeLanguage) {
+          const sourceLanguage = previewData.settings?.translation?.sourceLanguage || 'en';
+          aiServiceAdapter = createLanguageAwareAdapter(aiServiceAdapter, previewData.activeLanguage, sourceLanguage);
+          console.log('[PreviewWindow] AI service adapter wrapped with language directives:', previewData.activeLanguage);
+        }
         rendererRef.current.setState('aiService', aiServiceAdapter);
         console.log('[PreviewWindow] AI service adapter configured for runtime AI beats');
       } else {
@@ -936,6 +1081,59 @@ export const PreviewWindow: React.FC = () => {
         title: storyContext.title,
         characterCount: storyContext.characters.length,
       });
+
+      // Pre-translate loading messages and wrap renderLoading for language-aware display
+      if (previewData.activeLanguage && aiServiceAdapter) {
+        // Use the raw (unwrapped) adapter for translating UI strings — the language directive
+        // would interfere since we're explicitly asking for a specific target language
+        const rawAdapter = createAIServiceAdapter();
+        if (rawAdapter) {
+          preTranslateLoadingMessages(rawAdapter, previewData.activeLanguage)
+            .then(translations => {
+              loadingTranslationsRef.current = translations;
+              console.log(`[PreviewWindow] Loading message translations ready (${translations.size} entries)`);
+            });
+        }
+
+        // Wrap renderer methods to substitute translated messages and UI strings
+        const renderer = rendererRef.current;
+        const t = loadingTranslationsRef;
+
+        const originalRenderLoading = renderer.renderLoading.bind(renderer);
+        renderer.renderLoading = (message: string, options?: { subMessage?: string; spinnerType?: 'spinner' | 'dots' | 'pulse' }) => {
+          const translatedMsg = translateLoadingMessage(message, t.current);
+          const translatedSub = options?.subMessage
+            ? translateLoadingMessage(options.subMessage, t.current)
+            : options?.subMessage;
+          originalRenderLoading(translatedMsg, { ...options, subMessage: translatedSub });
+        };
+
+        // Wrap renderAISummary to translate button texts
+        if (renderer.renderAISummary) {
+          const originalRenderAISummary = renderer.renderAISummary.bind(renderer);
+          renderer.renderAISummary = (data: any, locations?: any) => {
+            return originalRenderAISummary({
+              ...data,
+              restartText: translateLoadingMessage(data.restartText || 'Play Again', t.current),
+              creditsText: translateLoadingMessage(data.creditsText || 'Credits', t.current),
+              title: translateLoadingMessage(data.title || '', t.current) || data.title,
+            }, locations);
+          };
+        }
+
+        // Wrap renderEndScreen to translate button texts (via renderer state)
+        const originalRenderEndScreen = renderer.renderEndScreen.bind(renderer);
+        renderer.renderEndScreen = (message: string, showRestart: boolean, showCredits: boolean, locations?: any) => {
+          // EndScreen reads restartText/creditsText from renderer state
+          const currentRestart = renderer.getState('restartText') as string;
+          const currentCredits = renderer.getState('creditsText') as string;
+          if (currentRestart) renderer.setState('restartText', translateLoadingMessage(currentRestart, t.current));
+          if (currentCredits) renderer.setState('creditsText', translateLoadingMessage(currentCredits, t.current));
+          return originalRenderEndScreen(message, showRestart, showCredits, locations);
+        };
+
+        console.log('[PreviewWindow] Renderer methods wrapped for language-aware display');
+      }
     }
 
     // Apply theme

@@ -223,7 +223,7 @@ describe('extractBeatSourceStrings', () => {
     const strings = extractBeatSourceStrings(beat, 'ai1');
 
     expect(strings['beat:ai1.parameters.fallbackText']).toBe('The forest is dark and mysterious.');
-    // prompt is a common field, but AI prompts should ideally stay in source language
-    // The current implementation does extract it as a common field
+    // AI prompts are system instructions, not user-facing text — they should NOT be extracted
+    expect(strings['beat:ai1.parameters.prompt']).toBeUndefined();
   });
 });

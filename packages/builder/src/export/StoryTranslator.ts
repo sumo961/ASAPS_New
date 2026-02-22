@@ -170,8 +170,11 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
   const type = beat.type || '';
 
   // Common text fields present on many beat types
+  const isAiBeat = type.startsWith('ai');
   const commonFields = ['text', 'buttonText', 'prompt', 'question', 'message', 'title', 'author'];
   for (const field of commonFields) {
+    // Skip 'prompt' for AI beats — it's a system instruction, not user-facing text
+    if (field === 'prompt' && isAiBeat) continue;
     if (params[field] && typeof params[field] === 'string') {
       strings[`${prefix}.parameters.${field}`] = params[field];
     }

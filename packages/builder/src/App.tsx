@@ -3509,6 +3509,7 @@ function App() {
         characters: translatedChars,
         themeAssets: themeAssets,
         beatId: selectedBeat?.id,
+        activeLanguage: translationState.activeLanguage ?? null,
       });
     }
   }, [state.beats, selectedBeat, assets, characters, themeAssets, getSerializedStoryData, globalSettings, translationState.activeLanguage, translationState.translations]);
@@ -3559,6 +3560,8 @@ function App() {
         assets: assets,
         characters: translatedCharacters,
         themeAssets: themeAssets,
+        beatId: selectedBeat?.id,
+        activeLanguage: translationState.activeLanguage ?? null,
       });
       console.log('[App] Sent auto-reload update to preview window');
     }, 300);
@@ -3568,7 +3571,7 @@ function App() {
         clearTimeout(previewUpdateTimeoutRef.current);
       }
     };
-  }, [previewWindowOpen, state.beats, state.connections, globalSettings, assets, characters, themeAssets, getSerializedStoryData, translationState.activeLanguage]);
+  }, [previewWindowOpen, state.beats, state.connections, globalSettings, assets, characters, themeAssets, getSerializedStoryData, translationState.activeLanguage, selectedBeat]);
 
   // Auto-navigate preview to selected beat
   useEffect(() => {

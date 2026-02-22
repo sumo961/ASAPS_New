@@ -402,8 +402,9 @@ describe('StoryTranslator', () => {
 
         expect(strings['project.story.beats.0.parameters.fallbackText']).toBe('Hello, traveler!');
         expect(strings['project.story.beats.1.parameters.fallbackText']).toBe('Time passes...');
-        // Note: prompt is also extracted as a common field (for potential translation)
-        expect(strings['project.story.beats.0.parameters.prompt']).toBe('Generate a greeting');
+        // AI prompts are system instructions — they should NOT be extracted for translation
+        expect(strings['project.story.beats.0.parameters.prompt']).toBeUndefined();
+        expect(strings['project.story.beats.1.parameters.prompt']).toBeUndefined();
       });
 
       it('should extract onlineContent displayTemplate and errorMessage', () => {
