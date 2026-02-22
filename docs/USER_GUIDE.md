@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Version 0.9.22*
+*Version 0.9.23*
 
 ---
 
@@ -461,14 +461,41 @@ Each bracketed word can lead to a different beat.
 
 **Purpose:** Story conclusion.
 
-The final beat. Display an ending message with options to restart or see credits.
+The final beat. Display an ending message with options to restart or view a dedicated credits page.
 
 **Key Settings:**
-- **Text** - Your ending message
-- **Show Restart** - Offer to play again
-- **Show Credits** - Display author info
+- **Message** - Your ending message (defaults to "The End")
+- **Show Restart** - Display a "Play Again" button. You can customize the button label with the **Restart Text** field.
+- **Show Credits** - Display a "Credits" button that opens a scrollable credits page. Customize the button label with the **Credits Text** field.
+- **Reset on Restart** - When enabled, clears story state before restarting. You can choose exactly what gets reset (see below).
 
-**When to Use:** Every ending your story has. (Good stories often have multiple!)
+**Granular Reset Options:**
+
+When the **Reset** toggle is turned on, a set of sub-options appears letting you control exactly which parts of the story state are cleared on restart. All are enabled by default, but you can uncheck any you want to preserve:
+
+| Option | What It Clears |
+|--------|---------------|
+| **Variables** | All true/false story variables |
+| **Counters** | All numeric counters (gold, health, etc.) |
+| **Inventory** | All items held by all characters |
+| **Timers** | All active timers |
+| **Fictional Time** | The in-story date and time |
+| **Visited Tracking** | Record of which beats and choices have been seen |
+| **History** | The ordered log of beats visited during play |
+
+This is especially useful for "New Game+" experiences where you want interactors to keep some progress. For example, you might reset variables and history but preserve inventory so the interactor carries their collected items into a second playthrough.
+
+**Customizable Credits Page:**
+
+When **Show Credits** is enabled, the interactor sees a "Credits" button on the end screen. Clicking it opens a dedicated credits page with its own title, body text, and close button. You can configure:
+
+- **Credits Page Title** - The heading at the top of the credits page (defaults to "Credits")
+- **Credits Page Body** - The main content of your credits page. This is a multi-line text area where you can write anything you like -- team members, acknowledgments, tools used, special thanks, licensing info, etc. If you leave it empty, ASAPS automatically populates it with your project's title and author from the project metadata.
+- **Credits Close Text** - The label on the button that returns to the end screen (defaults to "Close")
+
+All three credits fields support **variable interpolation**, so you can include dynamic content like `${playerName}` in your credits text.
+
+**When to Use:** Every ending your story has. Good stories often have multiple endings, and each one can have its own unique message, reset behavior, and credits content.
 
 ---
 
@@ -1608,7 +1635,7 @@ Quick reference for all beat types.
 | Input Text | Text entry | prompt, placeholder, validation, save target |
 | Keypad | Numeric input | prompt, layout (phone/numeric/pin), correct code, max attempts, min/max digits, mask input, save to |
 | Hyper Text | Clickable text | text with links, link targets |
-| End Screen | Story ending | text, show restart, show credits |
+| End Screen | Story ending | message, show restart, show credits, reset (with granular sub-options: variables, counters, inventory, timers, fictional time, visited tracking, history), restart text, credits text, credits page title, credits page body, credits close text |
 | Online Content | Live web data | mode (API/AI), query, template |
 
 ## Logic Beats
