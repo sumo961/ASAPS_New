@@ -16,12 +16,17 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.22)
+## ⚠️ Development Status (v0.9.23)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Unified Layout Engine** | **v0.9.23**: Visual Editor and Preview now use identical smart sizing and collision detection |
+| **EndScreen Credits Page** | **v0.9.23**: Customizable scrollable credits page for EndScreen beats |
+| **Visual Editor Undo/Redo** | **v0.9.23**: Full undo/redo for element moves, resizes, text edits |
+| **Granular EndScreen Reset** | **v0.9.23**: Reset variables, inventory, timers independently |
+| **Timer Interrupt Fix** | **v0.9.23**: Engine loop no longer stalls on timer interrupt during performAction |
 | **Project Switch Fix** | **v0.9.22**: Clear UI state on project switch to prevent cross-project beat leakage |
 | **Advisory Editing Locks** | **v0.9.22**: Beat-level editing locks for Git collaboration — purple canvas indicators + Inspector warnings |
 | **EndScreen Variables** | **v0.9.22**: `${variable}` interpolation now works in EndScreen button text |

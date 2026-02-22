@@ -1,5 +1,79 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-22: Unified Layout Engine & EndScreen Credits (v0.9.23)
+
+### Overview
+
+This release **unifies the Visual Editor and Preview rendering into a single layout engine**, eliminating position discrepancies between what users see in the editor and what appears in preview/playback. It also adds **customizable EndScreen credits pages**, **undo/redo for the visual editor**, **granular EndScreen reset options**, and several engine/rendering bug fixes.
+
+### Unified Visual Editor & Preview Layout
+
+The Visual Editor (VE) and Preview previously used two parallel layout engines that produced different element positions. The VE pre-computed sizes via `smartSizing.ts` at load time, while the Preview computed them at render time via `PositionedBeatView`. These engines diverged — different padding for dialogs, different font sizes, incomplete collision detection in the editor.
+
+**Solution: Single Render Path.** Both editor and preview now use identical smart sizing and collision detection computed at render time by `PositionedBeatView`:
+
+- Removed `editorMode` from collision detection — always runs `adjustElementsForCollisions()`
+- Removed `editorMode` from smart sizing in `TextElement` and `DialogElement` — both modes now compute dimensions identically
+- Added `manuallyResized` flag support — elements manually resized by the user skip smart sizing in both modes
+- Added `onLayoutComputed` callback from `PositionedBeatView` — reports computed positions (with smart-sized dimensions) back to the VE for selection handle alignment
+- Removed all `applySmartSizing()` calls from `VisualWorkspace.tsx` — elements load with raw positions, sizing happens at render time
+- Simplified `smartSizing.ts` to only export `computeAutoFontSize` and `computeAutoTextAlign` utilities
+
+**Files modified:**
+- `packages/renderer/src/components/PositionedBeatView.tsx` — Remove editorMode from layout logic, add onLayoutComputed callback, add manuallyResized support, add helper functions
+- `packages/builder/src/components/visual/VisualBeatEditor.tsx` — Consume onLayoutComputed, use computed positions for selection/drag handles
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — Remove all applySmartSizing calls, simplify content update handlers
+- `packages/builder/src/utils/smartSizing.ts` — Remove applySmartSizing/applySmartSizingToElement, keep only utility exports
+
+### Customizable EndScreen Credits Page
+
+Added a dedicated "Credits" phase to the EndScreen beat, allowing authors to create a scrollable credits page with customizable text, layout, and background.
+
+**Files modified:**
+- `packages/core/src/beats/EndScreenBeat.ts` — Credits page support
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — Credits phase element generation
+- `packages/renderer/src/components/PositionedBeatView.tsx` — Credits rendering
+
+### Undo/Redo for Visual Editor
+
+Added full undo/redo support for visual editor changes (element moves, resizes, text edits, additions, deletions).
+
+**Files modified:**
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — Undo/redo state management
+
+### Granular EndScreen Reset Options
+
+EndScreen beat now supports granular reset options: reset variables, reset inventory, reset timers independently instead of all-or-nothing.
+
+**Files modified:**
+- `packages/core/src/beats/EndScreenBeat.ts` — Granular reset parameters
+
+### Engine & Rendering Bug Fixes
+
+- **Timer interrupt pending action**: Fixed engine loop stalling when a timer interrupt fired during `performAction()` — the pending action promise now resolves on interrupt so the engine loop continues
+- **markVisited=false**: Respected the `markVisited` flag for DialogTree, MovementChoice, and PickProp beats — choices no longer dim when visited if the author disabled visit marking
+- **EndScreen restart navigation**: EndScreen restart button now navigates to the configured target beat instead of stopping the engine
+- **Flowchart drag-to-connect**: Removed broken drag-to-connect feature from the flowchart editor
+- **Vitest hang fix**: Resolved vitest hanging caused by lucide-react barrel imports by switching to direct icon imports
+
+**Files modified:**
+- `packages/core/src/engine/StoryEngine.ts` — Timer interrupt pending action fix
+- `packages/renderer/src/components/PositionedBeatView.tsx` — markVisited rendering
+- `packages/core/src/beats/EndScreenBeat.ts` — Restart navigation fix
+- `packages/builder/src/components/Canvas.tsx` — Remove broken drag-to-connect
+- Various test files — Updated stale tests, added CLAUDE.md testing guidance
+
+### Documentation
+
+- Updated User Guide to remove Perforce references (not yet user-facing)
+- Comprehensive user guide audit for accuracy
+
+**Files modified:**
+- `docs/USER_GUIDE.md` — Accuracy audit and Perforce removal
+- `CLAUDE.md` — Testing guidance additions
+
+---
+
 ## 2026-02-19: Bug Fixes & Advisory Editing Locks (v0.9.22)
 
 ### Overview
