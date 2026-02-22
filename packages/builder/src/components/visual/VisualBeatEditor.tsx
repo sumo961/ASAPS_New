@@ -196,6 +196,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Multi-drag offset tracking: stores offsets for all selected elements during drag
   const dragOffsetsRef = useRef<Map<string, { dx: number; dy: number }>>(new Map());
 
+  // Computed layout positions from PositionedBeatView (for selection handle alignment)
+  const [computedPositions, setComputedPositions] = useState<Map<string, { x: number; y: number; width: number; height: number }>>(new Map());
+
   // Use stage size from project settings, with fallback to 1024×768
   const stageWidth = projectSettings?.width || 1024;
   const stageHeight = projectSettings?.height || 768;
@@ -272,6 +275,31 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Debug logging for background
   console.log(`[VisualBeatEditor] backgroundAssetId="${backgroundAssetId}", found=${!!backgroundAsset}, url="${resolvedBackgroundUrl?.substring(0, 80) || 'none'}", assets.length=${assets.length}`);
 
+  // Callback from PositionedBeatView reporting computed layout positions
+  const handleLayoutComputed = useCallback((positions: { name: string; id?: string; x: number; y: number; width: number; height: number }[]) => {
+    setComputedPositions(prev => {
+      // Only update if positions actually changed
+      let changed = false;
+      if (prev.size !== positions.length) changed = true;
+      if (!changed) {
+        for (const p of positions) {
+          const key = p.id || p.name;
+          const existing = prev.get(key);
+          if (!existing || existing.x !== p.x || existing.y !== p.y || existing.width !== p.width || existing.height !== p.height) {
+            changed = true;
+            break;
+          }
+        }
+      }
+      if (!changed) return prev;
+      const map = new Map<string, { x: number; y: number; width: number; height: number }>();
+      for (const p of positions) {
+        map.set(p.id || p.name, { x: p.x, y: p.y, width: p.width, height: p.height });
+      }
+      return map;
+    });
+  }, []);
+
   // Convert VisualElements to Location objects for the renderer
   const locationsForRenderer: Location[] = elements
     .filter(el => el.visible)
@@ -298,7 +326,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       size: el.size,
       // Include font properties directly in Location (only if explicitly overridden)
       font: el.fontOverridden ? el.font : undefined,
-      fontSize: el.fontOverridden ? el.fontSize : undefined,
+      fontSize: el.fontSize,
       textAlign: el.textAlign,
       // Only autosize if font is not explicitly overridden
       autosize: !el.fontOverridden || el.fontSize === undefined,
@@ -1133,6 +1161,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   hideTextBoxes={activeBoxVisibility === 'hideText' || activeBoxVisibility === 'hideAll'}
                   hideButtonBoxes={activeBoxVisibility === 'hideAll'}
                   editorMode={true}
+                  beatType={beatType}
+                  onLayoutComputed={handleLayoutComputed}
                   theme={globalSettings ? (() => {
                     const baseTheme = convertGlobalSettingsToTheme(globalSettings);
                     return {
@@ -1282,11 +1312,15 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     }
                   }
 
+                  // For text/dialog/button, use computed positions from PositionedBeatView
+                  const computed = computedPositions.get(el.id);
+                  const useComputed = computed && (el.type === 'text' || el.type === 'dialog' || el.type === 'button');
+
                   // Calculate effective dimensions and position (accounting for scale with center origin)
-                  const effectiveWidth = baseWidth * scale;
-                  const effectiveHeight = baseHeight * scale;
-                  const effectiveX = el.x + (baseWidth - effectiveWidth) / 2;
-                  const effectiveY = el.y + (baseHeight - effectiveHeight) / 2;
+                  const effectiveWidth = useComputed ? computed.width : baseWidth * scale;
+                  const effectiveHeight = useComputed ? computed.height : baseHeight * scale;
+                  const effectiveX = useComputed ? computed.x : el.x + (baseWidth - effectiveWidth) / 2;
+                  const effectiveY = useComputed ? computed.y : el.y + (baseHeight - effectiveHeight) / 2;
 
                   // Build transform string - only rotation, no scale (we use effective dimensions)
                   const transforms: string[] = [];
@@ -1404,7 +1438,17 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   let effectiveX: number;
                   let effectiveY: number;
 
-                  if (hasSize) {
+                  // For text/dialog/button elements, use computed positions from PositionedBeatView
+                  // to align selection handles with the actual smart-sized rendering
+                  const computed = computedPositions.get(el.id);
+                  const useComputed = computed && (el.type === 'text' || el.type === 'dialog' || el.type === 'button');
+
+                  if (useComputed) {
+                    effectiveX = computed.x;
+                    effectiveY = computed.y;
+                    effectiveWidth = computed.width;
+                    effectiveHeight = computed.height;
+                  } else if (hasSize) {
                     effectiveWidth = baseWidth * sizeScale;
                     effectiveHeight = baseHeight * sizeScale;
                     effectiveX = el.x;

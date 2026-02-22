@@ -484,8 +484,10 @@ export interface PositionedBeatViewProps {
   onSubscribeTimerState?: (listener: (state: PositionedBeatViewProps['timerState']) => void) => () => void;
   /** Beat type for smart text box sizing (determines if there's a button) */
   beatType?: string;
-  /** Editor mode - disables smart text box sizing to match selection handles */
+  /** Editor mode - cosmetic differences only (hotspot borders, scroll badges) */
   editorMode?: boolean;
+  /** Callback reporting computed element positions after collision detection + smart sizing */
+  onLayoutComputed?: (positions: { name: string; id?: string; x: number; y: number; width: number; height: number }[]) => void;
   /** Timer HUD configuration from global settings */
   timerHudConfig?: import('./TimerHudDisplay').TimerHudConfig;
   /** Per-beat override text for static timer HUD mode */
@@ -616,23 +618,34 @@ export function adjustElementsForCollisions(
     const width = el.location.width;
     const originalHeight = el.location.height || 50;
 
-    // Calculate smart dimensions to get the actual rendered height
-    const fontSize = el.location.fontSize ?? theme.fonts.textFontSize ?? 16;
-    const effectiveButtonHeight = calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT;
-    const smartDims = calculateSmartTextBoxDimensions(
-      el.content || '',
-      fontSize,
-      { x: el.location.x, y: el.location.y, width: el.location.width, height: originalHeight },
-      padding,
-      effectiveButtonHeight,
-      stageWidth,
-      stageHeight
-    );
+    let height: number;
+    let effectiveX: number;
+    let effectiveWidth: number;
 
-    // Use the smart-sized height and apply xOffset for collision detection
-    const height = smartDims.height;
-    const effectiveX = el.location.x + (smartDims.xOffset || 0);
-    const effectiveWidth = smartDims.width;
+    if (el.location.manuallyResized) {
+      // Manually resized: use stored dimensions directly
+      height = originalHeight;
+      effectiveX = el.location.x;
+      effectiveWidth = width;
+    } else {
+      // Calculate smart dimensions to get the actual rendered height
+      const fontSize = el.location.fontSize ?? theme.fonts.textFontSize ?? 16;
+      const effectiveButtonHeight = calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT;
+      const smartDims = calculateSmartTextBoxDimensions(
+        el.content || '',
+        fontSize,
+        { x: el.location.x, y: el.location.y, width: el.location.width, height: originalHeight },
+        padding,
+        effectiveButtonHeight,
+        stageWidth,
+        stageHeight
+      );
+
+      // Use the smart-sized height and apply xOffset for collision detection
+      height = smartDims.height;
+      effectiveX = el.location.x + (smartDims.xOffset || 0);
+      effectiveWidth = smartDims.width;
+    }
 
     // Calculate bounds using smart-sized dimensions
     const bottom = el.location.y + height;
@@ -790,6 +803,51 @@ export function adjustElementsForCollisions(
   return [...otherElements, ...adjustedTextElements, ...adjustedButtonElements];
 }
 
+/**
+ * Compute the font size that TextElement/DialogElement will use for rendering.
+ * Used by onLayoutComputed callback to pre-compute smart dimensions at PBV level.
+ */
+function computeRenderedFontSize(
+  location: Location,
+  content: string,
+  theme: RenderThemeSettings
+): number {
+  if (location.fontSize !== undefined) return location.fontSize;
+
+  if (location.kind === 'dialog') {
+    return theme.fonts.textFontSize ?? 18;
+  }
+
+  // TextElement logic
+  const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
+  if (isTitleElement && theme.fonts.titleFontSize) return theme.fonts.titleFontSize;
+  if (!isTitleElement && theme.fonts.textFontSize) return theme.fonts.textFontSize;
+
+  const contentLength = content?.length || 0;
+  if (contentLength > 400) return 11;
+  if (contentLength > 200) return 12;
+  if (contentLength > 80) return 14;
+  if (contentLength < 30) return 36;
+  return 16;
+}
+
+/**
+ * Compute the padding that TextElement/DialogElement will use for smart sizing.
+ */
+function computeRenderedPadding(location: Location, theme: RenderThemeSettings): number {
+  if (location.kind === 'dialog') {
+    const paddingH = Math.max(Math.floor(location.width * 0.04), 12);
+    const paddingV = Math.max(Math.floor(location.height * 0.1), 12);
+    return Math.max(paddingH, paddingV);
+  }
+  return theme.textBox.padding || 20;
+}
+
+// Beat types that have continue buttons (need to reserve space at bottom)
+const BUTTON_BEAT_TYPES = ['infoText', 'endScreen', 'aiSummary', 'aiInfoText', 'onlineContent', 'titleScreen', 'inputText'];
+// Beat types without buttons (durScreen, aiDurScreen) - can use full height
+const NO_BUTTON_BEAT_TYPES = ['durScreen', 'aiDurScreen'];
+
 // Default theme to use if none provided (matches Visual Novel preset style)
 const DEFAULT_THEME: RenderThemeSettings = {
   textBox: {
@@ -859,6 +917,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   onSubscribeTimerState,
   beatType,
   editorMode = false,
+  onLayoutComputed,
   timerHudConfig,
   timerHudOverrideText: initialTimerHudOverrideText,
   timerHudState: initialTimerHudState,
@@ -1485,7 +1544,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Only applies to top-center HUDs (countdown meter) that span the center of the stage
   // Corner HUDs (top-left, top-right timer) don't overlap with centered content
   let hudBottomY = 0;
-  if (!editorMode) {
+  {
     const HUD_MARGIN = 12;
     const HUD_GAP = 8; // Gap between HUD bottom and content
     // Only check Countdown Meter HUD at top-center (wide enough to overlap centered content)
@@ -1504,11 +1563,53 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   }
 
   // Apply collision detection to adjust button positions when text boxes grow
-  // SKIP in editor mode - we want WYSIWYG where selection handles match rendered positions exactly
-  // Collision adjustment should only happen in preview/runtime mode
-  const adjustedElements = editorMode
-    ? elements
-    : adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY, beatType);
+  // Always run in both editor and preview modes for unified layout
+  const adjustedElements = adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY, beatType);
+
+  // Report computed layout positions to parent (for editor selection handles)
+  const onLayoutComputedRef = React.useRef(onLayoutComputed);
+  onLayoutComputedRef.current = onLayoutComputed;
+  React.useEffect(() => {
+    if (!onLayoutComputedRef.current) return;
+    const positions = adjustedElements.map(el => {
+      if ((el.location.kind === 'text' || el.location.kind === 'dialog') && !el.location.manuallyResized) {
+        const fontSize = computeRenderedFontSize(el.location, el.content, theme);
+        const padding = computeRenderedPadding(el.location, theme);
+        const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
+        const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
+        const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
+          ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
+          : 0;
+        const smartDims = calculateSmartTextBoxDimensions(
+          el.content || '',
+          fontSize,
+          { x: el.location.x, y: el.location.y, width: el.location.width, height: el.location.height },
+          padding,
+          effectiveButtonHeight,
+          stageWidth,
+          stageHeight
+        );
+        return {
+          name: el.location.name,
+          id: el.location.id,
+          x: el.location.x - smartDims.xOffset,
+          y: el.location.y,
+          width: smartDims.width,
+          height: smartDims.height,
+        };
+      }
+      return {
+        name: el.location.name,
+        id: el.location.id,
+        x: el.location.x,
+        y: el.location.y,
+        width: el.location.width,
+        height: el.location.height,
+      };
+    });
+    onLayoutComputedRef.current(positions);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elements, stageWidth, stageHeight, theme, beatType, calculatedButtonHeight, hudBottomY]);
 
   // Calculate animation delays for sequenced typewriter effect on text elements
   const animation = theme.textEffects?.animation || 'none';
@@ -1689,7 +1790,7 @@ interface PositionedElementProps {
   stageHeight?: number;
   /** Calculated button height for this beat (used by text elements to reserve space) */
   calculatedButtonHeight?: number;
-  /** Editor mode - disables smart text box sizing to match selection handles */
+  /** Editor mode - cosmetic differences only (hotspot borders, scroll badges) */
   editorMode?: boolean;
   /** Callback when text/dialog element is scrolled to bottom (for scroll-lock feature) */
   onScrolledToBottom?: (elementId: string) => void;
@@ -2232,11 +2333,6 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   }
 };
 
-// Beat types that have continue buttons (need to reserve space at bottom)
-const BUTTON_BEAT_TYPES = ['infoText', 'endScreen', 'aiSummary', 'aiInfoText', 'onlineContent'];
-// Beat types without buttons (durScreen, aiDurScreen) - can use full height
-const NO_BUTTON_BEAT_TYPES = ['durScreen', 'aiDurScreen'];
-
 /**
  * Text element renderer with smart autosize calculation
  */
@@ -2254,7 +2350,7 @@ const TextElement: React.FC<{
   stageWidth?: number;  // Stage width from project settings
   stageHeight?: number;  // Stage height from project settings
   calculatedButtonHeight?: number;  // Pre-calculated button height for this beat
-  editorMode?: boolean;  // Editor mode - disables smart sizing
+  editorMode?: boolean;  // Editor mode - cosmetic only (scroll badges, hotspot borders)
   onScrolledToBottom?: () => void;  // Callback when user scrolls to bottom
   mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
 }> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0 }) => {
@@ -2482,12 +2578,18 @@ const TextElement: React.FC<{
     : {};
 
   // Smart text box sizing: grow horizontally first, then vertically, scroll only as last resort
-  // Both editor and preview use the same path — editor pre-applies smart sizing at load time,
-  // so stored dimensions already include expansion. Running smart sizing again converges.
   let dimensionStyle: React.CSSProperties;
   let needsScroll = false;
-  {
-    // Use pre-calculated button height if provided, otherwise use default
+  if (location.manuallyResized) {
+    // User manually resized: use stored dimensions directly
+    dimensionStyle = {
+      left: `${location.x}px`,
+      width: `${location.width}px`,
+      height: `${location.height}px`,
+      overflowY: 'auto',
+    };
+  } else {
+    // Smart sizing: compute dimensions at render time (identical in editor + preview)
     const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
     const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
     const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
@@ -2513,10 +2615,8 @@ const TextElement: React.FC<{
     dimensionStyle = {
       left: `${adjustedLeft}px`,
       width: `${smartDims.width}px`,
-      // Use auto height with minHeight — smart sizing already computed the right height,
-      // so auto will naturally match. In editor mode, selection handles track location dimensions.
-      height: editorMode ? `${smartDims.height}px` : 'auto',
-      minHeight: editorMode ? undefined : `${smartDims.height}px`,
+      height: 'auto',
+      minHeight: `${smartDims.height}px`,
       overflowY: 'auto',
     };
   }
@@ -3068,7 +3168,7 @@ const DialogElement: React.FC<{
   stageWidth?: number;  // Stage width from project settings
   stageHeight?: number;  // Stage height from project settings
   calculatedButtonHeight?: number;  // Pre-calculated button height for this beat
-  editorMode?: boolean;  // Editor mode - disables smart sizing
+  editorMode?: boolean;  // Editor mode - cosmetic only (scroll badges, hotspot borders)
   onScrolledToBottom?: () => void;  // Callback when user scrolls to bottom
   mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
 }> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0 }) => {
@@ -3243,10 +3343,18 @@ const DialogElement: React.FC<{
   const totalPadding = Math.max(paddingHorizontal, paddingVertical);
 
   // Smart text box sizing: grow horizontally first, then vertically, scroll only as last resort
-  // Both editor and preview use the same path — editor pre-applies smart sizing at load time.
   let dimensionStyle: React.CSSProperties;
   let needsScroll = false;
-  {
+  if (location.manuallyResized) {
+    // User manually resized: use stored dimensions directly
+    dimensionStyle = {
+      left: `${location.x}px`,
+      width: `${location.width}px`,
+      height: `${location.height}px`,
+      overflowY: 'auto',
+    };
+  } else {
+    // Smart sizing: compute dimensions at render time (identical in editor + preview)
     const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
     const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
     const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
@@ -3270,8 +3378,8 @@ const DialogElement: React.FC<{
     dimensionStyle = {
       left: `${adjustedLeft}px`,
       width: `${smartDims.width}px`,
-      height: editorMode ? `${smartDims.height}px` : 'auto',
-      minHeight: editorMode ? undefined : `${smartDims.height}px`,
+      height: 'auto',
+      minHeight: `${smartDims.height}px`,
       overflowY: 'auto',
     };
   }

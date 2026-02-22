@@ -11,7 +11,7 @@ import { AnimationPanel } from './AnimationPanel';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
-import { applySmartSizing } from '../../utils/smartSizing';
+// applySmartSizing removed — smart sizing now computed at render time by PositionedBeatView
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
@@ -389,26 +389,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       prevPhaseIdRef.current = null;
     }
   }, [beat?.id, beat?.type, phaseTree?.id]);
-
-  // Helper functions to auto-size text elements based on content and font
-  // These use the improved textSizeCalculator utility with font awareness
-  const autoSizeTextBox = useCallback((element: VisualElement, text: string) => {
-    const fontSize = element.fontSize || 16;
-    const fontFamily = element.font || 'Arial';
-    return calculateTextBoxDimensions(text, fontSize, fontFamily);
-  }, []);
-
-  const autoSizeButton = useCallback((element: VisualElement, text: string) => {
-    const fontSize = element.fontSize || 16;
-    const fontFamily = element.font || 'Arial';
-    return calculateButtonDimensions(text, fontSize, fontFamily);
-  }, []);
-
-  const autoSizeDialog = useCallback((element: VisualElement, text: string) => {
-    const fontSize = element.fontSize || 16;
-    const fontFamily = element.font || 'Arial';
-    return calculateDialogDimensions(text, fontSize, fontFamily);
-  }, []);
 
   /**
    * Generate visual elements for a specific DialogTree phase
@@ -895,18 +875,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       }
     }
 
-    // Apply smart sizing to DialogTree phase elements
-    const smartSizedElements = renderTheme
-      ? applySmartSizing(allElements, projectSettings?.width || 1024, projectSettings?.height || 768, renderTheme, beat.type)
-      : allElements;
+    // Elements use raw positions from beat.locations / schema defaults
+    // Smart sizing is now computed at render time by PositionedBeatView
 
-    setVisualElements(smartSizedElements);
+    setVisualElements(allElements);
     setHasChanges(false);
     prevPhaseIdRef.current = selectedPhaseId;
     prevBeatIdRef.current = beat.id;
     prevChoicesCountRef.current = currentChoicesCount;
 
-    console.log(`[VisualWorkspace] Loaded ${smartSizedElements.length} elements for phase: ${selectedPhaseId} (${persistedElements.length} persisted + ${phaseElements.length} phase, ${currentChoicesCount} choices)`);
+    console.log(`[VisualWorkspace] Loaded ${allElements.length} elements for phase: ${selectedPhaseId} (${persistedElements.length} persisted + ${phaseElements.length} phase, ${currentChoicesCount} choices)`);
 
     // Update character/prop element dimensions based on actual image size
     // This ensures the selection box matches the actual rendered graphic
@@ -1058,10 +1036,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         creditsBtn.y = restartBtn.y;
       }
 
-      // Apply smart sizing to EndScreen elements
-      if (renderTheme) {
-        elements = applySmartSizing(elements, stageWidth, projectSettings?.height || 768, renderTheme, beat.type);
-      }
+      // Smart sizing is now computed at render time by PositionedBeatView
 
       setVisualElements(elements);
       setHasChanges(false);
@@ -1702,9 +1677,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // movementChoice/pickProp may have choice/prop hotspots in beat.locations
     // but be missing the schema-defined "question" text element
     if (elements.length > 0 && (beat.type === 'movementChoice' || beat.type === 'pickProp')) {
-      const hasQuestion = elements.some((e: VisualElement) => e.name?.toLowerCase().includes('question'));
+      const questionText = params.question || '';
+      const hasQuestion = elements.some((e: VisualElement) =>
+        e.name?.toLowerCase().includes('question') ||
+        // Also match text/dialog elements that already contain the question content
+        ((e.type === 'text' || e.type === 'dialog') && e.text && questionText && e.text === questionText)
+      );
       if (!hasQuestion) {
-        const questionText = params.question || (beat.type === 'movementChoice' ? 'Where do you want to go?' : 'What do you want to interact with?');
+        const supplementQuestionText = questionText || (beat.type === 'movementChoice' ? 'Where do you want to go?' : 'What do you want to interact with?');
         const stageWidth = projectSettings?.width || 1024;
         const qWidth = 600;
         // Find lowest z-index to place question behind choice elements
@@ -1715,7 +1695,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           id: `element_question_${Date.now()}`,
           type: 'dialog',
           name: 'Question',
-          text: questionText,
+          text: supplementQuestionText,
           x: stageWidth / 2 - qWidth / 2,
           y: Math.max(60, topY - 100),
           z: minZ - 1,
@@ -1754,13 +1734,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       }
     }
 
-    // Apply smart sizing to non-manually-resized elements
-    // This ensures the editor shows the same dimensions as the preview
-    if (renderTheme) {
-      const sw = projectSettings?.width || 1024;
-      const sh = projectSettings?.height || 768;
-      elements = applySmartSizing(elements, sw, sh, renderTheme, beat.type);
-    }
+    // Smart sizing is now computed at render time by PositionedBeatView
 
     console.warn(`[VisualWorkspace] ★★★ Setting ${elements.length} elements for ${beat.type} ★★★`);
     console.warn(`[VisualWorkspace] ========== ELEMENT POSITIONS BEING SET ==========`);
@@ -1887,17 +1861,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             if (e.text !== params.text) {
               changed = true;
               console.log('[VisualWorkspace] Updating text element, fontSize:', e.fontSize);
-              // Use smart sizing for non-manually-resized elements, fallback to autoSizeTextBox
-              if (!e.manuallyResized && renderTheme) {
-                const sized = applySmartSizing(
-                  [{ ...e, text: params.text }],
-                  projectSettings?.width || 1024, projectSettings?.height || 768,
-                  renderTheme, beat.type
-                );
-                return sized[0];
-              }
-              const { width, height } = autoSizeTextBox(e, params.text);
-              return { ...e, text: params.text, width, height };
+              // Smart sizing is computed at render time by PositionedBeatView
+              return { ...e, text: params.text };
             }
           }
           return e;
@@ -1911,16 +1876,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             if (e.text !== params.fallbackText) {
               changed = true;
               console.log('[VisualWorkspace] Updating AI beat text element');
-              if (!e.manuallyResized && renderTheme) {
-                const sized = applySmartSizing(
-                  [{ ...e, text: params.fallbackText }],
-                  projectSettings?.width || 1024, projectSettings?.height || 768,
-                  renderTheme, beat.type
-                );
-                return sized[0];
-              }
-              const { width, height } = autoSizeTextBox(e, params.fallbackText);
-              return { ...e, text: params.fallbackText, width, height };
+              // Smart sizing is computed at render time by PositionedBeatView
+              return { ...e, text: params.fallbackText };
             }
           }
           return e;
@@ -2133,26 +2090,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               if (e.text !== newText) {
                 console.log(`[VisualWorkspace] Updating Title text from "${e.text}" to "${newText}"`);
                 changed = true;
-                if (!e.manuallyResized && renderTheme) {
-                  const sized = applySmartSizing([{ ...e, text: newText }], projectSettings?.width || 1024, projectSettings?.height || 768, renderTheme, beat.type);
-                  return sized[0];
-                }
-                const sizeFunc = e.type === 'dialog' ? autoSizeDialog : autoSizeTextBox;
-                const { width, height } = sizeFunc(e, newText);
-                return { ...e, text: newText, width, height };
+                // Smart sizing is computed at render time by PositionedBeatView
+                return { ...e, text: newText };
               }
             } else if (nameLower.includes('author')) {
               const newText = params.author || 'Anonymous';
               if (e.text !== newText) {
                 console.log(`[VisualWorkspace] Updating Author text from "${e.text}" to "${newText}"`);
                 changed = true;
-                if (!e.manuallyResized && renderTheme) {
-                  const sized = applySmartSizing([{ ...e, text: newText }], projectSettings?.width || 1024, projectSettings?.height || 768, renderTheme, beat.type);
-                  return sized[0];
-                }
-                const sizeFunc = e.type === 'dialog' ? autoSizeDialog : autoSizeTextBox;
-                const { width, height } = sizeFunc(e, newText);
-                return { ...e, text: newText, width, height };
+                return { ...e, text: newText };
               }
             } else if (nameLower.includes('message')) {
               // Handle message box for endScreen
@@ -2160,13 +2106,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               if (e.text !== newText) {
                 console.log(`[VisualWorkspace] Updating message text from "${e.text}" to "${newText}"`);
                 changed = true;
-                if (!e.manuallyResized && renderTheme) {
-                  const sized = applySmartSizing([{ ...e, text: newText }], projectSettings?.width || 1024, projectSettings?.height || 768, renderTheme, beat.type);
-                  return sized[0];
-                }
-                const sizeFunc = e.type === 'dialog' ? autoSizeDialog : autoSizeTextBox;
-                const { width, height } = sizeFunc(e, newText);
-                return { ...e, text: newText, width, height };
+                return { ...e, text: newText };
               }
             }
           }
