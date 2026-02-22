@@ -106,7 +106,7 @@ export function calculateSmartTextBoxDimensions(
   buttonHeight: number,
   stageWidth: number,
   stageHeight: number
-): { width: number; height: number; needsScroll: boolean; xOffset: number } {
+): { width: number; height: number; needsScroll: boolean; xOffset: number; yOffset: number } {
   // Estimate text dimensions
   // Use 0.42 ratio for proportional fonts - measured from actual rendering
   const charWidth = fontSize * 0.42;
@@ -129,7 +129,7 @@ export function calculateSmartTextBoxDimensions(
   // Check if content fits in original dimensions
   if (estimatedTotalHeight <= location.height) {
     console.log(`[SmartTextBox] ✓ Content fits in original dimensions (${location.width}x${location.height})`);
-    return { width: location.width, height: location.height, needsScroll: false, xOffset: 0 };
+    return { width: location.width, height: location.height, needsScroll: false, xOffset: 0, yOffset: 0 };
   }
 
   // Calculate maximum allowed dimensions
@@ -144,12 +144,15 @@ export function calculateSmartTextBoxDimensions(
   // Total max width considering both directions
   const maxWidth = location.width + Math.max(0, maxRightGrowth) + Math.max(0, maxLeftGrowth);
 
-  // Max height: available space from text box top to button area (or bottom margin)
+  // Max height: bi-directional (downward + upward)
   const buttonSpace = buttonHeight > 0 ? (buttonHeight + stageHeight * BUTTON_PADDING_PERCENT) : (stageHeight * 0.05);
   const bottomMargin = stageHeight * 0.02;
-  const maxHeight = stageHeight - location.y - buttonSpace - bottomMargin;
+  const maxDownwardHeight = stageHeight - location.y - buttonSpace - bottomMargin;
+  const topMargin = stageHeight * 0.02;
+  const maxTopGrowth = Math.max(0, location.y - topMargin);
+  const maxHeight = Math.max(0, maxDownwardHeight) + maxTopGrowth;
 
-  console.log(`[SmartTextBox] Max growth: rightGrowth=${maxRightGrowth.toFixed(1)}, leftGrowth=${maxLeftGrowth.toFixed(1)}, maxWidth=${maxWidth.toFixed(1)}, maxHeight=${maxHeight.toFixed(1)}`);
+  console.log(`[SmartTextBox] Max growth: rightGrowth=${maxRightGrowth.toFixed(1)}, leftGrowth=${maxLeftGrowth.toFixed(1)}, maxWidth=${maxWidth.toFixed(1)}, maxDownwardHeight=${maxDownwardHeight.toFixed(1)}, maxTopGrowth=${maxTopGrowth.toFixed(1)}, maxHeight=${maxHeight.toFixed(1)}`);
 
   // Try growing horizontally first
   let newWidth = location.width;
@@ -219,13 +222,16 @@ export function calculateSmartTextBoxDimensions(
       }
 
       if (testTotalHeight <= location.height) {
-        console.log(`[SmartTextBox] ✓ Fits at width=${newWidth.toFixed(1)} with original height, xOffset=${xOffset}`);
-        return { width: newWidth, height: location.height, needsScroll: false, xOffset };
+        console.log(`[SmartTextBox] ✓ Fits at width=${newWidth.toFixed(1)} with original height, xOffset=${xOffset}, yOffset=0`);
+        return { width: newWidth, height: location.height, needsScroll: false, xOffset, yOffset: 0 };
       }
       if (bufferedHeight <= maxHeight) {
         newHeight = Math.min(bufferedHeight, maxHeight);
-        console.log(`[SmartTextBox] ✓ Fits at ${newWidth.toFixed(1)}x${newHeight.toFixed(1)}, xOffset=${xOffset}`);
-        return { width: newWidth, height: newHeight, needsScroll: false, xOffset };
+        const yOffset = newHeight > maxDownwardHeight
+          ? Math.min(newHeight - maxDownwardHeight, maxTopGrowth)
+          : 0;
+        console.log(`[SmartTextBox] ✓ Fits at ${newWidth.toFixed(1)}x${newHeight.toFixed(1)}, xOffset=${xOffset}, yOffset=${yOffset}`);
+        return { width: newWidth, height: newHeight, needsScroll: false, xOffset, yOffset };
       }
     }
     newWidth = maxWidth;
@@ -258,16 +264,22 @@ export function calculateSmartTextBoxDimensions(
 
   if (bufferedFinalHeight <= maxHeight) {
     newHeight = bufferedFinalHeight;
-    console.log(`[SmartTextBox] ✓ Final size: ${newWidth.toFixed(1)}x${newHeight.toFixed(1)}, xOffset=${finalXOffset}`);
-    return { width: newWidth, height: newHeight, needsScroll: false, xOffset: finalXOffset };
+    const yOffset = newHeight > maxDownwardHeight
+      ? Math.min(newHeight - maxDownwardHeight, maxTopGrowth)
+      : 0;
+    console.log(`[SmartTextBox] ✓ Final size: ${newWidth.toFixed(1)}x${newHeight.toFixed(1)}, xOffset=${finalXOffset}, yOffset=${yOffset}`);
+    return { width: newWidth, height: newHeight, needsScroll: false, xOffset: finalXOffset, yOffset };
   }
 
   // Step 4: Content doesn't fit - enable scrolling
   newHeight = maxHeight;
   needsScroll = true;
-  console.log(`[SmartTextBox] ⚠️ Needs scroll: ${newWidth.toFixed(1)}x${newHeight.toFixed(1)}, xOffset=${finalXOffset}`);
+  const yOffset = newHeight > maxDownwardHeight
+    ? Math.min(newHeight - maxDownwardHeight, maxTopGrowth)
+    : 0;
+  console.log(`[SmartTextBox] ⚠️ Needs scroll: ${newWidth.toFixed(1)}x${newHeight.toFixed(1)}, xOffset=${finalXOffset}, yOffset=${yOffset}`);
 
-  return { width: newWidth, height: newHeight, needsScroll, xOffset: finalXOffset };
+  return { width: newWidth, height: newHeight, needsScroll, xOffset: finalXOffset, yOffset };
 }
 
 /**
@@ -621,6 +633,7 @@ export function adjustElementsForCollisions(
     let height: number;
     let effectiveX: number;
     let effectiveWidth: number;
+    let yOffset = 0;
 
     if (el.location.manuallyResized) {
       // Manually resized: use stored dimensions directly
@@ -641,14 +654,16 @@ export function adjustElementsForCollisions(
         stageHeight
       );
 
-      // Use the smart-sized height and apply xOffset for collision detection
+      // Use the smart-sized dimensions and apply offsets for collision detection
       height = smartDims.height;
       effectiveX = el.location.x + (smartDims.xOffset || 0);
       effectiveWidth = smartDims.width;
+      yOffset = smartDims.yOffset || 0;
     }
 
-    // Calculate bounds using smart-sized dimensions
-    const bottom = el.location.y + height;
+    // Calculate bounds using smart-sized dimensions (account for upward growth via yOffset)
+    const effectiveY = el.location.y - yOffset;
+    const bottom = effectiveY + height;
     const left = effectiveX;
     const right = effectiveX + effectiveWidth;
     textBoxBounds.push({ bottom, left, right, name: el.location.name });
@@ -1593,7 +1608,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           name: el.location.name,
           id: el.location.id,
           x: el.location.x - smartDims.xOffset,
-          y: el.location.y,
+          y: el.location.y - (smartDims.yOffset || 0),
           width: smartDims.width,
           height: smartDims.height,
         };
@@ -1982,19 +1997,30 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
       const btnPaddingH = 16;
       const btnPaddingV = 10;
 
-      // Use stored dimensions if they look intentionally set (not just defaults)
-      const hasStoredDimensions = location.width && location.height;
-      const smartBtnDims = hasStoredDimensions ?
-        { width: location.width, height: location.height } :
-        calculateSmartButtonDimensions(
-          content,
-          btnFontSize,
-          { x: location.x, y: location.y, width: location.width || 200, height: location.height || 50 },
-          btnPaddingH,
-          btnPaddingV,
-          stageWidth,
-          stageHeight
-        );
+      // Always compute smart dimensions to ensure text fits
+      const smartBtnDims = calculateSmartButtonDimensions(
+        content,
+        btnFontSize,
+        { x: location.x, y: location.y, width: location.width || 200, height: location.height || 50 },
+        btnPaddingH,
+        btnPaddingV,
+        stageWidth,
+        stageHeight
+      );
+      // If stored dimensions exist, keep stored width but ensure height fits content
+      if (location.width && location.height) {
+        smartBtnDims.width = location.width;
+        // Recompute height for the stored width (account for border-box: padding + border inside height)
+        const charWidth = btnFontSize * 0.6;
+        const lineHeight = btnFontSize * 1.4;
+        const borderWidth = theme.button.borderWidth ?? 2;
+        const availW = location.width - btnPaddingH * 2 - borderWidth * 2;
+        const cpl = Math.floor(availW / charWidth);
+        const lines = cpl > 0 ? Math.ceil(content.length / cpl) : 1;
+        // border-box: total height = content + padding + border
+        const neededH = lines * lineHeight + btnPaddingV * 2 + borderWidth * 2;
+        smartBtnDims.height = Math.max(location.height, Math.ceil(neededH));
+      }
 
       // Debug logging for button overflow issues
       if (content && content.length > 30) {
@@ -2607,13 +2633,15 @@ const TextElement: React.FC<{
       stageHeight
     );
 
-    console.log(`[TextElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
+    console.log(`[TextElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}, yOffset=${smartDims.yOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
 
     needsScroll = smartDims.needsScroll;
-    // Adjust left position to keep box centered when width expands
+    // Adjust position when box expands beyond original bounds
     const adjustedLeft = location.x - smartDims.xOffset;
+    const adjustedTop = location.y - (smartDims.yOffset || 0);
     dimensionStyle = {
       left: `${adjustedLeft}px`,
+      top: `${adjustedTop}px`,
       width: `${smartDims.width}px`,
       height: 'auto',
       minHeight: `${smartDims.height}px`,
@@ -3371,12 +3399,14 @@ const DialogElement: React.FC<{
       stageHeight
     );
 
-    console.log(`[DialogElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
+    console.log(`[DialogElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}, yOffset=${smartDims.yOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
 
     needsScroll = smartDims.needsScroll;
     const adjustedLeft = location.x - smartDims.xOffset;
+    const adjustedTop = location.y - (smartDims.yOffset || 0);
     dimensionStyle = {
       left: `${adjustedLeft}px`,
+      top: `${adjustedTop}px`,
       width: `${smartDims.width}px`,
       height: 'auto',
       minHeight: `${smartDims.height}px`,

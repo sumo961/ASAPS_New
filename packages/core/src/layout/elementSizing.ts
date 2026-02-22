@@ -59,6 +59,7 @@ export interface ElementDimensions {
 export interface TextBoxDimensions extends ElementDimensions {
   needsScroll: boolean;
   xOffset: number;
+  yOffset: number;
 }
 
 /**
@@ -370,7 +371,7 @@ export function calculateSmartTextBoxDimensions(options: SmartTextBoxOptions): T
 
   // Check if content fits in original dimensions
   if (estimatedTotalHeight <= location.height) {
-    return { width: location.width, height: location.height, needsScroll: false, xOffset: 0 };
+    return { width: location.width, height: location.height, needsScroll: false, xOffset: 0, yOffset: 0 };
   }
 
   // Calculate maximum allowed dimensions
@@ -380,10 +381,13 @@ export function calculateSmartTextBoxDimensions(options: SmartTextBoxOptions): T
   const maxLeftGrowth = location.x - leftMargin;
   const maxWidth = location.width + Math.max(0, maxRightGrowth) + Math.max(0, maxLeftGrowth);
 
-  // Max height: available space from text box top to button area (or bottom margin)
+  // Max height: bi-directional (downward + upward)
   const buttonSpace = buttonHeight > 0 ? (buttonHeight + stageHeight * BUTTON_PADDING_PERCENT) : (stageHeight * 0.05);
   const bottomMargin = stageHeight * 0.02;
-  const maxHeight = stageHeight - location.y - buttonSpace - bottomMargin;
+  const maxDownwardHeight = stageHeight - location.y - buttonSpace - bottomMargin;
+  const topMargin = stageHeight * 0.02;
+  const maxTopGrowth = Math.max(0, location.y - topMargin);
+  const maxHeight = Math.max(0, maxDownwardHeight) + maxTopGrowth;
 
   // Try growing horizontally first
   let newWidth = location.width;
@@ -430,11 +434,14 @@ export function calculateSmartTextBoxDimensions(options: SmartTextBoxOptions): T
       }
 
       if (testTotalHeight <= location.height) {
-        return { width: newWidth, height: location.height, needsScroll: false, xOffset };
+        return { width: newWidth, height: location.height, needsScroll: false, xOffset, yOffset: 0 };
       }
       if (bufferedHeight <= maxHeight) {
         newHeight = Math.min(bufferedHeight, maxHeight);
-        return { width: newWidth, height: newHeight, needsScroll: false, xOffset };
+        const yOffset = newHeight > maxDownwardHeight
+          ? Math.min(newHeight - maxDownwardHeight, maxTopGrowth)
+          : 0;
+        return { width: newWidth, height: newHeight, needsScroll: false, xOffset, yOffset };
       }
     }
     newWidth = maxWidth;
@@ -458,14 +465,20 @@ export function calculateSmartTextBoxDimensions(options: SmartTextBoxOptions): T
 
   if (bufferedFinalHeight <= maxHeight) {
     newHeight = bufferedFinalHeight;
-    return { width: newWidth, height: newHeight, needsScroll: false, xOffset: finalXOffset };
+    const yOffset = newHeight > maxDownwardHeight
+      ? Math.min(newHeight - maxDownwardHeight, maxTopGrowth)
+      : 0;
+    return { width: newWidth, height: newHeight, needsScroll: false, xOffset: finalXOffset, yOffset };
   }
 
   // Step 4: Content doesn't fit - enable scrolling
   newHeight = maxHeight;
   needsScroll = true;
+  const yOffset = newHeight > maxDownwardHeight
+    ? Math.min(newHeight - maxDownwardHeight, maxTopGrowth)
+    : 0;
 
-  return { width: newWidth, height: newHeight, needsScroll, xOffset: finalXOffset };
+  return { width: newWidth, height: newHeight, needsScroll, xOffset: finalXOffset, yOffset };
 }
 
 /**
