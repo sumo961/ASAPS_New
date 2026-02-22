@@ -1,5 +1,48 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-23: Language-Aware AI & Bi-directional Layout (v0.9.24)
+
+### Overview
+
+This release adds **language-aware AI beat generation** with translated preview UI, and **bi-directional vertical textbox expansion** that allows text boxes to grow upward when they run out of downward space on the stage. Buttons with stored dimensions now **auto-expand height** to prevent text clipping.
+
+### Language-Aware AI Beats & Translated Preview UI
+
+AI beats (aiInfoText, aiDurScreen, aiDialogTree) now generate content in the story's active translation language. The preview window UI (buttons, labels, placeholders) is also translated to match the selected language.
+
+**Files modified:**
+- `packages/core/src/generated/beat-types.ts` — Updated generated types
+- `packages/builder/public/player-web.js` — Rebuilt player-web bundle
+
+### Bi-directional Vertical Textbox Expansion
+
+Text boxes previously could only grow downward when text overflowed, even when there was ample space above. This mirrors the existing horizontal bi-directional expansion (xOffset) for the vertical axis (yOffset). A textbox at y=500 on a 768px stage now uses the ~490px of upward space instead of being limited to ~165px downward.
+
+- Added `yOffset` to `TextBoxDimensions` interface (mirrors `xOffset`)
+- Smart sizing computes `maxDownwardHeight` + `maxTopGrowth` for total available vertical space
+- All return paths in `calculateSmartTextBoxDimensions()` compute yOffset: prefer downward growth, overflow upward
+- Collision detection, layout callbacks, and element rendering all account for yOffset
+
+**Files modified:**
+- `packages/core/src/layout/elementSizing.ts` — Add yOffset to interface, bi-directional height calculation
+- `packages/renderer/src/components/PositionedBeatView.tsx` — Same height calc in renderer copy, apply yOffset in TextElement, DialogElement, collision detection, layout callback
+
+### Button Auto-Height Expansion
+
+Buttons with stored dimensions now auto-expand their height to fit text content. Previously, buttons with stored heights that were too small for the text content would clip text due to `overflow: hidden` with `border-box` sizing. The fix computes the needed height at the stored width (accounting for border-box padding and border) and uses the maximum of stored height vs. needed height.
+
+**Files modified:**
+- `packages/renderer/src/components/PositionedBeatView.tsx` — Button height auto-expansion for stored dimensions
+
+### Documentation
+
+- Updated User Guide for EndScreen reset options and credits page
+
+**Files modified:**
+- `docs/USER_GUIDE.md` — EndScreen documentation updates
+
+---
+
 ## 2026-02-22: Unified Layout Engine & EndScreen Credits (v0.9.23)
 
 ### Overview

@@ -16,12 +16,15 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.23)
+## ⚠️ Development Status (v0.9.24)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Language-Aware AI Beats** | **v0.9.24**: AI beats generate content in the active translation language with translated preview UI |
+| **Bi-directional Textbox Expansion** | **v0.9.24**: Text boxes grow upward when downward space is limited (mirrors horizontal xOffset pattern) |
+| **Button Auto-Height** | **v0.9.24**: Buttons with stored dimensions auto-expand height to prevent text clipping |
 | **Unified Layout Engine** | **v0.9.23**: Visual Editor and Preview now use identical smart sizing and collision detection |
 | **EndScreen Credits Page** | **v0.9.23**: Customizable scrollable credits page for EndScreen beats |
 | **Visual Editor Undo/Redo** | **v0.9.23**: Full undo/redo for element moves, resizes, text edits |
