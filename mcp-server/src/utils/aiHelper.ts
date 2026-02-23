@@ -9,7 +9,7 @@
  *
  * CONNECTION RULES:
  * - SINGLE CONNECTION beats: Can only connect to ONE target beat via the connections array
- *   titleScreen, infoText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
+ *   titleScreen, infoText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText, keypad
  *
  * - MULTIPLE CONNECTION beats: Support multiple targets via their parameters (NOT the connections array)
  *   - dialogTree: targets defined in dialogTree.choices[].target
@@ -146,7 +146,7 @@ export const BEAT_TYPES = {
   // 🚨🚨🚨 MANDATORY: beat_0 MUST be titleScreen - NEVER start with infoText! 🚨🚨🚨
   titleScreen: '🚨 MANDATORY FIRST BEAT (beat_0)! Start screen with title and author. SINGLE CONNECTION: only one target via connections array.',
   infoText: 'Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: infoText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead. Optional: textVariations (array) for random text selection at runtime.',
-  endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true } }',
+  endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Optional credits page: showCredits (boolean), creditsPageTitle (default "Credits"), creditsPageBody (text content), creditsCloseText (default "Close"), creditsText (button label). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Created by..." } }',
 
   // Interactive content - MULTIPLE CONNECTIONS via parameters
   dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean for per-choice visited tracking). Choices can modify counters via counter/counterOperation/counterValue properties. RECURSIVE DIALOGS: use target "__self__" to loop back to the same dialogTree (e.g., interrogation, shopping).',
@@ -154,6 +154,7 @@ export const BEAT_TYPES = {
   pickProp: 'Interactive prop/item selection. MULTIPLE TARGETS: define targets in props[].target parameter. IMPORTANT: prop "name" should be ITEM NAMES ONLY (e.g., "Silver Key", "Lantern"), NOT action descriptions (e.g., "Take the key" is WRONG). For actions, use movementChoice instead. Supports: choiceDelay (seconds), markVisited (boolean).',
   hyperText: 'Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Links can have custom styling (color, underline, bold). Supports optional defaultTarget for timed auto-advance.',
   inputText: 'Player text input. Save to: variable (default), characterName (update display name), or counter (numeric). Validation: none, numeric, email, alphanumeric. Properties: minLength, maxLength, required. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance.',
+  keypad: 'Numeric keypad input (PIN entry, safe locks, phone dialers). Parameters: prompt, layout ("numeric"|"phone"|"pin"), maxDigits, minDigits, correctCode (optional auto-validation), failTarget (beat on wrong code), maxAttempts (0=unlimited), maskInput (boolean), saveToType ("variable"|"counter"), variable, buttonText, clearButtonText, showDisplay. SINGLE CONNECTION: correct code or submit → next beat. If correctCode is set, validates automatically and routes to failTarget on wrong entry.',
 
   // Timed content - SINGLE CONNECTION (NO defaultTarget - already timed by design)
   durScreen: 'Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target via connections array at beat level. ❌ WRONG: connection inside parameters. ✓ CORRECT: "connections": [{ "targetId": "beat_5" }] at beat level. Optional: textVariations (array) for random text selection at runtime.',
@@ -322,7 +323,7 @@ Return a JSON object with this structure:
 🚨 IMPORTANT: ALL beats including endings go in the "beats" array! Do NOT create a separate "endings" array!
 
 CRITICAL CONNECTION RULES:
-- SINGLE CONNECTION beats (titleScreen, infoText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
+- SINGLE CONNECTION beats (titleScreen, infoText, durScreen, videoBeat, endScreen, inputText, keypad, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
 - MULTIPLE CONNECTION beats (dialogTree, movementChoice, pickProp, hyperText, randomTarget): Define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.
   🚫 FORBIDDEN: Do NOT add a "connection" parameter to these beats - it triggers validation errors!
 - conditionBeat: EXACTLY 3 parameters allowed: "condition", "trueConnection", "falseConnection"
@@ -451,7 +452,9 @@ ADVANCED BRANCHING PATTERNS:
 5. Conditional Unlocks (Metroidvania): Locked options unlock after finding items/variables
 6. Timed Branching: setTimer + choices under pressure → conditionBeat checks timer → success/failure
 7. Inventory-Gated Puzzles: conditionBeat checks inventory → has tool: proceed | no tool: explore first
-8. Code/Password Puzzle: infoText (clue) → inputText (enter code) → conditionBeat (verify) → success/failure
+8. Code/Password Puzzle: infoText (clue) → keypad or inputText (enter code) → conditionBeat (verify) → success/failure
+   - Prefer keypad for numeric codes (visual keypad, auto-validation with correctCode/failTarget)
+   - Use inputText for text-based passwords
 9. Reputation System: Multiple interactions modify relationship counter → conditionBeat determines NPC behavior
 
 PROCEDURAL GAME ELEMENTS (REQUIRED for engaging stories):
@@ -555,7 +558,8 @@ CRITICAL ANTI-PATTERNS TO AVOID:
    ✓ CORRECT: dialogTree data ONLY inside parameters.dialogTree
 
 CORRECT PARAMETER NAMES (MUST use exactly these):
-- endScreen: { message (NOT "endText"), showRestart: true (ALWAYS), showCredits }
+- endScreen: { message (NOT "endText"), showRestart: true (ALWAYS), showCredits, creditsPageTitle, creditsPageBody, creditsCloseText, creditsText }
+- keypad: { prompt, layout ("numeric"|"phone"|"pin"), maxDigits, minDigits, correctCode, failTarget, maxAttempts, maskInput, saveToType, variable, buttonText, clearButtonText }
 - inputText: { prompt, variable (NOT "variableName"), saveToType: "variable" (REQUIRED), submitButtonText }
 - setVariable: { type: "variable"|"counter"|"fictionalTime", name (variable name, NOT "variableName"), value, operation }
   ⚠️ Two different "name" fields: beat.name = display label, beat.parameters.name = VARIABLE name
@@ -580,7 +584,9 @@ Note: quantityValue can also reference a variable with $ prefix: "$requiredAmoun
 
 conditionBeat (counterCompare): { "parameters": { "condition": { "type": "counterCompare", "counter1": "strength", "counter2": "threshold", "operator": ">=" }, "trueConnection": { "target": "beat_pass" }, "falseConnection": { "target": "beat_fail" } } }
 
-endScreen: { "id": "beat_end", "type": "endScreen", "label": "The End", "parameters": { "message": "Victory!", "showRestart": true } }
+endScreen: { "id": "beat_end", "type": "endScreen", "label": "The End", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\nDesigned by..." } }
+
+keypad: { "id": "beat_safe", "type": "keypad", "label": "Safe Lock", "parameters": { "prompt": "Enter the combination:", "layout": "numeric", "maxDigits": 4, "correctCode": "1847", "failTarget": "beat_wrong_code", "maxAttempts": 3, "maskInput": true }, "connections": [{ "targetId": "beat_safe_open" }] }
 
 inputText + conditionBeat (code puzzle): inputText { "variable": "code", "saveToType": "variable", "prompt": "Enter the vault code:" } → conditionBeat { "condition": { "type": "variable", "variable": "code", "operator": "==", "value": "8192" }, "trueConnection": { "target": "success" }, "falseConnection": { "target": "retry" } }
 

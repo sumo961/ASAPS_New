@@ -313,13 +313,41 @@ Good item descriptions should:
   - inputText stores player input → connection points to conditionBeat
   - conditionBeat checks if input matches correct answer
   - See Pattern 8: Code/Password Puzzle for complete example
+  - ⚠️ For numeric codes, prefer keypad over inputText — visual keypad is more immersive!
+
+**keypad** - Numeric keypad input (safe locks, PIN entry, phone dialers)
+- Use: Entering codes, unlocking safes, dialing phones, PIN verification
+- Parameters:
+  - prompt: Text asking the player for input (REQUIRED)
+  - layout: "numeric" (0-9 grid) | "phone" (phone-style with * #) | "pin" (PIN pad)
+  - maxDigits: Maximum digits allowed (default: 4)
+  - minDigits: Minimum digits required (default: 1)
+  - correctCode: If set, auto-validates input. Wrong code → failTarget
+  - failTarget: Beat ID to go to on wrong code
+  - maxAttempts: Max wrong attempts before forced to failTarget (0 = unlimited)
+  - maskInput: boolean (default true) — show dots instead of digits
+  - saveToType: "variable" (default) or "counter"
+  - variable: Variable name to store input (default: "keypadInput")
+  - buttonText: Submit button text (default: "Enter")
+  - clearButtonText: Clear button text (default: "Clear")
+- Connections: Single → after correct code or submit
+- ⚠️ For code puzzles, prefer keypad over inputText — visual keypad is more immersive!
+- Example: Safe combination puzzle:
+  {
+    "type": "keypad",
+    "parameters": { "prompt": "Enter the safe code:", "layout": "numeric", "maxDigits": 4, "correctCode": "1847", "failTarget": "beat_wrong", "maxAttempts": 3, "maskInput": true }
+  }
 
 **endScreen** - Story conclusion (ACTUAL BEATS in the beats array!)
 - Use: Ending (victory, defeat, various endings)
 - Parameters:
   - message: "Ending text"  ← NOT "endMessage" or "text"!
   - showRestart: boolean (ALWAYS set to true so player can replay!)
-  - showCredits: boolean
+  - showCredits: boolean — show a credits button
+  - creditsPageTitle: Title for the credits page (default: "Credits")
+  - creditsPageBody: Body text of the credits page (supports line breaks)
+  - creditsCloseText: Close button text on credits page (default: "Close")
+  - creditsText: Label for the credits button (default: "Credits")
 - ⚠️ CRITICAL: Use "message", NOT "endMessage"!
 - ⚠️ CRITICAL: ALWAYS set "showRestart": true - player must be able to replay!
 - Connections: None (terminal beat)
@@ -330,7 +358,7 @@ Good item descriptions should:
 - ✓ CORRECT: Put ALL endScreen beats in the main "beats" array:
   { "id": "beat_end_good", "type": "endScreen", "parameters": { "message": "...", "showRestart": true } }
 - 🚨 NEVER create an "endings" array - it will be IGNORED! All endings go in "beats"!
-- Example: { "id": "beat_ending_good", "type": "endScreen", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true } }
+- Example: { "id": "beat_ending_good", "type": "endScreen", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\\nDesigned by..." } }
 
 ### INVISIBLE BEATS (Logic/Background Operations)
 
@@ -737,11 +765,13 @@ Player must explore to find tool first
 Creates backtracking and exploration incentive
 \`\`\`
 
-### Pattern 8: Code/Password Puzzle (inputText → conditionBeat)
+### Pattern 8: Code/Password Puzzle (keypad or inputText → conditionBeat)
 \`\`\`
 🚨 CRITICAL: inputText MUST connect TO conditionBeat!
+Prefer keypad for numeric codes (visual keypad, auto-validation with correctCode/failTarget)
+Use inputText for text-based passwords
 
-Flow: infoText("Enter the code") → inputText → conditionBeat → success/failure
+Flow: infoText("Enter the code") → keypad or inputText → conditionBeat → success/failure
 
 Step 1: Clue beat reveals the code (e.g., "The combination is 8192")
 Step 2: Puzzle beat asks for input:
@@ -1257,7 +1287,7 @@ Generate complete, sophisticated interactive story structures that:
       "id": "beat_end_good",
       "name": "Good Ending",
       "type": "endScreen",
-      "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true }
+      "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by..." }
     }
   ],
   "variables": [
@@ -1530,7 +1560,7 @@ beat_4 now checks variable and shows new option to progress
 🚨🚨🚨 **CRITICAL - CONNECTIONS RULE** 🚨🚨🚨
 
 **ONLY these beat types should have a "connections" array:**
-- titleScreen, infoText, durScreen, setVariable, addRemoveInventory, videoBeat
+- titleScreen, infoText, durScreen, setVariable, addRemoveInventory, videoBeat, keypad
 These are single-path beats that need "connections" to specify the next beat.
 - ⚠️ Use "targetId" in connections: { "targetId": "beat_X" } NOT { "target": "beat_X" }
 
@@ -1615,9 +1645,31 @@ These are single-path beats that need "connections" to specify the next beat.
 \`\`\`
 ✓ hyperText has NO "connections" array - targets are in hyperlinks[].targetBeatId!
 
+## Keypad Example (Numeric Code Entry)
+
+\`\`\`json
+{
+  "id": "beat_safe",
+  "name": "Safe Lock",
+  "type": "keypad",
+  "position": { "x": 1300, "y": 300 },
+  "parameters": {
+    "prompt": "Enter the combination:",
+    "layout": "numeric",
+    "maxDigits": 4,
+    "correctCode": "1847",
+    "failTarget": "beat_wrong_code",
+    "maxAttempts": 3,
+    "maskInput": true
+  },
+  "connections": [{ "targetId": "beat_safe_open" }]
+}
+\`\`\`
+✓ keypad uses "connections" array (single-connection beat). If correctCode is set, auto-validates and routes to failTarget on wrong entry.
+
 ## Code/Password Puzzle - Complete JSON Example
 
-🚨 **inputText MUST connect TO conditionBeat for puzzles!**
+🚨 **For numeric codes, prefer keypad (auto-validates with correctCode/failTarget). Use inputText → conditionBeat for text passwords.**
 
 \`\`\`json
 {
