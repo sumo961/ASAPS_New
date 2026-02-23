@@ -9,6 +9,8 @@
  */
 
 import { createServer, Server as HTTPServer, IncomingMessage, ServerResponse } from 'http';
+import { request as httpsRequest } from 'https';
+import { request as httpRequest } from 'http';
 import { parse as parseUrl } from 'url';
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
@@ -188,31 +190,33 @@ export class EmbeddedAPIServer {
     const endpoint = resolveClaudeEndpoint(baseUrl);
 
     console.log(`[API Server] Claude proxy to: ${endpoint}`);
+    console.log(`[API Server] Making request (${DEFAULT_AI_TIMEOUT_MS / 1000}s timeout)...`);
 
     try {
       // Use shared header construction
       const headers = buildClaudeHeaders(apiKey);
+      const requestBodyStr = JSON.stringify(requestBody);
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-      });
+      // Use Node.js native https to bypass Electron's Chromium networking
+      const { status, text } = await this.nativeRequest(endpoint, headers, requestBodyStr, DEFAULT_AI_TIMEOUT_MS);
 
-      const text = await response.text();
+      console.log(`[API Server] Response status: ${status}`);
+      console.log(`[API Server] Response length: ${text.length} chars`);
 
-      if (!response.ok) {
+      if (status >= 400) {
+        console.log(`[API Server] Error response: ${text.substring(0, 500)}`);
         try {
           const errorData = JSON.parse(text);
-          this.sendJson(res, response.status, errorData);
+          this.sendJson(res, status, errorData);
         } catch {
-          this.sendJson(res, response.status, { error: text });
+          this.sendJson(res, status, { error: text });
         }
         return;
       }
 
       try {
         const data = JSON.parse(text);
+        console.log(`[API Server] Success - sending response`);
         this.sendJson(res, 200, data);
       } catch {
         this.sendJson(res, 500, {
@@ -222,8 +226,9 @@ export class EmbeddedAPIServer {
       }
     } catch (error) {
       console.error('[API Server] Claude proxy error:', error);
-      this.sendJson(res, 500, {
-        error: 'Proxy request failed',
+      const isTimeout = error instanceof Error && error.message === 'Request timeout';
+      this.sendJson(res, isTimeout ? 504 : 500, {
+        error: isTimeout ? 'Request timeout' : 'Proxy request failed',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }
@@ -247,33 +252,26 @@ export class EmbeddedAPIServer {
     console.log(`[API Server] OpenAI proxy to: ${endpoint}`);
     console.log(`[API Server] Making request (${DEFAULT_AI_TIMEOUT_MS / 1000}s timeout)...`);
 
-    // Create abort controller with shared timeout for long AI requests (e.g., thinking models)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), DEFAULT_AI_TIMEOUT_MS);
-
     try {
       // Use shared header construction
       const headers = buildOpenAIHeaders(apiKey);
+      const requestBodyStr = JSON.stringify(requestBody);
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      // Use Node.js native https to bypass Electron's Chromium networking
+      // Electron's fetch() goes through Chromium's network stack which can
+      // abort long-running AI requests prematurely
+      const { status, text } = await this.nativeRequest(endpoint, headers, requestBodyStr, DEFAULT_AI_TIMEOUT_MS);
 
-      console.log(`[API Server] Response status: ${response.status}`);
-      const text = await response.text();
+      console.log(`[API Server] Response status: ${status}`);
       console.log(`[API Server] Response length: ${text.length} chars`);
 
-      if (!response.ok) {
+      if (status >= 400) {
         console.log(`[API Server] Error response: ${text.substring(0, 500)}`);
         try {
           const errorData = JSON.parse(text);
-          this.sendJson(res, response.status, errorData);
+          this.sendJson(res, status, errorData);
         } catch {
-          this.sendJson(res, response.status, { error: text });
+          this.sendJson(res, status, { error: text });
         }
         return;
       }
@@ -289,10 +287,10 @@ export class EmbeddedAPIServer {
         });
       }
     } catch (error) {
-      clearTimeout(timeoutId);
       console.error('[API Server] OpenAI proxy error:', error);
-      this.sendJson(res, 500, {
-        error: 'Proxy request failed',
+      const isTimeout = error instanceof Error && error.message === 'Request timeout';
+      this.sendJson(res, isTimeout ? 504 : 500, {
+        error: isTimeout ? 'Request timeout' : 'Proxy request failed',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }
@@ -566,6 +564,56 @@ export class EmbeddedAPIServer {
   private sendJson(res: ServerResponse, status: number, data: unknown): void {
     res.writeHead(status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(data));
+  }
+
+  /**
+   * Make an outgoing HTTPS/HTTP request using Node.js native modules.
+   *
+   * Electron's main-process fetch() goes through Chromium's networking stack,
+   * which can abort long-running AI requests. Using Node.js native https/http
+   * modules bypasses Chromium entirely and handles large, slow responses reliably.
+   */
+  private nativeRequest(
+    endpoint: string,
+    headers: Record<string, string>,
+    body: string,
+    timeoutMs: number
+  ): Promise<{ status: number; text: string }> {
+    return new Promise((resolve, reject) => {
+      const url = new URL(endpoint);
+      const isHttps = url.protocol === 'https:';
+      const requestFn = isHttps ? httpsRequest : httpRequest;
+
+      const req = requestFn(
+        {
+          hostname: url.hostname,
+          port: url.port || (isHttps ? 443 : 80),
+          path: url.pathname + url.search,
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Length': Buffer.byteLength(body),
+          },
+        },
+        (response) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('end', () => {
+            const text = Buffer.concat(chunks).toString('utf-8');
+            resolve({ status: response.statusCode || 500, text });
+          });
+          response.on('error', reject);
+        }
+      );
+
+      req.on('error', reject);
+      req.setTimeout(timeoutMs, () => {
+        req.destroy(new Error('Request timeout'));
+      });
+
+      req.write(body);
+      req.end();
+    });
   }
 
   /**

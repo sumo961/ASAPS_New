@@ -36,7 +36,11 @@ export class OpenAIProvider extends BaseAIProvider {
   private model: string = 'gpt-5.2';
   private useJsonFormat: boolean = true;
   private useProxy: boolean = false;
-  private proxyEndpoint: string = 'http://localhost:3001/api/ai/openai';
+  // Prefer same-origin proxy (Vite dev server plugin) over cross-origin port 3001
+  // Same-origin uses Node.js native https; port 3001 may use Electron's Chromium fetch
+  private proxyEndpoint: string = typeof window !== 'undefined' && window.location?.port === '5173'
+    ? '/api/ai/openai'
+    : 'http://localhost:3001/api/ai/openai';
 
   /**
    * Check if a URL is a localhost address (no CORS issues, no proxy needed)

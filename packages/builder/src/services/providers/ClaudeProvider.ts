@@ -33,7 +33,10 @@ export class ClaudeProvider extends BaseAIProvider {
   private client: Anthropic | null = null;
   private model: string = 'claude-sonnet-4-20250514';
   private useProxy: boolean = false;
-  private proxyEndpoint: string = 'http://localhost:3001/api/ai/claude';
+  // Prefer same-origin proxy (Vite dev server plugin) over cross-origin port 3001
+  private proxyEndpoint: string = typeof window !== 'undefined' && window.location?.port === '5173'
+    ? '/api/ai/claude'
+    : 'http://localhost:3001/api/ai/claude';
 
   /**
    * Configure the provider

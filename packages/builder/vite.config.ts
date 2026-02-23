@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
+import { viteAIProxyPlugin } from './src/api/vite-ai-proxy';
 
 const rootPkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
 
@@ -15,7 +16,7 @@ try {
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), viteAIProxyPlugin()],
   define: {
     __APP_VERSION__: JSON.stringify(rootPkg.version),
     __BUILD_NUMBER__: JSON.stringify(buildData.build),
