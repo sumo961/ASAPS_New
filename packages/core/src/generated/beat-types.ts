@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-02-23T11:33:50.625Z
+ * Generated: 2026-02-23T16:55:06.967Z
  */
 
 // ============================================
@@ -534,6 +534,30 @@ export interface AiSummaryParameters {
   restartTarget?: string | undefined;
   /** Reset state on restart */
   resetOnRestart?: boolean | undefined;
+  /** Clear all variables */
+  resetVariables?: boolean | undefined;
+  /** Clear all counters */
+  resetCounters?: boolean | undefined;
+  /** Clear inventory */
+  resetInventory?: boolean | undefined;
+  /** Clear all timers */
+  resetTimers?: boolean | undefined;
+  /** Clear fictional time */
+  resetFictionalTime?: boolean | undefined;
+  /** Clear visited beat tracking */
+  resetVisitedTracking?: boolean | undefined;
+  /** Clear beat history */
+  resetHistory?: boolean | undefined;
+  /** Text for restart button */
+  restartText?: string | undefined;
+  /** Text for credits button */
+  creditsText?: string | undefined;
+  /** Title text for the credits page */
+  creditsPageTitle?: string | undefined;
+  /** Body text for the credits page (auto-populated from metadata if empty) */
+  creditsPageBody?: string | undefined;
+  /** Text for the close button on credits page */
+  creditsCloseText?: string | undefined;
 }
 
 /**

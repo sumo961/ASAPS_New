@@ -261,7 +261,12 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       break;
 
     case 'aiSummary':
-      // title only — prompts stay in original language
+      if (params.title) strings[`${prefix}.parameters.title`] = params.title;
+      if (params.restartText) strings[`${prefix}.parameters.restartText`] = params.restartText;
+      if (params.creditsText) strings[`${prefix}.parameters.creditsText`] = params.creditsText;
+      if (params.creditsPageTitle) strings[`${prefix}.parameters.creditsPageTitle`] = params.creditsPageTitle;
+      if (params.creditsPageBody) strings[`${prefix}.parameters.creditsPageBody`] = params.creditsPageBody;
+      if (params.creditsCloseText) strings[`${prefix}.parameters.creditsCloseText`] = params.creditsCloseText;
       break;
 
     case 'aiDialogTree':

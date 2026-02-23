@@ -562,6 +562,9 @@ Fictional time condition example (CORRECT format):
 **aiSummary** - AI-generated narrative summary
 - Use: Recap the player's journey at endings or checkpoints
 - Summarizes key choices and their consequences
+- Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength, includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory
+- Supports showRestart, showCredits, resetOnRestart with granular reset sub-options (resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory)
+- Credits page: creditsPageTitle, creditsPageBody, creditsCloseText
 
 **aiCondition** - AI-driven branching that analyzes player state
 - Use: Complex branching based on accumulated player behavior/personality
@@ -1767,6 +1770,7 @@ You may use these advanced beat types that leverage AI at runtime:
 - **aiCondition**: AI-driven branching that analyzes player state to determine path
 - **aiDialogTree**: Generate personalized dialog trees at runtime using AI
 - **aiSummary**: Generate a narrative summary of the player's journey at the end
+  Parameters: prompt, title, summaryStyle, maxLength, includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart, showCredits, resetOnRestart (with granular sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText
 - **aiInfoText**: Generate contextual 1-2 sentence text using AI based on player state (like infoText but dynamic)
   Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences
 - **aiDurScreen**: Generate contextual text with automatic duration based on reading speed (like durScreen but dynamic)

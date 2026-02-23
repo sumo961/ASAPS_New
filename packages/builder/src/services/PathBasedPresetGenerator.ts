@@ -250,7 +250,7 @@ function extractInputTextBeats(
   // Look through the path steps up to the target beat
   for (let i = 0; i <= upToIndex; i++) {
     const step = path.steps[i];
-    if (step.beatType === 'inputText') {
+    if (step.beatType === 'inputText' || step.beatType === 'keypad') {
       const beat = story.getBeat(step.beatId);
       if (!beat) continue;
 

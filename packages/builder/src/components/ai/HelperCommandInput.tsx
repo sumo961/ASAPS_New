@@ -505,7 +505,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
   const waitingForClarification = lastAssistantMessage?.needsClarification;
 
   return (
-    <div className="fixed right-0 top-0 bottom-0 w-[480px] bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col">
+    <div className="fixed right-0 top-0 bottom-0 w-[480px] bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
       {/* Applying Changes Overlay */}
       {isApplying && (
         <div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center">
@@ -518,7 +518,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
       )}
 
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
+      <div className="flex-shrink-0 p-4 pt-10 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <Wand2 className="w-5 h-5 text-purple-600" />

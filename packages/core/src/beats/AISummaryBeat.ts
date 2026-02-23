@@ -49,6 +49,20 @@ export interface AISummaryBeatParams {
 
   /** Reset state on restart */
   resetOnRestart?: boolean;
+
+  /** Granular reset sub-options */
+  resetVariables?: boolean;
+  resetCounters?: boolean;
+  resetInventory?: boolean;
+  resetTimers?: boolean;
+  resetFictionalTime?: boolean;
+  resetVisitedTracking?: boolean;
+  resetHistory?: boolean;
+
+  /** Credits page properties */
+  creditsPageTitle?: string;
+  creditsPageBody?: string;
+  creditsCloseText?: string;
 }
 
 /**
@@ -77,6 +91,20 @@ export class AISummaryBeat extends Beat {
   public restartTarget?: string;
   public resetOnRestart: boolean;
 
+  // Granular reset sub-options (all default true for backward compatibility)
+  public resetVariables: boolean;
+  public resetCounters: boolean;
+  public resetInventory: boolean;
+  public resetTimers: boolean;
+  public resetFictionalTime: boolean;
+  public resetVisitedTracking: boolean;
+  public resetHistory: boolean;
+
+  // Credits page properties
+  public creditsPageTitle: string;
+  public creditsPageBody: string;
+  public creditsCloseText: string;
+
   private generatedSummary: string | null = null;
 
   constructor(config: BeatConfig & {
@@ -100,6 +128,20 @@ export class AISummaryBeat extends Beat {
     this.creditsText = params.creditsText || config.creditsText || 'Credits';
     this.restartTarget = params.restartTarget || config.restartTarget;
     this.resetOnRestart = params.resetOnRestart ?? config.resetOnRestart ?? true;
+
+    // Granular reset sub-options default to true
+    this.resetVariables = params.resetVariables ?? config.resetVariables ?? true;
+    this.resetCounters = params.resetCounters ?? config.resetCounters ?? true;
+    this.resetInventory = params.resetInventory ?? config.resetInventory ?? true;
+    this.resetTimers = params.resetTimers ?? config.resetTimers ?? true;
+    this.resetFictionalTime = params.resetFictionalTime ?? config.resetFictionalTime ?? true;
+    this.resetVisitedTracking = params.resetVisitedTracking ?? config.resetVisitedTracking ?? true;
+    this.resetHistory = params.resetHistory ?? config.resetHistory ?? true;
+
+    // Credits page properties
+    this.creditsPageTitle = params.creditsPageTitle || config.creditsPageTitle || 'Credits';
+    this.creditsPageBody = params.creditsPageBody || config.creditsPageBody || '';
+    this.creditsCloseText = params.creditsCloseText || config.creditsCloseText || 'Close';
   }
 
   getParameters(): Record<string, any> {
@@ -119,6 +161,16 @@ export class AISummaryBeat extends Beat {
       creditsText: this.creditsText,
       restartTarget: this.restartTarget,
       resetOnRestart: this.resetOnRestart,
+      resetVariables: this.resetVariables,
+      resetCounters: this.resetCounters,
+      resetInventory: this.resetInventory,
+      resetTimers: this.resetTimers,
+      resetFictionalTime: this.resetFictionalTime,
+      resetVisitedTracking: this.resetVisitedTracking,
+      resetHistory: this.resetHistory,
+      creditsPageTitle: this.creditsPageTitle,
+      creditsPageBody: this.creditsPageBody,
+      creditsCloseText: this.creditsCloseText,
     };
   }
 
@@ -138,6 +190,16 @@ export class AISummaryBeat extends Beat {
     if (params.creditsText !== undefined) this.creditsText = params.creditsText;
     if (params.restartTarget !== undefined) this.restartTarget = params.restartTarget;
     if (params.resetOnRestart !== undefined) this.resetOnRestart = params.resetOnRestart;
+    if (params.resetVariables !== undefined) this.resetVariables = params.resetVariables;
+    if (params.resetCounters !== undefined) this.resetCounters = params.resetCounters;
+    if (params.resetInventory !== undefined) this.resetInventory = params.resetInventory;
+    if (params.resetTimers !== undefined) this.resetTimers = params.resetTimers;
+    if (params.resetFictionalTime !== undefined) this.resetFictionalTime = params.resetFictionalTime;
+    if (params.resetVisitedTracking !== undefined) this.resetVisitedTracking = params.resetVisitedTracking;
+    if (params.resetHistory !== undefined) this.resetHistory = params.resetHistory;
+    if (params.creditsPageTitle !== undefined) this.creditsPageTitle = params.creditsPageTitle;
+    if (params.creditsPageBody !== undefined) this.creditsPageBody = params.creditsPageBody;
+    if (params.creditsCloseText !== undefined) this.creditsCloseText = params.creditsCloseText;
   }
 
   protected async performAction(
@@ -209,19 +271,84 @@ export class AISummaryBeat extends Beat {
     // Handle restart
     if (result === 'restart') {
       if (this.resetOnRestart) {
-        context.reset();
+        // If all sub-options are true, use full reset for efficiency
+        const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
+          this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
+        if (allTrue) {
+          context.reset();
+        } else {
+          context.selectiveReset({
+            variables: this.resetVariables,
+            counters: this.resetCounters,
+            inventory: this.resetInventory,
+            timers: this.resetTimers,
+            fictionalTime: this.resetFictionalTime,
+            visitedTracking: this.resetVisitedTracking,
+            history: this.resetHistory,
+          });
+        }
       }
       return this.restartTarget || context.getStory().getFirstBeatId();
     }
 
-    // Handle credits (if implemented)
+    // Handle credits
     if (result === 'credits') {
-      // Credits handling would go here
-      // For now, just stay on this screen
+      if (this.showCredits) {
+        await this.showCreditsPage(context, renderer);
+      }
       return null;
     }
 
     return this.getNextBeat(context);
+  }
+
+  private async showCreditsPage(context: StoryContext, renderer: IRenderer): Promise<void> {
+    const story = context.getStory();
+    const metadata = story.getMetadata();
+
+    // Auto-populate body from metadata if empty
+    let body = this.creditsPageBody;
+    if (!body) {
+      body = `${metadata.title || 'Untitled Story'}\n\nCreated by: ${metadata.author || 'Anonymous'}\n\nThank you for playing!`;
+    }
+
+    const creditsContent = {
+      creditsTitle: this.processText(this.creditsPageTitle, context),
+      creditsBody: this.processText(body, context),
+      creditsCloseText: this.processText(this.creditsCloseText, context),
+    };
+
+    // Get credits-specific locations from beat locations
+    const creditsLocations = this.getCreditsLocations();
+
+    if (renderer.renderCreditsPage) {
+      await renderer.renderCreditsPage(creditsContent, creditsLocations);
+    } else {
+      // Fallback for renderers that don't support renderCreditsPage
+      await renderer.renderText(
+        `${creditsContent.creditsTitle}\n\n${creditsContent.creditsBody}`,
+        creditsContent.creditsCloseText,
+        []
+      );
+    }
+  }
+
+  /**
+   * Get Location[] for credits page elements from beat.locations
+   * Filters for credits-phase elements (creditsTitle, creditsBody, creditsCloseButton)
+   */
+  private getCreditsLocations(): Location[] {
+    const creditsLocationNames = ['creditstitle', 'creditsbody', 'creditsclosebutton'];
+    const locations: Location[] = [];
+
+    this.locations.forEach((loc) => {
+      const nameLower = loc.name?.toLowerCase().replace(/\s+/g, '') || '';
+      if (creditsLocationNames.some(n => nameLower.includes(n))) {
+        locations.push(loc);
+      }
+    });
+
+    return locations;
   }
 
   /**

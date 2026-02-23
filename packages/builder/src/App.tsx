@@ -233,6 +233,7 @@ function App() {
   const [showHelperCommands, setShowHelperCommands] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   const [previewWindowOpen, setPreviewWindowOpen] = useState(false);
+  const [triggerNewProject, setTriggerNewProject] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Cluster naming modal state (replaces prompt() for Electron compatibility)
@@ -649,10 +650,10 @@ function App() {
       }
     });
 
-    // Handle New Project from File menu
+    // Handle New Project from File menu - open New Project dialog instead of silently creating empty
     const unsubscribeNew = window.electronAPI.onMenuNewProject(() => {
       console.log('[Electron] New Project requested from menu');
-      discardUntitled();
+      setTriggerNewProject(prev => prev + 1);
     });
 
     // Handle Open Project Folder from File menu (directory format)
@@ -715,7 +716,7 @@ function App() {
       unsubscribeSaveAsFolder?.();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadProject, saveNow, discardUntitled, saveCurrent, openDirectoryProject, saveAsDirectory]);
+  }, [loadProject, saveNow, saveCurrent, openDirectoryProject, saveAsDirectory]);
 
   // Auto-initialize VCS when project format changes to directory.
   // IMPORTANT: We depend only on the specific primitive values we check, NOT the
@@ -4447,6 +4448,7 @@ function App() {
           setGlobalSettings(prev => ({ ...prev, ai: aiSettings }));
         }}
         onCurrentProjectDeleted={handleCurrentProjectDeleted}
+        triggerNewProject={triggerNewProject}
       />
 
       <div className="flex flex-1 overflow-hidden">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
@@ -56,6 +56,7 @@ interface HeaderProps {
     reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
   }) => void;
   onCurrentProjectDeleted?: () => void;
+  triggerNewProject?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -92,6 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
   onInitRepo,
   onAISettingsChanged,
   onCurrentProjectDeleted,
+  triggerNewProject,
 }) => {
   const { status, lastSaved, error: saveError, markChanged } = useSave();
   const { load } = useProject();
@@ -106,6 +108,13 @@ export const Header: React.FC<HeaderProps> = ({
   const [showImportMenu, setShowImportMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+
+  // Open New Project dialog when triggered from Electron menu
+  useEffect(() => {
+    if (triggerNewProject && triggerNewProject > 0) {
+      setShowNewProjectDialog(true);
+    }
+  }, [triggerNewProject]);
 
   const handleLoadProject = async (projectId: string) => {
     const success = await load(projectId);

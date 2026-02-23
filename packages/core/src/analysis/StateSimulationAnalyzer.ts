@@ -694,6 +694,22 @@ export class StateSimulationAnalyzer {
         break;
       }
 
+      case 'keypad': {
+        // Keypad beats save entered code to a variable or counter, similar to inputText
+        const kpSaveToType = params.saveToType || 'variable';
+        const kpVariableName = params.variable || params.variableName || 'keypadInput';
+        const kpCounterName = params.counter;
+        const kpPlaceholder = params.correctCode || '1234';
+
+        if (kpSaveToType === 'variable' && kpVariableName) {
+          newState.variables.set(kpVariableName, kpPlaceholder);
+        } else if (kpSaveToType === 'counter' && kpCounterName) {
+          const numValue = typeof kpPlaceholder === 'number' ? kpPlaceholder : Number(kpPlaceholder) || 0;
+          newState.counters.set(kpCounterName, numValue);
+        }
+        break;
+      }
+
       // Other beat types don't modify state
     }
 
@@ -795,6 +811,7 @@ export class StateSimulationAnalyzer {
       'pickProp',
       'hyperText',
       'aiDialogTree',
+      'keypad',
     ].includes(beat.type);
   }
 

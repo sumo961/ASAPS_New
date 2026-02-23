@@ -697,8 +697,10 @@ export const PreviewWindow: React.FC = () => {
 
   // Note: hasAutoStarted is now only used to track if we've shown the initial "waiting to start" state
 
-  // Generate presets when story or start beat changes
-  const handleGeneratePresets = useCallback(() => {
+  // Auto-generate presets when story or start beat changes
+  useEffect(() => {
+    setSelectedPreset(null);
+
     if (!story || !startBeatId) {
       setGeneratedPresets([]);
       return;
@@ -708,7 +710,6 @@ export const PreviewWindow: React.FC = () => {
     const firstBeatId = story.getMetadata().firstBeatId;
     if (startBeatId === firstBeatId) {
       setGeneratedPresets([]);
-      setSelectedPreset(null);
       return;
     }
 
@@ -730,9 +731,6 @@ export const PreviewWindow: React.FC = () => {
             modifiedAt: new Date().toISOString(),
           };
           setSelectedPreset(preset);
-        } else if (result.presets.length > 0 && !selectedPreset) {
-          // If no preset selected and there are paths, suggest selecting one
-          // Don't auto-select to let user choose
         }
       } catch (error) {
         console.error('[PreviewWindow] Failed to generate presets:', error);
@@ -741,16 +739,41 @@ export const PreviewWindow: React.FC = () => {
         setIsGeneratingPresets(false);
       }
     }, 0);
-  }, [story, startBeatId, selectedPreset]);
+  }, [story, startBeatId]);
 
-  // Auto-generate presets when start beat changes
-  useEffect(() => {
-    // Clear any previously selected preset when beat changes
+  // Manual refresh handler for the refresh button
+  const handleGeneratePresets = () => {
+    if (!story || !startBeatId) return;
     setSelectedPreset(null);
-    if (startBeatId && story) {
-      handleGeneratePresets();
+
+    const firstBeatId = story.getMetadata().firstBeatId;
+    if (startBeatId === firstBeatId) {
+      setGeneratedPresets([]);
+      return;
     }
-  }, [startBeatId, story]); // Note: intentionally not including handleGeneratePresets to avoid loops
+
+    setIsGeneratingPresets(true);
+    setTimeout(() => {
+      try {
+        const result = generatePathPresets(story, startBeatId);
+        setGeneratedPresets(result.presets);
+        if (result.presets.length === 1) {
+          const preset: StatePreset = {
+            ...result.presets[0].preset,
+            id: 'auto_0',
+            createdAt: new Date().toISOString(),
+            modifiedAt: new Date().toISOString(),
+          };
+          setSelectedPreset(preset);
+        }
+      } catch (error) {
+        console.error('[PreviewWindow] Failed to generate presets:', error);
+        setGeneratedPresets([]);
+      } finally {
+        setIsGeneratingPresets(false);
+      }
+    }, 0);
+  };
 
   // Group presets by outcome for display
   const presetsByOutcome = useMemo(() => {
