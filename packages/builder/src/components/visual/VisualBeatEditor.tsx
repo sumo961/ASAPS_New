@@ -152,6 +152,8 @@ interface VisualBeatEditorProps {
   themeAssets?: ThemeAssetUrls | null;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
+  /** Per-beat override for countdown meter visibility */
+  overrideCountdownMeter?: boolean;
   /** DialogTree presentation mode - when chat mode, show ChatDialogView preview */
   presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble';
 }
@@ -176,6 +178,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   themeAssets,
   onInteractionStart,
   onInteractionEnd,
+  overrideCountdownMeter,
   presentationMode,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -194,6 +197,53 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const [activeGuides, setActiveGuides] = useState<SnapLine[]>([]);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
   const [showHud, setShowHud] = useState(false);
+
+  // Mock resolvers for character HUD overlays in editor mode
+  const characterMeterFrameResolver = useCallback((characterId: string) => {
+    if (!showHud) return null;
+    const character = characters.find(c => c.id === characterId);
+    if (!character?.meterFrame) return null;
+    const visibleCounters = character.counters?.filter(c => c.visible) || [];
+    if (visibleCounters.length === 0) return null;
+    return {
+      counters: visibleCounters.map(counter => ({
+        name: counter.name,
+        displayName: counter.displayName,
+        value: counter.value,
+        min: counter.min ?? 0,
+        max: counter.max ?? 100,
+        color: counter.color || '#3B82F6',
+        showNumericValue: counter.showNumericValue ?? false,
+        numericFormat: (counter.numericFormat || 'value') as 'value' | 'fraction' | 'percentage',
+        orientation: (counter.levelMeterOrientation || 'horizontal') as 'horizontal' | 'vertical',
+      })),
+      config: character.meterFrame,
+    };
+  }, [showHud, characters]);
+
+  const characterInventoryResolver = useCallback((characterId: string) => {
+    if (!showHud) return null;
+    const character = characters.find(c => c.id === characterId);
+    if (!character?.inventoryFrame) return null;
+    // Show configured inventory items, or placeholder items for preview
+    let items = (character.inventory || []).map(item => ({
+      id: item.id,
+      name: item.name,
+      displayName: item.displayName,
+      description: item.description,
+      icon: item.icon || '',
+      quantity: item.quantity,
+      category: item.category,
+    }));
+    // If no items defined, show placeholders so the author can preview frame position
+    if (items.length === 0) {
+      items = [
+        { id: 'placeholder_1', name: 'Item 1', displayName: 'Item 1', description: 'Preview item', icon: '', quantity: 1, category: 'general' },
+        { id: 'placeholder_2', name: 'Item 2', displayName: 'Item 2', description: 'Preview item', icon: '', quantity: 1, category: 'general' },
+      ];
+    }
+    return { items, config: character.inventoryFrame };
+  }, [showHud, characters]);
 
   // Multi-drag offset tracking: stores offsets for all selected elements during drag
   const dragOffsetsRef = useRef<Map<string, { dx: number; dy: number }>>(new Map());
@@ -1194,12 +1244,16 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     remainingTime: 45, totalTime: 60
                   } : undefined}
                   countdownMeterConfig={showHud ? globalSettings?.hudOverlays?.countdownMeter : undefined}
+                  overrideCountdownMeter={overrideCountdownMeter}
                   countdownMeterValue={showHud && globalSettings?.hudOverlays?.countdownMeter?.enabled ? {
                     value: Math.round(((globalSettings.hudOverlays!.countdownMeter!.counterMax ?? 100) - (globalSettings.hudOverlays!.countdownMeter!.counterMin ?? 0)) * 0.65 + (globalSettings.hudOverlays!.countdownMeter!.counterMin ?? 0)),
                     min: globalSettings.hudOverlays!.countdownMeter!.counterMin ?? 0,
                     max: globalSettings.hudOverlays!.countdownMeter!.counterMax ?? 100,
                   } : undefined}
                   fictionalTimeText={showHud && globalSettings?.hudOverlays?.fictionalTime?.enabled && globalSettings?.hudOverlays?.fictionalTime?.showInTimerHud ? '12:00 PM' : undefined}
+                  characterMeterFrameResolver={showHud ? characterMeterFrameResolver : undefined}
+                  characterInventoryResolver={showHud ? characterInventoryResolver : undefined}
+                  inventoryVisible={showHud}
                 />
               )}
 

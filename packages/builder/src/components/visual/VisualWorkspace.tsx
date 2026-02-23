@@ -3170,6 +3170,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           projectSettings={projectSettings}
           globalSettings={globalSettings}
           themeAssets={themeAssets}
+          overrideCountdownMeter={(beat as any).overrideCountdownMeter}
           presentationMode={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).presentationMode || 'positioned') : undefined}
         />
       </div>

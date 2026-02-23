@@ -982,6 +982,13 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
     }
   }, [onSubscribeTimerHudState]);
 
+  // Sync timer HUD state from props when no subscriber (e.g. VE editor mode)
+  React.useEffect(() => {
+    if (!onSubscribeTimerHudState) {
+      setTimerHudTime(initialTimerHudState);
+    }
+  }, [initialTimerHudState, onSubscribeTimerHudState]);
+
   // State for timer HUD override text - subscribes to updates for per-beat text changes
   const [timerHudOverrideText, setTimerHudOverrideText] = React.useState(initialTimerHudOverrideText);
 
@@ -992,6 +999,13 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
     }
   }, [onSubscribeTimerHudOverrideText]);
 
+  // Sync override text from props when no subscriber
+  React.useEffect(() => {
+    if (!onSubscribeTimerHudOverrideText) {
+      setTimerHudOverrideText(initialTimerHudOverrideText);
+    }
+  }, [initialTimerHudOverrideText, onSubscribeTimerHudOverrideText]);
+
   // State for fictional time text - subscribes to updates
   const [fictionalTimeText, setFictionalTimeText] = React.useState(initialFictionalTimeText);
 
@@ -1001,6 +1015,13 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       return unsubscribe;
     }
   }, [onSubscribeFictionalTimeText]);
+
+  // Sync fictional time text from props when no subscriber
+  React.useEffect(() => {
+    if (!onSubscribeFictionalTimeText) {
+      setFictionalTimeText(initialFictionalTimeText);
+    }
+  }, [initialFictionalTimeText, onSubscribeFictionalTimeText]);
 
   // Animation state for button fade-in after text animation completes
   const [animationsComplete, setAnimationsComplete] = React.useState(false);
