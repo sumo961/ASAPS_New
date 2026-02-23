@@ -16,12 +16,16 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.24)
+## ⚠️ Development Status (v0.9.25)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **AI Prompt Sync (Keypad + Credits)** | **v0.9.25**: Both AI generation systems now document keypad beat and endScreen credits page parameters |
+| **HTML Export Credits Translation** | **v0.9.25**: Credits page fields (title, body, close text) now extracted for AI on-the-fly translation |
+| **EndScreen Credits Translation** | **v0.9.25**: Credits page fields translatable, continue button translation, language deletion |
+| **Visual Editor HUD Fix** | **v0.9.25**: HUD overlays (timer, countdown, fictional time) now render in the Visual Editor |
 | **Language-Aware AI Beats** | **v0.9.24**: AI beats generate content in the active translation language with translated preview UI |
 | **Bi-directional Textbox Expansion** | **v0.9.24**: Text boxes grow upward when downward space is limited (mirrors horizontal xOffset pattern) |
 | **Button Auto-Height** | **v0.9.24**: Buttons with stored dimensions auto-expand height to prevent text clipping |

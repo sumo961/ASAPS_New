@@ -1,5 +1,50 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-23: AI Documentation Sync & Credits Export Fix (v0.9.25)
+
+### Overview
+
+This release **synchronizes both AI story generation systems** (MCP server and builder) with the keypad beat type and endScreen credits page parameters, and **fixes HTML export AI translation** to properly extract credits page text fields for on-the-fly translation.
+
+### AI Documentation Sync: Keypad Beat & EndScreen Credits
+
+Both AI story generation paths (`mcp-server/src/utils/aiHelper.ts` and `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`) now document the keypad beat type and endScreen credits page parameters. Both files include matching coverage:
+
+- Keypad beat type entry with full parameter documentation
+- Keypad in single-connection beat lists
+- Concrete keypad JSON examples
+- Code/Password Puzzle pattern updated to recommend keypad for numeric codes
+- EndScreen credits parameters (`creditsPageTitle`, `creditsPageBody`, `creditsCloseText`, `creditsText`) documented
+- EndScreen examples updated to show credits page usage
+
+**Files modified:**
+- `mcp-server/src/utils/aiHelper.ts` — Add keypad beat type, update endScreen with credits params, update examples and patterns
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts` — Add keypad beat type guide, update endScreen docs, add concrete keypad example, update patterns
+
+### HTML Export AI Translation Fix
+
+The embedded AI on-the-fly translation in HTML exports was missing `creditsPageTitle`, `creditsPageBody`, and `creditsCloseText` from its string extraction function. These fields are now included, enabling proper translation of credits page content in exported stories.
+
+**Files modified:**
+- `packages/builder/src/export/HtmlExporter.ts` — Add credits page fields to extractStrings function
+
+### EndScreen Credits Translation & Continue Button Translation
+
+Added translation support for endScreen credits page fields and the Continue button. Also added the ability to delete translation languages from the translation panel.
+
+**Files modified:**
+- `packages/builder/src/export/StoryTranslator.ts` — Credits page field extraction for translation
+- Various translation pipeline files
+
+### Visual Editor HUD Overlay Fix
+
+HUD overlays (timer, countdown meter, fictional time) now render correctly in the Visual Editor, matching their appearance in the Preview window.
+
+**Files modified:**
+- `packages/renderer/src/components/PositionedBeatView.tsx` — HUD overlay rendering in editor mode
+
+---
+
 ## 2026-02-23: Language-Aware AI & Bi-directional Layout (v0.9.24)
 
 ### Overview
