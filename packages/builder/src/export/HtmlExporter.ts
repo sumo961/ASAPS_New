@@ -451,7 +451,8 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
             var params = beat.parameters || beat;
             var prefix = P + '.beats.' + i;
             var fields = ['text', 'buttonText', 'prompt', 'question', 'message', 'title', 'author',
-                          'restartText', 'creditsText', 'placeholder', 'clearButtonText', 'fallbackText',
+                          'restartText', 'creditsText', 'creditsPageTitle', 'creditsPageBody', 'creditsCloseText',
+                          'placeholder', 'clearButtonText', 'fallbackText',
                           'npcName', 'displayTemplate', 'errorMessage'];
             for (var f = 0; f < fields.length; f++) {
               if (params[fields[f]] && typeof params[fields[f]] === 'string') {
