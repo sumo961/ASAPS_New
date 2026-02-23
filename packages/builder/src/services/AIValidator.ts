@@ -453,7 +453,9 @@ export class AIValidator {
       if (params.trueConnection?.target) targetedBeatIds.add(params.trueConnection.target);
       if (params.falseConnection?.target) targetedBeatIds.add(params.falseConnection.target);
       if (params.target) targetedBeatIds.add(params.target);
+      if (params.connection?.target) targetedBeatIds.add(params.connection.target);
       if (params.timerTarget) targetedBeatIds.add(params.timerTarget);
+      if (params.failTarget) targetedBeatIds.add(params.failTarget);
       // Check choices arrays (movementChoice, pickProp, randomTarget)
       const choices = params.choices || params.props || [];
       for (const choice of choices) {
