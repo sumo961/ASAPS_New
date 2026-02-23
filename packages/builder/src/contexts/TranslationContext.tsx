@@ -14,6 +14,7 @@ import { buildManifestEntry, createEmptyTranslationManifest, syncTranslation, ap
 import {
   generateTranslationResource,
   createManualTranslationResource,
+  updateTranslationResource,
   applyTranslationResource,
   buildTranslationManifest,
   extractTranslatableStrings,
@@ -58,8 +59,8 @@ export interface TranslationActions {
   ) => void;
   /** Get the translated project data for the active language */
   getTranslatedProjectData: (projectData: any) => any;
-  /** Load translations from project data (e.g., after opening a project) */
-  loadTranslations: (translations: TranslationResource[], manifest?: TranslationManifest) => void;
+  /** Load translations from project data (e.g., after opening a project). Pass projectData to auto-sync staleness. */
+  loadTranslations: (translations: TranslationResource[], manifest?: TranslationManifest, projectData?: any) => void;
   /** Update a single translation entry (for inline editing in inspector) */
   updateTranslation: (languageCode: string, key: string, value: string) => void;
   /** Clear all translation state */
@@ -68,6 +69,14 @@ export interface TranslationActions {
   syncAllTranslations: (projectData: any) => void;
   /** Sync translations for a single beat after source-text edits */
   syncBeatTranslations: (beatId: string, beatData: any) => void;
+  /** Delete a translation language */
+  deleteTranslation: (languageCode: string) => void;
+  /** Continue translation: AI-translate only new + stale strings for an existing language */
+  continueTranslation: (
+    projectData: any,
+    languageCode: string,
+    aiConfig: TranslationAIConfig
+  ) => Promise<void>;
 }
 
 const TranslationStateContext = createContext<TranslationState>({
@@ -90,6 +99,8 @@ const TranslationActionsContext = createContext<TranslationActions>({
   clearTranslations: () => {},
   syncAllTranslations: () => {},
   syncBeatTranslations: () => {},
+  deleteTranslation: () => {},
+  continueTranslation: async () => {},
 });
 
 export function useTranslationState(): TranslationState {
@@ -220,7 +231,8 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
 
   const loadTranslations = useCallback((
     newTranslations: TranslationResource[],
-    newManifest?: TranslationManifest
+    newManifest?: TranslationManifest,
+    projectData?: any
   ) => {
     // Pre-load Noto fonts for all translations so they're ready when switching
     for (const t of newTranslations) {
@@ -228,7 +240,33 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         loadNotoFonts(t.requiredFonts);
       }
     }
-    setTranslations(newTranslations);
+
+    // Auto-sync against current source strings if projectData is provided.
+    // This catches new extractable fields added in code updates.
+    if (projectData && newTranslations.length > 0) {
+      const positionalStrings = extractTranslatableStrings(projectData);
+      const currentSource = positionalToIdBased(positionalStrings, projectData);
+
+      const synced = newTranslations.map(resource => {
+        const result = syncTranslation(resource, currentSource);
+        if (!result.hasChanges) return resource;
+
+        const cloned: TranslationResource = {
+          ...resource,
+          strings: { ...resource.strings },
+          _sourceSnapshot: { ...resource._sourceSnapshot },
+        };
+        applySyncResult(cloned, result, currentSource);
+        console.log(
+          `[TranslationContext] loadSync ${resource.languageName}: ${result.staleStrings.length} stale, ${result.newStrings.length} new, ${result.orphanedStrings.length} orphaned`
+        );
+        return cloned;
+      });
+      setTranslations(synced);
+    } else {
+      setTranslations(newTranslations);
+    }
+
     // Reset active language when loading new translations
     setActiveLanguageRaw(null);
   }, []);
@@ -338,6 +376,59 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     });
   }, []);
 
+  const deleteTranslation = useCallback((languageCode: string) => {
+    setTranslations(prev => prev.filter(t => t.languageCode !== languageCode));
+    setActiveLanguageRaw(prev => prev === languageCode ? null : prev);
+  }, []);
+
+  const continueTranslation = useCallback(async (
+    projectData: any,
+    languageCode: string,
+    aiConfig: TranslationAIConfig
+  ) => {
+    const existing = translations.find(t => t.languageCode === languageCode);
+    if (!existing) return;
+
+    setIsGenerating(true);
+    setGenerationProgress(`Continuing ${existing.languageName} translation...`);
+    setStringsTranslated(0);
+    setTotalStrings(0);
+
+    try {
+      const updated = await updateTranslationResource(
+        projectData,
+        existing,
+        aiConfig,
+        (progress) => {
+          setStringsTranslated(progress.stringsTranslated);
+          setTotalStrings(progress.totalStrings);
+          setGenerationProgress(
+            `Translating ${existing.languageName}: ${progress.stringsTranslated}/${progress.totalStrings} strings`
+          );
+        }
+      );
+
+      if (updated.requiredFonts.length > 0) {
+        loadNotoFonts(updated.requiredFonts);
+      }
+
+      setTranslations(prev =>
+        prev.map(t => t.languageCode === languageCode ? updated : t)
+      );
+
+      setGenerationProgress('');
+      setStringsTranslated(0);
+      setTotalStrings(0);
+    } catch (error) {
+      console.error('[TranslationContext] Continue translation failed:', error);
+      setGenerationProgress(
+        error instanceof Error ? `Error: ${error.message}` : 'Translation failed'
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [translations]);
+
   const clearTranslations = useCallback(() => {
     setTranslations([]);
     setActiveLanguageRaw(null);
@@ -364,6 +455,8 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     clearTranslations,
     syncAllTranslations,
     syncBeatTranslations,
+    deleteTranslation,
+    continueTranslation,
   }), [
     setActiveLanguage,
     generateTranslation,
@@ -374,6 +467,8 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     clearTranslations,
     syncAllTranslations,
     syncBeatTranslations,
+    deleteTranslation,
+    continueTranslation,
   ]);
 
   return (

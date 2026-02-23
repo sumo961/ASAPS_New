@@ -577,6 +577,36 @@ export const Header: React.FC<HeaderProps> = ({
               }
             }}
             isGenerating={translationState.isGenerating}
+            onDeleteTranslation={(code) => {
+              translationActions.deleteTranslation(code);
+              markChanged();
+            }}
+            onContinueTranslation={async (code, name) => {
+              if (!currentProjectId) return;
+              const savedConfig = getSavedAIConfig();
+              if (!savedConfig?.apiKey) {
+                alert('Please configure an AI provider with an API key in the AI Settings first.');
+                return;
+              }
+              try {
+                const projectData = await getProjectDataForExport(currentProjectId);
+                const providerMap: Record<string, 'openai' | 'anthropic' | 'custom' | 'local'> = {
+                  'openai': 'openai',
+                  'claude': 'anthropic',
+                  'local': 'local',
+                };
+                const aiConfig = {
+                  provider: providerMap[savedConfig.providerType || savedConfig.provider] || 'openai' as const,
+                  apiKey: savedConfig.apiKey,
+                  baseUrl: savedConfig.baseUrl,
+                  model: savedConfig.model,
+                };
+                await translationActions.continueTranslation(projectData, code, aiConfig);
+                markChanged();
+              } catch (e) {
+                console.error('[Header] Continue translation failed:', e);
+              }
+            }}
           />
 
           {/* Translation progress indicator */}

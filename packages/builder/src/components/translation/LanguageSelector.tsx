@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, Plus, Sparkles, PenLine, AlertTriangle, ChevronDown, Type } from 'lucide-react';
+import { Globe, Plus, Sparkles, PenLine, AlertTriangle, ChevronDown, Type, Play, Trash2 } from 'lucide-react';
 import type { TranslationResource, TranslationManifest } from '@asaps/core';
 
 /**
@@ -219,6 +219,10 @@ export interface LanguageSelectorProps {
   onCreateManualTranslation: (languageCode: string, languageName: string) => void;
   /** Whether an AI translation is currently being generated */
   isGenerating?: boolean;
+  /** Called when user wants to delete a translation */
+  onDeleteTranslation?: (languageCode: string) => void;
+  /** Called when user wants to continue translating (new + stale strings) */
+  onContinueTranslation?: (languageCode: string, languageName: string) => void;
 }
 
 export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
@@ -231,6 +235,8 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   onGenerateTranslation,
   onCreateManualTranslation,
   isGenerating = false,
+  onDeleteTranslation,
+  onContinueTranslation,
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -317,29 +323,63 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
             const entry = manifest?.languages.find(l => l.languageCode === t.languageCode);
             const completeness = entry?.completeness ?? 100;
             const hasStale = Object.values(t.strings).some(s => s.status === 'stale');
-
             return (
-              <button
+              <div
                 key={t.languageCode}
-                onClick={() => { onLanguageChange(t.languageCode); setShowDropdown(false); }}
-                className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-50 ${
+                className={`w-full px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 ${
                   activeLanguage === t.languageCode ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
                 }`}
               >
-                <span className="w-5 text-center text-xs text-gray-400">
-                  {activeLanguage === t.languageCode ? '>' : ''}
-                </span>
-                <span className="flex-1 truncate">
-                  {t.languageName}
-                  <span className="text-xs text-gray-400 ml-1">({t.languageCode})</span>
-                </span>
-                <span className="flex items-center gap-1">
-                  {hasStale && <AlertTriangle className="w-3 h-3 text-amber-500" />}
-                  <span className={`text-xs ${completeness === 100 ? 'text-green-600' : 'text-gray-400'}`}>
-                    {completeness}%
+                <button
+                  onClick={() => { onLanguageChange(t.languageCode); setShowDropdown(false); }}
+                  className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                >
+                  <span className="w-5 text-center text-xs text-gray-400 flex-shrink-0">
+                    {activeLanguage === t.languageCode ? '>' : ''}
                   </span>
+                  <span className="flex-1 truncate">
+                    {t.languageName}
+                    <span className="text-xs text-gray-400 ml-1">({t.languageCode})</span>
+                  </span>
+                  <span className="flex items-center gap-1 flex-shrink-0">
+                    {hasStale && <AlertTriangle className="w-3 h-3 text-amber-500" />}
+                    <span className={`text-xs ${completeness === 100 ? 'text-green-600' : 'text-gray-400'}`}>
+                      {completeness}%
+                    </span>
+                  </span>
+                </button>
+                {/* Per-language action buttons */}
+                <span className="flex items-center gap-0.5 flex-shrink-0">
+                  {completeness < 100 && onContinueTranslation && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onContinueTranslation(t.languageCode, t.languageName);
+                        setShowDropdown(false);
+                      }}
+                      className="p-1 rounded hover:bg-blue-100 text-blue-500"
+                      title="Continue translation — translate new & changed strings"
+                    >
+                      <Play className="w-3 h-3" />
+                    </button>
+                  )}
+                  {onDeleteTranslation && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Remove the ${t.languageName} translation? This cannot be undone.`)) {
+                          onDeleteTranslation(t.languageCode);
+                          setShowDropdown(false);
+                        }
+                      }}
+                      className="p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-500"
+                      title="Remove translation"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
                 </span>
-              </button>
+              </div>
             );
           })}
 

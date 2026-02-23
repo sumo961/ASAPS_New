@@ -20,6 +20,8 @@ import {
   computeSourceHash,
   isRTLLanguage,
   detectFontsForTranslation,
+  syncTranslation,
+  applySyncResult,
 } from '@asaps/core';
 
 export interface TranslationAIConfig {
@@ -48,7 +50,7 @@ const BATCH_SIZE = 80;
  * Keys that indicate UI elements which should be translated concisely (single words where possible).
  */
 const UI_ELEMENT_PATTERNS = [
-  'buttonText', 'restartText', 'creditsText', 'clearButtonText', 'placeholder',
+  'buttonText', 'restartText', 'creditsText', 'creditsCloseText', 'clearButtonText', 'placeholder',
 ];
 
 /**
@@ -224,6 +226,9 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
     case 'endScreen':
       if (params.restartText) strings[`${prefix}.parameters.restartText`] = params.restartText;
       if (params.creditsText) strings[`${prefix}.parameters.creditsText`] = params.creditsText;
+      if (params.creditsPageTitle) strings[`${prefix}.parameters.creditsPageTitle`] = params.creditsPageTitle;
+      if (params.creditsPageBody) strings[`${prefix}.parameters.creditsPageBody`] = params.creditsPageBody;
+      if (params.creditsCloseText) strings[`${prefix}.parameters.creditsCloseText`] = params.creditsCloseText;
       break;
 
     case 'inputText':
@@ -905,6 +910,118 @@ export async function generateTranslationResource(
     console.log(`[StoryTranslator] Required fonts: ${resource.requiredFonts.join(', ')}`);
   }
 
+  return resource;
+}
+
+/**
+ * Incrementally update a TranslationResource by AI-retranslating only stale and
+ * untranslated strings. Already-translated strings are preserved as-is.
+ *
+ * @param projectData - The full project JSON
+ * @param existingResource - The translation resource to update
+ * @param aiConfig - AI provider configuration
+ * @param onProgress - Progress callback
+ * @param signal - AbortSignal for cancellation
+ * @returns An updated TranslationResource with stale/new strings retranslated
+ */
+export async function updateTranslationResource(
+  projectData: any,
+  existingResource: TranslationResource,
+  aiConfig: TranslationAIConfig,
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
+): Promise<TranslationResource> {
+  // 1. Extract current source strings and convert to ID-based keys
+  const positionalStrings = extractTranslatableStrings(projectData);
+  const currentSource = positionalToIdBased(positionalStrings, projectData);
+
+  // 2. Sync to find stale + new keys
+  const syncResult = syncTranslation(existingResource, currentSource);
+
+  // Apply sync to a clone (marks stale, adds new as untranslated, updates snapshot)
+  const resource: TranslationResource = {
+    ...existingResource,
+    strings: { ...existingResource.strings },
+    _sourceSnapshot: { ...existingResource._sourceSnapshot },
+  };
+  applySyncResult(resource, syncResult, currentSource);
+
+  // 3. Collect source strings that need (re)translation
+  const keysToTranslate = [...syncResult.staleStrings, ...syncResult.newStrings];
+
+  // Also include any previously untranslated strings
+  for (const [key, entry] of Object.entries(resource.strings)) {
+    if (entry.status === 'untranslated' && !keysToTranslate.includes(key)) {
+      keysToTranslate.push(key);
+    }
+  }
+
+  if (keysToTranslate.length === 0) {
+    console.log(`[StoryTranslator] updateTranslationResource: nothing to retranslate for ${resource.languageName}`);
+    return resource;
+  }
+
+  const subset: Record<string, string> = {};
+  for (const key of keysToTranslate) {
+    if (currentSource[key]) {
+      subset[key] = currentSource[key];
+    }
+  }
+
+  const totalStrings = Object.keys(subset).length;
+  console.log(`[StoryTranslator] Retranslating ${totalStrings} strings for ${resource.languageName} (${syncResult.staleStrings.length} stale, ${syncResult.newStrings.length} new)`);
+
+  // 4. Analyze narrative context
+  const narrativeContext = await analyzeNarrative(projectData, aiConfig, signal);
+  const charContext = buildCharacterContext(projectData);
+
+  // 5. Translate in batches
+  const keys = Object.keys(subset);
+  let translated = 0;
+
+  for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+    if (signal?.aborted) {
+      throw new DOMException('Translation cancelled', 'AbortError');
+    }
+
+    const batchKeys = keys.slice(i, i + BATCH_SIZE);
+    const batch: Record<string, string> = {};
+    for (const key of batchKeys) {
+      batch[key] = subset[key];
+    }
+
+    const batchTranslations = await translateBatch(
+      batch, resource.languageName, aiConfig, signal, narrativeContext, charContext
+    );
+
+    // 6. Merge translations back
+    for (const [key, value] of Object.entries(batchTranslations)) {
+      resource.strings[key] = { value, status: 'translated' };
+      resource._sourceSnapshot[key] = currentSource[key];
+    }
+
+    translated += batchKeys.length;
+    onProgress?.({
+      currentLanguage: resource.languageName,
+      languageIndex: 0,
+      totalLanguages: 1,
+      stringsTranslated: translated,
+      totalStrings,
+    });
+  }
+
+  // 7. Recompute hash and timestamp
+  resource.sourceHash = computeSourceHash(currentSource);
+  resource.modifiedAt = new Date().toISOString();
+
+  // Re-detect fonts
+  const translatedValues: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(resource.strings)) {
+    translatedValues[key] = entry.value;
+  }
+  resource.requiredFonts = detectFontsForTranslation(translatedValues);
+
+  console.log(`[StoryTranslator] Retranslation complete for ${resource.languageName}: ${translated} strings updated`);
   return resource;
 }
 

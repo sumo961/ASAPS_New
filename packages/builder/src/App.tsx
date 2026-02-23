@@ -1784,13 +1784,17 @@ function App() {
         console.log('[App] >>> Setting themeId from project:', currentProject.themeId || '(none)');
         setCurrentThemeId(currentProject.themeId);
 
-        // Load translations from project
+        // Load translations from project (sync against current source to detect new fields)
         if (currentProject.translations?.length) {
-          translationActions.loadTranslations(
-            currentProject.translations,
-            currentProject.translationManifest
-          );
-          console.log('[App] >>> Loaded', currentProject.translations.length, 'translation(s)');
+          const translations = currentProject.translations;
+          const manifest = currentProject.translationManifest;
+          getProjectDataForExport(currentProject.id).then(projectData => {
+            translationActions.loadTranslations(translations, manifest, projectData);
+            console.log('[App] >>> Loaded', translations.length, 'translation(s) with sync');
+          }).catch(() => {
+            translationActions.loadTranslations(translations, manifest);
+            console.log('[App] >>> Loaded', translations.length, 'translation(s) without sync');
+          });
         } else {
           translationActions.clearTranslations();
         }
@@ -2007,13 +2011,17 @@ function App() {
         console.log('[App] >>> Setting themeId from project:', currentProject.themeId || '(none)');
         setCurrentThemeId(currentProject.themeId);
 
-        // Load translations from project
+        // Load translations from project (sync against current source to detect new fields)
         if (currentProject.translations?.length) {
-          translationActions.loadTranslations(
-            currentProject.translations,
-            currentProject.translationManifest
-          );
-          console.log('[App] >>> Loaded', currentProject.translations.length, 'translation(s)');
+          const translations = currentProject.translations;
+          const manifest = currentProject.translationManifest;
+          getProjectDataForExport(currentProject.id).then(projectData => {
+            translationActions.loadTranslations(translations, manifest, projectData);
+            console.log('[App] >>> Loaded', translations.length, 'translation(s) with sync');
+          }).catch(() => {
+            translationActions.loadTranslations(translations, manifest);
+            console.log('[App] >>> Loaded', translations.length, 'translation(s) without sync');
+          });
         } else {
           translationActions.clearTranslations();
         }
