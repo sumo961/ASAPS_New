@@ -12,7 +12,7 @@ import { detectVCS, type VCSType } from './VCSDetector';
 import {
   getGitStatus, getChangedFiles,
   gitInit, gitAddRemote,
-  gitStage, gitUnstage, gitCommit, gitPush, gitPull, gitFetch,
+  gitStage, gitUnstage, gitCommit, gitPush, gitForcePush, gitPull, gitFetch,
   gitStash, gitStashPop, gitRevertFiles, gitGetConflicts,
   gitDetectMergeState, gitConfigGet,
   gitResetHard, gitClean, gitResetHardAndClean,
@@ -121,6 +121,8 @@ export interface VCSContextValue extends VCSState {
   commit: (message: string) => Promise<GitOperationResult>;
   /** Push to remote */
   push: () => Promise<GitOperationResult>;
+  /** Force-push to remote (overwrites remote history) */
+  forcePush: () => Promise<GitOperationResult>;
   /** Pull from remote */
   pull: (rebase?: boolean) => Promise<GitOperationResult>;
   /** Fetch from remote */
@@ -553,6 +555,14 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     return result;
   }, [refresh, emitEvent]);
 
+  const forcePushOp = useCallback(async () => {
+    const result = await gitForcePush(requirePath());
+    if (result.success) suppressBehindRef.current = false;
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
   const pull = useCallback(async (rebase = false) => {
     suppressBehindRef.current = false;
     const result = await gitPull(requirePath(), rebase);
@@ -722,6 +732,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     unstage,
     commit,
     push,
+    forcePush: forcePushOp,
     pull,
     fetch: fetchRemote,
     stash: stashChanges,
@@ -743,7 +754,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     clearMessageLog,
   }), [
     state, refresh, isFileChanged, isBeatChanged, getBeatStatus, getLockedBy,
-    initialize, clear, initRepo, stage, unstage, commit, push, pull,
+    initialize, clear, initRepo, stage, unstage, commit, push, forcePushOp, pull,
     fetchRemote, stashChanges, stashPopChanges, revertFilesOp,
     resetHardOp, cleanUntrackedFilesOp, resetHardAndCleanOp,
     p4SubmitChanges, p4SyncLatest, p4EditFile, p4RevertFile, p4LockFile, p4UnlockFile,

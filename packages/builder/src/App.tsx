@@ -2064,17 +2064,31 @@ function App() {
         // the same commit, so any "stale" detection is a false positive from the extraction
         // logic having evolved between when the translation was created and now.
         if (currentProject.translations?.length) {
-          const translations = currentProject.translations;
-          const manifest = currentProject.translationManifest;
           const isGitResetReload = resumeAutoSaveAfterLoadRef.current;
-          const projectData = isGitResetReload ? undefined : {
-            project: {
-              ...currentProject,
-              story: currentProject.story,
-            },
-          };
-          translationActions.loadTranslations(translations, manifest, projectData);
-          console.log('[App] >>> Loaded', translations.length, 'translation(s)', isGitResetReload ? '(sync skipped — git reset)' : 'with sync');
+          let translations = currentProject.translations;
+          const manifest = currentProject.translationManifest;
+          if (isGitResetReload) {
+            // After git-reset: skip sync and clear any stale markers that may
+            // be baked into the committed translation files from previous sessions.
+            translations = translations.map((t: any) => ({
+              ...t,
+              strings: Object.fromEntries(
+                Object.entries(t.strings as Record<string, { value: string; status: string }>).map(
+                  ([k, v]) => [k, v.status === 'stale' ? { ...v, status: 'translated' } : v]
+                )
+              ),
+            }));
+            translationActions.loadTranslations(translations, manifest);
+          } else {
+            const projectData = {
+              project: {
+                ...currentProject,
+                story: currentProject.story,
+              },
+            };
+            translationActions.loadTranslations(translations, manifest, projectData);
+          }
+          console.log('[App] >>> Loaded', translations.length, 'translation(s)', isGitResetReload ? '(sync skipped, stale cleared — git reset)' : 'with sync');
         } else {
           translationActions.clearTranslations();
         }
@@ -2937,6 +2951,14 @@ function App() {
     const unsub = vcsCtx.onEvent((event) => {
       if (event.type !== 'success') return;
 
+      // After git reset, skip the entire post-VCS handler — the load effect
+      // handles translation loading correctly, and re-reading from disk here
+      // would reintroduce stale markers from committed translation files.
+      if (skipPostVCSSyncRef.current) {
+        skipPostVCSSyncRef.current = false;
+        return;
+      }
+
       // Clear undo history after VCS operations (pull, stash pop, etc.)
       // because the project state on disk has changed externally
       getCommandManager().clear();
@@ -3005,8 +3027,7 @@ function App() {
           }
 
           // If translations exist, also sync staleness against current source
-          // (but skip after git reset — both translations and source come from the same commit)
-          if (translationStateRef.current.translations.length > 0 && !skipPostVCSSyncRef.current) {
+          if (translationStateRef.current.translations.length > 0) {
             try {
               const projectData = await getProjectDataForExport(proj.id);
               translationActionsRef.current.syncAllTranslations(projectData);
@@ -3014,7 +3035,6 @@ function App() {
               console.error('[App] Post-VCS translation staleness sync failed:', e);
             }
           }
-          skipPostVCSSyncRef.current = false;
         } catch (e) {
           console.error('[App] Post-VCS translation reload failed:', e);
         }

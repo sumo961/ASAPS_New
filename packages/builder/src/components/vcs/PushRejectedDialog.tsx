@@ -10,7 +10,7 @@
 
 import React, { useState } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
-import { gitPull, gitPush, gitForcePush } from '../../vcs/GitAdapter';
+import { gitPull, gitPush } from '../../vcs/GitAdapter';
 import { MergeConflictDialog } from './MergeConflictDialog';
 
 interface PushRejectedDialogProps {
@@ -34,7 +34,7 @@ export const PushRejectedDialog: React.FC<PushRejectedDialogProps> = ({ errorMes
   const projectPath = vcs?.projectPath;
 
   const handleForcePush = async () => {
-    if (!projectPath || !vcs) return;
+    if (!vcs?.forcePush) return;
     const confirmed = window.confirm(
       'Force push will overwrite the remote history with your local state.\n\n' +
       'This is safe after a reset (to sync the remote with your restored state), ' +
@@ -44,8 +44,7 @@ export const PushRejectedDialog: React.FC<PushRejectedDialogProps> = ({ errorMes
     if (!confirmed) return;
     setError(null);
     setPhase('pushing');
-    const result = await gitForcePush(projectPath);
-    await vcs.refresh();
+    const result = await vcs.forcePush();
     if (!result.success) {
       setError(result.message);
       setPhase('idle');
