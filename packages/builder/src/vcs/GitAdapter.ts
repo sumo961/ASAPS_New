@@ -535,6 +535,22 @@ export async function gitResetHardAndClean(projectPath: string, commitHash: stri
     };
   }
 
+  // Update remote tracking ref to match HEAD so git doesn't report the
+  // reset-from commits as "incoming" (misleading after an intentional reset).
+  // The next `git fetch` will restore the real remote state.
+  try {
+    const run = getRunCommand();
+    const branchResult = await run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
+    if (branchResult.exitCode === 0) {
+      const branch = branchResult.stdout.trim();
+      const upstreamResult = await run('git', ['rev-parse', '--abbrev-ref', `${branch}@{upstream}`], projectPath);
+      if (upstreamResult.exitCode === 0) {
+        const upstream = upstreamResult.stdout.trim(); // e.g. "origin/main"
+        await run('git', ['update-ref', `refs/remotes/${upstream}`, 'HEAD'], projectPath);
+      }
+    }
+  } catch { /* cosmetic — don't fail the operation */ }
+
   return {
     success: true,
     message: `Reset to ${commitHash.substring(0, 7)} and cleaned untracked files`,

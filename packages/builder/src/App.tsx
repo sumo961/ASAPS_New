@@ -2054,17 +2054,21 @@ function App() {
         // Load translations from project (sync against current source to detect new fields)
         // IMPORTANT: Build projectData from currentProject directly instead of reading
         // from IndexedDB (which may be stale after git reset — race with async updateProject).
+        // After git-reset: skip sync entirely — both translations and source files come from
+        // the same commit, so any "stale" detection is a false positive from the extraction
+        // logic having evolved between when the translation was created and now.
         if (currentProject.translations?.length) {
           const translations = currentProject.translations;
           const manifest = currentProject.translationManifest;
-          const projectData = {
+          const isGitResetReload = resumeAutoSaveAfterLoadRef.current;
+          const projectData = isGitResetReload ? undefined : {
             project: {
               ...currentProject,
               story: currentProject.story,
             },
           };
           translationActions.loadTranslations(translations, manifest, projectData);
-          console.log('[App] >>> Loaded', translations.length, 'translation(s) with sync');
+          console.log('[App] >>> Loaded', translations.length, 'translation(s)', isGitResetReload ? '(sync skipped — git reset)' : 'with sync');
         } else {
           translationActions.clearTranslations();
         }
