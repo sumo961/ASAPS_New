@@ -762,6 +762,11 @@ function App() {
   // This prevents auto-save from firing between openDirectoryProject and the
   // load effect, which would write pre-reset in-memory state back to disk.
   const resumeAutoSaveAfterLoadRef = useRef(false);
+  // Flag: suppresses the post-VCS translation sync after a git reset.
+  // The post-VCS event handler normally re-syncs translations after every VCS
+  // operation, but after a reset both translations and source come from the same
+  // commit, so the sync would produce false stale detections.
+  const skipPostVCSSyncRef = useRef(false);
 
   // Listen for git-reset events — reload the directory project from disk
   // IMPORTANT: openDirectoryProject re-reads files into currentProject, but
@@ -776,6 +781,7 @@ function App() {
       // before the load effect updates refs from the reset commit
       pauseAutoSave();
       resumeAutoSaveAfterLoadRef.current = true;
+      skipPostVCSSyncRef.current = true;
       try {
         // Clear the loaded-project guard so the load effect will re-fire
         loadedProjectIdRef.current = null;
@@ -2999,7 +3005,8 @@ function App() {
           }
 
           // If translations exist, also sync staleness against current source
-          if (translationStateRef.current.translations.length > 0) {
+          // (but skip after git reset — both translations and source come from the same commit)
+          if (translationStateRef.current.translations.length > 0 && !skipPostVCSSyncRef.current) {
             try {
               const projectData = await getProjectDataForExport(proj.id);
               translationActionsRef.current.syncAllTranslations(projectData);
@@ -3007,6 +3014,7 @@ function App() {
               console.error('[App] Post-VCS translation staleness sync failed:', e);
             }
           }
+          skipPostVCSSyncRef.current = false;
         } catch (e) {
           console.error('[App] Post-VCS translation reload failed:', e);
         }
