@@ -15,6 +15,7 @@ import {
   gitStage, gitUnstage, gitCommit, gitPush, gitPull, gitFetch,
   gitStash, gitStashPop, gitRevertFiles, gitGetConflicts,
   gitDetectMergeState, gitConfigGet,
+  gitResetHard, gitClean, gitResetHardAndClean,
   type GitFileStatus, type GitOperationResult,
 } from './GitAdapter';
 import {
@@ -130,6 +131,12 @@ export interface VCSContextValue extends VCSState {
   stashPop: () => Promise<GitOperationResult>;
   /** Revert files to last committed state */
   revertFiles: (filePaths: string[]) => Promise<GitOperationResult>;
+  /** Hard-reset to a specific commit */
+  resetHard: (commitHash: string) => Promise<GitOperationResult>;
+  /** Remove untracked files (specific paths or all) */
+  cleanUntrackedFiles: (filePaths?: string[]) => Promise<GitOperationResult>;
+  /** Reset to a commit and clean all untracked files */
+  resetHardAndClean: (commitHash: string) => Promise<GitOperationResult>;
 
   // --- Perforce Operations ---
   /** Submit changelist (P4) */
@@ -582,6 +589,27 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     return result;
   }, [refresh, emitEvent]);
 
+  const resetHardOp = useCallback(async (commitHash: string) => {
+    const result = await gitResetHard(requirePath(), commitHash);
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const cleanUntrackedFilesOp = useCallback(async (filePaths?: string[]) => {
+    const result = await gitClean(requirePath(), filePaths);
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
+  const resetHardAndCleanOp = useCallback(async (commitHash: string) => {
+    const result = await gitResetHardAndClean(requirePath(), commitHash);
+    await refresh();
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    return result;
+  }, [refresh, emitEvent]);
+
   // ---- Editing lock wrappers ----
 
   const acquireEditingLockOp = useCallback(async (beatId: string, beatName: string) => {
@@ -689,6 +717,9 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     stash: stashChanges,
     stashPop: stashPopChanges,
     revertFiles: revertFilesOp,
+    resetHard: resetHardOp,
+    cleanUntrackedFiles: cleanUntrackedFilesOp,
+    resetHardAndClean: resetHardAndCleanOp,
     p4SubmitChanges,
     p4SyncLatest,
     p4EditFile,
@@ -704,6 +735,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     state, refresh, isFileChanged, isBeatChanged, getBeatStatus, getLockedBy,
     initialize, clear, initRepo, stage, unstage, commit, push, pull,
     fetchRemote, stashChanges, stashPopChanges, revertFilesOp,
+    resetHardOp, cleanUntrackedFilesOp, resetHardAndCleanOp,
     p4SubmitChanges, p4SyncLatest, p4EditFile, p4RevertFile, p4LockFile, p4UnlockFile,
     acquireEditingLockOp, releaseEditingLockOp, releaseAllEditingLocksOp,
     onEvent, clearMessageLog,

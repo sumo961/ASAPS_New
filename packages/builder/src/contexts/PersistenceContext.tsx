@@ -543,6 +543,12 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         throw result.error || new Error('Failed to create project');
       }
 
+      // Reset directory format state — new projects are always IndexedDB-based
+      setProjectFormat('indexeddb');
+      setProjectPath(null);
+      directoryAdapterRef.current = null;
+      savedAssetIdsRef.current = new Set();
+
       currentProjectRef.current = newProject;
       setCurrentProject(newProject);
       setProjectId(newProjectId);

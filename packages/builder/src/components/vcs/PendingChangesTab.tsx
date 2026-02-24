@@ -60,6 +60,18 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
     }
   }, [vcs]);
 
+  const handleDiscardUntracked = useCallback(async (files: string[]) => {
+    if (!vcs?.cleanUntrackedFiles) return;
+    const fileList = files.slice(0, 10).join('\n  ');
+    const suffix = files.length > 10 ? `\n  ...and ${files.length - 10} more` : '';
+    const confirmed = window.confirm(
+      `Delete ${files.length} untracked file(s)? This cannot be undone.\n\n  ${fileList}${suffix}`
+    );
+    if (confirmed) {
+      await vcs.cleanUntrackedFiles(files);
+    }
+  }, [vcs]);
+
   /**
    * Ensure all changes are staged before committing.
    * Uses `git add -A` to stage everything — avoids path-parsing issues and
@@ -155,6 +167,7 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
 
   const staged = vcs.stagedFiles;
   const unstaged = vcs.unstagedFiles;
+  const untrackedFiles = unstaged.filter(f => f.status === '?');
 
   const renderFileRow = (file: GitFileStatus, isStaged: boolean) => {
     const info = statusIcons[file.status] || { icon: file.status, color: '#94a3b8' };
@@ -244,6 +257,15 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
               {'\u21A9'}
             </button>
           )}
+          {!isStaged && file.status === '?' && (
+            <button
+              onClick={() => handleDiscardUntracked([file.path])}
+              style={{ ...actionBtnStyle, color: '#f87171' }}
+              title="Delete untracked file"
+            >
+              {'\u2715'}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -274,12 +296,22 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
           <div>
             <div style={sectionHeaderStyle}>
               <span>Changes ({unstaged.length})</span>
-              <button
-                onClick={() => handleStage(unstaged.map(f => f.path))}
-                style={smallBtnStyle}
-              >
-                Stage All
-              </button>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {untrackedFiles.length > 0 && (
+                  <button
+                    onClick={() => handleDiscardUntracked(untrackedFiles.map(f => f.path))}
+                    style={{ ...smallBtnStyle, color: '#f87171', borderColor: '#7f1d1d' }}
+                  >
+                    Discard Untracked
+                  </button>
+                )}
+                <button
+                  onClick={() => handleStage(unstaged.map(f => f.path))}
+                  style={smallBtnStyle}
+                >
+                  Stage All
+                </button>
+              </div>
             </div>
             {unstaged.map(f => renderFileRow(f, false))}
           </div>

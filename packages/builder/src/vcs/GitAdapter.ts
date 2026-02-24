@@ -460,6 +460,50 @@ export async function gitRevertFiles(projectPath: string, filePaths: string[]): 
   };
 }
 
+/** Hard-reset to a specific commit (discards all staged/unstaged changes) */
+export async function gitResetHard(projectPath: string, commitHash: string): Promise<GitOperationResult> {
+  const run = getRunCommand();
+  const result = await run('git', ['reset', '--hard', commitHash], projectPath);
+  return {
+    success: result.exitCode === 0,
+    message: result.exitCode === 0 ? `Reset to ${commitHash.substring(0, 7)}` : result.stderr.trim(),
+  };
+}
+
+/** Remove untracked files. If filePaths given, removes only those; otherwise removes all untracked files+dirs. */
+export async function gitClean(projectPath: string, filePaths?: string[]): Promise<GitOperationResult> {
+  const run = getRunCommand();
+  const args = filePaths && filePaths.length > 0
+    ? ['clean', '-f', '--', ...filePaths]
+    : ['clean', '-fd'];
+  const result = await run('git', args, projectPath);
+  return {
+    success: result.exitCode === 0,
+    message: result.exitCode === 0
+      ? filePaths ? `Removed ${filePaths.length} untracked file(s)` : 'Removed all untracked files'
+      : result.stderr.trim(),
+  };
+}
+
+/** Reset to a commit and clean all untracked files in one operation */
+export async function gitResetHardAndClean(projectPath: string, commitHash: string): Promise<GitOperationResult> {
+  const resetResult = await gitResetHard(projectPath, commitHash);
+  if (!resetResult.success) return resetResult;
+
+  const cleanResult = await gitClean(projectPath);
+  if (!cleanResult.success) {
+    return {
+      success: false,
+      message: `Reset succeeded but clean failed: ${cleanResult.message}`,
+    };
+  }
+
+  return {
+    success: true,
+    message: `Reset to ${commitHash.substring(0, 7)} and cleaned untracked files`,
+  };
+}
+
 /** Get list of files with merge conflicts */
 export async function gitGetConflicts(projectPath: string): Promise<string[]> {
   const run = getRunCommand();

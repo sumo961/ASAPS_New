@@ -758,6 +758,24 @@ function App() {
     return () => window.removeEventListener('asaps:stale-directory', handler);
   }, []);
 
+  // Listen for git-reset events — reload the directory project from disk
+  useEffect(() => {
+    const handler = async () => {
+      if (projectFormat !== 'directory' || !projectPath) return;
+      console.log('[App] asaps:git-reset received — reloading project from disk');
+      try {
+        const success = await openDirectoryProject(projectPath);
+        if (success) {
+          console.log('[App] Project reloaded after git reset');
+        }
+      } catch (e) {
+        console.error('[App] Failed to reload project after git reset:', e);
+      }
+    };
+    window.addEventListener('asaps:git-reset', handler);
+    return () => window.removeEventListener('asaps:git-reset', handler);
+  }, [projectFormat, projectPath, openDirectoryProject]);
+
   /**
    * Sync current story state to project before saving
    * This ensures beats, characters, etc. are persisted to the project story
@@ -4263,8 +4281,8 @@ function App() {
 
     markChanged();
 
-    // Auto-save: Create a new project and save the generated story
-    // Flow: 1) Wait for state 2) Sync to project 3) Wait 4) Save as new project
+    // Create a new project for the generated story (don't contaminate current project)
+    // Uses the same pattern as ASML import to fully detach from any directory/git project
     setTimeout(async () => {
       try {
         const description = story.metadata?.description || 'AI-generated interactive story';
@@ -4276,17 +4294,21 @@ function App() {
         // Wait for React state update
         await new Promise(resolve => setTimeout(resolve, 200));
 
-        console.log('[App] Auto-saving generated story as new project:', storyTitle);
-        await saveCurrent(storyTitle, description);
-        console.log('[App] Generated story saved successfully');
+        console.log('[App] Creating new project for generated story:', storyTitle);
+        pendingNewProjectIdRef.current = 'pending';
+        const newProjectId = await createProject(storyTitle, description);
+        pendingNewProjectIdRef.current = newProjectId;
+        loadedProjectIdRef.current = newProjectId;
+        console.log('[App] AI story generation - Created new project:', newProjectId);
 
         // Trigger AI debug analysis after save completes
         runAIDebug(beatsRef.current, connectionsRef.current);
       } catch (error) {
-        console.error('[App] Failed to auto-save generated story:', error);
+        console.error('[App] Failed to create project for generated story:', error);
+        pendingNewProjectIdRef.current = null;
       }
     }, 300);
-  }, [actions, markChanged, saveCurrent, syncProjectData, runAIDebug, globalSettings, setGlobalSettings]);
+  }, [actions, markChanged, createProject, syncProjectData, runAIDebug, globalSettings, setGlobalSettings]);
 
   /**
    * Handle AI-generated beat from natural language description

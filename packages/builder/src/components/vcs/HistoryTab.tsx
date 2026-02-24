@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
-import { gitLog, type GitLogEntry } from '../../vcs/GitAdapter';
+import { gitLog, getGitStatus, type GitLogEntry } from '../../vcs/GitAdapter';
 
 interface HistoryTabProps {
   onViewDiff?: (filePath: string, ref?: string) => void;
@@ -19,6 +19,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onViewDiff, filterFile }
   const [expandedHash, setExpandedHash] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [isResetting, setIsResetting] = useState(false);
 
   const loadCommits = useCallback(async (append = false) => {
     if (!vcs?.projectPath) return;
@@ -38,6 +39,42 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onViewDiff, filterFile }
       setLoading(false);
     }
   }, [vcs?.projectPath, filterFile, commits.length]);
+
+  const handleResetToCommit = useCallback(async (commitHash: string) => {
+    if (!vcs?.projectPath || !vcs.resetHardAndClean) return;
+
+    // Gather file counts for the confirmation dialog
+    let modifiedCount = 0;
+    let untrackedCount = 0;
+    try {
+      const status = await getGitStatus(vcs.projectPath);
+      modifiedCount = status.files.filter(f => f.status !== '?').length;
+      untrackedCount = status.files.filter(f => f.status === '?').length;
+    } catch { /* use zero counts */ }
+
+    const parts: string[] = [];
+    if (modifiedCount > 0) parts.push(`${modifiedCount} modified/staged file(s) will be DISCARDED`);
+    if (untrackedCount > 0) parts.push(`${untrackedCount} untracked file(s) will be DELETED`);
+    const detail = parts.length > 0 ? `\n\n${parts.join('\n')}` : '';
+
+    const confirmed = window.confirm(
+      `Reset to commit ${commitHash.substring(0, 7)}?\n\nThis will discard ALL uncommitted changes and cannot be undone.${detail}`
+    );
+    if (!confirmed) return;
+
+    setIsResetting(true);
+    try {
+      const result = await vcs.resetHardAndClean(commitHash);
+      if (result.success) {
+        // Dispatch event so App.tsx reloads the project from disk
+        window.dispatchEvent(new CustomEvent('asaps:git-reset'));
+        // Refresh the commit list
+        await loadCommits();
+      }
+    } finally {
+      setIsResetting(false);
+    }
+  }, [vcs, loadCommits]);
 
   useEffect(() => {
     loadCommits();
@@ -89,8 +126,8 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onViewDiff, filterFile }
             )}
           </div>
 
-          {/* Expanded file list */}
-          {expandedHash === commit.hash && commit.files.length > 0 && (
+          {/* Expanded file list + reset button */}
+          {expandedHash === commit.hash && (
             <div style={{ padding: '0 12px 8px 40px' }}>
               {commit.files.map(file => (
                 <div
@@ -125,6 +162,25 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onViewDiff, filterFile }
                   )}
                 </div>
               ))}
+              {/* Reset to this commit */}
+              <div style={{ borderTop: '1px solid #1e293b', marginTop: 6, paddingTop: 6 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleResetToCommit(commit.hash); }}
+                  disabled={isResetting}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #7f1d1d',
+                    color: '#f87171',
+                    cursor: isResetting ? 'not-allowed' : 'pointer',
+                    padding: '3px 10px',
+                    borderRadius: 3,
+                    fontSize: '11px',
+                    opacity: isResetting ? 0.5 : 1,
+                  }}
+                >
+                  {isResetting ? 'Resetting...' : 'Reset to here'}
+                </button>
+              </div>
             </div>
           )}
         </div>
