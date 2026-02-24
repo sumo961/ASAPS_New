@@ -758,35 +758,35 @@ function App() {
     return () => window.removeEventListener('asaps:stale-directory', handler);
   }, []);
 
+  // Flag: when set, the load effect will resume auto-save after completing.
+  // This prevents auto-save from firing between openDirectoryProject and the
+  // load effect, which would write pre-reset in-memory state back to disk.
+  const resumeAutoSaveAfterLoadRef = useRef(false);
+
   // Listen for git-reset events — reload the directory project from disk
   // IMPORTANT: openDirectoryProject re-reads files into currentProject, but
   // the load effect (line ~1641) skips reload when project ID hasn't changed.
   // We clear loadedProjectIdRef so the effect sees a "new" project and reloads
   // beats, connections, settings, translations, etc.
-  //
-  // CRITICAL: Pause auto-save during the reload. Without this, the auto-save
-  // fires before the load effect updates beatsRef/connectionsRef from the reset
-  // commit, writing the OLD in-memory state back to disk and overwriting the
-  // clean files from the git reset. This causes translation source mismatches.
   useEffect(() => {
     const handler = async () => {
       if (projectFormat !== 'directory' || !projectPath) return;
       console.log('[App] asaps:git-reset received — reloading project from disk');
+      // Pause auto-save so stale in-memory state isn't written to disk
+      // before the load effect updates refs from the reset commit
       pauseAutoSave();
+      resumeAutoSaveAfterLoadRef.current = true;
       try {
         // Clear the loaded-project guard so the load effect will re-fire
         loadedProjectIdRef.current = null;
         const success = await openDirectoryProject(projectPath);
-        if (success) {
-          console.log('[App] Project reloaded after git reset');
-          // Resume auto-save after load effect has had time to process
-          // and update in-memory refs (beats, connections, translations)
-          setTimeout(() => resumeAutoSave(), 2000);
-        } else {
+        if (!success) {
+          resumeAutoSaveAfterLoadRef.current = false;
           resumeAutoSave();
         }
       } catch (e) {
         console.error('[App] Failed to reload project after git reset:', e);
+        resumeAutoSaveAfterLoadRef.current = false;
         resumeAutoSave();
       }
     };
@@ -2078,10 +2078,19 @@ function App() {
       alert('Failed to load project. See console for details.');
     }
 
+    // Resume auto-save if it was paused by the git-reset handler.
+    // By this point all refs (beatsRef, connectionsRef, etc.) are updated
+    // from the new project data, so auto-save will write correct state.
+    if (resumeAutoSaveAfterLoadRef.current) {
+      resumeAutoSaveAfterLoadRef.current = false;
+      resumeAutoSave();
+      console.log('[App] >>> Auto-save resumed after git-reset reload');
+    }
+
     console.log('[App] >>> LOAD EFFECT completed');
     console.log('[App] ==========================================');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProject, setIsUntitledProject, updateMetadata, updateStory, initializeStory]);
+  }, [currentProject, setIsUntitledProject, updateMetadata, updateStory, initializeStory, resumeAutoSave]);
 
   // Handler functions
   const handleBeatSelect = useCallback((beat: Beat) => {
