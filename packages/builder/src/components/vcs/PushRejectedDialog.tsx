@@ -10,7 +10,7 @@
 
 import React, { useState } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
-import { gitPull, gitPush } from '../../vcs/GitAdapter';
+import { gitPull, gitPush, gitForcePush } from '../../vcs/GitAdapter';
 import { MergeConflictDialog } from './MergeConflictDialog';
 
 interface PushRejectedDialogProps {
@@ -32,6 +32,27 @@ export const PushRejectedDialog: React.FC<PushRejectedDialogProps> = ({ errorMes
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
 
   const projectPath = vcs?.projectPath;
+
+  const handleForcePush = async () => {
+    if (!projectPath || !vcs) return;
+    const confirmed = window.confirm(
+      'Force push will overwrite the remote history with your local state.\n\n' +
+      'This is safe after a reset (to sync the remote with your restored state), ' +
+      'but destructive if others have pushed commits you don\'t have.\n\n' +
+      'Continue with force push?'
+    );
+    if (!confirmed) return;
+    setError(null);
+    setPhase('pushing');
+    const result = await gitForcePush(projectPath);
+    await vcs.refresh();
+    if (!result.success) {
+      setError(result.message);
+      setPhase('idle');
+      return;
+    }
+    onClose();
+  };
 
   const handlePullAndPush = async (rebase: boolean) => {
     if (!projectPath || !vcs) return;
@@ -211,6 +232,24 @@ export const PushRejectedDialog: React.FC<PushRejectedDialogProps> = ({ errorMes
             }}
           >
             Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleForcePush}
+            disabled={loading}
+            title="Overwrite remote with local state (use after reset)"
+            style={{
+              padding: '6px 14px',
+              backgroundColor: 'transparent',
+              border: '1px solid #7f1d1d',
+              borderRadius: 4,
+              color: '#f87171',
+              fontSize: 13,
+              cursor: loading ? 'wait' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+            }}
+          >
+            Force Push
           </button>
           <button
             type="button"

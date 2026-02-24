@@ -290,6 +290,30 @@ export async function gitPush(projectPath: string): Promise<GitOperationResult> 
   return { success: false, message: errMsg };
 }
 
+/** Force-push to remote (overwrites remote history). Use after git reset --hard. */
+export async function gitForcePush(projectPath: string): Promise<GitOperationResult> {
+  const run = getRunCommand();
+  // Use --force-with-lease for safety: fails if remote has commits we haven't seen
+  const result = await run('git', ['push', '--force-with-lease'], projectPath);
+  if (result.exitCode === 0) {
+    return { success: true, message: result.stderr.trim() || 'Force-pushed successfully' };
+  }
+  // Fallback: if --force-with-lease fails (e.g. no upstream), try with -u
+  const errMsg = result.stderr.trim();
+  if (errMsg.includes('no tracking information') || errMsg.includes('has no upstream branch')) {
+    const branchResult = await run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
+    const branch = branchResult.stdout.trim() || 'main';
+    const retryResult = await run('git', ['push', '--force-with-lease', '-u', 'origin', branch], projectPath);
+    return {
+      success: retryResult.exitCode === 0,
+      message: retryResult.exitCode === 0
+        ? retryResult.stderr.trim() || `Force-pushed to origin/${branch}`
+        : retryResult.stderr.trim(),
+    };
+  }
+  return { success: false, message: errMsg };
+}
+
 /** Pull from remote, optionally with rebase. Automatically sets upstream when missing. */
 export async function gitPull(projectPath: string, rebase = false): Promise<GitOperationResult> {
   const run = getRunCommand();
