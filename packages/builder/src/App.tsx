@@ -763,24 +763,36 @@ function App() {
   // the load effect (line ~1641) skips reload when project ID hasn't changed.
   // We clear loadedProjectIdRef so the effect sees a "new" project and reloads
   // beats, connections, settings, translations, etc.
+  //
+  // CRITICAL: Pause auto-save during the reload. Without this, the auto-save
+  // fires before the load effect updates beatsRef/connectionsRef from the reset
+  // commit, writing the OLD in-memory state back to disk and overwriting the
+  // clean files from the git reset. This causes translation source mismatches.
   useEffect(() => {
     const handler = async () => {
       if (projectFormat !== 'directory' || !projectPath) return;
       console.log('[App] asaps:git-reset received — reloading project from disk');
+      pauseAutoSave();
       try {
         // Clear the loaded-project guard so the load effect will re-fire
         loadedProjectIdRef.current = null;
         const success = await openDirectoryProject(projectPath);
         if (success) {
           console.log('[App] Project reloaded after git reset');
+          // Resume auto-save after load effect has had time to process
+          // and update in-memory refs (beats, connections, translations)
+          setTimeout(() => resumeAutoSave(), 2000);
+        } else {
+          resumeAutoSave();
         }
       } catch (e) {
         console.error('[App] Failed to reload project after git reset:', e);
+        resumeAutoSave();
       }
     };
     window.addEventListener('asaps:git-reset', handler);
     return () => window.removeEventListener('asaps:git-reset', handler);
-  }, [projectFormat, projectPath, openDirectoryProject]);
+  }, [projectFormat, projectPath, openDirectoryProject, pauseAutoSave, resumeAutoSave]);
 
   /**
    * Sync current story state to project before saving
