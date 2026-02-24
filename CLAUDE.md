@@ -186,6 +186,14 @@ The system maintains backward compatibility with legacy ASML files:
 - Graceful handling of legacy attributes
 - Support for original ASML XML structure
 
+## Coding Principles
+
+### Prefer Signal-Based Over Time-Based Solutions
+Never use `setTimeout` or arbitrary delays to coordinate between async operations. Use deterministic signals instead — ref flags, events, callbacks, or promises. Time-based solutions are fragile and break with slow connections, large projects, or varying system performance. For example, use a ref flag that one operation sets and another checks, rather than assuming "2 seconds is enough."
+
+### Prefer Schema-Driven Over Hardcoded Logic
+Use a single source of truth whenever possible. UI components like the beat inspector should be built dynamically from the beat schema (`beat-definitions/core-beats.json`) rather than having hardcoded conditional sections for every beat type. When a new beat type is added or a parameter changes, only the schema should need updating — the UI should adapt automatically. This applies broadly: prefer data-driven rendering, validation, and behavior over scattered if/else or switch/case blocks tied to specific types.
+
 ## Common Development Tasks
 
 ### Adding a New Beat Type
