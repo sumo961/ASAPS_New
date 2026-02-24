@@ -216,6 +216,8 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   const eventHandlersRef = useRef<Set<(event: VCSEvent) => void>>(new Set());
   const localUserNameRef = useRef<string | null>(null);
   const logIdRef = useRef(0);
+  /** Suppress "behind" count after git reset (cleared on next fetch) */
+  const suppressBehindRef = useRef(false);
   const onBeforeRefreshRef = useRef(onBeforeRefresh);
   onBeforeRefreshRef.current = onBeforeRefresh;
 
@@ -300,7 +302,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
           changedFiles: new Set(changed),
           changedFileCount: status.files.length,
           ahead: status.ahead,
-          behind: status.behind,
+          behind: suppressBehindRef.current ? 0 : status.behind,
           isDirty: status.isDirty,
           conflictFiles: new Set(conflicts),
           stagedFiles,
@@ -545,12 +547,14 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
 
   const push = useCallback(async () => {
     const result = await gitPush(requirePath());
+    if (result.success) suppressBehindRef.current = false;
     await refresh();
     emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
     return result;
   }, [refresh, emitEvent]);
 
   const pull = useCallback(async (rebase = false) => {
+    suppressBehindRef.current = false;
     const result = await gitPull(requirePath(), rebase);
     await refresh();
     emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
@@ -558,6 +562,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   }, [refresh, emitEvent]);
 
   const fetchRemote = useCallback(async () => {
+    suppressBehindRef.current = false;
     const result = await gitFetch(requirePath());
     await refresh();
     if (result.success) {
@@ -605,6 +610,11 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
 
   const resetHardAndCleanOp = useCallback(async (commitHash: string) => {
     const result = await gitResetHardAndClean(requirePath(), commitHash);
+    if (result.success) {
+      // Suppress "behind" count — after reset, the remote being ahead is
+      // expected and not actionable (pulling would undo the reset).
+      suppressBehindRef.current = true;
+    }
     await refresh();
     emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
     return result;

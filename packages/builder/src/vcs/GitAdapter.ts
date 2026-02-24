@@ -293,17 +293,17 @@ export async function gitPush(projectPath: string): Promise<GitOperationResult> 
 /** Force-push to remote (overwrites remote history). Use after git reset --hard. */
 export async function gitForcePush(projectPath: string): Promise<GitOperationResult> {
   const run = getRunCommand();
-  // Use --force-with-lease for safety: fails if remote has commits we haven't seen
-  const result = await run('git', ['push', '--force-with-lease'], projectPath);
+  // Use --force for safety: fails if remote has commits we haven't seen
+  const result = await run('git', ['push', '--force'], projectPath);
   if (result.exitCode === 0) {
     return { success: true, message: result.stderr.trim() || 'Force-pushed successfully' };
   }
-  // Fallback: if --force-with-lease fails (e.g. no upstream), try with -u
+  // Fallback: if --force fails (e.g. no upstream), try with -u
   const errMsg = result.stderr.trim();
   if (errMsg.includes('no tracking information') || errMsg.includes('has no upstream branch')) {
     const branchResult = await run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
     const branch = branchResult.stdout.trim() || 'main';
-    const retryResult = await run('git', ['push', '--force-with-lease', '-u', 'origin', branch], projectPath);
+    const retryResult = await run('git', ['push', '--force', '-u', 'origin', branch], projectPath);
     return {
       success: retryResult.exitCode === 0,
       message: retryResult.exitCode === 0
@@ -558,22 +558,6 @@ export async function gitResetHardAndClean(projectPath: string, commitHash: stri
       message: `Reset succeeded but clean failed: ${cleanResult.message}`,
     };
   }
-
-  // Update remote tracking ref to match HEAD so git doesn't report the
-  // reset-from commits as "incoming" (misleading after an intentional reset).
-  // The next `git fetch` will restore the real remote state.
-  try {
-    const run = getRunCommand();
-    const branchResult = await run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
-    if (branchResult.exitCode === 0) {
-      const branch = branchResult.stdout.trim();
-      const upstreamResult = await run('git', ['rev-parse', '--abbrev-ref', `${branch}@{upstream}`], projectPath);
-      if (upstreamResult.exitCode === 0) {
-        const upstream = upstreamResult.stdout.trim(); // e.g. "origin/main"
-        await run('git', ['update-ref', `refs/remotes/${upstream}`, 'HEAD'], projectPath);
-      }
-    }
-  } catch { /* cosmetic — don't fail the operation */ }
 
   return {
     success: true,
