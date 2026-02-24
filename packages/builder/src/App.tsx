@@ -1275,13 +1275,6 @@ function App() {
 
         try {
           const description = story.metadata?.description || 'Story created via Claude Desktop MCP';
-          console.log('[App] Syncing injected story data to project...', 'injectionId:', injectionId);
-
-          // Explicitly sync current beats to project before saving
-          syncProjectData();
-
-          // Wait for sync to complete
-          await new Promise(resolve => setTimeout(resolve, 200));
 
           // Double-check we're still the active injection
           if (currentInjectionIdRef.current !== injectionId) {
@@ -1289,13 +1282,18 @@ function App() {
             return;
           }
 
-          console.log('[App] Auto-saving injected story as new project:', storyTitle);
+          console.log('[App] Creating new project for injected story:', storyTitle, 'injectionId:', injectionId);
 
           // NOTE: pendingNewProjectIdRef was already set to 'pending' before loadStoryData
           // to block the load effect from reloading the old project
 
-          const newProjectId = await saveCurrent(storyTitle, description);
+          // CRITICAL: Use createProject first to switch to a new IndexedDB project,
+          // THEN sync beats. This prevents writing AI beats to the current directory project.
+          const newProjectId = await createProject(storyTitle, description);
           console.log('[App] Injected story saved successfully, new project ID:', newProjectId);
+
+          // NOW sync beats to the new project (createProject updated currentProjectRef)
+          syncProjectData();
 
           // CRITICAL: Update both refs atomically
           // pendingNewProjectIdRef stores the new ID so the load effect knows to skip
@@ -1303,6 +1301,10 @@ function App() {
           pendingNewProjectIdRef.current = newProjectId;
           loadedProjectIdRef.current = newProjectId;
           resumeAutoSave();
+
+          // Trigger an immediate save to persist beats to the new project
+          markChanged();
+          saveNow();
         } catch (error) {
           console.error('[App] Failed to auto-save injected story:', error);
           // Clear pending flag on error to allow normal operation to resume
@@ -1318,7 +1320,7 @@ function App() {
     };
 
     // No cleanup needed - the async IIFE will check injectionId to prevent duplicate saves
-  }, [actions, markChanged, saveCurrent, syncProjectData, pauseAutoSave, resumeAutoSave]);
+  }, [actions, markChanged, createProject, syncProjectData, saveNow, pauseAutoSave, resumeAutoSave]);
 
   useEffect(() => {
     // MCP WebSocket integration is disabled by default to reduce noise
@@ -1694,6 +1696,12 @@ function App() {
         loadedProjectIdRef.current = currentProject.id;
         console.log('[App] ==========================================');
         return;
+      } else if (loadedProjectIdRef.current === pendingNewProjectIdRef.current) {
+        // The pending project was already loaded — user has switched to a different project.
+        // Clear the stale pending flag and proceed with loading the new project.
+        console.log('[App] >>> Clearing stale pendingNewProjectIdRef (was:', pendingNewProjectIdRef.current, ') — user switched to:', currentProject.id);
+        pendingNewProjectIdRef.current = null;
+        // Fall through to load the project normally
       } else {
         // Still in transition - currentProject has old ID, skip reload
         console.log('[App] >>> SKIPPED loading - in transition to new project. currentProject:', currentProject.id, 'pending:', pendingNewProjectIdRef.current);
@@ -4358,17 +4366,12 @@ function App() {
     markChanged();
 
     // Create a new project for the generated story (don't contaminate current project)
-    // Uses the same pattern as ASML import to fully detach from any directory/git project
+    // CRITICAL: Do NOT call syncProjectData() before createProject — it would write
+    // AI-generated beats to the CURRENT project (which may be a directory/git project).
+    // Instead, create the new IndexedDB project first, then sync beats to it.
     setTimeout(async () => {
       try {
         const description = story.metadata?.description || 'AI-generated interactive story';
-        console.log('[App] Syncing generated story data to project...');
-
-        // Explicitly sync current beats to project before saving
-        syncProjectData();
-
-        // Wait for React state update
-        await new Promise(resolve => setTimeout(resolve, 200));
 
         console.log('[App] Creating new project for generated story:', storyTitle);
         pendingNewProjectIdRef.current = 'pending';
@@ -4377,8 +4380,15 @@ function App() {
         loadedProjectIdRef.current = newProjectId;
         console.log('[App] AI story generation - Created new project:', newProjectId);
 
+        // NOW sync beats to the new project (createProject updated currentProjectRef)
+        syncProjectData();
+
         // Resume auto-save now that we're safely in the new project context
         resumeAutoSave();
+
+        // Trigger an immediate save to persist beats to the new project
+        markChanged();
+        saveNow();
 
         // Trigger AI debug analysis after save completes
         runAIDebug(beatsRef.current, connectionsRef.current);
@@ -4388,7 +4398,7 @@ function App() {
         resumeAutoSave();
       }
     }, 300);
-  }, [actions, markChanged, createProject, syncProjectData, runAIDebug, globalSettings, setGlobalSettings, pauseAutoSave, resumeAutoSave]);
+  }, [actions, markChanged, createProject, syncProjectData, saveNow, runAIDebug, globalSettings, setGlobalSettings, pauseAutoSave, resumeAutoSave]);
 
   /**
    * Handle AI-generated beat from natural language description
