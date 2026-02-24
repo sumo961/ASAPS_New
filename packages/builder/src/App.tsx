@@ -983,6 +983,10 @@ function App() {
       const storyTitle = story.metadata?.title || 'Injected Story';
       console.log('[App] Received story via WebSocket:', storyTitle, 'injectionId:', injectionId);
 
+      // Pause auto-save to prevent AI-generated content from being written
+      // to the current directory project before the new project is created
+      pauseAutoSave();
+
       // NOTE: We use loadStoryData for a single batch update instead of:
       // - actions.clearStory() - would trigger a state update
       // - actions.setTitle() - would trigger another state update
@@ -1298,10 +1302,12 @@ function App() {
           // until currentProject catches up
           pendingNewProjectIdRef.current = newProjectId;
           loadedProjectIdRef.current = newProjectId;
+          resumeAutoSave();
         } catch (error) {
           console.error('[App] Failed to auto-save injected story:', error);
           // Clear pending flag on error to allow normal operation to resume
           pendingNewProjectIdRef.current = null;
+          resumeAutoSave();
         } finally {
           // Reset flags only if this is still the active injection
           if (currentInjectionIdRef.current === injectionId) {
@@ -1312,7 +1318,7 @@ function App() {
     };
 
     // No cleanup needed - the async IIFE will check injectionId to prevent duplicate saves
-  }, [actions, markChanged, saveCurrent, syncProjectData]);
+  }, [actions, markChanged, saveCurrent, syncProjectData, pauseAutoSave, resumeAutoSave]);
 
   useEffect(() => {
     // MCP WebSocket integration is disabled by default to reduce noise
@@ -4092,6 +4098,11 @@ function App() {
     const storyTitle = story.metadata?.title || 'Generated Story';
     console.log('[App] Story generated:', storyTitle);
 
+    // CRITICAL: Pause auto-save immediately to prevent the AI-generated beats
+    // from being written to the current directory project. Auto-save will be
+    // resumed after the new project is created (see createProject below).
+    pauseAutoSave();
+
     // Validate AI-generated story structure before import
     const validation = validateAIStory(story);
     console.log('[App] AI Story Validation:\n' + formatValidationResult(validation));
@@ -4366,14 +4377,18 @@ function App() {
         loadedProjectIdRef.current = newProjectId;
         console.log('[App] AI story generation - Created new project:', newProjectId);
 
+        // Resume auto-save now that we're safely in the new project context
+        resumeAutoSave();
+
         // Trigger AI debug analysis after save completes
         runAIDebug(beatsRef.current, connectionsRef.current);
       } catch (error) {
         console.error('[App] Failed to create project for generated story:', error);
         pendingNewProjectIdRef.current = null;
+        resumeAutoSave();
       }
     }, 300);
-  }, [actions, markChanged, createProject, syncProjectData, runAIDebug, globalSettings, setGlobalSettings]);
+  }, [actions, markChanged, createProject, syncProjectData, runAIDebug, globalSettings, setGlobalSettings, pauseAutoSave, resumeAutoSave]);
 
   /**
    * Handle AI-generated beat from natural language description
