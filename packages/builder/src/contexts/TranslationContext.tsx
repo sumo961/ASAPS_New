@@ -71,6 +71,8 @@ export interface TranslationActions {
   syncBeatTranslations: (beatId: string, beatData: any) => void;
   /** Delete a translation language */
   deleteTranslation: (languageCode: string) => void;
+  /** Clean false stale markers — convert 'stale' to 'translated', preserving 'untranslated' */
+  cleanStaleMarkers: () => void;
   /** Continue translation: AI-translate only new + stale strings for an existing language */
   continueTranslation: (
     projectData: any,
@@ -100,6 +102,7 @@ const TranslationActionsContext = createContext<TranslationActions>({
   syncAllTranslations: () => {},
   syncBeatTranslations: () => {},
   deleteTranslation: () => {},
+  cleanStaleMarkers: () => {},
   continueTranslation: async () => {},
 });
 
@@ -381,6 +384,18 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     setActiveLanguageRaw(prev => prev === languageCode ? null : prev);
   }, []);
 
+  /** Clean false stale markers — convert 'stale' to 'translated', preserving 'untranslated'. */
+  const cleanStaleMarkers = useCallback(() => {
+    setTranslations(prev => prev.map(t => ({
+      ...t,
+      strings: Object.fromEntries(
+        Object.entries(t.strings).map(
+          ([k, v]) => [k, v.status === 'stale' ? { ...v, status: 'translated' } : v]
+        )
+      ),
+    })));
+  }, []);
+
   const continueTranslation = useCallback(async (
     projectData: any,
     languageCode: string,
@@ -456,6 +471,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     syncAllTranslations,
     syncBeatTranslations,
     deleteTranslation,
+    cleanStaleMarkers,
     continueTranslation,
   }), [
     setActiveLanguage,
@@ -468,6 +484,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     syncAllTranslations,
     syncBeatTranslations,
     deleteTranslation,
+    cleanStaleMarkers,
     continueTranslation,
   ]);
 

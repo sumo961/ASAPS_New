@@ -2072,20 +2072,19 @@ function App() {
         setCurrentThemeId(currentProject.themeId);
 
         // Load translations from project
-        // For directory projects: translations on disk are the source of truth.
-        // Skip sync and clean stale markers — any "stale" detection is a false
-        // positive from extraction logic evolving between when the translation
-        // was created and now. Sync only runs for IndexedDB projects where the
-        // user may have edited beats without re-syncing translations.
+        // Always run sync to detect NEW strings (from added beats) and orphaned
+        // strings (from deleted beats). But for directory projects, clean false
+        // stale markers afterward — the extraction logic may produce slightly
+        // different text for existing strings, causing false positives.
         if (currentProject.translations?.length) {
           const isDirectoryProject = !!(currentProject as any).directoryPath;
           const isGitResetReload = resumeAutoSaveAfterLoadRef.current;
-          const skipSync = isDirectoryProject || isGitResetReload;
+          const cleanStaleMarkers = isDirectoryProject || isGitResetReload;
           let translations = currentProject.translations;
           const manifest = currentProject.translationManifest;
-          if (skipSync) {
-            // Clean any stale markers that may be baked into committed
-            // translation files from previous sessions.
+
+          // Clean any stale markers baked into committed translation files BEFORE sync
+          if (cleanStaleMarkers) {
             translations = translations.map((t: any) => ({
               ...t,
               strings: Object.fromEntries(
@@ -2094,17 +2093,24 @@ function App() {
                 )
               ),
             }));
-            translationActions.loadTranslations(translations, manifest);
-          } else {
-            const projectData = {
-              project: {
-                ...currentProject,
-                story: currentProject.story,
-              },
-            };
-            translationActions.loadTranslations(translations, manifest, projectData);
           }
-          console.log('[App] >>> Loaded', translations.length, 'translation(s)', skipSync ? '(sync skipped, stale cleared — directory/reset)' : 'with sync');
+
+          // Run sync to detect new/orphaned strings (updates _sourceSnapshot)
+          const projectData = {
+            project: {
+              ...currentProject,
+              story: currentProject.story,
+            },
+          };
+          translationActions.loadTranslations(translations, manifest, projectData);
+
+          // For directory projects: clean any stale markers the sync just added.
+          // These are false positives from extraction differences, not real changes.
+          // New strings (status: 'untranslated') are preserved — only 'stale' is cleaned.
+          if (cleanStaleMarkers) {
+            translationActions.cleanStaleMarkers();
+          }
+          console.log('[App] >>> Loaded', translations.length, 'translation(s)', cleanStaleMarkers ? '(stale cleaned — directory/reset)' : 'with sync');
         } else {
           translationActions.clearTranslations();
         }
@@ -3052,11 +3058,17 @@ function App() {
             delete proj.translationManifest;
           }
 
-          // NOTE: We intentionally do NOT run syncAllTranslations here.
-          // For directory projects, translations loaded from disk are the source
-          // of truth (committed alongside beats). Running sync would produce false
-          // stale markers due to extraction logic differences. Incremental sync
-          // (syncBeatTranslations) handles staleness when the user edits a beat.
+          // Sync to detect new/orphaned strings (e.g., pulled new beats),
+          // then clean false stale markers from extraction differences.
+          if (translationStateRef.current.translations.length > 0) {
+            try {
+              const projectData = await getProjectDataForExport(proj.id);
+              translationActionsRef.current.syncAllTranslations(projectData);
+              translationActionsRef.current.cleanStaleMarkers();
+            } catch (e) {
+              console.error('[App] Post-VCS translation sync failed:', e);
+            }
+          }
         } catch (e) {
           console.error('[App] Post-VCS translation reload failed:', e);
         }
