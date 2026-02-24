@@ -2071,19 +2071,21 @@ function App() {
         console.log('[App] >>> Setting themeId from project:', currentProject.themeId || '(none)');
         setCurrentThemeId(currentProject.themeId);
 
-        // Load translations from project (sync against current source to detect new fields)
-        // IMPORTANT: Build projectData from currentProject directly instead of reading
-        // from IndexedDB (which may be stale after git reset — race with async updateProject).
-        // After git-reset: skip sync entirely — both translations and source files come from
-        // the same commit, so any "stale" detection is a false positive from the extraction
-        // logic having evolved between when the translation was created and now.
+        // Load translations from project
+        // For directory projects: translations on disk are the source of truth.
+        // Skip sync and clean stale markers — any "stale" detection is a false
+        // positive from extraction logic evolving between when the translation
+        // was created and now. Sync only runs for IndexedDB projects where the
+        // user may have edited beats without re-syncing translations.
         if (currentProject.translations?.length) {
+          const isDirectoryProject = !!(currentProject as any).directoryPath;
           const isGitResetReload = resumeAutoSaveAfterLoadRef.current;
+          const skipSync = isDirectoryProject || isGitResetReload;
           let translations = currentProject.translations;
           const manifest = currentProject.translationManifest;
-          if (isGitResetReload) {
-            // After git-reset: skip sync and clear any stale markers that may
-            // be baked into the committed translation files from previous sessions.
+          if (skipSync) {
+            // Clean any stale markers that may be baked into committed
+            // translation files from previous sessions.
             translations = translations.map((t: any) => ({
               ...t,
               strings: Object.fromEntries(
@@ -2102,7 +2104,7 @@ function App() {
             };
             translationActions.loadTranslations(translations, manifest, projectData);
           }
-          console.log('[App] >>> Loaded', translations.length, 'translation(s)', isGitResetReload ? '(sync skipped, stale cleared — git reset)' : 'with sync');
+          console.log('[App] >>> Loaded', translations.length, 'translation(s)', skipSync ? '(sync skipped, stale cleared — directory/reset)' : 'with sync');
         } else {
           translationActions.clearTranslations();
         }
@@ -3027,11 +3029,21 @@ function App() {
           }
 
           if (resources.length > 0) {
-            console.log('[App] Post-VCS: Loaded', resources.length, 'translation(s) from disk:',
-              resources.map((r: any) => r.languageCode));
-            translationActionsRef.current.loadTranslations(resources, manifest);
+            // Clean stale markers from committed translation files — they may
+            // contain stale entries from previous sessions. The disk is truth.
+            const cleanedResources = resources.map((r: any) => ({
+              ...r,
+              strings: Object.fromEntries(
+                Object.entries(r.strings as Record<string, { value: string; status: string }>).map(
+                  ([k, v]) => [k, v.status === 'stale' ? { ...v, status: 'translated' } : v]
+                )
+              ),
+            }));
+            console.log('[App] Post-VCS: Loaded', cleanedResources.length, 'translation(s) from disk:',
+              cleanedResources.map((r: any) => r.languageCode));
+            translationActionsRef.current.loadTranslations(cleanedResources, manifest);
             // Also update the project object so next save includes them
-            proj.translations = resources;
+            proj.translations = cleanedResources;
             proj.translationManifest = manifest;
           } else if (translationStateRef.current.translations.length > 0) {
             // Translation files were removed (e.g., reverted)
@@ -3040,15 +3052,11 @@ function App() {
             delete proj.translationManifest;
           }
 
-          // If translations exist, also sync staleness against current source
-          if (translationStateRef.current.translations.length > 0) {
-            try {
-              const projectData = await getProjectDataForExport(proj.id);
-              translationActionsRef.current.syncAllTranslations(projectData);
-            } catch (e) {
-              console.error('[App] Post-VCS translation staleness sync failed:', e);
-            }
-          }
+          // NOTE: We intentionally do NOT run syncAllTranslations here.
+          // For directory projects, translations loaded from disk are the source
+          // of truth (committed alongside beats). Running sync would produce false
+          // stale markers due to extraction logic differences. Incremental sync
+          // (syncBeatTranslations) handles staleness when the user edits a beat.
         } catch (e) {
           console.error('[App] Post-VCS translation reload failed:', e);
         }
