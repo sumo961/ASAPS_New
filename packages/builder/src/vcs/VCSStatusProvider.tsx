@@ -557,7 +557,17 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
 
   const forcePushOp = useCallback(async () => {
     const result = await gitForcePush(requirePath());
-    if (result.success) suppressBehindRef.current = false;
+    if (result.success) {
+      suppressBehindRef.current = false;
+      // Remove the previous push rejection error from the log — it's been
+      // handled by the force push, so showing both is confusing.
+      setState(prev => ({
+        ...prev,
+        messageLog: prev.messageLog.filter(entry =>
+          !(entry.type === 'error' && isPushRejected(entry.message))
+        ),
+      }));
+    }
     await refresh();
     emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
     return result;
