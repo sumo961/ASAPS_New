@@ -190,6 +190,30 @@ function getRunCommand() {
   return api.fs.runCommand;
 }
 
+/**
+ * Remove a stale .git/index.lock file if it exists.
+ * This can be left behind when a git operation is interrupted
+ * (e.g. by app close) or when VCS polling collides with a user action.
+ */
+async function removeStaleIndexLock(projectPath: string): Promise<void> {
+  try {
+    const api = window.electronAPI;
+    const sep = projectPath.includes('\\') ? '\\' : '/';
+    const lockPath = `${projectPath}${sep}.git${sep}index.lock`;
+    if (api?.fs?.exists && await api.fs.exists(lockPath)) {
+      console.warn('[GitAdapter] Removing stale index.lock:', lockPath);
+      await api.fs.unlink(lockPath);
+    }
+  } catch (e) {
+    console.warn('[GitAdapter] Could not remove index.lock:', e);
+  }
+}
+
+/** Check if an error message indicates a lock file conflict */
+function isLockError(message: string): boolean {
+  return message.includes('index.lock') || message.includes('Unable to create') && message.includes('.lock');
+}
+
 /** Stage specific files */
 export async function gitStage(projectPath: string, filePaths: string[]): Promise<GitOperationResult> {
   const run = getRunCommand();
@@ -463,7 +487,14 @@ export async function gitRevertFiles(projectPath: string, filePaths: string[]): 
 /** Hard-reset to a specific commit (discards all staged/unstaged changes) */
 export async function gitResetHard(projectPath: string, commitHash: string): Promise<GitOperationResult> {
   const run = getRunCommand();
-  const result = await run('git', ['reset', '--hard', commitHash], projectPath);
+  await removeStaleIndexLock(projectPath);
+  let result = await run('git', ['reset', '--hard', commitHash], projectPath);
+  // Retry once if a concurrent git operation (e.g. VCS poll) held the lock
+  if (result.exitCode !== 0 && isLockError(result.stderr)) {
+    await new Promise(r => setTimeout(r, 500));
+    await removeStaleIndexLock(projectPath);
+    result = await run('git', ['reset', '--hard', commitHash], projectPath);
+  }
   return {
     success: result.exitCode === 0,
     message: result.exitCode === 0 ? `Reset to ${commitHash.substring(0, 7)}` : result.stderr.trim(),
@@ -473,10 +504,16 @@ export async function gitResetHard(projectPath: string, commitHash: string): Pro
 /** Remove untracked files. If filePaths given, removes only those; otherwise removes all untracked files+dirs. */
 export async function gitClean(projectPath: string, filePaths?: string[]): Promise<GitOperationResult> {
   const run = getRunCommand();
+  await removeStaleIndexLock(projectPath);
   const args = filePaths && filePaths.length > 0
     ? ['clean', '-f', '--', ...filePaths]
     : ['clean', '-fd'];
-  const result = await run('git', args, projectPath);
+  let result = await run('git', args, projectPath);
+  if (result.exitCode !== 0 && isLockError(result.stderr)) {
+    await new Promise(r => setTimeout(r, 500));
+    await removeStaleIndexLock(projectPath);
+    result = await run('git', args, projectPath);
+  }
   return {
     success: result.exitCode === 0,
     message: result.exitCode === 0
