@@ -3465,7 +3465,7 @@ function App() {
     const storyData = {
       title: state.title,
       author: state.author,
-      firstBeatId: (state.story as any)?.getFirstBeatId?.() || (state.story as any)?.metadata?.firstBeatId || (state.story as any)?.firstBeatId || state.beats[0]?.id || '0',
+      firstBeatId: getStoryForPreview().getFirstBeatId(),
       beats: serializedBeats,
     };
 
@@ -3825,18 +3825,33 @@ function App() {
 
   // Create a Story object for preview
   const getStoryForPreview = useCallback((): Story => {
+    // Determine firstBeatId: prefer debug.firstbeat from global settings (user-configured),
+    // then story metadata, then let Story auto-detect (prefers titleScreen beats).
+    // Using beats[0] as fallback is WRONG because the beats array is sorted alphabetically.
+    const settingsFirstBeat = globalSettings?.debug?.firstbeat;
+    const knownFirstBeatId = settingsFirstBeat || (state.story as any)?.getFirstBeatId?.() || (state.story as any)?.metadata?.firstBeatId || (state.story as any)?.firstBeatId;
+
     const story = new Story({
       title: state.title,
       author: state.author || 'Unknown',
-      firstBeatId: (state.story as any)?.getFirstBeatId?.() || (state.story as any)?.metadata?.firstBeatId || (state.story as any)?.firstBeatId || state.beats[0]?.id || '0',
+      firstBeatId: knownFirstBeatId || undefined,
     });
 
     state.beats.forEach(beat => {
       story.addBeat(beat);
     });
 
+    // If no firstBeatId was known, let Story auto-detect now that beats are added
+    // and write it back to metadata so getFirstBeatId() returns consistently
+    if (!knownFirstBeatId) {
+      const detected = story.getFirstBeatId();
+      if (detected) {
+        story.setFirstBeatId(detected);
+      }
+    }
+
     return story;
-  }, [state]);
+  }, [state, globalSettings]);
 
   /**
    * Check if the current project is a "default empty" project

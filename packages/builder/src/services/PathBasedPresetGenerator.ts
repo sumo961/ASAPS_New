@@ -46,6 +46,9 @@ export interface GeneratedPreset {
 
   // InputText beats in this path that need user input
   inputTextBeats: InputTextBeatInfo[];
+
+  // How many paths lead to this exact game state (after dedup)
+  pathCount: number;
 }
 
 /**
@@ -54,7 +57,8 @@ export interface GeneratedPreset {
 export interface PresetGenerationResult {
   targetBeatId: string;
   targetBeatName: string;
-  presets: GeneratedPreset[];
+  presets: GeneratedPreset[];       // Deduplicated by game state
+  totalPaths: number;               // Total paths before dedup
   analysisTime: number;
 }
 
@@ -77,6 +81,7 @@ export function generatePathPresets(
       targetBeatId,
       targetBeatName: 'Unknown',
       presets: [],
+      totalPaths: 0,
       analysisTime: performance.now() - startTime,
     };
   }
@@ -122,16 +127,19 @@ export function generatePathPresets(
       pathIndex: pathIndexInGroup,
       totalPathsInGroup: totalInGroup,
       inputTextBeats,
+      pathCount: 1,
     };
   });
 
   // Deduplicate presets with identical states
+  const totalPaths = presets.length;
   const uniquePresets = deduplicatePresets(presets);
 
   return {
     targetBeatId,
     targetBeatName: targetBeat.name,
     presets: uniquePresets,
+    totalPaths,
     analysisTime: performance.now() - startTime,
   };
 }
@@ -356,16 +364,21 @@ function deduplicatePresets(presets: GeneratedPreset[]): GeneratedPreset[] {
   const seen = new Map<string, GeneratedPreset>();
 
   for (const preset of presets) {
-    // Create a hash of the state
+    // Create a hash of the game-relevant state (vars, counters, inventory)
+    // Exclude visitedBeats because paths with identical game state but
+    // different routes are redundant for testing purposes
     const stateHash = JSON.stringify({
       vars: preset.preset.state.variables,
       counters: preset.preset.state.counters,
       inv: preset.preset.state.inventory.sort(),
-      visited: preset.preset.state.visitedBeats.sort(),
     });
 
-    // Keep the first (usually shortest path)
-    if (!seen.has(stateHash)) {
+    const existing = seen.get(stateHash);
+    if (existing) {
+      // Increment pathCount on the existing representative entry
+      existing.pathCount++;
+    } else {
+      // Keep the first occurrence (shortest path) as representative
       seen.set(stateHash, preset);
     }
   }

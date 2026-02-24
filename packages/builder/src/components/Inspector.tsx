@@ -2537,9 +2537,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="rounded border-gray-300"
                           />
                           <label htmlFor="markVisited-dialog" className="text-sm text-gray-700">
-                            Mark already visited choices
+                            Block and dim visited choices
                             <span className="text-xs text-gray-500 block">
-                              Dim choices leading to previously visited beats
+                              Block and dim choices leading to previously visited beats
                             </span>
                           </label>
                         </div>
@@ -2589,9 +2589,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="rounded border-gray-300"
                           />
                           <label htmlFor="markVisited-movement" className="text-sm text-gray-700">
-                            Mark already visited choices
+                            Block and dim visited choices
                             <span className="text-xs text-gray-500 block">
-                              Dim choices leading to previously visited beats
+                              Block and dim choices leading to previously visited beats
                             </span>
                           </label>
                         </div>
@@ -2793,9 +2793,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="rounded border-gray-300"
                           />
                           <label htmlFor="markVisited-pickprop" className="text-sm text-gray-700">
-                            Mark already visited choices
+                            Block and dim visited choices
                             <span className="text-xs text-gray-500 block">
-                              Dim choices leading to previously visited beats
+                              Block and dim choices leading to previously visited beats
                             </span>
                           </label>
                         </div>

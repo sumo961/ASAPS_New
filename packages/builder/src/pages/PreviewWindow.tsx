@@ -475,6 +475,7 @@ export const PreviewWindow: React.FC = () => {
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<StatePreset | null>(null);
   const [generatedPresets, setGeneratedPresets] = useState<GeneratedPreset[]>([]);
+  const [totalPathCount, setTotalPathCount] = useState(0);
   const [isGeneratingPresets, setIsGeneratingPresets] = useState(false);
   // Input text values modal state
   const [showInputTextModal, setShowInputTextModal] = useState(false);
@@ -703,6 +704,7 @@ export const PreviewWindow: React.FC = () => {
 
     if (!story || !startBeatId) {
       setGeneratedPresets([]);
+      setTotalPathCount(0);
       return;
     }
 
@@ -710,6 +712,7 @@ export const PreviewWindow: React.FC = () => {
     const firstBeatId = story.getMetadata().firstBeatId;
     if (startBeatId === firstBeatId) {
       setGeneratedPresets([]);
+      setTotalPathCount(0);
       return;
     }
 
@@ -720,7 +723,8 @@ export const PreviewWindow: React.FC = () => {
       try {
         const result = generatePathPresets(story, startBeatId);
         setGeneratedPresets(result.presets);
-        console.log('[PreviewWindow] Generated', result.presets.length, 'presets for beat:', startBeatId);
+        setTotalPathCount(result.totalPaths);
+        console.log('[PreviewWindow] Generated', result.presets.length, 'unique states from', result.totalPaths, 'paths for beat:', startBeatId);
 
         // Auto-select first preset if there's only one path
         if (result.presets.length === 1) {
@@ -735,6 +739,7 @@ export const PreviewWindow: React.FC = () => {
       } catch (error) {
         console.error('[PreviewWindow] Failed to generate presets:', error);
         setGeneratedPresets([]);
+        setTotalPathCount(0);
       } finally {
         setIsGeneratingPresets(false);
       }
@@ -749,6 +754,7 @@ export const PreviewWindow: React.FC = () => {
     const firstBeatId = story.getMetadata().firstBeatId;
     if (startBeatId === firstBeatId) {
       setGeneratedPresets([]);
+      setTotalPathCount(0);
       return;
     }
 
@@ -757,6 +763,7 @@ export const PreviewWindow: React.FC = () => {
       try {
         const result = generatePathPresets(story, startBeatId);
         setGeneratedPresets(result.presets);
+        setTotalPathCount(result.totalPaths);
         if (result.presets.length === 1) {
           const preset: StatePreset = {
             ...result.presets[0].preset,
@@ -769,6 +776,7 @@ export const PreviewWindow: React.FC = () => {
       } catch (error) {
         console.error('[PreviewWindow] Failed to generate presets:', error);
         setGeneratedPresets([]);
+        setTotalPathCount(0);
       } finally {
         setIsGeneratingPresets(false);
       }
@@ -1305,7 +1313,7 @@ export const PreviewWindow: React.FC = () => {
           timers,
         });
 
-        // Update renderer with visited state for marking visited choices
+        // Update renderer with visited state for blocking/dimming visited choices
         if (rendererRef.current && 'setVisitedBeats' in rendererRef.current) {
           (rendererRef.current as any).setVisitedBeats(ctx.getVisitedBeats());
         }
@@ -1850,7 +1858,7 @@ export const PreviewWindow: React.FC = () => {
                   ) : selectedPreset ? (
                     selectedPreset.name.replace(/^.*? - /, '') // Show just the path part
                   ) : generatedPresets.length > 0 ? (
-                    `Select path (${generatedPresets.length})`
+                    `Select state (${generatedPresets.length})`
                   ) : (
                     'No paths found'
                   )}
@@ -1881,7 +1889,7 @@ export const PreviewWindow: React.FC = () => {
                       </button>
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      Select a path to set variables, counters, and visited beats
+                      {totalPathCount} {totalPathCount === 1 ? 'path' : 'paths'} → {generatedPresets.length} unique {generatedPresets.length === 1 ? 'state' : 'states'}
                     </div>
                   </div>
 
@@ -1914,13 +1922,15 @@ export const PreviewWindow: React.FC = () => {
                     </div>
                   ) : (
                     /* Group presets by outcome */
-                    Array.from(presetsByOutcome.entries()).map(([outcome, presets]) => (
+                    Array.from(presetsByOutcome.entries()).map(([outcome, presets]) => {
+                      const groupPathCount = presets.reduce((sum, p) => sum + p.pathCount, 0);
+                      return (
                       <div key={outcome}>
                         <div className="px-3 py-1 bg-gray-50 text-xs font-medium text-gray-600 border-t border-gray-200">
-                          → {outcome} ({presets.length} {presets.length === 1 ? 'path' : 'paths'})
+                          → {outcome} ({presets.length} {presets.length === 1 ? 'state' : 'states'} from {groupPathCount} {groupPathCount === 1 ? 'path' : 'paths'})
                         </div>
                         {presets.map((genPreset, idx) => {
-                          const { variables, counters, inventory, visitedBeats } = genPreset.preset.state;
+                          const { variables, counters, inventory } = genPreset.preset.state;
                           const varCount = Object.keys(variables).length;
                           const counterCount = Object.keys(counters).length;
                           const invCount = inventory.length;
@@ -1995,27 +2005,23 @@ export const PreviewWindow: React.FC = () => {
                               }`}
                             >
                               <div className="font-medium truncate flex items-center gap-2">
-                                {genPreset.pathDescription}
+                                {summaryParts.length > 0 ? summaryParts.join(' • ') : genPreset.pathDescription}
                                 {hasInputText && (
                                   <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
                                     {genPreset.inputTextBeats.length} input{genPreset.inputTextBeats.length > 1 ? 's' : ''}
                                   </span>
                                 )}
                               </div>
-                              {summaryParts.length > 0 ? (
-                                <div className="text-xs text-gray-500 truncate mt-0.5">
-                                  {summaryParts.join(' • ')}
-                                </div>
-                              ) : (
-                                <div className="text-xs text-gray-400 italic mt-0.5">
-                                  {visitedBeats.length} beats visited, no state changes
-                                </div>
-                              )}
+                              <div className="text-xs text-gray-500 truncate mt-0.5">
+                                {genPreset.pathCount} {genPreset.pathCount === 1 ? 'path' : 'paths'}
+                                {summaryParts.length > 0 && ` · ${genPreset.pathDescription}`}
+                              </div>
                             </button>
                           );
                         })}
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}

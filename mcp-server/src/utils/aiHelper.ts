@@ -82,7 +82,7 @@
  * - Useful for: skill checks, relationship comparisons, dynamic difficulty
  *
  * VISITED BEAT TRACKING:
- * - "markVisited" parameter (boolean): Show visual indication for choices leading to already-visited beats
+ * - "markVisited" parameter (boolean): Block and dim choices leading to previously visited beats
  * - Per-choice visited tracking: choices are individually tracked (composite key: "beatId:choiceId")
  * - Supported on: dialogTree, movementChoice, pickProp
  * - Useful for: helping players find unexplored paths, achievement hunting
@@ -92,7 +92,7 @@
  * RECURSIVE DIALOG TREES:
  * - DialogTree choices can use target: "__self__" to loop back to the SAME dialogTree beat
  * - Useful for: interrogation, shopping, asking multiple questions before leaving
- * - Combine with markVisited: true to gray out already-selected choices
+ * - Combine with markVisited: true to block and dim already-selected choices
  * - At least one choice should have a real target to exit the loop
  *
  * FICTIONAL TIME SYSTEM:
@@ -381,7 +381,7 @@ COUNTER OPERATIONS IN DIALOGTREE:
 - This allows tracking relationships, skills, or any numeric game state
 
 VISITED TRACKING:
-- "markVisited": boolean - Show visual indicator for choices leading to visited beats
+- "markVisited": boolean - Block and dim choices leading to previously visited beats
 - Per-choice visited tracking: choices are individually tracked (composite key: "beatId:choiceId")
 - Supported on dialogTree, movementChoice, pickProp
 - "visitedBeat" condition type for conditionBeat: check if beat was visited
@@ -389,7 +389,7 @@ VISITED TRACKING:
 RECURSIVE DIALOG TREES:
 - DialogTree choices can use target: "__self__" to loop back to the SAME dialogTree beat
 - Useful for: interrogation, shopping, asking multiple questions before leaving
-- Combine with markVisited: true to gray out already-selected choices
+- Combine with markVisited: true to block and dim already-selected choices
 - At least one choice should have a real target to exit the loop
 
 MOVEMENT CHOICE OPTIONS:
@@ -899,7 +899,7 @@ Important:
 - Choice text IS the player's spoken dialogue - never use "[Continue]" placeholders
 - Choices can modify counters: { "counter": "trust", "counterOperation": "change", "counterValue": 1 }
 - Choices can play sound effects: { "soundEffect": "click.mp3" }
-- markVisited: true enables per-choice visited tracking (grays out already-selected choices)
+- markVisited: true enables per-choice visited tracking (blocks and dims already-selected choices)
 - NEVER use "[Continue]" or placeholder text - choices should contain meaningful player dialogue`;
 
   const userPrompt = `Create a branching dialogue for this scene:

@@ -9,7 +9,7 @@ export class MovementChoiceBeat extends Beat {
   public question: string;
   public choices: MovementOption[];
   public choiceDelay?: number; // Delay in seconds before showing choices
-  public markVisited?: boolean; // Show visual indication for choices leading to already-visited beats
+  public markVisited?: boolean; // Block and dim choices leading to previously visited beats
   public showTextOnHover?: boolean; // Only show choice text when hovering over the hotspot
 
   constructor(config: BeatConfig & {

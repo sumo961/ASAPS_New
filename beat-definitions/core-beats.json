@@ -248,7 +248,7 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Show visual indication for choices leading to already-visited beats"
+          "description": "Block and dim choices leading to previously visited beats"
         },
         "presentationMode": {
           "type": "string",
@@ -333,7 +333,7 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Show visual indication for choices leading to already-visited beats"
+          "description": "Block and dim choices leading to previously visited beats"
         },
         "showTextOnHover": {
           "type": "boolean",
@@ -386,7 +386,7 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Show visual indication for choices leading to already-visited beats"
+          "description": "Block and dim choices leading to previously visited beats"
         }
       },
       "locations": ["question", "props"],

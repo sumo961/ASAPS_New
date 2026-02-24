@@ -315,14 +315,12 @@ export class StateSimulationAnalyzer {
       takenChoicesPerBeat: new Map(),
     });
 
-    const startBeat = this.getBeat(startBeatId);
-    console.log(`[PATH] Starting exploration from "${startBeatId}", beat found: ${!!startBeat}, name: ${startBeat?.name || 'N/A'}, maxPaths=${this.config.maxPaths}`);
-    if (startBeat) {
-      const conns = this.getConnections(startBeat);
-      console.log(`[PATH] First beat has ${conns.length} connections:`, conns.map(c => c.targetId));
-    }
     while (stack.length > 0 && paths.length < this.config.maxPaths) {
-      const frame = stack.pop()!;
+      // Use BFS (shift) instead of DFS (pop) to ensure fair coverage
+      // across all branches at each level. DFS can exhaust the maxPaths
+      // budget on the first few branches of a wide choice beat,
+      // leaving later branches unexplored.
+      const frame = stack.shift()!;
 
       // Check depth limit
       if (frame.path.length >= this.config.maxDepth) {
@@ -343,7 +341,6 @@ export class StateSimulationAnalyzer {
       const stateKey = `${beat.id}|${hashState(frame.state)}|${takenChoicesKey}`;
       if (frame.visitedStates.has(stateKey)) {
         // This is a non-productive loop (same beat + same state + same choices = no progress)
-        console.log(`[PATH] CYCLE detected at "${beat.name}" (${beat.id}), pathLen: ${frame.path.length}`);
         paths.push(this.buildPath(frame.path, frame.decisions, frame.state, 'cycle'));
         continue;
       }
@@ -409,8 +406,6 @@ export class StateSimulationAnalyzer {
         const takenHere = frame.takenChoicesPerBeat.get(beat.id) ?? new Set<number>();
 
         // DEBUG: Log choice beat branching
-        console.log(`[PATH] Choice beat "${beat.name}" (${beat.id}): ${connections.length} connections, taken: [${Array.from(takenHere).join(',')}], pathLen: ${frame.path.length}`);
-
         // Find options we haven't taken yet on THIS path
         const availableOptions: number[] = [];
         for (let i = 0; i < connections.length; i++) {
@@ -453,8 +448,8 @@ export class StateSimulationAnalyzer {
           }
           newVisitedStates.add(reexploreKey);
 
-          // Only retry the condition-gated options (in reverse for stack ordering)
-          for (let idx = conditionGatedOptions.length - 1; idx >= 0; idx--) {
+          // Only retry the condition-gated options (forward order for BFS queue)
+          for (let idx = 0; idx < conditionGatedOptions.length; idx++) {
             const i = conditionGatedOptions[idx];
             const conn = connections[i];
 
@@ -488,9 +483,8 @@ export class StateSimulationAnalyzer {
           continue;
         }
 
-        // Create branches for available options (in reverse for stack ordering)
-        console.log(`[PATH] Creating ${availableOptions.length} branches for available options: [${availableOptions.join(',')}]`);
-        for (let idx = availableOptions.length - 1; idx >= 0; idx--) {
+        // Create branches for available options (forward order for BFS queue)
+        for (let idx = 0; idx < availableOptions.length; idx++) {
           const i = availableOptions[idx];
           const conn = connections[i];
 
@@ -517,9 +511,18 @@ export class StateSimulationAnalyzer {
               .map(c => c.label || c.targetId),
           }];
 
+          // Apply per-choice effects (e.g., pickProp adds inventory item per choice)
+          const branchState = this.applyChoiceEffects(beat, cloneState(newState), i, conn);
+
+          // Update the step's stateAfter to reflect this branch's choice effects
+          branchPath[branchPath.length - 1] = {
+            ...branchPath[branchPath.length - 1],
+            stateAfter: cloneState(branchState),
+          };
+
           stack.push({
             beatId: conn.targetId,
-            state: newState,
+            state: branchState,
             path: branchPath,
             decisions: branchDecisions,
             visitedStates: newVisitedStates,
@@ -539,7 +542,6 @@ export class StateSimulationAnalyzer {
       }
     }
 
-    console.log(`[PATH] Exploration complete: ${paths.length} paths found, stack empty: ${stack.length === 0}`);
     return paths;
   }
 
@@ -565,6 +567,10 @@ export class StateSimulationAnalyzer {
    * For path analysis, multiple choices that lead to the same target
    * are effectively the same path (e.g., dialogue options that all continue
    * to the next beat). We deduplicate to avoid false branching.
+   *
+   * Exception: beats with per-choice state effects (pickProp, dialogTree)
+   * are NOT deduplicated, because each choice produces different state
+   * even when all choices lead to the same target beat.
    */
   private getConnections(beat: Beat): Connection[] {
     const connections = beat.getConnections();
@@ -572,6 +578,12 @@ export class StateSimulationAnalyzer {
     // Also check for defaultTarget
     if (beat.defaultTarget && !connections.some(c => c.targetId === beat.defaultTarget)) {
       connections.push({ targetId: beat.defaultTarget });
+    }
+
+    // Skip deduplication for beats where each choice has different state effects
+    // (e.g., pickProp adds different inventory items per choice)
+    if (this.hasPerChoiceEffects(beat)) {
+      return connections;
     }
 
     // Deduplicate connections by targetId
@@ -586,6 +598,26 @@ export class StateSimulationAnalyzer {
     }
 
     return uniqueConnections;
+  }
+
+  /**
+   * Check if a beat has per-choice state effects that make each branch unique
+   * even when connections share the same target.
+   */
+  private hasPerChoiceEffects(beat: Beat): boolean {
+    if (beat.type === 'pickProp') {
+      return true; // Each prop adds a different inventory item
+    }
+    if (beat.type === 'dialogTree') {
+      // Only if any choice has effects
+      const params = beat.getParameters();
+      const nodes = params.dialogNodes || params.nodes || [];
+      if (nodes.length > 0) {
+        const choices = nodes[0]?.choices || [];
+        return choices.some((c: any) => c.effects && c.effects.length > 0);
+      }
+    }
+    return false;
   }
 
   /**
@@ -714,6 +746,176 @@ export class StateSimulationAnalyzer {
     }
 
     return newState;
+  }
+
+  /**
+   * Apply per-choice effects when branching at a choice beat.
+   * For example, pickProp adds the selected prop's name to inventory.
+   */
+  private applyChoiceEffects(beat: Beat, state: SimulationState, choiceIndex: number, connection?: Connection): SimulationState {
+    const params = beat.getParameters();
+
+    switch (beat.type) {
+      case 'pickProp': {
+        // Each prop choice adds its item to inventory
+        const props = params.props || [];
+        if (choiceIndex < props.length) {
+          const prop = props[choiceIndex];
+          const itemName = prop.inventoryName || prop.locationName || prop.name || prop.id;
+          if (itemName) {
+            const character = 'player';
+            if (!state.inventory.has(character)) {
+              state.inventory.set(character, new Set());
+            }
+            state.inventory.get(character)!.add(itemName);
+          }
+          // Apply prop-specific effects
+          this.applyEffectsList(prop.effects, state);
+        }
+        break;
+      }
+
+      case 'dialogTree': {
+        // DialogTree connections come from recursive tree traversal,
+        // so choiceIndex does NOT map to root choices directly.
+        // We walk the tree to find the path to the exit choice matching
+        // this connection, collecting effects along the way.
+        const dialogTree = params.dialogTree;
+        if (dialogTree && connection) {
+          const effectsAlongPath = this.collectDialogTreeEffects(
+            dialogTree,
+            connection.targetId,
+            connection.label
+          );
+          for (const effects of effectsAlongPath) {
+            this.applyEffectsList(effects, state);
+          }
+        }
+        break;
+      }
+
+      // movementChoice, hyperText, etc. - no per-choice state effects typically
+    }
+
+    return state;
+  }
+
+  /**
+   * Apply a list of canonical Effects to simulation state.
+   * Handles both canonical format (incrementCounter, setVariable, etc.)
+   * and legacy format (type: 'counter' with counter/operation fields).
+   */
+  private applyEffectsList(effects: any[] | undefined, state: SimulationState): void {
+    if (!effects || !Array.isArray(effects)) return;
+
+    for (const effect of effects) {
+      switch (effect.type) {
+        case 'incrementCounter': {
+          const name = effect.target || effect.counter;
+          if (name) {
+            const current = state.counters.get(name) || 0;
+            state.counters.set(name, current + (effect.value ?? 1));
+          }
+          break;
+        }
+        case 'setCounter': {
+          const name = effect.target || effect.counter;
+          if (name) {
+            state.counters.set(name, effect.value ?? 0);
+          }
+          break;
+        }
+        case 'setVariable': {
+          const name = effect.target || effect.variable;
+          if (name) {
+            state.variables.set(name, effect.value ?? true);
+          }
+          break;
+        }
+        case 'addInventory': {
+          const item = effect.target || effect.item;
+          if (item) {
+            const character = effect.character || 'player';
+            if (!state.inventory.has(character)) {
+              state.inventory.set(character, new Set());
+            }
+            state.inventory.get(character)!.add(item);
+          }
+          break;
+        }
+        case 'removeInventory': {
+          const item = effect.target || effect.item;
+          if (item) {
+            const character = effect.character || 'player';
+            state.inventory.get(character)?.delete(item);
+          }
+          break;
+        }
+        // Legacy format (from pickProp or unmigrated data)
+        case 'counter': {
+          const name = effect.counter;
+          if (name) {
+            const current = state.counters.get(name) || 0;
+            const amount = effect.value ?? 1;
+            switch (effect.operation) {
+              case 'set': state.counters.set(name, amount); break;
+              case 'subtract': state.counters.set(name, current - amount); break;
+              default: state.counters.set(name, current + amount); // 'add' or default
+            }
+          }
+          break;
+        }
+        case 'variable': {
+          const name = effect.variable;
+          if (name) {
+            state.variables.set(name, effect.value ?? true);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Walk a dialog tree to find the path to an exit choice matching a target,
+   * collecting effects from all choices along the way.
+   * Returns an array of effect arrays (one per choice on the path).
+   */
+  private collectDialogTreeEffects(
+    node: any,
+    targetId: string,
+    targetLabel?: string,
+    depth: number = 0
+  ): any[][] {
+    if (!node || depth > 20) return [];
+
+    const choices = node.choices || [];
+    for (const choice of choices) {
+      // Check if this choice exits to the target
+      if (choice.target && choice.target === targetId && choice.target !== '__self__') {
+        // If we have a label, also match on it for disambiguation
+        if (!targetLabel || choice.text === targetLabel || targetLabel === 'Choice') {
+          // Found the exit - return this choice's effects
+          return [choice.effects || []];
+        }
+      }
+
+      // Check nested dialog node
+      if (choice.dialogNode) {
+        const nestedEffects = this.collectDialogTreeEffects(
+          choice.dialogNode,
+          targetId,
+          targetLabel,
+          depth + 1
+        );
+        if (nestedEffects.length > 0) {
+          // Found exit in nested node - prepend this choice's effects
+          return [choice.effects || [], ...nestedEffects];
+        }
+      }
+    }
+
+    return []; // Not found in this subtree
   }
 
   /**

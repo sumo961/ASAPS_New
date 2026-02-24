@@ -344,10 +344,11 @@ export function useStoryBuilder() {
 
   // FIXED: Export story to ASML with ALL data including assets and characters
   const exportStory = useCallback((assets?: any[], characters?: any[]): string => {
+    const knownFirstBeatId = (state.story as any)?.getFirstBeatId?.() || (state.story as any)?.metadata?.firstBeatId || (state.story as any)?.firstBeatId;
     const story = new Story({
       title: state.title,
       author: state.author,
-      firstBeatId: (state.story as any)?.getFirstBeatId?.() || (state.story as any)?.metadata?.firstBeatId || (state.story as any)?.firstBeatId || state.beats[0]?.id || '0',
+      firstBeatId: knownFirstBeatId || undefined,
     });
 
     // FIXED: Always use state.settings as it contains the most up-to-date settings
@@ -408,6 +409,14 @@ export function useStoryBuilder() {
         beat.getConnections().map((c: any) => ({ target: c.targetId, label: c.label })));
       story.addBeat(beat);
     });
+
+    // If no firstBeatId was known, let Story auto-detect now that beats are added
+    if (!knownFirstBeatId) {
+      const detected = story.getFirstBeatId();
+      if (detected) {
+        story.setFirstBeatId(detected);
+      }
+    }
 
     // Log what we're exporting for debugging
     console.log('Exporting story with:', {

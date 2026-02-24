@@ -67,7 +67,7 @@ All beats support advanced timing features to create pressure or self-running st
 
 Choice beats (dialogTree, movementChoice, pickProp) also support:
 - **choiceDelay**: Delay in seconds before choices appear (creates dramatic pauses)
-- **markVisited**: Show visual indication for choices leading to already-visited beats
+- **markVisited**: Block and dim choices leading to previously visited beats
 
 Use these features when suggesting beats that should:
 - Create tension and urgency (e.g., escape sequences, timed decisions)

@@ -24,7 +24,7 @@ export class DialogTreeBeat extends Beat {
   public emotion?: string;
   public choiceDelay?: number; // Delay in seconds before showing choices
   public responseDelay?: number; // Delay in seconds before NPC responds (for natural chat pacing)
-  public markVisited?: boolean; // Show visual indication for choices leading to already-visited beats
+  public markVisited?: boolean; // Block and dim choices leading to previously visited beats
   public backgroundUrl?: string; // Direct URL for background from ASML import
   public backgroundAssetId?: string; // Asset ID for background
   public phaseOverrides?: Record<string, Record<string, PhaseOverride>>; // Per-phase visual element overrides

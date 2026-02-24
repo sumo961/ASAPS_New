@@ -144,7 +144,7 @@ const BEAT_TYPE_GUIDE = `
 - Optional parameters:
   - choiceDelay: seconds before choices fade in (creates suspense)
   - presentationMode: "positioned" (default) | "chat-scroll" (scrollable chat) | "chat-bubble" (single bubble)
-  - markVisited: true to show visual indication for choices leading to already-visited beats
+  - markVisited: true to block and dim choices leading to previously visited beats
 - ⚠️ WRONG: { "dialogTree": { "root": { ... } } } - NO extra "root" wrapper!
 - choice: { id, text, target? | dialogNode? } - What player clicks (text IS the player's line)
 - target (string): Beat ID to exit dialog
@@ -174,7 +174,7 @@ const BEAT_TYPE_GUIDE = `
   Example: { "id": "c1", "text": "Go to the Library", "location": "Go to the Library", "target": "beat_3" }
 - Optional parameters:
   - choiceDelay: seconds before choices fade in (creates suspense)
-  - markVisited: true to show visual indication for choices leading to already-visited beats
+  - markVisited: true to block and dim choices leading to previously visited beats
   - showTextOnHover: true to only show choice text when hovering over the hotspot
 - Connections: Multiple → one per choice
 - COUNTER EFFECTS: Choices can modify counters (same as dialogTree)

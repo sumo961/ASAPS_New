@@ -9,7 +9,7 @@ export class PickPropBeat extends Beat {
   public question: string;
   public props: PropOption[];
   public choiceDelay?: number; // Delay in seconds before showing choices
-  public markVisited?: boolean; // Show visual indication for choices leading to already-visited beats
+  public markVisited?: boolean; // Block and dim choices leading to previously visited beats
 
   constructor(config: BeatConfig & {
     parameters?: Partial<PickPropParameters>;
