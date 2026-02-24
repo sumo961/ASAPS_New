@@ -126,9 +126,28 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onViewDiff, filterFile }
             )}
           </div>
 
-          {/* Expanded file list + reset button */}
+          {/* Expanded: reset button + file list */}
           {expandedHash === commit.hash && (
             <div style={{ padding: '0 12px 8px 40px' }}>
+              {/* Reset to this commit — shown at top for visibility */}
+              <div style={{ marginBottom: commit.files.length > 0 ? 6 : 0, paddingBottom: commit.files.length > 0 ? 6 : 0, borderBottom: commit.files.length > 0 ? '1px solid #1e293b' : 'none' }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleResetToCommit(commit.hash); }}
+                  disabled={isResetting}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #7f1d1d',
+                    color: '#f87171',
+                    cursor: isResetting ? 'not-allowed' : 'pointer',
+                    padding: '3px 10px',
+                    borderRadius: 3,
+                    fontSize: '11px',
+                    opacity: isResetting ? 0.5 : 1,
+                  }}
+                >
+                  {isResetting ? 'Resetting...' : 'Reset to here'}
+                </button>
+              </div>
               {commit.files.map(file => (
                 <div
                   key={file}
@@ -162,25 +181,6 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onViewDiff, filterFile }
                   )}
                 </div>
               ))}
-              {/* Reset to this commit */}
-              <div style={{ borderTop: '1px solid #1e293b', marginTop: 6, paddingTop: 6 }}>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleResetToCommit(commit.hash); }}
-                  disabled={isResetting}
-                  style={{
-                    background: 'none',
-                    border: '1px solid #7f1d1d',
-                    color: '#f87171',
-                    cursor: isResetting ? 'not-allowed' : 'pointer',
-                    padding: '3px 10px',
-                    borderRadius: 3,
-                    fontSize: '11px',
-                    opacity: isResetting ? 0.5 : 1,
-                  }}
-                >
-                  {isResetting ? 'Resetting...' : 'Reset to here'}
-                </button>
-              </div>
             </div>
           )}
         </div>
