@@ -759,11 +759,17 @@ function App() {
   }, []);
 
   // Listen for git-reset events — reload the directory project from disk
+  // IMPORTANT: openDirectoryProject re-reads files into currentProject, but
+  // the load effect (line ~1641) skips reload when project ID hasn't changed.
+  // We clear loadedProjectIdRef so the effect sees a "new" project and reloads
+  // beats, connections, settings, translations, etc.
   useEffect(() => {
     const handler = async () => {
       if (projectFormat !== 'directory' || !projectPath) return;
       console.log('[App] asaps:git-reset received — reloading project from disk');
       try {
+        // Clear the loaded-project guard so the load effect will re-fire
+        loadedProjectIdRef.current = null;
         const success = await openDirectoryProject(projectPath);
         if (success) {
           console.log('[App] Project reloaded after git reset');
