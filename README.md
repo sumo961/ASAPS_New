@@ -16,12 +16,18 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.25)
+## ⚠️ Development Status (v0.9.26)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Debug Analyzer: Variable Recognition** | **v0.9.26**: inputText/keypad beats now recognized as variable/counter setters — no more false "never set" warnings |
+| **Debug Analyzer: Keypad Connections** | **v0.9.26**: Keypad failTarget connections visible in flowchart and traversed by reachability analyzer |
+| **Translation Bleed Fix** | **v0.9.26**: Translations from open project no longer bleed into AI-generated stories |
+| **Translation Staleness Fixes** | **v0.9.26**: Fixed 99% stuck progress, false stale markers on directory load and git reset |
+| **AI Generation Safety** | **v0.9.26**: Auto-save paused during AI generation, directory/git projects protected from overwrite |
+| **Git Force Push** | **v0.9.26**: Force push option in push rejection dialog, improved git reset stability |
 | **AI Prompt Sync (Keypad + Credits)** | **v0.9.25**: Both AI generation systems now document keypad beat and endScreen credits page parameters |
 | **HTML Export Credits Translation** | **v0.9.25**: Credits page fields (title, body, close text) now extracted for AI on-the-fly translation |
 | **EndScreen Credits Translation** | **v0.9.25**: Credits page fields translatable, continue button translation, language deletion |

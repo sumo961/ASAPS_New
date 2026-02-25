@@ -1,5 +1,98 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-25: Debug Analyzer Fixes, Translation Stability & Git VCS Improvements (v0.9.26)
+
+### Overview
+
+This release fixes **false warnings in the debug/reachability analyzer** (inputText/keypad variables, keypad failTarget connections), resolves **translation bleed into AI-generated stories**, fixes multiple **translation staleness false positives**, and adds **Git force push** support with improved **auto-save safety** during git reset and AI generation operations.
+
+### Debug Analyzer: inputText/Keypad Variable Recognition
+
+The reachability analyzer now tracks variables and counters set by `inputText` and `keypad` beats. Previously it only tracked `setVariable` beats, `movementChoice`/`pickProp` counter effects, and `dialogTree` counter effects — causing false "variable is never set" warnings when conditions checked variables set by user input beats.
+
+- Variables saved via `saveToType='variable'` are marked as user-input (any value possible)
+- Counters saved via `saveToType='counter'` get unbounded range (±999999)
+- Conditions referencing user-input variables are always considered satisfiable
+
+**Files modified:**
+- `packages/core/src/analysis/ReachabilityAnalyzer.ts` — Add inputText/keypad handling in `analyzeStateModifications()`, short-circuit satisfiability for user-input sentinels
+
+### Debug Analyzer: Keypad failTarget Connections
+
+Keypad beat's "Fail Target Beat" connection was invisible in the flowchart and reported as missing by the debug system. Root cause: `KeypadBeat` didn't override `getConnections()` to expose `failTarget`.
+
+- Added `getConnections()` override to `KeypadBeat` following the `ConditionBeat` pattern
+- Added keypad failTarget extraction to `TreeLayoutAlgorithm.extractConnectionsFromBeats()`
+- Fail connections now appear in the flowchart and are traversed by the BFS reachability analyzer
+
+**Files modified:**
+- `packages/core/src/beats/KeypadBeat.ts` — Add `getConnections()` override exposing failTarget with 'fail' label
+- `packages/builder/src/utils/TreeLayoutAlgorithm.ts` — Add keypad failTarget edge extraction
+
+### Translation: Clear on AI Story Generation
+
+Translations from a previously open project bled into AI-generated stories because `handleStoryGenerated` never cleared the translation state. Now calls `clearTranslations()` alongside `clearStory()`, matching the pattern used in all other new-project code paths.
+
+**Files modified:**
+- `packages/builder/src/App.tsx` — Add `translationActionsRef.current?.clearTranslations()` in `handleStoryGenerated`
+
+### Translation: Fix 99% Stuck Progress
+
+Translation progress could get stuck at 99% due to orphaned entries (source strings removed but translation entries remaining) and phantom entries (entries for strings not in the current source). The sync process now cleans both types.
+
+**Files modified:**
+- `packages/builder/src/contexts/TranslationContext.tsx` — Remove orphaned and phantom translation entries during sync
+
+### Translation: Fix False Stale Markers
+
+Translation strings were falsely marked as stale on directory project load and after git reset operations. Multiple fixes across the translation pipeline:
+
+- Preserve new-string detection while cleaning false stale markers
+- Suppress post-VCS translation sync after git reset
+- Use currentProject for translation sync instead of stale IndexedDB
+- Replace timeout with ref-based signal for auto-save resume after reset
+
+**Files modified:**
+- `packages/builder/src/contexts/TranslationContext.tsx` — Multiple sync and staleness fixes
+- `packages/builder/src/App.tsx` — Suppress post-VCS sync, ref-based signals
+
+### AI Story Generation Safety
+
+Prevent AI story generation from overwriting directory/git-backed projects. Auto-save is paused during generation to avoid writing partial state to disk.
+
+**Files modified:**
+- `packages/builder/src/App.tsx` — Pause auto-save during AI generation, prevent directory overwrite
+
+### Git VCS: Force Push & Reset Improvements
+
+Added Force Push option to the push rejection dialog. Improved git reset stability with proper auto-save pausing, stale index.lock handling, and UI state reload.
+
+- Force push option in push rejection dialog
+- Git reset now pauses auto-save, clears stale index.lock files
+- Reset-to-commit button moved above file list for visibility
+- Post-reset UI properly reloads beats/connections
+
+**Files modified:**
+- `packages/builder/src/components/vcs/VCSPanel.tsx` — Force push dialog, reset UI improvements
+- `packages/builder/src/App.tsx` — Auto-save pause during reset, ref-based resume signal
+- `packages/builder/src/contexts/PersistenceContext.tsx` — Force push, stale lock cleanup
+
+### Grouped Path Presets, BFS Analyzer & Per-Choice Effects
+
+Preview path presets grouped by category. BFS-based reachability analyzer for story debugging. Per-choice counter/variable effects on dialogTree and movementChoice beats.
+
+**Files modified:**
+- Multiple files across core and builder packages
+
+### Electron AI Proxy Fix
+
+Replaced Electron Chromium fetch with Node.js native https for AI proxy requests, fixing connectivity issues in the desktop app.
+
+**Files modified:**
+- `apps/builder-desktop/` — AI proxy implementation
+
+---
+
 ## 2026-02-23: AI Documentation Sync & Credits Export Fix (v0.9.25)
 
 ### Overview
