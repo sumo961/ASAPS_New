@@ -39,6 +39,7 @@
     "appId": "com.asaps.builder",
     "productName": "ASAPS Builder",
     "electronVersion": "40.6.1",
+    "disableSanityCheckAsar": true,
     "directories": {
       "output": "release"
     },
