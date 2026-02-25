@@ -44,6 +44,7 @@
       "output": "release"
     },
     "files": [
+      "package.json",
       {
         "from": "dist-electron",
         "to": "dist-electron",
