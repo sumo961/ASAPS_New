@@ -522,6 +522,7 @@ const InputText: React.FC<{
           onChange={(e) => { setInputValue(e.target.value); setError(''); }}
           onKeyPress={(e) => { if (e.key === 'Enter') handleSubmit(); }}
           placeholder={placeholder}
+          autoFocus
           className={`w-full px-4 py-3 text-lg border-2 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
             error ? 'border-red-500' : 'border-gray-300'
           }`}

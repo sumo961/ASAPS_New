@@ -3104,6 +3104,7 @@ const InputFieldElement: React.FC<{
       value={inputValue}
       onChange={(e) => setInputValue?.(e.target.value)}
       disabled={!interactive}
+      autoFocus={interactive}
       data-input-field="true"
     />
   );
