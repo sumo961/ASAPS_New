@@ -17,6 +17,7 @@ import { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
 import { InputTextBeat } from './InputTextBeat';
 import { HyperTextBeat } from './HyperTextBeat';
 import { KeypadBeat } from './KeypadBeat';
+import { PanoramaBeat } from './PanoramaBeat';
 // AI-powered beats
 import { OnlineContentBeat } from './OnlineContentBeat';
 import { AIConditionBeat } from './AIConditionBeat';
@@ -71,6 +72,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('inputText', InputTextBeat);
     this.registerBeatType('hyperText', HyperTextBeat);
     this.registerBeatType('keypad', KeypadBeat);
+    this.registerBeatType('panorama', PanoramaBeat);
 
     // Invisible beats
     this.registerBeatType('setVariable', SetVariableBeat);

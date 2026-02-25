@@ -176,6 +176,15 @@ export function extractConnectionsFromBeats(
     if (beat.type === 'keypad' && params.failTarget) {
       addEdge(beat.id, params.failTarget);
     }
+
+    // panorama hotspots
+    if (beat.type === 'panorama' && params.hotspots) {
+      params.hotspots.forEach((hs: any) => {
+        if (hs.target) {
+          addEdge(beat.id, hs.target);
+        }
+      });
+    }
   });
 
   return edges;

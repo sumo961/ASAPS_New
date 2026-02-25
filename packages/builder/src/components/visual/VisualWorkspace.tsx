@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
+import { PanoramaEditor } from './PanoramaEditor';
 import { VisualPropertiesPanel } from './VisualPropertiesPanel';
 import { AnimationPanel } from './AnimationPanel';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
@@ -3122,57 +3123,80 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         </div>
       )}
 
-      {/* Main Visual Editor Canvas - uses VisualBeatEditor */}
+      {/* Main Visual Editor Canvas */}
       <div className="flex-1 overflow-hidden">
-        <VisualBeatEditor
-          backgroundAssetId={backgroundAssetId}
-          backgroundUrl={backgroundUrl}
-          backgroundSound={backgroundSound}
-          elements={visualElements}
-          onInteractionStart={() => {
-            if (commitTimeoutRef.current) {
-              clearTimeout(commitTimeoutRef.current);
-              commitTimeoutRef.current = null;
-            }
-            if (!snapshotRef.current) {
-              snapshotRef.current = visualElements.map(el => ({ ...el }));
-            }
-          }}
-          onInteractionEnd={() => {
-            commitSnapshot('Move/resize element');
-          }}
-          onElementsChange={(elements) => {
-            // Capture snapshot if not already in an interaction
-            if (!snapshotRef.current) {
-              snapshotRef.current = visualElements.map(el => ({ ...el }));
-            }
-            setVisualElements(elements);
-            setHasChanges(true);
-            // CRITICAL: Sync to beat.locations immediately so preview has latest positions
-            if (beat) {
-              syncElementsToBeatLocations(elements, beat);
-            }
-            // Debounced commit for non-drag changes (arrow keys, alignment, etc.)
-            if (commitTimeoutRef.current) clearTimeout(commitTimeoutRef.current);
-            commitTimeoutRef.current = window.setTimeout(() => {
-              commitSnapshot('Update elements');
-              commitTimeoutRef.current = null;
-            }, 800);
-          }}
-          assets={assets}
-          characters={characters}
-          onSelectAsset={handleAssetSelection}
-          onOpenCharacterManager={onOpenCharacterManager}
-          beatContent={content}
-          beatType={beat.type === 'endScreen' && selectedPhaseId === 'credits' ? 'endScreenCredits' : beat.type}
-          selectedElements={selectedElementIds}
-          onSelectElements={setSelectedElementIds}
-          projectSettings={projectSettings}
-          globalSettings={globalSettings}
-          themeAssets={themeAssets}
-          overrideCountdownMeter={(beat as any).overrideCountdownMeter}
-          presentationMode={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).presentationMode || 'positioned') : undefined}
-        />
+        {beat.type === 'panorama' ? (
+          <PanoramaEditor
+            panoramaUrl={(() => {
+              const assetId = beat.getParameters().panoramaAssetId;
+              const asset = assetId ? assets.find(a => a.id === assetId) : null;
+              return asset?.url || '';
+            })()}
+            hotspots={beat.getParameters().hotspots || []}
+            initialPitch={beat.getParameters().initialPitch}
+            initialYaw={beat.getParameters().initialYaw}
+            hfov={beat.getParameters().hfov}
+            autoRotate={beat.getParameters().autoRotate}
+            prompt={beat.getParameters().prompt}
+            onHotspotsChange={(hotspots) => {
+              beat.updateParameters({ hotspots });
+              if (onBeatUpdate) {
+                onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), hotspots } } as any);
+              }
+            }}
+            onSelectHotspot={() => {}}
+          />
+        ) : (
+          <VisualBeatEditor
+            backgroundAssetId={backgroundAssetId}
+            backgroundUrl={backgroundUrl}
+            backgroundSound={backgroundSound}
+            elements={visualElements}
+            onInteractionStart={() => {
+              if (commitTimeoutRef.current) {
+                clearTimeout(commitTimeoutRef.current);
+                commitTimeoutRef.current = null;
+              }
+              if (!snapshotRef.current) {
+                snapshotRef.current = visualElements.map(el => ({ ...el }));
+              }
+            }}
+            onInteractionEnd={() => {
+              commitSnapshot('Move/resize element');
+            }}
+            onElementsChange={(elements) => {
+              // Capture snapshot if not already in an interaction
+              if (!snapshotRef.current) {
+                snapshotRef.current = visualElements.map(el => ({ ...el }));
+              }
+              setVisualElements(elements);
+              setHasChanges(true);
+              // CRITICAL: Sync to beat.locations immediately so preview has latest positions
+              if (beat) {
+                syncElementsToBeatLocations(elements, beat);
+              }
+              // Debounced commit for non-drag changes (arrow keys, alignment, etc.)
+              if (commitTimeoutRef.current) clearTimeout(commitTimeoutRef.current);
+              commitTimeoutRef.current = window.setTimeout(() => {
+                commitSnapshot('Update elements');
+                commitTimeoutRef.current = null;
+              }, 800);
+            }}
+            assets={assets}
+            characters={characters}
+            onSelectAsset={handleAssetSelection}
+            onOpenCharacterManager={onOpenCharacterManager}
+            beatContent={content}
+            beatType={beat.type === 'endScreen' && selectedPhaseId === 'credits' ? 'endScreenCredits' : beat.type}
+            selectedElements={selectedElementIds}
+            onSelectElements={setSelectedElementIds}
+            projectSettings={projectSettings}
+            globalSettings={globalSettings}
+            themeAssets={themeAssets}
+            overrideCountdownMeter={(beat as any).overrideCountdownMeter}
+            presentationMode={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).presentationMode || 'positioned') : undefined}
+          />
+        )}
       </div>
 
       {/* Asset Selection Modal */}

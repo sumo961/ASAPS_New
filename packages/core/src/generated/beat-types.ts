@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-02-25T03:21:43.394Z
+ * Generated: 2026-02-25T11:52:56.623Z
  */
 
 // ============================================
@@ -78,6 +78,21 @@ export interface PropOption {
   counterOperation?: 'set' | 'change';
   counterValue?: number;
   soundEffect?: string;
+}
+
+/**
+ * A hotspot in a 360° panorama placed at pitch/yaw coordinates
+ */
+export interface PanoramaHotspot {
+  id: string;
+  pitch: number;
+  yaw: number;
+  text: string;
+  displayText?: string;
+  target: string;
+  icon?: string;
+  conditions?: Condition[];
+  effects?: Effect[];
 }
 
 // ============================================
@@ -228,6 +243,28 @@ export interface EndScreenParameters {
   creditsCloseText?: string | undefined;
   /** Target beat for restart (usually beat 0) */
   restartConnection?: Connection | undefined;
+}
+
+/**
+ * 360° Panorama - 360-degree panoramic view with interactive hotspots
+ * Category: visible
+ * Connection Type: multiple
+ */
+export interface PanoramaParameters {
+  /** Asset ID for the equirectangular panorama image */
+  panoramaAssetId: string;
+  /** Array of interactive hotspots (each contains a target) */
+  hotspots: PanoramaHotspot[];
+  /** Initial vertical angle (-90 to 90, 0 = horizon) */
+  initialPitch?: number | undefined;
+  /** Initial horizontal angle (-180 to 180, 0 = front-center) */
+  initialYaw?: number | undefined;
+  /** Horizontal field of view in degrees */
+  hfov?: number | undefined;
+  /** Auto-rotate speed in degrees/second (0 = off) */
+  autoRotate?: number | undefined;
+  /** Optional instruction text overlay (e.g. 'Look around to explore') */
+  prompt?: string | undefined;
 }
 
 /**
@@ -639,6 +676,7 @@ export type BeatType =
   | 'pickProp'
   | 'videoBeat'
   | 'endScreen'
+  | 'panorama'
   | 'setVariable'
   | 'conditionBeat'
   | 'durScreen'
@@ -666,6 +704,7 @@ export interface BeatParameterMap {
   'pickProp': PickPropParameters;
   'videoBeat': VideoBeatParameters;
   'endScreen': EndScreenParameters;
+  'panorama': PanoramaParameters;
   'setVariable': SetVariableParameters;
   'conditionBeat': ConditionBeatParameters;
   'durScreen': DurScreenParameters;

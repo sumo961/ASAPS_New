@@ -9,6 +9,7 @@ import type { InventoryItemData, InventoryFrameConfig } from '../components/Char
 import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 import { isMobileDevice } from '../utils/mobileDetection';
+import { PanoramaView } from '../components/PanoramaView';
 
 // ============= SCALED STAGE COMPONENT =============
 // Handles viewport-responsive scaling for the story stage
@@ -2068,6 +2069,42 @@ export class ReactRenderer extends BaseRenderer {
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('hyperText', data);
 
     return this.renderPositionedBeat('hyperText', data, effectiveLocations, true);
+  }
+
+  async renderPanorama(panoramaUrl: string, options: {
+    hotspots: Array<{
+      id: string;
+      pitch: number;
+      yaw: number;
+      text: string;
+      icon?: string;
+    }>;
+    initialPitch?: number;
+    initialYaw?: number;
+    hfov?: number;
+    autoRotate?: number;
+    prompt?: string;
+  }): Promise<string> {
+    // Resolve panorama URL from asset ID if not already a URL
+    const panoramaAssetId = this.getState('panoramaAssetId');
+    const resolvedUrl = panoramaUrl || this.getState('panoramaAssetUrl') || this.resolveAssetUrl(panoramaAssetId) || '';
+
+    return new Promise(resolve => {
+      this.renderComponent(
+        <div style={{ width: '100%', height: '100%' }}>
+          <PanoramaView
+            panoramaUrl={resolvedUrl}
+            hotspots={options.hotspots}
+            initialPitch={options.initialPitch}
+            initialYaw={options.initialYaw}
+            hfov={options.hfov}
+            autoRotate={options.autoRotate}
+            prompt={options.prompt}
+            onHotspotClick={(hotspotId) => resolve(hotspotId)}
+          />
+        </div>
+      );
+    });
   }
 
   // Show choices with fade-in animation

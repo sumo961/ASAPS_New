@@ -30,5 +30,8 @@ export { AudioManager, getAudioManager, disposeAudioManager, type AudioManagerOp
 export { AnimationEngine, AnimationManager, getAnimationManager, disposeAnimationManager } from './animation/AnimationEngine';
 export * from './animation/PathInterpolator';
 
+// Export panorama view component
+export { PanoramaView, type PanoramaViewProps, type PanoramaHotspotData } from './components/PanoramaView';
+
 // Export mobile detection utilities
 export { isMobileDevice, getDeviceScalingInfo, type DeviceScalingInfo } from './utils/mobileDetection';

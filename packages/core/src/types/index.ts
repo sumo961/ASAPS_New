@@ -247,6 +247,22 @@ export interface IRenderer {
     allowMultiple: boolean;
   }, locations?: Location[]): Promise<string>;
   
+  // 360° Panorama beat
+  renderPanorama?(panoramaUrl: string, options: {
+    hotspots: Array<{
+      id: string;
+      pitch: number;
+      yaw: number;
+      text: string;
+      icon?: string;
+    }>;
+    initialPitch?: number;
+    initialYaw?: number;
+    hfov?: number;
+    autoRotate?: number;
+    prompt?: string;
+  }): Promise<string>;
+
   // Keypad beat
   renderKeypad?(prompt: string, options: {
     layout: 'numeric' | 'phone' | 'pin';

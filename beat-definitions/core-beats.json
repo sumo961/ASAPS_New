@@ -111,6 +111,21 @@
         "condition": "condition?",
         "effects": "effect[]?"
       }
+    },
+    "panoramaHotspot": {
+      "description": "A hotspot in a 360° panorama placed at pitch/yaw coordinates",
+      "schema": {
+        "id": "string",
+        "pitch": "number",
+        "yaw": "number",
+        "text": "string",
+        "displayText": "string?",
+        "target": "string",
+        "icon": "string?",
+        "conditions": "condition[]?",
+        "effects": "effect[]?"
+      },
+      "notes": "pitch is vertical angle (-90 to 90), yaw is horizontal angle (-180 to 180). target is the beat ID to navigate to when clicked. icon can be 'arrow', 'info', 'door', or 'eye'."
     }
   },
 
@@ -578,6 +593,93 @@
       "transitions": true,
       "sound": true,
       "renderer": "endScreen"
+    },
+
+    "panorama": {
+      "category": "visible",
+      "displayName": "360° Panorama",
+      "icon": "🌐",
+      "description": "360-degree panoramic view with interactive hotspots",
+      "connectionType": "multiple",
+      "parameters": {
+        "panoramaAssetId": {
+          "type": "string",
+          "required": true,
+          "description": "Asset ID for the equirectangular panorama image",
+          "ui": {
+            "control": "asset-picker",
+            "accept": "image/*",
+            "label": "Panorama Image"
+          }
+        },
+        "hotspots": {
+          "type": "array<panoramaHotspot>",
+          "required": true,
+          "minItems": 1,
+          "description": "Array of interactive hotspots (each contains a target)"
+        },
+        "initialPitch": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Initial vertical angle (-90 to 90, 0 = horizon)",
+          "ui": {
+            "control": "number",
+            "min": -90,
+            "max": 90,
+            "step": 1,
+            "label": "Initial Pitch"
+          }
+        },
+        "initialYaw": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Initial horizontal angle (-180 to 180, 0 = front-center)",
+          "ui": {
+            "control": "number",
+            "min": -180,
+            "max": 180,
+            "step": 1,
+            "label": "Initial Yaw"
+          }
+        },
+        "hfov": {
+          "type": "number",
+          "required": false,
+          "default": 100,
+          "description": "Horizontal field of view in degrees",
+          "ui": {
+            "control": "number",
+            "min": 30,
+            "max": 120,
+            "step": 5,
+            "label": "Field of View"
+          }
+        },
+        "autoRotate": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Auto-rotate speed in degrees/second (0 = off)",
+          "ui": {
+            "control": "number",
+            "min": -10,
+            "max": 10,
+            "step": 0.5,
+            "label": "Auto-Rotate Speed"
+          }
+        },
+        "prompt": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Optional instruction text overlay (e.g. 'Look around to explore')"
+        }
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "panorama"
     },
 
     "setVariable": {

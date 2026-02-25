@@ -1560,7 +1560,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                 {beat.type !== 'dialogTree' && beat.type !== 'movementChoice' &&
                  beat.type !== 'pickProp' && getCanonicalBeatType(beat.type) !== 'conditionBeat' &&
                  beat.type !== 'setTimer' && beat.type !== 'randomTarget' &&
-                 beat.type !== 'hyperText' && beat.type !== 'keypad' && (
+                 beat.type !== 'hyperText' && beat.type !== 'keypad' &&
+                 beat.type !== 'panorama' && (
                   <SchemaFormGenerator
                     beatType={beat.type}
                     beatDefinition={getBeatDefinition(beat.type)}
@@ -2546,6 +2547,188 @@ export const Inspector: React.FC<InspectorProps> = ({
                       </div>
                     )}
 
+                  </div>
+                )}
+
+                {/* 360° Panorama */}
+                {beat.type === 'panorama' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Panorama Image</label>
+                      <AssetSelector
+                        selectedAssetId={localBeat.parameters?.panoramaAssetId || ''}
+                        onAssetSelect={(assetId) => handleParameterChange('panoramaAssetId', assetId || '')}
+                        assets={assets}
+                        assetType="image"
+                        placeholder="Select panorama image"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Equirectangular image (2:1 aspect ratio)</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Prompt Text</label>
+                      <TextFieldWithVariables
+                        value={localBeat.parameters?.prompt || ''}
+                        onChange={(val) => handleParameterChange('prompt', val)}
+                        placeholder="Look around to explore..."
+                        availableVariables={availableVariables}
+                      />
+                    </div>
+                    {showAdvanced && (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Initial Pitch</label>
+                            <input type="number" value={localBeat.parameters?.initialPitch ?? 0}
+                              onChange={(e) => handleParameterChange('initialPitch', parseFloat(e.target.value))}
+                              min="-90" max="90" step="1"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Initial Yaw</label>
+                            <input type="number" value={localBeat.parameters?.initialYaw ?? 0}
+                              onChange={(e) => handleParameterChange('initialYaw', parseFloat(e.target.value))}
+                              min="-180" max="180" step="1"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Field of View</label>
+                            <input type="number" value={localBeat.parameters?.hfov ?? 100}
+                              onChange={(e) => handleParameterChange('hfov', parseFloat(e.target.value))}
+                              min="30" max="120" step="5"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Auto-Rotate (°/s)</label>
+                            <input type="number" value={localBeat.parameters?.autoRotate ?? 0}
+                              onChange={(e) => handleParameterChange('autoRotate', parseFloat(e.target.value))}
+                              min="-10" max="10" step="0.5"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hotspots */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Hotspots</span>
+                        <button
+                          onClick={() => {
+                            const newHotspot = {
+                              id: `hotspot_${Date.now()}`,
+                              pitch: 0,
+                              yaw: 0,
+                              text: `Hotspot ${(localBeat.parameters?.hotspots?.length || 0) + 1}`,
+                              target: '',
+                            };
+                            handleParameterChange('hotspots', [...(localBeat.parameters?.hotspots || []), newHotspot]);
+                          }}
+                          className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                        >
+                          <Plus className="w-3 h-3 inline" /> Add
+                        </button>
+                      </div>
+
+                      {localBeat.parameters?.hotspots?.map((hotspot: any, index: number) => (
+                        <div key={hotspot.id || index} className="p-3 bg-gray-50 rounded-lg space-y-2 mb-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-medium text-gray-600">Hotspot {index + 1}</span>
+                            <button
+                              onClick={() => {
+                                const newHotspots = localBeat.parameters?.hotspots?.filter((_: any, i: number) => i !== index) || [];
+                                handleParameterChange('hotspots', newHotspots);
+                              }}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          <div>
+                            <input type="text"
+                              value={hotspot.text || ''}
+                              onChange={(e) => {
+                                const newHotspots = [...(localBeat.parameters?.hotspots || [])];
+                                newHotspots[index] = { ...newHotspots[index], text: e.target.value };
+                                handleParameterChange('hotspots', newHotspots);
+                              }}
+                              placeholder="Hotspot label"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-gray-500">Pitch</label>
+                              <input type="number"
+                                value={hotspot.pitch ?? 0}
+                                onChange={(e) => {
+                                  const newHotspots = [...(localBeat.parameters?.hotspots || [])];
+                                  newHotspots[index] = { ...newHotspots[index], pitch: parseFloat(e.target.value) };
+                                  handleParameterChange('hotspots', newHotspots);
+                                }}
+                                min="-90" max="90" step="0.1"
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs" />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500">Yaw</label>
+                              <input type="number"
+                                value={hotspot.yaw ?? 0}
+                                onChange={(e) => {
+                                  const newHotspots = [...(localBeat.parameters?.hotspots || [])];
+                                  newHotspots[index] = { ...newHotspots[index], yaw: parseFloat(e.target.value) };
+                                  handleParameterChange('hotspots', newHotspots);
+                                }}
+                                min="-180" max="180" step="0.1"
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs" />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-gray-500">Icon</label>
+                            <select
+                              value={hotspot.icon || 'arrow'}
+                              onChange={(e) => {
+                                const newHotspots = [...(localBeat.parameters?.hotspots || [])];
+                                newHotspots[index] = { ...newHotspots[index], icon: e.target.value };
+                                handleParameterChange('hotspots', newHotspots);
+                              }}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="arrow">Arrow</option>
+                              <option value="info">Info</option>
+                              <option value="door">Door</option>
+                              <option value="eye">Eye</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-gray-500">Target Beat</label>
+                            <select
+                              value={hotspot.target || ''}
+                              onChange={(e) => {
+                                const newHotspots = [...(localBeat.parameters?.hotspots || [])];
+                                newHotspots[index] = { ...newHotspots[index], target: e.target.value };
+                                handleParameterChange('hotspots', newHotspots);
+                              }}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="">Select target beat...</option>
+                              {availableTargets.map(target => (
+                                <option key={target.id} value={target.id}>
+                                  {target.name || target.id}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+
+                      {(!localBeat.parameters?.hotspots || localBeat.parameters.hotspots.length === 0) && (
+                        <p className="text-xs text-gray-400 italic">No hotspots yet. Add one to create an interactive point in the panorama.</p>
+                      )}
+                    </div>
                   </div>
                 )}
 

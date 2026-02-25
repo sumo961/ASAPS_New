@@ -18,6 +18,7 @@ export { ConversationChoiceBeat } from './ConversationChoiceBeat';
 export { SWFBeat } from './SWFBeat';
 export { InputTextBeat } from './InputTextBeat';
 export { HyperTextBeat } from './HyperTextBeat';
+export { PanoramaBeat } from './PanoramaBeat';
 export { BeatTypeRegistry } from './BeatRegistry';
 
 // AI-powered beats
