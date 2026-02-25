@@ -44,8 +44,16 @@
       "output": "release"
     },
     "files": [
-      "builder/**/*",
-      "dist-electron/**/*",
+      {
+        "from": "dist-electron",
+        "to": "dist-electron",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "builder",
+        "to": "builder",
+        "filter": ["**/*"]
+      },
       "!node_modules/**/*.ts",
       "!node_modules/**/*.map"
     ],
