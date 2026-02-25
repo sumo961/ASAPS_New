@@ -4223,8 +4223,9 @@ function App() {
       });
     }
 
-    // Clear existing beats and connections
+    // Clear existing beats, connections, and translations from previous project
     actions.clearStory();
+    translationActionsRef.current?.clearTranslations();
 
     // Add metadata
     if (story.metadata) {
