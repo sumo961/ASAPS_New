@@ -1,5 +1,42 @@
 # ASAPS Modern - Progress Log
 
+## 2026-02-25: Electron 40 Upgrade, Security Fixes & Input Autofocus (v0.9.27)
+
+### Overview
+
+This release **upgrades Electron from 33 to 40** (latest supported, EOL June 2026), resolves **4 high-severity security alerts** by bumping `@modelcontextprotocol/sdk` to 1.25.2, and adds **autofocus to inputText fields** so interactors can type immediately without clicking.
+
+### Electron 40 Upgrade
+
+Upgraded from Electron 33 (EOL April 2025) to Electron 40 (latest, supported until June 2026). Also upgraded electron-builder from 25 to 26 for compatibility. Required several CI fixes:
+
+- Pinned `electronVersion` in build config (CI can't resolve `^40.0.0` without electron in node_modules)
+- Disabled `disableSanityCheckAsar` (electron-builder's ASAR integrity checker incompatible with Electron 40 format)
+- Excluded `.ts` and `.map` files from ASAR archive (macOS universal binary merge can't reconcile differing source files)
+- Updated CI workflow to use electron-builder 26.8.1
+
+**Files modified:**
+- `apps/builder-desktop/package.json` — Electron 40.6.1, electron-builder ^26.0.0, disableSanityCheckAsar, file exclusions
+- `.github/workflows/build-desktop.yml` — electron-builder 26.8.1 in CI
+
+### Security: MCP SDK Bump
+
+Bumped `@modelcontextprotocol/sdk` from `^0.5.0` to `^1.25.2`, resolving 4 high-severity Dependabot alerts (ReDoS vulnerability and DNS rebinding protection not enabled by default).
+
+**Files modified:**
+- `mcp-server/package.json` — SDK version bump
+- `mcp-server/package-lock.json` — Updated dependency tree
+
+### InputText Autofocus
+
+Input fields in inputText beats now autofocus when the beat renders, so interactors can start typing immediately without having to click the field first.
+
+**Files modified:**
+- `packages/renderer/src/components/PositionedBeatView.tsx` — `autoFocus={interactive}` on input element
+- `packages/renderer/src/renderers/ReactRenderer.tsx` — `autoFocus` on fallback input element
+
+---
+
 ## 2026-02-25: Debug Analyzer Fixes, Translation Stability & Git VCS Improvements (v0.9.26)
 
 ### Overview

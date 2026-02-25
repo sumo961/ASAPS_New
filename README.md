@@ -16,12 +16,15 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.26)
+## ⚠️ Development Status (v0.9.27)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Electron 40** | **v0.9.27**: Upgraded from EOL Electron 33 to latest Electron 40 (Chromium 144, Node 24, supported until June 2026) |
+| **MCP SDK Security** | **v0.9.27**: Bumped @modelcontextprotocol/sdk to 1.25.2, fixing 4 high-severity alerts |
+| **InputText Autofocus** | **v0.9.27**: Input fields autofocus on render — interactors can type immediately |
 | **Debug Analyzer: Variable Recognition** | **v0.9.26**: inputText/keypad beats now recognized as variable/counter setters — no more false "never set" warnings |
 | **Debug Analyzer: Keypad Connections** | **v0.9.26**: Keypad failTarget connections visible in flowchart and traversed by reachability analyzer |
 | **Translation Bleed Fix** | **v0.9.26**: Translations from open project no longer bleed into AI-generated stories |
