@@ -362,6 +362,32 @@ export class ReachabilityAnalyzer {
       if (beat.type === 'dialogTree' && params.dialogTree) {
         this.analyzeDialogTreeForCounters(params.dialogTree);
       }
+
+      // Analyze inputText and keypad beats (user input saved to variable/counter)
+      if (beat.type === 'inputText' || beat.type === 'keypad') {
+        const saveToType = params.saveToType;
+        if (saveToType === 'variable') {
+          const varName = params.variable;
+          if (varName) {
+            if (!this.variableValues.has(varName)) {
+              this.variableValues.set(varName, new Set());
+            }
+            // Sentinel: user input can be anything
+            this.variableValues.get(varName)!.add('__user_input__');
+          }
+        } else if (saveToType === 'counter') {
+          const counterName = params.counter;
+          if (counterName) {
+            if (!this.counterModifications.has(counterName)) {
+              this.counterModifications.set(counterName, { min: 0, max: 0 });
+            }
+            // User input is unbounded — widen range conservatively
+            const range = this.counterModifications.get(counterName)!;
+            range.min = Math.min(range.min, -999999);
+            range.max = Math.max(range.max, 999999);
+          }
+        }
+      }
     }
   }
 
@@ -527,6 +553,11 @@ export class ReachabilityAnalyzer {
             reason: `Variable "${varName}" is never set in the story`,
             suggestedFix: `Add a setVariable beat that sets "${varName}"`
           };
+        }
+
+        // If user input can set this variable, any value is possible
+        if (possibleValues.has('__user_input__')) {
+          return { condition, isSatisfiable: true };
         }
 
         const isSatisfiable = Array.from(possibleValues).some(val =>

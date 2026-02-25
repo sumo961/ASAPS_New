@@ -109,6 +109,26 @@ export class KeypadBeat extends Beat {
     if (params.backgroundSound !== undefined) this.backgroundSound = params.backgroundSound;
   }
 
+  /**
+   * Override getConnections to expose failTarget to the graph and reachability analyzer
+   */
+  getConnections(): Array<{ targetId: string; label?: string; condition?: any }> {
+    // Start with base connections (defaultTarget, etc.)
+    const connections = super.getConnections();
+
+    // Add failTarget if set
+    if (this.failTarget) {
+      if (!connections.some(c => c.targetId === this.failTarget)) {
+        connections.push({
+          targetId: this.failTarget,
+          label: 'fail'
+        });
+      }
+    }
+
+    return connections;
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer

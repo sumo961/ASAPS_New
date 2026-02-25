@@ -171,6 +171,11 @@ export function extractConnectionsFromBeats(
     if (beat.type === 'endScreen' && params.restartConnection?.target) {
       addEdge(beat.id, params.restartConnection.target);
     }
+
+    // keypad failTarget
+    if (beat.type === 'keypad' && params.failTarget) {
+      addEdge(beat.id, params.failTarget);
+    }
   });
 
   return edges;
