@@ -236,7 +236,35 @@ describe('Translation Sync', () => {
       expect(resource.sourceHash).toBe(computeSourceHash(currentSource));
     });
 
-    it('should keep orphaned strings in the resource', () => {
+    it('should not overwrite existing translated entries for "new" keys', () => {
+      const resource = createEmptyResource('de', 'German');
+      resource._sourceSnapshot = { 'beat:1.text': 'Hello' };
+      resource.strings = {
+        'beat:1.text': { value: 'Hallo', status: 'translated' },
+        // Key exists in strings (from prior sync or AI generation) but not in snapshot
+        'beat:2.text': { value: 'Welt', status: 'translated' },
+      };
+
+      const syncResult = {
+        newStrings: ['beat:2.text'],  // "new" because not in snapshot
+        staleStrings: [],
+        orphanedStrings: [],
+        hasChanges: true,
+      };
+
+      const currentSource = {
+        'beat:1.text': 'Hello',
+        'beat:2.text': 'World',
+      };
+
+      applySyncResult(resource, syncResult, currentSource);
+
+      // Existing translation should be preserved (not overwritten with source text)
+      expect(resource.strings['beat:2.text'].value).toBe('Welt');
+      expect(resource.strings['beat:2.text'].status).toBe('translated');
+    });
+
+    it('should remove orphaned strings from the resource', () => {
       const resource = createEmptyResource('de', 'German');
       resource._sourceSnapshot = {
         'beat:1.text': 'Hello',
@@ -258,9 +286,39 @@ describe('Translation Sync', () => {
 
       applySyncResult(resource, syncResult, currentSource);
 
-      // Orphaned strings are kept (not deleted)
-      expect(resource.strings['beat:2.text']).toBeDefined();
-      expect(resource.strings['beat:2.text'].value).toBe('Welt');
+      // Orphaned strings are removed (source was deleted)
+      expect(resource.strings['beat:2.text']).toBeUndefined();
+      // Non-orphaned strings preserved
+      expect(resource.strings['beat:1.text'].value).toBe('Hallo');
+    });
+
+    it('should remove phantom entries not in snapshot or current source', () => {
+      const resource = createEmptyResource('de', 'German');
+      resource._sourceSnapshot = { 'beat:1.text': 'Hello' };
+      resource.strings = {
+        'beat:1.text': { value: 'Hallo', status: 'translated' },
+        // Phantom: exists in strings but NOT in snapshot or current source
+        // (e.g., from a deleted beat whose snapshot was never persisted)
+        'beat:deleted.text': { value: 'Ghost', status: 'untranslated' },
+        'beat:deleted.question': { value: 'Phantom', status: 'translated' },
+      };
+
+      const syncResult = {
+        newStrings: [],
+        staleStrings: [],
+        orphanedStrings: [],
+        hasChanges: false,
+      };
+
+      const currentSource = { 'beat:1.text': 'Hello' };
+
+      applySyncResult(resource, syncResult, currentSource);
+
+      // Phantom entries removed — they don't exist in current source
+      expect(resource.strings['beat:deleted.text']).toBeUndefined();
+      expect(resource.strings['beat:deleted.question']).toBeUndefined();
+      // Valid strings preserved
+      expect(resource.strings['beat:1.text'].value).toBe('Hallo');
     });
   });
 });

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-02-23T18:58:11.295Z
+ * Generated: 2026-02-24T22:08:14.207Z
  */
 
 // ============================================
@@ -126,7 +126,7 @@ export interface DialogTreeParameters {
   dialogTree: DialogNode;
   /** Delay in seconds before showing choices with fade-in */
   choiceDelay?: number | undefined;
-  /** Show visual indication for choices leading to already-visited beats */
+  /** Block and dim choices leading to previously visited beats */
   markVisited?: boolean | undefined;
   /** Dialog presentation style: 'positioned' (traditional positioned elements), 'chat-scroll' (scrollable chat history), or 'chat-bubble' (single message bubble) */
   presentationMode?: string | undefined;
@@ -148,7 +148,7 @@ export interface MovementChoiceParameters {
   choices: MovementOption[];
   /** Delay in seconds before showing choices with fade-in */
   choiceDelay?: number | undefined;
-  /** Show visual indication for choices leading to already-visited beats */
+  /** Block and dim choices leading to previously visited beats */
   markVisited?: boolean | undefined;
   /** Only show choice text when hovering over the hotspot */
   showTextOnHover?: boolean | undefined;
@@ -166,7 +166,7 @@ export interface PickPropParameters {
   props: PropOption[];
   /** Delay in seconds before showing choices with fade-in */
   choiceDelay?: number | undefined;
-  /** Show visual indication for choices leading to already-visited beats */
+  /** Block and dim choices leading to previously visited beats */
   markVisited?: boolean | undefined;
 }
 

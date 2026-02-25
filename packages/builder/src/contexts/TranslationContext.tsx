@@ -252,7 +252,13 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
 
       const synced = newTranslations.map(resource => {
         const result = syncTranslation(resource, currentSource);
-        if (!result.hasChanges) return resource;
+
+        // Also check for phantom entries — keys in resource.strings that don't
+        // exist in the current source extraction. These slip through syncTranslation
+        // when the snapshot was never persisted after a previous sync.
+        const hasPhantoms = Object.keys(resource.strings).some(k => !(k in currentSource));
+
+        if (!result.hasChanges && !hasPhantoms) return resource;
 
         const cloned: TranslationResource = {
           ...resource,
@@ -260,8 +266,12 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
           _sourceSnapshot: { ...resource._sourceSnapshot },
         };
         applySyncResult(cloned, result, currentSource);
+        const phantomCount = hasPhantoms
+          ? Object.keys(resource.strings).filter(k => !(k in currentSource)).length
+          : 0;
         console.log(
-          `[TranslationContext] loadSync ${resource.languageName}: ${result.staleStrings.length} stale, ${result.newStrings.length} new, ${result.orphanedStrings.length} orphaned`
+          `[TranslationContext] loadSync ${resource.languageName}: ${result.staleStrings.length} stale, ${result.newStrings.length} new, ${result.orphanedStrings.length} orphaned` +
+          (phantomCount > 0 ? `, ${phantomCount} phantom removed` : '')
         );
         return cloned;
       });
@@ -304,7 +314,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
       let anyChanged = false;
       const updated = prev.map(resource => {
         const result = syncTranslation(resource, currentSource);
-        if (!result.hasChanges) return resource;
+        const hasPhantoms = Object.keys(resource.strings).some(k => !(k in currentSource));
+
+        if (!result.hasChanges && !hasPhantoms) return resource;
 
         anyChanged = true;
         const cloned: TranslationResource = {
@@ -313,8 +325,12 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
           _sourceSnapshot: { ...resource._sourceSnapshot },
         };
         applySyncResult(cloned, result, currentSource);
+        const phantomCount = hasPhantoms
+          ? Object.keys(resource.strings).filter(k => !(k in currentSource)).length
+          : 0;
         console.log(
-          `[TranslationContext] syncAll ${resource.languageName}: ${result.staleStrings.length} stale, ${result.newStrings.length} new, ${result.orphanedStrings.length} orphaned`
+          `[TranslationContext] syncAll ${resource.languageName}: ${result.staleStrings.length} stale, ${result.newStrings.length} new, ${result.orphanedStrings.length} orphaned` +
+          (phantomCount > 0 ? `, ${phantomCount} phantom removed` : '')
         );
         return cloned;
       });

@@ -77,7 +77,8 @@ export function syncTranslation(
  * Apply sync results to a translation resource.
  * - New strings: added as 'untranslated' with source text as placeholder value
  * - Stale strings: marked as 'stale' (translation kept, but flagged for review)
- * - Orphaned strings: kept in the resource (not deleted) but could be flagged
+ * - Orphaned strings: removed from the resource (source was deleted)
+ * - Phantom entries: any resource strings not in current source are also removed
  *
  * @param resource - The translation resource to update (mutated in place)
  * @param syncResult - Result from syncTranslation()
@@ -88,18 +89,39 @@ export function applySyncResult(
   syncResult: TranslationSyncResult,
   currentSourceStrings: Record<string, string>
 ): void {
-  // Add new strings as untranslated (source text as placeholder)
+  // Add new strings as untranslated (source text as placeholder).
+  // Preserve existing translations — a key can be "new" (not in snapshot)
+  // if the extraction logic was updated, but the resource may already have
+  // a translated entry from a previous sync or AI generation.
   for (const key of syncResult.newStrings) {
-    resource.strings[key] = {
-      value: currentSourceStrings[key],
-      status: 'untranslated',
-    };
+    if (!resource.strings[key] || resource.strings[key].status === 'untranslated') {
+      resource.strings[key] = {
+        value: currentSourceStrings[key],
+        status: 'untranslated',
+      };
+    }
   }
 
   // Mark stale strings
   for (const key of syncResult.staleStrings) {
     if (resource.strings[key]) {
       resource.strings[key].status = 'stale';
+    }
+  }
+
+  // Remove orphaned strings (source was deleted — translation no longer needed)
+  for (const key of syncResult.orphanedStrings) {
+    delete resource.strings[key];
+  }
+
+  // Remove phantom entries — strings that exist in the resource but not in the
+  // current extraction. These can accumulate when beats are deleted but the
+  // snapshot was never updated on disk (so syncTranslation can't detect them
+  // as orphaned). This is the definitive cleanup pass.
+  const validKeys = new Set(Object.keys(currentSourceStrings));
+  for (const key of Object.keys(resource.strings)) {
+    if (!validKeys.has(key)) {
+      delete resource.strings[key];
     }
   }
 

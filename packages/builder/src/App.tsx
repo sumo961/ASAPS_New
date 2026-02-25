@@ -548,6 +548,8 @@ function App() {
   stateTitleRef.current = state.title;
   const projectFormatRef = useRef(projectFormat);
   projectFormatRef.current = projectFormat;
+  const projectPathRef = useRef(projectPath);
+  projectPathRef.current = projectPath;
 
   // Electron integration - set up menu event listeners
   useEffect(() => {
@@ -1845,16 +1847,59 @@ function App() {
         // IMPORTANT: Build projectData from currentProject directly instead of reading
         // from IndexedDB (which may be stale after git reset — race with async updateProject).
         if (currentProject.translations?.length) {
-          const translations = currentProject.translations;
+          const isDirectoryProject = !!(currentProject as any).directoryPath || projectFormat === 'directory';
+          let translations = currentProject.translations;
           const manifest = currentProject.translationManifest;
+
+          // Clean stale markers baked into committed translation files BEFORE sync
+          if (isDirectoryProject) {
+            translations = translations.map((t: any) => ({
+              ...t,
+              strings: Object.fromEntries(
+                Object.entries(t.strings as Record<string, { value: string; status: string }>).map(
+                  ([k, v]) => [k, v.status === 'stale' ? { ...v, status: 'translated' } : v]
+                )
+              ),
+            }));
+          }
+
           const projectData = {
             project: {
               ...currentProject,
               story: currentProject.story,
             },
           };
+          // Diagnostic: check story structure for translation extraction
+          const storyCheck = (currentProject.story as any);
+          const beatsCheck = storyCheck?.beats;
+          const beatsIsArray = Array.isArray(beatsCheck);
+          const beatsCount = beatsIsArray ? beatsCheck.length : (beatsCheck instanceof Map ? beatsCheck.size : 'unknown');
+          const beat109 = beatsIsArray
+            ? beatsCheck.find((b: any) => b.id === 'beat_109')
+            : (beatsCheck instanceof Map ? beatsCheck.get('beat_109') : null);
+          console.log('[App] Translation extraction diagnostic:', {
+            isDirectoryProject,
+            beatsIsArray,
+            beatsType: beatsCheck?.constructor?.name,
+            beatsCount,
+            beat109Found: !!beat109,
+            beat109Type: beat109?.type,
+            beat109HasQuestion: !!beat109?.parameters?.question,
+          });
+
           translationActions.loadTranslations(translations, manifest, projectData);
-          console.log('[App] >>> Loaded', translations.length, 'translation(s) with sync');
+
+          // For directory projects: clean false stale markers the sync just added
+          if (isDirectoryProject) {
+            translationActions.cleanStaleMarkers();
+            // Persist updated _sourceSnapshot to disk
+            setTimeout(() => {
+              markChanged();
+              saveNow();
+              console.log('[App] >>> Persisted translation sync (updated _sourceSnapshot)');
+            }, 1000);
+          }
+          console.log('[App] >>> Loaded', translations.length, 'translation(s)', isDirectoryProject ? '(stale cleaned — directory)' : 'with sync');
         } else {
           translationActions.clearTranslations();
         }
@@ -2109,6 +2154,17 @@ function App() {
           // New strings (status: 'untranslated') are preserved — only 'stale' is cleaned.
           if (cleanStaleMarkers) {
             translationActions.cleanStaleMarkers();
+          }
+
+          // Persist updated _sourceSnapshot to disk so sync doesn't re-detect
+          // the same "new" strings on every load. The sync updates the snapshot
+          // in memory but this is lost unless we trigger a save.
+          if (isDirectoryProject) {
+            setTimeout(() => {
+              markChanged();
+              saveNow();
+              console.log('[App] >>> Persisted translation sync (updated _sourceSnapshot)');
+            }, 1000);
           }
           console.log('[App] >>> Loaded', translations.length, 'translation(s)', cleanStaleMarkers ? '(stale cleaned — directory/reset)' : 'with sync');
         } else {
@@ -2989,8 +3045,12 @@ function App() {
       syncTimer = setTimeout(async () => {
         const proj = currentProjectRef2.current;
         if (!proj?.id) return;
-        const dirPath = proj.directoryPath;
-        if (!dirPath) return;
+        // Use projectPathRef as fallback — proj.directoryPath may not always be set
+        const dirPath = proj.directoryPath || projectPathRef.current;
+        if (!dirPath) {
+          console.log('[App] Post-VCS: No directory path, skipping translation reload');
+          return;
+        }
 
         const api = window.electronAPI;
         if (!api?.fs) return;
