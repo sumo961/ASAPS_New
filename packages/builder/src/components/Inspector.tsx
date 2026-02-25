@@ -236,15 +236,17 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   // Get available hotspots and props from beat.locations for MovementChoice/PickProp association
   // Dependencies include locations.size and activeTab to refresh when locations change or tab switches
-  const availableLocations = useMemo(() => {
-    if (!beat || !beat.locations) return { hotspots: [], props: [] };
+  // Recompute on every render — beat.locations is a Map mutated externally by the VE,
+  // so useMemo with reference-based deps can never reliably detect changes.
+  const availableLocations = (() => {
+    if (!beat || !beat.locations) return { hotspots: [] as any[], props: [] as any[] };
 
     const locations = Array.from(beat.locations.values());
     const hotspots = locations.filter(loc => loc.kind === 'hotspot');
     const props = locations.filter(loc => loc.kind === 'prop');
 
     return { hotspots, props };
-  }, [beat, beat?.locations?.size, locationUpdateTrigger, activeTab]);
+  })();
 
   // Asset selection modal state
   const [assetSelectionModal, setAssetSelectionModal] = useState<{
@@ -480,6 +482,11 @@ export const Inspector: React.FC<InspectorProps> = ({
     // Directly add to the beat's locations Map
     beat.locations.set(finalName, newHotspot as any);
 
+    // Notify VE to add the element to its live state
+    window.dispatchEvent(new CustomEvent('asaps:addElementToStage', {
+      detail: { beatId: beat.id, location: newHotspot }
+    }));
+
     // Update the choice's locationName to reference this new hotspot
     const newChoices = [...(localBeat.parameters?.choices || [])];
     newChoices[choiceIndex] = {
@@ -598,6 +605,11 @@ export const Inspector: React.FC<InspectorProps> = ({
 
     // Directly add to the beat's locations Map
     beat.locations.set(finalName, newHotspot as any);
+
+    // Notify VE to add the element to its live state
+    window.dispatchEvent(new CustomEvent('asaps:addElementToStage', {
+      detail: { beatId: beat.id, location: newHotspot }
+    }));
 
     // Update the prop's locationName to reference this new hotspot
     const newProps = [...(localBeat.parameters?.props || [])];
@@ -3065,29 +3077,97 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </>
                           )}
 
-                          {/* Visual Element Association - like movementChoice */}
+                          {/* Display — unified stage element / image asset selector */}
                           <div className="flex gap-2">
                             <select
-                              value={(prop as any).locationName || ''}
-                              onChange={(e) => handleUpdateProp(index, 'locationName', e.target.value)}
+                              value={
+                                (prop as any).locationName
+                                  ? `loc:${(prop as any).locationName}`
+                                  : (prop as any).assetId
+                                    ? `asset:${(prop as any).assetId}`
+                                    : [...availableLocations.hotspots, ...availableLocations.props]
+                                        .some(loc => loc.name === prop.name)
+                                      ? `loc:${prop.name}`
+                                      : ''
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const newProps = [...(localBeat.parameters?.props || [])];
+                                if (val.startsWith('loc:')) {
+                                  newProps[index] = { ...newProps[index], locationName: val.slice(4), assetId: undefined };
+                                  handleParameterChange('props', newProps);
+                                } else if (val.startsWith('asset:')) {
+                                  // Add image asset to stage as a prop element
+                                  const selectedAssetId = val.slice(6);
+                                  const selectedAsset = assets.find(a => a.id === selectedAssetId);
+                                  if (selectedAsset && beat) {
+                                    const baseName = (selectedAsset.name || `Prop ${index + 1}`).replace(/\.[^.]+$/, '');
+                                    const existingNames = new Set(
+                                      Array.from(beat.locations?.values() || []).map(loc => loc.name)
+                                    );
+                                    let finalName = baseName;
+                                    let counter = 1;
+                                    while (existingNames.has(finalName)) {
+                                      finalName = `${baseName} (${counter})`;
+                                      counter++;
+                                    }
+                                    // Build location object for both persistence and VE notification
+                                    const newLocation = {
+                                      kind: 'prop' as const,
+                                      name: finalName,
+                                      x: 100 + (index * 50),
+                                      y: 300 + (index * 60),
+                                      width: 150,
+                                      height: 150,
+                                      zIndex: 10 + index,
+                                      assetId: selectedAssetId,
+                                    };
+                                    // Persist to beat.locations (for when VE mounts later)
+                                    beat.locations.set(finalName, newLocation as any);
+                                    // Notify VE to add the element to its live state
+                                    window.dispatchEvent(new CustomEvent('asaps:addElementToStage', {
+                                      detail: { beatId: beat.id, location: newLocation }
+                                    }));
+                                    newProps[index] = { ...newProps[index], locationName: finalName, assetId: undefined };
+                                    const updatedBeat = {
+                                      ...localBeat,
+                                      parameters: { ...localBeat.parameters, props: newProps }
+                                    };
+                                    setLocalBeat(updatedBeat);
+                                    rebuildConnectionsAndUpdate(updatedBeat);
+                                  }
+                                } else {
+                                  newProps[index] = { ...newProps[index], locationName: '', assetId: undefined };
+                                  handleParameterChange('props', newProps);
+                                }
+                              }}
                               className="flex-1 px-2 py-1 text-sm border rounded"
-                              title="Associate this prop with a hotspot or prop from the Visual Editor"
+                              title="How this prop is displayed: as a text button, a stage element, or an image"
                             >
-                              <option value="">Auto-create hotspot</option>
+                              <option value="">Button (default)</option>
                               {availableLocations.hotspots.length > 0 && (
-                                <optgroup label="Hotspots">
+                                <optgroup label="Stage Elements — Hotspots">
                                   {availableLocations.hotspots.map((loc) => (
-                                    <option key={`hotspot-${loc.name}`} value={loc.name}>
+                                    <option key={`hotspot-${loc.name}`} value={`loc:${loc.name}`}>
                                       🎯 {loc.name}
                                     </option>
                                   ))}
                                 </optgroup>
                               )}
                               {availableLocations.props.length > 0 && (
-                                <optgroup label="Props">
+                                <optgroup label="Stage Elements — Props">
                                   {availableLocations.props.map((loc) => (
-                                    <option key={`prop-${loc.name}`} value={loc.name}>
+                                    <option key={`prop-${loc.name}`} value={`loc:${loc.name}`}>
                                       📦 {loc.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {assets.filter(a => a.type === 'image').length > 0 && (
+                                <optgroup label="Image Assets">
+                                  {assets.filter(a => a.type === 'image').map(asset => (
+                                    <option key={`asset-${asset.id}`} value={`asset:${asset.id}`}>
+                                      🖼 {asset.name}
                                     </option>
                                   ))}
                                 </optgroup>
@@ -3113,29 +3193,11 @@ export const Inspector: React.FC<InspectorProps> = ({
                               type="text"
                               value={(prop as any).inventoryName || ''}
                               onChange={(e) => handleUpdateProp(index, 'inventoryName', e.target.value)}
-                              placeholder={(prop as any).locationName || prop.name || 'Same as prop name'}
+                              placeholder={prop.name || 'Same as prop name'}
                               className="w-full px-2 py-1 text-sm border rounded"
                             />
                             <span className="text-xs text-gray-400">
-                              Name added to inventory when picked. Leave empty to use "{(prop as any).locationName || prop.name || 'prop name'}"
-                            </span>
-                          </div>
-
-                          {/* Prop Graphic Asset Selector */}
-                          <div>
-                            <label className="text-xs text-gray-600 mb-1 block">Prop Graphic (optional)</label>
-                            <select
-                              value={(prop as any).assetId || ''}
-                              onChange={(e) => handleUpdateProp(index, 'assetId', e.target.value || undefined)}
-                              className="w-full px-2 py-1 text-sm border rounded"
-                            >
-                              <option value="">None (use button)</option>
-                              {assets.filter(a => a.type === 'image').map(asset => (
-                                <option key={asset.id} value={asset.id}>{asset.name}</option>
-                              ))}
-                            </select>
-                            <span className="text-xs text-gray-400">
-                              Select an image to display as clickable prop
+                              Name added to inventory when picked. Leave empty to use "{prop.name || 'prop name'}"
                             </span>
                           </div>
 

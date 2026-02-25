@@ -287,6 +287,66 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     };
   }, []);
 
+  // Listen for elements added from the Inspector (hotspots, props via image asset selection)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { beatId, location } = (e as CustomEvent).detail;
+      if (!beatRef.current || beatRef.current.id !== beatId) return;
+
+      const loc = location as { kind: string; name: string; x: number; y: number; width: number; height: number; zIndex: number; assetId?: string };
+
+      const addElement = (w: number, h: number) => {
+        const newElement: VisualElement = {
+          id: `element_${Date.now()}`,
+          type: loc.kind as any,
+          name: loc.name,
+          x: loc.x,
+          y: loc.y,
+          z: loc.zIndex,
+          width: w,
+          height: h,
+          rotation: 0,
+          scale: 1,
+          visible: true,
+          locked: false,
+          ...(loc.assetId ? { assetId: loc.assetId } : {}),
+        };
+        const afterElements = [...visualElementsRef.current, newElement];
+        setVisualElements(afterElements);
+        setHasChanges(true);
+
+        // Update beat.locations with actual dimensions
+        if (beatRef.current) {
+          beatRef.current.locations.set(loc.name, {
+            ...loc,
+            width: Math.round(w),
+            height: Math.round(h),
+          } as any);
+        }
+      };
+
+      // For elements with an image asset, load actual dimensions
+      if (loc.assetId) {
+        const asset = assets.find(a => a.id === loc.assetId);
+        if (asset?.dimensions?.width && asset?.dimensions?.height) {
+          addElement(asset.dimensions.width, asset.dimensions.height);
+        } else if (asset?.url) {
+          const img = new Image();
+          img.onload = () => addElement(img.naturalWidth, img.naturalHeight);
+          img.onerror = () => addElement(loc.width, loc.height);
+          img.src = asset.url;
+        } else {
+          addElement(loc.width, loc.height);
+        }
+      } else {
+        addElement(loc.width, loc.height);
+      }
+    };
+
+    window.addEventListener('asaps:addElementToStage', handler);
+    return () => window.removeEventListener('asaps:addElementToStage', handler);
+  }, [assets]);
+
   // Handle panel resize dragging
   useEffect(() => {
     if (!isResizingPanel) return;
