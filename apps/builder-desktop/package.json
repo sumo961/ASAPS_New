@@ -45,7 +45,9 @@
     },
     "files": [
       "builder/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "!node_modules/**/*.ts",
+      "!node_modules/**/*.map"
     ],
     "publish": {
       "provider": "github",
