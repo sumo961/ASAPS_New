@@ -8,7 +8,7 @@
  *
  * CONNECTION RULES:
  * - SINGLE CONNECTION beats: Can only connect to ONE target beat via the connections array
- *   titleScreen, infoText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
+ *   titleScreen, infoText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText, keypad
  *
  * - MULTIPLE CONNECTION beats: Support multiple targets via their parameters (NOT the connections array)
  *   - dialogTree: targets defined in dialogTree.choices[].target
@@ -81,11 +81,27 @@
  * - Useful for: skill checks, relationship comparisons, dynamic difficulty
  *
  * VISITED BEAT TRACKING:
- * - "markVisited" parameter (boolean): Show visual indication for choices leading to already-visited beats
+ * - "markVisited" parameter (boolean): Block and dim choices leading to previously visited beats
+ * - Per-choice visited tracking: choices are individually tracked (composite key: "beatId:choiceId")
  * - Supported on: dialogTree, movementChoice, pickProp
  * - Useful for: helping players find unexplored paths, achievement hunting
  * - "visitedBeat" condition type: Check if a specific beat has been visited
  *   Example: { "type": "visitedBeat", "beatId": "some_beat_id", "operator": "==" }
+ *
+ * RECURSIVE DIALOG TREES:
+ * - DialogTree choices can use target: "__self__" to loop back to the SAME dialogTree beat
+ * - Useful for: interrogation, shopping, asking multiple questions before leaving
+ * - Combine with markVisited: true to block and dim already-selected choices
+ * - At least one choice should have a real target to exit the loop
+ *
+ * FICTIONAL TIME SYSTEM:
+ * Stories can track in-story date/time progression (separate from real-time timers):
+ * - Set via setVariable with type "fictionalTime": operations "set", "advance", "subtract"
+ * - Check via conditionBeat with type "fictionalTime": compare current time against a date/time
+ * - Display: Shows automatically in Timer HUD when enabled in global settings
+ * - Supports units: minutes, hours, days, months, years
+ * - Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
+ * - Per-beat timeDisplayMode: "fictionalTime" (default), "manual" (custom text), "none" (hide HUD)
  *
  * MOVEMENT CHOICE OPTIONS:
  * - "showTextOnHover" parameter (boolean): Only show choice text when hovering over the hotspot
@@ -127,23 +143,24 @@
 export declare const BEAT_TYPES: {
     readonly titleScreen: "🚨 MANDATORY FIRST BEAT (beat_0)! Start screen with title and author. SINGLE CONNECTION: only one target via connections array.";
     readonly infoText: "Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: infoText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead. Optional: textVariations (array) for random text selection at runtime.";
-    readonly endScreen: "End screen with message. 🚨 MUST be actual beats in beats array, NOT an \"endings\" metadata array! ALWAYS set showRestart: true. Use \"message\" parameter (not \"endMessage\"). Example: { \"id\": \"end_bad\", \"type\": \"endScreen\", \"parameters\": { \"message\": \"You lost!\", \"showRestart\": true } }";
-    readonly dialogTree: "Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode (\"positioned\"/\"chat-scroll\"/\"chat-bubble\"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean). Choices can modify counters via counter/counterOperation/counterValue properties.";
+    readonly endScreen: "End screen with message. 🚨 MUST be actual beats in beats array, NOT an \"endings\" metadata array! ALWAYS set showRestart: true. Use \"message\" parameter (not \"endMessage\"). Optional credits page: showCredits (boolean), creditsPageTitle (default \"Credits\"), creditsPageBody (text content), creditsCloseText (default \"Close\"), creditsText (button label). Example: { \"id\": \"end_bad\", \"type\": \"endScreen\", \"parameters\": { \"message\": \"You lost!\", \"showRestart\": true, \"showCredits\": true, \"creditsPageTitle\": \"Credits\", \"creditsPageBody\": \"Created by...\" } }";
+    readonly dialogTree: "Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode (\"positioned\"/\"chat-scroll\"/\"chat-bubble\"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean for per-choice visited tracking). Choices can modify counters via counter/counterOperation/counterValue properties. RECURSIVE DIALOGS: use target \"__self__\" to loop back to the same dialogTree (e.g., interrogation, shopping).";
     readonly movementChoice: "Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. IMPORTANT: Each choice needs { id, text, location, target } - always set \"location\" to same value as \"text\" for hover labels! Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).";
     readonly pickProp: "Interactive prop/item selection. MULTIPLE TARGETS: define targets in props[].target parameter. IMPORTANT: prop \"name\" should be ITEM NAMES ONLY (e.g., \"Silver Key\", \"Lantern\"), NOT action descriptions (e.g., \"Take the key\" is WRONG). For actions, use movementChoice instead. Supports: choiceDelay (seconds), markVisited (boolean).";
     readonly hyperText: "Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Links can have custom styling (color, underline, bold). Supports optional defaultTarget for timed auto-advance.";
     readonly inputText: "Player text input. Save to: variable (default), characterName (update display name), or counter (numeric). Validation: none, numeric, email, alphanumeric. Properties: minLength, maxLength, required. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance.";
+    readonly keypad: "Numeric keypad input (PIN entry, safe locks, phone dialers). Parameters: prompt, layout (\"numeric\"|\"phone\"|\"pin\"), maxDigits, minDigits, correctCode (optional auto-validation), failTarget (beat on wrong code), maxAttempts (0=unlimited), maskInput (boolean), saveToType (\"variable\"|\"counter\"), variable, buttonText, clearButtonText, showDisplay. SINGLE CONNECTION: correct code or submit → next beat. If correctCode is set, validates automatically and routes to failTarget on wrong entry.";
     readonly durScreen: "Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target via connections array at beat level. ❌ WRONG: connection inside parameters. ✓ CORRECT: \"connections\": [{ \"targetId\": \"beat_5\" }] at beat level. Optional: textVariations (array) for random text selection at runtime.";
     readonly videoBeat: "Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.";
-    readonly conditionBeat: "Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat.";
-    readonly setVariable: "Set ONE variable/counter per beat. Operations: set (replace), change (add/subtract), multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.";
+    readonly conditionBeat: "Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat, fictionalTime (compare in-story date/time).";
+    readonly setVariable: "Set ONE variable/counter/fictionalTime per beat. Types: \"variable\" (text/boolean), \"counter\" (numeric ops), \"fictionalTime\" (set/advance/subtract in-story date/time). Operations: set, add, subtract, multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.";
     readonly addRemoveInventory: "Modify inventory. Actions: add, remove, or transfer (move between characters). Use \"character\" parameter to specify which character's inventory (defaults to player). Examples: { \"action\": \"add\", \"item\": \"key\", \"character\": \"merchant\" }, { \"action\": \"transfer\", \"item\": \"sword\", \"fromCharacter\": \"player\", \"toCharacter\": \"companion\" }. SINGLE CONNECTION: executes then continues to one target.";
     readonly randomTarget: "Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.";
     readonly setTimer: "Set/check timers. Beat continues immediately to SINGLE CONNECTION target while timer runs in background. Optional timerTarget parameter: where story jumps when timer expires.";
     readonly aiInfoText: "AI-generated contextual text with Continue button. Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables. SINGLE CONNECTION. Generates personalized 1-2 sentences based on player state.";
     readonly aiDurScreen: "AI-generated text with auto-advance based on reading speed. Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables, wordsPerMinute (default 200), minDuration (ms), maxDuration (ms). SINGLE CONNECTION.";
     readonly aiDialogTree: "AI-generated branching dialogue at runtime. Creates personalized conversations based on player state and context.";
-    readonly aiSummary: "AI-generated narrative summary of the player's journey. Useful for endings or recaps.";
+    readonly aiSummary: "AI-generated narrative summary of the player's journey. Parameters: prompt, title, summaryStyle (\"narrative\"|\"bullet-points\"|\"reflection\"), maxLength (\"short\"|\"medium\"|\"long\"), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart (boolean), showCredits (boolean), resetOnRestart (boolean), resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory (granular reset sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText. SINGLE CONNECTION.";
     readonly aiCondition: "AI-driven branching that analyzes player state to determine path. Parameters: prompt (what AI evaluates), categories (array of {name, description, targetId}), evaluateVariables, evaluateInventory, evaluateHistory, evaluateCounters, evaluateChoiceHistory, fallbackTarget, timeout. MULTIPLE CONNECTIONS via categories. AI classifies player state and routes to appropriate category target.";
     readonly onlineContent: "Fetch and display real-time data from web APIs or AI queries. Parameters: sourceType (\"api\" or \"ai-query\"), apiUrl, apiParams, jsonPath, query, title, maxWords, fallbackText, buttonText. SINGLE CONNECTION. For dynamic content like weather, news, or AI-generated facts.";
 };
@@ -190,8 +207,29 @@ export interface GeneratedStory {
         description: string;
         genre: string;
     };
+    suggestedTheme?: {
+        themeId: string;
+        reason: string;
+    };
     beats: GeneratedBeat[];
     connections: GeneratedConnection[];
+    variables?: Array<{
+        name: string;
+        initialValue: any;
+        description: string;
+    }>;
+    characters?: Array<{
+        id: string;
+        name: string;
+        description: string;
+        counters?: Array<{
+            name: string;
+            displayName: string;
+            value: number;
+            min: number;
+            max: number;
+        }>;
+    }>;
     reasoning: string;
 }
 /**

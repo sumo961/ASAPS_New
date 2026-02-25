@@ -8,7 +8,7 @@
  *
  * CONNECTION RULES:
  * - SINGLE CONNECTION beats: Can only connect to ONE target beat via the connections array
- *   titleScreen, infoText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText
+ *   titleScreen, infoText, durScreen, videoBeat, endScreen, setVariable, addRemoveInventory, setTimer, inputText, keypad
  *
  * - MULTIPLE CONNECTION beats: Support multiple targets via their parameters (NOT the connections array)
  *   - dialogTree: targets defined in dialogTree.choices[].target
@@ -81,11 +81,27 @@
  * - Useful for: skill checks, relationship comparisons, dynamic difficulty
  *
  * VISITED BEAT TRACKING:
- * - "markVisited" parameter (boolean): Show visual indication for choices leading to already-visited beats
+ * - "markVisited" parameter (boolean): Block and dim choices leading to previously visited beats
+ * - Per-choice visited tracking: choices are individually tracked (composite key: "beatId:choiceId")
  * - Supported on: dialogTree, movementChoice, pickProp
  * - Useful for: helping players find unexplored paths, achievement hunting
  * - "visitedBeat" condition type: Check if a specific beat has been visited
  *   Example: { "type": "visitedBeat", "beatId": "some_beat_id", "operator": "==" }
+ *
+ * RECURSIVE DIALOG TREES:
+ * - DialogTree choices can use target: "__self__" to loop back to the SAME dialogTree beat
+ * - Useful for: interrogation, shopping, asking multiple questions before leaving
+ * - Combine with markVisited: true to block and dim already-selected choices
+ * - At least one choice should have a real target to exit the loop
+ *
+ * FICTIONAL TIME SYSTEM:
+ * Stories can track in-story date/time progression (separate from real-time timers):
+ * - Set via setVariable with type "fictionalTime": operations "set", "advance", "subtract"
+ * - Check via conditionBeat with type "fictionalTime": compare current time against a date/time
+ * - Display: Shows automatically in Timer HUD when enabled in global settings
+ * - Supports units: minutes, hours, days, months, years
+ * - Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
+ * - Per-beat timeDisplayMode: "fictionalTime" (default), "manual" (custom text), "none" (hide HUD)
  *
  * MOVEMENT CHOICE OPTIONS:
  * - "showTextOnHover" parameter (boolean): Only show choice text when hovering over the hotspot
@@ -129,19 +145,20 @@ export const BEAT_TYPES = {
     // 🚨🚨🚨 MANDATORY: beat_0 MUST be titleScreen - NEVER start with infoText! 🚨🚨🚨
     titleScreen: '🚨 MANDATORY FIRST BEAT (beat_0)! Start screen with title and author. SINGLE CONNECTION: only one target via connections array.',
     infoText: 'Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: infoText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead. Optional: textVariations (array) for random text selection at runtime.',
-    endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true } }',
+    endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Optional credits page: showCredits (boolean), creditsPageTitle (default "Credits"), creditsPageBody (text content), creditsCloseText (default "Close"), creditsText (button label). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Created by..." } }',
     // Interactive content - MULTIPLE CONNECTIONS via parameters
-    dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean). Choices can modify counters via counter/counterOperation/counterValue properties.',
+    dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean for per-choice visited tracking). Choices can modify counters via counter/counterOperation/counterValue properties. RECURSIVE DIALOGS: use target "__self__" to loop back to the same dialogTree (e.g., interrogation, shopping).',
     movementChoice: 'Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. IMPORTANT: Each choice needs { id, text, location, target } - always set "location" to same value as "text" for hover labels! Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).',
     pickProp: 'Interactive prop/item selection. MULTIPLE TARGETS: define targets in props[].target parameter. IMPORTANT: prop "name" should be ITEM NAMES ONLY (e.g., "Silver Key", "Lantern"), NOT action descriptions (e.g., "Take the key" is WRONG). For actions, use movementChoice instead. Supports: choiceDelay (seconds), markVisited (boolean).',
     hyperText: 'Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Links can have custom styling (color, underline, bold). Supports optional defaultTarget for timed auto-advance.',
     inputText: 'Player text input. Save to: variable (default), characterName (update display name), or counter (numeric). Validation: none, numeric, email, alphanumeric. Properties: minLength, maxLength, required. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance.',
+    keypad: 'Numeric keypad input (PIN entry, safe locks, phone dialers). Parameters: prompt, layout ("numeric"|"phone"|"pin"), maxDigits, minDigits, correctCode (optional auto-validation), failTarget (beat on wrong code), maxAttempts (0=unlimited), maskInput (boolean), saveToType ("variable"|"counter"), variable, buttonText, clearButtonText, showDisplay. SINGLE CONNECTION: correct code or submit → next beat. If correctCode is set, validates automatically and routes to failTarget on wrong entry.',
     // Timed content - SINGLE CONNECTION (NO defaultTarget - already timed by design)
     durScreen: 'Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target via connections array at beat level. ❌ WRONG: connection inside parameters. ✓ CORRECT: "connections": [{ "targetId": "beat_5" }] at beat level. Optional: textVariations (array) for random text selection at runtime.',
     videoBeat: 'Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.',
     // Logic beats (invisible - no defaultTarget needed)
-    conditionBeat: 'Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat.',
-    setVariable: 'Set ONE variable/counter per beat. Operations: set (replace), change (add/subtract), multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.',
+    conditionBeat: 'Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat, fictionalTime (compare in-story date/time).',
+    setVariable: 'Set ONE variable/counter/fictionalTime per beat. Types: "variable" (text/boolean), "counter" (numeric ops), "fictionalTime" (set/advance/subtract in-story date/time). Operations: set, add, subtract, multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.',
     addRemoveInventory: 'Modify inventory. Actions: add, remove, or transfer (move between characters). Use "character" parameter to specify which character\'s inventory (defaults to player). Examples: { "action": "add", "item": "key", "character": "merchant" }, { "action": "transfer", "item": "sword", "fromCharacter": "player", "toCharacter": "companion" }. SINGLE CONNECTION: executes then continues to one target.',
     randomTarget: 'Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.',
     setTimer: 'Set/check timers. Beat continues immediately to SINGLE CONNECTION target while timer runs in background. Optional timerTarget parameter: where story jumps when timer expires.',
@@ -149,7 +166,7 @@ export const BEAT_TYPES = {
     aiInfoText: 'AI-generated contextual text with Continue button. Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables. SINGLE CONNECTION. Generates personalized 1-2 sentences based on player state.',
     aiDurScreen: 'AI-generated text with auto-advance based on reading speed. Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables, wordsPerMinute (default 200), minDuration (ms), maxDuration (ms). SINGLE CONNECTION.',
     aiDialogTree: 'AI-generated branching dialogue at runtime. Creates personalized conversations based on player state and context.',
-    aiSummary: 'AI-generated narrative summary of the player\'s journey. Useful for endings or recaps.',
+    aiSummary: 'AI-generated narrative summary of the player\'s journey. Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength ("short"|"medium"|"long"), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart (boolean), showCredits (boolean), resetOnRestart (boolean), resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory (granular reset sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText. SINGLE CONNECTION.',
     aiCondition: 'AI-driven branching that analyzes player state to determine path. Parameters: prompt (what AI evaluates), categories (array of {name, description, targetId}), evaluateVariables, evaluateInventory, evaluateHistory, evaluateCounters, evaluateChoiceHistory, fallbackTarget, timeout. MULTIPLE CONNECTIONS via categories. AI classifies player state and routes to appropriate category target.',
     onlineContent: 'Fetch and display real-time data from web APIs or AI queries. Parameters: sourceType ("api" or "ai-query"), apiUrl, apiParams, jsonPath, query, title, maxWords, fallbackText, buttonText. SINGLE CONNECTION. For dynamic content like weather, news, or AI-generated facts.',
 };
@@ -176,7 +193,7 @@ export async function generateStory(config) {
 async function generateStoryWithAI(config, apiKey) {
     const { prompt, genre = 'adventure', length = 'medium', complexity = 'moderate', context } = config;
     // Determine beat count based on length
-    const beatCount = length === 'short' ? '5-8' : length === 'medium' ? '10-15' : '20-30';
+    const beatCount = length === 'short' ? '8-15' : length === 'medium' ? '15-30' : '30+';
     const branchingDesc = complexity === 'linear' ? 'mostly linear with few choices' :
         complexity === 'moderate' ? 'moderate branching with 2-3 choices per decision point' :
             'complex branching with multiple paths and consequences';
@@ -191,24 +208,43 @@ Return a JSON object with this structure:
     "title": "Story Title",
     "author": "AI Assistant",
     "description": "Brief description",
-    "genre": "genre"
+    "genre": "mystery|fantasy|scifi|romance|horror|adventure"
+  },
+  "suggestedTheme": {
+    "themeId": "builtin-visual-novel | builtin-twine | builtin-point-and-click",
+    "reason": "Brief explanation of why this theme fits the story"
   },
   "beats": [
     {
-      "id": "beat-0",
+      "id": "beat_0",
       "type": "titleScreen",  // 🚨 MANDATORY: First beat MUST be titleScreen, NEVER infoText!
       "label": "Title",
-      "parameters": { "title": "...", "subtitle": "...", "buttonText": "Begin" }
+      "parameters": { "title": "...", "author": "...", "buttonText": "Begin" },
+      "notes": "Optional author annotations (not shown to player)",
+      "cluster": "optional-cluster-name"
     }
   ],
   "connections": [
-    { "id": "conn-0", "sourceId": "beat-0", "targetId": "beat-1", "label": "Continue" }
+    { "id": "conn-0", "sourceId": "beat_0", "targetId": "beat_1", "label": "Continue" }
   ],
-  "reasoning": "Explanation of story structure"
+  "variables": [
+    { "name": "cluesFound", "initialValue": 0, "description": "Number of clues discovered" }
+  ],
+  "characters": [
+    {
+      "id": "char_player", "name": "Hero", "description": "The protagonist",
+      "counters": [
+        { "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 }
+      ]
+    }
+  ],
+  "reasoning": "Explain story structure, branching strategy, and how beat types work together"
 }
 
+🚨 IMPORTANT: ALL beats including endings go in the "beats" array! Do NOT create a separate "endings" array!
+
 CRITICAL CONNECTION RULES:
-- SINGLE CONNECTION beats (titleScreen, infoText, durScreen, videoBeat, endScreen, inputText, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
+- SINGLE CONNECTION beats (titleScreen, infoText, durScreen, videoBeat, endScreen, inputText, keypad, setVariable, addRemoveInventory, setTimer): Can ONLY have ONE connection in the connections array. For branching, use dialogTree or movementChoice instead.
 - MULTIPLE CONNECTION beats (dialogTree, movementChoice, pickProp, hyperText, randomTarget): Define targets in their PARAMETERS (choices[].target, props[].target, etc.), NOT in the connections array.
   🚫 FORBIDDEN: Do NOT add a "connection" parameter to these beats - it triggers validation errors!
 - conditionBeat: EXACTLY 3 parameters allowed: "condition", "trueConnection", "falseConnection"
@@ -266,12 +302,31 @@ COUNTER OPERATIONS IN DIALOGTREE:
 - This allows tracking relationships, skills, or any numeric game state
 
 VISITED TRACKING:
-- "markVisited": boolean - Show visual indicator for choices leading to visited beats
+- "markVisited": boolean - Block and dim choices leading to previously visited beats
+- Per-choice visited tracking: choices are individually tracked (composite key: "beatId:choiceId")
 - Supported on dialogTree, movementChoice, pickProp
 - "visitedBeat" condition type for conditionBeat: check if beat was visited
 
+RECURSIVE DIALOG TREES:
+- DialogTree choices can use target: "__self__" to loop back to the SAME dialogTree beat
+- Useful for: interrogation, shopping, asking multiple questions before leaving
+- Combine with markVisited: true to block and dim already-selected choices
+- At least one choice should have a real target to exit the loop
+
 MOVEMENT CHOICE OPTIONS:
 - "showTextOnHover": boolean - Only reveal choice text on hover (for exploration gameplay)
+
+THEME PRESETS:
+ASAPS includes built-in themes. Recommend the most appropriate theme via "suggestedTheme" in output.
+
+- **builtin-visual-novel**: Best for romance, drama, character-driven. Semi-transparent text box, golden names, serif fonts. Use when: dialog focus, relationships, emotional.
+- **builtin-twine**: Best for interactive fiction, literary, mystery (text-based). Blue hyperlinks, serif typography, dark bg. Use when: text-heavy, literary, minimal UI.
+- **builtin-point-and-click**: Best for adventure, exploration, puzzles. Golden text on dark blue, prominent hotspots, pixelated. Use when: exploration, items, location puzzles.
+
+Theme recommendations by genre:
+Romance/Drama → visual-novel | Mystery (text) → twine | Mystery (exploration) → point-and-click | Horror → twine or visual-novel | Fantasy (epic) → visual-novel | Fantasy (adventure) → point-and-click | Sci-Fi → twine or visual-novel | Adventure → point-and-click | Literary → twine
+
+Color contrast rule: Text/background must have 4.5:1+ contrast ratio. Avoid yellow on white, light gray on white, dark blue on black.
 
 CONTENT GUIDELINES:
 - Content should work with any visual theme - avoid hardcoding colors or fonts in narrative text
@@ -288,11 +343,60 @@ TIMER VISUALIZATION:
 - This displays a countdown bar to give players visual time pressure
 - Example: { "defaultTarget": "fail", "defaultTargetDelay": 10, "showTimer": true }
 
+FICTIONAL TIME SYSTEM:
+- Track in-story date/time progression (separate from real-time timers)
+- Set via setVariable: type "fictionalTime", operations "set"/"advance"/"subtract"
+  - Set: { "type": "fictionalTime", "operation": "set", "timeYear": 1929, "timeMonth": 1, "timeDay": 15, "timeHour": 9, "timeMinute": 0 }
+  - Advance: { "type": "fictionalTime", "operation": "advance", "value": 3, "timeUnit": "hours" }
+  - Subtract (time travel): { "type": "fictionalTime", "operation": "subtract", "value": 2, "timeUnit": "days" }
+- Check via conditionBeat: type "fictionalTime" with compareTime
+  - { "condition": { "type": "fictionalTime", "operator": ">", "compareTime": { "year": 1969, "month": 1, "day": 1, "hour": 0, "minute": 0 } } }
+- Display: Shows in Timer HUD when enabled in global settings
+- Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
+
 CHARACTER COUNTERS:
 - Define counters on characters first, then reference them in choices
 - Counter effects work on dialogTree, movementChoice, AND pickProp
 - Example character: { "counters": [{ "name": "trust", "displayName": "Trust", "value": 50, "min": 0, "max": 100 }] }
 - Example choice: { "text": "Be friendly", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
+
+SOUND EFFECTS ON CHOICES:
+- dialogTree, movementChoice, and pickProp choices support "soundEffect" parameter
+- Value: filename of sound to play when choice is selected (e.g., "click.mp3", "coin_pickup.wav")
+- Example: { "text": "Pick up coins", "target": "next", "soundEffect": "coin_pickup.mp3" }
+
+ADVANCED BRANCHING PATTERNS:
+1. Hub-and-Spoke: Central hub (movementChoice) → explore locations → find clues → return to hub → conditionBeat unlocks finale
+2. Critical Path + Optional Content: Main story + side content that reconverges at checkpoint
+3. State Accumulation → Branching Finale: Multiple counter-modifying choices → conditionBeat checks scores → different endings
+4. Parallel Tracks + Forced Merge: Major choice splits into completely different experiences, merge at plot point
+5. Conditional Unlocks (Metroidvania): Locked options unlock after finding items/variables
+6. Timed Branching: setTimer + choices under pressure → conditionBeat checks timer → success/failure
+7. Inventory-Gated Puzzles: conditionBeat checks inventory → has tool: proceed | no tool: explore first
+8. Code/Password Puzzle: infoText (clue) → keypad or inputText (enter code) → conditionBeat (verify) → success/failure
+   - Prefer keypad for numeric codes (visual keypad, auto-validation with correctCode/failTarget)
+   - Use inputText for text-based passwords
+9. Reputation System: Multiple interactions modify relationship counter → conditionBeat determines NPC behavior
+
+PROCEDURAL GAME ELEMENTS (REQUIRED for engaging stories):
+Stories MUST include at least 2-3 of these mechanics:
+1. Counters - Track numeric values (clues, trust, suspicion). ADD counter effects to choices! Check with conditionBeat.
+2. Variables - Track boolean/string state (hasKey, doorUnlocked). Check with conditionBeat.
+3. Inventory - Track collected items. Check with conditionBeat type "inventory".
+4. Visited Beats - conditionBeat type "visitedBeat" to unlock content after exploration.
+5. Fictional Time - setVariable type "fictionalTime" for historical fiction, day counters.
+6. Conditional Endings - Endings depend on ACCUMULATED state, not just final choice.
+
+Genre-specific requirements:
+- Mystery/Detective: Track clues (counter), evidence (inventory), suspect trust (counter)
+- Adventure: Track items (inventory), visited locations (variables), puzzle progress (counters)
+- Romance/Drama: Track relationship values (counters), conversation choices (variables)
+- Horror: Track sanity/fear (counter), items (inventory), knowledge gained (variables)
+
+🚨 CRITICAL RULE: If you use counters, you MUST include a conditionBeat to check them!
+- Every counter that gets incremented MUST be checked before endings
+- Route ALL paths through the conditionBeat before reaching endScreen
+- Without a conditionBeat, counters are POINTLESS
 
 COUNTER THRESHOLD REACHABILITY (CRITICAL):
 🚨 If you create a conditionBeat checking a counter, you MUST modify that counter somewhere earlier!
@@ -345,6 +449,68 @@ CRITICAL ANTI-PATTERNS TO AVOID:
    - NEVER stop generating early - complete ALL referenced beats
    - Missing beat references cause import FAILURE!
 
+5. HUB BEATS WITH STATE-DEPENDENT TEXT (NARRATIVE LOGIC ERROR):
+   Hub beats (reachable from multiple paths) should NOT assume player state!
+   ❌ WRONG: Hub text says "You have enough clues..." without checking counter
+   ✓ CORRECT: Generic hub text "What's next?" → conditionBeat checks state → different outcomes
+
+6. ORPHAN BEATS - Every beat must be connected:
+   ❌ WRONG: Creating a beat that nothing connects to
+   ✓ CORRECT: For EVERY beat, verify another beat targets it (except titleScreen)
+
+7. pickProp + addRemoveInventory (DUPLICATE ITEMS):
+   pickProp AUTOMATICALLY adds the selected item to inventory!
+   ❌ WRONG: pickProp "Key" → addRemoveInventory add "key" (creates duplicate!)
+   ✓ CORRECT: pickProp "Key" → infoText describing the key
+   ✓ Use addRemoveInventory ONLY for items from non-pickProp sources (NPC gifts, events)
+
+8. pickProp props MUST have descriptions:
+   ❌ WRONG: { "name": "Letter" } (no description)
+   ✓ CORRECT: { "name": "Letter", "description": "A sealed envelope with a wax seal" }
+
+9. MANDATORY: DESCRIBE ITEMS AFTER PICKUP!
+   Every pickProp choice MUST lead to an infoText that describes what the player learns from the item!
+   ❌ WRONG: pickProp "Old Photo" → movementChoice (photo never described!)
+   ✓ CORRECT: pickProp "Old Photo" → infoText "The photograph shows a family portrait..." → next beat
+   Good item descriptions should: reveal story details, hint at mysteries, give useful information, create atmosphere.
+
+10. NO DUPLICATE DATA - Put beat data in parameters ONLY:
+   ❌ WRONG: dialogTree data at both top level AND in parameters
+   ✓ CORRECT: dialogTree data ONLY inside parameters.dialogTree
+
+CORRECT PARAMETER NAMES (MUST use exactly these):
+- endScreen: { message (NOT "endText"), showRestart: true (ALWAYS), showCredits, creditsPageTitle, creditsPageBody, creditsCloseText, creditsText }
+- keypad: { prompt, layout ("numeric"|"phone"|"pin"), maxDigits, minDigits, correctCode, failTarget, maxAttempts, maskInput, saveToType, variable, buttonText, clearButtonText }
+- inputText: { prompt, variable (NOT "variableName"), saveToType: "variable" (REQUIRED), submitButtonText }
+- setVariable: { type: "variable"|"counter"|"fictionalTime", name (variable name, NOT "variableName"), value, operation }
+  ⚠️ Two different "name" fields: beat.name = display label, beat.parameters.name = VARIABLE name
+- addRemoveInventory: { action, item (NOT "itemName"), character (default "player"), quantity }
+- setTimer: { name (NOT "timerName"), value in seconds (NOT "duration"), timerTarget }
+- videoBeat: { videoFile (NOT "videoUrl" or "videoAssetId"), autoplay, controls, skipButton }
+- pickProp: { question, props: [{ id, name, description (REQUIRED), target }] }
+  ⚠️ pickProp "name" should be ITEM NAMES (e.g., "Silver Key"), NOT actions (e.g., "Take the key")
+
+CONCRETE BEAT EXAMPLES:
+
+titleScreen: { "id": "beat_0", "type": "titleScreen", "label": "Title", "parameters": { "title": "My Story", "author": "Author", "buttonText": "Start" }, "connections": [{ "targetId": "beat_1" }] }
+
+movementChoice: { "id": "beat_2", "type": "movementChoice", "label": "Choice", "parameters": { "choices": [{ "id": "c1", "text": "Go left", "location": "Go left", "target": "beat_3" }, { "id": "c2", "text": "Go right", "location": "Go right", "target": "beat_4" }] } }
+
+conditionBeat (counter): { "id": "beat_5", "type": "conditionBeat", "label": "Check Clues", "parameters": { "condition": { "type": "counter", "variable": "cluesFound", "operator": ">=", "value": 3 }, "trueConnection": { "target": "beat_good_end" }, "falseConnection": { "target": "beat_bad_end" } } }
+
+conditionBeat (inventory has): { "parameters": { "condition": { "type": "inventory", "item": "lantern", "character": "player", "checkType": "has" }, "trueConnection": { "target": "beat_light" }, "falseConnection": { "target": "beat_dark" } } }
+
+conditionBeat (inventory quantity): { "parameters": { "condition": { "type": "inventory", "item": "gold_coin", "character": "player", "checkType": "quantity", "quantityOperator": ">=", "quantityValue": 10 }, "trueConnection": { "target": "beat_afford" }, "falseConnection": { "target": "beat_poor" } } }
+Note: quantityValue can also reference a variable with $ prefix: "$requiredAmount"
+
+conditionBeat (counterCompare): { "parameters": { "condition": { "type": "counterCompare", "counter1": "strength", "counter2": "threshold", "operator": ">=" }, "trueConnection": { "target": "beat_pass" }, "falseConnection": { "target": "beat_fail" } } }
+
+endScreen: { "id": "beat_end", "type": "endScreen", "label": "The End", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\nDesigned by..." } }
+
+keypad: { "id": "beat_safe", "type": "keypad", "label": "Safe Lock", "parameters": { "prompt": "Enter the combination:", "layout": "numeric", "maxDigits": 4, "correctCode": "1847", "failTarget": "beat_wrong_code", "maxAttempts": 3, "maskInput": true }, "connections": [{ "targetId": "beat_safe_open" }] }
+
+inputText + conditionBeat (code puzzle): inputText { "variable": "code", "saveToType": "variable", "prompt": "Enter the vault code:" } → conditionBeat { "condition": { "type": "variable", "variable": "code", "operator": "==", "value": "8192" }, "trueConnection": { "target": "success" }, "falseConnection": { "target": "retry" } }
+
 Important:
 - Use descriptive labels for beats
 - Create engaging, coherent narrative flow
@@ -354,7 +520,10 @@ Important:
 - For movementChoice beats, targets go in choices[].target parameter - NO connections array!
 - For pickProp beats, targets go in props[].target parameter - NO connections array!
 - Only titleScreen and infoText need a "connections" array (single target beats)
-- Ensure all beat IDs are unique and all connections reference valid beat IDs`;
+- Ensure all beat IDs are unique and all connections reference valid beat IDs
+- Include "suggestedTheme" with a theme ID and reason based on genre/style
+- EVERY beat must be reachable - some other beat must connect TO it (except titleScreen)
+- Don't artificially truncate long stories - let the story develop naturally`;
     const userPrompt = `Create an interactive story with these requirements:
 
 Prompt: ${prompt}
@@ -490,7 +659,7 @@ function generateStorySimulation(config) {
         type: 'endScreen',
         label: 'The End',
         parameters: {
-            endMessage: `The End\n\nThank you for experiencing this ${genre} adventure!`,
+            message: `The End\n\nThank you for experiencing this ${genre} adventure!`,
             showRestart: true,
             showCredits: false,
         },
@@ -582,15 +751,34 @@ Presentation modes:
 - "chat-scroll": Scrollable chat history like a messaging app - great for modern/casual tone
 - "chat-bubble": Single message bubble that replaces previous - minimal, focused UI
 
+Dialog Flow Pattern:
+- dialogNode: Contains speaker, text, and choices array
+- choice: What the player clicks - the text IS what the player says
+- Nested dialogNode inside choice: The NPC's response to that choice
+- Key insight: The choice text IS the player's line. To have NPC respond and exit, put NPC response in dialogNode and exit target on the nested choice.
+
+Writing Guidelines:
+1. Keep dialog natural and conversational
+2. Player choices should be distinct and meaningful
+3. Use emotions to convey character state
+4. Create branching that matters to the story
+5. Balance dialog length - not too long per node
+6. Consider adding conditions/effects for consequences
+
+Example Emotions: neutral, happy, angry, sad, surprised, fearful
+
 Important:
 - Create ${branchingFactor} meaningful choices per decision point
 - Write natural, engaging dialogue
 - Include character emotions and motivations
 - Create consequences for choices when appropriate
 - Use nested nodes (dialogNode) for multi-turn conversations within same beat
-- Use "target" to exit to a different beat
+- Use "target" to exit to a different beat; use "__self__" to loop back to the same dialog (interrogation, shopping)
 - Choice text IS the player's spoken dialogue - never use "[Continue]" placeholders
-- Choices can modify counters: { "counter": "trust", "counterOperation": "change", "counterValue": 1 }`;
+- Choices can modify counters: { "counter": "trust", "counterOperation": "change", "counterValue": 1 }
+- Choices can play sound effects: { "soundEffect": "click.mp3" }
+- markVisited: true enables per-choice visited tracking (blocks and dims already-selected choices)
+- NEVER use "[Continue]" or placeholder text - choices should contain meaningful player dialogue`;
     const userPrompt = `Create a branching dialogue for this scene:
 
 Scene: ${scene}

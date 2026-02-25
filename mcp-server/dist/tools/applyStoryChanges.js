@@ -43,32 +43,37 @@ function extractConnectionsFromBeat(beat) {
             }
         });
     }
-    // dialogTree - choices[].target or entries[].choices[].target
+    // dialogTree - recursively extract targets from choices and nested dialogNodes
     if (beat.type === 'dialogTree' && params.dialogTree) {
-        const processChoices = (choices, prefix) => {
+        let connIndex = 0;
+        const processChoices = (choices) => {
             if (!Array.isArray(choices))
                 return;
-            choices.forEach((choice, index) => {
+            choices.forEach((choice) => {
                 const target = extractTargetId(choice.target);
-                if (target) {
+                if (target && target !== '__self__') {
                     connections.push({
-                        id: `${beatId}-dialog-${prefix}-${index}`,
+                        id: `${beatId}-dialog-${connIndex++}`,
                         sourceId: beatId,
                         targetId: target,
-                        label: choice.text || `Choice ${index + 1}`,
+                        label: choice.text || `Choice ${connIndex}`,
                     });
+                }
+                // Recurse into nested dialogNode (NPC response with further choices)
+                if (choice.dialogNode?.choices) {
+                    processChoices(choice.dialogNode.choices);
                 }
             });
         };
-        // Direct choices array
+        // Current format: direct choices on dialogTree root
         if (params.dialogTree.choices) {
-            processChoices(params.dialogTree.choices, 'choice');
+            processChoices(params.dialogTree.choices);
         }
-        // Entries array with nested choices
+        // Legacy format: entries array with nested choices
         if (params.dialogTree.entries) {
-            params.dialogTree.entries.forEach((entry, entryIndex) => {
+            params.dialogTree.entries.forEach((entry) => {
                 if (entry.choices) {
-                    processChoices(entry.choices, `entry${entryIndex}`);
+                    processChoices(entry.choices);
                 }
             });
         }
@@ -100,22 +105,25 @@ function extractConnectionsFromBeat(beat) {
             }
         });
     }
-    // conditionBeat - trueTarget, falseTarget
+    // conditionBeat - trueConnection.target, falseConnection.target (nested format)
+    // Also supports legacy flat format: trueTarget, falseTarget
     // IMPORTANT: Labels must be lowercase 'true'/'false' to match Inspector.tsx expectations
     if (beat.type === 'conditionBeat') {
-        if (params.trueTarget) {
+        const trueTarget = params.trueConnection?.target || params.trueTarget;
+        const falseTarget = params.falseConnection?.target || params.falseTarget;
+        if (trueTarget) {
             connections.push({
                 id: `${beatId}-true`,
                 sourceId: beatId,
-                targetId: params.trueTarget,
+                targetId: trueTarget,
                 label: 'true',
             });
         }
-        if (params.falseTarget) {
+        if (falseTarget) {
             connections.push({
                 id: `${beatId}-false`,
                 sourceId: beatId,
-                targetId: params.falseTarget,
+                targetId: falseTarget,
                 label: 'false',
             });
         }
@@ -156,25 +164,28 @@ BEAT TYPES AND CONNECTION RULES:
 
 SINGLE CONNECTION beats (only ONE target in connections array):
 - titleScreen: Start screen. Parameters: { title, author, buttonText }
-- infoText: Narrative text with Continue. Parameters: { text, textColor, backgroundColor }
-- endScreen: Story ending. Parameters: { endTitle, endText }
+- infoText: Narrative text with Continue. Parameters: { text }
+- endScreen: Story ending. Parameters: { message, showRestart (ALWAYS true), showCredits }
 - durScreen: Timed auto-advance. Parameters: { text, duration }
-- videoBeat: Video playback. Parameters: { videoUrl }
-- inputText: Text input. Parameters: { prompt, variableName }
-- setVariable: Set ONE variable per beat. IMPORTANT: Can only modify ONE variable at a time! Chain multiple setVariable beats for multiple changes. Parameters: { variableName, value, operation }
-- addRemoveInventory: Modify inventory. Parameters: { action, itemName }
-- setTimer: Timer control. Parameters: { timerName, action, duration, timerTarget }
+- videoBeat: Video playback. Parameters: { videoFile (NOT "videoUrl" or "videoAssetId"), autoplay, controls, skipButton }
+- inputText: Text input. Parameters: { prompt, variable (NOT "variableName"), saveToType: "variable" (REQUIRED), submitButtonText }
+- setVariable: Set ONE variable per beat. IMPORTANT: Two "name" fields - beat.name is display label, beat.parameters.name is the VARIABLE name! Parameters: { type: "variable"|"counter"|"fictionalTime", name (variable name), value, operation: "set"|"add"|"subtract"|"multiply"|"divide" }. Chain multiple setVariable beats for multiple changes.
+- addRemoveInventory: Modify inventory. Parameters: { action: "add"|"remove"|"transfer" (REQUIRED), item (REQUIRED, NOT "itemName"), character (REQUIRED, default "player"), quantity (optional), fromChar/toChar (for transfer) }
+- setTimer: Timer control. Parameters: { name (NOT "timerName"), value in seconds (NOT "duration"), timerTarget }
 
 MULTIPLE CONNECTION beats (targets in PARAMETERS, NOT connections array):
-- dialogTree: Branching dialogue. Parameters: { dialogTree: { speaker, entries: [{ text, choices: [{ text, target }] }] } }
-- movementChoice: Location/action choices. Parameters: { choices: [{ id, text, target }] }
-- pickProp: Prop selection. Parameters: { props: [{ name, target }] }
+- dialogTree: Branching dialogue. Parameters: { dialogTree: { id: "root", speaker, text, choices: [{ id, text, target | dialogNode: { id, speaker, text, choices } }] } }. Choice text IS the player's line. Use __self__ target for loops (interrogation, shopping).
+- movementChoice: Location/action choices. Parameters: { choices: [{ id, text, location, target }] }
+- pickProp: Prop selection. Parameters: { question, props: [{ id, name, description, target }] }. pickProp AUTOMATICALLY adds selected item to inventory - do NOT follow with addRemoveInventory add!
 - hyperText: Clickable text. Parameters: { text, hyperlinks: [{ word, targetBeatId }] }
-- conditionBeat: Conditional branch. Parameters: { variableName, operator, value, trueTarget, falseTarget }
+- conditionBeat: Conditional branch. ONLY 3 parameters allowed: { condition: { type, variable/item, operator, value, compareTime? }, trueConnection: { target }, falseConnection: { target } }. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat, fictionalTime. Use "target" NOT "targetId" in connections!
 - randomTarget: Random branch. Parameters: { choices: [{ id, target, weight }] }
 
 DEFAULT TARGET (Timed Auto-Advance):
-Most visible beats (EXCEPT durScreen) support optional defaultTarget and defaultTargetTimeout parameters for auto-advance if user doesn't interact within timeout (milliseconds).
+Most visible beats (EXCEPT durScreen) support optional defaultTarget and defaultTargetDelay (seconds) parameters for auto-advance if user doesn't interact within timeout.
+
+FICTIONAL TIME:
+setVariable with type "fictionalTime" can set/advance/subtract in-story date/time. conditionBeat with type "fictionalTime" can branch based on date/time comparison.
 
 CONNECTION FORMAT:
 { id, sourceId, targetId, label? }
