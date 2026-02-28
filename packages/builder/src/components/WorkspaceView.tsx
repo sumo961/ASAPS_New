@@ -133,7 +133,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       'aiSummary',
       'aiInfoText',
       'aiDurScreen',
-      'keypad'
+      'keypad',
+      'panorama'
     ];
     return visualBeatTypes.includes(beat.type);
   };

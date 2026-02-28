@@ -6,49 +6,58 @@ import type { PanoramaHotspot } from '../generated/beat-types';
 
 export class PanoramaBeat extends Beat {
   public panoramaAssetId: string;
+  public projectionType: 'equirectangular' | 'cylindrical';
   public hotspots: PanoramaHotspot[];
   public initialPitch: number;
   public initialYaw: number;
   public hfov: number;
   public autoRotate: number;
   public prompt: string;
+  public promptDisplay: 'static' | 'pinned';
 
   constructor(config: BeatConfig & {
     parameters?: Partial<{
       panoramaAssetId: string;
+      projectionType: 'equirectangular' | 'cylindrical';
       hotspots: PanoramaHotspot[];
       initialPitch: number;
       initialYaw: number;
       hfov: number;
       autoRotate: number;
       prompt: string;
+      promptDisplay: 'static' | 'pinned';
     }>;
   }) {
     super(config);
     this.panoramaAssetId = config.parameters?.panoramaAssetId || '';
+    this.projectionType = config.parameters?.projectionType || 'equirectangular';
     this.hotspots = config.parameters?.hotspots || [];
     this.initialPitch = config.parameters?.initialPitch ?? 0;
     this.initialYaw = config.parameters?.initialYaw ?? 0;
-    this.hfov = config.parameters?.hfov ?? 100;
+    this.hfov = config.parameters?.hfov ?? 75;
     this.autoRotate = config.parameters?.autoRotate ?? 0;
     this.prompt = config.parameters?.prompt || '';
+    this.promptDisplay = config.parameters?.promptDisplay || 'static';
   }
 
   getParameters(): Record<string, any> {
     return {
       panoramaAssetId: this.panoramaAssetId,
+      projectionType: this.projectionType,
       hotspots: this.hotspots,
       initialPitch: this.initialPitch,
       initialYaw: this.initialYaw,
       hfov: this.hfov,
       autoRotate: this.autoRotate,
       prompt: this.prompt,
+      promptDisplay: this.promptDisplay,
       node: this.node,
     };
   }
 
   updateParameters(params: Record<string, any>): void {
     if (params.panoramaAssetId !== undefined) this.panoramaAssetId = params.panoramaAssetId;
+    if (params.projectionType !== undefined) this.projectionType = params.projectionType;
     if (params.hotspots !== undefined) {
       this.hotspots = params.hotspots;
       // Rebuild connections from hotspots to keep graph in sync
@@ -67,6 +76,7 @@ export class PanoramaBeat extends Beat {
     if (params.hfov !== undefined) this.hfov = params.hfov;
     if (params.autoRotate !== undefined) this.autoRotate = params.autoRotate;
     if (params.prompt !== undefined) this.prompt = params.prompt;
+    if (params.promptDisplay !== undefined) this.promptDisplay = params.promptDisplay;
     if (params.node !== undefined) this.node = params.node;
   }
 
@@ -129,12 +139,11 @@ export class PanoramaBeat extends Beat {
           pitch: h.pitch,
           yaw: h.yaw,
           text: this.processText(h.displayText || h.text, context),
-          icon: h.icon,
         })),
         initialPitch: this.initialPitch,
         initialYaw: this.initialYaw,
         hfov: this.hfov,
-        autoRotate: this.autoRotate,
+        projectionType: this.projectionType,
         prompt: processedPrompt,
       });
 

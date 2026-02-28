@@ -254,12 +254,11 @@ export interface IRenderer {
       pitch: number;
       yaw: number;
       text: string;
-      icon?: string;
     }>;
     initialPitch?: number;
     initialYaw?: number;
     hfov?: number;
-    autoRotate?: number;
+    projectionType?: 'equirectangular' | 'cylindrical';
     prompt?: string;
   }): Promise<string>;
 

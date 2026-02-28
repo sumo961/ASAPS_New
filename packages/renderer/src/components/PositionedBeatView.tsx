@@ -1338,7 +1338,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
     containerStyle.background = 'transparent';
   } else if (backgroundUrl) {
     containerStyle.backgroundImage = `url(${backgroundUrl})`;
-    containerStyle.backgroundSize = 'cover';
+    // Panorama: stretch full image so layout positions map to full image extent
+    containerStyle.backgroundSize = beatType === 'panorama' ? '100% 100%' : 'cover';
     containerStyle.backgroundPosition = 'center';
     containerStyle.backgroundRepeat = 'no-repeat';
   } else {

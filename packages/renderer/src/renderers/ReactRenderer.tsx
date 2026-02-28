@@ -2077,12 +2077,11 @@ export class ReactRenderer extends BaseRenderer {
       pitch: number;
       yaw: number;
       text: string;
-      icon?: string;
     }>;
     initialPitch?: number;
     initialYaw?: number;
     hfov?: number;
-    autoRotate?: number;
+    projectionType?: 'equirectangular' | 'cylindrical';
     prompt?: string;
   }): Promise<string> {
     // Resolve panorama URL from asset ID if not already a URL
@@ -2098,9 +2097,22 @@ export class ReactRenderer extends BaseRenderer {
             initialPitch={options.initialPitch}
             initialYaw={options.initialYaw}
             hfov={options.hfov}
-            autoRotate={options.autoRotate}
+            projectionType={options.projectionType}
             prompt={options.prompt}
             onHotspotClick={(hotspotId) => resolve(hotspotId)}
+            promptStyle={this.theme ? {
+              fontFamily: this.theme.fonts?.textFont,
+              fontSize: this.theme.fonts?.textFontSize,
+              color: this.theme.colors?.textColor,
+              backgroundColor: this.theme.textBox?.backgroundColor
+                ? `rgba(0, 0, 0, ${(this.theme.textBox.opacity ?? 70) / 100})`
+                : undefined,
+              border: (this.theme.textBox?.borderWidth && this.theme.textBox?.borderColor)
+                ? `${this.theme.textBox.borderWidth}px solid ${this.theme.textBox.borderColor}`
+                : undefined,
+              borderRadius: this.theme.textBox?.borderRadius ?? 8,
+              padding: this.theme.textBox?.padding ?? 8,
+            } : undefined}
           />
         </div>
       );

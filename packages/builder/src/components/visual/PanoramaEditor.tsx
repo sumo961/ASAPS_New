@@ -4,9 +4,10 @@
  * Renders the panorama image using Pannellum and allows hotspot placement.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { PanoramaView } from '@asaps/renderer';
-import { MapPin, Plus, Trash2, Move, Eye } from 'lucide-react';
+import type { PanoramaViewerApi } from '@asaps/renderer';
+import { MapPin, Eye } from 'lucide-react';
 
 export interface PanoramaHotspotData {
   id: string;
@@ -15,7 +16,6 @@ export interface PanoramaHotspotData {
   text: string;
   displayText?: string;
   target: string;
-  icon?: string;
 }
 
 interface PanoramaEditorProps {
@@ -24,11 +24,13 @@ interface PanoramaEditorProps {
   initialPitch?: number;
   initialYaw?: number;
   hfov?: number;
-  autoRotate?: number;
   prompt?: string;
-  selectedHotspotId?: string;
+  selectedHotspotId?: string | null;
+  placementMode: boolean;
   onHotspotsChange: (hotspots: PanoramaHotspotData[]) => void;
   onSelectHotspot: (hotspotId: string | null) => void;
+  onTogglePlacementMode: () => void;
+  onViewerReady?: (api: PanoramaViewerApi) => void;
 }
 
 export const PanoramaEditor: React.FC<PanoramaEditorProps> = ({
@@ -39,11 +41,12 @@ export const PanoramaEditor: React.FC<PanoramaEditorProps> = ({
   hfov = 100,
   prompt,
   selectedHotspotId,
+  placementMode,
   onHotspotsChange,
   onSelectHotspot,
+  onTogglePlacementMode,
+  onViewerReady,
 }) => {
-  const [placementMode, setPlacementMode] = useState(false);
-
   const handleEditorClick = useCallback((pitch: number, yaw: number) => {
     if (!placementMode) return;
 
@@ -56,8 +59,8 @@ export const PanoramaEditor: React.FC<PanoramaEditorProps> = ({
     };
     onHotspotsChange([...hotspots, newHotspot]);
     onSelectHotspot(newHotspot.id);
-    setPlacementMode(false);
-  }, [placementMode, hotspots, onHotspotsChange, onSelectHotspot]);
+    onTogglePlacementMode();
+  }, [placementMode, hotspots, onHotspotsChange, onSelectHotspot, onTogglePlacementMode]);
 
   const handleHotspotClick = useCallback((hotspotId: string) => {
     onSelectHotspot(hotspotId);
@@ -70,7 +73,6 @@ export const PanoramaEditor: React.FC<PanoramaEditorProps> = ({
       pitch: hs.pitch,
       yaw: hs.yaw,
       text: hs.text,
-      icon: hs.icon,
     })),
     [hotspots]
   );
@@ -81,7 +83,7 @@ export const PanoramaEditor: React.FC<PanoramaEditorProps> = ({
         <div className="text-center">
           <Eye className="w-12 h-12 mx-auto mb-3 text-gray-300" />
           <p className="text-sm">No panorama image selected</p>
-          <p className="text-xs text-gray-400 mt-1">Select a panorama image in the inspector panel</p>
+          <p className="text-xs text-gray-400 mt-1">Select a panorama image in the properties panel</p>
         </div>
       </div>
     );
@@ -92,7 +94,7 @@ export const PanoramaEditor: React.FC<PanoramaEditorProps> = ({
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 bg-gray-800 border-b border-gray-700">
         <button
-          onClick={() => setPlacementMode(!placementMode)}
+          onClick={onTogglePlacementMode}
           className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
             placementMode
               ? 'bg-blue-500 text-white'
@@ -128,14 +130,9 @@ export const PanoramaEditor: React.FC<PanoramaEditorProps> = ({
           onHotspotClick={handleHotspotClick}
           editorMode={placementMode}
           onEditorClick={handleEditorClick}
+          selectedHotspotId={selectedHotspotId || undefined}
+          onViewerReady={onViewerReady}
         />
-
-        {/* Selected hotspot indicator */}
-        {selectedHotspotId && (
-          <div className="absolute top-2 left-2 bg-blue-500 text-white px-2 py-1 rounded text-xs">
-            Selected: {hotspots.find(h => h.id === selectedHotspotId)?.text || selectedHotspotId}
-          </div>
-        )}
       </div>
     </div>
   );

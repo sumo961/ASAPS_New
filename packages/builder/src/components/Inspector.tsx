@@ -2574,7 +2574,22 @@ export const Inspector: React.FC<InspectorProps> = ({
                         assetType="image"
                         placeholder="Select panorama image"
                       />
-                      <p className="text-xs text-gray-400 mt-1">Equirectangular image (2:1 aspect ratio)</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Projection</label>
+                      <select
+                        value={localBeat.parameters?.projectionType || 'equirectangular'}
+                        onChange={(e) => handleParameterChange('projectionType', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="equirectangular">Equirectangular (2:1, e.g. 4096x2048)</option>
+                        <option value="cylindrical">Cylindrical (4:1–8:1, e.g. 8000x2000)</option>
+                      </select>
+                      <p className="text-xs text-blue-600 mt-1">
+                        {(localBeat.parameters?.projectionType || 'equirectangular') === 'equirectangular'
+                          ? 'Use 2:1 images from 360° cameras.'
+                          : 'Use wide panoramas from phone cameras (4:1 to 8:1 ratio).'}
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Prompt Text</label>
@@ -2603,21 +2618,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">Field of View</label>
-                            <input type="number" value={localBeat.parameters?.hfov ?? 100}
-                              onChange={(e) => handleParameterChange('hfov', parseFloat(e.target.value))}
-                              min="30" max="120" step="5"
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">Auto-Rotate (°/s)</label>
-                            <input type="number" value={localBeat.parameters?.autoRotate ?? 0}
-                              onChange={(e) => handleParameterChange('autoRotate', parseFloat(e.target.value))}
-                              min="-10" max="10" step="0.5"
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
-                          </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Field of View</label>
+                          <input type="number" value={localBeat.parameters?.hfov ?? 100}
+                            onChange={(e) => handleParameterChange('hfov', parseFloat(e.target.value))}
+                            min="30" max="120" step="5"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
                         </div>
                       </div>
                     )}
@@ -2628,14 +2634,23 @@ export const Inspector: React.FC<InspectorProps> = ({
                         <span className="text-sm font-medium text-gray-700">Hotspots</span>
                         <button
                           onClick={() => {
+                            const hotspotId = `hotspot_${Date.now()}`;
                             const newHotspot = {
-                              id: `hotspot_${Date.now()}`,
+                              id: hotspotId,
                               pitch: 0,
                               yaw: 0,
                               text: `Hotspot ${(localBeat.parameters?.hotspots?.length || 0) + 1}`,
                               target: '',
                             };
                             handleParameterChange('hotspots', [...(localBeat.parameters?.hotspots || []), newHotspot]);
+                            // Also create a VisualElement on the VE stage so it's visible in Layout view
+                            console.log('[Inspector] Dispatching addElementToStage for panorama hotspot:', hotspotId);
+                            window.dispatchEvent(new CustomEvent('asaps:addPanoramaHotspot', {
+                              detail: {
+                                beatId: localBeat.id,
+                                hotspot: newHotspot,
+                              }
+                            }));
                           }}
                           className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
                         >
@@ -2695,24 +2710,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 min="-180" max="180" step="0.1"
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-xs" />
                             </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs text-gray-500">Icon</label>
-                            <select
-                              value={hotspot.icon || 'arrow'}
-                              onChange={(e) => {
-                                const newHotspots = [...(localBeat.parameters?.hotspots || [])];
-                                newHotspots[index] = { ...newHotspots[index], icon: e.target.value };
-                                handleParameterChange('hotspots', newHotspots);
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                            >
-                              <option value="arrow">Arrow</option>
-                              <option value="info">Info</option>
-                              <option value="door">Door</option>
-                              <option value="eye">Eye</option>
-                            </select>
                           </div>
 
                           <div>

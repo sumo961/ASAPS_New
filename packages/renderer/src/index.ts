@@ -31,7 +31,7 @@ export { AnimationEngine, AnimationManager, getAnimationManager, disposeAnimatio
 export * from './animation/PathInterpolator';
 
 // Export panorama view component
-export { PanoramaView, type PanoramaViewProps, type PanoramaHotspotData } from './components/PanoramaView';
+export { PanoramaView, type PanoramaViewProps, type PanoramaHotspotData, type PanoramaViewerApi } from './components/PanoramaView';
 
 // Export mobile detection utilities
 export { isMobileDevice, getDeviceScalingInfo, type DeviceScalingInfo } from './utils/mobileDetection';

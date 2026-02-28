@@ -8,6 +8,7 @@
 
 import type { Beat } from '@asaps/core';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
+import { yawPitchToStage } from './panoramaCoordinates';
 
 export interface VisualElement {
   id: string;
@@ -220,6 +221,11 @@ function getDefaultTextForLocation(
     if (nameLower.includes('question')) return params.question || '';
   }
 
+  // Panorama
+  if (beatType === 'panorama') {
+    if (nameLower.includes('prompt')) return params.prompt || '';
+  }
+
   return undefined;
 }
 
@@ -268,6 +274,9 @@ export function initializeLocationsFromSchema(
       return; // Skip - will be created dynamically below
     }
     if (beat.type === 'pickProp' && locationName === 'props') {
+      return; // Skip - will be created dynamically below
+    }
+    if (beat.type === 'panorama' && locationName === 'hotspots') {
       return; // Skip - will be created dynamically below
     }
     // Skip 'hyperlinks' location for hyperText - links are rendered as part of the text element
@@ -556,6 +565,37 @@ export function initializeLocationsFromSchema(
           textAlign: 'center',
         });
       }
+    });
+  }
+
+  // Panorama hotspots → VisualElement hotspots
+  // Convert pitch/yaw to x/y using projection-aware conversion
+  if (beat.type === 'panorama' && params.hotspots) {
+    const projType = params.projectionType || 'equirectangular';
+    const imgAspect = params.imageAspectRatio ?? 4;
+    console.log(`[SchemaLocationInitializer] Panorama hotspots: ${params.hotspots.length} hotspots, proj=${projType}, imgAspect=${imgAspect}, stage=${stageWidth}x${stageHeight}`);
+    const hotspotWidth = 120;
+    const hotspotHeight = 50;
+
+    params.hotspots.forEach((hs: any, index: number) => {
+      const { centerX: xCenter, centerY: yCenter } = yawPitchToStage(hs.yaw ?? 0, hs.pitch ?? 0, projType, stageWidth, stageHeight, imgAspect);
+      console.log(`[SchemaLocationInitializer]   hs=${hs.id} (${hs.text}): yaw=${hs.yaw ?? 0} pitch=${hs.pitch ?? 0} → px(${Math.round(xCenter)},${Math.round(yCenter)})`);
+
+      elements.push({
+        id: hs.id || `hotspot_${index}_${Date.now()}`,
+        type: 'hotspot',
+        name: hs.text || `Hotspot ${index + 1}`,
+        text: hs.text || `Hotspot ${index + 1}`,
+        x: xCenter - hotspotWidth / 2,
+        y: yCenter - hotspotHeight / 2,
+        z: 10 + index,
+        width: hotspotWidth,
+        height: hotspotHeight,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+      });
     });
   }
 

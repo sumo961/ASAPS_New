@@ -16,7 +16,7 @@ interface ParameterDefinition {
   targetField?: boolean;
   ui?: {
     control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations';
-    options?: string[];
+    options?: (string | { value: string; label: string })[];
     label?: string;
     min?: number;
     max?: number;
@@ -28,6 +28,8 @@ interface ParameterDefinition {
     itemLabel?: string;
     // Help text shown below the field
     help?: string;
+    // Hint text shown below select fields (e.g. recommendations)
+    hint?: string;
     // Conditional visibility - only show when another field has the specified value
     dependsOn?: { field: string; value: any };
     // Visual grouping - fields sharing the same group render inside a bordered container
@@ -295,11 +297,16 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 onChange={(e) => onParameterChange(paramName, e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
-                {paramDef.ui.options.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
+                {paramDef.ui.options.map((option: string | { value: string; label: string }) => {
+                  const optValue = typeof option === 'string' ? option : option.value;
+                  const optLabel = typeof option === 'string' ? option : option.label;
+                  return <option key={optValue} value={optValue}>{optLabel}</option>;
+                })}
               </select>
-              {paramDef.description && (
+              {paramDef.ui.hint && (
+                <p className="text-xs text-blue-600 mt-1">{paramDef.ui.hint}</p>
+              )}
+              {!paramDef.ui.hint && paramDef.description && (
                 <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
               )}
             </div>
@@ -997,9 +1004,11 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                               }}
                               className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
                             >
-                              {fieldDef.ui.options.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
+                              {fieldDef.ui.options.map((opt: string | { value: string; label: string }) => {
+                                const optValue = typeof opt === 'string' ? opt : opt.value;
+                                const optLabel = typeof opt === 'string' ? opt : opt.label;
+                                return <option key={optValue} value={optValue}>{optLabel}</option>;
+                              })}
                             </select>
                           </div>
                         );

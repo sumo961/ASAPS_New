@@ -1,16 +1,17 @@
-import React, { useRef, useEffect, useCallback } from 'react';
-
-// Pannellum is a global-style library — we import it for side effects
-// and access it via window.pannellum
-import 'pannellum/build/pannellum.js';
-import 'pannellum/build/pannellum.css';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
+import View360, { EquirectProjection, CylindricalProjection } from '@egjs/react-view360';
+import '@egjs/react-view360/css/view360.min.css';
 
 export interface PanoramaHotspotData {
   id: string;
   pitch: number;
   yaw: number;
   text: string;
-  icon?: string;
+}
+
+export interface PanoramaViewerApi {
+  lookAt: (pitch: number, yaw: number, hfov?: number) => void;
+  getView: () => { pitch: number; yaw: number; hfov: number };
 }
 
 export interface PanoramaViewProps {
@@ -19,25 +20,27 @@ export interface PanoramaViewProps {
   initialPitch?: number;
   initialYaw?: number;
   hfov?: number;
-  autoRotate?: number;
   prompt?: string;
+  /** Projection type: 'equirectangular' (sphere, 2:1) or 'cylindrical' (cylinder, 4:1–8:1) */
+  projectionType?: 'equirectangular' | 'cylindrical';
   onHotspotClick: (hotspotId: string) => void;
   /** Editor mode: click to place hotspots instead of navigating */
   editorMode?: boolean;
   onEditorClick?: (pitch: number, yaw: number) => void;
-}
-
-/**
- * Get the CSS class for a hotspot icon type
- */
-function getHotspotIconClass(icon?: string): string {
-  switch (icon) {
-    case 'info': return 'pnlm-hotspot-info';
-    case 'door': return 'pnlm-hotspot-door';
-    case 'eye': return 'pnlm-hotspot-eye';
-    case 'arrow':
-    default: return 'pnlm-hotspot-arrow';
-  }
+  /** ID of the currently selected hotspot (for highlighting) */
+  selectedHotspotId?: string;
+  /** Callback providing viewer API for programmatic control */
+  onViewerReady?: (api: PanoramaViewerApi) => void;
+  /** Optional theme styling for the prompt overlay */
+  promptStyle?: {
+    fontFamily?: string;
+    fontSize?: string | number;
+    color?: string;
+    backgroundColor?: string;
+    border?: string;
+    borderRadius?: string | number;
+    padding?: string | number;
+  };
 }
 
 export const PanoramaView: React.FC<PanoramaViewProps> = ({
@@ -45,132 +48,166 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
   hotspots,
   initialPitch = 0,
   initialYaw = 0,
-  hfov = 100,
-  autoRotate = 0,
+  hfov = 75,
   prompt,
+  projectionType = 'equirectangular',
   onHotspotClick,
   editorMode = false,
   onEditorClick,
+  selectedHotspotId,
+  onViewerReady,
+  promptStyle,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<any>(null);
+  const view360Ref = useRef<View360 | null>(null);
   const onHotspotClickRef = useRef(onHotspotClick);
   const onEditorClickRef = useRef(onEditorClick);
+  const onViewerReadyRef = useRef(onViewerReady);
+  const initializedRef = useRef(false);
 
   // Keep refs up to date
   onHotspotClickRef.current = onHotspotClick;
   onEditorClickRef.current = onEditorClick;
+  onViewerReadyRef.current = onViewerReady;
 
-  // Initialize Pannellum viewer
-  useEffect(() => {
-    if (!containerRef.current || !panoramaUrl) return;
+  // Create projection from panorama URL (equirectangular or cylindrical)
+  const projection = useMemo(() => {
+    if (!panoramaUrl) return null;
+    if (projectionType === 'cylindrical') {
+      return new CylindricalProjection({ src: panoramaUrl, partial: true });
+    }
+    return new EquirectProjection({ src: panoramaUrl });
+  }, [panoramaUrl, projectionType]);
 
-    const pannellumApi = (window as any).pannellum;
-    if (!pannellumApi) {
-      console.error('[PanoramaView] pannellum not found on window');
-      return;
+  // After viewer is ready, set initial camera position using hfov → zoom conversion
+  const handleReady = useCallback((e: { target: any }) => {
+    const viewer = e.target;
+    const camera = viewer.camera;
+
+    // Convert our horizontal FOV to zoom level
+    try {
+      const safeHfov = Math.max(50, hfov);
+      const zoom = camera.fovToZoom(safeHfov);
+      camera.lookAt({ yaw: initialYaw, pitch: initialPitch, zoom });
+    } catch (err) {
+      // Fallback: just set yaw/pitch
+      camera.lookAt({ yaw: initialYaw, pitch: initialPitch });
     }
 
-    // Build hotspot config
-    const hotSpotConfig: any[] = hotspots.map(hs => ({
-      id: hs.id,
-      pitch: hs.pitch,
-      yaw: hs.yaw,
-      type: 'info',
-      text: hs.text,
-      cssClass: `pnlm-hotspot-custom ${getHotspotIconClass(hs.icon)}`,
-      clickHandlerFunc: () => {
-        onHotspotClickRef.current(hs.id);
-      },
-    }));
+    initializedRef.current = true;
 
-    const viewer = pannellumApi.viewer(containerRef.current, {
-      type: 'equirectangular',
-      panorama: panoramaUrl,
-      autoLoad: true,
-      pitch: initialPitch,
-      yaw: initialYaw,
-      hfov: hfov,
-      minHfov: 30,
-      maxHfov: 120,
-      autoRotate: autoRotate || undefined,
-      autoRotateInactivityDelay: 3000,
-      showZoomCtrl: false,
-      showFullscreenCtrl: false,
-      showControls: false,
-      hotSpots: editorMode ? [] : hotSpotConfig,
-      compass: false,
-      hotSpotDebug: editorMode,
-    });
-
-    viewerRef.current = viewer;
-
-    // In editor mode, capture clicks to place hotspots
-    if (editorMode) {
-      viewer.on('mouseup', (event: MouseEvent) => {
-        if (onEditorClickRef.current) {
-          const coords = viewer.mouseEventToCoords(event);
-          if (coords) {
-            onEditorClickRef.current(coords[0], coords[1]);
+    // Expose viewer API
+    if (onViewerReadyRef.current) {
+      onViewerReadyRef.current({
+        lookAt: (pitch: number, yaw: number, targetHfov?: number) => {
+          try {
+            const cam = viewer.camera;
+            const lookAtOpts: { yaw: number; pitch: number; zoom?: number } = { yaw, pitch };
+            if (targetHfov !== undefined) {
+              lookAtOpts.zoom = cam.fovToZoom(Math.max(50, targetHfov));
+            }
+            cam.lookAt(lookAtOpts);
+          } catch (err) { /* viewer may be destroyed */ }
+        },
+        getView: () => {
+          try {
+            const cam = viewer.camera;
+            // Normalize yaw from egjs 0-360° to -180..180°
+            let yaw = cam.yaw % 360;
+            if (yaw > 180) yaw -= 360;
+            if (yaw < -180) yaw += 360;
+            return {
+              pitch: cam.pitch,
+              yaw,
+              hfov: cam.getHorizontalFov(cam.zoom),
+            };
+          } catch (err) {
+            return { pitch: 0, yaw: 0, hfov: 75 };
           }
-        }
+        },
       });
     }
+  }, [initialYaw, initialPitch, hfov]);
 
-    return () => {
-      try {
-        viewer.destroy();
-      } catch (e) {
-        // Pannellum may throw during destroy if container is already gone
-      }
-      viewerRef.current = null;
-    };
-  // Only reinitialize when the panorama URL changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panoramaUrl]);
-
-  // Update hotspots when they change (without reinitializing the viewer)
+  // Update camera when settings change externally (sliders)
   useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer || editorMode) return;
-
+    if (!view360Ref.current || !initializedRef.current) return;
     try {
-      // Remove existing hotspots
-      const config = viewer.getConfig();
-      if (config.hotSpots) {
-        for (const hs of [...config.hotSpots]) {
-          if (hs.id) {
-            try { viewer.removeHotSpot(hs.id); } catch (e) { /* ignore */ }
-          }
-        }
-      }
+      const viewer = view360Ref.current.view360;
+      const camera = viewer.camera;
+      const zoom = camera.fovToZoom(Math.max(50, hfov));
+      camera.lookAt({ yaw: initialYaw, pitch: initialPitch, zoom });
+    } catch (err) { /* viewer may not be fully loaded yet */ }
+  }, [initialPitch, initialYaw, hfov]);
 
-      // Add updated hotspots
-      for (const hs of hotspots) {
-        viewer.addHotSpot({
-          id: hs.id,
-          pitch: hs.pitch,
-          yaw: hs.yaw,
-          type: 'info',
-          text: hs.text,
-          cssClass: `pnlm-hotspot-custom ${getHotspotIconClass(hs.icon)}`,
-          clickHandlerFunc: () => {
-            onHotspotClickRef.current(hs.id);
-          },
-        });
-      }
-    } catch (e) {
-      console.warn('[PanoramaView] Error updating hotspots:', e);
-    }
-  }, [hotspots, editorMode]);
+  if (!projection) {
+    return (
+      <div style={{
+        position: 'relative', width: '100%', height: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#000', color: 'rgba(255,255,255,0.5)',
+        fontFamily: 'sans-serif', fontSize: '14px',
+      }}>
+        No panorama image
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {/* Pannellum container */}
-      <div
-        ref={containerRef}
+      <View360
+        ref={view360Ref}
+        projection={projection}
+        initialYaw={initialYaw}
+        initialPitch={initialPitch}
+        fov={90}
+        hotspot={{ zoom: true }}
         style={{ width: '100%', height: '100%' }}
-      />
+        onReady={handleReady}
+      >
+        {/* Hotspots as DOM elements */}
+        {!editorMode && (
+          <div className="view360-hotspots">
+            {hotspots.map((hs) => {
+              const isSelected = selectedHotspotId === hs.id;
+              return (
+                <div
+                  key={hs.id}
+                  className="view360-hotspot"
+                  data-yaw={hs.yaw}
+                  data-pitch={hs.pitch}
+                  style={{ cursor: 'pointer' }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onHotspotClickRef.current(hs.id);
+                  }}
+                >
+                  <div style={{
+                    minWidth: '80px',
+                    minHeight: '36px',
+                    padding: '6px 12px',
+                    backgroundColor: isSelected ? 'rgba(255, 255, 0, 0.4)' : 'rgba(255, 255, 0, 0.25)',
+                    border: isSelected ? '2px dashed rgba(245, 158, 11, 0.8)' : '2px dashed rgba(255, 255, 0, 0.7)',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transform: 'translate(-50%, -50%)',
+                    fontSize: '13px',
+                    fontFamily: 'sans-serif',
+                    fontWeight: '600',
+                    color: 'white',
+                    textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {hs.text || 'Hotspot'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </View360>
 
       {/* Prompt overlay */}
       {prompt && (
@@ -179,12 +216,13 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
           bottom: 24,
           left: '50%',
           transform: 'translateX(-50%)',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          color: 'white',
-          padding: '10px 24px',
-          borderRadius: 8,
-          fontSize: 16,
-          fontFamily: 'sans-serif',
+          backgroundColor: promptStyle?.backgroundColor || 'rgba(0, 0, 0, 0.7)',
+          color: promptStyle?.color || 'white',
+          padding: promptStyle?.padding ?? '10px 24px',
+          borderRadius: promptStyle?.borderRadius ?? 8,
+          border: promptStyle?.border || 'none',
+          fontSize: promptStyle?.fontSize || 16,
+          fontFamily: promptStyle?.fontFamily || 'sans-serif',
           pointerEvents: 'none',
           whiteSpace: 'nowrap',
           zIndex: 10,
@@ -192,49 +230,6 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
           {prompt}
         </div>
       )}
-
-      {/* Custom hotspot styles */}
-      <style>{`
-        .pnlm-hotspot-custom {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.9);
-          border: 3px solid #3b82f6;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-        .pnlm-hotspot-custom:hover {
-          transform: scale(1.2);
-          box-shadow: 0 4px 16px rgba(59, 130, 246, 0.5);
-          border-color: #2563eb;
-        }
-        .pnlm-hotspot-custom .pnlm-tooltip {
-          background: rgba(0, 0, 0, 0.8);
-          color: white;
-          padding: 6px 12px;
-          border-radius: 4px;
-          font-size: 14px;
-          white-space: nowrap;
-          pointer-events: none;
-        }
-        .pnlm-hotspot-arrow::after { content: "→"; font-size: 18px; color: #3b82f6; }
-        .pnlm-hotspot-info::after { content: "ℹ"; font-size: 16px; color: #3b82f6; }
-        .pnlm-hotspot-door::after { content: "🚪"; font-size: 16px; }
-        .pnlm-hotspot-eye::after { content: "👁"; font-size: 16px; }
-
-        /* Override Pannellum default styles for our embedded use */
-        .pnlm-container {
-          background: #000 !important;
-        }
-        .pnlm-load-box, .pnlm-load-button {
-          display: none !important;
-        }
-      `}</style>
     </div>
   );
 };

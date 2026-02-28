@@ -6,14 +6,17 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
-import { PanoramaEditor } from './PanoramaEditor';
+import { PanoramaCameraPanel, type PanoramaViewMode } from './PanoramaCameraPanel';
 import { VisualPropertiesPanel } from './VisualPropertiesPanel';
 import { AnimationPanel } from './AnimationPanel';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
+import { stageToYawPitch, yawPitchToStage } from '../../utils/panoramaCoordinates';
 // applySmartSizing removed — smart sizing now computed at render time by PositionedBeatView
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
+import View360, { EquirectProjection, CylindricalProjection } from '@egjs/react-view360';
+import '@egjs/react-view360/css/view360.min.css';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
 
@@ -207,6 +210,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Phase navigation state for DialogTree beats
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
   const [phasesExpanded, setPhasesExpanded] = useState(true);
+
+  // Panorama view mode toggle: layout (flat equirect + VE tools) vs preview (egjs-view360 360°)
+  const [panoramaViewMode, setPanoramaViewMode] = useState<PanoramaViewMode>('layout');
+  // Counter to force View360 remount AND fresh projection each time we enter preview
+  const [view360MountKey, setView360MountKey] = useState(0);
+  const view360Ref = useRef<View360 | null>(null);
+  const panoramaPreviewContainerRef = useRef<HTMLDivElement | null>(null);
+  const [panoramaPreviewWidth, setPanoramaPreviewWidth] = useState(600);
+  // Flag to prevent feedback loop: onViewChange → updateParams → useEffect → camera.lookAt → onViewChange
+  const panoramaViewChangingRef = useRef(false);
+  // Flag to prevent onViewChange from saving before onReady sets the correct zoom
+  const panoramaReadyRef = useRef(false);
+  // Track user interaction — only save onViewChange when user is dragging/scrolling
+  const panoramaUserInteractingRef = useRef(false);
 
   // Use refs to track current state for cleanup
   const beatRef = useRef(beat);
@@ -407,6 +424,96 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const isDialogTreeBeat = beat?.type === 'dialogTree' && flattenedPhases.length > 1;
   console.log('[VisualWorkspace] isDialogTreeBeat:', isDialogTreeBeat, 'phases:', flattenedPhases.length);
 
+  const isPanoramaBeat = beat?.type === 'panorama';
+
+  // Memoized projection for egjs-view360 preview (equirectangular or cylindrical)
+  const panoramaProjectionType = isPanoramaBeat && beat?.getParameters ? (beat.getParameters().projectionType || 'equirectangular') : 'equirectangular';
+
+  // Track panorama image aspect ratio for coordinate conversion
+  const [panoramaImageAspect, setPanoramaImageAspect] = useState<number>(4);
+  useEffect(() => {
+    if (!isPanoramaBeat || !backgroundUrl) return;
+    const resolvedUrl = backgroundAssetId ? assets.find(a => a.id === backgroundAssetId)?.url : undefined;
+    const img = new Image();
+    img.onload = () => {
+      const aspect = img.naturalWidth / img.naturalHeight;
+      setPanoramaImageAspect(aspect);
+      // Persist to beat params so SchemaLocationInitializer can use it
+      if (beat?.updateParameters) {
+        beat.updateParameters({ imageAspectRatio: aspect });
+      }
+    };
+    img.src = resolvedUrl || backgroundUrl;
+  }, [isPanoramaBeat, backgroundUrl, backgroundAssetId, assets]);
+
+  // Listen for panorama hotspots added from the Inspector
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { beatId, hotspot } = (e as CustomEvent).detail;
+      if (!beatRef.current || beatRef.current.id !== beatId) return;
+
+      // Convert yaw/pitch to stage pixel position
+      const stageW = projectSettings?.width || 1024;
+      const stageH = projectSettings?.height || 768;
+      const params = beatRef.current.getParameters ? beatRef.current.getParameters() : {};
+      const projType = params.projectionType || 'equirectangular';
+      const imgAspect = params.imageAspectRatio ?? panoramaImageAspect;
+
+      const { centerX, centerY } = yawPitchToStage(hotspot.yaw ?? 0, hotspot.pitch ?? 0, projType, stageW, stageH, imgAspect);
+      const hotspotWidth = 120;
+      const hotspotHeight = 50;
+
+      const newElement: VisualElement = {
+        id: hotspot.id,
+        type: 'hotspot',
+        name: hotspot.text || 'Hotspot',
+        text: hotspot.text || 'Hotspot',
+        x: centerX - hotspotWidth / 2,
+        y: centerY - hotspotHeight / 2,
+        z: 10 + (params.hotspots?.length || 0),
+        width: hotspotWidth,
+        height: hotspotHeight,
+        rotation: 0,
+        scale: 1,
+        visible: true,
+        locked: false,
+      };
+
+      console.log(`[VisualWorkspace] Adding panorama hotspot VisualElement: id=${hotspot.id} at px(${Math.round(newElement.x)},${Math.round(newElement.y)}) from yaw=${hotspot.yaw} pitch=${hotspot.pitch}`);
+      const afterElements = [...visualElementsRef.current, newElement];
+      setVisualElements(afterElements);
+      setHasChanges(true);
+    };
+
+    window.addEventListener('asaps:addPanoramaHotspot', handler);
+    return () => window.removeEventListener('asaps:addPanoramaHotspot', handler);
+  }, [projectSettings, panoramaImageAspect]);
+
+  const panoramaProjection = useMemo(() => {
+    if (!isPanoramaBeat) return null;
+    const resolvedUrl = backgroundAssetId ? assets.find(a => a.id === backgroundAssetId)?.url : undefined;
+    const url = resolvedUrl || backgroundUrl || '';
+    if (!url) return null;
+    if (panoramaProjectionType === 'cylindrical') {
+      return new CylindricalProjection({ src: url, partial: true });
+    }
+    return new EquirectProjection({ src: url });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPanoramaBeat, backgroundAssetId, backgroundUrl, assets, panoramaProjectionType, view360MountKey]);
+
+  // Extract hotspot data from beat parameters for the preview
+  const panoramaHotspots: { id: string; pitch: number; yaw: number; text: string }[] = useMemo(() => {
+    if (!isPanoramaBeat || !beat) return [];
+    const params = beat.getParameters ? beat.getParameters() : {};
+    return (params.hotspots || []).map((hs: any) => ({
+      id: hs.id as string,
+      pitch: hs.pitch as number,
+      yaw: hs.yaw as number,
+      text: (hs.text || '') as string,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPanoramaBeat, beat, beatVersion]);
+
   // EndScreen with credits phase detection
   const isEndScreenWithCredits = useMemo(() => {
     if (beat?.type !== 'endScreen') return false;
@@ -434,7 +541,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Track previous phase choices count to detect when choices are added/removed
   const prevChoicesCountRef = useRef<number>(0);
 
-  // Reset selected phase when beat changes
+  // Reset selected phase and panorama view mode when beat changes
   useEffect(() => {
     if (beat?.id) {
       if (beat.type === 'endScreen') {
@@ -445,11 +552,39 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         const rootPhase = phaseTree?.id || null;
         setSelectedPhaseId(rootPhase);
       }
+      // Reset panorama view to layout mode when switching beats
+      setPanoramaViewMode('layout');
+      panoramaReadyRef.current = false;
+      view360Ref.current = null;
       // Set prevPhaseIdRef to null so the phase effect knows to reload
       // (if we set it to rootPhase, the phase effect would skip loading)
       prevPhaseIdRef.current = null;
     }
   }, [beat?.id, beat?.type, phaseTree?.id]);
+
+  // Sync panorama camera settings (sliders) to the View360 preview
+  useEffect(() => {
+    if (!isPanoramaBeat || panoramaViewMode !== 'preview' || !view360Ref.current) return;
+    // Skip if this update came from the View360 viewer itself (prevents feedback loop)
+    if (panoramaViewChangingRef.current) return;
+    // Defer to onReady for initial camera setup — the viewer isn't fully initialized yet
+    if (!panoramaReadyRef.current) return;
+    try {
+      const viewer = (view360Ref.current as any).view360;
+      if (!viewer) return;
+      const camera = viewer.camera;
+      const params = beat!.getParameters();
+      const safeHfov = Math.max(50, Number.isFinite(params.hfov) ? params.hfov : 75);
+      // fovToZoom expects HORIZONTAL FOV (same unit as the fov={90} prop)
+      const zoom = camera.fovToZoom(safeHfov);
+      camera.lookAt({
+        yaw: Number.isFinite(params.initialYaw) ? params.initialYaw : 0,
+        pitch: Number.isFinite(params.initialPitch) ? params.initialPitch : 0,
+        zoom,
+      });
+    } catch (err) { /* viewer may not be fully loaded yet */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPanoramaBeat, panoramaViewMode, beatVersion]);
 
   /**
    * Generate visual elements for a specific DialogTree phase
@@ -595,7 +730,48 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     });
 
     console.log(`[VisualWorkspace] Synced ${targetBeat.locations.size} locations to beat.locations`);
-  }, []);
+
+    // For panorama beats, also sync hotspot positions from elements back to beat parameters
+    if (targetBeat.type === 'panorama') {
+      const stageW = projectSettings?.width || 1024;
+      const stageH = projectSettings?.height || 768;
+      syncPanoramaHotspotsFromElements(elements, targetBeat, stageW, stageH);
+    }
+  }, [projectSettings]);
+
+  /**
+   * Sync panorama hotspot positions from VisualElements back to beat.hotspots[]
+   * Converts element x/y center → pitch/yaw and merges into existing hotspot data
+   */
+  const syncPanoramaHotspotsFromElements = useCallback((
+    elements: VisualElement[],
+    targetBeat: Beat,
+    stageW: number,
+    stageH: number
+  ) => {
+    const params = targetBeat.getParameters ? targetBeat.getParameters() : {};
+    const existingHotspots: any[] = params.hotspots || [];
+    const hotspotElements = elements.filter(el => el.type === 'hotspot');
+
+    const updatedHotspots = existingHotspots.map((hs: any) => {
+      const el = hotspotElements.find(e => e.id === hs.id) ||
+                 hotspotElements.find(e => e.name === hs.text);
+      if (!el) return hs;
+
+      // Convert element center x/y → yaw/pitch
+      const xCenter = el.x + el.width / 2;
+      const yCenter = el.y + el.height / 2;
+      const { yaw, pitch } = stageToYawPitch(xCenter, yCenter, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
+
+      return {
+        ...hs,
+        pitch: Math.round(pitch * 10) / 10,
+        yaw: Math.round(yaw * 10) / 10,
+      };
+    });
+
+    targetBeat.updateParameters({ hotspots: updatedHotspots });
+  }, [panoramaProjectionType, panoramaImageAspect]);
 
   // Keep sync ref up to date for undo/redo applyElements
   syncElementsRef.current = syncElementsToBeatLocations;
@@ -715,6 +891,30 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           [phaseKey]: overrides,
         };
         console.log(`[VisualWorkspace] Saved phase overrides for phase: ${phaseKey} before beat change`, overrides);
+      }
+
+      // For panorama beats, also save panoramaAssetId and sync hotspot positions
+      if (prevBeat.type === 'panorama') {
+        params.panoramaAssetId = backgroundAssetIdRef.current;
+        // Sync hotspot x/y → pitch/yaw before saving
+        const stageW = projectSettings?.width || 1024;
+        const stageH = projectSettings?.height || 768;
+        const projType = params.projectionType || 'equirectangular';
+        const hotspotEls = visualElementsRef.current.filter(el => el.type === 'hotspot');
+        if (params.hotspots && hotspotEls.length > 0) {
+          params.hotspots = params.hotspots.map((hs: any) => {
+            const el = hotspotEls.find(e => e.id === hs.id);
+            if (!el) return hs;
+            const xCenter = el.x + el.width / 2;
+            const yCenter = el.y + el.height / 2;
+            const { yaw, pitch } = stageToYawPitch(xCenter, yCenter, projType, stageW, stageH, panoramaImageAspect);
+            return {
+              ...hs,
+              pitch: Math.round(pitch * 10) / 10,
+              yaw: Math.round(yaw * 10) / 10,
+            };
+          });
+        }
       }
 
       // Save to parameters
@@ -866,7 +1066,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         // Only include characters and props - dialog/buttons come from phase
         if (loc.kind === 'character' || loc.kind === 'prop') {
           const element: VisualElement = {
-            id: `element_${Date.now()}_${Math.random()}`,
+            id: loc.id || `element_${Date.now()}_${Math.random()}`,
             type: loc.kind as 'character' | 'prop',
             name: loc.name,
             text: '',
@@ -1178,7 +1378,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         beat.locations.forEach((loc: Location) => {
           if (loc.kind === 'character' || loc.kind === 'prop') {
             const element: VisualElement = {
-              id: `element_${Date.now()}_${Math.random()}`,
+              id: loc.id || `element_${Date.now()}_${Math.random()}`,
               type: loc.kind as 'character' | 'prop',
               name: loc.name,
               text: '',
@@ -1310,7 +1510,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                                nameLower.includes('skip');
 
         const element: any = {
-          id: `element_${Date.now()}_${Math.random()}`,
+          id: loc.id || `element_${Date.now()}_${Math.random()}`,
           type: loc.kind === 'character' ? 'character' :
                 loc.kind === 'prop' ? 'prop' :
                 loc.kind === 'button' ? 'button' :
@@ -1462,6 +1662,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             if (nameLower.includes('prompt')) {
               element.text = params.prompt || 'Please enter your response:';
             }
+          } else if (beat.type === 'panorama') {
+            if (nameLower.includes('prompt')) {
+              element.text = params.prompt || '';
+            }
           }
         } else if (element.type === 'button') {
           // Populate button text from params
@@ -1518,7 +1722,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                                nameLower.includes('skip');
 
         const element: any = {
-          id: `element_${Date.now()}_${Math.random()}`,
+          id: loc.id || `element_${Date.now()}_${Math.random()}`,
           type: loc.kind === 'char' || loc.kind === 'character' ? 'character' :
                 loc.kind === 'button' ? 'button' :
                 isButtonByName ? 'button' : // Detect buttons by name for legacy ASML
@@ -1734,6 +1938,54 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       elements = schemaElements;
     }
 
+    // Panorama hotspot sync: ensure each hotspot in beat.parameters.hotspots
+    // has a matching VisualElement with the correct ID
+    if (beat.type === 'panorama' && params.hotspots && params.hotspots.length > 0) {
+      const hotspotElements = elements.filter((e: VisualElement) => e.type === 'hotspot');
+      const projType = params.projectionType || 'equirectangular';
+      const imgAspect = params.imageAspectRatio ?? 4;
+      const stageW = projectSettings?.width || 1024;
+      const stageH = projectSettings?.height || 768;
+
+      params.hotspots.forEach((hs: any) => {
+        // Match by ID first, then by name (for elements saved with old random IDs)
+        let matchEl = hotspotElements.find((e: VisualElement) => e.id === hs.id);
+        if (!matchEl) {
+          matchEl = hotspotElements.find((e: VisualElement) => e.name === hs.text);
+        }
+
+        if (matchEl) {
+          // Fix the ID to match the hotspot param ID (for elements with old random IDs)
+          if (matchEl.id !== hs.id) {
+            console.log(`[VisualWorkspace] Fixing hotspot VE ID: "${matchEl.id}" → "${hs.id}" (name=${hs.text})`);
+            matchEl.id = hs.id;
+          }
+        } else {
+          // Create new VisualElement for orphan hotspot
+          const { centerX: cx, centerY: cy } = yawPitchToStage(hs.yaw ?? 0, hs.pitch ?? 0, projType, stageW, stageH, imgAspect);
+          const hotspotWidth = 120;
+          const hotspotHeight = 50;
+          const maxZ = elements.length > 0 ? Math.max(...elements.map((e: VisualElement) => e.z)) : 0;
+          elements.push({
+            id: hs.id,
+            type: 'hotspot',
+            name: hs.text || `Hotspot`,
+            text: hs.text || `Hotspot`,
+            x: cx - hotspotWidth / 2,
+            y: cy - hotspotHeight / 2,
+            z: maxZ + 1,
+            width: hotspotWidth,
+            height: hotspotHeight,
+            rotation: 0,
+            scale: 1,
+            visible: true,
+            locked: false,
+          });
+          console.log(`[VisualWorkspace] Created orphan hotspot VE: hs=${hs.id} (${hs.text}): yaw=${hs.yaw} pitch=${hs.pitch} → px(${Math.round(cx)},${Math.round(cy)})`);
+        }
+      });
+    }
+
     // Supplement missing static elements for beats with dynamic locations
     // movementChoice/pickProp may have choice/prop hotspots in beat.locations
     // but be missing the schema-defined "question" text element
@@ -1778,7 +2030,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Note: All visible beats now use schema-driven initialization only
 
     // Load background from node parameter (old ASML style) or backgroundAssetId
-    const bgId = params.node || params.backgroundAssetId || '';
+    // For panorama beats, the panorama image IS the background
+    const bgId = beat.type === 'panorama'
+      ? (params.panoramaAssetId || '')
+      : (params.node || params.backgroundAssetId || '');
     // Use direct backgroundUrl from ASML import (if available) - avoids asset lookup
     const bgUrl = params.backgroundUrl || '';
 
@@ -2698,6 +2953,48 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             </div>
           )}
 
+          {/* Panorama Camera Settings (shown above tabs for panorama beats) */}
+          {isPanoramaBeat && (
+            <PanoramaCameraPanel
+              initialPitch={Number.isFinite(beat.getParameters().initialPitch) ? beat.getParameters().initialPitch : 0}
+              initialYaw={Number.isFinite(beat.getParameters().initialYaw) ? beat.getParameters().initialYaw : 0}
+              hfov={Number.isFinite(beat.getParameters().hfov) ? beat.getParameters().hfov : 75}
+              prompt={beat.getParameters().prompt || ''}
+              projectionType={beat.getParameters().projectionType || 'equirectangular'}
+              viewMode={panoramaViewMode}
+              onViewModeChange={(mode) => {
+                // CRITICAL: Reset readyRef BEFORE remount to prevent onViewChange
+                // from saving stale FOV values during View360 re-initialization.
+                // Without this, panoramaReadyRef stays true from the previous preview
+                // session, and onViewChange saves the default fov={90} before onReady
+                // can set the correct zoom level.
+                panoramaReadyRef.current = false;
+                if (mode === 'preview') setView360MountKey(k => k + 1);
+                setPanoramaViewMode(mode);
+              }}
+              onCameraChange={(settings) => {
+                beat.updateParameters(settings);
+                if (onBeatUpdate) {
+                  onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), ...settings } } as any);
+                }
+              }}
+              onPromptChange={(newPrompt) => {
+                beat.updateParameters({ prompt: newPrompt });
+                if (onBeatUpdate) {
+                  onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), prompt: newPrompt } } as any);
+                }
+              }}
+              onProjectionTypeChange={(type) => {
+                beat.updateParameters({ projectionType: type });
+                setHasChanges(true);
+                if (onBeatUpdate) {
+                  onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), projectionType: type } } as any);
+                }
+              }}
+            />
+          )}
+
+          <>
           {/* Tab Buttons */}
           <div className="flex border-b border-gray-200">
             <button
@@ -2864,6 +3161,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     if (beat.locations.has(locationKey)) {
                       beat.locations.delete(locationKey);
                       console.log(`[VisualWorkspace] Removed "${locationKey}" from beat.locations (now ${beat.locations.size} locations)`);
+                    }
+
+                    // For panorama beats, also remove the corresponding PanoramaHotspot entry
+                    if (beat.type === 'panorama' && elementToDelete.type === 'hotspot') {
+                      const params = beat.getParameters ? beat.getParameters() : {};
+                      const hotspots = (params.hotspots || []).filter((hs: any) => hs.id !== elementId);
+                      beat.updateParameters({ hotspots });
+                      console.log(`[VisualWorkspace] Removed panorama hotspot "${elementId}" (now ${hotspots.length} hotspots)`);
                     }
                   }
 
@@ -3044,21 +3349,25 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     return;
                   }
 
+                  // For panorama hotspots, use a stable ID and also create a panorama hotspot entry
+                  const isPanorama = beat.type === 'panorama' && type === 'hotspot';
+                  const elementId = isPanorama ? `hotspot_${Date.now()}` : `element_${Date.now()}`;
+
                   // For text and hotspot types, create element immediately
                   const newElement: VisualElement = {
-                    id: `element_${Date.now()}`,
+                    id: elementId,
                     type,
-                    name: type.charAt(0).toUpperCase() + type.slice(1),
+                    name: isPanorama ? `Hotspot ${(beat.getParameters().hotspots || []).length + 1}` : type.charAt(0).toUpperCase() + type.slice(1),
                     x: Math.floor(stageWidth / 2) - 50,
                     y: Math.floor(stageHeight / 2) - 50,
                     z: visualElements.length,
-                    width: type === 'text' ? 200 : 100,
-                    height: type === 'text' ? 40 : 100,
+                    width: type === 'text' ? 200 : (isPanorama ? 120 : 100),
+                    height: type === 'text' ? 40 : (isPanorama ? 80 : 100),
                     rotation: 0,
                     scale: 1,
                     visible: true,
                     locked: false,
-                    text: type === 'text' ? 'New Text' : undefined,
+                    text: type === 'text' ? 'New Text' : (isPanorama ? `Hotspot ${(beat.getParameters().hotspots || []).length + 1}` : undefined),
                     // Font is left undefined to use theme default
                     font: undefined,
                     fontSize: (type === 'text' || type === 'hotspot') ? 16 : undefined,
@@ -3068,6 +3377,23 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   setVisualElements(afterElements);
                   setSelectedElementIds([newElement.id]);
                   setHasChanges(true);
+
+                  // For panorama beats, also create a corresponding PanoramaHotspot entry
+                  if (isPanorama) {
+                    const params = beat.getParameters ? beat.getParameters() : {};
+                    const existingHotspots = params.hotspots || [];
+                    const xCenter = newElement.x + newElement.width / 2;
+                    const yCenter = newElement.y + newElement.height / 2;
+                    const { yaw, pitch } = stageToYawPitch(xCenter, yCenter, panoramaProjectionType, stageWidth, stageHeight, panoramaImageAspect);
+                    const newHotspot = {
+                      id: elementId,
+                      pitch: Math.round(pitch * 10) / 10,
+                      yaw: Math.round(yaw * 10) / 10,
+                      text: newElement.name,
+                      target: '',
+                    };
+                    beat.updateParameters({ hotspots: [...existingHotspots, newHotspot] });
+                  }
 
                   // Commit add for undo
                   const cmd = new VisualElementsSnapshotCommand(
@@ -3152,6 +3478,67 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   onBeatUpdate(beat.id, { responseDelay: delay } as any);
                   setHasChanges(true);
                 } : undefined}
+                allBeats={beat.type === 'panorama' ? beats.map(b => ({ id: b.id, name: b.name, type: b.type })) : undefined}
+                panoramaHotspots={beat.type === 'panorama' ? (() => {
+                  const params = beat.getParameters ? beat.getParameters() : {};
+                  const hotspots: any[] = params.hotspots || [];
+                  const stageW = projectSettings?.width || 1024;
+                  const stageH = projectSettings?.height || 768;
+                  // Compute pitch/yaw from current element positions
+                  return hotspots.map((hs: any) => {
+                    const el = visualElements.find(e => e.id === hs.id) ||
+                               visualElements.find(e => e.type === 'hotspot' && e.name === hs.text);
+                    if (el) {
+                      const xCenter = el.x + el.width / 2;
+                      const yCenter = el.y + el.height / 2;
+                      const { yaw, pitch } = stageToYawPitch(xCenter, yCenter, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
+                      return {
+                        ...hs,
+                        pitch: Math.round(pitch * 10) / 10,
+                        yaw: Math.round(yaw * 10) / 10,
+                      };
+                    }
+                    return hs;
+                  });
+                })() : undefined}
+                onPanoramaHotspotUpdate={beat.type === 'panorama' ? (id, updates) => {
+                  const params = beat.getParameters ? beat.getParameters() : {};
+                  const hotspots = (params.hotspots || []).map((hs: any) =>
+                    hs.id === id ? { ...hs, ...updates } : hs
+                  );
+                  beat.updateParameters({ hotspots });
+                  if (onBeatUpdate) {
+                    onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), hotspots } } as any);
+                  }
+                  // If yaw or pitch changed, reposition the visual element on stage
+                  if ('yaw' in updates || 'pitch' in updates) {
+                    const updatedHs = hotspots.find((hs: any) => hs.id === id);
+                    if (updatedHs) {
+                      const stageW = projectSettings?.width || 1024;
+                      const stageH = projectSettings?.height || 768;
+                      const projType = params.projectionType || 'equirectangular';
+                      const imgAspect = params.imageAspectRatio ?? panoramaImageAspect;
+                      const { centerX, centerY } = yawPitchToStage(updatedHs.yaw, updatedHs.pitch, projType, stageW, stageH, imgAspect);
+                      const el = visualElements.find(e => e.id === id);
+                      if (el) {
+                        const newX = centerX - el.width / 2;
+                        const newY = centerY - el.height / 2;
+                        setVisualElements(prev => prev.map(e =>
+                          e.id === id ? { ...e, x: newX, y: newY } : e
+                        ));
+                      }
+                    }
+                  }
+                  setHasChanges(true);
+                } : undefined}
+                promptDisplay={beat.type === 'panorama' ? (beat.getParameters().promptDisplay || 'static') : undefined}
+                onPromptDisplayChange={beat.type === 'panorama' ? (display) => {
+                  beat.updateParameters({ promptDisplay: display });
+                  if (onBeatUpdate) {
+                    onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), promptDisplay: display } } as any);
+                  }
+                  setHasChanges(true);
+                } : undefined}
               />
             )}
 
@@ -3180,33 +3567,390 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               />
             )}
           </div>
+          </>
         </div>
       )}
 
       {/* Main Visual Editor Canvas */}
-      <div className="flex-1 overflow-hidden">
-        {beat.type === 'panorama' ? (
-          <PanoramaEditor
-            panoramaUrl={(() => {
-              const assetId = beat.getParameters().panoramaAssetId;
-              const asset = assetId ? assets.find(a => a.id === assetId) : null;
-              return asset?.url || '';
-            })()}
-            hotspots={beat.getParameters().hotspots || []}
-            initialPitch={beat.getParameters().initialPitch}
-            initialYaw={beat.getParameters().initialYaw}
-            hfov={beat.getParameters().hfov}
-            autoRotate={beat.getParameters().autoRotate}
-            prompt={beat.getParameters().prompt}
-            onHotspotsChange={(hotspots) => {
-              beat.updateParameters({ hotspots });
-              if (onBeatUpdate) {
-                onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), hotspots } } as any);
-              }
-            }}
-            onSelectHotspot={() => {}}
-          />
+      <div className="flex-1 overflow-hidden relative">
+        {isPanoramaBeat && panoramaViewMode === 'preview' ? (
+          /* Panorama Preview Mode: egjs-view360 interactive 360° viewer */
+          <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {panoramaProjection ? (
+              <div
+                ref={(el) => {
+                  panoramaPreviewContainerRef.current = el;
+                  if (el) {
+                    const w = el.clientWidth;
+                    if (w > 0 && w !== panoramaPreviewWidth) setPanoramaPreviewWidth(w);
+                  }
+                }}
+                style={{ width: '100%', maxHeight: '100%', aspectRatio: `${projectSettings?.width || 1024}/${projectSettings?.height || 768}`, position: 'relative', overflow: 'hidden' }}
+                onPointerDown={() => { panoramaUserInteractingRef.current = true; }}
+                onPointerUp={() => { setTimeout(() => { panoramaUserInteractingRef.current = false; }, 150); }}
+                onPointerCancel={() => { setTimeout(() => { panoramaUserInteractingRef.current = false; }, 150); }}
+                onWheel={() => {
+                  panoramaUserInteractingRef.current = true;
+                  setTimeout(() => { panoramaUserInteractingRef.current = false; }, 300);
+                }}
+              >
+              <View360
+                key={`panorama-preview-${view360MountKey}`}
+                ref={(ref) => { view360Ref.current = ref; }}
+                projection={panoramaProjection}
+                initialYaw={Number.isFinite(beat.getParameters().initialYaw) ? beat.getParameters().initialYaw : 0}
+                initialPitch={Number.isFinite(beat.getParameters().initialPitch) ? beat.getParameters().initialPitch : 0}
+                fov={90}
+                initialZoom={(() => {
+                  // Start at the correct zoom so there's no flash of zoom=1 before onReady
+                  const h = beat.getParameters().hfov;
+                  const safeH = Math.max(50, Number.isFinite(h) ? h : 75);
+                  return 1 / Math.tan(safeH * Math.PI / 360); // tan(45°)/tan(hfov/2)
+                })()}
+                hotspot={{ zoom: false }}
+                className="view360-panorama-preview"
+                style={{ width: '100%', height: '100%' }}
+                onReady={(e: { target: any }) => {
+                  const viewer = e.target;
+                  const camera = viewer.camera;
+                  // Prevent onViewChange from saving stale values before we set the correct zoom
+                  panoramaReadyRef.current = false;
+
+                  // Force resize — View360 may have measured the container at 0x0 during initial mount
+                  if (typeof viewer.resize === 'function') {
+                    viewer.resize();
+                  }
+
+                  // fovToZoom expects HORIZONTAL FOV (same unit as the fov={90} prop)
+                  try {
+                    const storedHfov = Number.isFinite(beat.getParameters().hfov) ? beat.getParameters().hfov : 75;
+                    const safeHfov = Math.max(50, storedHfov);
+                    const zoom = camera.fovToZoom(safeHfov);
+                    camera.lookAt({
+                      yaw: Number.isFinite(beat.getParameters().initialYaw) ? beat.getParameters().initialYaw : 0,
+                      pitch: Number.isFinite(beat.getParameters().initialPitch) ? beat.getParameters().initialPitch : 0,
+                      zoom,
+                    });
+                  } catch (err) {
+                    console.error('[Panorama] onReady camera setup error:', err);
+                  }
+
+                  // Now allow onViewChange to save — camera is at the correct state
+                  requestAnimationFrame(() => { panoramaReadyRef.current = true; });
+                }}
+                onViewChange={(e: { yaw: number; pitch: number; zoom: number; target: any }) => {
+                  // Only save when user is actively interacting (drag/scroll)
+                  // This prevents programmatic lookAt calls from overwriting stored values
+                  if (!panoramaReadyRef.current || !panoramaUserInteractingRef.current) return;
+                  const camera = e.target.camera;
+                  // getHorizontalFov returns the HORIZONTAL FOV in degrees (same unit as fov prop)
+                  const hfovValue = camera.getHorizontalFov(e.zoom);
+                  // Guard against NaN values from uninitialised camera
+                  if (isNaN(hfovValue) || isNaN(e.yaw) || isNaN(e.pitch)) return;
+                  // Normalize yaw from egjs 0-360° to our -180..180° range
+                  let yaw = e.yaw % 360;
+                  if (yaw > 180) yaw -= 360;
+                  if (yaw < -180) yaw += 360;
+                  // Set flag to prevent useEffect from feeding back into the camera
+                  panoramaViewChangingRef.current = true;
+                  beat.updateParameters({
+                    initialYaw: Math.round(yaw * 10) / 10,
+                    initialPitch: Math.round(e.pitch * 10) / 10,
+                    hfov: Math.round(hfovValue),
+                  });
+                  setHasChanges(true);
+                  if (onBeatUpdate) {
+                    onBeatUpdate(beat.id, {
+                      parameters: {
+                        ...beat.getParameters(),
+                        initialYaw: Math.round(yaw * 10) / 10,
+                        initialPitch: Math.round(e.pitch * 10) / 10,
+                        hfov: Math.round(hfovValue),
+                      },
+                    } as any);
+                  }
+                  // Clear feedback flag after React has a chance to process the state update
+                  requestAnimationFrame(() => { panoramaViewChangingRef.current = false; });
+                }}
+              >
+                {/* Hotspots as DOM elements — sized from VisualElement dimensions, scaled to viewer */}
+                <div className="view360-hotspots">
+                  {panoramaHotspots.map((hs) => {
+                    const isSelected = selectedElementId === hs.id;
+                    // Look up VisualElement to get stage width/height
+                    const veEl = visualElements.find(e => e.id === hs.id);
+                    const stageW = projectSettings?.width || 1024;
+                    const stageH = projectSettings?.height || 768;
+                    const currentHfov = beat.getParameters().hfov || 75;
+                    // Compute yaw/pitch from VE position for consistent positioning with non-hotspot elements
+                    let dataYaw = hs.yaw;
+                    let dataPitch = hs.pitch;
+                    if (veEl) {
+                      const cX = veEl.x + veEl.width / 2;
+                      const cY = veEl.y + veEl.height / 2;
+                      const computed = stageToYawPitch(cX, cY, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
+                      dataYaw = computed.yaw;
+                      dataPitch = computed.pitch;
+                    }
+                    // Convert stage pixel size to angular degrees, then to CSS pixels in the viewer.
+                    // hotspot zoom is disabled, so we size directly using the current HFOV.
+                    const totalHDeg = panoramaProjectionType === 'cylindrical' ? (panoramaImageAspect ?? 4) * (180 / Math.PI) : 360;
+                    const totalVDeg = panoramaProjectionType === 'cylindrical' ? 2 * Math.atan(0.5) * (180 / Math.PI) : 180;
+                    const elStageW = veEl?.width || 120;
+                    const elStageH = veEl?.height || 50;
+                    const angularW = (elStageW / stageW) * totalHDeg;
+                    const angularH = (elStageH / stageH) * totalVDeg;
+                    const displayAR = stageW / stageH;
+                    const containerH = panoramaPreviewWidth / displayAR;
+                    const currentVfov = currentHfov / displayAR;
+                    const cssW = (angularW / currentHfov) * panoramaPreviewWidth;
+                    const cssH = (angularH / currentVfov) * containerH;
+                    return (
+                      <div
+                        key={hs.id}
+                        className="view360-hotspot"
+                        data-yaw={dataYaw}
+                        data-pitch={dataPitch}
+                        style={{ cursor: 'pointer' }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedElementIds([hs.id]);
+                        }}
+                      >
+                        <div style={{
+                          width: `${Math.round(cssW)}px`,
+                          height: `${Math.round(cssH)}px`,
+                          backgroundColor: isSelected ? 'rgba(255, 255, 0, 0.4)' : 'rgba(255, 255, 0, 0.25)',
+                          border: isSelected ? '2px dashed rgba(245, 158, 11, 0.8)' : '2px dashed rgba(255, 255, 0, 0.7)',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: '13px',
+                          fontFamily: 'sans-serif',
+                          fontWeight: '600',
+                          color: 'white',
+                          textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                        }}>
+                          {hs.text || 'Hotspot'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Non-hotspot elements (props, text, characters) projected into 360° view */}
+                  {visualElements
+                    .filter(el => el.type !== 'hotspot' && el.visible !== false
+                      && !((el.type === 'text' || el.type === 'dialog') && (beat.getParameters().promptDisplay || 'static') !== 'pinned'))
+                    .map((el) => {
+                      const stageW = projectSettings?.width || 1024;
+                      const stageH = projectSettings?.height || 768;
+                      // Convert element center x/y to pitch/yaw for View360
+                      const centerX = el.x + el.width / 2;
+                      const centerY = el.y + el.height / 2;
+                      const { yaw, pitch } = stageToYawPitch(centerX, centerY, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
+                      const isSelected = selectedElementId === el.id;
+
+                      // Scale stage pixel sizes to CSS pixel sizes for the 3D viewer.
+                      // hotspot zoom is disabled, so size directly using the current HFOV.
+                      const currentHfov = beat.getParameters().hfov || 75;
+                      const totalHDeg = panoramaProjectionType === 'cylindrical' ? (panoramaImageAspect ?? 4) * (180 / Math.PI) : 360;
+                      const totalVDeg = panoramaProjectionType === 'cylindrical' ? 2 * Math.atan(0.5) * (180 / Math.PI) : 180;
+                      const angularW = (el.width / stageW) * totalHDeg;
+                      const angularH = (el.height / stageH) * totalVDeg;
+                      const displayAR = stageW / stageH;
+                      const containerH = panoramaPreviewWidth / displayAR;
+                      const currentVfov = currentHfov / displayAR;
+                      const cssW = (angularW / currentHfov) * panoramaPreviewWidth;
+                      const cssH = (angularH / currentVfov) * containerH;
+                      const fontScale = panoramaPreviewWidth / ((currentHfov / totalHDeg) * stageW);
+
+                      // Determine content to render
+                      let content: React.ReactNode;
+                      if (el.type === 'prop' || el.type === 'character') {
+                        const imgSrc = el.assetUrl || el.imageUrl;
+                        content = imgSrc ? (
+                          <img
+                            src={imgSrc}
+                            alt={el.name}
+                            style={{
+                              width: `${Math.round(cssW)}px`,
+                              height: `${Math.round(cssH)}px`,
+                              objectFit: 'contain',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: `${Math.round(cssW)}px`,
+                            height: `${Math.round(cssH)}px`,
+                            backgroundColor: 'rgba(255,255,255,0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            color: 'rgba(255,255,255,0.5)',
+                          }}>
+                            {el.name}
+                          </div>
+                        );
+                      } else if (el.type === 'text' || el.type === 'dialog') {
+                        const scaledFontSize = Math.round((el.fontSize || globalSettings?.fonts?.fontSize?.text || 16) * fontScale);
+                        const themedTextColor = globalSettings?.colors?.nonptextcolor || (() => {
+                          const bg = globalSettings?.colors?.nonpcolor || '#000000';
+                          const r = parseInt(bg.slice(1,3), 16);
+                          const g = parseInt(bg.slice(3,5), 16);
+                          const b = parseInt(bg.slice(5,7), 16);
+                          return (r * 299 + g * 587 + b * 114) / 1000 > 128 ? '#000000' : '#ffffff';
+                        })();
+                        content = (
+                          <div style={{
+                            width: `${Math.round(cssW)}px`,
+                            backgroundColor: (() => {
+                              const hex = globalSettings?.colors?.nonpcolor || '#000000';
+                              const alpha = (globalSettings?.colors?.nonpalpha ?? 65) / 100;
+                              const r = parseInt(hex.slice(1,3), 16);
+                              const g = parseInt(hex.slice(3,5), 16);
+                              const b = parseInt(hex.slice(5,7), 16);
+                              return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                            })(),
+                            padding: `${Math.round((globalSettings?.textbox?.padding ?? 8) * fontScale)}px`,
+                            borderRadius: `${globalSettings?.textbox?.radius ?? 8}px`,
+                            border: (globalSettings?.textbox?.borderWidth && globalSettings?.colors?.textBoxBorder)
+                              ? `${globalSettings.textbox.borderWidth}px solid ${globalSettings.colors.textBoxBorder}`
+                              : 'none',
+                            fontSize: `${scaledFontSize}px`,
+                            fontFamily: el.font || globalSettings?.fonts?.textFont || 'sans-serif',
+                            color: themedTextColor,
+                            textAlign: el.textAlign || 'center',
+                            pointerEvents: 'none',
+                          }}>
+                            {el.text || el.name}
+                          </div>
+                        );
+                      } else {
+                        // Generic fallback for other element types
+                        content = (
+                          <div style={{
+                            width: `${Math.round(cssW)}px`,
+                            height: `${Math.round(cssH)}px`,
+                            backgroundColor: 'rgba(255,255,255,0.1)',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            color: 'rgba(255,255,255,0.7)',
+                            pointerEvents: 'none',
+                          }}>
+                            {el.name}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={el.id}
+                          className="view360-hotspot"
+                          data-yaw={yaw}
+                          data-pitch={pitch}
+                          style={{ cursor: 'pointer' }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedElementIds([el.id]);
+                          }}
+                        >
+                          <div style={{
+                            transform: 'translate(-50%, -50%)',
+                            border: isSelected ? '2px solid rgba(59, 130, 246, 0.8)' : '2px solid transparent',
+                            borderRadius: '4px',
+                          }}>
+                            {content}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </View360>
+
+              {/* Prompt text overlay — themed from global settings */}
+              {(() => {
+                const promptText = beat.getParameters().prompt || '';
+                if (!promptText) return null;
+                const promptDisplay = beat.getParameters().promptDisplay || 'static';
+                if (promptDisplay === 'pinned') return null;
+                return (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 60,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: (() => {
+                      const hex = globalSettings?.colors?.nonpcolor || '#000000';
+                      const alpha = (globalSettings?.colors?.nonpalpha ?? 65) / 100;
+                      const r = parseInt(hex.slice(1,3), 16);
+                      const g = parseInt(hex.slice(3,5), 16);
+                      const b = parseInt(hex.slice(5,7), 16);
+                      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                    })(),
+                    color: globalSettings?.colors?.nonptextcolor || (() => {
+                      const bg = globalSettings?.colors?.nonpcolor || '#000000';
+                      const r = parseInt(bg.slice(1,3), 16);
+                      const g = parseInt(bg.slice(3,5), 16);
+                      const b = parseInt(bg.slice(5,7), 16);
+                      return (r * 299 + g * 587 + b * 114) / 1000 > 128 ? '#000000' : '#ffffff';
+                    })(),
+                    padding: `${globalSettings?.textbox?.padding ?? 8}px`,
+                    borderRadius: `${globalSettings?.textbox?.radius ?? 8}px`,
+                    border: (globalSettings?.textbox?.borderWidth && globalSettings?.colors?.textBoxBorder)
+                      ? `${globalSettings.textbox.borderWidth}px solid ${globalSettings.colors.textBoxBorder}`
+                      : 'none',
+                    fontSize: `${globalSettings?.fonts?.fontSize?.text || 16}px`,
+                    fontFamily: globalSettings?.fonts?.textFont || 'sans-serif',
+                    pointerEvents: 'none',
+                    whiteSpace: 'nowrap',
+                    zIndex: 10,
+                  }}>
+                    {promptText}
+                  </div>
+                );
+              })()}
+
+              {/* Hint overlay */}
+              <div style={{
+                position: 'absolute',
+                bottom: 16,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                color: 'rgba(255, 255, 255, 0.7)',
+                padding: '6px 14px',
+                borderRadius: 6,
+                fontSize: 11,
+                fontFamily: 'sans-serif',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+              }}>
+                Switch to Layout view to move hotspots
+              </div>
+              </div>
+            ) : (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '100%', height: '100%', color: 'rgba(255,255,255,0.5)',
+                fontFamily: 'sans-serif', fontSize: '14px',
+              }}>
+                No panorama image assigned
+              </div>
+            )}
+          </div>
         ) : (
+          /* Layout Mode: Standard Visual Beat Editor (with viewport rect for panorama) */
           <VisualBeatEditor
             backgroundAssetId={backgroundAssetId}
             backgroundUrl={backgroundUrl}
@@ -3255,6 +3999,25 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             themeAssets={themeAssets}
             overrideCountdownMeter={(beat as any).overrideCountdownMeter}
             presentationMode={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).presentationMode || 'positioned') : undefined}
+            panoramaViewport={isPanoramaBeat ? {
+              pitch: beat.getParameters().initialPitch ?? 0,
+              yaw: beat.getParameters().initialYaw ?? 0,
+              hfov: beat.getParameters().hfov ?? 75,
+              projectionType: panoramaProjectionType,
+              imageAspect: panoramaImageAspect,
+            } : undefined}
+            onPanoramaViewportChange={isPanoramaBeat ? (viewport) => {
+              beat.updateParameters({
+                initialPitch: viewport.pitch,
+                initialYaw: viewport.yaw,
+                hfov: viewport.hfov,
+              });
+              setHasChanges(true);
+              if (onBeatUpdate) {
+                onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), ...viewport } } as any);
+              }
+            } : undefined}
+            promptDisplay={isPanoramaBeat ? (beat.getParameters().promptDisplay || 'static') : undefined}
           />
         )}
       </div>

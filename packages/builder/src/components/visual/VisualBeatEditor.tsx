@@ -37,6 +37,7 @@ import {
   type ChatMessage,
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
+import { yawPitchToStage, stageToYawPitch, viewportSizeOnStage } from '../../utils/panoramaCoordinates';
 import {
   alignLeft, alignRight, alignTop, alignBottom,
   alignCenterH, alignCenterV, distributeH, distributeV,
@@ -156,6 +157,17 @@ interface VisualBeatEditorProps {
   overrideCountdownMeter?: boolean;
   /** DialogTree presentation mode - when chat mode, show ChatDialogView preview */
   presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble';
+  /** Panorama camera viewport overlay */
+  panoramaViewport?: {
+    pitch: number;   // -90 to 90
+    yaw: number;     // -180 to 180
+    hfov: number;    // 30 to 120
+    projectionType?: string;
+    imageAspect?: number;
+  };
+  onPanoramaViewportChange?: (viewport: { pitch: number; yaw: number; hfov: number }) => void;
+  /** Panorama prompt display mode: 'static' or 'pinned' */
+  promptDisplay?: 'static' | 'pinned';
 }
 
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
@@ -180,6 +192,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   onInteractionEnd,
   overrideCountdownMeter,
   presentationMode,
+  panoramaViewport,
+  onPanoramaViewportChange,
+  promptDisplay,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedElement, setDraggedElement] = useState<string | null>(null);
@@ -197,6 +212,14 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const [activeGuides, setActiveGuides] = useState<SnapLine[]>([]);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
   const [showHud, setShowHud] = useState(false);
+
+  // Panorama viewport rectangle drag state (uses ref + document listeners to avoid z-index / stale closure issues)
+  const viewportDraggingRef = useRef(false);
+  const viewportDragStartRef = useRef<{ mouseX: number; mouseY: number; yaw: number; pitch: number } | null>(null);
+  const panoramaViewportRef = useRef(panoramaViewport);
+  const onPanoramaViewportChangeRef = useRef(onPanoramaViewportChange);
+  panoramaViewportRef.current = panoramaViewport;
+  onPanoramaViewportChangeRef.current = onPanoramaViewportChange;
 
   // Mock resolvers for character HUD overlays in editor mode
   const characterMeterFrameResolver = useCallback((characterId: string) => {
@@ -324,6 +347,53 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     return () => el.removeEventListener('keydown', handleKeyDown);
   }, [selectedElements, elements, stageWidth, stageHeight, onElementsChange, onSelectElements]);
 
+  // Panorama viewport drag via document-level listeners (bypasses z-index issues)
+  useEffect(() => {
+    const handleDocMouseMove = (e: MouseEvent) => {
+      if (!viewportDraggingRef.current || !viewportDragStartRef.current) return;
+      const vp = panoramaViewportRef.current;
+      const onChange = onPanoramaViewportChangeRef.current;
+      if (!vp || !onChange) return;
+
+      const stageEl = canvasRef.current?.querySelector('[data-stage]') as HTMLElement;
+      if (!stageEl) return;
+      const stageRect = stageEl.getBoundingClientRect();
+
+      const deltaPixelX = e.clientX - viewportDragStartRef.current.mouseX;
+      const deltaPixelY = e.clientY - viewportDragStartRef.current.mouseY;
+      // Convert start yaw/pitch → pixel, add delta, convert back
+      const projType = vp.projectionType || 'equirectangular';
+      const { centerX: startPx, centerY: startPy } = yawPitchToStage(
+        viewportDragStartRef.current.yaw, viewportDragStartRef.current.pitch,
+        projType, stageRect.width, stageRect.height, vp.imageAspect
+      );
+      const { yaw: newYawRaw, pitch: newPitchRaw } = stageToYawPitch(
+        startPx + deltaPixelX, startPy + deltaPixelY,
+        projType, stageRect.width, stageRect.height, vp.imageAspect
+      );
+      let newYaw = newYawRaw;
+      let newPitch = newPitchRaw;
+      while (newYaw > 180) newYaw -= 360;
+      while (newYaw < -180) newYaw += 360;
+      newPitch = Math.max(-90, Math.min(90, newPitch));
+      onChange({
+        pitch: Math.round(newPitch * 10) / 10,
+        yaw: Math.round(newYaw * 10) / 10,
+        hfov: vp.hfov,
+      });
+    };
+    const handleDocMouseUp = () => {
+      viewportDraggingRef.current = false;
+      viewportDragStartRef.current = null;
+    };
+    document.addEventListener('mousemove', handleDocMouseMove);
+    document.addEventListener('mouseup', handleDocMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleDocMouseMove);
+      document.removeEventListener('mouseup', handleDocMouseUp);
+    };
+  }, []);
+
   // Debug logging for background
   console.log(`[VisualBeatEditor] backgroundAssetId="${backgroundAssetId}", found=${!!backgroundAsset}, url="${resolvedBackgroundUrl?.substring(0, 80) || 'none'}", assets.length=${assets.length}`);
 
@@ -352,9 +422,15 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     });
   }, []);
 
+  // For panorama beats, identify elements that need custom rendering instead of PositionedBeatView
+  const isPanoramaBeat = beatType === 'panorama';
+
   // Convert VisualElements to Location objects for the renderer
   const locationsForRenderer: Location[] = elements
     .filter(el => el.visible)
+    // For panorama beats, skip hotspot and dialog/text elements from PositionedBeatView
+    // (they'll be rendered as custom overlays instead)
+    .filter(el => !isPanoramaBeat || (el.type !== 'hotspot' && el.type !== 'dialog' && el.type !== 'text'))
     .sort((a, b) => a.z - b.z)
     .map(el => ({
       name: el.name,
@@ -686,6 +762,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     dragOffsetsRef.current.clear();
     if (marquee) {
       setMarquee(null);
+    }
+    if (viewportDraggingRef.current) {
+      viewportDraggingRef.current = false;
+      viewportDragStartRef.current = null;
     }
   };
 
@@ -1257,6 +1337,99 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                 />
               )}
 
+              {/* Panorama custom overlays: hotspot markers + prompt text */}
+              {isPanoramaBeat && elements
+                .filter(el => el.visible && (el.type === 'hotspot' || el.type === 'dialog' || el.type === 'text'))
+                .map(el => {
+                  if (el.type === 'hotspot') {
+                    // Render as yellow dashed rectangle using element's actual dimensions
+                    const cx = el.x + el.width / 2;
+                    const cy = el.y + el.height / 2;
+                    const isSelected = selectedElements.includes(el.id);
+                    return (
+                      <div
+                        key={`pano-marker-${el.id}`}
+                        style={{
+                          position: 'absolute',
+                          left: `${cx}px`,
+                          top: `${cy}px`,
+                          transform: 'translate(-50%, -50%)',
+                          width: `${el.width}px`,
+                          height: `${el.height}px`,
+                          backgroundColor: isSelected ? 'rgba(255, 255, 0, 0.4)' : 'rgba(255, 255, 0, 0.25)',
+                          border: isSelected ? '2px dashed rgba(245, 158, 11, 0.8)' : '2px dashed rgba(255, 255, 0, 0.7)',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '13px',
+                          fontFamily: 'sans-serif',
+                          fontWeight: '600',
+                          color: 'white',
+                          textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          pointerEvents: 'none',
+                          zIndex: (el.z || 0) + 100,
+                        }}
+                      >
+                        {el.text || el.name || 'Hotspot'}
+                      </div>
+                    );
+                  }
+                  // Prompt / text overlay — styled from global settings
+                  if (el.type === 'dialog' || el.type === 'text') {
+                    const promptText = el.text || el.content || '';
+                    if (!promptText) return null;
+                    const isPinned = promptDisplay === 'pinned';
+                    return (
+                      <div
+                        key={`pano-prompt-${el.id}`}
+                        style={{
+                          position: 'absolute',
+                          left: `${el.x}px`,
+                          top: `${el.y}px`,
+                          width: `${el.width}px`,
+                          backgroundColor: (() => {
+                            const hex = globalSettings?.colors?.nonpcolor || '#000000';
+                            const alpha = (globalSettings?.colors?.nonpalpha ?? 65) / 100;
+                            const r = parseInt(hex.slice(1,3), 16);
+                            const g = parseInt(hex.slice(3,5), 16);
+                            const b = parseInt(hex.slice(5,7), 16);
+                            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                          })(),
+                          color: globalSettings?.colors?.nonptextcolor || (() => {
+                            const bg = globalSettings?.colors?.nonpcolor || '#000000';
+                            const r = parseInt(bg.slice(1,3), 16);
+                            const g = parseInt(bg.slice(3,5), 16);
+                            const b = parseInt(bg.slice(5,7), 16);
+                            return (r * 299 + g * 587 + b * 114) / 1000 > 128 ? '#000000' : '#ffffff';
+                          })(),
+                          padding: `${globalSettings?.textbox?.padding ?? 8}px`,
+                          borderRadius: `${globalSettings?.textbox?.radius ?? 8}px`,
+                          border: isPinned
+                            ? '2px dashed rgba(59, 130, 246, 0.6)'
+                            : (globalSettings?.textbox?.borderWidth && globalSettings?.colors?.textBoxBorder)
+                              ? `${globalSettings.textbox.borderWidth}px solid ${globalSettings.colors.textBoxBorder}`
+                              : 'none',
+                          fontSize: `${globalSettings?.fonts?.fontSize?.text || 14}px`,
+                          fontFamily: globalSettings?.fonts?.textFont || 'sans-serif',
+                          textAlign: 'center',
+                          pointerEvents: 'none',
+                          zIndex: (el.z || 0) + 100,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {promptText}
+                      </div>
+                    );
+                  }
+                  return null;
+                })
+              }
+
               {/* Mobile Safe Zone overlay - shows crop areas for common mobile aspect ratios */}
               {globalSettings?.project?.showMobileSafeZone && (() => {
                 // Calculate crop zones for 16:9 and 19.5:9 ratios on the current stage
@@ -1606,6 +1779,95 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   </div>
                   );
                 })}
+
+              {/* Panorama Viewport Rectangle Overlay */}
+              {panoramaViewport && (() => {
+                const { pitch, yaw, hfov: hfovDeg, projectionType: vpProjType, imageAspect: vpImageAspect } = panoramaViewport;
+                const projType = vpProjType || 'equirectangular';
+                // Compute rectangle position using projection-aware conversion
+                const { centerX, centerY } = yawPitchToStage(yaw, pitch, projType, stageWidth, stageHeight, vpImageAspect);
+                const { width: rectWidth, height: rectHeight } = viewportSizeOnStage(hfovDeg, projType, stageWidth, stageHeight, vpImageAspect, stageWidth / stageHeight);
+
+                const left = centerX - rectWidth / 2;
+                const top = centerY - rectHeight / 2;
+
+                // Check if rectangle wraps horizontally
+                const wrapsLeft = left < 0;
+                const wrapsRight = left + rectWidth > stageWidth;
+
+                const rects: { x: number; y: number; w: number; h: number; ghost?: boolean }[] = [];
+                rects.push({ x: left, y: top, w: rectWidth, h: rectHeight });
+                if (wrapsLeft) {
+                  rects.push({ x: left + stageWidth, y: top, w: rectWidth, h: rectHeight, ghost: true });
+                }
+                if (wrapsRight) {
+                  rects.push({ x: left - stageWidth, y: top, w: rectWidth, h: rectHeight, ghost: true });
+                }
+
+                return rects.map((r, i) => (
+                  <React.Fragment key={`viewport-rect-${i}`}>
+                    {/* Visual rectangle */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: `${r.x}px`,
+                        top: `${r.y}px`,
+                        width: `${r.w}px`,
+                        height: `${r.h}px`,
+                        border: '2px dashed rgba(59, 130, 246, 0.7)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.06)',
+                        borderRadius: '2px',
+                        pointerEvents: 'none',
+                        zIndex: 9999,
+                        opacity: r.ghost ? 0.4 : 1,
+                      }}
+                    >
+                      {/* Label */}
+                      {!r.ghost && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '4px',
+                          left: '6px',
+                          fontSize: '10px',
+                          fontFamily: 'monospace',
+                          color: 'rgba(59, 130, 246, 0.8)',
+                          pointerEvents: 'none',
+                          userSelect: 'none',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          Camera View
+                        </span>
+                      )}
+                    </div>
+                    {/* Drag hit-detect overlay (only on primary, not ghost) */}
+                    {!r.ghost && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: `${r.x}px`,
+                          top: `${r.y}px`,
+                          width: `${r.w}px`,
+                          height: `${r.h}px`,
+                          cursor: viewportDraggingRef.current ? 'grabbing' : 'grab',
+                          pointerEvents: 'auto',
+                          zIndex: 10001,
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          viewportDraggingRef.current = true;
+                          viewportDragStartRef.current = {
+                            mouseX: e.clientX,
+                            mouseY: e.clientY,
+                            yaw: panoramaViewport.yaw,
+                            pitch: panoramaViewport.pitch,
+                          };
+                        }}
+                      />
+                    )}
+                  </React.Fragment>
+                ));
+              })()}
 
               {/* Snap guide lines */}
               {activeGuides.map((guide, i) => (

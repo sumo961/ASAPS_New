@@ -19,6 +19,9 @@ import {
   Maximize2,
   Volume2,
   BarChart3,
+  ArrowRight,
+  Info,
+  DoorOpen,
 } from 'lucide-react';
 import { getAllPresetSounds, isPresetSound, getPresetSound, type PresetSound } from '@asaps/core';
 import type { Asset } from '../assets/AssetManager';
@@ -60,6 +63,13 @@ interface VisualPropertiesPanelProps {
   onShowAvatarsChange?: (show: boolean) => void;
   responseDelay?: number;
   onResponseDelayChange?: (delay: number) => void;
+  // Panorama hotspot props
+  allBeats?: { id: string; name: string; type: string }[];
+  panoramaHotspots?: { id: string; target: string; text: string; displayText?: string; icon?: string; pitch: number; yaw: number }[];
+  onPanoramaHotspotUpdate?: (id: string, updates: Record<string, any>) => void;
+  // Panorama prompt display toggle
+  promptDisplay?: 'static' | 'pinned';
+  onPromptDisplayChange?: (display: 'static' | 'pinned') => void;
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -97,6 +107,11 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onShowAvatarsChange,
   responseDelay,
   onResponseDelayChange,
+  allBeats,
+  panoramaHotspots,
+  onPanoramaHotspotUpdate,
+  promptDisplay,
+  onPromptDisplayChange,
 }) => {
   // Get available fonts (built-in + custom from assets)
   const { fonts } = useFonts(assets);
@@ -209,7 +224,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           >
             <div className="flex items-center gap-2">
               <ImageIcon className="w-4 h-4" />
-              <span className="font-medium text-sm">Background</span>
+              <span className="font-medium text-sm">{beatType === 'panorama' ? 'Panorama Image' : 'Background'}</span>
             </div>
           </button>
           
@@ -219,7 +234,9 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                 onClick={onBackgroundSelect}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
               >
-                {backgroundAsset ? 'Change Background' : 'Choose Background'}
+                {backgroundAsset
+                  ? (beatType === 'panorama' ? 'Change Panorama Image' : 'Change Background')
+                  : (beatType === 'panorama' ? 'Choose Panorama Image' : 'Choose Background')}
               </button>
               {backgroundAsset && (
                 <div className="mt-2 text-xs text-gray-600">
@@ -391,6 +408,49 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           </div>
         )}
 
+        {/* Panorama Settings Section - For panorama beats */}
+        {beatType === 'panorama' && onPromptDisplayChange && (
+          <div className="border-b border-gray-200">
+            <button
+              onClick={() => toggleSection('panoramaSettings')}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+            >
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4" />
+                <span className="font-medium text-sm">Panorama Settings</span>
+              </div>
+              {expandedSections.panoramaSettings ? (
+                <ChevronUp className="w-4 h-4 text-gray-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              )}
+            </button>
+
+            {expandedSections.panoramaSettings && (
+              <div className="px-4 pb-4 space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">
+                    Prompt Display
+                  </label>
+                  <select
+                    value={promptDisplay || 'static'}
+                    onChange={(e) => onPromptDisplayChange(e.target.value as 'static' | 'pinned')}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                  >
+                    <option value="static">Static (floating)</option>
+                    <option value="pinned">Pinned (scrolls with pano)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {promptDisplay === 'pinned'
+                      ? 'Prompt text scrolls with the panorama at its positioned location'
+                      : 'Prompt text floats as an overlay in front of the panorama'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Elements Section */}
         <div className="border-b border-gray-200">
           <button
@@ -428,8 +488,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   <Type className="w-3 h-3" />
                   Text
                 </button>
-                {/* Show Hotspot button for movementChoice and pickProp beats */}
-                {(beatType === 'movementChoice' || beatType === 'pickProp') && (
+                {/* Show Hotspot button for movementChoice, pickProp, and panorama beats */}
+                {(beatType === 'movementChoice' || beatType === 'pickProp' || beatType === 'panorama') && (
                   <button
                     onClick={() => onElementAdd('hotspot')}
                     className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"
@@ -1061,6 +1121,95 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                     )}
                   </div>
                 )}
+
+                {/* Panorama Hotspot Properties - Only for hotspot elements in panorama beats */}
+                {selected.type === 'hotspot' && beatType === 'panorama' && panoramaHotspots && onPanoramaHotspotUpdate && (() => {
+                  const hs = panoramaHotspots.find(h => h.id === selected.id);
+                  if (!hs) return null;
+                  return (
+                    <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                      <label className="text-xs font-semibold text-gray-700 block uppercase tracking-wider">
+                        Panorama Hotspot
+                      </label>
+
+                      {/* Target Beat */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 mb-1 block">Target Beat</label>
+                        <select
+                          value={hs.target || ''}
+                          onChange={(e) => onPanoramaHotspotUpdate(hs.id, { target: e.target.value })}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        >
+                          <option value="">— None —</option>
+                          {(allBeats || []).map(b => (
+                            <option key={b.id} value={b.id}>{b.name || b.id}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Display Text */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 mb-1 block">Display Text</label>
+                        <input
+                          type="text"
+                          value={hs.displayText || ''}
+                          onChange={(e) => onPanoramaHotspotUpdate(hs.id, { displayText: e.target.value })}
+                          placeholder="Text shown to player"
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        />
+                      </div>
+
+                      {/* Icon */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 mb-1 block">Icon</label>
+                        <select
+                          value={hs.icon || 'arrow'}
+                          onChange={(e) => onPanoramaHotspotUpdate(hs.id, { icon: e.target.value })}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        >
+                          <option value="arrow">Arrow</option>
+                          <option value="info">Info</option>
+                          <option value="door">Door</option>
+                          <option value="eye">Eye</option>
+                        </select>
+                      </div>
+
+                      {/* Pitch/Yaw (editable — repositions element on stage) */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-500">Pitch</label>
+                          <input
+                            type="number"
+                            value={parseFloat(hs.pitch.toFixed(1))}
+                            onChange={(e) => {
+                              const newPitch = parseFloat(e.target.value) || 0;
+                              onPanoramaHotspotUpdate(hs.id, { pitch: Math.round(newPitch * 10) / 10 });
+                            }}
+                            step={0.5}
+                            min={-90}
+                            max={90}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">Yaw</label>
+                          <input
+                            type="number"
+                            value={parseFloat(hs.yaw.toFixed(1))}
+                            onChange={(e) => {
+                              const newYaw = parseFloat(e.target.value) || 0;
+                              onPanoramaHotspotUpdate(hs.id, { yaw: Math.round(newYaw * 10) / 10 });
+                            }}
+                            step={0.5}
+                            min={-180}
+                            max={180}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Font Controls - Only for text, dialog, and button elements */}
                 {(selected.type === 'text' || selected.type === 'dialog' || selected.type === 'button') && (

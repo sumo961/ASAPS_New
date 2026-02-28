@@ -274,39 +274,73 @@ export class HybridStorageAdapter implements IStorageAdapter {
         info.thumbnail = await this.generateThumbnail(asset.blob);
       }
 
-      // Route to appropriate storage
+      // Route to appropriate storage — blob must be saved BEFORE metadata
+      let blobSaved = false;
+
       if (location === 'indexeddb') {
         await this.saveAssetToIndexedDB(asset);
+        blobSaved = true;
       } else if (location === 'filesystem' && this.isElectron) {
         const path = await this.saveAssetToFilesystem(asset);
         info.path = path;
+        blobSaved = true;
       } else if (location === 'cache-api' || location === 'filesystem') {
-        // Fallback to Cache API in browser (if available)
+        // Browser large-file path: try Cache API (with lazy initialization)
+        if (!this.cache) {
+          await this.ensureCacheAPI();
+        }
+
         if (this.cache) {
           const path = await this.saveAssetToCache(asset);
           info.path = path;
           info.location = 'cache-api';
+          blobSaved = true;
         } else {
-          // If cache not available, fall back to IndexedDB
+          // Cache API truly unavailable — fall back to IndexedDB with warning
+          console.warn(
+            `[HybridStorageAdapter] Cache API unavailable for large file ` +
+            `"${asset.filename}" (${(asset.blob.size / 1048576).toFixed(1)} MB). ` +
+            `Falling back to IndexedDB — this may fail for very large files.`
+          );
           await this.saveAssetToIndexedDB(asset);
           info.location = 'indexeddb';
+          blobSaved = true;
         }
       }
 
-      // Always save metadata to IndexedDB
+      if (!blobSaved) {
+        throw new Error(`No storage backend accepted the asset (location=${location})`);
+      }
+
+      // Verify the blob is retrievable before committing metadata
+      const verifyBlob = await this.loadAssetBlob(info);
+      if (!verifyBlob) {
+        throw new Error(
+          `Blob verification failed after save — asset "${asset.filename}" ` +
+          `was not found in ${info.location} storage`
+        );
+      }
+
+      // Only save metadata AFTER blob is confirmed stored
       await this.db!.put(STORES.assetMetadata, info);
+
+      console.log(
+        `[HybridStorageAdapter] Saved "${asset.filename}" ` +
+        `(${(asset.blob.size / 1048576).toFixed(1)} MB) to ${info.location}`
+      );
 
       return info;
     } catch (err) {
       if ((err as any).name === 'QuotaExceededError') {
         throw new StorageError(
-          'Storage quota exceeded',
+          `Storage quota exceeded while saving "${asset.filename}" ` +
+          `(${(asset.blob.size / 1048576).toFixed(1)} MB)`,
           'QUOTA_EXCEEDED',
           err as Error
         );
       }
       throw new StorageError(
-        `Failed to save asset ${asset.id}`,
+        `Failed to save asset "${asset.filename}" (${asset.id}): ${(err as Error).message}`,
         'UNKNOWN',
         err as Error
       );
@@ -322,16 +356,31 @@ export class HybridStorageAdapter implements IStorageAdapter {
       if (!metadata) return null;
 
       // Load from appropriate storage
+      let blob: Blob | null = null;
+
       if (metadata.location === 'indexeddb') {
         const asset = await this.db!.get(STORES.assets, assetId);
-        return asset?.blob || null;
+        blob = asset?.blob || null;
       } else if (metadata.location === 'filesystem' && this.isElectron) {
-        return await this.loadAssetFromFilesystem(metadata.path!);
+        blob = await this.loadAssetFromFilesystem(metadata.path!);
       } else if (metadata.location === 'cache-api') {
-        return await this.loadAssetFromCache(metadata.path!);
+        // Lazy-init Cache API in case it wasn't available at startup
+        if (!this.cache) {
+          await this.ensureCacheAPI();
+        }
+        blob = await this.loadAssetFromCache(metadata.path!);
       }
 
-      return null;
+      if (!blob) {
+        console.warn(
+          `[HybridStorageAdapter] Orphaned metadata for "${metadata.filename}" ` +
+          `(${assetId}) — blob missing from ${metadata.location}. ` +
+          `Cleaning up stale metadata.`
+        );
+        await this.db!.delete(STORES.assetMetadata, assetId);
+      }
+
+      return blob;
     } catch (err) {
       throw new StorageError(
         `Failed to load asset ${assetId}`,
@@ -624,6 +673,43 @@ export class HybridStorageAdapter implements IStorageAdapter {
   // ============================================================
   // STORAGE-SPECIFIC OPERATIONS
   // ============================================================
+
+  /**
+   * Lazy-initialize Cache API if it wasn't available during initial setup.
+   * Browsers may block Cache API in certain contexts (e.g., incognito)
+   * but it may become available later.
+   */
+  private async ensureCacheAPI(): Promise<void> {
+    if (this.cache) return;
+    if (!this.config.enableCache || typeof caches === 'undefined') return;
+
+    try {
+      this.cache = await caches.open('asaps-assets-cache');
+      console.log('[HybridStorageAdapter] Cache API initialized (lazy)');
+    } catch (err) {
+      console.warn('[HybridStorageAdapter] Cache API lazy init failed:', err);
+    }
+  }
+
+  /**
+   * Load a blob directly using storage info (without going through metadata lookup).
+   * Used for post-save verification.
+   */
+  private async loadAssetBlob(info: AssetStorageInfo): Promise<Blob | null> {
+    try {
+      if (info.location === 'indexeddb') {
+        const asset = await this.db!.get(STORES.assets, info.id);
+        return asset?.blob || null;
+      } else if (info.location === 'filesystem' && this.isElectron) {
+        return await this.loadAssetFromFilesystem(info.path!);
+      } else if (info.location === 'cache-api') {
+        return await this.loadAssetFromCache(info.path!);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
 
   private async saveAssetToIndexedDB(asset: StoredAsset): Promise<void> {
     await this.db!.put(STORES.assets, {

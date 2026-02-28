@@ -121,11 +121,10 @@
         "text": "string",
         "displayText": "string?",
         "target": "string",
-        "icon": "string?",
         "conditions": "condition[]?",
         "effects": "effect[]?"
       },
-      "notes": "pitch is vertical angle (-90 to 90), yaw is horizontal angle (-180 to 180). target is the beat ID to navigate to when clicked. icon can be 'arrow', 'info', 'door', or 'eye'."
+      "notes": "pitch is vertical angle (-90 to 90), yaw is horizontal angle (-180 to 180). target is the beat ID to navigate to when clicked."
     }
   },
 
@@ -602,10 +601,25 @@
       "description": "360-degree panoramic view with interactive hotspots",
       "connectionType": "multiple",
       "parameters": {
+        "projectionType": {
+          "type": "string",
+          "required": false,
+          "default": "equirectangular",
+          "description": "How the panorama image is mapped. Equirectangular = full sphere (360° cameras), Cylindrical = cylinder wrap (phone panoramas)",
+          "ui": {
+            "control": "select",
+            "options": [
+              { "value": "equirectangular", "label": "Equirectangular (2:1 ratio, e.g. 4096×2048)" },
+              { "value": "cylindrical", "label": "Cylindrical (4:1–8:1 ratio, e.g. 8000×2000)" }
+            ],
+            "label": "Projection",
+            "hint": "Equirectangular: use 2:1 images from 360° cameras. Cylindrical: use wide panoramas from phone cameras (4:1 to 8:1 aspect ratio)."
+          }
+        },
         "panoramaAssetId": {
           "type": "string",
           "required": true,
-          "description": "Asset ID for the equirectangular panorama image",
+          "description": "Panorama image (equirectangular 2:1 or cylindrical 4:1–8:1, depending on projection)",
           "ui": {
             "control": "asset-picker",
             "accept": "image/*",
@@ -647,27 +661,14 @@
         "hfov": {
           "type": "number",
           "required": false,
-          "default": 100,
+          "default": 75,
           "description": "Horizontal field of view in degrees",
           "ui": {
             "control": "number",
-            "min": 30,
+            "min": 50,
             "max": 120,
             "step": 5,
             "label": "Field of View"
-          }
-        },
-        "autoRotate": {
-          "type": "number",
-          "required": false,
-          "default": 0,
-          "description": "Auto-rotate speed in degrees/second (0 = off)",
-          "ui": {
-            "control": "number",
-            "min": -10,
-            "max": 10,
-            "step": 0.5,
-            "label": "Auto-Rotate Speed"
           }
         },
         "prompt": {
@@ -675,8 +676,24 @@
           "required": false,
           "default": "",
           "description": "Optional instruction text overlay (e.g. 'Look around to explore')"
+        },
+        "promptDisplay": {
+          "type": "string",
+          "required": false,
+          "default": "static",
+          "description": "How prompt text is displayed: static (floating overlay) or pinned (scrolls with panorama)",
+          "ui": {
+            "control": "select",
+            "options": [
+              { "value": "static", "label": "Static (floating)" },
+              { "value": "pinned", "label": "Pinned (scrolls with pano)" }
+            ],
+            "label": "Prompt Display"
+          }
         }
       },
+      "locations": ["prompt", "hotspots"],
+      "locationMapping": { "prompt": "prompt" },
       "transitions": true,
       "sound": true,
       "renderer": "panorama"
