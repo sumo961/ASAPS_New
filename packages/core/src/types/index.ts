@@ -264,6 +264,7 @@ export interface IRenderer {
     hfov?: number;
     projectionType?: 'equirectangular' | 'cylindrical';
     prompt?: string;
+    promptDisplay?: 'static' | 'pinned';
     locations?: Location[];
   }): Promise<string>;
 

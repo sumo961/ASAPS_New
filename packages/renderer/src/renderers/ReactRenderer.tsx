@@ -2122,6 +2122,20 @@ export class ReactRenderer extends BaseRenderer {
             }))}
             resolveAssetUrl={(assetId) => this.resolveAssetUrl(assetId) || undefined}
             stageWidth={this.context.width}
+            hotspotStyle={this.theme?.hotspot ? {
+              highlightColor: this.theme.hotspot.highlightColor,
+              opacity: this.theme.hotspot.opacity,
+              visible: this.theme.hotspot.visible,
+              showInPreview: this.theme.hotspot.showInPreview,
+              labelDisplay: this.theme.hotspot.labelDisplay,
+              fontFamily: this.theme.fonts?.textFont,
+              fontSize: this.theme.fonts?.textFontSize,
+              tooltipBackgroundColor: this.theme.button?.backgroundColor,
+              tooltipTextColor: this.theme.button?.textColor,
+              tooltipBorderColor: this.theme.button?.borderColor,
+              tooltipBorderRadius: this.theme.button?.borderRadius,
+              tooltipFontFamily: this.theme.fonts?.buttonFont,
+            } : undefined}
             promptStyle={this.theme ? {
               fontFamily: this.theme.fonts?.textFont,
               fontSize: this.theme.fonts?.textFontSize,

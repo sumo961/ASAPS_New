@@ -87,6 +87,22 @@ export interface PanoramaViewProps {
   }>;
   /** Asset URL resolver for overlay element images */
   resolveAssetUrl?: (assetId: string) => string | undefined;
+  /** Hotspot appearance settings from theme */
+  hotspotStyle?: {
+    highlightColor?: string;
+    opacity?: number;         // 0-1 normalized
+    visible?: boolean;
+    showInPreview?: 'visible' | 'onHover' | 'invisible';
+    labelDisplay?: 'none' | 'hover' | 'always';
+    fontFamily?: string;
+    fontSize?: number;
+    // Tooltip styling (from button theme)
+    tooltipBackgroundColor?: string;
+    tooltipTextColor?: string;
+    tooltipBorderColor?: string;
+    tooltipBorderRadius?: number;
+    tooltipFontFamily?: string;
+  };
   /** Stage dimensions for coordinate mapping (default 1024x768) */
   stageWidth?: number;
   stageHeight?: number;
@@ -121,6 +137,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
   selectedHotspotId,
   onViewerReady,
   promptStyle,
+  hotspotStyle,
   overlayElements,
   resolveAssetUrl,
   stageWidth = 1024,
@@ -135,6 +152,11 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
 
   // Trigger markers sync when viewer becomes ready
   const [markersVersion, setMarkersVersion] = useState(0);
+
+  // Tooltip state for hotspot hover labels
+  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const hotspotStyleRef = useRef(hotspotStyle);
+  hotspotStyleRef.current = hotspotStyle;
 
   // Keep refs up to date
   onHotspotClickRef.current = onHotspotClick;
@@ -224,6 +246,24 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
         }
       });
 
+      // Hotspot hover — show/hide themed tooltip for 'hover' label mode
+      markersPlugin.addEventListener('enter-marker', (e) => {
+        const hotspotId = e.marker.data?.hotspotId;
+        const labelDisplay = hotspotStyleRef.current?.labelDisplay ?? 'hover';
+        if (hotspotId && labelDisplay === 'hover') {
+          const text = e.marker.config?.data?.text || '';
+          if (text) {
+            // Position will be updated by mousemove on the container
+            setTooltip({ text, x: 0, y: 0 });
+          }
+        }
+      });
+      markersPlugin.addEventListener('leave-marker', (e) => {
+        if (e.marker.data?.hotspotId) {
+          setTooltip(null);
+        }
+      });
+
       // Editor mode click — report yaw/pitch in degrees
       viewer.addEventListener('click', (e) => {
         if (editorModeRef.current && onEditorClickRef.current) {
@@ -287,6 +327,20 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
     const scale = sizeFactor * zoomScale;
     const markers: any[] = [];
 
+    // Hotspot appearance from theme settings
+    const hsColor = hotspotStyle?.highlightColor || '#ffff00';
+    const hsOpacity = hotspotStyle?.opacity ?? 0.3;
+    const hsVisible = hotspotStyle?.visible ?? true;
+    const hsShowInPreview = hotspotStyle?.showInPreview ?? 'visible';
+    const hsLabelDisplay = hotspotStyle?.labelDisplay ?? 'hover';
+    const hsFontFamily = hotspotStyle?.fontFamily || 'sans-serif';
+    const hsFontSizeBase = hotspotStyle?.fontSize || 16;
+    // Parse hex color to RGB
+    const hsR = parseInt(hsColor.slice(1,3), 16) || 255;
+    const hsG = parseInt(hsColor.slice(3,5), 16) || 255;
+    const hsB = parseInt(hsColor.slice(5,7), 16) || 0;
+    const hsHoverAlpha = Math.min(hsOpacity * 1.5, 1);
+
     // Hotspot markers (no psv--capture-event: let PSV fire select-marker for navigation)
     for (const hs of hotspots) {
       const elScale = hs.scale || 1;
@@ -294,25 +348,57 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
       const h = (hs.height || 50) * elScale * scale;
       const isSelected = selectedHotspotId === hs.id;
       const rotateStyle = hs.rotation ? `transform: rotate(${hs.rotation}deg);` : '';
-      const fontSize = Math.max(10, Math.round(13 * scale));
+      const fontSize = Math.max(10, Math.round(hsFontSizeBase * scale * 0.8));
 
-      console.log(`[PanoramaView] Hotspot "${hs.text}": yaw=${hs.yaw} pitch=${hs.pitch} w=${hs.width} h=${hs.height} scale=${scale.toFixed(3)} → ${Math.round(w)}x${Math.round(h)}px`);
+      // Determine background based on visibility mode
+      let bgStyle: string;
+      if (!hsVisible || hsShowInPreview === 'invisible') {
+        bgStyle = 'background-color:transparent;';
+      } else if (hsShowInPreview === 'onHover') {
+        // Transparent by default, colored on hover via CSS class
+        bgStyle = 'background-color:transparent;';
+      } else {
+        // 'visible' mode
+        const alpha = isSelected ? Math.min(hsOpacity * 1.5, 1) : hsOpacity;
+        bgStyle = `background-color:rgba(${hsR},${hsG},${hsB},${alpha.toFixed(2)});`;
+      }
+
+      // Determine label text
+      const labelText = hsLabelDisplay === 'none' ? '' : (hs.text || 'Hotspot');
+      // For 'hover' label mode, custom tooltip is shown via marker events (no inline text)
+      const showInlineText = hsLabelDisplay === 'always' || editorMode;
+
+      // Unique class for onHover CSS targeting
+      const hoverClass = (hsShowInPreview === 'onHover' && hsVisible) ? `pano-hs-hover` : '';
 
       markers.push({
         id: `hotspot-${hs.id}`,
         position: { yaw: hs.yaw * DEG_TO_RAD, pitch: hs.pitch * DEG_TO_RAD },
-        html: `<div style="width:${Math.round(w)}px;height:${Math.round(h)}px;${rotateStyle}
-          background-color:${isSelected ? 'rgba(255,255,0,0.4)' : 'rgba(255,255,0,0.25)'};
-          border:${isSelected ? '2px dashed rgba(245,158,11,0.8)' : '2px dashed rgba(255,255,0,0.7)'};
+        html: `<div class="${hoverClass}" style="width:${Math.round(w)}px;height:${Math.round(h)}px;${rotateStyle}
+          ${bgStyle}
+          border:${isSelected ? `2px dashed rgba(${hsR},${hsG},${hsB},0.8)` : 'none'};
           border-radius:4px;display:flex;align-items:center;justify-content:center;
-          font-size:${fontSize}px;font-family:sans-serif;font-weight:600;color:white;
+          font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:white;
           text-shadow:0 1px 3px rgba(0,0,0,0.6);white-space:nowrap;overflow:hidden;
-          cursor:pointer;box-sizing:border-box;">
-          ${hs.text || 'Hotspot'}</div>`,
+          cursor:pointer;box-sizing:border-box;
+          transition:background-color 0.15s ease;">
+          ${showInlineText ? labelText : ''}</div>`,
         size: { width: Math.round(w), height: Math.round(h) },
         anchor: 'center center',
-        data: { hotspotId: hs.id },
+        data: { hotspotId: hs.id, text: hs.text || '' },
       });
+    }
+
+    // Inject hover CSS for onHover mode hotspots
+    if (hsShowInPreview === 'onHover' && hsVisible) {
+      const styleId = 'pano-hotspot-hover-style';
+      let styleEl = document.getElementById(styleId);
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        document.head.appendChild(styleEl);
+      }
+      styleEl.textContent = `.pano-hs-hover:hover { background-color: rgba(${hsR},${hsG},${hsB},${hsHoverAlpha.toFixed(2)}) !important; }`;
     }
 
     // Overlay element markers (props, characters, pinned text/dialog)
@@ -362,7 +448,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
     try {
       mp.setMarkers(markers);
     } catch { /* viewer may be initializing */ }
-  }, [hotspots, overlayElements, selectedHotspotId, resolveAssetUrl, markersVersion, hfov, stageWidth, promptStyle, prompt, promptDisplay]);
+  }, [hotspots, overlayElements, selectedHotspotId, resolveAssetUrl, markersVersion, hfov, stageWidth, promptStyle, prompt, promptDisplay, hotspotStyle, editorMode]);
 
   // Effect #3: Camera sync when initialPitch/Yaw/hfov props change externally
   useEffect(() => {
@@ -388,7 +474,12 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div
+      style={{ position: 'relative', width: '100%', height: '100%' }}
+      onMouseMove={(e) => {
+        if (tooltip) setTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+      }}
+    >
       <div ref={viewerContainerRef} style={{ width: '100%', height: '100%' }} />
 
       {/* Prompt overlay (static mode only — pinned mode renders as a PSV marker) */}
@@ -410,6 +501,32 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
           zIndex: 10,
         }}>
           {prompt}
+        </div>
+      )}
+
+      {/* Hotspot hover tooltip (themed like button, follows cursor) */}
+      {tooltip && (
+        <div style={{
+          position: 'fixed',
+          left: tooltip.x + 12,
+          top: tooltip.y - 8,
+          backgroundColor: hotspotStyle?.tooltipBackgroundColor || '#4a90d9',
+          color: hotspotStyle?.tooltipTextColor || '#ffffff',
+          padding: '6px 12px',
+          borderRadius: `${hotspotStyle?.tooltipBorderRadius ?? 8}px`,
+          fontSize: '14px',
+          fontFamily: hotspotStyle?.tooltipFontFamily || hotspotStyle?.fontFamily || 'sans-serif',
+          fontWeight: 600,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          border: hotspotStyle?.tooltipBorderColor ? `1px solid ${hotspotStyle.tooltipBorderColor}` : 'none',
+          pointerEvents: 'none',
+          zIndex: 10000,
+          whiteSpace: 'nowrap',
+          maxWidth: '300px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
+          {tooltip.text}
         </div>
       )}
     </div>

@@ -416,6 +416,16 @@ const PanoramaPreviewSection: React.FC<{
 
     const markers: any[] = [];
 
+    // Hotspot appearance from global settings (editor always shows, but uses configured style)
+    const hsColor = globalSettings?.hotspots?.highlightColor || '#ffff00';
+    const hsOpacity = (globalSettings?.hotspots?.opacity ?? 25) / 100; // 0-100 → 0-1
+    const hsFontFamily = globalSettings?.fonts?.textFont || 'sans-serif';
+    const hsFontSize = globalSettings?.fonts?.fontSize?.text || 16;
+    // Parse hex to rgb for rgba usage
+    const hsR = parseInt(hsColor.slice(1,3), 16) || 255;
+    const hsG = parseInt(hsColor.slice(3,5), 16) || 255;
+    const hsB = parseInt(hsColor.slice(5,7), 16) || 0;
+
     // 1. Hotspot markers — interactive (draggable + resizable via overlay)
     for (const hs of panoramaHotspots) {
       const veEl = visualElements.find(e => e.id === hs.id);
@@ -428,18 +438,21 @@ const PanoramaPreviewSection: React.FC<{
       const h = Math.round((veEl?.height || 50) * elScale * scale);
       const isSelected = selectedElementId === hs.id;
       const rotateStyle = elRotation ? `transform:rotate(${elRotation}deg);` : '';
+      const fontSize = Math.max(10, Math.round(hsFontSize * scale * 0.8));
 
-      console.log(`[VE-Pano] Hotspot "${hs.text}": stageCenter=(${Math.round(cx)},${Math.round(cy)}) → yaw=${elYaw.toFixed(1)} pitch=${elPitch.toFixed(1)} stageSize=${veEl?.width}x${veEl?.height} scale=${scale.toFixed(3)} → ${w}x${h}px`);
+      // Editor: slightly reduced opacity, brightened when selected
+      const bgAlpha = isSelected ? Math.min(hsOpacity * 1.5, 1) : hsOpacity * 0.7;
+      const borderAlpha = isSelected ? 0.8 : 0.7;
 
       // Create the element with pointer event handlers for drag/resize
       const el = document.createElement('div');
       el.className = 'psv--capture-event';
       el.style.cssText = `width:${w}px;height:${h}px;position:relative;cursor:${previewDragRef.current?.elementId === hs.id ? 'grabbing' : 'grab'};${rotateStyle}`;
       el.innerHTML = `<div style="width:100%;height:100%;
-        background-color:${isSelected ? 'rgba(255,255,0,0.4)' : 'rgba(255,255,0,0.25)'};
-        border:${isSelected ? '2px dashed rgba(245,158,11,0.8)' : '2px dashed rgba(255,255,0,0.7)'};
+        background-color:rgba(${hsR},${hsG},${hsB},${bgAlpha.toFixed(2)});
+        border:2px dashed rgba(${hsR},${hsG},${hsB},${borderAlpha});
         border-radius:4px;display:flex;align-items:center;justify-content:center;
-        font-size:${Math.max(10, Math.round(13 * scale))}px;font-family:sans-serif;font-weight:600;color:white;
+        font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:white;
         text-shadow:0 1px 3px rgba(0,0,0,0.6);white-space:nowrap;overflow:hidden;box-sizing:border-box;">
         ${hs.text || 'Hotspot'}</div>`;
 
