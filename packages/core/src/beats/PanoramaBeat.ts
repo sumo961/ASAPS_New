@@ -146,6 +146,7 @@ export class PanoramaBeat extends Beat {
             height: loc.height,
             scale: loc.scale,
             rotation: loc.rotation,
+            sound: loc.sound,
           } : {}),
         };
       });

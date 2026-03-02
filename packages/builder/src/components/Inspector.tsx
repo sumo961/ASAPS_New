@@ -2566,32 +2566,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                 {beat.type === 'panorama' && (
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Panorama Image</label>
-                      <AssetSelector
-                        selectedAssetId={localBeat.parameters?.panoramaAssetId || ''}
-                        onAssetSelect={(assetId) => handleParameterChange('panoramaAssetId', assetId || '')}
-                        assets={assets}
-                        assetType="image"
-                        placeholder="Select panorama image"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Projection</label>
-                      <select
-                        value={localBeat.parameters?.projectionType || 'equirectangular'}
-                        onChange={(e) => handleParameterChange('projectionType', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      >
-                        <option value="equirectangular">Equirectangular (2:1, e.g. 4096x2048)</option>
-                        <option value="cylindrical">Cylindrical (4:1–8:1, e.g. 8000x2000)</option>
-                      </select>
-                      <p className="text-xs text-blue-600 mt-1">
-                        {(localBeat.parameters?.projectionType || 'equirectangular') === 'equirectangular'
-                          ? 'Use 2:1 images from 360° cameras.'
-                          : 'Use wide panoramas from phone cameras (4:1 to 8:1 ratio).'}
-                      </p>
-                    </div>
-                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Prompt Text</label>
                       <TextFieldWithVariables
                         value={localBeat.parameters?.prompt || ''}
@@ -2683,33 +2657,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                               }}
                               placeholder="Hotspot label"
                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-xs text-gray-500">Pitch</label>
-                              <input type="number"
-                                value={hotspot.pitch ?? 0}
-                                onChange={(e) => {
-                                  const newHotspots = [...(localBeat.parameters?.hotspots || [])];
-                                  newHotspots[index] = { ...newHotspots[index], pitch: parseFloat(e.target.value) };
-                                  handleParameterChange('hotspots', newHotspots);
-                                }}
-                                min="-90" max="90" step="0.1"
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs" />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-500">Yaw</label>
-                              <input type="number"
-                                value={hotspot.yaw ?? 0}
-                                onChange={(e) => {
-                                  const newHotspots = [...(localBeat.parameters?.hotspots || [])];
-                                  newHotspots[index] = { ...newHotspots[index], yaw: parseFloat(e.target.value) };
-                                  handleParameterChange('hotspots', newHotspots);
-                                }}
-                                min="-180" max="180" step="0.1"
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs" />
-                            </div>
                           </div>
 
                           <div>

@@ -258,6 +258,7 @@ export interface IRenderer {
       height?: number;
       scale?: number;
       rotation?: number;
+      sound?: string;
     }>;
     initialPitch?: number;
     initialYaw?: number;

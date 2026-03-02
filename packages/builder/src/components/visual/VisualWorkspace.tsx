@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
-import { PanoramaCameraPanel, type PanoramaViewMode } from './PanoramaCameraPanel';
+type PanoramaViewMode = 'layout' | 'preview';
 import { VisualPropertiesPanel } from './VisualPropertiesPanel';
 import { AnimationPanel } from './AnimationPanel';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
@@ -412,7 +412,6 @@ const PanoramaPreviewSection: React.FC<{
     const initRad = panoramaInitialHfovRef.current * 0.5 * _DEG_TO_RAD;
     const currRad = currentHfov * 0.5 * _DEG_TO_RAD;
     const zoomScale = Math.tan(initRad) / Math.tan(currRad);
-    const scale = sizeFactor * zoomScale;
 
     const markers: any[] = [];
 
@@ -434,11 +433,18 @@ const PanoramaPreviewSection: React.FC<{
       const { yaw: elYaw, pitch: elPitch } = stageToYawPitch(cx, cy, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
       const elScale = veEl?.scale || 1;
       const elRotation = veEl?.rotation || 0;
-      const w = Math.round((veEl?.width || 120) * elScale * scale);
-      const h = Math.round((veEl?.height || 50) * elScale * scale);
+      // Base dimensions at container scale (no zoom) — CSS transform handles zoom uniformly
+      // so text and box scale together, avoiding browser minimum font-size issues
+      const baseW = Math.round((veEl?.width || 120) * elScale * sizeFactor);
+      const baseH = Math.round((veEl?.height || 50) * elScale * sizeFactor);
       const isSelected = selectedElementId === hs.id;
-      const rotateStyle = elRotation ? `transform:rotate(${elRotation}deg);` : '';
-      const fontSize = Math.max(10, Math.round(hsFontSize * scale * 0.8));
+      // Font size at base scale only — CSS transform: scale(zoomScale) scales it uniformly with the box
+      const baseFontSize = (veEl?.fontOverridden && veEl?.fontSize) ? veEl.fontSize : hsFontSize;
+      const fontSize = Math.max(10, Math.round(baseFontSize * sizeFactor * 0.8));
+
+      // Combine zoom scale and rotation in one CSS transform
+      const transforms = [`scale(${zoomScale.toFixed(4)})`];
+      if (elRotation) transforms.push(`rotate(${elRotation}deg)`);
 
       // Editor: slightly reduced opacity, brightened when selected
       const bgAlpha = isSelected ? Math.min(hsOpacity * 1.5, 1) : hsOpacity * 0.7;
@@ -447,7 +453,7 @@ const PanoramaPreviewSection: React.FC<{
       // Create the element with pointer event handlers for drag/resize
       const el = document.createElement('div');
       el.className = 'psv--capture-event';
-      el.style.cssText = `width:${w}px;height:${h}px;position:relative;cursor:${previewDragRef.current?.elementId === hs.id ? 'grabbing' : 'grab'};${rotateStyle}`;
+      el.style.cssText = `width:${baseW}px;height:${baseH}px;position:relative;cursor:${previewDragRef.current?.elementId === hs.id ? 'grabbing' : 'grab'};transform:${transforms.join(' ')};transform-origin:center center;`;
       el.innerHTML = `<div style="width:100%;height:100%;
         background-color:rgba(${hsR},${hsG},${hsB},${bgAlpha.toFixed(2)});
         border:2px dashed rgba(${hsR},${hsG},${hsB},${borderAlpha});
@@ -470,7 +476,7 @@ const PanoramaPreviewSection: React.FC<{
         id: `hotspot-${hs.id}`,
         element: el,
         position: { yaw: elYaw * _DEG_TO_RAD, pitch: elPitch * _DEG_TO_RAD },
-        size: { width: w, height: h },
+        size: { width: baseW, height: baseH },
         anchor: 'center center',
         data: { elementId: hs.id, type: 'hotspot' },
       });
@@ -485,14 +491,18 @@ const PanoramaPreviewSection: React.FC<{
       const { yaw: elYaw, pitch: elPitch } = stageToYawPitch(elCx, elCy, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
       const elScale = vel.scale || 1;
       const elRotation = vel.rotation || 0;
-      const w = Math.round(vel.width * elScale * scale);
-      const h = Math.round(vel.height * elScale * scale);
+      // Base dimensions at container scale (no zoom) — CSS transform handles zoom
+      const baseW = Math.round(vel.width * elScale * sizeFactor);
+      const baseH = Math.round(vel.height * elScale * sizeFactor);
       const isElSelected = selectedElementId === vel.id;
-      const rotateStyle = elRotation ? `transform:rotate(${elRotation}deg);` : '';
+
+      // Combine zoom scale and rotation
+      const transforms = [`scale(${zoomScale.toFixed(4)})`];
+      if (elRotation) transforms.push(`rotate(${elRotation}deg)`);
 
       const el = document.createElement('div');
       el.className = 'psv--capture-event';
-      el.style.cssText = `cursor:${previewDragRef.current?.elementId === vel.id ? 'grabbing' : 'grab'};${rotateStyle}`;
+      el.style.cssText = `width:${baseW}px;height:${baseH}px;cursor:${previewDragRef.current?.elementId === vel.id ? 'grabbing' : 'grab'};transform:${transforms.join(' ')};transform-origin:center center;`;
 
       if (vel.type === 'text' || vel.type === 'dialog') {
         const promptText = vel.text || vel.name || '';
@@ -505,23 +515,24 @@ const PanoramaPreviewSection: React.FC<{
         const textColor = globalSettings?.colors?.nonptextcolor || (
           (r * 299 + g * 587 + b * 114) / 1000 > 128 ? '#000000' : '#ffffff'
         );
+        const textFontSize = (vel.fontOverridden && vel.fontSize) ? vel.fontSize : (globalSettings?.fonts?.fontSize?.text || 16);
         el.innerHTML = `<div style="
-          width:${w}px;height:${h}px;box-sizing:border-box;overflow:hidden;
+          width:100%;height:100%;box-sizing:border-box;overflow:hidden;
           background-color:rgba(${r},${g},${b},${alpha});
           color:${textColor};
           padding:${globalSettings?.textbox?.padding ?? 8}px;
           border-radius:${globalSettings?.textbox?.radius ?? 8}px;
           border:${isElSelected ? '2px solid rgba(245,158,11,0.8)' : (globalSettings?.textbox?.borderWidth && globalSettings?.colors?.textBoxBorder) ? `${globalSettings.textbox.borderWidth}px solid ${globalSettings.colors.textBoxBorder}` : 'none'};
-          font-size:${Math.round((globalSettings?.fonts?.fontSize?.text || 16) * scale)}px;
+          font-size:${Math.round(textFontSize * sizeFactor)}px;
           font-family:${globalSettings?.fonts?.textFont || 'sans-serif'};
           display:flex;align-items:center;justify-content:center;
           word-wrap:break-word;overflow-wrap:break-word;text-align:center;">${promptText}</div>`;
       } else {
         const imgSrc = vel.assetUrl || vel.imageUrl;
         if (imgSrc) {
-          el.innerHTML = `<img src="${imgSrc}" alt="${vel.name}" style="width:${w}px;height:${h}px;object-fit:contain;pointer-events:none;${isElSelected ? 'outline:2px solid rgba(245,158,11,0.8);border-radius:4px;' : ''}" />`;
+          el.innerHTML = `<img src="${imgSrc}" alt="${vel.name}" style="width:100%;height:100%;object-fit:contain;pointer-events:none;${isElSelected ? 'outline:2px solid rgba(245,158,11,0.8);border-radius:4px;' : ''}" />`;
         } else {
-          el.innerHTML = `<div style="width:${w}px;height:${h}px;
+          el.innerHTML = `<div style="width:100%;height:100%;
             background-color:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);
             border-radius:4px;display:flex;align-items:center;justify-content:center;
             font-size:11px;color:rgba(255,255,255,0.5);box-sizing:border-box;">
@@ -533,7 +544,7 @@ const PanoramaPreviewSection: React.FC<{
         id: `element-${vel.id}`,
         element: el,
         position: { yaw: elYaw * _DEG_TO_RAD, pitch: elPitch * _DEG_TO_RAD },
-        size: { width: w, height: h },
+        size: { width: baseW, height: baseH },
         anchor: 'center center',
         data: { elementId: vel.id, type: vel.type },
       });
@@ -749,7 +760,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const [phasesExpanded, setPhasesExpanded] = useState(true);
 
   // Panorama view mode toggle: layout (flat equirect + VE tools) vs preview (PSV 360°)
-  const [panoramaViewMode, setPanoramaViewMode] = useState<PanoramaViewMode>('layout');
+  // Panorama beats always use preview mode (no layout mode)
+  const panoramaViewMode: PanoramaViewMode = 'preview';
   // Counter to force PSV remount each time we enter preview
   const [psvMountKey, setPsvMountKey] = useState(0);
   const psvViewerRef = useRef<PSVViewer | null>(null);
@@ -1020,13 +1032,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const projType = params.projectionType || 'equirectangular';
       const imgAspect = params.imageAspectRatio ?? panoramaImageAspect;
 
-      // In preview mode, place new hotspot at current camera center
-      let initYaw = hotspot.yaw ?? 0;
-      let initPitch = hotspot.pitch ?? 0;
-      if (panoramaViewMode === 'preview') {
-        initYaw = livePanoCamRef.current.yaw;
-        initPitch = livePanoCamRef.current.pitch;
-      }
+      // Place new hotspot at current camera center
+      let initYaw = livePanoCamRef.current.yaw;
+      let initPitch = livePanoCamRef.current.pitch;
 
       const { centerX, centerY } = yawPitchToStage(initYaw, initPitch, projType, stageW, stageH, imgAspect);
       const hotspotWidth = 120;
@@ -1060,7 +1068,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
     window.addEventListener('asaps:addPanoramaHotspot', handler);
     return () => window.removeEventListener('asaps:addPanoramaHotspot', handler);
-  }, [projectSettings, panoramaImageAspect, panoramaViewMode]);
+  }, [projectSettings, panoramaImageAspect]);
 
   const panoramaResolvedUrl = useMemo(() => {
     if (!isPanoramaBeat) return '';
@@ -1119,8 +1127,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         const rootPhase = phaseTree?.id || null;
         setSelectedPhaseId(rootPhase);
       }
-      // Reset panorama view to layout mode when switching beats
-      setPanoramaViewMode('layout');
+      // Reset panorama viewer when switching beats
       panoramaReadyRef.current = false;
       if (psvViewerRef.current) {
         try { psvViewerRef.current.destroy(); } catch { /* ignore */ }
@@ -1135,7 +1142,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
   // Sync panorama camera settings (sliders) to the PSV preview
   useEffect(() => {
-    if (!isPanoramaBeat || panoramaViewMode !== 'preview' || !psvViewerRef.current) return;
+    if (!isPanoramaBeat || !psvViewerRef.current) return;
     // Skip if this update came from the PSV viewer itself (prevents feedback loop)
     if (panoramaViewChangingRef.current) return;
     // Defer to ready handler for initial camera setup
@@ -1151,7 +1158,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       viewer.zoom(viewer.dataHelper.fovToZoomLevel(vFov));
     } catch { /* viewer may not be fully loaded yet */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPanoramaBeat, panoramaViewMode, beatVersion]);
+  }, [isPanoramaBeat, beatVersion]);
 
   /**
    * Generate visual elements for a specific DialogTree phase
@@ -3370,11 +3377,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // This ensures the background is saved even without switching beats
       if (beat && beat.updateParameters) {
         const params = beat.getParameters ? beat.getParameters() : {};
-        beat.updateParameters({
-          ...params,
-          backgroundAssetId: asset.id,
-          node: asset.id // Also set 'node' for compatibility with Beat.execute()
-        });
+        if (beat.type === 'panorama') {
+          beat.updateParameters({ ...params, panoramaAssetId: asset.id });
+        } else {
+          beat.updateParameters({
+            ...params,
+            backgroundAssetId: asset.id,
+            node: asset.id // Also set 'node' for compatibility with Beat.execute()
+          });
+        }
         console.log(`[VisualWorkspace] Background immediately persisted to beat: ${asset.id}`);
       }
     });
@@ -3483,8 +3494,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const updatedParams: any = {
       ...params,
       visualElements,
-      backgroundAssetId,
-      node: backgroundAssetId,
+      ...(beat.type === 'panorama'
+        ? { panoramaAssetId: backgroundAssetId }
+        : { backgroundAssetId, node: backgroundAssetId }),
       backgroundSound,
       animations
     };
@@ -3727,47 +3739,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             </div>
           )}
 
-          {/* Panorama Camera Settings (shown above tabs for panorama beats) */}
-          {isPanoramaBeat && (
-            <PanoramaCameraPanel
-              initialPitch={Number.isFinite(beat.getParameters().initialPitch) ? beat.getParameters().initialPitch : 0}
-              initialYaw={Number.isFinite(beat.getParameters().initialYaw) ? beat.getParameters().initialYaw : 0}
-              hfov={Number.isFinite(beat.getParameters().hfov) ? beat.getParameters().hfov : 75}
-              prompt={beat.getParameters().prompt || ''}
-              projectionType={beat.getParameters().projectionType || 'equirectangular'}
-              viewMode={panoramaViewMode}
-              onViewModeChange={(mode) => {
-                // CRITICAL: Reset readyRef BEFORE remount to prevent onViewChange
-                // from saving stale FOV values during PSV viewer re-initialization.
-                // Without this, panoramaReadyRef stays true from the previous preview
-                // session, and onViewChange saves the default fov={90} before onReady
-                // can set the correct zoom level.
-                panoramaReadyRef.current = false;
-                if (mode === 'preview') setPsvMountKey(k => k + 1);
-                setPanoramaViewMode(mode);
-              }}
-              onCameraChange={(settings) => {
-                beat.updateParameters(settings);
-                if (onBeatUpdate) {
-                  onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), ...settings } } as any);
-                }
-              }}
-              onPromptChange={(newPrompt) => {
-                beat.updateParameters({ prompt: newPrompt });
-                if (onBeatUpdate) {
-                  onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), prompt: newPrompt } } as any);
-                }
-              }}
-              onProjectionTypeChange={(type) => {
-                beat.updateParameters({ projectionType: type });
-                setHasChanges(true);
-                if (onBeatUpdate) {
-                  onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), projectionType: type } } as any);
-                }
-              }}
-            />
-          )}
-
           <>
           {/* Tab Buttons */}
           <div className="flex border-b border-gray-200">
@@ -3813,7 +3784,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       const updatedElement = { ...el, ...updates };
 
                       // Auto-resize if fontSize, font, or text changes for text/button/dialog elements
+                      // Skip for panorama beats — markers use global settings font, not element fontSize
                       if ((el.type === 'text' || el.type === 'dialog' || el.type === 'button') &&
+                          beat?.type !== 'panorama' &&
                           (updates.fontSize !== undefined || updates.font !== undefined || updates.text !== undefined)) {
                         const text = updatedElement.text || '';
                         const fontSize = updatedElement.fontSize || 16;
@@ -4307,13 +4280,32 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   }
                   setHasChanges(true);
                 } : undefined}
-                promptDisplay={beat.type === 'panorama' ? (beat.getParameters().promptDisplay ?? (beat as any).parameters?.promptDisplay ?? 'static') : undefined}
-                onPromptDisplayChange={beat.type === 'panorama' ? (display) => {
+                panoramaSettings={isPanoramaBeat ? {
+                  initialPitch: Number.isFinite(beat.getParameters().initialPitch) ? beat.getParameters().initialPitch : 0,
+                  initialYaw: Number.isFinite(beat.getParameters().initialYaw) ? beat.getParameters().initialYaw : 0,
+                  hfov: Number.isFinite(beat.getParameters().hfov) ? beat.getParameters().hfov : 75,
+                  promptDisplay: beat.getParameters().promptDisplay ?? (beat as any).parameters?.promptDisplay ?? 'static',
+                  projectionType: beat.getParameters().projectionType || 'equirectangular',
+                } : undefined}
+                onPanoramaCameraChange={isPanoramaBeat ? (settings) => {
+                  beat.updateParameters(settings);
+                  if (onBeatUpdate) {
+                    onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), ...settings } } as any);
+                  }
+                } : undefined}
+                onPromptDisplayChange={isPanoramaBeat ? (display) => {
                   beat.updateParameters({ promptDisplay: display });
                   if (onBeatUpdate) {
                     onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), promptDisplay: display } } as any);
                   }
                   setHasChanges(true);
+                } : undefined}
+                onProjectionTypeChange={isPanoramaBeat ? (type) => {
+                  beat.updateParameters({ projectionType: type });
+                  setHasChanges(true);
+                  if (onBeatUpdate) {
+                    onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), projectionType: type } } as any);
+                  }
                 } : undefined}
               />
             )}
@@ -4349,7 +4341,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
       {/* Main Visual Editor Canvas */}
       <div className="flex-1 overflow-hidden relative">
-        {isPanoramaBeat && panoramaViewMode === 'preview' ? (
+        {isPanoramaBeat ? (
           /* Panorama Preview Mode: PSV interactive 360° viewer */
           <PanoramaPreviewSection
             key={`psv-section-${psvMountKey}`}
@@ -4430,25 +4422,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             themeAssets={themeAssets}
             overrideCountdownMeter={(beat as any).overrideCountdownMeter}
             presentationMode={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).presentationMode || 'positioned') : undefined}
-            panoramaViewport={isPanoramaBeat ? {
-              pitch: beat.getParameters().initialPitch ?? 0,
-              yaw: beat.getParameters().initialYaw ?? 0,
-              hfov: beat.getParameters().hfov ?? 75,
-              projectionType: panoramaProjectionType,
-              imageAspect: panoramaImageAspect,
-            } : undefined}
-            onPanoramaViewportChange={isPanoramaBeat ? (viewport) => {
-              beat.updateParameters({
-                initialPitch: viewport.pitch,
-                initialYaw: viewport.yaw,
-                hfov: viewport.hfov,
-              });
-              setHasChanges(true);
-              if (onBeatUpdate) {
-                onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), ...viewport } } as any);
-              }
-            } : undefined}
-            promptDisplay={isPanoramaBeat ? (beat.getParameters().promptDisplay ?? (beat as any).parameters?.promptDisplay ?? 'static') : undefined}
             initialZoom={vbeZoomRef.current}
             onZoomChange={(z: number) => { vbeZoomRef.current = z; }}
             initialScroll={vbeScrollRef.current}

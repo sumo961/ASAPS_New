@@ -67,9 +67,17 @@ interface VisualPropertiesPanelProps {
   allBeats?: { id: string; name: string; type: string }[];
   panoramaHotspots?: { id: string; target: string; text: string; displayText?: string; icon?: string; pitch: number; yaw: number }[];
   onPanoramaHotspotUpdate?: (id: string, updates: Record<string, any>) => void;
-  // Panorama prompt display toggle
-  promptDisplay?: 'static' | 'pinned';
+  // Panorama camera/settings props
+  panoramaSettings?: {
+    initialPitch: number;
+    initialYaw: number;
+    hfov: number;
+    promptDisplay: 'static' | 'pinned';
+    projectionType: 'equirectangular' | 'cylindrical';
+  };
+  onPanoramaCameraChange?: (settings: { initialPitch?: number; initialYaw?: number; hfov?: number }) => void;
   onPromptDisplayChange?: (display: 'static' | 'pinned') => void;
+  onProjectionTypeChange?: (type: 'equirectangular' | 'cylindrical') => void;
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -110,8 +118,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   allBeats,
   panoramaHotspots,
   onPanoramaHotspotUpdate,
-  promptDisplay,
+  panoramaSettings,
+  onPanoramaCameraChange,
   onPromptDisplayChange,
+  onProjectionTypeChange,
 }) => {
   // Get available fonts (built-in + custom from assets)
   const { fonts } = useFonts(assets);
@@ -241,6 +251,106 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
               {backgroundAsset && (
                 <div className="mt-2 text-xs text-gray-600">
                   {backgroundAsset.name}
+                </div>
+              )}
+
+              {/* Panorama Settings - inline under panorama image */}
+              {beatType === 'panorama' && panoramaSettings && (
+                <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                  {/* Projection Type */}
+                  {onProjectionTypeChange && (
+                    <label className="block">
+                      <span className="text-xs text-gray-500">Projection</span>
+                      <select
+                        value={panoramaSettings.projectionType}
+                        onChange={(e) => onProjectionTypeChange(e.target.value as 'equirectangular' | 'cylindrical')}
+                        className="mt-0.5 w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="equirectangular">Equirectangular (2:1, e.g. 4096x2048)</option>
+                        <option value="cylindrical">Cylindrical (4:1-8:1, e.g. 8000x2000)</option>
+                      </select>
+                      <p className="text-xs text-blue-600 mt-1">
+                        {panoramaSettings.projectionType === 'equirectangular'
+                          ? 'Use 2:1 images from 360\u00b0 cameras.'
+                          : 'Use wide panoramas from phone cameras (4:1 to 8:1 ratio).'}
+                      </p>
+                    </label>
+                  )}
+
+                  {/* Initial Pitch */}
+                  {onPanoramaCameraChange && (
+                    <>
+                      <label className="block">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">Initial Pitch</span>
+                          <span className="text-xs text-gray-400">{panoramaSettings.initialPitch}°</span>
+                        </div>
+                        <input
+                          type="range"
+                          value={panoramaSettings.initialPitch}
+                          onChange={(e) => onPanoramaCameraChange({ initialPitch: parseFloat(e.target.value) })}
+                          min={-90}
+                          max={90}
+                          step={1}
+                          className="mt-0.5 w-full h-1.5 accent-blue-500"
+                        />
+                      </label>
+
+                      {/* Initial Yaw */}
+                      <label className="block">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">Initial Yaw</span>
+                          <span className="text-xs text-gray-400">{panoramaSettings.initialYaw}°</span>
+                        </div>
+                        <input
+                          type="range"
+                          value={panoramaSettings.initialYaw}
+                          onChange={(e) => onPanoramaCameraChange({ initialYaw: parseFloat(e.target.value) })}
+                          min={-180}
+                          max={180}
+                          step={1}
+                          className="mt-0.5 w-full h-1.5 accent-blue-500"
+                        />
+                      </label>
+
+                      {/* HFOV */}
+                      <label className="block">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">Field of View</span>
+                          <span className="text-xs text-gray-400">{panoramaSettings.hfov}°</span>
+                        </div>
+                        <input
+                          type="range"
+                          value={panoramaSettings.hfov}
+                          onChange={(e) => onPanoramaCameraChange({ hfov: parseFloat(e.target.value) })}
+                          min={50}
+                          max={120}
+                          step={1}
+                          className="mt-0.5 w-full h-1.5 accent-blue-500"
+                        />
+                      </label>
+                    </>
+                  )}
+
+                  {/* Prompt Display */}
+                  {onPromptDisplayChange && (
+                    <label className="block">
+                      <span className="text-xs text-gray-500">Prompt Display</span>
+                      <select
+                        value={panoramaSettings.promptDisplay}
+                        onChange={(e) => onPromptDisplayChange(e.target.value as 'static' | 'pinned')}
+                        className="mt-0.5 w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="static">Static (floating)</option>
+                        <option value="pinned">Pinned (scrolls with pano)</option>
+                      </select>
+                      <p className="text-xs text-blue-600 mt-1">
+                        {panoramaSettings.promptDisplay === 'pinned'
+                          ? 'Prompt scrolls with the panorama at its positioned location'
+                          : 'Prompt floats as an overlay in front of the panorama'}
+                      </p>
+                    </label>
+                  )}
                 </div>
               )}
             </div>
@@ -403,49 +513,6 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                     </p>
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Panorama Settings Section - For panorama beats */}
-        {beatType === 'panorama' && onPromptDisplayChange && (
-          <div className="border-b border-gray-200">
-            <button
-              onClick={() => toggleSection('panoramaSettings')}
-              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
-            >
-              <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4" />
-                <span className="font-medium text-sm">Panorama Settings</span>
-              </div>
-              {expandedSections.panoramaSettings ? (
-                <ChevronUp className="w-4 h-4 text-gray-400" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-              )}
-            </button>
-
-            {expandedSections.panoramaSettings && (
-              <div className="px-4 pb-4 space-y-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">
-                    Prompt Display
-                  </label>
-                  <select
-                    value={promptDisplay || 'static'}
-                    onChange={(e) => onPromptDisplayChange(e.target.value as 'static' | 'pinned')}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                  >
-                    <option value="static">Static (floating)</option>
-                    <option value="pinned">Pinned (scrolls with pano)</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {promptDisplay === 'pinned'
-                      ? 'Prompt text scrolls with the panorama at its positioned location'
-                      : 'Prompt text floats as an overlay in front of the panorama'}
-                  </p>
-                </div>
               </div>
             )}
           </div>
@@ -1132,48 +1199,6 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         Panorama Hotspot
                       </label>
 
-                      {/* Target Beat */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 mb-1 block">Target Beat</label>
-                        <select
-                          value={hs.target || ''}
-                          onChange={(e) => onPanoramaHotspotUpdate(hs.id, { target: e.target.value })}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        >
-                          <option value="">— None —</option>
-                          {(allBeats || []).map(b => (
-                            <option key={b.id} value={b.id}>{b.name || b.id}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Display Text */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 mb-1 block">Display Text</label>
-                        <input
-                          type="text"
-                          value={hs.displayText || ''}
-                          onChange={(e) => onPanoramaHotspotUpdate(hs.id, { displayText: e.target.value })}
-                          placeholder="Text shown to player"
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        />
-                      </div>
-
-                      {/* Icon */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 mb-1 block">Icon</label>
-                        <select
-                          value={hs.icon || 'arrow'}
-                          onChange={(e) => onPanoramaHotspotUpdate(hs.id, { icon: e.target.value })}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        >
-                          <option value="arrow">Arrow</option>
-                          <option value="info">Info</option>
-                          <option value="door">Door</option>
-                          <option value="eye">Eye</option>
-                        </select>
-                      </div>
-
                       {/* Pitch/Yaw (editable — repositions element on stage) */}
                       <div className="grid grid-cols-2 gap-2">
                         <div>
@@ -1344,128 +1369,129 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       </div>
                     )}
 
-                    {/* Click Sound Section - Only for interactive elements */}
-                    {(selected.type === 'button' || selected.type === 'text' || selected.type === 'dialog') && (
-                      <div className="mt-4">
-                        <label className="text-xs font-medium text-gray-700 mb-2 block">
-                          Click Sound
-                        </label>
+                  </>
+                )}
 
-                        {/* Tab Selection */}
-                        <div className="grid grid-cols-2 gap-1 mb-2">
-                          <button
-                            onClick={() => setSoundTab('presets')}
-                            className={`px-2 py-1 text-xs border rounded ${
-                              soundTab === 'presets'
-                                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                : 'border-gray-300 hover:bg-gray-50'
+                {/* Click Sound Section - For interactive elements (outside font controls block so hotspots can access it) */}
+                {(selected.type === 'button' || selected.type === 'text' || selected.type === 'dialog' || selected.type === 'hotspot') && (
+                  <div className="mt-4">
+                    <label className="text-xs font-medium text-gray-700 mb-2 block">
+                      Click Sound
+                    </label>
+
+                    {/* Tab Selection */}
+                    <div className="grid grid-cols-2 gap-1 mb-2">
+                      <button
+                        onClick={() => setSoundTab('presets')}
+                        className={`px-2 py-1 text-xs border rounded ${
+                          soundTab === 'presets'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        Presets
+                      </button>
+                      <button
+                        onClick={() => setSoundTab('custom')}
+                        className={`px-2 py-1 text-xs border rounded ${
+                          soundTab === 'custom'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        Custom
+                      </button>
+                    </div>
+
+                    {/* Preset Sounds */}
+                    {soundTab === 'presets' && (
+                      <div className="space-y-1 max-h-48 overflow-y-auto border border-gray-200 rounded p-2">
+                        {presetSounds.map((sound) => (
+                          <div
+                            key={sound.id}
+                            className={`flex items-center justify-between p-2 rounded border transition-colors ${
+                              selected.sound === sound.id
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                             }`}
                           >
-                            Presets
-                          </button>
-                          <button
-                            onClick={() => setSoundTab('custom')}
-                            className={`px-2 py-1 text-xs border rounded ${
-                              soundTab === 'custom'
-                                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                : 'border-gray-300 hover:bg-gray-50'
-                            }`}
-                          >
-                            Custom
-                          </button>
-                        </div>
-
-                        {/* Preset Sounds */}
-                        {soundTab === 'presets' && (
-                          <div className="space-y-1 max-h-48 overflow-y-auto border border-gray-200 rounded p-2">
-                            {presetSounds.map((sound) => (
-                              <div
-                                key={sound.id}
-                                className={`flex items-center justify-between p-2 rounded border transition-colors ${
-                                  selected.sound === sound.id
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                }`}
+                            <div className="flex-1 min-w-0 mr-2">
+                              <div className="text-xs font-medium text-gray-900">{sound.name}</div>
+                              <div className="text-xs text-gray-500">{sound.description}</div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => playSound(sound.url, sound.id)}
+                                className="p-1 hover:bg-white rounded"
+                                title="Preview sound"
                               >
-                                <div className="flex-1 min-w-0 mr-2">
-                                  <div className="text-xs font-medium text-gray-900">{sound.name}</div>
-                                  <div className="text-xs text-gray-500">{sound.description}</div>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => playSound(sound.url, sound.id)}
-                                    className="p-1 hover:bg-white rounded"
-                                    title="Preview sound"
-                                  >
-                                    <Volume2 className={`w-3 h-3 ${playingSound === sound.id ? 'text-blue-600' : 'text-gray-600'}`} />
-                                  </button>
-                                  <button
-                                    onClick={() => onElementUpdate(selected.id, { sound: sound.id })}
-                                    className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                                  >
-                                    {selected.sound === sound.id ? 'Selected' : 'Use'}
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                                <Volume2 className={`w-3 h-3 ${playingSound === sound.id ? 'text-blue-600' : 'text-gray-600'}`} />
+                              </button>
+                              <button
+                                onClick={() => onElementUpdate(selected.id, { sound: sound.id })}
+                                className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                              >
+                                {selected.sound === sound.id ? 'Selected' : 'Use'}
+                              </button>
+                            </div>
                           </div>
-                        )}
+                        ))}
+                      </div>
+                    )}
 
-                        {/* Custom Audio Assets */}
-                        {soundTab === 'custom' && (
-                          <div className="space-y-1 max-h-48 overflow-y-auto border border-gray-200 rounded p-2">
-                            {audioAssets.length === 0 ? (
-                              <div className="text-xs text-gray-500 italic py-4 text-center">
-                                No custom audio assets uploaded yet.
-                                <br />
-                                Upload audio files with subType 'sfx' to use them here.
+                    {/* Custom Audio Assets */}
+                    {soundTab === 'custom' && (
+                      <div className="space-y-1 max-h-48 overflow-y-auto border border-gray-200 rounded p-2">
+                        {audioAssets.length === 0 ? (
+                          <div className="text-xs text-gray-500 italic py-4 text-center">
+                            No custom audio assets uploaded yet.
+                            <br />
+                            Upload audio files with subType 'sfx' to use them here.
+                          </div>
+                        ) : (
+                          audioAssets.map((asset) => (
+                            <div
+                              key={asset.id}
+                              className={`flex items-center justify-between p-2 rounded border transition-colors ${
+                                selected.sound === asset.id
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0 mr-2">
+                                <div className="text-xs font-medium text-gray-900 truncate">{asset.name}</div>
                               </div>
-                            ) : (
-                              audioAssets.map((asset) => (
-                                <div
-                                  key={asset.id}
-                                  className={`flex items-center justify-between p-2 rounded border transition-colors ${
-                                    selected.sound === asset.id
-                                      ? 'border-blue-500 bg-blue-50'
-                                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                  }`}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => playSound(asset.url, asset.id)}
+                                  className="p-1 hover:bg-white rounded"
+                                  title="Preview sound"
                                 >
-                                  <div className="flex-1 min-w-0 mr-2">
-                                    <div className="text-xs font-medium text-gray-900 truncate">{asset.name}</div>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      onClick={() => playSound(asset.url, asset.id)}
-                                      className="p-1 hover:bg-white rounded"
-                                      title="Preview sound"
-                                    >
-                                      <Volume2 className={`w-3 h-3 ${playingSound === asset.id ? 'text-blue-600' : 'text-gray-600'}`} />
-                                    </button>
-                                    <button
-                                      onClick={() => onElementUpdate(selected.id, { sound: asset.id, soundAssetId: asset.id })}
-                                      className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                                    >
-                                      {selected.sound === asset.id ? 'Selected' : 'Use'}
-                                    </button>
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        )}
-
-                        {/* Clear Sound Button */}
-                        {selected.sound && (
-                          <button
-                            onClick={() => onElementUpdate(selected.id, { sound: undefined, soundAssetId: undefined })}
-                            className="w-full mt-2 px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
-                          >
-                            Remove Sound
-                          </button>
+                                  <Volume2 className={`w-3 h-3 ${playingSound === asset.id ? 'text-blue-600' : 'text-gray-600'}`} />
+                                </button>
+                                <button
+                                  onClick={() => onElementUpdate(selected.id, { sound: asset.id, soundAssetId: asset.id })}
+                                  className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                                >
+                                  {selected.sound === asset.id ? 'Selected' : 'Use'}
+                                </button>
+                              </div>
+                            </div>
+                          ))
                         )}
                       </div>
                     )}
-                  </>
+
+                    {/* Clear Sound Button */}
+                    {selected.sound && (
+                      <button
+                        onClick={() => onElementUpdate(selected.id, { sound: undefined, soundAssetId: undefined })}
+                        className="w-full mt-2 px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                      >
+                        Remove Sound
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}

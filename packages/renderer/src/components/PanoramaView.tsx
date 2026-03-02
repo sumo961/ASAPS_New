@@ -3,6 +3,8 @@ import { Viewer } from '@photo-sphere-viewer/core';
 import { MarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
 import '@photo-sphere-viewer/core/index.css';
 import '@photo-sphere-viewer/markers-plugin/index.css';
+import { isPresetSound, getPresetSound } from '@asaps/core';
+import { getAudioManager } from '../audio/AudioManager';
 
 const DEG_TO_RAD = Math.PI / 180;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -35,6 +37,7 @@ export interface PanoramaHotspotData {
   height?: number;
   scale?: number;
   rotation?: number;
+  sound?: string;
 }
 
 export interface PanoramaViewerApi {
@@ -103,6 +106,8 @@ export interface PanoramaViewProps {
     tooltipBorderRadius?: number;
     tooltipFontFamily?: string;
   };
+  /** Sound blob resolver for click sounds on hotspots */
+  soundBlobResolver?: (assetId: string) => Promise<Blob | null>;
   /** Stage dimensions for coordinate mapping (default 1024x768) */
   stageWidth?: number;
   stageHeight?: number;
@@ -140,6 +145,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
   hotspotStyle,
   overlayElements,
   resolveAssetUrl,
+  soundBlobResolver,
   stageWidth = 1024,
 }) => {
   const viewerContainerRef = useRef<HTMLDivElement | null>(null);
@@ -149,6 +155,8 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
   const onEditorClickRef = useRef(onEditorClick);
   const onViewerReadyRef = useRef(onViewerReady);
   const editorModeRef = useRef(editorMode);
+  const soundBlobResolverRef = useRef(soundBlobResolver);
+  const hotspotsRef = useRef(hotspots);
 
   // Trigger markers sync when viewer becomes ready
   const [markersVersion, setMarkersVersion] = useState(0);
@@ -163,6 +171,8 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
   onEditorClickRef.current = onEditorClick;
   onViewerReadyRef.current = onViewerReady;
   editorModeRef.current = editorMode;
+  soundBlobResolverRef.current = soundBlobResolver;
+  hotspotsRef.current = hotspots;
 
   // Stable callback for panoramaUrl changes - load image to get natural dimensions for cylindrical
   const createViewer = useCallback(() => {
@@ -239,9 +249,28 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
       });
 
       // Hotspot click via marker event
-      markersPlugin.addEventListener('select-marker', (e) => {
+      markersPlugin.addEventListener('select-marker', async (e) => {
         const hotspotId = e.marker.data?.hotspotId;
         if (hotspotId) {
+          // Play click sound if assigned
+          const hs = hotspotsRef.current.find(h => h.id === hotspotId);
+          const soundRef = hs?.sound;
+          if (soundRef && soundRef !== 'undefined') {
+            try {
+              const audioManager = getAudioManager();
+              if (isPresetSound(soundRef)) {
+                const preset = getPresetSound(soundRef);
+                if (preset) await audioManager.playSoundAndWait(preset.url, preset.volume);
+              } else if (soundBlobResolverRef.current) {
+                const blob = await soundBlobResolverRef.current(soundRef);
+                if (blob) await audioManager.playSoundFromBlobAndWait(blob, 1.0, soundRef);
+              } else if (soundRef.startsWith('http')) {
+                await audioManager.playSoundAndWait(soundRef);
+              }
+            } catch (error) {
+              console.error('[PanoramaView] Error playing hotspot sound:', error);
+            }
+          }
           onHotspotClickRef.current(hotspotId);
         }
       });

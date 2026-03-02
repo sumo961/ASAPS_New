@@ -2081,6 +2081,7 @@ export class ReactRenderer extends BaseRenderer {
       height?: number;
       scale?: number;
       rotation?: number;
+      sound?: string;
     }>;
     initialPitch?: number;
     initialYaw?: number;
@@ -2121,6 +2122,7 @@ export class ReactRenderer extends BaseRenderer {
               imageUrl: loc.imageUrl,
             }))}
             resolveAssetUrl={(assetId) => this.resolveAssetUrl(assetId) || undefined}
+            soundBlobResolver={this.soundBlobResolver || undefined}
             stageWidth={this.context.width}
             hotspotStyle={this.theme?.hotspot ? {
               highlightColor: this.theme.hotspot.highlightColor,
