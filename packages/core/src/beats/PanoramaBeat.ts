@@ -133,18 +133,63 @@ export class PanoramaBeat extends Beat {
     const processedPrompt = this.prompt ? this.processText(this.prompt, context) : '';
 
     if (renderer.renderPanorama) {
-      const selectedHotspotId = await renderer.renderPanorama(panoramaUrl, {
-        hotspots: availableHotspots.map(h => ({
+      // Enrich hotspot data with visual properties from beat.locations
+      const enrichedHotspots = availableHotspots.map(h => {
+        const loc = this.locations.get(h.text) || this.locations.get(h.id);
+        return {
           id: h.id,
           pitch: h.pitch,
           yaw: h.yaw,
           text: this.processText(h.displayText || h.text, context),
-        })),
+          ...(loc ? {
+            width: loc.width,
+            height: loc.height,
+            scale: loc.scale,
+            rotation: loc.rotation,
+          } : {}),
+        };
+      });
+
+      // Collect non-hotspot locations (props, characters) for overlay rendering
+      // Convert stage x,y → yaw,pitch so the renderer can position them as panorama hotspots
+      // Stage dimensions default to 1024x768 (matching project defaults and VE conventions)
+      const stageW = 1024;
+      const stageH = 768;
+      const RAD_TO_DEG = 180 / Math.PI;
+      const overlayLocations = Array.from(this.locations.values())
+        .filter(loc => {
+          if (loc.kind === 'hotspot') return false;
+          // Include text/dialog locations only in pinned mode
+          if (loc.kind === 'text' || loc.kind === 'dialog') return this.promptDisplay === 'pinned';
+          return true;
+        })
+        .map(loc => {
+          const centerX = loc.x + loc.width / 2;
+          const centerY = loc.y + loc.height / 2;
+          // Stage → yaw/pitch conversion (same formulas as builder/panoramaCoordinates.ts)
+          let yaw: number, pitch: number;
+          if (this.projectionType === 'cylindrical') {
+            const imgAspect = 4; // default cylindrical aspect
+            const halfYawDeg = 0.5 * imgAspect * RAD_TO_DEG;
+            const maxPitchDeg = Math.atan(0.5) * RAD_TO_DEG;
+            yaw = halfYawDeg * (1 - 2 * centerX / stageW);
+            pitch = maxPitchDeg * (1 - 2 * centerY / stageH);
+          } else {
+            yaw = 180 - (centerX / stageW) * 360;
+            pitch = 90 - (centerY / stageH) * 180;
+          }
+          return { ...loc, yaw, pitch };
+        });
+
+      const selectedHotspotId = await renderer.renderPanorama(panoramaUrl, {
+        hotspots: enrichedHotspots,
         initialPitch: this.initialPitch,
         initialYaw: this.initialYaw,
         hfov: this.hfov,
         projectionType: this.projectionType,
         prompt: processedPrompt,
+        promptDisplay: this.promptDisplay,
+        locations: overlayLocations.length > 0 ? overlayLocations : undefined,
       });
 
       // Find selected hotspot

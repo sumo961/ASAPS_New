@@ -2,12 +2,12 @@
  * Panorama coordinate conversion utilities.
  *
  * Converts between stage pixel coordinates (x, y) and panorama
- * yaw/pitch values used by egjs-view360.
+ * yaw/pitch values used by Photo Sphere Viewer.
  *
- * Key insight: egjs CylindricalProjection with partial:true uses
- * image aspect ratio A (width/height) as the cylinder theta in radians.
- * The horizontal mapping is FLIPPED: image left (u=0) maps to positive yaw,
- * image right (u=1) maps to negative yaw.
+ * Cylindrical images are treated as partial equirectangular via
+ * panoData cropping.  The horizontal mapping is FLIPPED: image
+ * left (u=0) maps to positive yaw, image right (u=1) maps to
+ * negative yaw.
  */
 
 const RAD_TO_DEG = 180 / Math.PI;
@@ -101,4 +101,26 @@ export function viewportSizeOnStage(
   // matches the project's actual aspect ratio on stage.
   const height = width / displayAR;
   return { width, height };
+}
+
+/**
+ * Compute panoData for a partial (cylindrical) panorama image.
+ * PSV treats it as a cropped region of a full equirectangular sphere.
+ *
+ * @param imageWidth   Natural pixel width of the panorama image
+ * @param imageHeight  Natural pixel height of the panorama image
+ */
+export function computePanoData(imageWidth: number, imageHeight: number) {
+  const A = imageWidth / imageHeight;
+  const horizArcDeg = A * RAD_TO_DEG;
+  const fullWidth = Math.round(imageWidth * (360 / horizArcDeg));
+  const fullHeight = Math.round(fullWidth / 2);
+  return {
+    fullWidth,
+    fullHeight,
+    croppedWidth: imageWidth,
+    croppedHeight: imageHeight,
+    croppedX: Math.round((fullWidth - imageWidth) / 2),
+    croppedY: Math.round((fullHeight - imageHeight) / 2),
+  };
 }

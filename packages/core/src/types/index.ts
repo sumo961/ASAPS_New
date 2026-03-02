@@ -254,12 +254,17 @@ export interface IRenderer {
       pitch: number;
       yaw: number;
       text: string;
+      width?: number;
+      height?: number;
+      scale?: number;
+      rotation?: number;
     }>;
     initialPitch?: number;
     initialYaw?: number;
     hfov?: number;
     projectionType?: 'equirectangular' | 'cylindrical';
     prompt?: string;
+    locations?: Location[];
   }): Promise<string>;
 
   // Keypad beat

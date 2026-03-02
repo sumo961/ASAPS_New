@@ -12,11 +12,13 @@ import { AnimationPanel } from './AnimationPanel';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 import type { Asset } from '../assets/AssetManager';
 import { initializeLocationsFromSchema } from '../../utils/SchemaLocationInitializer';
-import { stageToYawPitch, yawPitchToStage } from '../../utils/panoramaCoordinates';
+import { stageToYawPitch, yawPitchToStage, viewportSizeOnStage, computePanoData } from '../../utils/panoramaCoordinates';
 // applySmartSizing removed — smart sizing now computed at render time by PositionedBeatView
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
-import View360, { EquirectProjection, CylindricalProjection } from '@egjs/react-view360';
-import '@egjs/react-view360/css/view360.min.css';
+import { Viewer as PSVViewer } from '@photo-sphere-viewer/core';
+import { MarkersPlugin as PSVMarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
+import '@photo-sphere-viewer/core/index.css';
+import '@photo-sphere-viewer/markers-plugin/index.css';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
 
@@ -152,6 +154,528 @@ function findPhaseById(dialogTree: DialogNode | undefined, phaseId: string | nul
   return currentNode || null;
 }
 
+const _DEG_TO_RAD = Math.PI / 180;
+const _RAD_TO_DEG = 180 / Math.PI;
+
+/** Convert our HFOV (degrees) to PSV zoom level 0-100 */
+function _hfovToZoom(viewer: PSVViewer, hfovDeg: number): number {
+  const vFov = viewer.dataHelper.hFovToVFov(hfovDeg);
+  return viewer.dataHelper.fovToZoomLevel(vFov);
+}
+
+/** Get current HFOV (degrees) from PSV zoom level */
+function _zoomToHfov(viewer: PSVViewer): number {
+  const vFov = viewer.dataHelper.zoomLevelToFov(viewer.getZoomLevel());
+  return viewer.dataHelper.vFovToHFov(vFov);
+}
+
+/**
+ * Panorama Preview Section — imperative PSV Viewer + MarkersPlugin.
+ * Extracted as a separate component so the viewer lifecycle (create/destroy)
+ * is tied to React mount/unmount rather than manual refs.
+ */
+const PanoramaPreviewSection: React.FC<{
+  beat: Beat;
+  panoramaResolvedUrl: string;
+  panoramaProjectionType: string;
+  panoramaImageAspect: number | undefined;
+  panoramaHotspots: { id: string; pitch: number; yaw: number; text: string }[];
+  visualElements: VisualElement[];
+  selectedElementId: string | null | undefined;
+  projectSettings: { width: number; height: number; aspectRatio: string; scalingMode: string } | undefined;
+  globalSettings: GlobalSettings | undefined;
+  panoramaPreviewContainerRef: React.MutableRefObject<HTMLDivElement | null>;
+  panoramaPreviewWidth: number;
+  setPanoramaPreviewWidth: (w: number) => void;
+  psvViewerRef: React.MutableRefObject<PSVViewer | null>;
+  psvMarkersRef: React.MutableRefObject<PSVMarkersPlugin | null>;
+  panoramaReadyRef: React.MutableRefObject<boolean>;
+  panoramaUserInteractingRef: React.MutableRefObject<boolean>;
+  panoramaViewChangingRef: React.MutableRefObject<boolean>;
+  livePanoCamRef: React.MutableRefObject<{ yaw: number; pitch: number; hfov: number }>;
+  previewDragRef: React.MutableRefObject<any>;
+  setHasChanges: (v: boolean) => void;
+  onBeatUpdate?: (beatId: string, updates: Partial<Beat>) => void;
+  setSelectedElementIds: (ids: string[]) => void;
+  handlePreviewPointerDown: (e: React.PointerEvent, elementId: string) => void;
+  handlePreviewPointerMove: (e: React.PointerEvent) => void;
+  handlePreviewPointerUp: (e: React.PointerEvent) => void;
+  handlePreviewResizeDown: (e: React.PointerEvent, elementId: string, corner: 'nw' | 'ne' | 'sw' | 'se') => void;
+}> = ({
+  beat,
+  panoramaResolvedUrl,
+  panoramaProjectionType,
+  panoramaImageAspect,
+  panoramaHotspots,
+  visualElements,
+  selectedElementId,
+  projectSettings,
+  globalSettings,
+  panoramaPreviewContainerRef,
+  panoramaPreviewWidth,
+  setPanoramaPreviewWidth,
+  psvViewerRef,
+  psvMarkersRef,
+  panoramaReadyRef,
+  panoramaUserInteractingRef,
+  panoramaViewChangingRef,
+  livePanoCamRef,
+  previewDragRef,
+  setHasChanges,
+  onBeatUpdate,
+  setSelectedElementIds,
+  handlePreviewPointerDown,
+  handlePreviewPointerMove,
+  handlePreviewPointerUp,
+  handlePreviewResizeDown,
+}) => {
+  // Ref to hold the PSV viewer div (separate from the outer container)
+  const psvContainerRef = useRef<HTMLDivElement | null>(null);
+  // Force re-render for markers sync
+  const [markersVersion, setMarkersVersion] = useState(0);
+  // Store HFOV at viewer creation for zoom scaling reference
+  const panoramaInitialHfovRef = useRef(75);
+
+  // PSV Viewer lifecycle — create when mounted, destroy on cleanup
+  useEffect(() => {
+    if (!psvContainerRef.current || !panoramaResolvedUrl) return;
+
+    panoramaReadyRef.current = false;
+    let cancelled = false;
+
+    const createWithPanoData = (panoData?: any) => {
+      if (!psvContainerRef.current || cancelled) return;
+
+      const params = beat.getParameters();
+      const yawDeg = Number.isFinite(params.initialYaw) ? params.initialYaw : 0;
+      const pitchDeg = Number.isFinite(params.initialPitch) ? params.initialPitch : 0;
+
+      const viewer = new PSVViewer({
+        container: psvContainerRef.current,
+        // Do NOT pass panorama here — PSV's initial load can stall in React StrictMode.
+        // Instead, call setPanorama() after creation (below).
+        defaultYaw: yawDeg * _DEG_TO_RAD,
+        defaultPitch: pitchDeg * _DEG_TO_RAD,
+        defaultZoomLvl: 50,
+        minFov: 10,
+        maxFov: 120,
+        navbar: false,
+        plugins: [[PSVMarkersPlugin, { markers: [] }]],
+      });
+
+      psvViewerRef.current = viewer;
+      const markersPlugin = viewer.getPlugin<PSVMarkersPlugin>(PSVMarkersPlugin);
+      psvMarkersRef.current = markersPlugin;
+
+      // Ready handler: set correct zoom from HFOV
+      viewer.addEventListener('ready', () => {
+        try {
+          const storedHfov = Number.isFinite(params.hfov) ? params.hfov : 75;
+          viewer.zoom(_hfovToZoom(viewer, Math.max(30, storedHfov)));
+        } catch { /* ignore */ }
+
+        // Initialize live camera state
+        livePanoCamRef.current = {
+          yaw: yawDeg,
+          pitch: pitchDeg,
+          hfov: Math.max(30, Number.isFinite(params.hfov) ? params.hfov : 75),
+        };
+
+        // Store initial HFOV for zoom scaling reference
+        panoramaInitialHfovRef.current = Math.max(30, Number.isFinite(params.hfov) ? params.hfov : 75);
+        // Allow camera sync after a tick
+        requestAnimationFrame(() => { panoramaReadyRef.current = true; });
+        // Trigger markers sync
+        setMarkersVersion(v => v + 1);
+      }, { once: true });
+
+      // Load the panorama via setPanorama() after a frame — deferred to survive
+      // React StrictMode's rapid mount→unmount→mount cycle in development.
+      // The cancelled flag ensures we don't load on a viewer that's about to be destroyed.
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        viewer.setPanorama(panoramaResolvedUrl, {
+          panoData: panoData || undefined,
+          position: { yaw: yawDeg * _DEG_TO_RAD, pitch: pitchDeg * _DEG_TO_RAD },
+        }).catch(() => { /* ignore load errors during cleanup */ });
+      });
+
+      // Position updated: update live camera state and save to beat params
+      viewer.addEventListener('position-updated', (e) => {
+        const pos = e.position;
+        let yaw = pos.yaw * _RAD_TO_DEG;
+        while (yaw > 180) yaw -= 360;
+        while (yaw < -180) yaw += 360;
+        const hfovValue = _zoomToHfov(viewer);
+        if (isNaN(hfovValue) || isNaN(yaw) || isNaN(pos.pitch)) return;
+
+        livePanoCamRef.current = { yaw, pitch: pos.pitch * _RAD_TO_DEG, hfov: hfovValue };
+
+        if (!panoramaReadyRef.current || !panoramaUserInteractingRef.current) return;
+        panoramaViewChangingRef.current = true;
+        beat.updateParameters({
+          initialYaw: Math.round(yaw * 10) / 10,
+          initialPitch: Math.round(pos.pitch * _RAD_TO_DEG * 10) / 10,
+          hfov: Math.round(hfovValue),
+        });
+        setHasChanges(true);
+        if (onBeatUpdate) {
+          onBeatUpdate(beat.id, {
+            parameters: {
+              ...beat.getParameters(),
+              initialYaw: Math.round(yaw * 10) / 10,
+              initialPitch: Math.round(pos.pitch * _RAD_TO_DEG * 10) / 10,
+              hfov: Math.round(hfovValue),
+            },
+          } as any);
+        }
+        requestAnimationFrame(() => { panoramaViewChangingRef.current = false; });
+      });
+
+      // Zoom updated: same pattern as position
+      viewer.addEventListener('zoom-updated', (e) => {
+        const hfovValue = _zoomToHfov(viewer);
+        const pos = viewer.getPosition();
+        let yaw = pos.yaw * _RAD_TO_DEG;
+        while (yaw > 180) yaw -= 360;
+        while (yaw < -180) yaw += 360;
+
+        livePanoCamRef.current = { yaw, pitch: pos.pitch * _RAD_TO_DEG, hfov: hfovValue };
+
+        // Trigger markers rebuild so markers scale with zoom
+        setMarkersVersion(v => v + 1);
+
+        if (!panoramaReadyRef.current || !panoramaUserInteractingRef.current) return;
+        panoramaViewChangingRef.current = true;
+        beat.updateParameters({
+          initialYaw: Math.round(yaw * 10) / 10,
+          initialPitch: Math.round(pos.pitch * _RAD_TO_DEG * 10) / 10,
+          hfov: Math.round(hfovValue),
+        });
+        setHasChanges(true);
+        if (onBeatUpdate) {
+          onBeatUpdate(beat.id, {
+            parameters: {
+              ...beat.getParameters(),
+              initialYaw: Math.round(yaw * 10) / 10,
+              initialPitch: Math.round(pos.pitch * _RAD_TO_DEG * 10) / 10,
+              hfov: Math.round(hfovValue),
+            },
+          } as any);
+        }
+        requestAnimationFrame(() => { panoramaViewChangingRef.current = false; });
+      });
+    };
+
+    // For cylindrical projection, load image to get natural dimensions for panoData
+    if (panoramaProjectionType === 'cylindrical') {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => createWithPanoData(computePanoData(img.naturalWidth, img.naturalHeight));
+      img.onerror = () => createWithPanoData();
+      img.src = panoramaResolvedUrl;
+    } else {
+      createWithPanoData();
+    }
+
+    return () => {
+      cancelled = true;
+      if (psvViewerRef.current) {
+        try { psvViewerRef.current.destroy(); } catch { /* ignore */ }
+        psvViewerRef.current = null;
+        psvMarkersRef.current = null;
+      }
+    };
+    // Only re-create viewer when URL or projection type changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panoramaResolvedUrl, panoramaProjectionType]);
+
+  // Markers sync: update markers when hotspots, elements, or selection changes
+  useEffect(() => {
+    const mp = psvMarkersRef.current;
+    const viewer = psvViewerRef.current;
+    if (!mp || !viewer) return;
+
+    const stageW = projectSettings?.width || 1024;
+    const stageH = projectSettings?.height || 768;
+    const beatParams = beat.getParameters();
+    const rawBeatParams = (beat as any).parameters;
+    const promptDisplay = beatParams.promptDisplay ?? rawBeatParams?.promptDisplay ?? 'static';
+
+    // Scale marker pixel sizes from stage coordinates to screen coordinates
+    const containerW = psvContainerRef.current?.clientWidth || stageW;
+    const sizeFactor = containerW / stageW;
+
+    // Scale markers proportionally with zoom using perspective-correct tangent ratio.
+    // This matches how PSV's Three.js renderer scales the panorama background.
+    const currentHfov = Math.max(30, livePanoCamRef.current.hfov);
+    const initRad = panoramaInitialHfovRef.current * 0.5 * _DEG_TO_RAD;
+    const currRad = currentHfov * 0.5 * _DEG_TO_RAD;
+    const zoomScale = Math.tan(initRad) / Math.tan(currRad);
+    const scale = sizeFactor * zoomScale;
+
+    const markers: any[] = [];
+
+    // 1. Hotspot markers — interactive (draggable + resizable via overlay)
+    for (const hs of panoramaHotspots) {
+      const veEl = visualElements.find(e => e.id === hs.id);
+      const cx = veEl ? veEl.x + veEl.width / 2 : stageW / 2;
+      const cy = veEl ? veEl.y + veEl.height / 2 : stageH / 2;
+      const { yaw: elYaw, pitch: elPitch } = stageToYawPitch(cx, cy, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
+      const elScale = veEl?.scale || 1;
+      const elRotation = veEl?.rotation || 0;
+      const w = Math.round((veEl?.width || 120) * elScale * scale);
+      const h = Math.round((veEl?.height || 50) * elScale * scale);
+      const isSelected = selectedElementId === hs.id;
+      const rotateStyle = elRotation ? `transform:rotate(${elRotation}deg);` : '';
+
+      console.log(`[VE-Pano] Hotspot "${hs.text}": stageCenter=(${Math.round(cx)},${Math.round(cy)}) → yaw=${elYaw.toFixed(1)} pitch=${elPitch.toFixed(1)} stageSize=${veEl?.width}x${veEl?.height} scale=${scale.toFixed(3)} → ${w}x${h}px`);
+
+      // Create the element with pointer event handlers for drag/resize
+      const el = document.createElement('div');
+      el.className = 'psv--capture-event';
+      el.style.cssText = `width:${w}px;height:${h}px;position:relative;cursor:${previewDragRef.current?.elementId === hs.id ? 'grabbing' : 'grab'};${rotateStyle}`;
+      el.innerHTML = `<div style="width:100%;height:100%;
+        background-color:${isSelected ? 'rgba(255,255,0,0.4)' : 'rgba(255,255,0,0.25)'};
+        border:${isSelected ? '2px dashed rgba(245,158,11,0.8)' : '2px dashed rgba(255,255,0,0.7)'};
+        border-radius:4px;display:flex;align-items:center;justify-content:center;
+        font-size:${Math.max(10, Math.round(13 * scale))}px;font-family:sans-serif;font-weight:600;color:white;
+        text-shadow:0 1px 3px rgba(0,0,0,0.6);white-space:nowrap;overflow:hidden;box-sizing:border-box;">
+        ${hs.text || 'Hotspot'}</div>`;
+
+      // Corner resize handles — visual indicators only (pointer-events: none).
+      // Resize detection is done via coordinate-based hit-testing in onPointerDown.
+      if (isSelected) {
+        for (const corner of ['nw', 'ne', 'sw', 'se'] as const) {
+          const handle = document.createElement('div');
+          handle.style.cssText = `position:absolute;width:14px;height:14px;background:white;border:2px solid #f59e0b;border-radius:2px;pointer-events:none;z-index:10;${corner.includes('n') ? 'top:-7px;' : 'bottom:-7px;'}${corner.includes('w') ? 'left:-7px;' : 'right:-7px;'}`;
+          el.appendChild(handle);
+        }
+      }
+
+      markers.push({
+        id: `hotspot-${hs.id}`,
+        element: el,
+        position: { yaw: elYaw * _DEG_TO_RAD, pitch: elPitch * _DEG_TO_RAD },
+        size: { width: w, height: h },
+        anchor: 'center center',
+        data: { elementId: hs.id, type: 'hotspot' },
+      });
+    }
+
+    // 2. Non-hotspot elements (props, characters, pinned text/dialog)
+    for (const vel of visualElements) {
+      if (vel.type === 'hotspot' || vel.visible === false) continue;
+      if ((vel.type === 'text' || vel.type === 'dialog') && promptDisplay !== 'pinned') continue;
+      const elCx = vel.x + vel.width / 2;
+      const elCy = vel.y + vel.height / 2;
+      const { yaw: elYaw, pitch: elPitch } = stageToYawPitch(elCx, elCy, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
+      const elScale = vel.scale || 1;
+      const elRotation = vel.rotation || 0;
+      const w = Math.round(vel.width * elScale * scale);
+      const h = Math.round(vel.height * elScale * scale);
+      const isElSelected = selectedElementId === vel.id;
+      const rotateStyle = elRotation ? `transform:rotate(${elRotation}deg);` : '';
+
+      const el = document.createElement('div');
+      el.className = 'psv--capture-event';
+      el.style.cssText = `cursor:${previewDragRef.current?.elementId === vel.id ? 'grabbing' : 'grab'};${rotateStyle}`;
+
+      if (vel.type === 'text' || vel.type === 'dialog') {
+        const promptText = vel.text || vel.name || '';
+        const hex = globalSettings?.colors?.nonpcolor || '#000000';
+        const alpha = (globalSettings?.colors?.nonpalpha ?? 65) / 100;
+        const r = parseInt(hex.slice(1,3), 16);
+        const g = parseInt(hex.slice(3,5), 16);
+        const b = parseInt(hex.slice(5,7), 16);
+        // Use nonptextcolor if set, otherwise compute contrast color from background
+        const textColor = globalSettings?.colors?.nonptextcolor || (
+          (r * 299 + g * 587 + b * 114) / 1000 > 128 ? '#000000' : '#ffffff'
+        );
+        el.innerHTML = `<div style="
+          width:${w}px;height:${h}px;box-sizing:border-box;overflow:hidden;
+          background-color:rgba(${r},${g},${b},${alpha});
+          color:${textColor};
+          padding:${globalSettings?.textbox?.padding ?? 8}px;
+          border-radius:${globalSettings?.textbox?.radius ?? 8}px;
+          border:${isElSelected ? '2px solid rgba(245,158,11,0.8)' : (globalSettings?.textbox?.borderWidth && globalSettings?.colors?.textBoxBorder) ? `${globalSettings.textbox.borderWidth}px solid ${globalSettings.colors.textBoxBorder}` : 'none'};
+          font-size:${Math.round((globalSettings?.fonts?.fontSize?.text || 16) * scale)}px;
+          font-family:${globalSettings?.fonts?.textFont || 'sans-serif'};
+          display:flex;align-items:center;justify-content:center;
+          word-wrap:break-word;overflow-wrap:break-word;text-align:center;">${promptText}</div>`;
+      } else {
+        const imgSrc = vel.assetUrl || vel.imageUrl;
+        if (imgSrc) {
+          el.innerHTML = `<img src="${imgSrc}" alt="${vel.name}" style="width:${w}px;height:${h}px;object-fit:contain;pointer-events:none;${isElSelected ? 'outline:2px solid rgba(245,158,11,0.8);border-radius:4px;' : ''}" />`;
+        } else {
+          el.innerHTML = `<div style="width:${w}px;height:${h}px;
+            background-color:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);
+            border-radius:4px;display:flex;align-items:center;justify-content:center;
+            font-size:11px;color:rgba(255,255,255,0.5);box-sizing:border-box;">
+            ${vel.name}</div>`;
+        }
+      }
+
+      markers.push({
+        id: `element-${vel.id}`,
+        element: el,
+        position: { yaw: elYaw * _DEG_TO_RAD, pitch: elPitch * _DEG_TO_RAD },
+        size: { width: w, height: h },
+        anchor: 'center center',
+        data: { elementId: vel.id, type: vel.type },
+      });
+    }
+
+    try {
+      mp.setMarkers(markers);
+    } catch { /* viewer may be initializing */ }
+  }, [panoramaHotspots, visualElements, selectedElementId, panoramaProjectionType, panoramaImageAspect, projectSettings, globalSettings, markersVersion, beat]);
+
+  const stageW = projectSettings?.width || 1024;
+  const stageH = projectSettings?.height || 768;
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {panoramaResolvedUrl ? (
+        <div
+          ref={(el) => {
+            panoramaPreviewContainerRef.current = el;
+            if (el) {
+              const w = el.clientWidth;
+              if (w > 0 && w !== panoramaPreviewWidth) setPanoramaPreviewWidth(w);
+            }
+          }}
+          style={{ width: '100%', maxHeight: '100%', aspectRatio: `${stageW}/${stageH}`, position: 'relative', overflow: 'hidden' }}
+          onClick={() => { setSelectedElementIds([]); }}
+          onPointerDown={(e) => {
+            panoramaUserInteractingRef.current = true;
+            // Check if clicking on a marker element for drag/resize
+            const target = e.target as HTMLElement;
+            const markerEl = target.closest?.('.psv--capture-event') as HTMLElement;
+            if (markerEl) {
+              // Find which marker this element belongs to
+              const mp = psvMarkersRef.current;
+              if (mp) {
+                for (const m of mp.getMarkers()) {
+                  if (m.domElement === markerEl || markerEl.closest?.(`[data-marker-id="${m.id}"]`) || m.domElement?.contains(markerEl)) {
+                    const elementId = (m.data as any)?.elementId;
+                    if (elementId) {
+                      // If this is the selected element, check if click is near a corner for resize
+                      if (elementId === selectedElementId) {
+                        const rect = markerEl.getBoundingClientRect();
+                        const mx = e.clientX - rect.left;
+                        const my = e.clientY - rect.top;
+                        const threshold = 24; // px from corner
+                        let corner: 'nw' | 'ne' | 'sw' | 'se' | null = null;
+                        if (mx < threshold && my < threshold) corner = 'nw';
+                        else if (mx > rect.width - threshold && my < threshold) corner = 'ne';
+                        else if (mx < threshold && my > rect.height - threshold) corner = 'sw';
+                        else if (mx > rect.width - threshold && my > rect.height - threshold) corner = 'se';
+                        if (corner) {
+                          handlePreviewResizeDown(e, elementId, corner);
+                          return;
+                        }
+                      }
+                      handlePreviewPointerDown(e, elementId);
+                      return;
+                    }
+                  }
+                }
+              }
+            }
+          }}
+          onPointerMove={(e) => { handlePreviewPointerMove(e); }}
+          onPointerUp={(e) => {
+            setTimeout(() => { panoramaUserInteractingRef.current = false; }, 150);
+            handlePreviewPointerUp(e);
+          }}
+          onPointerCancel={() => { setTimeout(() => { panoramaUserInteractingRef.current = false; }, 150); }}
+          onWheel={() => {
+            panoramaUserInteractingRef.current = true;
+            setTimeout(() => { panoramaUserInteractingRef.current = false; }, 300);
+          }}
+        >
+          {/* PSV viewer mounts here */}
+          <div ref={psvContainerRef} style={{ width: '100%', height: '100%' }} />
+
+          {/* Prompt text overlay — themed from global settings (only in 'static' display mode) */}
+          {(() => {
+            const params = beat.getParameters();
+            const rawParams = (beat as any).parameters;
+            const promptText = params.prompt || rawParams?.prompt || '';
+            if (!promptText) return null;
+            const promptDisplayVal = params.promptDisplay ?? rawParams?.promptDisplay ?? 'static';
+            if (promptDisplayVal === 'pinned') return null;
+            return (
+              <div style={{
+                position: 'absolute',
+                bottom: 60,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: (() => {
+                  const hex = globalSettings?.colors?.nonpcolor || '#000000';
+                  const alpha = (globalSettings?.colors?.nonpalpha ?? 65) / 100;
+                  const r = parseInt(hex.slice(1,3), 16);
+                  const g = parseInt(hex.slice(3,5), 16);
+                  const b = parseInt(hex.slice(5,7), 16);
+                  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                })(),
+                color: globalSettings?.colors?.nonptextcolor || (() => {
+                  const bg = globalSettings?.colors?.nonpcolor || '#000000';
+                  const r = parseInt(bg.slice(1,3), 16);
+                  const g = parseInt(bg.slice(3,5), 16);
+                  const b = parseInt(bg.slice(5,7), 16);
+                  return (r * 299 + g * 587 + b * 114) / 1000 > 128 ? '#000000' : '#ffffff';
+                })(),
+                padding: `${globalSettings?.textbox?.padding ?? 8}px`,
+                borderRadius: `${globalSettings?.textbox?.radius ?? 8}px`,
+                border: (globalSettings?.textbox?.borderWidth && globalSettings?.colors?.textBoxBorder)
+                  ? `${globalSettings.textbox.borderWidth}px solid ${globalSettings.colors.textBoxBorder}`
+                  : 'none',
+                fontSize: `${globalSettings?.fonts?.fontSize?.text || 16}px`,
+                fontFamily: globalSettings?.fonts?.textFont || 'sans-serif',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                zIndex: 10,
+              }}>
+                {promptText}
+              </div>
+            );
+          })()}
+
+          {/* Hint overlay */}
+          <div style={{
+            position: 'absolute',
+            bottom: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            color: 'rgba(255, 255, 255, 0.7)',
+            padding: '6px 14px',
+            borderRadius: 6,
+            fontSize: 11,
+            fontFamily: 'sans-serif',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}>
+            {selectedElementId
+              ? 'Drag to reposition \u2022 Use corners to resize'
+              : 'Click to select \u2022 Drag to reposition'}
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: '100%', height: '100%', color: 'rgba(255,255,255,0.5)',
+          fontFamily: 'sans-serif', fontSize: '14px',
+        }}>
+          No panorama image assigned
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface VisualWorkspaceProps {
   beat: Beat | null;
   beats: Beat[];
@@ -211,19 +735,43 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
   const [phasesExpanded, setPhasesExpanded] = useState(true);
 
-  // Panorama view mode toggle: layout (flat equirect + VE tools) vs preview (egjs-view360 360°)
+  // Panorama view mode toggle: layout (flat equirect + VE tools) vs preview (PSV 360°)
   const [panoramaViewMode, setPanoramaViewMode] = useState<PanoramaViewMode>('layout');
-  // Counter to force View360 remount AND fresh projection each time we enter preview
-  const [view360MountKey, setView360MountKey] = useState(0);
-  const view360Ref = useRef<View360 | null>(null);
+  // Counter to force PSV remount each time we enter preview
+  const [psvMountKey, setPsvMountKey] = useState(0);
+  const psvViewerRef = useRef<PSVViewer | null>(null);
+  const psvMarkersRef = useRef<PSVMarkersPlugin | null>(null);
   const panoramaPreviewContainerRef = useRef<HTMLDivElement | null>(null);
   const [panoramaPreviewWidth, setPanoramaPreviewWidth] = useState(600);
-  // Flag to prevent feedback loop: onViewChange → updateParams → useEffect → camera.lookAt → onViewChange
+  // Flag to prevent feedback loop: position-updated → updateParams → useEffect → rotate → position-updated
   const panoramaViewChangingRef = useRef(false);
-  // Flag to prevent onViewChange from saving before onReady sets the correct zoom
+  // Flag to prevent position-updated from saving before ready sets the correct zoom
   const panoramaReadyRef = useRef(false);
-  // Track user interaction — only save onViewChange when user is dragging/scrolling
+  // Track user interaction — only save when user is dragging/scrolling
   const panoramaUserInteractingRef = useRef(false);
+  // Live camera state for markers — updated on EVERY position/zoom change
+  const livePanoCamRef = useRef({ yaw: 0, pitch: 0, hfov: 75 });
+  // VBE Stage zoom/scroll persistence across Layout↔Preview switches
+  const vbeZoomRef = useRef(1);
+  const vbeScrollRef = useRef<{ left: number; top: number }>({ left: 0, top: 0 });
+
+  // Panorama preview direct-interaction drag/resize state (refs to avoid re-render churn)
+  const previewDragRef = useRef<{
+    elementId: string;
+    offsetX: number;  // mouse-to-element-center offset in screen px
+    offsetY: number;
+  } | null>(null);
+
+  const previewResizeRef = useRef<{
+    elementId: string;
+    corner: 'nw' | 'ne' | 'sw' | 'se';
+    startMouseX: number;  // screen px relative to container
+    startMouseY: number;
+    startX: number;       // stage px
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+  } | null>(null);
 
   // Use refs to track current state for cleanup
   const beatRef = useRef(beat);
@@ -426,7 +974,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
   const isPanoramaBeat = beat?.type === 'panorama';
 
-  // Memoized projection for egjs-view360 preview (equirectangular or cylindrical)
+  // Memoized panorama projection type for PSV preview (equirectangular or cylindrical)
   const panoramaProjectionType = isPanoramaBeat && beat?.getParameters ? (beat.getParameters().projectionType || 'equirectangular') : 'equirectangular';
 
   // Track panorama image aspect ratio for coordinate conversion
@@ -459,7 +1007,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const projType = params.projectionType || 'equirectangular';
       const imgAspect = params.imageAspectRatio ?? panoramaImageAspect;
 
-      const { centerX, centerY } = yawPitchToStage(hotspot.yaw ?? 0, hotspot.pitch ?? 0, projType, stageW, stageH, imgAspect);
+      // In preview mode, place new hotspot at current camera center
+      let initYaw = hotspot.yaw ?? 0;
+      let initPitch = hotspot.pitch ?? 0;
+      if (panoramaViewMode === 'preview') {
+        initYaw = livePanoCamRef.current.yaw;
+        initPitch = livePanoCamRef.current.pitch;
+      }
+
+      const { centerX, centerY } = yawPitchToStage(initYaw, initPitch, projType, stageW, stageH, imgAspect);
       const hotspotWidth = 120;
       const hotspotHeight = 50;
 
@@ -479,27 +1035,25 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         locked: false,
       };
 
-      console.log(`[VisualWorkspace] Adding panorama hotspot VisualElement: id=${hotspot.id} at px(${Math.round(newElement.x)},${Math.round(newElement.y)}) from yaw=${hotspot.yaw} pitch=${hotspot.pitch}`);
+      console.log(`[VisualWorkspace] Adding panorama hotspot VisualElement: id=${hotspot.id} at px(${Math.round(newElement.x)},${Math.round(newElement.y)}) from yaw=${initYaw} pitch=${initPitch}`);
       const afterElements = [...visualElementsRef.current, newElement];
       setVisualElements(afterElements);
       setHasChanges(true);
+      // Sync to beat locations so yaw/pitch gets written to beat params
+      if (beatRef.current && syncElementsRef.current) {
+        syncElementsRef.current(afterElements, beatRef.current);
+      }
     };
 
     window.addEventListener('asaps:addPanoramaHotspot', handler);
     return () => window.removeEventListener('asaps:addPanoramaHotspot', handler);
-  }, [projectSettings, panoramaImageAspect]);
+  }, [projectSettings, panoramaImageAspect, panoramaViewMode]);
 
-  const panoramaProjection = useMemo(() => {
-    if (!isPanoramaBeat) return null;
+  const panoramaResolvedUrl = useMemo(() => {
+    if (!isPanoramaBeat) return '';
     const resolvedUrl = backgroundAssetId ? assets.find(a => a.id === backgroundAssetId)?.url : undefined;
-    const url = resolvedUrl || backgroundUrl || '';
-    if (!url) return null;
-    if (panoramaProjectionType === 'cylindrical') {
-      return new CylindricalProjection({ src: url, partial: true });
-    }
-    return new EquirectProjection({ src: url });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPanoramaBeat, backgroundAssetId, backgroundUrl, assets, panoramaProjectionType, view360MountKey]);
+    return resolvedUrl || backgroundUrl || '';
+  }, [isPanoramaBeat, backgroundAssetId, backgroundUrl, assets]);
 
   // Extract hotspot data from beat parameters for the preview
   const panoramaHotspots: { id: string; pitch: number; yaw: number; text: string }[] = useMemo(() => {
@@ -555,34 +1109,34 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // Reset panorama view to layout mode when switching beats
       setPanoramaViewMode('layout');
       panoramaReadyRef.current = false;
-      view360Ref.current = null;
+      if (psvViewerRef.current) {
+        try { psvViewerRef.current.destroy(); } catch { /* ignore */ }
+        psvViewerRef.current = null;
+        psvMarkersRef.current = null;
+      }
       // Set prevPhaseIdRef to null so the phase effect knows to reload
       // (if we set it to rootPhase, the phase effect would skip loading)
       prevPhaseIdRef.current = null;
     }
   }, [beat?.id, beat?.type, phaseTree?.id]);
 
-  // Sync panorama camera settings (sliders) to the View360 preview
+  // Sync panorama camera settings (sliders) to the PSV preview
   useEffect(() => {
-    if (!isPanoramaBeat || panoramaViewMode !== 'preview' || !view360Ref.current) return;
-    // Skip if this update came from the View360 viewer itself (prevents feedback loop)
+    if (!isPanoramaBeat || panoramaViewMode !== 'preview' || !psvViewerRef.current) return;
+    // Skip if this update came from the PSV viewer itself (prevents feedback loop)
     if (panoramaViewChangingRef.current) return;
-    // Defer to onReady for initial camera setup — the viewer isn't fully initialized yet
+    // Defer to ready handler for initial camera setup
     if (!panoramaReadyRef.current) return;
     try {
-      const viewer = (view360Ref.current as any).view360;
-      if (!viewer) return;
-      const camera = viewer.camera;
+      const viewer = psvViewerRef.current;
       const params = beat!.getParameters();
-      const safeHfov = Math.max(50, Number.isFinite(params.hfov) ? params.hfov : 75);
-      // fovToZoom expects HORIZONTAL FOV (same unit as the fov={90} prop)
-      const zoom = camera.fovToZoom(safeHfov);
-      camera.lookAt({
-        yaw: Number.isFinite(params.initialYaw) ? params.initialYaw : 0,
-        pitch: Number.isFinite(params.initialPitch) ? params.initialPitch : 0,
-        zoom,
-      });
-    } catch (err) { /* viewer may not be fully loaded yet */ }
+      const yawDeg = Number.isFinite(params.initialYaw) ? params.initialYaw : 0;
+      const pitchDeg = Number.isFinite(params.initialPitch) ? params.initialPitch : 0;
+      const hfovDeg = Math.max(30, Number.isFinite(params.hfov) ? params.hfov : 75);
+      viewer.rotate({ yaw: yawDeg * DEG_TO_RAD, pitch: pitchDeg * DEG_TO_RAD });
+      const vFov = viewer.dataHelper.hFovToVFov(hfovDeg);
+      viewer.zoom(viewer.dataHelper.fovToZoomLevel(vFov));
+    } catch { /* viewer may not be fully loaded yet */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPanoramaBeat, panoramaViewMode, beatVersion]);
 
@@ -753,15 +1307,28 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const existingHotspots: any[] = params.hotspots || [];
     const hotspotElements = elements.filter(el => el.type === 'hotspot');
 
+    console.log(`[SyncHotspots] ${existingHotspots.length} hotspots, ${hotspotElements.length} elements`);
+    for (const hs of existingHotspots) {
+      console.log(`[SyncHotspots]   hs: id="${hs.id}" text="${hs.text}" pitch=${hs.pitch} yaw=${hs.yaw}`);
+    }
+    for (const el of hotspotElements) {
+      console.log(`[SyncHotspots]   el: id="${el.id}" name="${el.name}" center=(${Math.round(el.x + el.width/2)},${Math.round(el.y + el.height/2)})`);
+    }
+
     const updatedHotspots = existingHotspots.map((hs: any) => {
       const el = hotspotElements.find(e => e.id === hs.id) ||
                  hotspotElements.find(e => e.name === hs.text);
-      if (!el) return hs;
+      if (!el) {
+        console.warn(`[SyncHotspots] NO MATCH for hs "${hs.text}" (id=${hs.id})`);
+        return hs;
+      }
 
       // Convert element center x/y → yaw/pitch
       const xCenter = el.x + el.width / 2;
       const yCenter = el.y + el.height / 2;
       const { yaw, pitch } = stageToYawPitch(xCenter, yCenter, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
+
+      console.log(`[SyncHotspots] MATCHED hs "${hs.text}" → el "${el.name}" (id match: ${el.id === hs.id}): pitch ${hs.pitch}→${Math.round(pitch*10)/10}, yaw ${hs.yaw}→${Math.round(yaw*10)/10}`);
 
       return {
         ...hs,
@@ -775,6 +1342,204 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
   // Keep sync ref up to date for undo/redo applyElements
   syncElementsRef.current = syncElementsToBeatLocations;
+
+  /**
+   * Unproject screen coordinates (relative to panorama preview container) back to stage pixels.
+   * Uses inverse gnomonic projection for perspective-correct mapping.
+   */
+  const DEG_TO_RAD = Math.PI / 180;
+  const RAD_TO_DEG = 180 / Math.PI;
+
+  /**
+   * Unproject screen coordinates to stage pixels using PSV's viewerCoordsToSphericalCoords.
+   * This replaces the old gnomonic unproject and uses PSV's native inverse projection.
+   */
+  const unprojectScreenToStage = useCallback((screenX: number, screenY: number) => {
+    const stageW = projectSettings?.width || 1024;
+    const stageH = projectSettings?.height || 768;
+    const viewer = psvViewerRef.current;
+    if (viewer) {
+      try {
+        const pos = viewer.dataHelper.viewerCoordsToSphericalCoords({ x: screenX, y: screenY });
+        const yawDeg = pos.yaw * RAD_TO_DEG;
+        const pitchDeg = pos.pitch * RAD_TO_DEG;
+        const stage = yawPitchToStage(yawDeg, pitchDeg, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
+        let cx = stage.centerX;
+        let cy = stage.centerY;
+        // Wrap horizontally for equirectangular
+        if (cx < 0) cx += stageW;
+        if (cx > stageW) cx -= stageW;
+        cy = Math.max(0, Math.min(stageH, cy));
+        return { cx, cy };
+      } catch { /* fall through */ }
+    }
+    // Fallback if viewer not available
+    return { cx: stageW / 2, cy: stageH / 2 };
+  }, [projectSettings, panoramaProjectionType, panoramaImageAspect]);
+
+  /** Convert screen pixel delta to stage pixel delta (for resize). */
+  const screenToStageDelta = useCallback((dScreenX: number, dScreenY: number) => {
+    const stageW = projectSettings?.width || 1024;
+    const stageH = projectSettings?.height || 768;
+    const cW = panoramaPreviewWidth || 600;
+    const cH = cW / (stageW / stageH);
+    const hfov = Math.max(30, livePanoCamRef.current.hfov);
+    const vp = viewportSizeOnStage(hfov, panoramaProjectionType, stageW, stageH, panoramaImageAspect, stageW / stageH);
+    return {
+      dStageX: dScreenX * vp.width / cW,
+      dStageY: dScreenY * vp.height / cH,
+    };
+  }, [projectSettings, panoramaPreviewWidth, panoramaProjectionType, panoramaImageAspect]);
+
+  // ---- Panorama preview direct-interaction handlers (drag & resize) ----
+
+  /** Get mouse position relative to the panorama preview container */
+  const getPreviewMousePos = useCallback((e: React.PointerEvent) => {
+    const container = panoramaPreviewContainerRef.current;
+    if (!container) return { x: 0, y: 0 };
+    const rect = container.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }, []);
+
+  const handlePreviewPointerDown = useCallback((e: React.PointerEvent, elementId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setSelectedElementIds([elementId]);
+
+    // Capture undo snapshot
+    if (!snapshotRef.current) {
+      snapshotRef.current = visualElementsRef.current.map(el => ({ ...el }));
+    }
+
+    // Compute drag offset = mouse position minus element's projected screen center
+    const mouse = getPreviewMousePos(e);
+    const el = visualElementsRef.current.find(v => v.id === elementId);
+    if (!el) return;
+
+    // Project element center to screen using PSV's sphericalCoordsToViewerCoords
+    const stageW = projectSettings?.width || 1024;
+    const stageH = projectSettings?.height || 768;
+    const elCx = el.x + el.width / 2;
+    const elCy = el.y + el.height / 2;
+    const { yaw: elYaw, pitch: elPitch } = stageToYawPitch(elCx, elCy, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
+
+    const viewer = psvViewerRef.current;
+    let screenCx = (panoramaPreviewWidth || 600) / 2;
+    let screenCy = screenCx / (stageW / stageH) / 2;
+    if (viewer) {
+      try {
+        const pt = viewer.dataHelper.sphericalCoordsToViewerCoords({ yaw: elYaw * DEG_TO_RAD, pitch: elPitch * DEG_TO_RAD });
+        screenCx = pt.x;
+        screenCy = pt.y;
+      } catch { /* ignore */ }
+    }
+
+    previewDragRef.current = {
+      elementId,
+      offsetX: mouse.x - screenCx,
+      offsetY: mouse.y - screenCy,
+    };
+    // Capture on the container (currentTarget), not on the marker element (target).
+    // Marker elements get destroyed/recreated by setMarkers() during drag,
+    // which would release pointer capture if set on target.
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, [getPreviewMousePos, projectSettings, panoramaProjectionType, panoramaImageAspect]);
+
+  const handlePreviewPointerMove = useCallback((e: React.PointerEvent) => {
+    const mouse = getPreviewMousePos(e);
+
+    // Resize takes priority over drag.
+    if (previewResizeRef.current) {
+      const rs = previewResizeRef.current;
+      const dMouse = { x: mouse.x - rs.startMouseX, y: mouse.y - rs.startMouseY };
+      const { dStageX, dStageY } = screenToStageDelta(dMouse.x, dMouse.y);
+
+      // Center-symmetric resize: grow/shrink from element center so the
+      // marker's yaw/pitch position stays fixed in PSV (avoids visual drift).
+      const centerX = rs.startX + rs.startWidth / 2;
+      const centerY = rs.startY + rs.startHeight / 2;
+
+      // Determine size delta based on which corner is dragged
+      let dw = 0, dh = 0;
+      if (rs.corner === 'se')      { dw =  dStageX * 2; dh =  dStageY * 2; }
+      else if (rs.corner === 'nw') { dw = -dStageX * 2; dh = -dStageY * 2; }
+      else if (rs.corner === 'ne') { dw =  dStageX * 2; dh = -dStageY * 2; }
+      else if (rs.corner === 'sw') { dw = -dStageX * 2; dh =  dStageY * 2; }
+
+      const newW = Math.max(30, rs.startWidth + dw);
+      const newH = Math.max(20, rs.startHeight + dh);
+      const newX = centerX - newW / 2;
+      const newY = centerY - newH / 2;
+
+      const updated = visualElementsRef.current.map(el => {
+        if (el.id !== rs.elementId) return el;
+        return { ...el, x: newX, y: newY, width: newW, height: newH };
+      });
+      setVisualElements(updated);
+      setHasChanges(true);
+      if (beatRef.current) {
+        syncElementsToBeatLocations(updated, beatRef.current);
+      }
+    } else if (previewDragRef.current) {
+      const drag = previewDragRef.current;
+      // Compute new screen center (mouse - offset), unproject to stage
+      const screenCx = mouse.x - drag.offsetX;
+      const screenCy = mouse.y - drag.offsetY;
+      const { cx, cy } = unprojectScreenToStage(screenCx, screenCy);
+
+      const updated = visualElementsRef.current.map(el => {
+        if (el.id !== drag.elementId) return el;
+        return { ...el, x: cx - el.width / 2, y: cy - el.height / 2 };
+      });
+      setVisualElements(updated);
+      setHasChanges(true);
+      if (beatRef.current) {
+        syncElementsToBeatLocations(updated, beatRef.current);
+      }
+    }
+  }, [getPreviewMousePos, unprojectScreenToStage, screenToStageDelta, syncElementsToBeatLocations]);
+
+  const handlePreviewPointerUp = useCallback((e: React.PointerEvent) => {
+    if (previewDragRef.current || previewResizeRef.current) {
+      commitSnapshot(previewResizeRef.current ? 'Resize element' : 'Move element');
+      previewDragRef.current = null;
+      previewResizeRef.current = null;
+      try {
+        // Release on the container (currentTarget) — matches the capture target
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        // Pointer capture may already be released
+      }
+    }
+  }, [commitSnapshot]);
+
+  const handlePreviewResizeDown = useCallback((e: React.PointerEvent, elementId: string, corner: 'nw' | 'ne' | 'sw' | 'se') => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    // Capture undo snapshot
+    if (!snapshotRef.current) {
+      snapshotRef.current = visualElementsRef.current.map(el => ({ ...el }));
+    }
+
+    const mouse = getPreviewMousePos(e);
+    const el = visualElementsRef.current.find(v => v.id === elementId);
+    if (!el) return;
+
+    previewResizeRef.current = {
+      elementId,
+      corner,
+      startMouseX: mouse.x,
+      startMouseY: mouse.y,
+      startX: el.x,
+      startY: el.y,
+      startWidth: el.width,
+      startHeight: el.height,
+    };
+    // Capture on the container (currentTarget), not on the corner handle element.
+    // Corner elements get destroyed/recreated by setMarkers() during resize.
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, [getPreviewMousePos]);
 
   // Save changes when switching to a different beat - MUST run before load
   const prevBeatIdRef = useRef(beat?.id);
@@ -2766,14 +3531,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const selectedElement = visualElements.find(el => el.id === selectedElementId);
   const content = getBeatContent();
 
-  // Debug: log selected element details when selection changes
+  // Debug: log selected element details when selection changes (debug level to avoid flood)
   if (selectedElement) {
-    console.warn(`[VisualWorkspace] ★ SELECTED ELEMENT: ${selectedElement.type}/${selectedElement.name}`);
-    console.warn(`[VisualWorkspace]   Position: x=${selectedElement.x}, y=${selectedElement.y}`);
-    console.warn(`[VisualWorkspace]   Size: w=${selectedElement.width}, h=${selectedElement.height}, size=${selectedElement.size}`);
+    console.debug(`[VisualWorkspace] Selected: ${selectedElement.type}/${selectedElement.name} x=${Math.round(selectedElement.x)} y=${Math.round(selectedElement.y)} w=${Math.round(selectedElement.width)} h=${Math.round(selectedElement.height)}`);
   }
-
-  console.log('[VisualWorkspace] beatContent for rendering:', { beatType: beat?.type, content });
 
   // Handle sharing current background to cluster
   const handleShareBackgroundToCluster = useCallback(() => {
@@ -2964,12 +3725,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               viewMode={panoramaViewMode}
               onViewModeChange={(mode) => {
                 // CRITICAL: Reset readyRef BEFORE remount to prevent onViewChange
-                // from saving stale FOV values during View360 re-initialization.
+                // from saving stale FOV values during PSV viewer re-initialization.
                 // Without this, panoramaReadyRef stays true from the previous preview
                 // session, and onViewChange saves the default fov={90} before onReady
                 // can set the correct zoom level.
                 panoramaReadyRef.current = false;
-                if (mode === 'preview') setView360MountKey(k => k + 1);
+                if (mode === 'preview') setPsvMountKey(k => k + 1);
                 setPanoramaViewMode(mode);
               }}
               onCameraChange={(settings) => {
@@ -3291,6 +4052,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                               visible: true,
                               locked: false,
                               assetId: asset.id,
+                              imageUrl: asset.url,
                             };
                             const afterElements = [...visualElementsRef.current, newElement];
                             setVisualElements(afterElements);
@@ -3309,7 +4071,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                                 width: Math.round(newElement.width),
                                 height: Math.round(newElement.height),
                                 zIndex: newElement.z,
-                                assetId: asset.id
+                                assetId: asset.id,
+                                imageUrl: asset.url,
                               });
                               console.log(`[VisualWorkspace] Added prop "${locationName}" to beat.locations (now ${beat.locations.size} locations)`);
                             }
@@ -3531,7 +4294,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   }
                   setHasChanges(true);
                 } : undefined}
-                promptDisplay={beat.type === 'panorama' ? (beat.getParameters().promptDisplay || 'static') : undefined}
+                promptDisplay={beat.type === 'panorama' ? (beat.getParameters().promptDisplay ?? (beat as any).parameters?.promptDisplay ?? 'static') : undefined}
                 onPromptDisplayChange={beat.type === 'panorama' ? (display) => {
                   beat.updateParameters({ promptDisplay: display });
                   if (onBeatUpdate) {
@@ -3574,381 +4337,36 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       {/* Main Visual Editor Canvas */}
       <div className="flex-1 overflow-hidden relative">
         {isPanoramaBeat && panoramaViewMode === 'preview' ? (
-          /* Panorama Preview Mode: egjs-view360 interactive 360° viewer */
-          <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {panoramaProjection ? (
-              <div
-                ref={(el) => {
-                  panoramaPreviewContainerRef.current = el;
-                  if (el) {
-                    const w = el.clientWidth;
-                    if (w > 0 && w !== panoramaPreviewWidth) setPanoramaPreviewWidth(w);
-                  }
-                }}
-                style={{ width: '100%', maxHeight: '100%', aspectRatio: `${projectSettings?.width || 1024}/${projectSettings?.height || 768}`, position: 'relative', overflow: 'hidden' }}
-                onPointerDown={() => { panoramaUserInteractingRef.current = true; }}
-                onPointerUp={() => { setTimeout(() => { panoramaUserInteractingRef.current = false; }, 150); }}
-                onPointerCancel={() => { setTimeout(() => { panoramaUserInteractingRef.current = false; }, 150); }}
-                onWheel={() => {
-                  panoramaUserInteractingRef.current = true;
-                  setTimeout(() => { panoramaUserInteractingRef.current = false; }, 300);
-                }}
-              >
-              <View360
-                key={`panorama-preview-${view360MountKey}`}
-                ref={(ref) => { view360Ref.current = ref; }}
-                projection={panoramaProjection}
-                initialYaw={Number.isFinite(beat.getParameters().initialYaw) ? beat.getParameters().initialYaw : 0}
-                initialPitch={Number.isFinite(beat.getParameters().initialPitch) ? beat.getParameters().initialPitch : 0}
-                fov={90}
-                initialZoom={(() => {
-                  // Start at the correct zoom so there's no flash of zoom=1 before onReady
-                  const h = beat.getParameters().hfov;
-                  const safeH = Math.max(50, Number.isFinite(h) ? h : 75);
-                  return 1 / Math.tan(safeH * Math.PI / 360); // tan(45°)/tan(hfov/2)
-                })()}
-                hotspot={{ zoom: false }}
-                className="view360-panorama-preview"
-                style={{ width: '100%', height: '100%' }}
-                onReady={(e: { target: any }) => {
-                  const viewer = e.target;
-                  const camera = viewer.camera;
-                  // Prevent onViewChange from saving stale values before we set the correct zoom
-                  panoramaReadyRef.current = false;
-
-                  // Force resize — View360 may have measured the container at 0x0 during initial mount
-                  if (typeof viewer.resize === 'function') {
-                    viewer.resize();
-                  }
-
-                  // fovToZoom expects HORIZONTAL FOV (same unit as the fov={90} prop)
-                  try {
-                    const storedHfov = Number.isFinite(beat.getParameters().hfov) ? beat.getParameters().hfov : 75;
-                    const safeHfov = Math.max(50, storedHfov);
-                    const zoom = camera.fovToZoom(safeHfov);
-                    camera.lookAt({
-                      yaw: Number.isFinite(beat.getParameters().initialYaw) ? beat.getParameters().initialYaw : 0,
-                      pitch: Number.isFinite(beat.getParameters().initialPitch) ? beat.getParameters().initialPitch : 0,
-                      zoom,
-                    });
-                  } catch (err) {
-                    console.error('[Panorama] onReady camera setup error:', err);
-                  }
-
-                  // Now allow onViewChange to save — camera is at the correct state
-                  requestAnimationFrame(() => { panoramaReadyRef.current = true; });
-                }}
-                onViewChange={(e: { yaw: number; pitch: number; zoom: number; target: any }) => {
-                  // Only save when user is actively interacting (drag/scroll)
-                  // This prevents programmatic lookAt calls from overwriting stored values
-                  if (!panoramaReadyRef.current || !panoramaUserInteractingRef.current) return;
-                  const camera = e.target.camera;
-                  // getHorizontalFov returns the HORIZONTAL FOV in degrees (same unit as fov prop)
-                  const hfovValue = camera.getHorizontalFov(e.zoom);
-                  // Guard against NaN values from uninitialised camera
-                  if (isNaN(hfovValue) || isNaN(e.yaw) || isNaN(e.pitch)) return;
-                  // Normalize yaw from egjs 0-360° to our -180..180° range
-                  let yaw = e.yaw % 360;
-                  if (yaw > 180) yaw -= 360;
-                  if (yaw < -180) yaw += 360;
-                  // Set flag to prevent useEffect from feeding back into the camera
-                  panoramaViewChangingRef.current = true;
-                  beat.updateParameters({
-                    initialYaw: Math.round(yaw * 10) / 10,
-                    initialPitch: Math.round(e.pitch * 10) / 10,
-                    hfov: Math.round(hfovValue),
-                  });
-                  setHasChanges(true);
-                  if (onBeatUpdate) {
-                    onBeatUpdate(beat.id, {
-                      parameters: {
-                        ...beat.getParameters(),
-                        initialYaw: Math.round(yaw * 10) / 10,
-                        initialPitch: Math.round(e.pitch * 10) / 10,
-                        hfov: Math.round(hfovValue),
-                      },
-                    } as any);
-                  }
-                  // Clear feedback flag after React has a chance to process the state update
-                  requestAnimationFrame(() => { panoramaViewChangingRef.current = false; });
-                }}
-              >
-                {/* Hotspots as DOM elements — sized from VisualElement dimensions, scaled to viewer */}
-                <div className="view360-hotspots">
-                  {panoramaHotspots.map((hs) => {
-                    const isSelected = selectedElementId === hs.id;
-                    // Look up VisualElement to get stage width/height
-                    const veEl = visualElements.find(e => e.id === hs.id);
-                    const stageW = projectSettings?.width || 1024;
-                    const stageH = projectSettings?.height || 768;
-                    const currentHfov = beat.getParameters().hfov || 75;
-                    // Compute yaw/pitch from VE position for consistent positioning with non-hotspot elements
-                    let dataYaw = hs.yaw;
-                    let dataPitch = hs.pitch;
-                    if (veEl) {
-                      const cX = veEl.x + veEl.width / 2;
-                      const cY = veEl.y + veEl.height / 2;
-                      const computed = stageToYawPitch(cX, cY, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
-                      dataYaw = computed.yaw;
-                      dataPitch = computed.pitch;
-                    }
-                    // Convert stage pixel size to angular degrees, then to CSS pixels in the viewer.
-                    // hotspot zoom is disabled, so we size directly using the current HFOV.
-                    const totalHDeg = panoramaProjectionType === 'cylindrical' ? (panoramaImageAspect ?? 4) * (180 / Math.PI) : 360;
-                    const totalVDeg = panoramaProjectionType === 'cylindrical' ? 2 * Math.atan(0.5) * (180 / Math.PI) : 180;
-                    const elStageW = veEl?.width || 120;
-                    const elStageH = veEl?.height || 50;
-                    const angularW = (elStageW / stageW) * totalHDeg;
-                    const angularH = (elStageH / stageH) * totalVDeg;
-                    const displayAR = stageW / stageH;
-                    const containerH = panoramaPreviewWidth / displayAR;
-                    const currentVfov = currentHfov / displayAR;
-                    const cssW = (angularW / currentHfov) * panoramaPreviewWidth;
-                    const cssH = (angularH / currentVfov) * containerH;
-                    return (
-                      <div
-                        key={hs.id}
-                        className="view360-hotspot"
-                        data-yaw={dataYaw}
-                        data-pitch={dataPitch}
-                        style={{ cursor: 'pointer' }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedElementIds([hs.id]);
-                        }}
-                      >
-                        <div style={{
-                          width: `${Math.round(cssW)}px`,
-                          height: `${Math.round(cssH)}px`,
-                          backgroundColor: isSelected ? 'rgba(255, 255, 0, 0.4)' : 'rgba(255, 255, 0, 0.25)',
-                          border: isSelected ? '2px dashed rgba(245, 158, 11, 0.8)' : '2px dashed rgba(255, 255, 0, 0.7)',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transform: 'translate(-50%, -50%)',
-                          fontSize: '13px',
-                          fontFamily: 'sans-serif',
-                          fontWeight: '600',
-                          color: 'white',
-                          textShadow: '0 1px 3px rgba(0,0,0,0.6)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                        }}>
-                          {hs.text || 'Hotspot'}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {/* Non-hotspot elements (props, text, characters) projected into 360° view */}
-                  {visualElements
-                    .filter(el => el.type !== 'hotspot' && el.visible !== false
-                      && !((el.type === 'text' || el.type === 'dialog') && (beat.getParameters().promptDisplay || 'static') !== 'pinned'))
-                    .map((el) => {
-                      const stageW = projectSettings?.width || 1024;
-                      const stageH = projectSettings?.height || 768;
-                      // Convert element center x/y to pitch/yaw for View360
-                      const centerX = el.x + el.width / 2;
-                      const centerY = el.y + el.height / 2;
-                      const { yaw, pitch } = stageToYawPitch(centerX, centerY, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
-                      const isSelected = selectedElementId === el.id;
-
-                      // Scale stage pixel sizes to CSS pixel sizes for the 3D viewer.
-                      // hotspot zoom is disabled, so size directly using the current HFOV.
-                      const currentHfov = beat.getParameters().hfov || 75;
-                      const totalHDeg = panoramaProjectionType === 'cylindrical' ? (panoramaImageAspect ?? 4) * (180 / Math.PI) : 360;
-                      const totalVDeg = panoramaProjectionType === 'cylindrical' ? 2 * Math.atan(0.5) * (180 / Math.PI) : 180;
-                      const angularW = (el.width / stageW) * totalHDeg;
-                      const angularH = (el.height / stageH) * totalVDeg;
-                      const displayAR = stageW / stageH;
-                      const containerH = panoramaPreviewWidth / displayAR;
-                      const currentVfov = currentHfov / displayAR;
-                      const cssW = (angularW / currentHfov) * panoramaPreviewWidth;
-                      const cssH = (angularH / currentVfov) * containerH;
-                      const fontScale = panoramaPreviewWidth / ((currentHfov / totalHDeg) * stageW);
-
-                      // Determine content to render
-                      let content: React.ReactNode;
-                      if (el.type === 'prop' || el.type === 'character') {
-                        const imgSrc = el.assetUrl || el.imageUrl;
-                        content = imgSrc ? (
-                          <img
-                            src={imgSrc}
-                            alt={el.name}
-                            style={{
-                              width: `${Math.round(cssW)}px`,
-                              height: `${Math.round(cssH)}px`,
-                              objectFit: 'contain',
-                              pointerEvents: 'none',
-                            }}
-                          />
-                        ) : (
-                          <div style={{
-                            width: `${Math.round(cssW)}px`,
-                            height: `${Math.round(cssH)}px`,
-                            backgroundColor: 'rgba(255,255,255,0.1)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '11px',
-                            color: 'rgba(255,255,255,0.5)',
-                          }}>
-                            {el.name}
-                          </div>
-                        );
-                      } else if (el.type === 'text' || el.type === 'dialog') {
-                        const scaledFontSize = Math.round((el.fontSize || globalSettings?.fonts?.fontSize?.text || 16) * fontScale);
-                        const themedTextColor = globalSettings?.colors?.nonptextcolor || (() => {
-                          const bg = globalSettings?.colors?.nonpcolor || '#000000';
-                          const r = parseInt(bg.slice(1,3), 16);
-                          const g = parseInt(bg.slice(3,5), 16);
-                          const b = parseInt(bg.slice(5,7), 16);
-                          return (r * 299 + g * 587 + b * 114) / 1000 > 128 ? '#000000' : '#ffffff';
-                        })();
-                        content = (
-                          <div style={{
-                            width: `${Math.round(cssW)}px`,
-                            backgroundColor: (() => {
-                              const hex = globalSettings?.colors?.nonpcolor || '#000000';
-                              const alpha = (globalSettings?.colors?.nonpalpha ?? 65) / 100;
-                              const r = parseInt(hex.slice(1,3), 16);
-                              const g = parseInt(hex.slice(3,5), 16);
-                              const b = parseInt(hex.slice(5,7), 16);
-                              return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-                            })(),
-                            padding: `${Math.round((globalSettings?.textbox?.padding ?? 8) * fontScale)}px`,
-                            borderRadius: `${globalSettings?.textbox?.radius ?? 8}px`,
-                            border: (globalSettings?.textbox?.borderWidth && globalSettings?.colors?.textBoxBorder)
-                              ? `${globalSettings.textbox.borderWidth}px solid ${globalSettings.colors.textBoxBorder}`
-                              : 'none',
-                            fontSize: `${scaledFontSize}px`,
-                            fontFamily: el.font || globalSettings?.fonts?.textFont || 'sans-serif',
-                            color: themedTextColor,
-                            textAlign: el.textAlign || 'center',
-                            pointerEvents: 'none',
-                          }}>
-                            {el.text || el.name}
-                          </div>
-                        );
-                      } else {
-                        // Generic fallback for other element types
-                        content = (
-                          <div style={{
-                            width: `${Math.round(cssW)}px`,
-                            height: `${Math.round(cssH)}px`,
-                            backgroundColor: 'rgba(255,255,255,0.1)',
-                            border: '1px solid rgba(255,255,255,0.3)',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '11px',
-                            color: 'rgba(255,255,255,0.7)',
-                            pointerEvents: 'none',
-                          }}>
-                            {el.name}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div
-                          key={el.id}
-                          className="view360-hotspot"
-                          data-yaw={yaw}
-                          data-pitch={pitch}
-                          style={{ cursor: 'pointer' }}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedElementIds([el.id]);
-                          }}
-                        >
-                          <div style={{
-                            transform: 'translate(-50%, -50%)',
-                            border: isSelected ? '2px solid rgba(59, 130, 246, 0.8)' : '2px solid transparent',
-                            borderRadius: '4px',
-                          }}>
-                            {content}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </View360>
-
-              {/* Prompt text overlay — themed from global settings */}
-              {(() => {
-                const promptText = beat.getParameters().prompt || '';
-                if (!promptText) return null;
-                const promptDisplay = beat.getParameters().promptDisplay || 'static';
-                if (promptDisplay === 'pinned') return null;
-                return (
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 60,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    backgroundColor: (() => {
-                      const hex = globalSettings?.colors?.nonpcolor || '#000000';
-                      const alpha = (globalSettings?.colors?.nonpalpha ?? 65) / 100;
-                      const r = parseInt(hex.slice(1,3), 16);
-                      const g = parseInt(hex.slice(3,5), 16);
-                      const b = parseInt(hex.slice(5,7), 16);
-                      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-                    })(),
-                    color: globalSettings?.colors?.nonptextcolor || (() => {
-                      const bg = globalSettings?.colors?.nonpcolor || '#000000';
-                      const r = parseInt(bg.slice(1,3), 16);
-                      const g = parseInt(bg.slice(3,5), 16);
-                      const b = parseInt(bg.slice(5,7), 16);
-                      return (r * 299 + g * 587 + b * 114) / 1000 > 128 ? '#000000' : '#ffffff';
-                    })(),
-                    padding: `${globalSettings?.textbox?.padding ?? 8}px`,
-                    borderRadius: `${globalSettings?.textbox?.radius ?? 8}px`,
-                    border: (globalSettings?.textbox?.borderWidth && globalSettings?.colors?.textBoxBorder)
-                      ? `${globalSettings.textbox.borderWidth}px solid ${globalSettings.colors.textBoxBorder}`
-                      : 'none',
-                    fontSize: `${globalSettings?.fonts?.fontSize?.text || 16}px`,
-                    fontFamily: globalSettings?.fonts?.textFont || 'sans-serif',
-                    pointerEvents: 'none',
-                    whiteSpace: 'nowrap',
-                    zIndex: 10,
-                  }}>
-                    {promptText}
-                  </div>
-                );
-              })()}
-
-              {/* Hint overlay */}
-              <div style={{
-                position: 'absolute',
-                bottom: 16,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                color: 'rgba(255, 255, 255, 0.7)',
-                padding: '6px 14px',
-                borderRadius: 6,
-                fontSize: 11,
-                fontFamily: 'sans-serif',
-                pointerEvents: 'none',
-                whiteSpace: 'nowrap',
-              }}>
-                Switch to Layout view to move hotspots
-              </div>
-              </div>
-            ) : (
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '100%', height: '100%', color: 'rgba(255,255,255,0.5)',
-                fontFamily: 'sans-serif', fontSize: '14px',
-              }}>
-                No panorama image assigned
-              </div>
-            )}
-          </div>
+          /* Panorama Preview Mode: PSV interactive 360° viewer */
+          <PanoramaPreviewSection
+            key={`psv-section-${psvMountKey}`}
+            beat={beat}
+            panoramaResolvedUrl={panoramaResolvedUrl}
+            panoramaProjectionType={panoramaProjectionType}
+            panoramaImageAspect={panoramaImageAspect}
+            panoramaHotspots={panoramaHotspots}
+            visualElements={visualElements}
+            selectedElementId={selectedElementId}
+            projectSettings={projectSettings}
+            globalSettings={globalSettings}
+            panoramaPreviewContainerRef={panoramaPreviewContainerRef}
+            panoramaPreviewWidth={panoramaPreviewWidth}
+            setPanoramaPreviewWidth={setPanoramaPreviewWidth}
+            psvViewerRef={psvViewerRef}
+            psvMarkersRef={psvMarkersRef}
+            panoramaReadyRef={panoramaReadyRef}
+            panoramaUserInteractingRef={panoramaUserInteractingRef}
+            panoramaViewChangingRef={panoramaViewChangingRef}
+            livePanoCamRef={livePanoCamRef}
+            previewDragRef={previewDragRef}
+            setHasChanges={setHasChanges}
+            onBeatUpdate={onBeatUpdate}
+            setSelectedElementIds={setSelectedElementIds}
+            handlePreviewPointerDown={handlePreviewPointerDown}
+            handlePreviewPointerMove={handlePreviewPointerMove}
+            handlePreviewPointerUp={handlePreviewPointerUp}
+            handlePreviewResizeDown={handlePreviewResizeDown}
+          />
         ) : (
           /* Layout Mode: Standard Visual Beat Editor (with viewport rect for panorama) */
           <VisualBeatEditor
@@ -4017,7 +4435,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), ...viewport } } as any);
               }
             } : undefined}
-            promptDisplay={isPanoramaBeat ? (beat.getParameters().promptDisplay || 'static') : undefined}
+            promptDisplay={isPanoramaBeat ? (beat.getParameters().promptDisplay ?? (beat as any).parameters?.promptDisplay ?? 'static') : undefined}
+            initialZoom={vbeZoomRef.current}
+            onZoomChange={(z: number) => { vbeZoomRef.current = z; }}
+            initialScroll={vbeScrollRef.current}
+            onScrollChange={(s: { left: number; top: number }) => { vbeScrollRef.current = s; }}
           />
         )}
       </div>

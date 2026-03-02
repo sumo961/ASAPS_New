@@ -2077,12 +2077,18 @@ export class ReactRenderer extends BaseRenderer {
       pitch: number;
       yaw: number;
       text: string;
+      width?: number;
+      height?: number;
+      scale?: number;
+      rotation?: number;
     }>;
     initialPitch?: number;
     initialYaw?: number;
     hfov?: number;
     projectionType?: 'equirectangular' | 'cylindrical';
     prompt?: string;
+    promptDisplay?: 'static' | 'pinned';
+    locations?: any[];
   }): Promise<string> {
     // Resolve panorama URL from asset ID if not already a URL
     const panoramaAssetId = this.getState('panoramaAssetId');
@@ -2099,14 +2105,30 @@ export class ReactRenderer extends BaseRenderer {
             hfov={options.hfov}
             projectionType={options.projectionType}
             prompt={options.prompt}
+            promptDisplay={options.promptDisplay}
             onHotspotClick={(hotspotId) => resolve(hotspotId)}
+            overlayElements={options.locations?.map((loc: any) => ({
+              id: loc.id,
+              name: loc.name,
+              kind: loc.kind,
+              yaw: loc.yaw,
+              pitch: loc.pitch,
+              width: loc.width,
+              height: loc.height,
+              scale: loc.scale,
+              rotation: loc.rotation,
+              assetId: loc.assetId,
+              imageUrl: loc.imageUrl,
+            }))}
+            resolveAssetUrl={(assetId) => this.resolveAssetUrl(assetId) || undefined}
+            stageWidth={this.context.width}
             promptStyle={this.theme ? {
               fontFamily: this.theme.fonts?.textFont,
               fontSize: this.theme.fonts?.textFontSize,
               color: this.theme.colors?.textColor,
-              backgroundColor: this.theme.textBox?.backgroundColor
-                ? `rgba(0, 0, 0, ${(this.theme.textBox.opacity ?? 70) / 100})`
-                : undefined,
+              backgroundColor: this.theme.textBox?.backgroundColor?.startsWith('#')
+                ? `rgba(${parseInt(this.theme.textBox.backgroundColor.slice(1,3), 16)}, ${parseInt(this.theme.textBox.backgroundColor.slice(3,5), 16)}, ${parseInt(this.theme.textBox.backgroundColor.slice(5,7), 16)}, ${(this.theme.textBox.opacity ?? 70) / 100})`
+                : this.theme.textBox?.backgroundColor || undefined,
               border: (this.theme.textBox?.borderWidth && this.theme.textBox?.borderColor)
                 ? `${this.theme.textBox.borderWidth}px solid ${this.theme.textBox.borderColor}`
                 : undefined,

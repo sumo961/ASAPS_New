@@ -168,6 +168,12 @@ interface VisualBeatEditorProps {
   onPanoramaViewportChange?: (viewport: { pitch: number; yaw: number; hfov: number }) => void;
   /** Panorama prompt display mode: 'static' or 'pinned' */
   promptDisplay?: 'static' | 'pinned';
+  /** External zoom level (persisted across Layout↔Preview switches) */
+  initialZoom?: number;
+  onZoomChange?: (zoom: number) => void;
+  /** External scroll position (persisted across Layout↔Preview switches) */
+  initialScroll?: { left: number; top: number };
+  onScrollChange?: (scroll: { left: number; top: number }) => void;
 }
 
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
@@ -195,6 +201,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   panoramaViewport,
   onPanoramaViewportChange,
   promptDisplay,
+  initialZoom,
+  onZoomChange,
+  initialScroll,
+  onScrollChange,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedElement, setDraggedElement] = useState<string | null>(null);
@@ -277,7 +287,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Use stage size from project settings, with fallback to 1024×768
   const stageWidth = projectSettings?.width || 1024;
   const stageHeight = projectSettings?.height || 768;
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoomInternal] = useState(initialZoom ?? 1);
+  const setZoom = (z: number) => { setZoomInternal(z); onZoomChange?.(z); };
   const [showGrid, setShowGrid] = useState(true);
   const activeBoxVisibility = boxVisibility || 'all';
   const [tool, setTool] = useState<'select' | 'hotspot' | 'text' | 'character' | 'prop'>('select');
@@ -1059,7 +1070,24 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       </div>
 
       {/* Scrollable Canvas Container */}
-      <div className="flex-1 overflow-auto bg-gray-100" style={{ maxWidth: '100%', maxHeight: '100%' }}>
+      <div
+        className="flex-1 overflow-auto bg-gray-100"
+        style={{ maxWidth: '100%', maxHeight: '100%' }}
+        ref={(el) => {
+          if (el && initialScroll && !el.dataset.scrollRestored) {
+            // Restore scroll position after mount
+            requestAnimationFrame(() => {
+              el.scrollLeft = initialScroll.left;
+              el.scrollTop = initialScroll.top;
+              el.dataset.scrollRestored = '1';
+            });
+          }
+        }}
+        onScroll={(e) => {
+          const t = e.currentTarget;
+          onScrollChange?.({ left: t.scrollLeft, top: t.scrollTop });
+        }}
+      >
         <div
           ref={canvasRef}
           tabIndex={0}
