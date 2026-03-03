@@ -2170,6 +2170,7 @@ export class ReactRenderer extends BaseRenderer {
               labelDisplay: this.theme.hotspot.labelDisplay,
               fontFamily: this.theme.fonts?.textFont,
               fontSize: this.theme.fonts?.textFontSize,
+              fontColor: this.theme.colors?.textColor,
               tooltipBackgroundColor: this.theme.button?.backgroundColor,
               tooltipTextColor: this.theme.button?.textColor,
               tooltipBorderColor: this.theme.button?.borderColor,

@@ -108,6 +108,7 @@ export interface PanoramaViewProps {
     labelDisplay?: 'none' | 'hover' | 'always';
     fontFamily?: string;
     fontSize?: number;
+    fontColor?: string;
     // Tooltip styling (from button theme)
     tooltipBackgroundColor?: string;
     tooltipTextColor?: string;
@@ -403,6 +404,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
     const hsLabelDisplay = hotspotStyle?.labelDisplay ?? 'hover';
     const hsFontFamily = hotspotStyle?.fontFamily || 'sans-serif';
     const hsFontSizeBase = hotspotStyle?.fontSize || 16;
+    const hsFontColor = hotspotStyle?.fontColor || 'white';
     // Parse hex color to RGB
     const hsR = parseInt(hsColor.slice(1,3), 16) || 255;
     const hsG = parseInt(hsColor.slice(3,5), 16) || 255;
@@ -419,7 +421,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
       const h = (hs.height || 50) * elScale * scale;
       const isSelected = selectedHotspotId === hs.id;
       const rotateStyle = hs.rotation ? `transform: rotate(${hs.rotation}deg);` : '';
-      const fontSize = Math.max(10, Math.round(hsFontSizeBase * scale * 0.8));
+      const fontSize = Math.max(10, Math.round(hsFontSizeBase * scale));
 
       // Per-hotspot override: use element-level settings when enabled, fall back to global
       const ovr = hs.hotspotOverride?.enabled ? hs.hotspotOverride : undefined;
@@ -441,7 +443,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
         // Image-based marker for props/characters — no label in preview (only in editor)
         const showImgLabel = editorMode && hsLabelDisplay !== 'none';
         const labelHtml = showImgLabel && labelText
-          ? `<div style="text-align:center;font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.6);margin-top:2px;white-space:nowrap;">${labelText}</div>`
+          ? `<div style="text-align:center;font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:${hsFontColor};text-shadow:0 1px 3px rgba(0,0,0,0.6);margin-top:2px;white-space:nowrap;">${labelText}</div>`
           : '';
         markerHtml = `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;${rotateStyle}">
           <img src="${imgSrc}" alt="${hs.text || ''}" style="width:${Math.round(w)}px;height:${Math.round(h)}px;object-fit:contain;" />
@@ -466,7 +468,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
           ${bgStyle}
           border:${isSelected ? `2px dashed rgba(${hsR},${hsG},${hsB},0.8)` : 'none'};
           border-radius:4px;display:flex;align-items:center;justify-content:center;
-          font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:white;
+          font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:${hsFontColor};
           text-shadow:0 1px 3px rgba(0,0,0,0.6);white-space:nowrap;overflow:hidden;
           cursor:pointer;box-sizing:border-box;
           transition:background-color 0.15s ease;">

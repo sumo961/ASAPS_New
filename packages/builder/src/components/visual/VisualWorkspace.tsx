@@ -436,6 +436,15 @@ const PanoramaPreviewSection: React.FC<{
     const hsOpacity = (globalSettings?.hotspots?.opacity ?? 25) / 100; // 0-100 → 0-1
     const hsFontFamily = globalSettings?.fonts?.textFont || 'sans-serif';
     const hsFontSize = globalSettings?.fonts?.fontSize?.text || 16;
+    // Use NPC text color for hotspot labels (matches prompt/NPC text styling)
+    // When nonptextcolor is empty, compute contrast from NPC background color
+    const hsFontColor = globalSettings?.colors?.nonptextcolor || (() => {
+      const bg = globalSettings?.colors?.nonpcolor || '#000000';
+      const r = parseInt(bg.slice(1,3), 16);
+      const g = parseInt(bg.slice(3,5), 16);
+      const b = parseInt(bg.slice(5,7), 16);
+      return (r * 299 + g * 587 + b * 114) / 1000 > 128 ? '#000000' : '#ffffff';
+    })();
     // Parse hex to rgb for rgba usage
     const hsR = parseInt(hsColor.slice(1,3), 16) || 255;
     const hsG = parseInt(hsColor.slice(3,5), 16) || 255;
@@ -465,7 +474,7 @@ const PanoramaPreviewSection: React.FC<{
       const isSelected = selectedElementId === (veEl?.id || hs.id);
       // Font size at base scale only — CSS transform: scale(zoomScale) scales it uniformly with the box
       const baseFontSize = (veEl?.fontOverridden && veEl?.fontSize) ? veEl.fontSize : hsFontSize;
-      const fontSize = Math.max(10, Math.round(baseFontSize * sizeFactor * 0.8));
+      const fontSize = Math.max(10, Math.round(baseFontSize * sizeFactor));
 
       // Combine zoom scale and rotation in one CSS transform
       const transforms = [`scale(${zoomScale.toFixed(4)})`];
@@ -492,7 +501,7 @@ const PanoramaPreviewSection: React.FC<{
           background-color:rgba(${hsR},${hsG},${hsB},${bgAlpha.toFixed(2)});
           border:2px dashed rgba(${hsR},${hsG},${hsB},${borderAlpha});
           border-radius:4px;display:flex;align-items:center;justify-content:center;
-          font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:white;
+          font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:${hsFontColor};
           text-shadow:0 1px 3px rgba(0,0,0,0.6);white-space:nowrap;overflow:hidden;box-sizing:border-box;">
           ${hs.text || 'Hotspot'}</div>`;
       }
