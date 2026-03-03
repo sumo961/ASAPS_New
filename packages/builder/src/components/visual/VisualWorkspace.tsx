@@ -489,7 +489,8 @@ const PanoramaPreviewSection: React.FC<{
       const elCx = vel.x + vel.width / 2;
       const elCy = vel.y + vel.height / 2;
       const { yaw: elYaw, pitch: elPitch } = stageToYawPitch(elCx, elCy, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
-      const elScale = vel.scale || 1;
+      const sizeScale = vel.size !== undefined ? vel.size / 100 : 1;
+      const elScale = (vel.scale || 1) * sizeScale;
       const elRotation = vel.rotation || 0;
       // Base dimensions at container scale (no zoom) — CSS transform handles zoom
       const baseW = Math.round(vel.width * elScale * sizeFactor);
