@@ -1,3 +1,7 @@
+/* Photo Sphere Viewer CSS for panorama beats */
+@import '@photo-sphere-viewer/core/index.css';
+@import '@photo-sphere-viewer/markers-plugin/index.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
