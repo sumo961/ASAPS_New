@@ -179,7 +179,7 @@ const PanoramaPreviewSection: React.FC<{
   panoramaResolvedUrl: string;
   panoramaProjectionType: string;
   panoramaImageAspect: number | undefined;
-  panoramaHotspots: { id: string; pitch: number; yaw: number; text: string }[];
+  panoramaHotspots: { id: string; pitch: number; yaw: number; text: string; locationName?: string }[];
   visualElements: VisualElement[];
   selectedElementId: string | null | undefined;
   projectSettings: { width: number; height: number; aspectRatio: string; scalingMode: string } | undefined;
@@ -274,15 +274,21 @@ const PanoramaPreviewSection: React.FC<{
           viewer.zoom(_hfovToZoom(viewer, Math.max(30, storedHfov)));
         } catch { /* ignore */ }
 
+        // Read back actual HFOV from viewer after zoom is applied — PSV's
+        // HFOV→zoomLevel→HFOV round-trip may differ from the requested value
+        // due to aspect-ratio-dependent quantization.  Using the actual value
+        // ensures zoomScale=1 at initialization regardless of container size.
+        const actualHfov = Math.max(30, _zoomToHfov(viewer));
+
         // Initialize live camera state
         livePanoCamRef.current = {
           yaw: yawDeg,
           pitch: pitchDeg,
-          hfov: Math.max(30, Number.isFinite(params.hfov) ? params.hfov : 75),
+          hfov: actualHfov,
         };
 
         // Store initial HFOV for zoom scaling reference
-        panoramaInitialHfovRef.current = Math.max(30, Number.isFinite(params.hfov) ? params.hfov : 75);
+        panoramaInitialHfovRef.current = actualHfov;
         // Allow camera sync after a tick
         requestAnimationFrame(() => { panoramaReadyRef.current = true; });
         // Trigger markers sync
@@ -390,6 +396,18 @@ const PanoramaPreviewSection: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panoramaResolvedUrl, panoramaProjectionType]);
 
+  // Compute panorama camera/prompt settings outside the markers effect so `beat` is not a dependency
+  const panoramaBeatCamera = useMemo(() => {
+    const bp = beat.getParameters();
+    const raw = (beat as any).parameters;
+    return {
+      promptDisplay: (bp.promptDisplay ?? raw?.promptDisplay ?? 'static') as 'static' | 'pinned',
+      initialYaw: bp.initialYaw ?? raw?.initialYaw ?? 0,
+      initialPitch: bp.initialPitch ?? raw?.initialPitch ?? 0,
+      hfov: bp.hfov ?? raw?.hfov ?? 75,
+    };
+  }, [beat?.id, (beat as any)?._version]);
+
   // Markers sync: update markers when hotspots, elements, or selection changes
   useEffect(() => {
     const mp = psvMarkersRef.current;
@@ -398,9 +416,7 @@ const PanoramaPreviewSection: React.FC<{
 
     const stageW = projectSettings?.width || 1024;
     const stageH = projectSettings?.height || 768;
-    const beatParams = beat.getParameters();
-    const rawBeatParams = (beat as any).parameters;
-    const promptDisplay = beatParams.promptDisplay ?? rawBeatParams?.promptDisplay ?? 'static';
+    const promptDisplay = panoramaBeatCamera.promptDisplay;
 
     // Scale marker pixel sizes from stage coordinates to screen coordinates
     const containerW = psvContainerRef.current?.clientWidth || stageW;
@@ -425,9 +441,18 @@ const PanoramaPreviewSection: React.FC<{
     const hsG = parseInt(hsColor.slice(3,5), 16) || 255;
     const hsB = parseInt(hsColor.slice(5,7), 16) || 0;
 
+    // Build set of locationName values from hotspots — elements assigned via locationName
+    // are rendered as hotspot markers and should NOT also appear in the non-hotspot loop
+    const assignedLocationNames = new Set(
+      panoramaHotspots.map(hs => hs.locationName).filter(Boolean) as string[]
+    );
+
     // 1. Hotspot markers — interactive (draggable + resizable via overlay)
     for (const hs of panoramaHotspots) {
-      const veEl = visualElements.find(e => e.id === hs.id);
+      // When locationName is set, look up the referenced VE element by name (not hotspot id)
+      const veEl = hs.locationName
+        ? visualElements.find(e => e.name === hs.locationName) || visualElements.find(e => e.id === hs.id)
+        : visualElements.find(e => e.id === hs.id);
       const cx = veEl ? veEl.x + veEl.width / 2 : stageW / 2;
       const cy = veEl ? veEl.y + veEl.height / 2 : stageH / 2;
       const { yaw: elYaw, pitch: elPitch } = stageToYawPitch(cx, cy, panoramaProjectionType, stageW, stageH, panoramaImageAspect);
@@ -437,7 +462,7 @@ const PanoramaPreviewSection: React.FC<{
       // so text and box scale together, avoiding browser minimum font-size issues
       const baseW = Math.round((veEl?.width || 120) * elScale * sizeFactor);
       const baseH = Math.round((veEl?.height || 50) * elScale * sizeFactor);
-      const isSelected = selectedElementId === hs.id;
+      const isSelected = selectedElementId === (veEl?.id || hs.id);
       // Font size at base scale only — CSS transform: scale(zoomScale) scales it uniformly with the box
       const baseFontSize = (veEl?.fontOverridden && veEl?.fontSize) ? veEl.fontSize : hsFontSize;
       const fontSize = Math.max(10, Math.round(baseFontSize * sizeFactor * 0.8));
@@ -446,6 +471,10 @@ const PanoramaPreviewSection: React.FC<{
       const transforms = [`scale(${zoomScale.toFixed(4)})`];
       if (elRotation) transforms.push(`rotate(${elRotation}deg)`);
 
+      // Check if the referenced element has an image (prop/character with asset)
+      const imgSrc = veEl ? (veEl.assetUrl || veEl.imageUrl) : undefined;
+      const isImageMarker = imgSrc && veEl?.type !== 'hotspot';
+
       // Editor: slightly reduced opacity, brightened when selected
       const bgAlpha = isSelected ? Math.min(hsOpacity * 1.5, 1) : hsOpacity * 0.7;
       const borderAlpha = isSelected ? 0.8 : 0.7;
@@ -453,14 +482,20 @@ const PanoramaPreviewSection: React.FC<{
       // Create the element with pointer event handlers for drag/resize
       const el = document.createElement('div');
       el.className = 'psv--capture-event';
-      el.style.cssText = `width:${baseW}px;height:${baseH}px;position:relative;cursor:${previewDragRef.current?.elementId === hs.id ? 'grabbing' : 'grab'};transform:${transforms.join(' ')};transform-origin:center center;`;
-      el.innerHTML = `<div style="width:100%;height:100%;
-        background-color:rgba(${hsR},${hsG},${hsB},${bgAlpha.toFixed(2)});
-        border:2px dashed rgba(${hsR},${hsG},${hsB},${borderAlpha});
-        border-radius:4px;display:flex;align-items:center;justify-content:center;
-        font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:white;
-        text-shadow:0 1px 3px rgba(0,0,0,0.6);white-space:nowrap;overflow:hidden;box-sizing:border-box;">
-        ${hs.text || 'Hotspot'}</div>`;
+      el.style.cssText = `width:${baseW}px;height:${baseH}px;position:relative;cursor:${previewDragRef.current?.elementId === (veEl?.id || hs.id) ? 'grabbing' : 'grab'};transform:${transforms.join(' ')};transform-origin:center center;`;
+
+      if (isImageMarker) {
+        // Image-based marker for props/characters assigned via locationName
+        el.innerHTML = `<img src="${imgSrc}" alt="${hs.text || veEl?.name || 'Hotspot'}" style="width:100%;height:100%;object-fit:contain;pointer-events:none;${isSelected ? 'outline:2px solid rgba(245,158,11,0.8);border-radius:4px;' : ''}" />`;
+      } else {
+        el.innerHTML = `<div style="width:100%;height:100%;
+          background-color:rgba(${hsR},${hsG},${hsB},${bgAlpha.toFixed(2)});
+          border:2px dashed rgba(${hsR},${hsG},${hsB},${borderAlpha});
+          border-radius:4px;display:flex;align-items:center;justify-content:center;
+          font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:white;
+          text-shadow:0 1px 3px rgba(0,0,0,0.6);white-space:nowrap;overflow:hidden;box-sizing:border-box;">
+          ${hs.text || 'Hotspot'}</div>`;
+      }
 
       // Corner resize handles — visual indicators only (pointer-events: none).
       // Resize detection is done via coordinate-based hit-testing in onPointerDown.
@@ -478,13 +513,15 @@ const PanoramaPreviewSection: React.FC<{
         position: { yaw: elYaw * _DEG_TO_RAD, pitch: elPitch * _DEG_TO_RAD },
         size: { width: baseW, height: baseH },
         anchor: 'center center',
-        data: { elementId: hs.id, type: 'hotspot' },
+        data: { elementId: veEl?.id || hs.id, type: 'hotspot' },
       });
     }
 
     // 2. Non-hotspot elements (props, characters, pinned text/dialog)
     for (const vel of visualElements) {
       if (vel.type === 'hotspot' || vel.visible === false) continue;
+      // Skip elements assigned to a hotspot via locationName (rendered as hotspot marker above)
+      if (assignedLocationNames.has(vel.name)) continue;
       if ((vel.type === 'text' || vel.type === 'dialog') && promptDisplay !== 'pinned') continue;
       const elCx = vel.x + vel.width / 2;
       const elCy = vel.y + vel.height / 2;
@@ -554,7 +591,7 @@ const PanoramaPreviewSection: React.FC<{
     try {
       mp.setMarkers(markers);
     } catch { /* viewer may be initializing */ }
-  }, [panoramaHotspots, visualElements, selectedElementId, panoramaProjectionType, panoramaImageAspect, projectSettings, globalSettings, markersVersion, beat]);
+  }, [panoramaHotspots, visualElements, selectedElementId, panoramaProjectionType, panoramaImageAspect, projectSettings, globalSettings, markersVersion, panoramaBeatCamera]);
 
   const stageW = projectSettings?.width || 1024;
   const stageH = projectSettings?.height || 768;
@@ -1078,7 +1115,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   }, [isPanoramaBeat, backgroundAssetId, backgroundUrl, assets]);
 
   // Extract hotspot data from beat parameters for the preview
-  const panoramaHotspots: { id: string; pitch: number; yaw: number; text: string }[] = useMemo(() => {
+  const panoramaHotspots: { id: string; pitch: number; yaw: number; text: string; locationName?: string }[] = useMemo(() => {
     if (!isPanoramaBeat || !beat) return [];
     const params = beat.getParameters ? beat.getParameters() : {};
     return (params.hotspots || []).map((hs: any) => ({
@@ -1086,6 +1123,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       pitch: hs.pitch as number,
       yaw: hs.yaw as number,
       text: (hs.text || '') as string,
+      locationName: hs.locationName as string | undefined,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPanoramaBeat, beat, beatVersion]);
@@ -2823,6 +2861,36 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Use direct backgroundUrl from ASML import (if available) - avoids asset lookup
     const bgUrl = params.backgroundUrl || '';
 
+    // Panorama: reposition text/dialog (prompt) elements to camera-center position.
+    // The schema initializer places prompts near the top of the stage (y≈100), which maps
+    // to near the north pole in equirectangular. Reposition so the prompt appears at the
+    // bottom-center of the initial camera view, matching the expected prompt location.
+    if (beat.type === 'panorama') {
+      const stageW = projectSettings?.width || 1024;
+      const stageH = projectSettings?.height || 768;
+      const hfov = params.hfov ?? 75;
+      const iYaw = params.initialYaw ?? 0;
+      const iPitch = params.initialPitch ?? 0;
+      const projType = params.projectionType || 'equirectangular';
+      const imgAspect = params.imageAspectRatio ?? 4;
+      const aspectRatio = stageW / stageH;
+      const vfov = hfov / aspectRatio;
+      // Camera-center bottom: below center of initial view
+      const promptYaw = iYaw;
+      const promptPitch = iPitch - vfov * 0.35;
+      const { centerX: camCx, centerY: camCy } = yawPitchToStage(promptYaw, promptPitch, projType, stageW, stageH, imgAspect);
+
+      for (const el of elements) {
+        if (el.type !== 'text' && el.type !== 'dialog') continue;
+        // Only reposition if still at the schema default position (y < 200, centered horizontally)
+        if (el.y < 200 && el.x > stageW * 0.2 && el.x < stageW * 0.5) {
+          el.x = Math.round(camCx - el.width / 2);
+          el.y = Math.round(camCy - el.height / 2);
+          console.log(`[VisualWorkspace] Panorama: repositioned prompt "${el.name}" to camera-center (x=${el.x}, y=${el.y})`);
+        }
+      }
+    }
+
     // Fix z-index ordering: ensure all elements have unique z values
     // This handles ASML imports where z-index wasn't preserved (all 0) or has duplicates
     if (elements.length > 1) {
@@ -4298,6 +4366,26 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   beat.updateParameters({ promptDisplay: display });
                   if (onBeatUpdate) {
                     onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), promptDisplay: display } } as any);
+                  }
+                  // When switching to pinned mode, reposition prompt element near camera center
+                  // so the user can find it easily instead of hunting for it off-screen
+                  if (display === 'pinned') {
+                    const params = beat.getParameters();
+                    const stW = projectSettings?.width || 1024;
+                    const stH = projectSettings?.height || 768;
+                    const iYaw = params.initialYaw ?? 0;
+                    const iPitch = params.initialPitch ?? 0;
+                    const hfovVal = params.hfov ?? 75;
+                    const projT = params.projectionType || 'equirectangular';
+                    const imgA = panoramaImageAspect;
+                    const vfov = hfovVal / (stW / stH);
+                    const promptYaw = iYaw;
+                    const promptPitch = iPitch - vfov * 0.35;
+                    const { centerX: cx, centerY: cy } = yawPitchToStage(promptYaw, promptPitch, projT, stW, stH, imgA);
+                    setVisualElements(prev => prev.map(el => {
+                      if (el.type !== 'text' && el.type !== 'dialog') return el;
+                      return { ...el, x: Math.round(cx - el.width / 2), y: Math.round(cy - el.height / 2) };
+                    }));
                   }
                   setHasChanges(true);
                 } : undefined}

@@ -38,6 +38,9 @@ export interface PanoramaHotspotData {
   scale?: number;
   rotation?: number;
   sound?: string;
+  assetId?: string;
+  imageUrl?: string;
+  kind?: string;
 }
 
 export interface PanoramaViewerApi {
@@ -84,6 +87,7 @@ export interface PanoramaViewProps {
     width: number;
     height: number;
     scale?: number;
+    size?: number;       // Character size percentage (e.g. 90 = 90%)
     rotation?: number;
     assetId?: string;
     imageUrl?: string;
@@ -157,9 +161,33 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
   const editorModeRef = useRef(editorMode);
   const soundBlobResolverRef = useRef(soundBlobResolver);
   const hotspotsRef = useRef(hotspots);
+  // Store actual HFOV from the viewer after zoom is applied (may differ from
+  // the requested `hfov` prop due to PSV's aspect-ratio-dependent quantization)
+  const initialHfovRef = useRef(Math.max(30, hfov));
 
   // Trigger markers sync when viewer becomes ready
   const [markersVersion, setMarkersVersion] = useState(0);
+
+  // Detect CSS scale applied by parent (e.g. PreviewWindow's transform: scale())
+  // so we can compensate the static prompt overlay's font size
+  const [cssScale, setCssScale] = useState(1);
+  useEffect(() => {
+    const el = viewerContainerRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      const layoutW = el.offsetWidth;
+      if (layoutW > 0) {
+        const s = rect.width / layoutW;
+        if (Math.abs(s - 1) > 0.01) setCssScale(s);
+        else setCssScale(1);
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Tooltip state for hotspot hover labels
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
@@ -212,6 +240,10 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
           const zoom = hfovToZoom(viewer, Math.max(30, hfov));
           viewer.zoom(zoom);
         } catch { /* ignore */ }
+
+        // Read back actual HFOV from the viewer — PSV's round-trip may differ
+        // from the requested value due to aspect-ratio quantization
+        initialHfovRef.current = Math.max(30, zoomToHfov(viewer));
 
         // Expose viewer API
         if (onViewerReadyRef.current) {
@@ -342,12 +374,14 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
 
     // Scale markers proportionally with zoom using perspective-correct tangent ratio.
     // This matches how PSV's Three.js renderer scales the panorama background.
+    // Uses the actual initial HFOV from the viewer (stored in initialHfovRef)
+    // rather than the requested hfov prop, ensuring zoomScale=1 at default zoom.
     const viewer = viewerRef.current;
     let zoomScale = 1;
     if (viewer && viewer.state.ready) {
       try {
         const currentHfov = zoomToHfov(viewer);
-        const initRad = Math.max(30, hfov) * 0.5 * DEG_TO_RAD;
+        const initRad = initialHfovRef.current * 0.5 * DEG_TO_RAD;
         const currRad = Math.max(30, currentHfov) * 0.5 * DEG_TO_RAD;
         zoomScale = Math.tan(initRad) / Math.tan(currRad);
       } catch { /* ignore */ }
@@ -379,31 +413,41 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
       const rotateStyle = hs.rotation ? `transform: rotate(${hs.rotation}deg);` : '';
       const fontSize = Math.max(10, Math.round(hsFontSizeBase * scale * 0.8));
 
-      // Determine background based on visibility mode
-      let bgStyle: string;
-      if (!hsVisible || hsShowInPreview === 'invisible') {
-        bgStyle = 'background-color:transparent;';
-      } else if (hsShowInPreview === 'onHover') {
-        // Transparent by default, colored on hover via CSS class
-        bgStyle = 'background-color:transparent;';
-      } else {
-        // 'visible' mode
-        const alpha = isSelected ? Math.min(hsOpacity * 1.5, 1) : hsOpacity;
-        bgStyle = `background-color:rgba(${hsR},${hsG},${hsB},${alpha.toFixed(2)});`;
-      }
+      // Check if this hotspot has an image (prop/character assigned via locationName)
+      const imgSrc = (hs.assetId && resolveAssetUrl ? resolveAssetUrl(hs.assetId) : undefined) || hs.imageUrl;
+      const isImageMarker = imgSrc && hs.kind !== 'hotspot';
 
       // Determine label text
       const labelText = hsLabelDisplay === 'none' ? '' : (hs.text || 'Hotspot');
       // For 'hover' label mode, custom tooltip is shown via marker events (no inline text)
       const showInlineText = hsLabelDisplay === 'always' || editorMode;
 
-      // Unique class for onHover CSS targeting
-      const hoverClass = (hsShowInPreview === 'onHover' && hsVisible) ? `pano-hs-hover` : '';
+      let markerHtml: string;
+      if (isImageMarker) {
+        // Image-based marker for props/characters — always visible (visibility settings only apply to standard hotspots)
+        const imgLabelDisplay = hsLabelDisplay !== 'none';
+        const labelHtml = imgLabelDisplay && labelText
+          ? `<div style="text-align:center;font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.6);margin-top:2px;white-space:nowrap;">${labelText}</div>`
+          : '';
+        markerHtml = `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;${rotateStyle}">
+          <img src="${imgSrc}" alt="${hs.text || ''}" style="width:${Math.round(w)}px;height:${Math.round(h)}px;object-fit:contain;" />
+          ${labelHtml}</div>`;
+      } else {
+        // Standard colored-rectangle hotspot
+        // Determine background based on visibility mode
+        let bgStyle: string;
+        if (!hsVisible || hsShowInPreview === 'invisible') {
+          bgStyle = 'background-color:transparent;';
+        } else if (hsShowInPreview === 'onHover') {
+          bgStyle = 'background-color:transparent;';
+        } else {
+          const alpha = isSelected ? Math.min(hsOpacity * 1.5, 1) : hsOpacity;
+          bgStyle = `background-color:rgba(${hsR},${hsG},${hsB},${alpha.toFixed(2)});`;
+        }
 
-      markers.push({
-        id: `hotspot-${hs.id}`,
-        position: { yaw: hs.yaw * DEG_TO_RAD, pitch: hs.pitch * DEG_TO_RAD },
-        html: `<div class="${hoverClass}" style="width:${Math.round(w)}px;height:${Math.round(h)}px;${rotateStyle}
+        const hoverClass = (hsShowInPreview === 'onHover' && hsVisible) ? `pano-hs-hover` : '';
+
+        markerHtml = `<div class="${hoverClass}" style="width:${Math.round(w)}px;height:${Math.round(h)}px;${rotateStyle}
           ${bgStyle}
           border:${isSelected ? `2px dashed rgba(${hsR},${hsG},${hsB},0.8)` : 'none'};
           border-radius:4px;display:flex;align-items:center;justify-content:center;
@@ -411,7 +455,13 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
           text-shadow:0 1px 3px rgba(0,0,0,0.6);white-space:nowrap;overflow:hidden;
           cursor:pointer;box-sizing:border-box;
           transition:background-color 0.15s ease;">
-          ${showInlineText ? labelText : ''}</div>`,
+          ${showInlineText ? labelText : ''}</div>`;
+      }
+
+      markers.push({
+        id: `hotspot-${hs.id}`,
+        position: { yaw: hs.yaw * DEG_TO_RAD, pitch: hs.pitch * DEG_TO_RAD },
+        html: markerHtml,
         size: { width: Math.round(w), height: Math.round(h) },
         anchor: 'center center',
         data: { hotspotId: hs.id, text: hs.text || '' },
@@ -433,7 +483,8 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
     // Overlay element markers (props, characters, pinned text/dialog)
     if (overlayElements) {
       for (const el of overlayElements) {
-        const elScale = el.scale || 1;
+        const sizeScale = el.size !== undefined ? el.size / 100 : 1;
+        const elScale = (el.scale || 1) * sizeScale;
         const w = el.width * elScale * scale;
         const h = el.height * elScale * scale;
         const rotateStyle = el.rotation ? `transform: rotate(${el.rotation}deg);` : '';
@@ -477,7 +528,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
     try {
       mp.setMarkers(markers);
     } catch { /* viewer may be initializing */ }
-  }, [hotspots, overlayElements, selectedHotspotId, resolveAssetUrl, markersVersion, hfov, stageWidth, promptStyle, prompt, promptDisplay, hotspotStyle, editorMode]);
+  }, [hotspots, overlayElements, selectedHotspotId, resolveAssetUrl, markersVersion, stageWidth, promptStyle, prompt, promptDisplay, hotspotStyle, editorMode]);
 
   // Effect #3: Camera sync when initialPitch/Yaw/hfov props change externally
   useEffect(() => {
@@ -512,26 +563,35 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
       <div ref={viewerContainerRef} style={{ width: '100%', height: '100%' }} />
 
       {/* Prompt overlay (static mode only — pinned mode renders as a PSV marker) */}
-      {prompt && promptDisplay !== 'pinned' && (
-        <div style={{
-          position: 'absolute',
-          bottom: 24,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          backgroundColor: promptStyle?.backgroundColor || 'rgba(0, 0, 0, 0.7)',
-          color: promptStyle?.color || 'white',
-          padding: promptStyle?.padding ?? '10px 24px',
-          borderRadius: promptStyle?.borderRadius ?? 8,
-          border: promptStyle?.border || 'none',
-          fontSize: promptStyle?.fontSize || 16,
-          fontFamily: promptStyle?.fontFamily || 'sans-serif',
-          pointerEvents: 'none',
-          whiteSpace: 'nowrap',
-          zIndex: 10,
-        }}>
-          {prompt}
-        </div>
-      )}
+      {prompt && promptDisplay !== 'pinned' && (() => {
+        // Compensate for parent CSS scale (PreviewWindow applies transform: scale()
+        // which shrinks the prompt; divide by cssScale to undo the shrinkage)
+        const scaleComp = cssScale < 1 ? 1 / cssScale : 1;
+        const baseFontSize = typeof promptStyle?.fontSize === 'number' ? promptStyle.fontSize : 16;
+        const basePadding = promptStyle?.padding ?? '10px 24px';
+        const baseRadius = typeof promptStyle?.borderRadius === 'number' ? promptStyle.borderRadius : 8;
+        return (
+          <div style={{
+            position: 'absolute',
+            bottom: Math.round(60 * scaleComp),
+            left: '50%',
+            transform: `translateX(-50%)${scaleComp !== 1 ? ` scale(${scaleComp.toFixed(4)})` : ''}`,
+            transformOrigin: 'bottom center',
+            backgroundColor: promptStyle?.backgroundColor || 'rgba(0, 0, 0, 0.7)',
+            color: promptStyle?.color || 'white',
+            padding: basePadding,
+            borderRadius: baseRadius,
+            border: promptStyle?.border || 'none',
+            fontSize: baseFontSize,
+            fontFamily: promptStyle?.fontFamily || 'sans-serif',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            zIndex: 10,
+          }}>
+            {prompt}
+          </div>
+        );
+      })()}
 
       {/* Hotspot hover tooltip (themed like button, follows cursor) */}
       {tooltip && (

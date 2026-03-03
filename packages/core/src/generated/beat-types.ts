@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-03-02T04:03:20.969Z
+ * Generated: 2026-03-03T13:08:51.933Z
  */
 
 // ============================================
@@ -89,6 +89,8 @@ export interface PanoramaHotspot {
   yaw: number;
   text: string;
   displayText?: string;
+  locationName?: string;
+  soundEffect?: string;
   target: string;
   conditions?: Condition[];
   effects?: Effect[];

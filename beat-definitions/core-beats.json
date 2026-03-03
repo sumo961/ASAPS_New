@@ -120,11 +120,13 @@
         "yaw": "number",
         "text": "string",
         "displayText": "string?",
+        "locationName": "string?",
+        "soundEffect": "string?",
         "target": "string",
         "conditions": "condition[]?",
         "effects": "effect[]?"
       },
-      "notes": "pitch is vertical angle (-90 to 90), yaw is horizontal angle (-180 to 180). target is the beat ID to navigate to when clicked."
+      "notes": "pitch is vertical angle (-90 to 90), yaw is horizontal angle (-180 to 180). target is the beat ID to navigate to when clicked. locationName optionally references a hotspot, prop, or character from beat.locations by name. soundEffect plays when this hotspot is selected."
     }
   },
 

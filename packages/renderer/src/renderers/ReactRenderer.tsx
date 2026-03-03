@@ -2082,6 +2082,9 @@ export class ReactRenderer extends BaseRenderer {
       scale?: number;
       rotation?: number;
       sound?: string;
+      assetId?: string;
+      imageUrl?: string;
+      kind?: string;
     }>;
     initialPitch?: number;
     initialYaw?: number;
@@ -2095,12 +2098,22 @@ export class ReactRenderer extends BaseRenderer {
     const panoramaAssetId = this.getState('panoramaAssetId');
     const resolvedUrl = panoramaUrl || this.getState('panoramaAssetUrl') || this.resolveAssetUrl(panoramaAssetId) || '';
 
+    // Pre-resolve hotspot images using asset resolver (PanoramaView may not
+    // be able to resolve asset IDs if they aren't in the same blob store)
+    const resolvedHotspots = options.hotspots.map(hs => {
+      if (hs.assetId) {
+        const resolved = this.resolveAssetUrl(hs.assetId);
+        if (resolved) return { ...hs, imageUrl: resolved };
+      }
+      return hs;
+    });
+
     return new Promise(resolve => {
       this.renderComponent(
         <div style={{ width: '100%', height: '100%' }}>
           <PanoramaView
             panoramaUrl={resolvedUrl}
-            hotspots={options.hotspots}
+            hotspots={resolvedHotspots}
             initialPitch={options.initialPitch}
             initialYaw={options.initialYaw}
             hfov={options.hfov}
@@ -2108,19 +2121,37 @@ export class ReactRenderer extends BaseRenderer {
             prompt={options.prompt}
             promptDisplay={options.promptDisplay}
             onHotspotClick={(hotspotId) => resolve(hotspotId)}
-            overlayElements={options.locations?.map((loc: any) => ({
-              id: loc.id,
-              name: loc.name,
-              kind: loc.kind,
-              yaw: loc.yaw,
-              pitch: loc.pitch,
-              width: loc.width,
-              height: loc.height,
-              scale: loc.scale,
-              rotation: loc.rotation,
-              assetId: loc.assetId,
-              imageUrl: loc.imageUrl,
-            }))}
+            overlayElements={options.locations?.map((loc: any) => {
+              // Pre-resolve image: try asset resolver, then character resolver
+              let resolvedImageUrl: string | undefined;
+              if (loc.assetId) {
+                resolvedImageUrl = this.resolveAssetUrl(loc.assetId) || undefined;
+              }
+              if (!resolvedImageUrl && loc.characterId && this.characterResolver) {
+                resolvedImageUrl = this.characterResolver(loc.characterId, loc.stateId);
+              }
+              // Only use loc.imageUrl if it looks like a real URL (not a bare UUID)
+              if (!resolvedImageUrl && loc.imageUrl) {
+                const img = loc.imageUrl as string;
+                if (img.startsWith('blob:') || img.startsWith('data:') || img.startsWith('http') || img.startsWith('/')) {
+                  resolvedImageUrl = img;
+                }
+              }
+              return {
+                id: loc.id,
+                name: loc.name,
+                kind: loc.kind,
+                yaw: loc.yaw,
+                pitch: loc.pitch,
+                width: loc.width,
+                height: loc.height,
+                scale: loc.scale,
+                size: loc.size,
+                rotation: loc.rotation,
+                assetId: loc.assetId,
+                imageUrl: resolvedImageUrl,
+              };
+            })}
             resolveAssetUrl={(assetId) => this.resolveAssetUrl(assetId) || undefined}
             soundBlobResolver={this.soundBlobResolver || undefined}
             stageWidth={this.context.width}

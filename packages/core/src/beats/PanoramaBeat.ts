@@ -4,6 +4,8 @@ import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { PanoramaHotspot } from '../generated/beat-types';
 
+const RAD_TO_DEG = 180 / Math.PI;
+
 export class PanoramaBeat extends Beat {
   public panoramaAssetId: string;
   public projectionType: 'equirectangular' | 'cylindrical';
@@ -56,6 +58,7 @@ export class PanoramaBeat extends Beat {
   }
 
   updateParameters(params: Record<string, any>): void {
+    this._version++;
     if (params.panoramaAssetId !== undefined) this.panoramaAssetId = params.panoramaAssetId;
     if (params.projectionType !== undefined) this.projectionType = params.projectionType;
     if (params.hotspots !== undefined) {
@@ -133,33 +136,80 @@ export class PanoramaBeat extends Beat {
     const processedPrompt = this.prompt ? this.processText(this.prompt, context) : '';
 
     if (renderer.renderPanorama) {
+      // Stage dimensions default to 1024x768 (matching project defaults and VE conventions)
+      const stageW = 1024;
+      const stageH = 768;
+
+      // Log available locations for debugging
+      console.log(`[PanoramaBeat] Beat "${this.name || this.id}" — ${this.locations.size} locations: [${Array.from(this.locations.keys()).join(', ')}]`);
+      for (const [name, loc] of this.locations) {
+        console.log(`  loc "${name}": kind=${loc.kind} x=${loc.x} y=${loc.y} w=${loc.width} h=${loc.height} assetId=${loc.assetId || 'none'} imageUrl=${loc.imageUrl ? 'yes' : 'none'}`);
+      }
+
       // Enrich hotspot data with visual properties from beat.locations
       const enrichedHotspots = availableHotspots.map(h => {
-        const loc = this.locations.get(h.text) || this.locations.get(h.id);
+        const loc = (h.locationName ? this.locations.get(h.locationName) : undefined)
+          || this.locations.get(h.text) || this.locations.get(h.id);
+        console.log(`  [PanoramaBeat] Hotspot "${h.id}" locationName="${h.locationName || ''}" → loc found: ${!!loc} (lookup keys: "${h.locationName}", "${h.text}", "${h.id}")`);
+
+        // When a location is linked via locationName with valid x/y, derive yaw/pitch
+        // from the location's stage position instead of the hotspot's stored values.
+        // This keeps runtime position in sync with VE element placement.
+        let pitch = h.pitch;
+        let yaw = h.yaw;
+        if (loc && h.locationName && loc.x !== undefined && loc.y !== undefined) {
+          const centerX = loc.x + loc.width / 2;
+          const centerY = loc.y + loc.height / 2;
+          if (this.projectionType === 'cylindrical') {
+            const imgAspect = 4;
+            const halfYawDeg = 0.5 * imgAspect * RAD_TO_DEG;
+            const maxPitchDeg = Math.atan(0.5) * RAD_TO_DEG;
+            yaw = halfYawDeg * (1 - 2 * centerX / stageW);
+            pitch = maxPitchDeg * (1 - 2 * centerY / stageH);
+          } else {
+            yaw = 180 - (centerX / stageW) * 360;
+            pitch = 90 - (centerY / stageH) * 180;
+          }
+        }
+
         return {
           id: h.id,
-          pitch: h.pitch,
-          yaw: h.yaw,
+          pitch,
+          yaw,
           text: this.processText(h.displayText || h.text, context),
           ...(loc ? {
             width: loc.width,
             height: loc.height,
             scale: loc.scale,
             rotation: loc.rotation,
-            sound: loc.sound,
-          } : {}),
+            sound: h.soundEffect || loc.sound,
+            assetId: loc.assetId,
+            imageUrl: loc.imageUrl,
+            kind: loc.kind,
+          } : {
+            ...(h.soundEffect ? { sound: h.soundEffect } : {}),
+          }),
         };
       });
 
+      // Log enriched hotspot data for debugging
+      console.log(`[PanoramaBeat] Beat "${this.name || this.id}" — ${enrichedHotspots.length} enriched hotspots:`);
+      for (const eh of enrichedHotspots) {
+        console.log(`  [${eh.id}] yaw=${eh.yaw?.toFixed(1)} pitch=${eh.pitch?.toFixed(1)} text="${eh.text}" kind=${eh.kind || 'hotspot'} assetId=${eh.assetId || 'none'} imageUrl=${eh.imageUrl ? 'yes' : 'none'} w=${eh.width || 'default'} h=${eh.height || 'default'}`);
+      }
+
       // Collect non-hotspot locations (props, characters) for overlay rendering
       // Convert stage x,y → yaw,pitch so the renderer can position them as panorama hotspots
-      // Stage dimensions default to 1024x768 (matching project defaults and VE conventions)
-      const stageW = 1024;
-      const stageH = 768;
-      const RAD_TO_DEG = 180 / Math.PI;
+      // Build set of locationName values assigned to hotspots — these are rendered
+      // as hotspot markers and should NOT also appear as standalone overlay elements
+      const assignedLocationNames = new Set(
+        availableHotspots.map(h => h.locationName).filter(Boolean) as string[]
+      );
       const overlayLocations = Array.from(this.locations.values())
         .filter(loc => {
           if (loc.kind === 'hotspot') return false;
+          // Skip locations that are assigned to a hotspot via locationName
+          if (assignedLocationNames.has(loc.name)) return false;
           // Include text/dialog locations only in pinned mode
           if (loc.kind === 'text' || loc.kind === 'dialog') return this.promptDisplay === 'pinned';
           return true;
@@ -167,8 +217,8 @@ export class PanoramaBeat extends Beat {
         .map(loc => {
           const centerX = loc.x + loc.width / 2;
           const centerY = loc.y + loc.height / 2;
-          // Stage → yaw/pitch conversion (same formulas as builder/panoramaCoordinates.ts)
           let yaw: number, pitch: number;
+          // Stage → yaw/pitch conversion (same formulas as builder/panoramaCoordinates.ts)
           if (this.projectionType === 'cylindrical') {
             const imgAspect = 4; // default cylindrical aspect
             const halfYawDeg = 0.5 * imgAspect * RAD_TO_DEG;

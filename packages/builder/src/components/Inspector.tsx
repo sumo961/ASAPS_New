@@ -239,13 +239,14 @@ export const Inspector: React.FC<InspectorProps> = ({
   // Recompute on every render — beat.locations is a Map mutated externally by the VE,
   // so useMemo with reference-based deps can never reliably detect changes.
   const availableLocations = (() => {
-    if (!beat || !beat.locations) return { hotspots: [] as any[], props: [] as any[] };
+    if (!beat || !beat.locations) return { hotspots: [] as any[], props: [] as any[], characters: [] as any[] };
 
     const locations = Array.from(beat.locations.values());
     const hotspots = locations.filter(loc => loc.kind === 'hotspot');
     const props = locations.filter(loc => loc.kind === 'prop');
+    const characters = locations.filter(loc => loc.kind === 'character');
 
-    return { hotspots, props };
+    return { hotspots, props, characters };
   })();
 
   // Asset selection modal state
@@ -624,6 +625,92 @@ export const Inspector: React.FC<InspectorProps> = ({
       parameters: {
         ...localBeat.parameters,
         props: newProps
+      }
+    };
+    setLocalBeat(updatedBeat);
+
+    // Trigger re-render to update availableLocations
+    setLocationUpdateTrigger(prev => prev + 1);
+
+    // Use rebuildConnectionsAndUpdate to persist the changes
+    rebuildConnectionsAndUpdate(updatedBeat);
+  };
+
+  // Update a field on a panorama hotspot (mirrors handleUpdateChoice for hotspots array)
+  const handleUpdateHotspot = (index: number, field: string, value: any) => {
+    const newHotspots = [...(localBeat.parameters?.hotspots || [])];
+    newHotspots[index] = {
+      ...newHotspots[index],
+      [field]: value
+    };
+    handleParameterChange('hotspots', newHotspots);
+
+    // If target changed, rebuild connections immediately
+    if (field === 'target') {
+      const updatedBeat = {
+        ...localBeat,
+        parameters: {
+          ...localBeat.parameters,
+          hotspots: newHotspots
+        }
+      };
+      rebuildConnectionsAndUpdate(updatedBeat);
+    }
+  };
+
+  // Create a new hotspot VE element for a panorama hotspot (mirrors handleCreateHotspotForChoice)
+  const handleCreateHotspotForPanorama = (hotspotIndex: number) => {
+    if (!beat || !onUpdate) return;
+
+    const hotspot = localBeat.parameters?.hotspots?.[hotspotIndex];
+    if (!hotspot) return;
+
+    // Generate a unique hotspot name based on hotspot text
+    const hotspotName = hotspot.text || `Hotspot ${hotspotIndex + 1}`;
+
+    // Check if a location with this name already exists
+    const existingNames = new Set(
+      Array.from(beat.locations?.values() || []).map(loc => loc.name)
+    );
+    let finalName = hotspotName;
+    let counter = 1;
+    while (existingNames.has(finalName)) {
+      finalName = `${hotspotName} (${counter})`;
+      counter++;
+    }
+
+    // Create a new hotspot location
+    const newLocation = {
+      kind: 'hotspot' as const,
+      name: finalName,
+      x: 100 + (hotspotIndex * 50),
+      y: 300 + (hotspotIndex * 60),
+      width: 150,
+      height: 50,
+      zIndex: 10 + hotspotIndex,
+    };
+
+    // Directly add to the beat's locations Map
+    beat.locations.set(finalName, newLocation as any);
+
+    // Notify VE to add the element to its live state
+    window.dispatchEvent(new CustomEvent('asaps:addElementToStage', {
+      detail: { beatId: beat.id, location: newLocation }
+    }));
+
+    // Update the hotspot's locationName to reference this new location
+    const newHotspots = [...(localBeat.parameters?.hotspots || [])];
+    newHotspots[hotspotIndex] = {
+      ...newHotspots[hotspotIndex],
+      locationName: finalName
+    };
+
+    // Update local state with the new hotspots
+    const updatedBeat = {
+      ...localBeat,
+      parameters: {
+        ...localBeat.parameters,
+        hotspots: newHotspots
       }
     };
     setLocalBeat(updatedBeat);
@@ -2647,37 +2734,125 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </button>
                           </div>
 
-                          <div>
+                          {translationState.activeLanguage ? (
+                            <>
+                              <input
+                                type="text"
+                                value={hotspot.displayText || ''}
+                                onChange={(e) => handleUpdateHotspot(index, 'displayText', e.target.value)}
+                                placeholder="Translated label"
+                                className="w-full px-2 py-1 text-sm border rounded border-blue-300"
+                              />
+                              {sourceParametersRef.current?.hotspots?.[index] && (
+                                <div className="text-xs text-gray-400 italic truncate">
+                                  Source: {sourceParametersRef.current.hotspots[index].text || ''}
+                                </div>
+                              )}
+                            </>
+                          ) : (
                             <input type="text"
                               value={hotspot.text || ''}
-                              onChange={(e) => {
-                                const newHotspots = [...(localBeat.parameters?.hotspots || [])];
-                                newHotspots[index] = { ...newHotspots[index], text: e.target.value };
-                                handleParameterChange('hotspots', newHotspots);
-                              }}
+                              onChange={(e) => handleUpdateHotspot(index, 'text', e.target.value)}
                               placeholder="Hotspot label"
                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
-                          </div>
+                          )}
 
-                          <div>
-                            <label className="block text-xs text-gray-500">Target Beat</label>
+                          {/* Location Assignment (hotspot/prop/character) */}
+                          {(() => {
+                            // Compute the effective locationName: explicit locationName, or fall back
+                            // to matching by hotspot text/id against existing VE elements
+                            const allLocs = [...availableLocations.hotspots, ...availableLocations.props, ...availableLocations.characters];
+                            const allLocNames = new Set(allLocs.map(l => l.name));
+                            const effectiveLocationName = hotspot.locationName
+                              || (allLocNames.has(hotspot.text) ? hotspot.text : undefined)
+                              || (allLocNames.has(hotspot.id) ? hotspot.id : undefined)
+                              || '';
+                            return (
+                          <div className="flex gap-2">
                             <select
-                              value={hotspot.target || ''}
-                              onChange={(e) => {
-                                const newHotspots = [...(localBeat.parameters?.hotspots || [])];
-                                newHotspots[index] = { ...newHotspots[index], target: e.target.value };
-                                handleParameterChange('hotspots', newHotspots);
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              value={effectiveLocationName}
+                              onChange={(e) => handleUpdateHotspot(index, 'locationName', e.target.value)}
+                              className="flex-1 px-2 py-1 text-sm border rounded"
+                              title="Associate this hotspot with a VE element"
                             >
-                              <option value="">Select target beat...</option>
-                              {availableTargets.map(target => (
-                                <option key={target.id} value={target.id}>
-                                  {target.name || target.id}
-                                </option>
-                              ))}
+                              <option value="">Auto-create hotspot</option>
+                              {availableLocations.hotspots.length > 0 && (
+                                <optgroup label="Hotspots">
+                                  {availableLocations.hotspots.map((loc) => (
+                                    <option key={`hotspot-${loc.name}`} value={loc.name}>
+                                      🎯 {loc.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {availableLocations.props.length > 0 && (
+                                <optgroup label="Props">
+                                  {availableLocations.props.map((loc) => (
+                                    <option key={`prop-${loc.name}`} value={loc.name}>
+                                      📦 {loc.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {availableLocations.characters.length > 0 && (
+                                <optgroup label="Characters">
+                                  {availableLocations.characters.map((loc) => (
+                                    <option key={`char-${loc.name}`} value={loc.name}>
+                                      👤 {loc.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
                             </select>
+                            <button
+                              type="button"
+                              onClick={() => handleCreateHotspotForPanorama(index)}
+                              className="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 flex items-center gap-1"
+                              title="Create a new hotspot in the Visual Editor for this panorama hotspot"
+                            >
+                              <MapPin className="w-3 h-3" />
+                              New
+                            </button>
                           </div>
+                            );
+                          })()}
+
+                          <select
+                            value={hotspot.target || ''}
+                            onChange={(e) => handleUpdateHotspot(index, 'target', e.target.value)}
+                            className="w-full px-2 py-1 text-sm border rounded"
+                          >
+                            <option value="">Select target beat...</option>
+                            {availableTargets.map(target => (
+                              <option key={target.id} value={target.id}>
+                                {target.name} ({target.id})
+                              </option>
+                            ))}
+                          </select>
+
+                          {showAdvanced && (
+                            <div className="p-2 bg-blue-50 rounded space-y-2">
+                              <div className="text-xs font-medium text-blue-700">Effects (Optional)</div>
+                              <ChoiceEffectsEditor
+                                effects={hotspot.effects || []}
+                                onChange={(newEffects) => handleUpdateHotspot(index, 'effects', newEffects)}
+                                availableCounters={availableCounters}
+                                availableVariables={availableVariables}
+                                availableInventoryItems={availableInventoryItems}
+                                compact
+                              />
+                              <div className="mt-2 pt-2 border-t border-blue-200">
+                                <div className="text-xs font-medium text-blue-700 mb-1">Sound Effect (Optional)</div>
+                                <input
+                                  type="text"
+                                  value={hotspot.soundEffect || ''}
+                                  onChange={(e) => handleUpdateHotspot(index, 'soundEffect', e.target.value)}
+                                  placeholder="Sound file (e.g., click.mp3)"
+                                  className="w-full px-2 py-1 text-xs border rounded"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
 

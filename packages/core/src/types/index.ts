@@ -259,6 +259,9 @@ export interface IRenderer {
       scale?: number;
       rotation?: number;
       sound?: string;
+      assetId?: string;
+      imageUrl?: string;
+      kind?: string;
     }>;
     initialPitch?: number;
     initialYaw?: number;
