@@ -41,6 +41,11 @@ export interface PanoramaHotspotData {
   assetId?: string;
   imageUrl?: string;
   kind?: string;
+  hotspotOverride?: {
+    enabled: boolean;
+    opacity?: number;           // 0-100 percentage
+    showInPreview?: 'visible' | 'onHover' | 'invisible';
+  };
 }
 
 export interface PanoramaViewerApi {
@@ -404,6 +409,9 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
     const hsB = parseInt(hsColor.slice(5,7), 16) || 0;
     const hsHoverAlpha = Math.min(hsOpacity * 1.5, 1);
 
+    // Track whether any hotspot uses onHover mode (global or per-element override)
+    let hasAnyHoverHotspot = false;
+
     // Hotspot markers (no psv--capture-event: let PSV fire select-marker for navigation)
     for (const hs of hotspots) {
       const elScale = hs.scale || 1;
@@ -413,8 +421,14 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
       const rotateStyle = hs.rotation ? `transform: rotate(${hs.rotation}deg);` : '';
       const fontSize = Math.max(10, Math.round(hsFontSizeBase * scale * 0.8));
 
+      // Per-hotspot override: use element-level settings when enabled, fall back to global
+      const ovr = hs.hotspotOverride?.enabled ? hs.hotspotOverride : undefined;
+      const thisOpacity = ovr?.opacity !== undefined ? ovr.opacity / 100 : hsOpacity;
+      const thisShowInPreview = ovr?.showInPreview || hsShowInPreview;
+
       // Check if this hotspot has an image (prop/character assigned via locationName)
-      const imgSrc = (hs.assetId && resolveAssetUrl ? resolveAssetUrl(hs.assetId) : undefined) || hs.imageUrl;
+      const resolvedFromAssetId = hs.assetId && resolveAssetUrl ? resolveAssetUrl(hs.assetId) : undefined;
+      const imgSrc = resolvedFromAssetId || hs.imageUrl;
       const isImageMarker = imgSrc && hs.kind !== 'hotspot';
 
       // Determine label text
@@ -424,9 +438,9 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
 
       let markerHtml: string;
       if (isImageMarker) {
-        // Image-based marker for props/characters — always visible (visibility settings only apply to standard hotspots)
-        const imgLabelDisplay = hsLabelDisplay !== 'none';
-        const labelHtml = imgLabelDisplay && labelText
+        // Image-based marker for props/characters — no label in preview (only in editor)
+        const showImgLabel = editorMode && hsLabelDisplay !== 'none';
+        const labelHtml = showImgLabel && labelText
           ? `<div style="text-align:center;font-size:${fontSize}px;font-family:${hsFontFamily};font-weight:600;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.6);margin-top:2px;white-space:nowrap;">${labelText}</div>`
           : '';
         markerHtml = `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;${rotateStyle}">
@@ -434,18 +448,19 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
           ${labelHtml}</div>`;
       } else {
         // Standard colored-rectangle hotspot
-        // Determine background based on visibility mode
+        // Determine background based on per-hotspot or global visibility mode
         let bgStyle: string;
-        if (!hsVisible || hsShowInPreview === 'invisible') {
+        if (!hsVisible || thisShowInPreview === 'invisible') {
           bgStyle = 'background-color:transparent;';
-        } else if (hsShowInPreview === 'onHover') {
+        } else if (thisShowInPreview === 'onHover') {
           bgStyle = 'background-color:transparent;';
+          hasAnyHoverHotspot = true;
         } else {
-          const alpha = isSelected ? Math.min(hsOpacity * 1.5, 1) : hsOpacity;
+          const alpha = isSelected ? Math.min(thisOpacity * 1.5, 1) : thisOpacity;
           bgStyle = `background-color:rgba(${hsR},${hsG},${hsB},${alpha.toFixed(2)});`;
         }
 
-        const hoverClass = (hsShowInPreview === 'onHover' && hsVisible) ? `pano-hs-hover` : '';
+        const hoverClass = (thisShowInPreview === 'onHover' && hsVisible) ? `pano-hs-hover` : '';
 
         markerHtml = `<div class="${hoverClass}" style="width:${Math.round(w)}px;height:${Math.round(h)}px;${rotateStyle}
           ${bgStyle}
@@ -468,8 +483,8 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
       });
     }
 
-    // Inject hover CSS for onHover mode hotspots
-    if (hsShowInPreview === 'onHover' && hsVisible) {
+    // Inject hover CSS for onHover mode hotspots (global or per-element override)
+    if (hasAnyHoverHotspot || (hsShowInPreview === 'onHover' && hsVisible)) {
       const styleId = 'pano-hotspot-hover-style';
       let styleEl = document.getElementById(styleId);
       if (!styleEl) {

@@ -1284,9 +1284,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       else if (el.type === 'keypad') kind = 'keypad';
       else kind = 'text';
 
+      // Use consistent key for both Map key and location.name to avoid
+      // mismatches after serialization (toJSON uses values, Beat constructor uses loc.name as key)
+      const locationKey = el.name || el.text || el.id;
       const location: any = {
         kind,
-        name: el.name || el.text || '',
+        name: locationKey,
         id: el.id, // Include element ID for animation targeting
         x: Math.round(el.x),
         y: Math.round(el.y),
@@ -1339,7 +1342,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       if (el.manuallyResized) location.manuallyResized = el.manuallyResized;
       if (el.initialAutoSized) location.initialAutoSized = el.initialAutoSized;
 
-      targetBeat.locations.set(el.name || el.id, location);
+      // Per-element hotspot appearance override
+      if ((el as any).hotspotOverride?.enabled) location.hotspotOverride = (el as any).hotspotOverride;
+
+      targetBeat.locations.set(locationKey, location);
     });
 
     console.log(`[VisualWorkspace] Synced ${targetBeat.locations.size} locations to beat.locations`);
@@ -1636,9 +1642,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         else if (el.type === 'keypad') kind = 'keypad';
         else kind = 'text';
 
+        // Use consistent key for both Map key and location.name
+        const locationKey = el.name || el.text || el.id;
         const location: any = {
           kind,
-          name: el.name || el.text || '',
+          name: locationKey,
           id: el.id,  // Include element ID for animation targeting
           x: Math.round(el.x),
           y: Math.round(el.y),
@@ -1686,7 +1694,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           if (el.meterBackgroundColor) location.meterBackgroundColor = el.meterBackgroundColor;
         }
 
-        prevBeat.locations.set(el.name || el.id, location);
+        // Per-element hotspot appearance override
+        if ((el as any).hotspotOverride?.enabled) location.hotspotOverride = (el as any).hotspotOverride;
+
+        prevBeat.locations.set(locationKey, location);
       });
 
       // For DialogTree and EndScreen beats: save phase-specific element positions to phaseOverrides
@@ -1910,6 +1921,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             visible: true,
             locked: false,
             sound: loc.sound,
+            hotspotOverride: loc.hotspotOverride,
           };
 
           // Resolve character image URLs
@@ -2222,6 +2234,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               visible: true,
               locked: false,
               sound: loc.sound,
+              hotspotOverride: loc.hotspotOverride,
             };
             persistedElements.push(element);
           }
@@ -2363,6 +2376,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           visible: true,
           locked: false,
           sound: loc.sound,
+          hotspotOverride: loc.hotspotOverride,
           // Include font properties from location (mark as overridden if stored)
           font: loc.font,
           fontSize: loc.fontSize,
@@ -2575,6 +2589,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           visible: true,
           locked: false,
           sound: loc.sound,
+          hotspotOverride: (loc as any).hotspotOverride,
           // Include font properties from location (mark as overridden if stored)
           font: loc.font,
           fontSize: loc.fontSize,
@@ -2715,9 +2730,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         else if (el.type === 'keypad') kind = 'keypad';
         else if (el.type === 'text') kind = 'text';
 
+        // Use consistent key for both Map key and location.name
+        const locationKey = el.name || el.text || el.id;
         const location: any = {
           kind,
-          name: el.name || el.text || '',
+          name: locationKey,
           id: el.id,  // Include element ID for animation targeting
           x: Math.round(el.x),
           y: Math.round(el.y),
@@ -2745,7 +2762,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           if (el.meterBackgroundColor) location.meterBackgroundColor = el.meterBackgroundColor;
         }
 
-        beat.locations.set(el.name || el.id, location);
+        // Per-element hotspot appearance override
+        if ((el as any).hotspotOverride?.enabled) location.hotspotOverride = (el as any).hotspotOverride;
+
+        beat.locations.set(locationKey, location);
       });
       console.log(`[VisualWorkspace] Loaded ${beat.locations.size} locations to beat.locations Map`);
     }
@@ -3500,9 +3520,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       else if (el.type === 'meter') kind = 'meter';
       else if (el.type === 'keypad') kind = 'keypad';
 
+      // Use consistent key for both Map key and location.name
+      const locationKey = el.name || el.text || el.id;
       const location: any = {
         kind,
-        name: el.name || el.text || '',
+        name: locationKey,
         id: el.id,  // Include element ID for animation targeting
         x: Math.round(el.x),
         y: Math.round(el.y),
@@ -3554,9 +3576,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         if (el.meterBackgroundColor) location.meterBackgroundColor = el.meterBackgroundColor;
       }
 
-      beat.locations.set(el.name || el.id, location);
+      // Per-element hotspot appearance override
+      if ((el as any).hotspotOverride?.enabled) location.hotspotOverride = (el as any).hotspotOverride;
+
+      beat.locations.set(locationKey, location);
     });
-    
+
     console.log(`[VisualWorkspace] Saved ${beat.locations.size} locations to beat`);
 
     // For EndScreen credits phase, save phase overrides and credits text

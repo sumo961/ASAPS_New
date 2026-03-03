@@ -42,6 +42,12 @@ export interface Location {
   numericFormat?: 'value' | 'fraction' | 'percentage';
   meterColor?: string;       // Bar fill color
   meterBackgroundColor?: string;  // Bar background color
+  // Per-element hotspot appearance override (overrides global hotspot settings)
+  hotspotOverride?: {
+    enabled: boolean;
+    opacity?: number;           // 0-100 percentage
+    showInPreview?: 'visible' | 'onHover' | 'invisible';
+  };
 }
 
 export interface Transition {
@@ -262,6 +268,11 @@ export interface IRenderer {
       assetId?: string;
       imageUrl?: string;
       kind?: string;
+      hotspotOverride?: {
+        enabled: boolean;
+        opacity?: number;
+        showInPreview?: 'visible' | 'onHover' | 'invisible';
+      };
     }>;
     initialPitch?: number;
     initialYaw?: number;

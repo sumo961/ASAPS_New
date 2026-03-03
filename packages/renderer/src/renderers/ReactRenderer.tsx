@@ -2085,6 +2085,11 @@ export class ReactRenderer extends BaseRenderer {
       assetId?: string;
       imageUrl?: string;
       kind?: string;
+      hotspotOverride?: {
+        enabled: boolean;
+        opacity?: number;
+        showInPreview?: 'visible' | 'onHover' | 'invisible';
+      };
     }>;
     initialPitch?: number;
     initialYaw?: number;
@@ -2103,10 +2108,12 @@ export class ReactRenderer extends BaseRenderer {
     const resolvedHotspots = options.hotspots.map(hs => {
       if (hs.assetId) {
         const resolved = this.resolveAssetUrl(hs.assetId);
+        console.log(`[ReactRenderer.renderPanorama] Hotspot "${hs.id}" assetId=${hs.assetId} → resolved=${resolved ? 'YES' : 'NO'} imageUrl=${hs.imageUrl || 'none'} kind=${hs.kind || 'hotspot'}`);
         if (resolved) return { ...hs, imageUrl: resolved };
       }
       return hs;
     });
+    console.log(`[ReactRenderer.renderPanorama] ${resolvedHotspots.length} hotspots, ${options.locations?.length || 0} overlay locations`);
 
     return new Promise(resolve => {
       this.renderComponent(

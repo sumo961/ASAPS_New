@@ -1,5 +1,5 @@
 import { Beat } from './Beat';
-import type { BeatConfig } from '../types';
+import type { BeatConfig, Location } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { PanoramaHotspot } from '../generated/beat-types';
@@ -148,9 +148,25 @@ export class PanoramaBeat extends Beat {
 
       // Enrich hotspot data with visual properties from beat.locations
       const enrichedHotspots = availableHotspots.map(h => {
-        const loc = (h.locationName ? this.locations.get(h.locationName) : undefined)
-          || this.locations.get(h.text) || this.locations.get(h.id);
-        console.log(`  [PanoramaBeat] Hotspot "${h.id}" locationName="${h.locationName || ''}" → loc found: ${!!loc} (lookup keys: "${h.locationName}", "${h.text}", "${h.id}")`);
+        // Robust location lookup: try Map key first, then search through values
+        // by name or id (handles Map key / loc.name mismatches after serialization)
+        let loc: Location | undefined;
+        if (h.locationName) {
+          loc = this.locations.get(h.locationName);
+          if (!loc) {
+            // Search values — Map key may differ from loc.name or loc.id
+            for (const l of this.locations.values()) {
+              if (l.name === h.locationName || l.id === h.locationName) { loc = l; break; }
+            }
+          }
+          // When locationName is set but not found, do NOT fall through to text/id
+          // (avoids matching the hotspot's own bare location element)
+        } else {
+          // No explicit locationName — match by hotspot text or id (including hotspot-
+          // kind locations, which carry VE-set dimensions for standard hotspots)
+          loc = this.locations.get(h.text) || this.locations.get(h.id);
+        }
+        console.log(`  [PanoramaBeat] Hotspot "${h.id}" locationName="${h.locationName || ''}" → loc found: ${!!loc} kind=${loc?.kind || 'none'} (lookup keys: "${h.locationName}", "${h.text}", "${h.id}")`);
 
         // When a location is linked via locationName with valid x/y, derive yaw/pitch
         // from the location's stage position instead of the hotspot's stored values.
@@ -186,6 +202,7 @@ export class PanoramaBeat extends Beat {
             assetId: loc.assetId,
             imageUrl: loc.imageUrl,
             kind: loc.kind,
+            ...(loc.hotspotOverride?.enabled ? { hotspotOverride: loc.hotspotOverride } : {}),
           } : {
             ...(h.soundEffect ? { sound: h.soundEffect } : {}),
           }),
@@ -195,7 +212,8 @@ export class PanoramaBeat extends Beat {
       // Log enriched hotspot data for debugging
       console.log(`[PanoramaBeat] Beat "${this.name || this.id}" — ${enrichedHotspots.length} enriched hotspots:`);
       for (const eh of enrichedHotspots) {
-        console.log(`  [${eh.id}] yaw=${eh.yaw?.toFixed(1)} pitch=${eh.pitch?.toFixed(1)} text="${eh.text}" kind=${eh.kind || 'hotspot'} assetId=${eh.assetId || 'none'} imageUrl=${eh.imageUrl ? 'yes' : 'none'} w=${eh.width || 'default'} h=${eh.height || 'default'}`);
+        const a = eh as any;
+        console.log(`  [${eh.id}] yaw=${eh.yaw?.toFixed(1)} pitch=${eh.pitch?.toFixed(1)} text="${eh.text}" kind=${a.kind || 'hotspot'} assetId=${a.assetId || 'none'} imageUrl=${a.imageUrl ? 'yes' : 'none'} w=${a.width || 'default'} h=${a.height || 'default'}`);
       }
 
       // Collect non-hotspot locations (props, characters) for overlay rendering
