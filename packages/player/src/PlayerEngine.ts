@@ -501,6 +501,21 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
 
     console.log(`[PlayerEngine] Building assets from ${manifest.length} files in ZIP`);
 
+    // First pass: collect known asset IDs from metadata JSON filenames.
+    // The ZIP stores metadata as "{folder}/{assetId}.json" alongside media files
+    // as "{folder}/{assetId}_{originalFilename}.ext". Since asset IDs can contain
+    // underscores (e.g. "asset_1772586254887_ty1nd6r8i"), we can't just split on
+    // the first underscore. Instead, use the JSON filenames as the source of truth.
+    const knownAssetIds = new Set<string>();
+    for (const assetInfo of manifest) {
+      if (assetInfo.path.endsWith('.json')) {
+        const jsonFilename = assetInfo.path.split('/').pop() || '';
+        const potentialId = jsonFilename.replace(/\.json$/, '');
+        if (potentialId) knownAssetIds.add(potentialId);
+      }
+    }
+
+    // Second pass: load media assets with correct IDs
     for (const assetInfo of manifest) {
       try {
         // Skip .json metadata files - only load actual media assets
@@ -511,8 +526,19 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         const loaded = await this.assetResolver.getAsset(assetInfo.path);
         if (loaded) {
           // Extract asset ID from path - format is "folder/assetId_filename.ext"
+          // Match against known IDs from metadata files (handles IDs with underscores)
           const filename = assetInfo.path.split('/').pop() || '';
-          const assetId = filename.includes('_') ? filename.split('_')[0] : assetInfo.id;
+          let assetId = '';
+          for (const knownId of knownAssetIds) {
+            if (filename.startsWith(knownId + '_') || filename === knownId) {
+              assetId = knownId;
+              break;
+            }
+          }
+          // Fallback for ZIPs without metadata files
+          if (!assetId) {
+            assetId = filename.includes('_') ? filename.split('_')[0] : assetInfo.id;
+          }
 
           assets.push({
             id: assetId,

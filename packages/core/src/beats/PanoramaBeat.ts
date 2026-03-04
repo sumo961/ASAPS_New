@@ -118,8 +118,25 @@ export class PanoramaBeat extends Beat {
   ): Promise<string | null> {
     // Set panorama asset ID on renderer state so it can resolve the URL
     renderer.setState('panoramaAssetId', this.panoramaAssetId);
-    // The renderer resolves the URL via its asset resolver (same pattern as backgroundAssetId)
-    const panoramaUrl = renderer.getState('panoramaAssetUrl') || '';
+
+    // Resolve panorama URL from environment nodes (same approach as background in base Beat)
+    let panoramaUrl = '';
+    if (this.panoramaAssetId) {
+      const story = context.getStory();
+      if (story) {
+        const environment = story.getEnvironment();
+        if (environment?.nodes && Array.isArray(environment.nodes)) {
+          const node = environment.nodes.find((n: any) => n.id === this.panoramaAssetId);
+          if (node) {
+            panoramaUrl = node.url || node.src || '';
+          }
+        }
+      }
+      // Fallback to renderer state (set by builder visual editor)
+      if (!panoramaUrl) {
+        panoramaUrl = renderer.getState('panoramaAssetUrl') || '';
+      }
+    }
 
     // Filter hotspots based on conditions
     const availableHotspots = this.hotspots.filter(hotspot => {

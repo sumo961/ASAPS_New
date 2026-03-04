@@ -171,6 +171,33 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
   // the requested `hfov` prop due to PSV's aspect-ratio-dependent quantization)
   const initialHfovRef = useRef(Math.max(30, hfov));
 
+  // blob: URLs fail in null-origin contexts (file:// HTML exports) because
+  // Three.js sets crossOrigin='anonymous' on the img element, which Chrome
+  // blocks for blob:null/ URLs. Convert to data URL which works everywhere.
+  const [resolvedPanoUrl, setResolvedPanoUrl] = useState(panoramaUrl);
+  useEffect(() => {
+    let cancelled = false;
+    if (!panoramaUrl) {
+      setResolvedPanoUrl('');
+      return;
+    }
+    if (panoramaUrl.startsWith('blob:')) {
+      fetch(panoramaUrl)
+        .then(r => r.blob())
+        .then(blob => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        }))
+        .then(dataUrl => { if (!cancelled) setResolvedPanoUrl(dataUrl); })
+        .catch(() => { if (!cancelled) setResolvedPanoUrl(panoramaUrl); });
+    } else {
+      setResolvedPanoUrl(panoramaUrl);
+    }
+    return () => { cancelled = true; };
+  }, [panoramaUrl]);
+
   // Trigger markers sync when viewer becomes ready
   const [markersVersion, setMarkersVersion] = useState(0);
 
@@ -210,7 +237,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
 
   // Stable callback for panoramaUrl changes - load image to get natural dimensions for cylindrical
   const createViewer = useCallback(() => {
-    if (!viewerContainerRef.current || !panoramaUrl) return;
+    if (!viewerContainerRef.current || !resolvedPanoUrl) return;
 
     // Destroy existing viewer
     if (viewerRef.current) {
@@ -224,7 +251,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
 
       const viewer = new Viewer({
         container: viewerContainerRef.current,
-        panorama: panoramaUrl,
+        panorama: resolvedPanoUrl,
         panoData: panoData || undefined,
         defaultYaw: initialYaw * DEG_TO_RAD,
         defaultPitch: initialPitch * DEG_TO_RAD,
@@ -352,11 +379,11 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
         // Fall back to equirectangular
         createWithPanoData();
       };
-      img.src = panoramaUrl;
+      img.src = resolvedPanoUrl;
     } else {
       createWithPanoData();
     }
-  }, [panoramaUrl, projectionType, initialYaw, initialPitch, hfov]);
+  }, [resolvedPanoUrl, projectionType, initialYaw, initialPitch, hfov]);
 
   // Effect #1: Viewer lifecycle
   useEffect(() => {
@@ -559,7 +586,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
     } catch { /* viewer may not be fully loaded yet */ }
   }, [initialPitch, initialYaw, hfov]);
 
-  if (!panoramaUrl) {
+  if (!resolvedPanoUrl) {
     return (
       <div style={{
         position: 'relative', width: '100%', height: '100%',
