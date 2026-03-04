@@ -898,6 +898,18 @@ export const Inspector: React.FC<InspectorProps> = ({
             beatData.parameters.hyperlinks = translatedLinks;
           }
 
+          // Overlay nested translations for panorama hotspots
+          if (beatData.parameters.hotspots && Array.isArray(beatData.parameters.hotspots)) {
+            const translatedHotspots = JSON.parse(JSON.stringify(beatData.parameters.hotspots));
+            for (const entry of entries) {
+              if (entry.path.startsWith('hotspots.') && entry.status === 'translated') {
+                const subPath = entry.path.substring('hotspots.'.length);
+                setNestedValue(translatedHotspots, subPath, entry.value);
+              }
+            }
+            beatData.parameters.hotspots = translatedHotspots;
+          }
+
           // Overlay nested translations for textVariations
           if (beatData.parameters.textVariations && Array.isArray(beatData.parameters.textVariations)) {
             for (const entry of entries) {
@@ -1110,6 +1122,9 @@ export const Inspector: React.FC<InspectorProps> = ({
         }
         if (sourceParametersRef.current.hyperlinks) {
           parametersForUpdate.hyperlinks = sourceParametersRef.current.hyperlinks;
+        }
+        if (sourceParametersRef.current.hotspots) {
+          parametersForUpdate.hotspots = sourceParametersRef.current.hotspots;
         }
         if (sourceParametersRef.current.textVariations) {
           parametersForUpdate.textVariations = sourceParametersRef.current.textVariations;

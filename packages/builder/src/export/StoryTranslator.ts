@@ -249,6 +249,16 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       }
       break;
 
+    case 'panorama':
+      if (Array.isArray(params.hotspots)) {
+        for (let j = 0; j < params.hotspots.length; j++) {
+          const hotspot = params.hotspots[j];
+          const label = hotspot.displayText || hotspot.text;
+          if (label) strings[`${prefix}.parameters.hotspots.${j}.displayText`] = label;
+        }
+      }
+      break;
+
     case 'aiInfoText':
     case 'aiDurScreen':
       // Translate fallback text but NOT the AI prompt (prompts stay in original language)
