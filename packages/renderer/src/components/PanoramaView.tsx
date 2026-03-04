@@ -290,6 +290,8 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
       markersPlugin.addEventListener('select-marker', async (e) => {
         const hotspotId = e.marker.data?.hotspotId;
         if (hotspotId) {
+          // Clear tooltip immediately so it doesn't persist into the next beat
+          setTooltip(null);
           // Play click sound if assigned
           const hs = hotspotsRef.current.find(h => h.id === hotspotId);
           const soundRef = hs?.sound;

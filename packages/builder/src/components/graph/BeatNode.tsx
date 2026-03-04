@@ -28,6 +28,7 @@ const beatTypeIcons: Record<string, string> = {
   hyperText: '🔗',
   endScreen: '🏁',
   SWFBeat: '📽️',
+  panorama: '🌐',
   // Logic beats
   setVariable: '🔧',
   conditionBeat: '❓',
