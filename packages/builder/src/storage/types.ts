@@ -184,6 +184,9 @@ export interface Project {
   /** Filesystem path for directory-format projects (Electron only) */
   directoryPath?: string | null;
 
+  /** External assets folder path for large files (Electron only, IndexedDB projects) */
+  assetsPath?: string | null;
+
   /** Storage format: 'directory' for folder-based, 'indexeddb' (default) for browser storage */
   storageFormat?: 'directory' | 'indexeddb';
 

@@ -20,6 +20,16 @@ import { StorageError } from './IStorageAdapter';
 import type { Project, StoredAsset, StorageResult } from './types';
 import type { IDBPDatabase } from 'idb';
 import { initDatabase, type AsapsDBSchema } from './schema';
+import {
+  type AssetManifestEntry,
+  type DirectoryAssetManifest,
+  createEmptyManifest,
+  serializeManifest,
+  parseManifest,
+  setManifestEntry,
+  getAssetFolder,
+  generateUniqueFilename,
+} from '@asaps/core';
 
 /**
  * Store names matching the schema definitions
@@ -459,6 +469,106 @@ export class HybridStorageAdapter implements IStorageAdapter {
 
     console.log(`[HybridStorageAdapter] Registered ${registered} directory assets for project ${projectId}`);
     return registered;
+  }
+
+  /**
+   * Save an asset to an external user-designated folder.
+   * Writes the file, updates the _manifest.json, and registers metadata.
+   * Returns the filesystem path of the saved file.
+   */
+  async saveAssetToExternalFolder(
+    asset: StoredAsset,
+    assetsPath: string,
+  ): Promise<AssetStorageInfo> {
+    this.ensureReady();
+
+    const api = (window as any).electronAPI;
+    if (!api?.fs) throw new Error('Electron filesystem API not available');
+
+    const sep = assetsPath.includes('\\') ? '\\' : '/';
+    const assetsDir = [assetsPath, 'assets'].join(sep);
+
+    // Determine category folder
+    const assetType = this.inferAssetType(asset.mimeType);
+    const folder = getAssetFolder(assetType);
+
+    // Ensure directory structure exists
+    const categoryDir = [assetsDir, folder].join(sep);
+    for (const dir of [assetsPath, assetsDir, categoryDir]) {
+      const exists = await api.fs.exists(dir);
+      if (!exists) {
+        await api.fs.mkdir(dir);
+      }
+    }
+
+    // Read existing manifest or create new one
+    const manifestPath = [assetsDir, '_manifest.json'].join(sep);
+    let manifest: DirectoryAssetManifest;
+    try {
+      const manifestExists = await api.fs.exists(manifestPath);
+      if (manifestExists) {
+        const raw = await api.fs.readFile(manifestPath);
+        const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+        manifest = parseManifest(text);
+      } else {
+        manifest = createEmptyManifest();
+      }
+    } catch {
+      manifest = createEmptyManifest();
+    }
+
+    // Generate unique filename
+    const existingNames = new Set(
+      Object.values(manifest.assets)
+        .filter(e => e.folder === folder)
+        .map(e => e.filename)
+    );
+    const filename = generateUniqueFilename(asset.filename, existingNames);
+
+    // Write file
+    const filepath = [categoryDir, filename].join(sep);
+    const buffer = await asset.blob.arrayBuffer();
+    await api.fs.writeFile(filepath, new Uint8Array(buffer));
+
+    // Update manifest
+    const entry: AssetManifestEntry = {
+      id: asset.id,
+      filename,
+      type: assetType,
+      mimeType: asset.mimeType,
+      size: asset.blob.size,
+      folder,
+      uploadedAt: new Date().toISOString(),
+      metadata: asset.metadata,
+    };
+    setManifestEntry(manifest, entry);
+    await api.fs.writeFile(manifestPath, serializeManifest(manifest));
+
+    // Register metadata in IndexedDB so loadAsset() finds it
+    const info: AssetStorageInfo = {
+      id: asset.id,
+      projectId: asset.projectId,
+      location: 'filesystem',
+      path: filepath,
+      size: asset.blob.size,
+      mimeType: asset.mimeType,
+      filename: asset.filename,
+      uploadedAt: new Date().toISOString(),
+      thumbnail: '',
+    };
+
+    // Generate thumbnail for images
+    if (asset.mimeType.startsWith('image/')) {
+      info.thumbnail = await this.generateThumbnail(asset.blob);
+    }
+
+    await this.db!.put(STORES.assetMetadata, info);
+
+    console.log(
+      `[HybridStorageAdapter] Saved "${asset.filename}" to external folder: ${filepath}`
+    );
+
+    return info;
   }
 
   /**

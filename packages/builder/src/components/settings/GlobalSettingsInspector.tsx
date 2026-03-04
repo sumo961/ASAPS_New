@@ -150,6 +150,10 @@ interface GlobalSettingsInspectorProps {
   onThemeChange?: (themeId: string | undefined) => void;
   /** Available beats for the first beat dropdown */
   beats?: Array<{ id: string; name: string; type: string }>;
+  /** External assets folder path (Electron only, IndexedDB projects) */
+  assetsPath?: string | null;
+  /** Callback when assets folder path changes */
+  onAssetsPathChange?: (path: string | null) => void;
 }
 
 export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = ({
@@ -161,6 +165,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   themeId: initialThemeId,
   onThemeChange,
   beats = [],
+  assetsPath,
+  onAssetsPathChange,
 }) => {
   const [settings, setSettings] = useState<GlobalSettings>(initialSettings);
   const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'copyright' | 'variables' | 'translation' | 'debug'>('project');
@@ -1013,6 +1019,48 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </div>
                 </div>
               </div>
+
+              {/* Assets Folder (Electron only) */}
+              {!!(window as any).electronAPI?.fs && onAssetsPathChange && (
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Assets Folder</h4>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Large files (&gt;5 MB) are stored in an external folder on disk. Choose a folder to enable importing large assets.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={assetsPath || ''}
+                      readOnly
+                      placeholder="(none — choose a folder for large assets)"
+                      className="flex-1 px-3 py-2 border rounded bg-gray-50 text-sm text-gray-600 truncate"
+                    />
+                    <button
+                      onClick={async () => {
+                        const api = (window as any).electronAPI;
+                        const result = await api.dialog?.open?.({
+                          properties: ['openDirectory', 'createDirectory'],
+                        });
+                        if (!result?.canceled && result?.filePaths?.[0]) {
+                          onAssetsPathChange(result.filePaths[0]);
+                        }
+                      }}
+                      className="px-3 py-2 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded whitespace-nowrap"
+                    >
+                      Choose Folder
+                    </button>
+                    {assetsPath && (
+                      <button
+                        onClick={() => onAssetsPathChange(null)}
+                        className="px-3 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded whitespace-nowrap"
+                        title="Remove folder association (does not delete files)"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

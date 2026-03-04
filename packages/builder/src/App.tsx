@@ -72,6 +72,7 @@ declare global {
       dialog?: {
         save: (options: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePath?: string }>;
         open: (options: { properties?: string[]; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ canceled: boolean; filePaths: string[] }>;
+        message: (options: { type?: string; title?: string; message: string; detail?: string; buttons?: string[]; defaultId?: number; cancelId?: number }) => Promise<{ response: number }>;
       };
       settings?: {
         getMcpEnabled: () => Promise<boolean>;
@@ -1789,6 +1790,74 @@ function App() {
             const storage = getStorageAdapter();
             await storage.initialize();
             console.log('[App] >>> HybridStorageAdapter initialized');
+
+            // Register external assets folder if configured (Electron IndexedDB projects)
+            if (currentProject.assetsPath && !!(window as any).electronAPI?.fs) {
+              const api = (window as any).electronAPI;
+              const sep = currentProject.assetsPath.includes('\\') ? '\\' : '/';
+              const assetsDir = [currentProject.assetsPath, 'assets'].join(sep);
+              const manifestPath = [assetsDir, '_manifest.json'].join(sep);
+
+              const folderExists = await api.fs.exists(assetsDir);
+              if (folderExists) {
+                try {
+                  const manifestExists = await api.fs.exists(manifestPath);
+                  if (manifestExists) {
+                    const raw = await api.fs.readFile(manifestPath, 'utf-8');
+                    const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+                    const manifest = JSON.parse(text);
+                    if (manifest.assets) {
+                      const registered = await storage.registerDirectoryAssets(
+                        currentProject.id,
+                        assetsDir,
+                        manifest.assets,
+                      );
+                      console.log('[App] >>> Registered', registered, 'external assets from', assetsDir);
+                    }
+                  }
+                } catch (manifestErr) {
+                  console.warn('[App] >>> Error reading external assets manifest:', manifestErr);
+                }
+              } else {
+                // Assets folder missing — prompt user to relocate
+                console.warn('[App] >>> External assets folder not found:', assetsDir);
+                const msgResult = await api.dialog?.message?.({
+                  type: 'warning',
+                  title: 'Assets Folder Not Found',
+                  message: `The assets folder was not found`,
+                  detail: `Expected location: ${currentProject.assetsPath}\n\nWould you like to locate the folder?`,
+                  buttons: ['Locate Folder', 'Continue Without'],
+                  defaultId: 0,
+                  cancelId: 1,
+                });
+
+                if (msgResult?.response === 0) {
+                  const folderResult = await api.dialog?.open?.({
+                    properties: ['openDirectory'],
+                  });
+                  if (!folderResult?.canceled && folderResult?.filePaths?.[0]) {
+                    const newPath = folderResult.filePaths[0];
+                    updateMetadata({ assetsPath: newPath });
+                    // Try to register from new path
+                    const newAssetsDir = [newPath, 'assets'].join(sep);
+                    const newManifestPath = [newAssetsDir, '_manifest.json'].join(sep);
+                    try {
+                      const newManifestExists = await api.fs.exists(newManifestPath);
+                      if (newManifestExists) {
+                        const raw = await api.fs.readFile(newManifestPath, 'utf-8');
+                        const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+                        const manifest = JSON.parse(text);
+                        if (manifest.assets) {
+                          await storage.registerDirectoryAssets(currentProject.id, newAssetsDir, manifest.assets);
+                        }
+                      }
+                    } catch (relocateErr) {
+                      console.warn('[App] >>> Error reading manifest from relocated folder:', relocateErr);
+                    }
+                  }
+                }
+              }
+            }
 
             // listAssets returns metadata only, we need to load blobs separately
             const assetInfoList = await storage.listAssets(currentProject.id);
@@ -3794,11 +3863,64 @@ function App() {
       console.log('[App] handleAssetAdd - Converted to stored format');
 
       // Save to storage using HybridStorageAdapter (v2 schema with asset-metadata)
-      const storage = getStorageAdapter();
+      const hybridStorage = getStorageAdapter();
       console.log('[App] handleAssetAdd - Got HybridStorageAdapter');
-      await storage.initialize();
+      await hybridStorage.initialize();
       console.log('[App] handleAssetAdd - Storage initialized, saving asset...');
-      await storage.saveAsset(storedAsset);
+
+      const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024; // 5MB
+      const isElectron = !!(window as any).electronAPI?.fs;
+      const isLargeFile = blob.size > LARGE_FILE_THRESHOLD;
+      const isIndexedDBProject = currentProject.storageFormat !== 'directory';
+
+      // Route large files to external folder in Electron IndexedDB projects
+      if (isLargeFile && isElectron && isIndexedDBProject) {
+        let assetsPath = currentProject.assetsPath;
+
+        if (!assetsPath) {
+          // Prompt user to designate an assets folder
+          const api = (window as any).electronAPI;
+          const sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
+
+          const msgResult = await api.dialog?.message?.({
+            type: 'question',
+            title: 'Large File Detected',
+            message: `"${asset.name}" is ${sizeMB} MB`,
+            detail: 'Large files need to be stored in a project folder on disk.\n\nPlease choose a folder for this project\'s assets.',
+            buttons: ['Choose Folder', 'Cancel'],
+            defaultId: 0,
+            cancelId: 1,
+          });
+
+          if (msgResult?.response === 0) {
+            // User chose to pick a folder
+            const folderResult = await api.dialog?.open?.({
+              properties: ['openDirectory', 'createDirectory'],
+            });
+
+            if (!folderResult?.canceled && folderResult?.filePaths?.[0]) {
+              assetsPath = folderResult.filePaths[0];
+              // Save assetsPath on the project
+              updateMetadata({ assetsPath });
+              console.log('[App] handleAssetAdd - User set assetsPath:', assetsPath);
+            }
+          }
+        }
+
+        if (assetsPath) {
+          // Save to external folder
+          await hybridStorage.saveAssetToExternalFolder(storedAsset, assetsPath);
+          setAssets(prev => [...prev, asset]);
+          markChanged();
+          console.log('[App] handleAssetAdd - Asset saved to external folder:', asset.name);
+          return true;
+        }
+        // User cancelled — don't import the large file
+        console.log('[App] handleAssetAdd - Large file import cancelled by user');
+        return false;
+      }
+
+      await hybridStorage.saveAsset(storedAsset);
 
       setAssets(prev => [...prev, asset]);
       markChanged();
@@ -3811,7 +3933,7 @@ function App() {
       markChanged();
       return true;
     }
-  }, [currentProject, markChanged]);
+  }, [currentProject, markChanged, updateMetadata]);
 
   const handleAssetRemove = useCallback(async (assetId: string) => {
     try {
@@ -4971,6 +5093,11 @@ function App() {
           themeId={currentThemeId}
           onThemeChange={setCurrentThemeId}
           beats={state.beats.map(b => ({ id: b.id, name: b.name, type: b.type }))}
+          assetsPath={currentProject?.assetsPath}
+          onAssetsPathChange={(path) => {
+            updateMetadata({ assetsPath: path });
+            markChanged();
+          }}
         />
       )}
 

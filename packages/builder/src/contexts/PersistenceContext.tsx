@@ -53,7 +53,7 @@ export interface PersistenceContextValue {
   loadProject: (projectId: string) => Promise<boolean>;
   createProject: (name: string, description?: string) => Promise<string>;
   deleteProject: (projectId: string) => Promise<boolean>;
-  updateProjectMetadata: (updates: Partial<Pick<Project, 'name' | 'description' | 'themeId'>>) => Promise<void>;
+  updateProjectMetadata: (updates: Partial<Pick<Project, 'name' | 'description' | 'themeId' | 'assetsPath'>>) => Promise<void>;
   updateProjectStory: (storyData: Partial<any>) => void;
   updateProjectGlobalSettings: (settings: GlobalSettings) => Promise<void>;
   saveCurrentProject: (name: string, description?: string) => Promise<string>;
@@ -606,7 +606,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    * Update project metadata
    */
   const updateProjectMetadata = useCallback(async (
-    updates: Partial<Pick<Project, 'name' | 'description' | 'themeId'>>
+    updates: Partial<Pick<Project, 'name' | 'description' | 'themeId' | 'assetsPath'>>
   ) => {
     if (!currentProject) {
       throw new Error('No current project');
