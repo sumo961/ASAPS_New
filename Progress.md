@@ -1,5 +1,97 @@
 # ASAPS Modern - Progress Log
 
+## 2026-03-04: 360° Panorama Beat & HTML Export Fixes (v0.9.28)
+
+### Overview
+
+This release adds a full-featured **360° Panorama beat type** with interactive hotspots, migrates the panorama viewer from Pannellum to **Photo Sphere Viewer** (Three.js-backed), and fixes critical issues with **panorama images in HTML exports** including asset ID extraction and blob URL handling. Also includes **PickProp display mode** improvements and numerous panorama authoring refinements.
+
+### 360° Panorama Beat Type
+
+Added a new interactive beat type for immersive 360° panorama experiences with clickable hotspots for story navigation.
+
+- Initial implementation using Pannellum library with equirectangular projection
+- Hotspot-based navigation with conditional visibility, sound effects, and variable effects
+- Visual Editor integration with drag-and-drop hotspot placement on panorama canvas
+- Location assignment system connecting hotspots to VE elements (props, characters, images)
+- Per-hotspot overrides for opacity and visibility mode
+
+**Files modified:**
+- `packages/core/src/beats/PanoramaBeat.ts` — Beat class with hotspot connections, location lookup, environment node URL resolution
+- `packages/renderer/src/components/PanoramaView.tsx` — Panorama viewer component (Pannellum → Photo Sphere Viewer)
+- `packages/renderer/src/renderers/ReactRenderer.tsx` — renderPanorama implementation with theme styling
+- `packages/builder/src/components/visual/PanoramaEditor.tsx` — Visual editor for panorama authoring
+- `packages/builder/src/components/visual/VisualBeatEditor.tsx` — Panorama beat VE integration
+- `beat-definitions/core-beats.json` — Panorama beat schema definition
+
+### Panorama Viewer Migration: Pannellum → Photo Sphere Viewer
+
+Migrated from Pannellum to Photo Sphere Viewer (PSV) backed by Three.js for better rendering quality, cylindrical projection support, and marker customization.
+
+- Full equirectangular and cylindrical projection support
+- Custom HTML markers with themed styling (color, opacity, label display)
+- Zoom-proportional marker scaling using perspective-correct tangent ratio
+- Viewport indicator in VE showing camera field of view
+- FOV accuracy improvements with PSV's aspect-ratio-aware quantization
+
+**Files modified:**
+- `packages/renderer/src/components/PanoramaView.tsx` — Complete rewrite from Pannellum to PSV with MarkersPlugin
+- `packages/renderer/package.json` — Replace pannellum with @photo-sphere-viewer/core and markers-plugin
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — Viewport indicator overlay
+
+### Panorama Hotspot Features
+
+Extensive hotspot authoring features for the Visual Editor:
+
+- Location assignment: assign VE elements (props, characters) to hotspots via `locationName`
+- Image markers: props/characters with images render as image-based panorama markers
+- Per-element overrides for hotspot opacity and visibility (visible/onHover/invisible)
+- Click sound effects with preset and custom sound support
+- Hotspot labels follow theme font family, size, and color settings
+- Overlay elements (non-hotspot props/characters) positioned in panorama space
+- Pinned prompt display mode as a panorama marker at a specific position
+
+**Files modified:**
+- `packages/core/src/beats/PanoramaBeat.ts` — Enriched hotspot data, location lookup, overlay element extraction
+- `packages/renderer/src/components/PanoramaView.tsx` — Image markers, hover tooltips, overlay elements, sound playback
+- `packages/builder/src/components/visual/VisualPropertiesPanel.tsx` — Hotspot override controls
+- `packages/core/src/generated/beat-types.ts` — Updated PanoramaHotspot type with new fields
+
+### HTML Export Panorama Fixes
+
+Fixed three critical issues preventing panorama images from displaying in HTML exports:
+
+1. **Asset ID extraction**: PlayerEngine extracted asset IDs by splitting filenames on the first underscore, breaking IDs containing underscores (e.g. `asset_1772586254887_ty1nd6r8i` → `asset`). Now uses metadata JSON filenames as source of truth.
+2. **URL resolution**: PanoramaBeat now resolves panorama URLs from `environment.nodes` (same mechanism as background images) with fallback to renderer state for builder preview.
+3. **Blob URL handling**: PanoramaView converts `blob:` URLs to `data:` URLs before passing to Photo Sphere Viewer, avoiding Chrome's crossOrigin restriction on `blob:null/` URLs in file:// contexts.
+
+**Files modified:**
+- `packages/player/src/PlayerEngine.ts` — Two-pass asset ID extraction using metadata JSON filenames
+- `packages/core/src/beats/PanoramaBeat.ts` — Environment node URL resolution
+- `packages/renderer/src/components/PanoramaView.tsx` — Blob-to-data URL conversion
+- `packages/builder/public/player-web.js` — Rebuilt player bundle
+
+### PickProp Display Mode & Inspector Sync
+
+Unified PickProp display dropdown and added live Inspector↔Visual Editor synchronization.
+
+**Files modified:**
+- `packages/builder/src/components/Inspector.tsx` — Unified display dropdown
+- `packages/builder/src/components/visual/VisualBeatEditor.tsx` — Live sync between Inspector and VE
+
+### Graph & Export Fixes
+
+- Added panorama icon (🌐) to graph nodes for panorama beats
+- Included PSV CSS in HTML export for proper panorama rendering
+- Clear hotspot tooltip on click to prevent persistence into next beat
+
+**Files modified:**
+- `packages/builder/src/components/graph/BeatNode.tsx` — Panorama icon
+- `packages/renderer/src/renderers/ReactRenderer.tsx` — PSV CSS injection for HTML export
+- `packages/renderer/src/components/PanoramaView.tsx` — Tooltip clear on hotspot click
+
+---
+
 ## 2026-02-25: Electron 40 Upgrade, Security Fixes & Input Autofocus (v0.9.27)
 
 ### Overview

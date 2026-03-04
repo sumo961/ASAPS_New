@@ -16,12 +16,15 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.27)
+## ⚠️ Development Status (v0.9.28)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **360° Panorama Beat** | **v0.9.28**: New interactive beat type with hotspot navigation, equirectangular/cylindrical projections, Photo Sphere Viewer |
+| **Panorama Visual Editor** | **v0.9.28**: Drag-and-drop hotspot placement, location assignment, image markers, per-element overrides |
+| **Panorama HTML Export** | **v0.9.28**: Fixed asset ID extraction, environment node URL resolution, and blob URL handling for file:// contexts |
 | **Electron 40** | **v0.9.27**: Upgraded from EOL Electron 33 to latest Electron 40 (Chromium 144, Node 24, supported until June 2026) |
 | **MCP SDK Security** | **v0.9.27**: Bumped @modelcontextprotocol/sdk to 1.25.2, fixing 4 high-severity alerts |
 | **InputText Autofocus** | **v0.9.27**: Input fields autofocus on render — interactors can type immediately |
