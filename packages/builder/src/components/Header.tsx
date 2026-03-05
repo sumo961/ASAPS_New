@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
@@ -8,12 +8,15 @@ import { SaveStatus } from './SaveStatus';
 import { AIConfigDialog } from './ai/AIConfigDialog';
 import { StoryGenerator } from './ai/StoryGenerator';
 import { NaturalLanguageBeatCreator } from './ai/NaturalLanguageBeatCreator';
+import { TTSConfigDialog } from './tts/TTSConfigDialog';
 import { LanguageSelector } from './translation/LanguageSelector';
 import { useSave, useProject, usePersistence } from '../contexts/PersistenceContext';
 import { useTranslationState, useTranslationActions } from '../contexts/TranslationContext';
 import { VCSStatusBar } from './vcs/VCSStatusBar';
 import { getProjectDataForExport } from '../utils/projectZipManager';
 import { getSavedAIConfig } from '../hooks/useAI';
+import { useTTS } from '../hooks/useTTS';
+import { getTTSService } from '../services/tts';
 
 interface HeaderProps {
   title: string;
@@ -108,6 +111,13 @@ export const Header: React.FC<HeaderProps> = ({
   const [showImportMenu, setShowImportMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [showTTSConfig, setShowTTSConfig] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('asaps_tts_enabled') !== 'false';
+    } catch { return true; }
+  });
+  const { configure: configureTTS } = useTTS();
 
   // Open New Project dialog when triggered from Electron menu
   useEffect(() => {
@@ -537,8 +547,22 @@ export const Header: React.FC<HeaderProps> = ({
           <VCSStatusBar panelOpen={vcsPanelOpen} onTogglePanel={onToggleVCSPanel} onInitRepo={onInitRepo} />
         </div>
 
-        {/* Right: Language + Translation Progress */}
+        {/* Right: TTS + Language + Translation Progress */}
         <div className="flex items-center space-x-2">
+          {/* TTS Button */}
+          <button
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              ttsEnabled
+                ? 'bg-teal-500 text-white hover:bg-teal-600'
+                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+            }`}
+            onClick={() => setShowTTSConfig(true)}
+            title={ttsEnabled ? 'TTS enabled - click to configure' : 'TTS disabled - click to configure'}
+          >
+            {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            TTS
+          </button>
+
           {/* Language Selector */}
           <LanguageSelector
             sourceLanguage="en"
@@ -684,6 +708,20 @@ export const Header: React.FC<HeaderProps> = ({
         isOpen={showAIConfig}
         onClose={() => setShowAIConfig(false)}
         onSettingsChanged={onAISettingsChanged}
+      />
+
+      {/* TTS Configuration Dialog */}
+      <TTSConfigDialog
+        isOpen={showTTSConfig}
+        onClose={() => setShowTTSConfig(false)}
+        onConfigure={configureTTS}
+        ttsEnabled={ttsEnabled}
+        onToggleTTS={(enabled) => {
+          setTtsEnabled(enabled);
+          getTTSService().setEnabled(enabled);
+          localStorage.setItem('asaps_tts_enabled', String(enabled));
+          if (!enabled) getTTSService().stop();
+        }}
       />
 
       {/* Story Generator Dialog */}

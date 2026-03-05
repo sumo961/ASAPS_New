@@ -852,6 +852,7 @@ export class ReactRenderer extends BaseRenderer {
   private fictionalTimeTextListeners: Set<(text: string | undefined) => void> = new Set();
   protected mobileMode: boolean = false;  // Whether mobile display adaptation is active
   protected mobileFontScale: number = 1.0;  // Font scale multiplier for mobile (1.0-2.0)
+  private ttsSpeakCallback: ((text: string, speaker?: string, isPrompt?: boolean) => void) | null = null;
 
   private get root(): ReactDOM.Root | null {
     return this._root;
@@ -1034,6 +1035,14 @@ export class ReactRenderer extends BaseRenderer {
       this.resolveAction('__timer_interrupt__');
     }
     this.resolveAction = null;
+  }
+
+  /**
+   * Set TTS speak callback. Called fire-and-forget when text should be spoken.
+   * @param isPrompt — true for interactor-facing prompts (question, input prompt)
+   */
+  setTTSSpeakCallback(callback: ((text: string, speaker?: string, isPrompt?: boolean) => void) | null): void {
+    this.ttsSpeakCallback = callback;
   }
 
   /**
@@ -1481,6 +1490,7 @@ export class ReactRenderer extends BaseRenderer {
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('titleScreen', content);
 
     console.log(`[ReactRenderer ${this.instanceId}] ✅ Using POSITIONED rendering with ${effectiveLocations.length} locations`);
+    this.ttsSpeakCallback?.(title, 'Narrator');
     await this.renderPositionedBeat('titleScreen', content, effectiveLocations);
   }
 
@@ -1502,6 +1512,7 @@ export class ReactRenderer extends BaseRenderer {
       console.log(`[ReactRenderer.renderText] Location[${i}] "${loc.name}" (${loc.kind}): x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height}, content="${(loc as any).content?.substring?.(0, 50) || 'N/A'}..."`);
     });
 
+    this.ttsSpeakCallback?.(text, 'Narrator');
     await this.renderPositionedBeat(beatType, content, effectiveLocations);
   }
 
@@ -1523,6 +1534,9 @@ export class ReactRenderer extends BaseRenderer {
 
     // Store dialog context for renderChoices to use later
     this.setState('dialogContext', { speaker, text, emotion });
+
+    // Fire TTS for dialog text (speaker is passed for voice differentiation)
+    this.ttsSpeakCallback?.(text, speaker);
 
     // If in chat mode, add this message to the history
     if (this.currentPresentationMode !== 'positioned') {
@@ -1832,6 +1846,7 @@ export class ReactRenderer extends BaseRenderer {
     const content = { question, choices, markVisited };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('movementChoice', content);
 
+    this.ttsSpeakCallback?.(question, 'Narrator', true);
     return this.renderPositionedBeat('movementChoice', content, effectiveLocations, true);
   }
 
@@ -1847,6 +1862,7 @@ export class ReactRenderer extends BaseRenderer {
     const content = { question, props, markVisited };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('pickProp', content);
 
+    this.ttsSpeakCallback?.(question, 'Narrator', true);
     return this.renderPositionedBeat('pickProp', content, effectiveLocations, true);
   }
 
@@ -1888,6 +1904,7 @@ export class ReactRenderer extends BaseRenderer {
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('endScreen', content);
 
     // Return the user's action (e.g., 'restart', 'credits', button text)
+    this.ttsSpeakCallback?.(message, 'Narrator');
     return this.renderPositionedBeat('endScreen', content, effectiveLocations);
   }
 
@@ -1916,6 +1933,7 @@ export class ReactRenderer extends BaseRenderer {
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('aiSummary', content);
 
     // Return the user's action (e.g., 'restart', 'credits')
+    this.ttsSpeakCallback?.(data.summary, 'Narrator');
     return this.renderPositionedBeat('aiSummary', content, effectiveLocations);
   }
 
@@ -1938,6 +1956,7 @@ export class ReactRenderer extends BaseRenderer {
     const content = { text };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('durScreen', content);
 
+    this.ttsSpeakCallback?.(text, 'Narrator');
     await this.renderPositionedBeat('durScreen', content, effectiveLocations, false);
     await new Promise(resolve => setTimeout(resolve, duration));
   }
@@ -1968,6 +1987,8 @@ export class ReactRenderer extends BaseRenderer {
       required: options?.required
     };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('inputText', content);
+
+    this.ttsSpeakCallback?.(prompt, 'Narrator', true);
 
     // renderPositionedBeat returns a Promise<void>, but we need Promise<string>
     // So we wrap it and return the input value from resolveAction
@@ -2006,6 +2027,8 @@ export class ReactRenderer extends BaseRenderer {
   ): Promise<string> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+
+    this.ttsSpeakCallback?.(prompt, 'Narrator', true);
 
     const content = {
       prompt,
@@ -2068,6 +2091,7 @@ export class ReactRenderer extends BaseRenderer {
     // Use provided locations or generate default locations from schema
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('hyperText', data);
 
+    this.ttsSpeakCallback?.(data.text, 'Narrator');
     return this.renderPositionedBeat('hyperText', data, effectiveLocations, true);
   }
 
@@ -2114,6 +2138,10 @@ export class ReactRenderer extends BaseRenderer {
       return hs;
     });
     console.log(`[ReactRenderer.renderPanorama] ${resolvedHotspots.length} hotspots, ${options.locations?.length || 0} overlay locations`);
+
+    if (options.prompt) {
+      this.ttsSpeakCallback?.(options.prompt, 'Narrator', true);
+    }
 
     return new Promise(resolve => {
       this.renderComponent(

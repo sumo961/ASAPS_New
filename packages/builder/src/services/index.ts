@@ -33,6 +33,14 @@ export type {
   AIValidationResult
 } from '../types/ai';
 
+// TTS
+export { TTSService, getTTSService, resetTTSService } from './tts/TTSService';
+export { BaseTTSProvider } from './tts/BaseTTSProvider';
+export { WebSpeechProvider } from './tts/WebSpeechProvider';
+export { OpenAITTSProvider } from './tts/OpenAITTSProvider';
+export { ElevenLabsProvider } from './tts/ElevenLabsProvider';
+export { CustomTTSProvider } from './tts/CustomTTSProvider';
+
 // Prompt templates
 export * as StoryPrompts from './prompts/storyGeneration';
 export * as DialogPrompts from './prompts/dialogGeneration';

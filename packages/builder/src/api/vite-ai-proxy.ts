@@ -72,7 +72,61 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+/**
+ * Make an outgoing request that returns raw binary data (for TTS audio)
+ */
+function nativeBinaryRequest(
+  endpoint: string,
+  method: 'GET' | 'POST',
+  headers: Record<string, string>,
+  body?: string,
+  timeoutMs: number = TTS_TIMEOUT_MS
+): Promise<{ status: number; buffer: Buffer; contentType: string }> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(endpoint);
+    const isHttps = url.protocol === 'https:';
+    const requestFn = isHttps ? httpsRequest : httpRequest;
+
+    const reqHeaders: Record<string, string | number> = { ...headers };
+    if (body) {
+      reqHeaders['Content-Length'] = Buffer.byteLength(body);
+    }
+
+    const req = requestFn(
+      {
+        hostname: url.hostname,
+        port: url.port || (isHttps ? 443 : 80),
+        path: url.pathname + url.search,
+        method,
+        headers: reqHeaders,
+      },
+      (response: IncomingMessage) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => {
+          const buffer = Buffer.concat(chunks);
+          resolve({
+            status: response.statusCode || 500,
+            buffer,
+            contentType: response.headers['content-type'] || 'application/octet-stream',
+          });
+        });
+        response.on('error', reject);
+      }
+    );
+
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error('Request timeout'));
+    });
+
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
 const AI_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const TTS_TIMEOUT_MS = 30 * 1000; // 30 seconds
 
 /**
  * Vite plugin that adds AI proxy middleware to the dev server
@@ -150,17 +204,112 @@ export function viteAIProxyPlugin(): Plugin {
         }
       });
 
-      // Handle OPTIONS preflight for AI routes
-      server.middlewares.use((req, res, next) => {
-        if (req.method === 'OPTIONS' && (req.url === '/api/ai/openai' || req.url === '/api/ai/claude')) {
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-          res.writeHead(204);
-          res.end();
-          return;
+      // -----------------------------------------------------------------------
+      // TTS proxy routes (binary audio)
+      // -----------------------------------------------------------------------
+      server.middlewares.use(async (req, res, next) => {
+        if (req.method !== 'POST') return next();
+
+        const TTS_ROUTES = ['/api/tts/openai', '/api/tts/elevenlabs', '/api/tts/elevenlabs/voices'];
+        if (!TTS_ROUTES.includes(req.url || '')) return next();
+
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        try {
+          const body = await readBody(req);
+          const parsed = JSON.parse(body);
+          const { apiKey, baseUrl, voiceId, ...requestBody } = parsed;
+
+          if (!apiKey) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing required parameter: apiKey' }));
+            return;
+          }
+
+          if (req.url === '/api/tts/openai') {
+            // OpenAI TTS — returns binary audio/mpeg
+            const effectiveBaseUrl = (baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
+            const endpoint = `${effectiveBaseUrl}/audio/speech`;
+
+            console.log(`[Vite TTS Proxy] OpenAI TTS → ${endpoint}`);
+
+            const result = await nativeBinaryRequest(endpoint, 'POST', {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+            }, JSON.stringify(requestBody));
+
+            if (result.status !== 200) {
+              console.error(`[Vite TTS Proxy] OpenAI TTS error: ${result.status}`);
+              res.writeHead(result.status, { 'Content-Type': 'application/json' });
+              res.end(result.buffer.toString('utf-8'));
+              return;
+            }
+
+            res.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+            res.end(result.buffer);
+
+          } else if (req.url === '/api/tts/elevenlabs') {
+            // ElevenLabs TTS — returns binary audio/mpeg
+            const vid = voiceId || 'EXAVITQu4vr4xnSDxMaL';
+            const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${vid}`;
+
+            console.log(`[Vite TTS Proxy] ElevenLabs TTS → ${endpoint}`);
+
+            const result = await nativeBinaryRequest(endpoint, 'POST', {
+              'Content-Type': 'application/json',
+              'xi-api-key': apiKey,
+            }, JSON.stringify(requestBody));
+
+            if (result.status !== 200) {
+              console.error(`[Vite TTS Proxy] ElevenLabs TTS error: ${result.status}`);
+              res.writeHead(result.status, { 'Content-Type': 'application/json' });
+              res.end(result.buffer.toString('utf-8'));
+              return;
+            }
+
+            res.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+            res.end(result.buffer);
+
+          } else if (req.url === '/api/tts/elevenlabs/voices') {
+            // ElevenLabs voices list — returns JSON
+            const endpoint = 'https://api.elevenlabs.io/v1/voices';
+
+            console.log('[Vite TTS Proxy] ElevenLabs voices → GET', endpoint);
+
+            const result = await nativeBinaryRequest(endpoint, 'GET', {
+              'xi-api-key': apiKey,
+            });
+
+            res.writeHead(result.status, { 'Content-Type': 'application/json' });
+            res.end(result.buffer);
+          }
+        } catch (error) {
+          console.error('[Vite TTS Proxy] Error:', error);
+          const isTimeout = error instanceof Error && error.message === 'Request timeout';
+          res.writeHead(isTimeout ? 504 : 500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: isTimeout ? 'Request timeout' : 'TTS proxy request failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+          }));
         }
-        next();
+      });
+
+      // Handle OPTIONS preflight for AI and TTS routes
+      server.middlewares.use((req, res, next) => {
+        if (req.method !== 'OPTIONS') return next();
+        const PREFLIGHT_ROUTES = [
+          '/api/ai/openai', '/api/ai/claude',
+          '/api/tts/openai', '/api/tts/elevenlabs', '/api/tts/elevenlabs/voices',
+        ];
+        if (!PREFLIGHT_ROUTES.includes(req.url || '')) return next();
+
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.writeHead(204);
+        res.end();
       });
     },
   };

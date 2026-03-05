@@ -93,6 +93,14 @@ export interface GlobalSettings {
     maxTokens?: number;
     reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
   };
+  tts?: {
+    provider?: 'web-speech' | 'openai' | 'elevenlabs' | 'custom';
+    providerType?: 'web-speech' | 'openai' | 'elevenlabs' | 'custom';
+    model?: string;
+    baseUrl?: string;
+    defaultVoiceId?: string;
+    readPrompts?: boolean;
+  };
   translation?: {
     sourceLanguage: string;  // BCP 47 code, default 'en'
   };
