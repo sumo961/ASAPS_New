@@ -249,7 +249,9 @@ const PanoramaPreviewSection: React.FC<{
       const params = beat.getParameters();
       const yawDeg = Number.isFinite(params.initialYaw) ? params.initialYaw : 0;
       const pitchDeg = Number.isFinite(params.initialPitch) ? params.initialPitch : 0;
-
+      // VE editor: no min/max/zoomSpeed restrictions on the PSV viewer.
+      // FOV is the design-time ground truth for element sizing.
+      // Min/max are runtime-only zoom limits for the player.
       const viewer = new PSVViewer({
         container: psvContainerRef.current,
         // Do NOT pass panorama here — PSV's initial load can stall in React StrictMode.
@@ -258,7 +260,7 @@ const PanoramaPreviewSection: React.FC<{
         defaultPitch: pitchDeg * _DEG_TO_RAD,
         defaultZoomLvl: 50,
         minFov: 10,
-        maxFov: 120,
+        maxFov: 179,
         navbar: false,
         plugins: [[PSVMarkersPlugin, { markers: [] }]],
       });
@@ -1200,7 +1202,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const params = beat!.getParameters();
       const yawDeg = Number.isFinite(params.initialYaw) ? params.initialYaw : 0;
       const pitchDeg = Number.isFinite(params.initialPitch) ? params.initialPitch : 0;
-      const hfovDeg = Math.max(30, Number.isFinite(params.hfov) ? params.hfov : 75);
+      // FOV is the design-time ground truth — no min/max clamping in the editor
+      const hfovDeg = Math.max(10, Number.isFinite(params.hfov) ? params.hfov : 75);
       viewer.rotate({ yaw: yawDeg * DEG_TO_RAD, pitch: pitchDeg * DEG_TO_RAD });
       const vFov = viewer.dataHelper.hFovToVFov(hfovDeg);
       viewer.zoom(viewer.dataHelper.fovToZoomLevel(vFov));
@@ -4387,6 +4390,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   initialPitch: Number.isFinite(beat.getParameters().initialPitch) ? beat.getParameters().initialPitch : 0,
                   initialYaw: Number.isFinite(beat.getParameters().initialYaw) ? beat.getParameters().initialYaw : 0,
                   hfov: Number.isFinite(beat.getParameters().hfov) ? beat.getParameters().hfov : 75,
+                  minHfov: Number.isFinite(beat.getParameters().minHfov) ? beat.getParameters().minHfov : 30,
+                  maxHfov: Number.isFinite(beat.getParameters().maxHfov) ? beat.getParameters().maxHfov : 120,
+                  zoomSpeed: Number.isFinite(beat.getParameters().zoomSpeed) ? beat.getParameters().zoomSpeed : 1.0,
                   promptDisplay: beat.getParameters().promptDisplay ?? (beat as any).parameters?.promptDisplay ?? 'static',
                   projectionType: beat.getParameters().projectionType || 'equirectangular',
                 } : undefined}

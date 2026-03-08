@@ -673,6 +673,45 @@
             "label": "Field of View"
           }
         },
+        "minHfov": {
+          "type": "number",
+          "required": false,
+          "default": 30,
+          "description": "Minimum horizontal FOV in degrees (maximum zoom in)",
+          "ui": {
+            "control": "number",
+            "min": 10,
+            "max": 120,
+            "step": 5,
+            "label": "Min FOV (Max Zoom In)"
+          }
+        },
+        "maxHfov": {
+          "type": "number",
+          "required": false,
+          "default": 120,
+          "description": "Maximum horizontal FOV in degrees (maximum zoom out)",
+          "ui": {
+            "control": "number",
+            "min": 30,
+            "max": 180,
+            "step": 5,
+            "label": "Max FOV (Max Zoom Out)"
+          }
+        },
+        "zoomSpeed": {
+          "type": "number",
+          "required": false,
+          "default": 1.0,
+          "description": "Mouse wheel zoom speed multiplier (0.1 = very slow, 3.0 = very fast)",
+          "ui": {
+            "control": "number",
+            "min": 0.1,
+            "max": 3.0,
+            "step": 0.1,
+            "label": "Zoom Speed"
+          }
+        },
         "prompt": {
           "type": "string",
           "required": false,

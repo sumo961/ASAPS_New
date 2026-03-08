@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages } from 'lucide-react';
+import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
 import RenpyThemeImporter from './RenpyThemeImporter';
 import type { RenpyConversionResult } from '@asaps/core';
 import { getThemeService } from '../../services/ThemeService';
+import { validateProjectAssets, type AssetValidationResult } from '../../utils/assetValidator';
+import { MissingAssetsDialog } from './MissingAssetsDialog';
 
 interface GlobalSettings {
   project: {
@@ -154,6 +156,8 @@ interface GlobalSettingsInspectorProps {
   assetsPath?: string | null;
   /** Callback when assets folder path changes */
   onAssetsPathChange?: (path: string | null) => void;
+  /** Filesystem path for directory-format projects (Electron only) */
+  directoryPath?: string | null;
 }
 
 export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = ({
@@ -167,6 +171,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   beats = [],
   assetsPath,
   onAssetsPathChange,
+  directoryPath,
 }) => {
   const [settings, setSettings] = useState<GlobalSettings>(initialSettings);
   const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'copyright' | 'variables' | 'translation' | 'debug'>('project');
@@ -176,6 +181,27 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   const [newThemeName, setNewThemeName] = useState('');
   const [showSoundPicker, setShowSoundPicker] = useState(false);
   const [showRenpyImporter, setShowRenpyImporter] = useState(false);
+  const [missingAssetsResult, setMissingAssetsResult] = useState<AssetValidationResult | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+
+  const handleValidateAssets = useCallback(async () => {
+    const path = directoryPath || assetsPath;
+    if (!path) return;
+    setIsValidating(true);
+    try {
+      const result = await validateProjectAssets(path);
+      if (result.missing.length > 0) {
+        setMissingAssetsResult(result);
+      } else {
+        // Brief success feedback — no missing assets
+        alert(`All ${result.valid.length} assets are present.`);
+      }
+    } catch (err) {
+      console.error('[GlobalSettingsInspector] Asset validation failed:', err);
+    } finally {
+      setIsValidating(false);
+    }
+  }, [directoryPath, assetsPath]);
 
   // Filter audio assets for background music selection
   const audioAssets = assets.filter(a => a.type === 'audio');
@@ -1020,10 +1046,27 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                 </div>
               </div>
 
-              {/* Assets Folder (Electron only) */}
-              {!!(window as any).electronAPI?.fs && onAssetsPathChange && (
+              {/* Project Directory (directory-format projects, Electron only) */}
+              {directoryPath && (
                 <div className="border-t pt-4 mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Assets Folder</h4>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Project Directory</h4>
+                  <p className="text-xs text-gray-500 mb-2">
+                    This project is saved as a folder on disk. Assets are stored alongside the project file.
+                  </p>
+                  <input
+                    type="text"
+                    value={directoryPath}
+                    readOnly
+                    className="w-full px-3 py-2 border rounded bg-gray-50 text-sm text-gray-600 truncate"
+                    title={directoryPath}
+                  />
+                </div>
+              )}
+
+              {/* External Assets Folder (Electron only, IndexedDB projects) */}
+              {!!(window as any).electronAPI?.fs && onAssetsPathChange && !directoryPath && (
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">External Assets Folder</h4>
                   <p className="text-xs text-gray-500 mb-2">
                     Large files (&gt;5 MB) are stored in an external folder on disk. Choose a folder to enable importing large assets.
                   </p>
@@ -1061,7 +1104,32 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </div>
                 </div>
               )}
+
+              {/* Validate Assets button (when any asset path exists) */}
+              {!!(window as any).electronAPI?.fs && (directoryPath || assetsPath) && (
+                <div className="border-t pt-4 mt-4">
+                  <button
+                    onClick={handleValidateAssets}
+                    disabled={isValidating}
+                    className="w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                  >
+                    <Search className="w-4 h-4" />
+                    {isValidating ? 'Validating...' : 'Validate Assets'}
+                  </button>
+                </div>
+              )}
             </div>
+          )}
+
+          {/* Missing Assets Dialog */}
+          {missingAssetsResult && missingAssetsResult.missing.length > 0 && (
+            <MissingAssetsDialog
+              isOpen={true}
+              missing={missingAssetsResult.missing}
+              assetsPath={(directoryPath || assetsPath)!}
+              onClose={() => setMissingAssetsResult(null)}
+              onRepaired={() => setMissingAssetsResult(null)}
+            />
           )}
 
           {activeTab === 'colors' && (

@@ -199,9 +199,11 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
 
   // Create nested dialog for a choice
   const createNestedDialog = (nodeId: string, choiceIndex: number) => {
+    // Inherit the parent node's speaker instead of defaulting to characters[0]
+    const parentNode = findNode(dialogTree, nodeId);
     const newNode: DialogNode = {
       id: `node_${Date.now()}`,
-      speaker: characters[0], // Default to first NPC
+      speaker: parentNode?.speaker || characters[0],
       text: 'NPC response...',
       emotion: 'neutral'
     };

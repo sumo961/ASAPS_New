@@ -277,6 +277,9 @@ export interface IRenderer {
     initialPitch?: number;
     initialYaw?: number;
     hfov?: number;
+    minHfov?: number;
+    maxHfov?: number;
+    zoomSpeed?: number;
     projectionType?: 'equirectangular' | 'cylindrical';
     prompt?: string;
     promptDisplay?: 'static' | 'pinned';

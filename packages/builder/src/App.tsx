@@ -31,6 +31,8 @@ import { HelperCommandInput } from './components/ai/HelperCommandInput';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
 import { validateStoryLogic, formatLogicValidationResult } from './utils/storyLogicValidator';
+import { validateProjectAssets } from './utils/assetValidator';
+import { MissingAssetsDialog } from './components/settings/MissingAssetsDialog';
 import { preloadFonts } from './utils/fontRegistry';
 import { useThemes, type ThemeAssetUrls } from './hooks/useThemes';
 import { useAIDebug } from './hooks/useAIDebug';
@@ -235,6 +237,7 @@ function App() {
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   const [previewWindowOpen, setPreviewWindowOpen] = useState(false);
   const [triggerNewProject, setTriggerNewProject] = useState(0);
+  const [missingAssetsInfo, setMissingAssetsInfo] = useState<{ missing: import('@asaps/core').AssetManifestEntry[]; path: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Cluster naming modal state (replaces prompt() for Electron compatibility)
@@ -1528,6 +1531,21 @@ function App() {
       }
     }
   }, [currentProject?.id]);
+
+  // Validate external assets on project open (Electron only)
+  useEffect(() => {
+    const assetsPathToCheck = currentProject?.assetsPath || (currentProject as any)?.directoryPath;
+    if (!assetsPathToCheck || !(window as any).electronAPI?.fs) return;
+
+    validateProjectAssets(assetsPathToCheck).then(result => {
+      if (result.missing.length > 0) {
+        console.warn(`[App] ${result.missing.length} missing assets detected in ${assetsPathToCheck}`);
+        setMissingAssetsInfo({ missing: result.missing, path: assetsPathToCheck });
+      }
+    }).catch(err => {
+      console.warn('[App] Asset validation failed:', err);
+    });
+  }, [currentProject?.id]); // Re-validate when project changes
 
   // Initialize with a basic story and create untitled project on mount
   useEffect(() => {
@@ -3681,7 +3699,12 @@ function App() {
   // Serialize story data for preview window
   const getSerializedStoryData = useCallback(() => {
     // Serialize beats with all their data
-    const serializedBeats = state.beats.map(beat => ({
+    const serializedBeats = state.beats.map(beat => {
+      if (beat.type === 'panorama') {
+        const params = beat.getParameters?.() || {};
+        console.log(`[getSerializedStoryData] Panorama beat "${beat.id}" hotspots:`, params.hotspots?.length ?? 0, params.hotspots);
+      }
+      return {
       id: beat.id,
       name: beat.name,
       type: beat.type,
@@ -3706,7 +3729,7 @@ function App() {
       })) || [],
       locations: beat.locations ? Array.from(beat.locations.values()) : [],
       animations: beat.animations || [],
-    }));
+    };});
 
     const storyData = {
       title: state.title,
@@ -5098,6 +5121,18 @@ function App() {
             updateMetadata({ assetsPath: path });
             markChanged();
           }}
+          directoryPath={(currentProject as any)?.directoryPath}
+        />
+      )}
+
+      {/* Missing Assets Dialog */}
+      {missingAssetsInfo && (
+        <MissingAssetsDialog
+          isOpen={true}
+          missing={missingAssetsInfo.missing}
+          assetsPath={missingAssetsInfo.path}
+          onClose={() => setMissingAssetsInfo(null)}
+          onRepaired={() => setMissingAssetsInfo(null)}
         />
       )}
 

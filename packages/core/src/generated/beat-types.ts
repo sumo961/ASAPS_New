@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-03-05T12:00:28.071Z
+ * Generated: 2026-03-08T12:51:47.890Z
  */
 
 // ============================================
@@ -264,6 +264,12 @@ export interface PanoramaParameters {
   initialYaw?: number | undefined;
   /** Horizontal field of view in degrees */
   hfov?: number | undefined;
+  /** Minimum horizontal FOV in degrees (maximum zoom in) */
+  minHfov?: number | undefined;
+  /** Maximum horizontal FOV in degrees (maximum zoom out) */
+  maxHfov?: number | undefined;
+  /** Mouse wheel zoom speed multiplier (0.1 = very slow, 3.0 = very fast) */
+  zoomSpeed?: number | undefined;
   /** Optional instruction text overlay (e.g. 'Look around to explore') */
   prompt?: string | undefined;
   /** How prompt text is displayed: static (floating overlay) or pinned (scrolls with panorama) */

@@ -111,6 +111,22 @@
         "condition": "condition?",
         "effects": "effect[]?"
       }
+    },
+    "panoramaHotspot": {
+      "description": "A hotspot in a 360° panorama placed at pitch/yaw coordinates",
+      "schema": {
+        "id": "string",
+        "pitch": "number",
+        "yaw": "number",
+        "text": "string",
+        "displayText": "string?",
+        "locationName": "string?",
+        "soundEffect": "string?",
+        "target": "string",
+        "conditions": "condition[]?",
+        "effects": "effect[]?"
+      },
+      "notes": "pitch is vertical angle (-90 to 90), yaw is horizontal angle (-180 to 180). target is the beat ID to navigate to when clicked. locationName optionally references a hotspot, prop, or character from beat.locations by name. soundEffect plays when this hotspot is selected."
     }
   },
 
@@ -248,7 +264,7 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Show visual indication for choices leading to already-visited beats"
+          "description": "Block and dim choices leading to previously visited beats"
         },
         "presentationMode": {
           "type": "string",
@@ -333,7 +349,7 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Show visual indication for choices leading to already-visited beats"
+          "description": "Block and dim choices leading to previously visited beats"
         },
         "showTextOnHover": {
           "type": "boolean",
@@ -386,7 +402,7 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Show visual indication for choices leading to already-visited beats"
+          "description": "Block and dim choices leading to previously visited beats"
         }
       },
       "locations": ["question", "props"],
@@ -578,6 +594,150 @@
       "transitions": true,
       "sound": true,
       "renderer": "endScreen"
+    },
+
+    "panorama": {
+      "category": "visible",
+      "displayName": "360° Panorama",
+      "icon": "🌐",
+      "description": "360-degree panoramic view with interactive hotspots",
+      "connectionType": "multiple",
+      "parameters": {
+        "projectionType": {
+          "type": "string",
+          "required": false,
+          "default": "equirectangular",
+          "description": "How the panorama image is mapped. Equirectangular = full sphere (360° cameras), Cylindrical = cylinder wrap (phone panoramas)",
+          "ui": {
+            "control": "select",
+            "options": [
+              { "value": "equirectangular", "label": "Equirectangular (2:1 ratio, e.g. 4096×2048)" },
+              { "value": "cylindrical", "label": "Cylindrical (4:1–8:1 ratio, e.g. 8000×2000)" }
+            ],
+            "label": "Projection",
+            "hint": "Equirectangular: use 2:1 images from 360° cameras. Cylindrical: use wide panoramas from phone cameras (4:1 to 8:1 aspect ratio)."
+          }
+        },
+        "panoramaAssetId": {
+          "type": "string",
+          "required": true,
+          "description": "Panorama image (equirectangular 2:1 or cylindrical 4:1–8:1, depending on projection)",
+          "ui": {
+            "control": "asset-picker",
+            "accept": "image/*",
+            "label": "Panorama Image"
+          }
+        },
+        "hotspots": {
+          "type": "array<panoramaHotspot>",
+          "required": true,
+          "minItems": 1,
+          "description": "Array of interactive hotspots (each contains a target)"
+        },
+        "initialPitch": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Initial vertical angle (-90 to 90, 0 = horizon)",
+          "ui": {
+            "control": "number",
+            "min": -90,
+            "max": 90,
+            "step": 1,
+            "label": "Initial Pitch"
+          }
+        },
+        "initialYaw": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "description": "Initial horizontal angle (-180 to 180, 0 = front-center)",
+          "ui": {
+            "control": "number",
+            "min": -180,
+            "max": 180,
+            "step": 1,
+            "label": "Initial Yaw"
+          }
+        },
+        "hfov": {
+          "type": "number",
+          "required": false,
+          "default": 75,
+          "description": "Horizontal field of view in degrees",
+          "ui": {
+            "control": "number",
+            "min": 50,
+            "max": 120,
+            "step": 5,
+            "label": "Field of View"
+          }
+        },
+        "minHfov": {
+          "type": "number",
+          "required": false,
+          "default": 30,
+          "description": "Minimum horizontal FOV in degrees (maximum zoom in)",
+          "ui": {
+            "control": "number",
+            "min": 10,
+            "max": 120,
+            "step": 5,
+            "label": "Min FOV (Max Zoom In)"
+          }
+        },
+        "maxHfov": {
+          "type": "number",
+          "required": false,
+          "default": 120,
+          "description": "Maximum horizontal FOV in degrees (maximum zoom out)",
+          "ui": {
+            "control": "number",
+            "min": 30,
+            "max": 180,
+            "step": 5,
+            "label": "Max FOV (Max Zoom Out)"
+          }
+        },
+        "zoomSpeed": {
+          "type": "number",
+          "required": false,
+          "default": 1.0,
+          "description": "Mouse wheel zoom speed multiplier (0.1 = very slow, 3.0 = very fast)",
+          "ui": {
+            "control": "number",
+            "min": 0.1,
+            "max": 3.0,
+            "step": 0.1,
+            "label": "Zoom Speed"
+          }
+        },
+        "prompt": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Optional instruction text overlay (e.g. 'Look around to explore')"
+        },
+        "promptDisplay": {
+          "type": "string",
+          "required": false,
+          "default": "static",
+          "description": "How prompt text is displayed: static (floating overlay) or pinned (scrolls with panorama)",
+          "ui": {
+            "control": "select",
+            "options": [
+              { "value": "static", "label": "Static (floating)" },
+              { "value": "pinned", "label": "Pinned (scrolls with pano)" }
+            ],
+            "label": "Prompt Display"
+          }
+        }
+      },
+      "locations": ["prompt", "hotspots"],
+      "locationMapping": { "prompt": "prompt" },
+      "transitions": true,
+      "sound": true,
+      "renderer": "panorama"
     },
 
     "setVariable": {
@@ -1462,11 +1622,130 @@
           "required": false,
           "default": true,
           "description": "Reset state on restart"
+        },
+        "resetVariables": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear all variables",
+          "ui": {
+            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "group": "resetOptions",
+            "label": "Variables"
+          }
+        },
+        "resetCounters": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear all counters",
+          "ui": {
+            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "group": "resetOptions",
+            "label": "Counters"
+          }
+        },
+        "resetInventory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear inventory",
+          "ui": {
+            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "group": "resetOptions",
+            "label": "Inventory"
+          }
+        },
+        "resetTimers": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear all timers",
+          "ui": {
+            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "group": "resetOptions",
+            "label": "Timers"
+          }
+        },
+        "resetFictionalTime": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear fictional time",
+          "ui": {
+            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "group": "resetOptions",
+            "label": "Fictional Time"
+          }
+        },
+        "resetVisitedTracking": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear visited beat tracking",
+          "ui": {
+            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "group": "resetOptions",
+            "label": "Visited Tracking"
+          }
+        },
+        "resetHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Clear beat history",
+          "ui": {
+            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "group": "resetOptions",
+            "label": "History"
+          }
+        },
+        "restartText": {
+          "type": "string",
+          "required": false,
+          "default": "Play Again",
+          "description": "Text for restart button"
+        },
+        "creditsText": {
+          "type": "string",
+          "required": false,
+          "default": "Credits",
+          "description": "Text for credits button"
+        },
+        "creditsPageTitle": {
+          "type": "string",
+          "required": false,
+          "default": "Credits",
+          "description": "Title text for the credits page"
+        },
+        "creditsPageBody": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Body text for the credits page (auto-populated from metadata if empty)",
+          "ui": {
+            "control": "textarea",
+            "rows": 6
+          }
+        },
+        "creditsCloseText": {
+          "type": "string",
+          "required": false,
+          "default": "Close",
+          "description": "Text for the close button on credits page"
         }
       },
-      "locations": ["title", "summary", "restartButton"],
+      "locations": ["title", "summary", "restartButton", "creditsButton"],
       "locationMapping": {
-        "title": "title"
+        "title": "title",
+        "restartButton": "restartText",
+        "creditsButton": "creditsText"
+      },
+      "creditsLocations": ["creditsTitle", "creditsBody", "creditsCloseButton"],
+      "creditsLocationMapping": {
+        "creditsTitle": "creditsPageTitle",
+        "creditsBody": "creditsPageBody",
+        "creditsCloseButton": "creditsCloseText"
       },
       "transitions": true,
       "sound": true,

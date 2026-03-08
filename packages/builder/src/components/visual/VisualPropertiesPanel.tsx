@@ -72,10 +72,13 @@ interface VisualPropertiesPanelProps {
     initialPitch: number;
     initialYaw: number;
     hfov: number;
+    minHfov: number;
+    maxHfov: number;
+    zoomSpeed: number;
     promptDisplay: 'static' | 'pinned';
     projectionType: 'equirectangular' | 'cylindrical';
   };
-  onPanoramaCameraChange?: (settings: { initialPitch?: number; initialYaw?: number; hfov?: number }) => void;
+  onPanoramaCameraChange?: (settings: { initialPitch?: number; initialYaw?: number; hfov?: number; minHfov?: number; maxHfov?: number; zoomSpeed?: number }) => void;
   onPromptDisplayChange?: (display: 'static' | 'pinned') => void;
   onProjectionTypeChange?: (type: 'equirectangular' | 'cylindrical') => void;
 }
@@ -283,7 +286,16 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       <label className="block">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500">Initial Pitch</span>
-                          <span className="text-xs text-gray-400">{panoramaSettings.initialPitch}°</span>
+                          <input
+                            type="number"
+                            value={parseFloat(panoramaSettings.initialPitch.toFixed(1))}
+                            onChange={(e) => {
+                              const v = Math.max(-90, Math.min(90, parseFloat(e.target.value) || 0));
+                              onPanoramaCameraChange({ initialPitch: v });
+                            }}
+                            min={-90} max={90} step={0.1}
+                            className="w-16 text-right text-xs text-gray-400 border border-gray-200 rounded px-1 py-0.5"
+                          />
                         </div>
                         <input
                           type="range"
@@ -291,7 +303,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                           onChange={(e) => onPanoramaCameraChange({ initialPitch: parseFloat(e.target.value) })}
                           min={-90}
                           max={90}
-                          step={1}
+                          step={0.1}
                           className="mt-0.5 w-full h-1.5 accent-blue-500"
                         />
                       </label>
@@ -300,7 +312,16 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       <label className="block">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500">Initial Yaw</span>
-                          <span className="text-xs text-gray-400">{panoramaSettings.initialYaw}°</span>
+                          <input
+                            type="number"
+                            value={parseFloat(panoramaSettings.initialYaw.toFixed(1))}
+                            onChange={(e) => {
+                              const v = Math.max(-180, Math.min(180, parseFloat(e.target.value) || 0));
+                              onPanoramaCameraChange({ initialYaw: v });
+                            }}
+                            min={-180} max={180} step={0.1}
+                            className="w-16 text-right text-xs text-gray-400 border border-gray-200 rounded px-1 py-0.5"
+                          />
                         </div>
                         <input
                           type="range"
@@ -308,24 +329,134 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                           onChange={(e) => onPanoramaCameraChange({ initialYaw: parseFloat(e.target.value) })}
                           min={-180}
                           max={180}
-                          step={1}
+                          step={0.1}
                           className="mt-0.5 w-full h-1.5 accent-blue-500"
                         />
                       </label>
 
-                      {/* HFOV */}
+                      {/* HFOV — design-time ground truth, independent of min/max */}
                       <label className="block">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500">Field of View</span>
-                          <span className="text-xs text-gray-400">{panoramaSettings.hfov}°</span>
+                          <input
+                            type="number"
+                            value={panoramaSettings.hfov}
+                            onChange={(e) => {
+                              const v = Math.max(10, Math.min(179, parseFloat(e.target.value) || 75));
+                              onPanoramaCameraChange({ hfov: v });
+                            }}
+                            min={10} max={179} step={1}
+                            className="w-14 text-right text-xs text-gray-400 border border-gray-200 rounded px-1 py-0.5"
+                          />
                         </div>
                         <input
                           type="range"
                           value={panoramaSettings.hfov}
                           onChange={(e) => onPanoramaCameraChange({ hfov: parseFloat(e.target.value) })}
-                          min={50}
-                          max={120}
+                          min={10}
+                          max={179}
                           step={1}
+                          className="mt-0.5 w-full h-1.5 accent-blue-500"
+                        />
+                      </label>
+
+                      {/* Zoom Limits (runtime only) */}
+                      <div className="mt-1 pt-1 border-t border-gray-100">
+                        <span className="text-xs text-gray-400 font-medium">Zoom Limits (runtime)</span>
+                      </div>
+
+                      {/* Min HFOV (Max Zoom In) */}
+                      <label className="block">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">Min FOV (Max Zoom In)</span>
+                          <input
+                            type="number"
+                            value={panoramaSettings.minHfov}
+                            onChange={(e) => {
+                              const val = Math.max(10, Math.min(175, parseFloat(e.target.value) || 30));
+                              const gap = 5;
+                              const updates: Record<string, number> = { minHfov: val };
+                              if (val + gap > panoramaSettings.maxHfov) updates.maxHfov = val + gap;
+                              onPanoramaCameraChange(updates);
+                            }}
+                            min={10} max={175} step={5}
+                            className="w-14 text-right text-xs text-gray-400 border border-gray-200 rounded px-1 py-0.5"
+                          />
+                        </div>
+                        <input
+                          type="range"
+                          value={panoramaSettings.minHfov}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            const gap = 5;
+                            const updates: Record<string, number> = { minHfov: val };
+                            if (val + gap > panoramaSettings.maxHfov) updates.maxHfov = val + gap;
+                            onPanoramaCameraChange(updates);
+                          }}
+                          min={10}
+                          max={175}
+                          step={5}
+                          className="mt-0.5 w-full h-1.5 accent-blue-500"
+                        />
+                      </label>
+
+                      {/* Max HFOV (Max Zoom Out) */}
+                      <label className="block">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">Max FOV (Max Zoom Out)</span>
+                          <input
+                            type="number"
+                            value={panoramaSettings.maxHfov}
+                            onChange={(e) => {
+                              const val = Math.max(15, Math.min(180, parseFloat(e.target.value) || 120));
+                              const gap = 5;
+                              const updates: Record<string, number> = { maxHfov: val };
+                              if (val - gap < panoramaSettings.minHfov) updates.minHfov = val - gap;
+                              onPanoramaCameraChange(updates);
+                            }}
+                            min={15} max={180} step={5}
+                            className="w-14 text-right text-xs text-gray-400 border border-gray-200 rounded px-1 py-0.5"
+                          />
+                        </div>
+                        <input
+                          type="range"
+                          value={panoramaSettings.maxHfov}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            const gap = 5;
+                            const updates: Record<string, number> = { maxHfov: val };
+                            if (val - gap < panoramaSettings.minHfov) updates.minHfov = val - gap;
+                            onPanoramaCameraChange(updates);
+                          }}
+                          min={15}
+                          max={180}
+                          step={5}
+                          className="mt-0.5 w-full h-1.5 accent-blue-500"
+                        />
+                      </label>
+
+                      {/* Zoom Speed */}
+                      <label className="block">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">Zoom Speed</span>
+                          <input
+                            type="number"
+                            value={panoramaSettings.zoomSpeed}
+                            onChange={(e) => {
+                              const v = Math.max(0.1, Math.min(3.0, parseFloat(e.target.value) || 1.0));
+                              onPanoramaCameraChange({ zoomSpeed: v });
+                            }}
+                            min={0.1} max={3.0} step={0.1}
+                            className="w-14 text-right text-xs text-gray-400 border border-gray-200 rounded px-1 py-0.5"
+                          />
+                        </div>
+                        <input
+                          type="range"
+                          value={panoramaSettings.zoomSpeed}
+                          onChange={(e) => onPanoramaCameraChange({ zoomSpeed: parseFloat(e.target.value) })}
+                          min={0.1}
+                          max={3.0}
+                          step={0.1}
                           className="mt-0.5 w-full h-1.5 accent-blue-500"
                         />
                       </label>

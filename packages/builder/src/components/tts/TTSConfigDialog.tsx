@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Key, CheckCircle, AlertCircle, Server, Trash2, Play, Volume2 } from 'lucide-react';
 import { getSavedTTSConfig, clearSavedTTSConfig } from '../../hooks/useTTS';
-import { getTTSService } from '../../services/tts';
+import { getTTSService, WebSpeechProvider } from '../../services/tts';
 import type { TTSProviderType, TTSVoiceInfo } from '../../types/tts';
 
 type TTSProviderTab = 'web-speech' | 'openai' | 'elevenlabs' | 'custom';
@@ -132,25 +132,39 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
     }
   }, [isOpen]);
 
-  // Load voices when provider is active and configured
-  const loadVoices = useCallback(async () => {
-    const ttsService = getTTSService();
-    const activeProvider = ttsService.getActiveProvider();
-    if (activeProvider) {
-      try {
+  // Load voices for the currently selected provider tab
+  const loadVoices = useCallback(async (forProvider?: TTSProviderTab) => {
+    const tab = forProvider || provider;
+    try {
+      if (tab === 'web-speech') {
+        // Load Web Speech voices directly (doesn't need saved config)
+        const wsProvider = new WebSpeechProvider();
+        wsProvider.configure({ provider: 'web-speech' });
+        const ttsService = getTTSService();
         const lang = ttsService.getLanguage() || undefined;
-        const v = await activeProvider.getVoices(lang);
+        const v = await wsProvider.getVoices(lang);
         setVoices(v);
-      } catch {
-        setVoices([]);
+      } else {
+        // For cloud providers, use the active service provider
+        const ttsService = getTTSService();
+        const activeProvider = ttsService.getActiveProvider();
+        if (activeProvider) {
+          const lang = ttsService.getLanguage() || undefined;
+          const v = await activeProvider.getVoices(lang);
+          setVoices(v);
+        } else {
+          setVoices([]);
+        }
       }
+    } catch {
+      setVoices([]);
     }
-  }, []);
+  }, [provider]);
 
-  // Load voices when dialog opens
+  // Load voices when dialog opens or provider tab changes
   useEffect(() => {
-    if (isOpen) loadVoices();
-  }, [isOpen, loadVoices]);
+    if (isOpen) loadVoices(provider);
+  }, [isOpen, provider, loadVoices]);
 
   const handleProviderChange = (newProvider: TTSProviderTab) => {
     setProvider(newProvider);
@@ -203,14 +217,41 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
 
   const handleTestVoice = async () => {
     setIsTesting(true);
+    setError('');
     try {
-      const ttsService = getTTSService();
-      const activeProvider = ttsService.getActiveProvider();
-      if (!activeProvider) {
-        setError('No TTS provider configured. Save settings first.');
-        return;
+      if (provider === 'web-speech') {
+        // Test Web Speech directly — no API key needed
+        const wsProvider = new WebSpeechProvider();
+        wsProvider.configure({ provider: 'web-speech' });
+        const voiceConfig: Record<string, unknown> = {};
+        if (defaultVoiceId) voiceConfig.voiceId = defaultVoiceId;
+        await wsProvider.synthesize(
+          'Hello, this is a voice test. How does this sound?',
+          voiceConfig as any,
+        );
+      } else {
+        // For cloud providers: validate required fields, temporarily configure, then test
+        if (preset.apiKeyRequired && !apiKey.trim()) {
+          setError('Enter an API key before testing');
+          return;
+        }
+        if (preset.baseUrlRequired && !baseUrl.trim()) {
+          setError('Enter a base URL before testing');
+          return;
+        }
+        // Temporarily configure the service with current dialog values
+        onConfigure(
+          provider as TTSProviderType,
+          apiKey || undefined,
+          model || preset.defaultModel || undefined,
+          baseUrl || undefined,
+          defaultVoiceId || undefined,
+        );
+        // Small delay for provider to initialize
+        await new Promise(r => setTimeout(r, 100));
+        const ttsService = getTTSService();
+        await ttsService.speak('Hello, this is a voice test. How does this sound?');
       }
-      await ttsService.speak('Hello, this is a voice test. How does this sound?');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Voice test failed');
     } finally {

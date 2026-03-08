@@ -27,6 +27,9 @@ interface PanoramaPropertiesPanelProps {
   initialPitch: number;
   initialYaw: number;
   hfov: number;
+  minHfov: number;
+  maxHfov: number;
+  zoomSpeed: number;
   prompt: string;
   beats: Beat[];
   assets: Asset[];
@@ -35,7 +38,7 @@ interface PanoramaPropertiesPanelProps {
   onHotspotsChange: (hotspots: PanoramaHotspotData[]) => void;
   onSelectHotspot: (id: string | null) => void;
   onTogglePlacementMode: () => void;
-  onCameraChange: (settings: { initialPitch?: number; initialYaw?: number; hfov?: number }) => void;
+  onCameraChange: (settings: { initialPitch?: number; initialYaw?: number; hfov?: number; minHfov?: number; maxHfov?: number; zoomSpeed?: number }) => void;
   onPromptChange: (prompt: string) => void;
   onLookAtHotspot?: (pitch: number, yaw: number) => void;
   onSetFromCurrentView?: () => void;
@@ -48,6 +51,9 @@ export const PanoramaPropertiesPanel: React.FC<PanoramaPropertiesPanelProps> = (
   initialPitch,
   initialYaw,
   hfov,
+  minHfov,
+  maxHfov,
+  zoomSpeed,
   prompt,
   beats,
   assets,
@@ -327,6 +333,57 @@ export const PanoramaPropertiesPanel: React.FC<PanoramaPropertiesPanelProps> = (
               min={30}
               max={120}
               step={1}
+              className="mt-0.5 w-full h-1.5 accent-blue-500"
+            />
+          </label>
+
+          {/* Min HFOV (Max Zoom In) */}
+          <label className="block">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">Min FOV (Max Zoom In)</span>
+              <span className="text-xs text-gray-400">{minHfov}°</span>
+            </div>
+            <input
+              type="range"
+              value={minHfov}
+              onChange={(e) => onCameraChange({ minHfov: parseFloat(e.target.value) })}
+              min={10}
+              max={120}
+              step={5}
+              className="mt-0.5 w-full h-1.5 accent-blue-500"
+            />
+          </label>
+
+          {/* Max HFOV (Max Zoom Out) */}
+          <label className="block">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">Max FOV (Max Zoom Out)</span>
+              <span className="text-xs text-gray-400">{maxHfov}°</span>
+            </div>
+            <input
+              type="range"
+              value={maxHfov}
+              onChange={(e) => onCameraChange({ maxHfov: parseFloat(e.target.value) })}
+              min={30}
+              max={180}
+              step={5}
+              className="mt-0.5 w-full h-1.5 accent-blue-500"
+            />
+          </label>
+
+          {/* Zoom Speed */}
+          <label className="block">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">Zoom Speed</span>
+              <span className="text-xs text-gray-400">{zoomSpeed.toFixed(1)}x</span>
+            </div>
+            <input
+              type="range"
+              value={zoomSpeed}
+              onChange={(e) => onCameraChange({ zoomSpeed: parseFloat(e.target.value) })}
+              min={0.1}
+              max={3.0}
+              step={0.1}
               className="mt-0.5 w-full h-1.5 accent-blue-500"
             />
           </label>

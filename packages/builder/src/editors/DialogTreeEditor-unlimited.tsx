@@ -198,13 +198,25 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
 
   // Create nested dialog
   const createNestedDialog = (path: string[], choiceIndex: number) => {
+    // Navigate to the parent node to inherit its speaker
+    let parentNode: any = dialogTree;
+    for (const key of path) {
+      if (key === 'root') continue;
+      if (key.startsWith('choice_')) {
+        const idx = parseInt(key.split('_')[1]);
+        if (parentNode.choices?.[idx]?.target && typeof parentNode.choices[idx].target === 'object') {
+          parentNode = parentNode.choices[idx].target;
+        }
+      }
+    }
+
     const newNode: DialogNode = {
       id: `node_${Date.now()}`,
-      speaker: characters[0],
+      speaker: parentNode?.speaker || characters[0],
       text: 'NPC response...',
       emotion: 'neutral'
     };
-    
+
     updateChoiceAtPath(path, choiceIndex, { target: newNode });
     
     // Expand the parent node

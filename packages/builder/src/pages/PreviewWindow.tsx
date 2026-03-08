@@ -696,11 +696,17 @@ export const PreviewWindow: React.FC = () => {
 
       // Reconstruct beats from serialized data
       for (const beatData of storyData.beats) {
+        if (beatData.type === 'panorama') {
+          console.log(`[PreviewWindow] Reconstructing panorama beat "${beatData.id}" — hotspots in parameters:`, beatData.parameters?.hotspots?.length ?? 0, beatData.parameters?.hotspots);
+        }
         const beat = registry.createBeat(beatData.type, {
           ...beatData,
           parameters: beatData.parameters,
           connections: beatData.connections,
         });
+        if (beatData.type === 'panorama') {
+          console.log(`[PreviewWindow] After createBeat — hotspots on instance:`, (beat as any).hotspots?.length ?? 0, (beat as any).hotspots);
+        }
 
         // Set position
         if (beatData.x !== undefined) beat.x = beatData.x;
@@ -1145,9 +1151,10 @@ export const PreviewWindow: React.FC = () => {
       }
       ttsService.setEnabled(ttsEnabled);
 
-      // Wire TTS callback to renderer
+      // Wire TTS callbacks to renderer
       reactRenderer.setTTSSpeakCallback((text, speaker, isPrompt) => {
         const svc = getTTSService();
+        console.log(`[PreviewWindow] TTS callback fired: speaker="${speaker}", isPrompt=${isPrompt}, enabled=${svc.isEnabled()}, text="${text.substring(0, 50)}..."`);
         if (!svc.isEnabled()) return;
         if (isPrompt) {
           svc.speakPrompt(text, speaker);
@@ -1155,6 +1162,7 @@ export const PreviewWindow: React.FC = () => {
           svc.speak(text, speaker);
         }
       });
+      reactRenderer.setTTSStopCallback(() => getTTSService().stop());
 
       const engine = new StoryEngine(reactRenderer as any);
       rendererRef.current = reactRenderer;

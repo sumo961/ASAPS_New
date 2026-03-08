@@ -59,6 +59,12 @@ export interface PanoramaViewProps {
   initialPitch?: number;
   initialYaw?: number;
   hfov?: number;
+  /** Minimum horizontal FOV in degrees (maximum zoom in). Default 30 */
+  minHfov?: number;
+  /** Maximum horizontal FOV in degrees (maximum zoom out). Default 120 */
+  maxHfov?: number;
+  /** Mouse wheel zoom speed multiplier (0.1–3.0). Default 1.0 */
+  zoomSpeed?: number;
   prompt?: string;
   /** Prompt display mode: 'static' (CSS overlay) or 'pinned' (marker at yaw/pitch) */
   promptDisplay?: 'static' | 'pinned';
@@ -143,6 +149,9 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
   initialPitch = 0,
   initialYaw = 0,
   hfov = 75,
+  minHfov = 30,
+  maxHfov = 120,
+  zoomSpeed = 1.0,
   prompt,
   promptDisplay = 'static',
   projectionType = 'equirectangular',
@@ -249,6 +258,9 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
     const createWithPanoData = (panoData?: any) => {
       if (!viewerContainerRef.current) return;
 
+      // Create viewer without min/max restrictions so the design-time FOV
+      // can be set as the ground truth for marker scaling. Runtime zoom limits
+      // are applied AFTER the initial FOV is established.
       const viewer = new Viewer({
         container: viewerContainerRef.current,
         panorama: resolvedPanoUrl,
@@ -257,7 +269,7 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
         defaultPitch: initialPitch * DEG_TO_RAD,
         defaultZoomLvl: 50, // refined in ready handler
         minFov: 10,
-        maxFov: 120,
+        maxFov: 179,
         navbar: false,
         mousemove: !editorModeRef.current || true, // always allow panning
         plugins: [[MarkersPlugin, { markers: [] }]],
@@ -270,13 +282,20 @@ export const PanoramaView: React.FC<PanoramaViewProps> = ({
       // Ready handler: set correct zoom from HFOV and expose API
       viewer.addEventListener('ready', () => {
         try {
-          const zoom = hfovToZoom(viewer, Math.max(30, hfov));
+          // 1. Set the design-time FOV (unclamped — this is the ground truth)
+          const zoom = hfovToZoom(viewer, Math.max(10, hfov));
           viewer.zoom(zoom);
         } catch { /* ignore */ }
 
-        // Read back actual HFOV from the viewer — PSV's round-trip may differ
-        // from the requested value due to aspect-ratio quantization
-        initialHfovRef.current = Math.max(30, zoomToHfov(viewer));
+        // 2. Store the design-time HFOV as the scaling reference
+        initialHfovRef.current = Math.max(10, zoomToHfov(viewer));
+
+        // 3. NOW apply runtime zoom limits and speed
+        try {
+          viewer.setOption('minFov', minHfov);
+          viewer.setOption('maxFov', maxHfov);
+          viewer.setOption('zoomSpeed', zoomSpeed);
+        } catch { /* ignore */ }
 
         // Expose viewer API
         if (onViewerReadyRef.current) {

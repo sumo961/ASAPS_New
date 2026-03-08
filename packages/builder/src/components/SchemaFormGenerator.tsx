@@ -653,7 +653,11 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           );
         }
 
-      case 'number':
+      case 'number': {
+        const numMin = paramDef.ui?.min ?? 0;
+        const numMax = paramDef.ui?.max;
+        const numStep = paramDef.ui?.step ?? 1;
+        const useFloat = numStep < 1 || (numMin !== undefined && !Number.isInteger(numMin));
         return (
           <div key={paramName}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -662,9 +666,10 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
             <input
               type="number"
               value={value ?? paramDef.default ?? 0}
-              onChange={(e) => onParameterChange(paramName, paramName === 'duration' && beatType === 'durScreen' ?
-                parseInt(e.target.value) : parseInt(e.target.value))}
-              min={paramDef.type === 'number' ? 0 : undefined}
+              onChange={(e) => onParameterChange(paramName, useFloat ? parseFloat(e.target.value) : parseInt(e.target.value))}
+              min={numMin}
+              max={numMax}
+              step={numStep}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             />
             {paramDef.description && (
@@ -672,6 +677,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
             )}
           </div>
         );
+      }
 
       case 'boolean':
         return (

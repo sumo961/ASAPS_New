@@ -101,7 +101,11 @@ export class TTSService {
    * Speak text, optionally using a speaker-specific voice.
    */
   async speak(text: string, speaker?: string): Promise<void> {
-    if (!this._enabled || !this.activeProvider?.isReady()) return;
+    if (!this._enabled || !this.activeProvider?.isReady()) {
+      console.log(`[TTSService] speak() skipped: enabled=${this._enabled}, providerReady=${this.activeProvider?.isReady()}, provider=${this.activeProvider?.name || 'none'}`);
+      return;
+    }
+    console.log(`[TTSService] speak(): "${text.substring(0, 60)}..." speaker=${speaker || 'none'}`);
 
     // Stop any in-progress speech
     this.stop();

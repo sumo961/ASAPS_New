@@ -853,6 +853,7 @@ export class ReactRenderer extends BaseRenderer {
   protected mobileMode: boolean = false;  // Whether mobile display adaptation is active
   protected mobileFontScale: number = 1.0;  // Font scale multiplier for mobile (1.0-2.0)
   private ttsSpeakCallback: ((text: string, speaker?: string, isPrompt?: boolean) => void) | null = null;
+  private ttsStopCallback: (() => void) | null = null;
 
   private get root(): ReactDOM.Root | null {
     return this._root;
@@ -1010,6 +1011,9 @@ export class ReactRenderer extends BaseRenderer {
   private pendingTransitionDuration: number = 500;
 
   protected handleAction = (id: string): void => {
+    // Stop any in-progress TTS when user advances
+    this.ttsStopCallback?.();
+
     if (this.resolveAction) {
       this.resolveAction(id);
       this.resolveAction = null;
@@ -1025,6 +1029,9 @@ export class ReactRenderer extends BaseRenderer {
    * (the engine will check timerInterruptBeat and use the timer's target instead).
    */
   cancelPendingAction(): void {
+    // Stop any in-progress TTS
+    this.ttsStopCallback?.();
+
     if (this._originalHandleAction) {
       this.handleAction = this._originalHandleAction;
       this._originalHandleAction = null;
@@ -1043,6 +1050,13 @@ export class ReactRenderer extends BaseRenderer {
    */
   setTTSSpeakCallback(callback: ((text: string, speaker?: string, isPrompt?: boolean) => void) | null): void {
     this.ttsSpeakCallback = callback;
+  }
+
+  /**
+   * Set TTS stop callback. Called when user advances (clicks action) to stop in-progress speech.
+   */
+  setTTSStopCallback(callback: (() => void) | null): void {
+    this.ttsStopCallback = callback;
   }
 
   /**
@@ -2118,6 +2132,9 @@ export class ReactRenderer extends BaseRenderer {
     initialPitch?: number;
     initialYaw?: number;
     hfov?: number;
+    minHfov?: number;
+    maxHfov?: number;
+    zoomSpeed?: number;
     projectionType?: 'equirectangular' | 'cylindrical';
     prompt?: string;
     promptDisplay?: 'static' | 'pinned';
@@ -2152,6 +2169,9 @@ export class ReactRenderer extends BaseRenderer {
             initialPitch={options.initialPitch}
             initialYaw={options.initialYaw}
             hfov={options.hfov}
+            minHfov={options.minHfov}
+            maxHfov={options.maxHfov}
+            zoomSpeed={options.zoomSpeed}
             projectionType={options.projectionType}
             prompt={options.prompt}
             promptDisplay={options.promptDisplay}

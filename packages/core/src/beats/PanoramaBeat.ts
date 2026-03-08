@@ -16,6 +16,9 @@ export class PanoramaBeat extends Beat {
   public autoRotate: number;
   public prompt: string;
   public promptDisplay: 'static' | 'pinned';
+  public minHfov: number;
+  public maxHfov: number;
+  public zoomSpeed: number;
 
   constructor(config: BeatConfig & {
     parameters?: Partial<{
@@ -28,6 +31,9 @@ export class PanoramaBeat extends Beat {
       autoRotate: number;
       prompt: string;
       promptDisplay: 'static' | 'pinned';
+      minHfov: number;
+      maxHfov: number;
+      zoomSpeed: number;
     }>;
   }) {
     super(config);
@@ -40,6 +46,9 @@ export class PanoramaBeat extends Beat {
     this.autoRotate = config.parameters?.autoRotate ?? 0;
     this.prompt = config.parameters?.prompt || '';
     this.promptDisplay = config.parameters?.promptDisplay || 'static';
+    this.minHfov = config.parameters?.minHfov ?? 30;
+    this.maxHfov = config.parameters?.maxHfov ?? 120;
+    this.zoomSpeed = config.parameters?.zoomSpeed ?? 1.0;
   }
 
   getParameters(): Record<string, any> {
@@ -53,6 +62,9 @@ export class PanoramaBeat extends Beat {
       autoRotate: this.autoRotate,
       prompt: this.prompt,
       promptDisplay: this.promptDisplay,
+      minHfov: this.minHfov,
+      maxHfov: this.maxHfov,
+      zoomSpeed: this.zoomSpeed,
       node: this.node,
     };
   }
@@ -80,6 +92,9 @@ export class PanoramaBeat extends Beat {
     if (params.autoRotate !== undefined) this.autoRotate = params.autoRotate;
     if (params.prompt !== undefined) this.prompt = params.prompt;
     if (params.promptDisplay !== undefined) this.promptDisplay = params.promptDisplay;
+    if (params.minHfov !== undefined) this.minHfov = params.minHfov;
+    if (params.maxHfov !== undefined) this.maxHfov = params.maxHfov;
+    if (params.zoomSpeed !== undefined) this.zoomSpeed = params.zoomSpeed;
     if (params.node !== undefined) this.node = params.node;
   }
 
@@ -145,8 +160,9 @@ export class PanoramaBeat extends Beat {
     });
 
     if (availableHotspots.length === 0) {
-      console.warn(`[PanoramaBeat] No available hotspots for beat ${this.id}`);
-      return this.getNextBeat(context);
+      console.warn(`[PanoramaBeat] No available hotspots for beat ${this.id} (total hotspots: ${this.hotspots.length})`);
+      // Still render the panorama — it can be explored even without hotspots.
+      // If there's a defaultTarget, the beat will advance via getNextBeat after rendering.
     }
 
     // Process text with variable interpolation
@@ -272,6 +288,9 @@ export class PanoramaBeat extends Beat {
         initialPitch: this.initialPitch,
         initialYaw: this.initialYaw,
         hfov: this.hfov,
+        minHfov: this.minHfov,
+        maxHfov: this.maxHfov,
+        zoomSpeed: this.zoomSpeed,
         projectionType: this.projectionType,
         prompt: processedPrompt,
         promptDisplay: this.promptDisplay,
