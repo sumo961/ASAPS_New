@@ -26,7 +26,10 @@ export async function validateProjectAssets(
   }
 
   const sep = api.path?.sep || '/';
-  const manifestPath = [assetsPath, '_manifest.json'].join(sep);
+  // The external assets folder structure is: assetsPath/assets/_manifest.json
+  // and files at: assetsPath/assets/{folder}/{filename}
+  const assetsDir = [assetsPath, 'assets'].join(sep);
+  const manifestPath = [assetsDir, '_manifest.json'].join(sep);
 
   // Read manifest
   let manifest: DirectoryAssetManifest;
@@ -36,7 +39,8 @@ export async function validateProjectAssets(
       return { valid: [], missing: [] };
     }
     const raw = await api.fs.readFile(manifestPath, 'utf-8');
-    manifest = parseManifest(raw);
+    const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+    manifest = parseManifest(text);
   } catch {
     return { valid: [], missing: [] };
   }
@@ -45,7 +49,7 @@ export async function validateProjectAssets(
   const missing: AssetManifestEntry[] = [];
 
   for (const entry of Object.values(manifest.assets)) {
-    const filePath = [assetsPath, entry.folder, entry.filename].join(sep);
+    const filePath = [assetsDir, entry.folder, entry.filename].join(sep);
     try {
       const exists = await api.fs.exists(filePath);
       if (exists) {
