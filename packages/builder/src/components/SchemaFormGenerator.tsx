@@ -205,7 +205,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   // Skip parameters that should be handled elsewhere (connections, complex types)
   // Note: 'operation' is handled inside the 'value' case for setVariable beats
   const skipParameters = ['connection', 'defaultConnection', 'trueConnection', 'falseConnection',
-    'dialogTree', 'choices', 'props', 'hyperlinks', 'restartConnection', 'operation'];
+    'dialogTree', 'choices', 'props', 'hyperlinks', 'restartConnection', 'operation',
+    'speaker', 'showSpeaker']; // Rendered in Inspector's common Speaker section
 
   const renderField = (paramName: string, paramDef: ParameterDefinition): React.ReactNode => {
     // Check for custom renderer first

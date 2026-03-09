@@ -1041,7 +1041,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setHasChanges(true);
 
     // For fields that affect graph visualization or need immediate persistence, update immediately
-    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'timeDisplayMode' || field === 'timeDisplayText' || field === 'overrideCountdownMeter') {
+    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'speaker' || field === 'showSpeaker' || field === 'timeDisplayMode' || field === 'timeDisplayText' || field === 'overrideCountdownMeter') {
       if (onUpdate && beat) {
         onUpdate(beat.id, { [field]: value });
       }
@@ -1341,6 +1341,8 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.showTimer = localBeat.showTimer;
       beat.transition = localBeat.transition;
       beat.notes = localBeat.notes;
+      beat.speaker = localBeat.speaker || '';
+      beat.showSpeaker = localBeat.showSpeaker || false;
 
       // Convert backgroundSound from parameters to proper Sound object
       const bgSoundId = localBeat.parameters?.backgroundSound;
@@ -3623,6 +3625,56 @@ export const Inspector: React.FC<InspectorProps> = ({
                           : 'Show the countdown meter HUD on this beat (overrides the global "hide by default" setting).'}
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {/* Speaker Section - for all visible beats */}
+                {!['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition'].includes(getCanonicalBeatType(beat.type)) && (
+                  <div className="border-t pt-3 mt-3">
+                    <h4 className="text-sm font-medium text-gray-700 mb-1">Speaker</h4>
+                    <select
+                      value={
+                        localBeat.speaker && !['', 'Narrator', ...getAvailableCharacters()].includes(localBeat.speaker)
+                          ? '__custom__'
+                          : (localBeat.speaker || '')
+                      }
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          handleChange('speaker', localBeat.speaker || '');
+                        } else {
+                          handleChange('speaker', e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">(Default — Narrator)</option>
+                      <option value="Narrator">Narrator</option>
+                      {getAvailableCharacters().filter(name => name !== 'Narrator' && name !== 'NPC').map(name => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                      <option value="__custom__">Custom...</option>
+                    </select>
+                    {localBeat.speaker && !['', 'Narrator', ...getAvailableCharacters()].includes(localBeat.speaker) && (
+                      <input
+                        type="text"
+                        value={localBeat.speaker}
+                        onChange={(e) => handleChange('speaker', e.target.value)}
+                        placeholder="Enter speaker name..."
+                        className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
+                      />
+                    )}
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mt-2">
+                      <input
+                        type="checkbox"
+                        checked={localBeat.showSpeaker || false}
+                        onChange={(e) => handleChange('showSpeaker', e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <span>Show speaker name to interactor</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Sets the TTS voice and optionally displays the speaker name on screen.
+                    </p>
                   </div>
                 )}
 
