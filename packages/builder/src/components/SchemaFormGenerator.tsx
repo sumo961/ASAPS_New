@@ -15,7 +15,7 @@ interface ParameterDefinition {
   // For fields that reference beats (target selectors)
   targetField?: boolean;
   ui?: {
-    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations';
+    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker';
     options?: (string | { value: string; label: string })[];
     label?: string;
     min?: number;
@@ -308,6 +308,55 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               )}
               {!paramDef.ui.hint && paramDef.description && (
                 <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+              )}
+            </div>
+          );
+        }
+
+        // Speaker control - dropdown populated from characters + Narrator + Custom
+        if (paramDef.ui?.control === 'speaker') {
+          const speakerOptions: { value: string; label: string }[] = [
+            { value: '', label: '(Default — Narrator)' },
+            { value: 'Narrator', label: 'Narrator' },
+          ];
+          if (characters) {
+            for (const char of characters) {
+              const name = char.displayName || char.name || char.id;
+              if (name && !speakerOptions.some(o => o.value === name)) {
+                speakerOptions.push({ value: name, label: name });
+              }
+            }
+          }
+          const isCustom = value && !speakerOptions.some(o => o.value === value);
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {paramDef.ui.label || label}
+              </label>
+              <select
+                value={isCustom ? '__custom__' : (value || '')}
+                onChange={(e) => {
+                  if (e.target.value === '__custom__') {
+                    onParameterChange(paramName, value || '');
+                  } else {
+                    onParameterChange(paramName, e.target.value);
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                {speakerOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+                <option value="__custom__">Custom...</option>
+              </select>
+              {(isCustom || value === '__custom__') && (
+                <input
+                  type="text"
+                  value={isCustom ? value : ''}
+                  onChange={(e) => onParameterChange(paramName, e.target.value)}
+                  placeholder="Enter speaker name..."
+                  className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
+                />
               )}
             </div>
           );

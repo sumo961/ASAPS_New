@@ -173,6 +173,18 @@
           "default": "Start",
           "description": "Start button text"
         },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+        },
         "connection": {
           "type": "connection",
           "required": true,
@@ -219,6 +231,18 @@
           "required": false,
           "default": "Continue",
           "description": "Continue button text (also used as connection label)"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
         },
         "connection": {
           "type": "connection",
@@ -356,6 +380,18 @@
           "required": false,
           "default": false,
           "description": "Only show choice text when hovering over the hotspot"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
         }
       },
       "locations": ["question", "choices"],
@@ -403,6 +439,18 @@
           "required": false,
           "default": false,
           "description": "Block and dim choices leading to previously visited beats"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
         }
       },
       "locations": ["question", "props"],
@@ -443,6 +491,18 @@
           "required": false, 
           "default": true,
           "description": "Allow skipping video"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
         },
         "connection": {
           "type": "connection",
@@ -572,6 +632,18 @@
           "required": false,
           "default": "Close",
           "description": "Text for the close button on credits page"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
         },
         "restartConnection": {
           "type": "connection",
@@ -731,6 +803,18 @@
             ],
             "label": "Prompt Display"
           }
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
         }
       },
       "locations": ["prompt", "hotspots"],
@@ -838,6 +922,18 @@
           "required": true,
           "default": 3000,
           "description": "Display duration in milliseconds"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
         },
         "connection": {
           "type": "connection",
@@ -1037,6 +1133,18 @@
           "default": "Continue",
           "description": "Text for submit button"
         },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+        },
         "connection": {
           "type": "connection",
           "required": true,
@@ -1206,6 +1314,18 @@
           "required": false,
           "default": "#003366",
           "description": "Color when hovering over hyperlinks"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
         }
       },
       "locations": ["text", "hyperlinks"],

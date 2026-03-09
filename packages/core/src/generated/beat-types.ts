@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-03-08T12:51:47.890Z
+ * Generated: 2026-03-09T00:59:31.358Z
  */
 
 // ============================================
@@ -112,6 +112,10 @@ export interface TitleScreenParameters {
   author?: string | undefined;
   /** Start button text */
   buttonText?: string | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
   /** Target beat when start is clicked */
   connection: Connection;
 }
@@ -128,6 +132,10 @@ export interface InfoTextParameters {
   textVariations?: string[] | undefined;
   /** Continue button text (also used as connection label) */
   buttonText?: string | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
   /** Target beat when button is clicked */
   connection: Connection;
 }
@@ -168,6 +176,10 @@ export interface MovementChoiceParameters {
   markVisited?: boolean | undefined;
   /** Only show choice text when hovering over the hotspot */
   showTextOnHover?: boolean | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
 }
 
 /**
@@ -184,6 +196,10 @@ export interface PickPropParameters {
   choiceDelay?: number | undefined;
   /** Block and dim choices leading to previously visited beats */
   markVisited?: boolean | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
 }
 
 /**
@@ -200,6 +216,10 @@ export interface VideoBeatParameters {
   controls?: boolean | undefined;
   /** Allow skipping video */
   skipButton?: boolean | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
   /** Target beat after video ends */
   connection?: Connection | undefined;
 }
@@ -242,6 +262,10 @@ export interface EndScreenParameters {
   creditsPageBody?: string | undefined;
   /** Text for the close button on credits page */
   creditsCloseText?: string | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
   /** Target beat for restart (usually beat 0) */
   restartConnection?: Connection | undefined;
 }
@@ -274,6 +298,10 @@ export interface PanoramaParameters {
   prompt?: string | undefined;
   /** How prompt text is displayed: static (floating overlay) or pinned (scrolls with panorama) */
   promptDisplay?: string | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
 }
 
 /**
@@ -320,6 +348,10 @@ export interface DurScreenParameters {
   textVariations?: string[] | undefined;
   /** Display duration in milliseconds */
   duration: number;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
   /** Target beat after duration expires */
   connection?: Connection | undefined;
 }
@@ -402,6 +434,10 @@ export interface InputTextParameters {
   required?: boolean | undefined;
   /** Text for submit button */
   buttonText?: string | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
   /** Target beat after input is submitted */
   connection: Connection;
 }
@@ -462,6 +498,10 @@ export interface HyperTextParameters {
   highlightColor?: string | undefined;
   /** Color when hovering over hyperlinks */
   hoverColor?: string | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
 }
 
 /**

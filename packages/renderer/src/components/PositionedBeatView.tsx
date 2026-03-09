@@ -528,6 +528,8 @@ export interface PositionedBeatViewProps {
   externalBackground?: boolean;
   /** Mobile font scale multiplier (1.0 = normal, up to 2.0) */
   mobileFontScale?: number;
+  /** Speaker name to display as a VN-style label overlay (only when showSpeaker is true) */
+  speakerName?: string;
 }
 
 /**
@@ -947,6 +949,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   notoFontFallbacks,
   externalBackground = false,
   mobileFontScale = 1.0,
+  speakerName,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -1462,6 +1465,30 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           />
         ))}
 
+        {/* Speaker name label overlay (VN-style) in preview mode */}
+        {speakerName && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 12,
+              left: 16,
+              zIndex: 200,
+              background: 'rgba(0, 0, 0, 0.65)',
+              color: theme.colors?.textColor || '#f0f0f0',
+              padding: '4px 14px',
+              borderRadius: 6,
+              fontSize: Math.round(16 * mobileFontScale),
+              fontFamily: theme.fonts?.titleFont ? getFontFamily(theme.fonts.titleFont) : 'inherit',
+              fontWeight: 600,
+              letterSpacing: '0.02em',
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {speakerName}
+          </div>
+        )}
+
         {/* Flex container for text and buttons */}
         <div style={{
           position: 'absolute',
@@ -1734,6 +1761,30 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           counterMax={countdownMeterValue.max}
           fontScale={mobileFontScale}
         />
+      )}
+      {/* Speaker name label overlay (VN-style) */}
+      {speakerName && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            left: textDirection === 'rtl' ? undefined : 16,
+            right: textDirection === 'rtl' ? 16 : undefined,
+            zIndex: 200,
+            background: 'rgba(0, 0, 0, 0.65)',
+            color: theme.colors?.textColor || '#f0f0f0',
+            padding: '4px 14px',
+            borderRadius: 6,
+            fontSize: Math.round(16 * mobileFontScale),
+            fontFamily: theme.fonts?.titleFont ? getFontFamily(theme.fonts.titleFont) : 'inherit',
+            fontWeight: 600,
+            letterSpacing: '0.02em',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {speakerName}
+        </div>
       )}
       {adjustedElements.map((element, index) => (
         <PositionedElement
