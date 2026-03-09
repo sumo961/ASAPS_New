@@ -7,6 +7,17 @@ import { autoUpdater, type UpdateInfo } from 'electron-updater';
 import { startWatching, stopWatching } from './fileWatcher';
 import { execFile } from 'child_process';
 
+// Suppress EPIPE errors from console.log when stdout/stderr pipes are closed
+// (common when the launching terminal is closed while the app keeps running)
+process.stdout?.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EPIPE') return;
+  throw err;
+});
+process.stderr?.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EPIPE') return;
+  throw err;
+});
+
 // Track if we're in the process of installing an update
 let isUpdating = false;
 
