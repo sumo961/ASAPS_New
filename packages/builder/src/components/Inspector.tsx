@@ -3628,8 +3628,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </div>
                 )}
 
-                {/* Speaker Section - for all visible beats */}
-                {!['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition'].includes(getCanonicalBeatType(beat.type)) && (
+                {/* Speaker Section - for visible beats (not dialogTree which has per-node speakers) */}
+                {!['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition', 'dialogTree'].includes(getCanonicalBeatType(beat.type)) && (
                   <div className="border-t pt-3 mt-3">
                     <h4 className="text-sm font-medium text-gray-700 mb-1">Speaker</h4>
                     <select
