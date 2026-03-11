@@ -2087,7 +2087,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   // Characters and props get z-index 0-99, text/button/dialog get 100+
   const isTextOrUI = ['text', 'button', 'dialog', 'hotspot'].includes(location.kind);
   const baseZIndex = isTextOrUI ? 100 : 0;
-  const effectiveZIndex = (location.zIndex || index) + baseZIndex;
+  const effectiveZIndex = (location.zIndex ?? index) + baseZIndex;
 
   // Apply animated opacity if available
   const effectiveOpacity = animatedPosition?.opacity;

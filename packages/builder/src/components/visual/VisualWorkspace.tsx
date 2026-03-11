@@ -1925,11 +1925,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             size: loc.size,
             x: loc.x,
             y: loc.y,
-            z: loc.zIndex || 0,
+            z: loc.zIndex ?? 0,
             width: loc.width,
             height: loc.height,
-            rotation: loc.rotation || 0,
-            scale: loc.scale || 1,
+            rotation: loc.rotation ?? 0,
+            scale: loc.scale ?? 1,
             visible: true,
             locked: false,
             sound: loc.sound,
@@ -1971,13 +1971,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Log z-index values for debugging
     console.log(`[VisualWorkspace] Phase elements z-values:`, phaseElements.map(el => ({ id: el.id, name: el.name, z: el.z })));
 
-    // Fix z-index ordering: ensure all elements have unique z values
-    // This handles ASML imports where z-index wasn't preserved (all 0) or has duplicates
-    if (allElements.length > 1) {
+    // Fix z-index ordering for phase elements only.
+    // Persisted elements (characters/props) keep their user-set z-values.
+    // Phase elements (dialog/buttons) get z-values starting above the max persisted z.
+    if (persistedElements.length > 0 && phaseElements.length > 0) {
+      const maxPersistedZ = Math.max(...persistedElements.map(el => el.z), -1);
+      phaseElements.forEach((el: VisualElement, idx: number) => {
+        el.z = maxPersistedZ + 1 + idx;
+      });
+    } else if (allElements.length > 1) {
+      // No persisted elements — only reassign if ALL z-values are the same (ASML import)
       const zValues = allElements.map((el: VisualElement) => el.z);
       const uniqueZValues = new Set(zValues);
-      if (uniqueZValues.size < allElements.length) {
-        console.log(`[VisualWorkspace] DialogTree: Duplicate z-index values (${uniqueZValues.size} unique for ${allElements.length} elements), assigning incremental values`);
+      if (uniqueZValues.size === 1) {
         allElements.forEach((el: VisualElement, idx: number) => {
           el.z = idx;
         });
@@ -2092,11 +2098,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             text: '',
             x: loc.x,
             y: loc.y,
-            z: loc.zIndex || 0,
+            z: loc.zIndex ?? 0,
             width: loc.width,
             height: loc.height,
-            rotation: (loc as any).rotation || 0,
-            scale: (loc as any).scale || 1,
+            rotation: (loc as any).rotation ?? 0,
+            scale: (loc as any).scale ?? 1,
             visible: true,
             locked: false,
             assetId: loc.assetId,
@@ -2238,11 +2244,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               size: loc.size,
               x: loc.x,
               y: loc.y,
-              z: loc.zIndex || 0,
+              z: loc.zIndex ?? 0,
               width: loc.width,
               height: loc.height,
-              rotation: loc.rotation || 0,
-              scale: loc.scale || 1,
+              rotation: loc.rotation ?? 0,
+              scale: loc.scale ?? 1,
               visible: true,
               locked: false,
               sound: loc.sound,
@@ -2329,7 +2335,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       console.warn(`[VisualWorkspace] ★★★ Loading ${beat.locations.size} elements from beat.locations for ${beat.type} ★★★`);
       console.warn(`[VisualWorkspace] ========== LOCATION POSITIONS ==========`);
       beat.locations.forEach((loc: Location, key: string) => {
-        console.warn(`[VisualWorkspace]   "${key}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height}, size=${(loc as any).size}`);
+        console.warn(`[VisualWorkspace]   "${key}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height}, z=${loc.zIndex}, size=${(loc as any).size}`);
       });
       console.warn(`[VisualWorkspace] ========================================`);
       const locationDetails = Array.from(beat.locations.values()).map((loc: Location) => ({
@@ -2380,11 +2386,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           size: loc.size,
           x: loc.x,
           y: loc.y,
-          z: loc.zIndex || 0,
+          z: loc.zIndex ?? 0,
           width: loc.width,
           height: loc.height,
-          rotation: loc.rotation || 0,
-          scale: loc.scale || 1,
+          rotation: loc.rotation ?? 0,
+          scale: loc.scale ?? 1,
           visible: true,
           locked: false,
           sound: loc.sound,
@@ -2941,7 +2947,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     console.warn(`[VisualWorkspace] ★★★ Setting ${elements.length} elements for ${beat.type} ★★★`);
     console.warn(`[VisualWorkspace] ========== ELEMENT POSITIONS BEING SET ==========`);
     elements.forEach((e, idx) => {
-      console.warn(`[VisualWorkspace]   [${idx}] ${e.type}/${e.name}: x=${e.x}, y=${e.y}, w=${e.width}, h=${e.height}, size=${e.size}, fontSize=${e.fontSize}`);
+      console.warn(`[VisualWorkspace]   [${idx}] ${e.type}/${e.name}: x=${e.x}, y=${e.y}, z=${e.z}, w=${e.width}, h=${e.height}, size=${e.size}, fontSize=${e.fontSize}`);
     });
     console.warn(`[VisualWorkspace] ================================================`);
     console.log(`[VisualWorkspace] Background: bgId=${bgId?.substring?.(0, 8) || 'none'}, bgUrl=${bgUrl ? 'set' : 'none'}`);
@@ -4283,28 +4289,37 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   if (index === -1) return;
 
                   let reordered = false;
+                  let updatedElements: VisualElement[] = visualElements;
                   if (direction === 'up' && index > 0) {
                     // Swap z values
                     const currentZ = sortedElements[index].z;
                     const targetZ = sortedElements[index - 1].z;
-                    setVisualElements(prev => prev.map(el => {
+                    updatedElements = visualElements.map(el => {
                       if (el.id === elementId) return { ...el, z: targetZ };
                       if (el.id === sortedElements[index - 1].id) return { ...el, z: currentZ };
                       return el;
-                    }));
+                    });
+                    setVisualElements(updatedElements);
                     setHasChanges(true);
                     reordered = true;
                   } else if (direction === 'down' && index < sortedElements.length - 1) {
                     // Swap z values
                     const currentZ = sortedElements[index].z;
                     const targetZ = sortedElements[index + 1].z;
-                    setVisualElements(prev => prev.map(el => {
+                    updatedElements = visualElements.map(el => {
                       if (el.id === elementId) return { ...el, z: targetZ };
                       if (el.id === sortedElements[index + 1].id) return { ...el, z: currentZ };
                       return el;
-                    }));
+                    });
+                    setVisualElements(updatedElements);
                     setHasChanges(true);
                     reordered = true;
+                  }
+
+                  // Sync z-order changes to beat.locations immediately
+                  // (component remounts on beat change, so auto-save on unmount won't help)
+                  if (reordered && beat) {
+                    syncElementsToBeatLocations(updatedElements, beat);
                   }
 
                   // Commit reorder for undo (use timeout to capture state after React update)
