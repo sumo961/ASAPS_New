@@ -171,8 +171,10 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
   const params = beat.parameters || beat;
   const type = beat.type || '';
 
-  // Speaker name (top-level beat property, not inside parameters)
-  if (beat.speaker && typeof beat.speaker === 'string') {
+  // Speaker name (top-level beat property, not inside parameters).
+  // Skip for dialogTree — speaker lives in parameters.dialogTree.speaker
+  // and is extracted separately below.
+  if (beat.speaker && typeof beat.speaker === 'string' && type !== 'dialogTree') {
     strings[`${prefix}.speaker`] = beat.speaker;
   }
 
