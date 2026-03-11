@@ -3644,6 +3644,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     beat.animations = animations;
     console.log(`[VisualWorkspace] Saved animations to beat:`, animations.length, animations);
 
+    // Notify the store so autosave/VCS detects the changes (locations, parameters, animations)
+    if (onBeatUpdate) {
+      onBeatUpdate(beat.id, {
+        locations: Array.from(beat.locations.values()),
+        animations,
+      } as any);
+    }
+
     setHasChanges(false);
 
     // Show save confirmation
