@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-03-09T01:24:02.690Z
+ * Generated: 2026-03-11T01:44:53.338Z
  */
 
 // ============================================

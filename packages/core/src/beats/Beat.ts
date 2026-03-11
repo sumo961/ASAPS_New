@@ -28,7 +28,7 @@ export abstract class Beat {
   public animations?: AnimationPath[]; // Path animations for elements
   public notes?: string; // Author notes (not shown to player)
   public speaker: string; // Who speaks this beat's text (for TTS voice routing and optional display)
-  public showSpeaker: boolean; // Whether to show speaker name to the interactor
+  public showSpeaker: boolean | undefined; // undefined = inherit global, true = force show, false = force hide
   public timeDisplayMode?: 'fictionalTime' | 'manual' | 'none'; // Per-beat time display mode
   public timeDisplayText?: string; // Override Timer HUD text for this beat (manual mode)
   public overrideCountdownMeter?: boolean; // Override default countdown meter visibility on this beat
@@ -48,7 +48,7 @@ export abstract class Beat {
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
     this.notes = config.notes || (config.parameters as any)?.notes;
     this.speaker = (config as any).speaker || (config.parameters as any)?.speaker || '';
-    this.showSpeaker = (config as any).showSpeaker || (config.parameters as any)?.showSpeaker || false;
+    this.showSpeaker = (config as any).showSpeaker ?? (config.parameters as any)?.showSpeaker ?? undefined;
     this.timeDisplayMode = (config as any).timeDisplayMode || (config.parameters as any)?.timeDisplayMode;
     this.timeDisplayText = (config as any).timeDisplayText || (config.parameters as any)?.timeDisplayText;
     this.overrideCountdownMeter = (config as any).overrideCountdownMeter || (config.parameters as any)?.overrideCountdownMeter;
@@ -81,7 +81,7 @@ export abstract class Beat {
 
       // Set speaker info in renderer state for TTS routing and display
       renderer.setState('beatSpeaker', this.speaker || '');
-      renderer.setState('showSpeaker', this.showSpeaker || false);
+      renderer.setState('showSpeaker', this.showSpeaker);
 
       // Set animations in renderer state for path animations
       if (this.animations && this.animations.length > 0) {
@@ -399,7 +399,7 @@ export abstract class Beat {
       node: this.node,
       notes: this.notes,
       speaker: this.speaker || undefined,
-      showSpeaker: this.showSpeaker || undefined,
+      showSpeaker: this.showSpeaker != null ? this.showSpeaker : undefined,
       timeDisplayMode: this.timeDisplayMode,
       timeDisplayText: this.timeDisplayText,
       overrideCountdownMeter: this.overrideCountdownMeter,

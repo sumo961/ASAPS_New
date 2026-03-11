@@ -838,6 +838,7 @@ export class ReactRenderer extends BaseRenderer {
   protected currentPresentationMode: 'positioned' | 'chat-scroll' | 'chat-bubble' = 'positioned';  // NEW: Current dialog presentation mode
   protected currentShowAvatars: boolean = true;  // NEW: Whether to show avatars in chat mode
   private characterAvatarResolver: ((characterId: string) => string | undefined) | null = null;  // NEW: Character avatar resolver
+  private characterPortraitResolver: ((speakerName: string) => string | undefined) | null = null;  // Speaker portrait resolver
   protected timerState: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined;  // NEW: Timer state for progress bar
   private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
   protected timerHudConfig: import('../components/TimerHudDisplay').TimerHudConfig | undefined;  // Timer HUD config from global settings
@@ -1145,6 +1146,14 @@ export class ReactRenderer extends BaseRenderer {
    */
   setCharacterAvatarResolver(resolver: (characterId: string) => string | undefined): void {
     this.characterAvatarResolver = resolver;
+  }
+
+  /**
+   * Set the character portrait resolver function
+   * Resolves speaker name to portrait image URL for dialog display
+   */
+  setCharacterPortraitResolver(resolver: (speakerName: string) => string | undefined): void {
+    this.characterPortraitResolver = resolver;
   }
 
   /**
@@ -1484,7 +1493,21 @@ export class ReactRenderer extends BaseRenderer {
               onSubscribeFictionalTimeText={(listener) => this.subscribeToFictionalTimeText(listener)}
               externalBackground={useMobileBg}
               mobileFontScale={this.mobileFontScale}
-              speakerName={this.getState('showSpeaker') ? (this.getState('beatSpeaker') as string) || undefined : undefined}
+              speakerName={(() => {
+                const beatOverride = this.getState('showSpeaker') as boolean | undefined;
+                const globalShowNames = this.theme?.speakerDisplay?.showNames ?? false;
+                const show = beatOverride === true ? true : beatOverride === false ? false : globalShowNames;
+                return show ? (this.getState('beatSpeaker') as string) || undefined : undefined;
+              })()}
+              speakerPortraitUrl={(() => {
+                const beatOverride = this.getState('showSpeaker') as boolean | undefined;
+                const globalShowNames = this.theme?.speakerDisplay?.showNames ?? false;
+                const globalShowGraphics = this.theme?.speakerDisplay?.showGraphics ?? false;
+                const showName = beatOverride === true ? true : beatOverride === false ? false : globalShowNames;
+                if (!showName || !globalShowGraphics || !this.characterPortraitResolver) return undefined;
+                const speaker = this.getState('beatSpeaker') as string | undefined;
+                return speaker ? this.characterPortraitResolver(speaker) : undefined;
+              })()}
             />
           </ScaledStage>
         </div>

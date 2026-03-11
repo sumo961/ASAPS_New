@@ -37,6 +37,7 @@ import {
   type ChatMessage,
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
+import { resolvePortraitUrl, shouldShowSpeaker } from '../../utils/speakerUtils';
 import { yawPitchToStage, stageToYawPitch, viewportSizeOnStage } from '../../utils/panoramaCoordinates';
 import {
   alignLeft, alignRight, alignTop, alignBottom,
@@ -137,6 +138,7 @@ interface VisualBeatEditorProps {
     author?: string;
     buttonText?: string;
     speaker?: string;
+    showSpeaker?: boolean;
     choices?: Array<{ text: string; target?: string }>;
   };
   beatType?: string;
@@ -296,6 +298,22 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const backgroundAsset = assets.find(a => a.id === backgroundAssetId);
   // Prioritize asset lookup (fresh URL) over direct URL (may be stale blob URL)
   const resolvedBackgroundUrl = backgroundAsset?.url || backgroundUrlProp;
+
+  // Resolve speaker portrait URL from character data
+  // Resolve global speaker toggles + per-beat override
+  const effectiveShowSpeaker = React.useMemo(() => {
+    if (!beatContent?.speaker) return false;
+    return shouldShowSpeaker(beatContent?.showSpeaker, globalSettings?.speakerDisplay?.showNames ?? false);
+  }, [beatContent?.showSpeaker, beatContent?.speaker, globalSettings?.speakerDisplay?.showNames]);
+
+  const effectiveShowGraphics = globalSettings?.speakerDisplay?.showGraphics ?? false;
+
+  const speakerPortraitUrl = React.useMemo(() => {
+    if (!effectiveShowSpeaker || !effectiveShowGraphics || !beatContent?.speaker) return undefined;
+    return resolvePortraitUrl(beatContent.speaker, characters, assets);
+  }, [effectiveShowSpeaker, effectiveShowGraphics, beatContent?.speaker, characters, assets]);
+
+
 
   // Get stage background color from global settings (used when no background image is set)
   const stageBackgroundColor = globalSettings?.colors?.bgColor || 'transparent';
@@ -1301,6 +1319,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         elements={overlayElements}
                         interactive={false}
                         editorMode={true}
+                        speakerName={effectiveShowSpeaker && beatContent?.speaker ? beatContent.speaker : undefined}
+                        speakerPortraitUrl={speakerPortraitUrl}
                         theme={globalSettings ? (() => {
                           const baseTheme = convertGlobalSettingsToTheme(globalSettings);
                           return {
@@ -1330,6 +1350,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   editorMode={true}
                   beatType={beatType}
                   onLayoutComputed={handleLayoutComputed}
+                  speakerName={effectiveShowSpeaker && beatContent?.speaker ? beatContent.speaker : undefined}
+                  speakerPortraitUrl={speakerPortraitUrl}
                   theme={globalSettings ? (() => {
                     const baseTheme = convertGlobalSettingsToTheme(globalSettings);
                     return {

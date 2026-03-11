@@ -3448,6 +3448,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     }
   };
 
+  // Wrap getBeatContent to always include base beat speaker fields
+  const getBeatContentWithSpeaker = () => {
+    const content = getBeatContent();
+    if (!content || !beat) return content;
+    return {
+      ...content,
+      speaker: content.speaker || beat.speaker,
+      showSpeaker: beat.showSpeaker,
+    };
+  };
+
   // Handle asset selection
   const handleAssetSelection = useCallback((
     type: 'background' | 'character' | 'prop' | 'sound',
@@ -3660,7 +3671,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   }
 
   const selectedElement = visualElements.find(el => el.id === selectedElementId);
-  const content = getBeatContent();
+  const content = getBeatContentWithSpeaker();
 
   // Debug: log selected element details when selection changes (debug level to avoid flood)
   if (selectedElement) {

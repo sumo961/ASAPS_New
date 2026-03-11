@@ -24,7 +24,13 @@ export interface Character {
       animations: SpriteAnimation[];
     };
   };
-  
+
+  // Speaker Portrait (face/head image for dialog display)
+  portrait?: {
+    image?: string;      // Blob URL for display
+    assetId?: string;    // Asset ID for persistence
+  };
+
   // Character States
   states: CharacterState[];
   defaultState: string;

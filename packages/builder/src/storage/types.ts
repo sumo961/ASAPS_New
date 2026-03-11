@@ -100,6 +100,16 @@ export interface GlobalSettings {
     baseUrl?: string;
     defaultVoiceId?: string;
     readPrompts?: boolean;
+    speakerVoices?: Record<string, string>;  // speaker name → voice ID
+  };
+  speakerDisplay?: {
+    showNames?: boolean;                       // Master toggle: show speaker names globally (default derived from nameStyle)
+    showGraphics?: boolean;                    // Master toggle: show speaker portraits globally (default derived from graphicPosition)
+    nameStyle: 'off' | 'label' | 'inline';   // Off / label above text box / bold first line inside text box
+    namePosition: 'left' | 'right';           // Which side the name appears on
+    nameColor?: string;                       // Custom color for inline name (default: inherit)
+    graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';  // Portrait placement
+    graphicSize?: number;                     // Portrait size in px (default 48 inside, 80 above)
   };
   translation?: {
     sourceLanguage: string;  // BCP 47 code, default 'en'

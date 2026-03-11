@@ -1183,44 +1183,10 @@ export const Inspector: React.FC<InspectorProps> = ({
 
     // Rebuild connections based on beat type
     if (beat.type === 'dialogTree') {
-      // Handle dialog tree connections
-      const extractConnections = (node: any): any[] => {
-        const connections: any[] = [];
-
-        if (node.choices) {
-          node.choices.forEach((choice: any) => {
-            if (typeof choice.target === 'string' && choice.target) {
-              connections.push({
-                targetId: choice.target,
-                label: choice.text
-              });
-            } else if (typeof choice.target === 'object' && choice.target) {
-              connections.push(...extractConnections(choice.target));
-            }
-          });
-        }
-
-        if (typeof node.next === 'string' && node.next) {
-          connections.push({
-            targetId: node.next,
-            label: 'Continue'
-          });
-        } else if (typeof node.next === 'object' && node.next) {
-          connections.push(...extractConnections(node.next));
-        }
-
-        return connections;
-      };
-
-      const dialogConnections = extractConnections(parametersForUpdate.dialogTree);
-
-      if (beatToUpdate.connections?.length > 0) {
-        const defaultConn = beatToUpdate.connections.find((c: any) => !c.label || c.label === 'Continue');
-        if (defaultConn) {
-          dialogConnections.push(defaultConn);
-        }
-      }
-
+      // Use the beat's own getConnections() which correctly handles both
+      // old format (choice.target as object) and new format (choice.dialogNode).
+      // The beat's dialogTree was already updated via updateParameters() above.
+      const dialogConnections = beat.getConnections ? beat.getConnections() : [];
       const uniqueConns = Array.from(
         new Map(dialogConnections.map(c => [`${c.targetId}-${c.label}`, c])).values()
       );
@@ -1342,7 +1308,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.transition = localBeat.transition;
       beat.notes = localBeat.notes;
       beat.speaker = localBeat.speaker || '';
-      beat.showSpeaker = localBeat.showSpeaker || false;
+      beat.showSpeaker = localBeat.showSpeaker ?? undefined;
 
       // Convert backgroundSound from parameters to proper Sound object
       const bgSoundId = localBeat.parameters?.backgroundSound;
@@ -3628,53 +3594,68 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </div>
                 )}
 
-                {/* Speaker Section - for visible beats (not dialogTree which has per-node speakers) */}
-                {!['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition', 'dialogTree'].includes(getCanonicalBeatType(beat.type)) && (
+                {/* Speaker Section - for visible beats */}
+                {!['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition'].includes(getCanonicalBeatType(beat.type)) && (
                   <div className="border-t pt-3 mt-3">
                     <h4 className="text-sm font-medium text-gray-700 mb-1">Speaker</h4>
-                    <select
-                      value={
-                        localBeat.speaker && !['', 'Narrator', ...getAvailableCharacters()].includes(localBeat.speaker)
-                          ? '__custom__'
-                          : (localBeat.speaker || '')
-                      }
-                      onChange={(e) => {
-                        if (e.target.value === '__custom__') {
-                          handleChange('speaker', localBeat.speaker || '');
-                        } else {
-                          handleChange('speaker', e.target.value);
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    >
-                      <option value="">(Default — Narrator)</option>
-                      <option value="Narrator">Narrator</option>
-                      {getAvailableCharacters().filter(name => name !== 'Narrator' && name !== 'NPC').map(name => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                      <option value="__custom__">Custom...</option>
-                    </select>
-                    {localBeat.speaker && !['', 'Narrator', ...getAvailableCharacters()].includes(localBeat.speaker) && (
-                      <input
-                        type="text"
-                        value={localBeat.speaker}
-                        onChange={(e) => handleChange('speaker', e.target.value)}
-                        placeholder="Enter speaker name..."
-                        className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
-                      />
+                    {/* Speaker dropdown - hidden for dialogTree which has per-node speakers */}
+                    {getCanonicalBeatType(beat.type) !== 'dialogTree' && (
+                      <>
+                        <select
+                          value={
+                            localBeat.speaker && !['', 'Narrator', ...getAvailableCharacters()].includes(localBeat.speaker)
+                              ? '__custom__'
+                              : (localBeat.speaker || '')
+                          }
+                          onChange={(e) => {
+                            if (e.target.value === '__custom__') {
+                              handleChange('speaker', localBeat.speaker || '');
+                            } else {
+                              handleChange('speaker', e.target.value);
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="">(Default — Narrator)</option>
+                          <option value="Narrator">Narrator</option>
+                          {getAvailableCharacters().filter(name => name !== 'Narrator' && name !== 'NPC').map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                          <option value="__custom__">Custom...</option>
+                        </select>
+                        {localBeat.speaker && !['', 'Narrator', ...getAvailableCharacters()].includes(localBeat.speaker) && (
+                          <input
+                            type="text"
+                            value={localBeat.speaker}
+                            onChange={(e) => handleChange('speaker', e.target.value)}
+                            placeholder="Enter speaker name..."
+                            className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
+                          />
+                        )}
+                      </>
                     )}
-                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mt-2">
-                      <input
-                        type="checkbox"
-                        checked={localBeat.showSpeaker || false}
-                        onChange={(e) => handleChange('showSpeaker', e.target.checked)}
-                        className="rounded border-gray-300"
-                      />
-                      <span>Show speaker name to interactor</span>
-                    </label>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Sets the TTS voice and optionally displays the speaker name on screen.
-                    </p>
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Show speaker name
+                      </label>
+                      <select
+                        value={localBeat.showSpeaker == null ? 'default' : localBeat.showSpeaker ? 'show' : 'hide'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handleChange('showSpeaker', val === 'default' ? undefined : val === 'show');
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="default">Default (use global setting)</option>
+                        <option value="show">Always show</option>
+                        <option value="hide">Always hide</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {getCanonicalBeatType(beat.type) === 'dialogTree'
+                          ? 'Displays per-node speaker names as labels during dialog.'
+                          : 'Overrides the global speaker name setting for this beat.'}
+                      </p>
+                    </div>
                   </div>
                 )}
 

@@ -60,6 +60,9 @@ interface HeaderProps {
   }) => void;
   onCurrentProjectDeleted?: () => void;
   triggerNewProject?: number;
+  speakers?: string[];
+  speakerVoices?: Record<string, string>;
+  onSpeakerVoiceChange?: (speaker: string, voiceId: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -97,6 +100,9 @@ export const Header: React.FC<HeaderProps> = ({
   onAISettingsChanged,
   onCurrentProjectDeleted,
   triggerNewProject,
+  speakers = [],
+  speakerVoices = {},
+  onSpeakerVoiceChange,
 }) => {
   const { status, lastSaved, error: saveError, markChanged } = useSave();
   const { load } = useProject();
@@ -112,12 +118,31 @@ export const Header: React.FC<HeaderProps> = ({
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [showTTSConfig, setShowTTSConfig] = useState(false);
+  const [showTTSMenu, setShowTTSMenu] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<Array<{ id: string; name: string }>>([]);
   const [ttsEnabled, setTtsEnabled] = useState(() => {
     try {
       return localStorage.getItem('asaps_tts_enabled') !== 'false';
     } catch { return true; }
   });
   const { configure: configureTTS } = useTTS();
+
+  // Load available voices when TTS menu opens
+  useEffect(() => {
+    if (!showTTSMenu || !ttsEnabled) return;
+    const loadVoices = async () => {
+      try {
+        const provider = getTTSService().getActiveProvider();
+        if (provider) {
+          const voices = await provider.getVoices();
+          setAvailableVoices(voices.map(v => ({ id: v.id, name: v.name })));
+        }
+      } catch (e) {
+        console.warn('[Header] Failed to load TTS voices:', e);
+      }
+    };
+    loadVoices();
+  }, [showTTSMenu, ttsEnabled]);
 
   // Open New Project dialog when triggered from Electron menu
   useEffect(() => {
@@ -549,19 +574,87 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right: TTS + Language + Translation Progress */}
         <div className="flex items-center space-x-2">
-          {/* TTS Button */}
-          <button
-            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-              ttsEnabled
-                ? 'bg-teal-500 text-white hover:bg-teal-600'
-                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-            }`}
-            onClick={() => setShowTTSConfig(true)}
-            title={ttsEnabled ? 'TTS enabled - click to configure' : 'TTS disabled - click to configure'}
-          >
-            {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            TTS
-          </button>
+          {/* TTS Menu Button */}
+          <div className="relative">
+            <button
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                ttsEnabled
+                  ? 'bg-teal-500 text-white hover:bg-teal-600'
+                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+              }`}
+              onClick={() => setShowTTSMenu(!showTTSMenu)}
+              title={ttsEnabled ? 'TTS enabled' : 'TTS disabled'}
+            >
+              {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              TTS
+              <ChevronDown className="w-3 h-3" />
+            </button>
+
+            {/* TTS Dropdown Menu */}
+            {showTTSMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowTTSMenu(false)}
+                />
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                  {/* Toggle TTS */}
+                  <button
+                    onClick={() => {
+                      const newEnabled = !ttsEnabled;
+                      setTtsEnabled(newEnabled);
+                      getTTSService().setEnabled(newEnabled);
+                      localStorage.setItem('asaps_tts_enabled', String(newEnabled));
+                      if (!newEnabled) getTTSService().stop();
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
+                  >
+                    {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                    {ttsEnabled ? 'Disable TTS' : 'Enable TTS'}
+                  </button>
+
+                  {/* Configure Provider */}
+                  <button
+                    onClick={() => {
+                      setShowTTSConfig(true);
+                      setShowTTSMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Configure Provider
+                  </button>
+
+                  {/* Character Voices section */}
+                  {ttsEnabled && speakers.length > 0 && (
+                    <>
+                      <div className="my-2 border-t border-gray-200" />
+                      <div className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Character Voices
+                      </div>
+                      {speakers.map(speaker => (
+                        <div key={speaker} className="px-4 py-1.5 flex items-center justify-between gap-2">
+                          <span className="text-sm text-gray-700 truncate flex-shrink-0" style={{ maxWidth: '40%' }}>
+                            {speaker}
+                          </span>
+                          <select
+                            value={speakerVoices[speaker] || ''}
+                            onChange={(e) => onSpeakerVoiceChange?.(speaker, e.target.value)}
+                            className="flex-1 text-xs px-2 py-1 border rounded bg-white min-w-0"
+                          >
+                            <option value="">Auto</option>
+                            {availableVoices.map(v => (
+                              <option key={v.id} value={v.id}>{v.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Language Selector */}
           <LanguageSelector

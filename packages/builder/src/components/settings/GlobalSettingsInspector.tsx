@@ -8,6 +8,7 @@ import type { RenpyConversionResult } from '@asaps/core';
 import { getThemeService } from '../../services/ThemeService';
 import { validateProjectAssets, type AssetValidationResult } from '../../utils/assetValidator';
 import { MissingAssetsDialog } from './MissingAssetsDialog';
+import { normalizeSpeakerDisplay } from '../../utils/themeConverter';
 
 interface GlobalSettings {
   project: {
@@ -87,6 +88,15 @@ interface GlobalSettings {
     defaultValue?: string | number | boolean;
     description?: string;
   }[];
+  tts?: {
+    provider?: 'web-speech' | 'openai' | 'elevenlabs' | 'custom';
+    providerType?: 'web-speech' | 'openai' | 'elevenlabs' | 'custom';
+    model?: string;
+    baseUrl?: string;
+    defaultVoiceId?: string;
+    readPrompts?: boolean;
+    speakerVoices?: Record<string, string>;
+  };
   translation?: {
     sourceLanguage: string;  // BCP 47 code, default 'en'
   };
@@ -138,6 +148,15 @@ interface GlobalSettings {
       counterMax?: number; // Counter maximum value (default 100)
     };
   };
+  speakerDisplay?: {
+    showNames?: boolean;                       // Master toggle: show speaker names globally
+    showGraphics?: boolean;                    // Master toggle: show speaker portraits globally
+    nameStyle: 'off' | 'label' | 'inline';   // Off / label above text box / bold first line inside text box
+    namePosition: 'left' | 'right';           // Which side the name appears on
+    nameColor?: string;                       // Custom color for inline name (default: inherit)
+    graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';  // Portrait placement
+    graphicSize?: number;                     // Portrait size in px (default 48 inside, 80 above)
+  };
 }
 
 interface GlobalSettingsInspectorProps {
@@ -158,6 +177,8 @@ interface GlobalSettingsInspectorProps {
   onAssetsPathChange?: (path: string | null) => void;
   /** Filesystem path for directory-format projects (Electron only) */
   directoryPath?: string | null;
+  /** Characters for portrait display in speaker settings */
+  characters?: Array<{ displayName: string; name: string; portrait?: { image?: string; assetId?: string } }>;
 }
 
 export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = ({
@@ -172,8 +193,18 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   assetsPath,
   onAssetsPathChange,
   directoryPath,
+  characters = [],
 }) => {
-  const [settings, setSettings] = useState<GlobalSettings>(initialSettings);
+  const [settings, setSettings] = useState<GlobalSettings>(() => {
+    // Normalize speakerDisplay on load to migrate old format to new
+    if (initialSettings.speakerDisplay && !initialSettings.speakerDisplay.nameStyle) {
+      return {
+        ...initialSettings,
+        speakerDisplay: normalizeSpeakerDisplay(initialSettings.speakerDisplay) as GlobalSettings['speakerDisplay'],
+      };
+    }
+    return initialSettings;
+  });
   const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'copyright' | 'variables' | 'translation' | 'debug'>('project');
   const [hasChanges, setHasChanges] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
@@ -1813,6 +1844,192 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Speaker Display Settings */}
+                <div className="border rounded-lg p-4 space-y-3">
+                  <h4 className="font-medium text-gray-700">Speaker Display</h4>
+                  <p className="text-xs text-gray-500">Controls how speaker names and portrait graphics appear during playback. Individual beats can override these settings.</p>
+
+                  {/* Global toggles */}
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.speakerDisplay?.showNames ?? false}
+                        onChange={(e) => {
+                          const on = e.target.checked;
+                          handleChange('speakerDisplay', 'showNames', on);
+                          // Sync nameStyle: turning off → 'off'; turning on with 'off' → 'label'
+                          if (!on) {
+                            handleChange('speakerDisplay', 'nameStyle', 'off');
+                          } else if ((settings.speakerDisplay?.nameStyle ?? 'off') === 'off') {
+                            handleChange('speakerDisplay', 'nameStyle', 'label');
+                            if (!settings.speakerDisplay?.namePosition) {
+                              handleChange('speakerDisplay', 'namePosition', 'left');
+                            }
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <span>Show speaker names</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.speakerDisplay?.showGraphics ?? false}
+                        onChange={(e) => {
+                          const on = e.target.checked;
+                          handleChange('speakerDisplay', 'showGraphics', on);
+                          // Sync graphicPosition: turning off → 'off'; turning on with 'off' → 'inside-left'
+                          if (!on) {
+                            handleChange('speakerDisplay', 'graphicPosition', 'off');
+                          } else if ((settings.speakerDisplay?.graphicPosition ?? 'off') === 'off') {
+                            handleChange('speakerDisplay', 'graphicPosition', 'inside-left');
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <span>Show speaker portraits</span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Name Style */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Name Style
+                      </label>
+                      <select
+                        value={settings.speakerDisplay?.nameStyle ?? 'off'}
+                        onChange={(e) => {
+                          const val = e.target.value as 'off' | 'label' | 'inline';
+                          handleChange('speakerDisplay', 'nameStyle', val);
+                          // Sync showNames toggle with nameStyle
+                          handleChange('speakerDisplay', 'showNames', val !== 'off');
+                          // Ensure namePosition has a default when enabling
+                          if (val !== 'off' && !settings.speakerDisplay?.namePosition) {
+                            handleChange('speakerDisplay', 'namePosition', 'left');
+                          }
+                        }}
+                        className="w-full px-3 py-2 border rounded"
+                      >
+                        <option value="off">Off</option>
+                        <option value="label">Label (above text box)</option>
+                        <option value="inline">Inline (bold in text box)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        How the speaker name is displayed
+                      </p>
+                    </div>
+
+                    {/* Name Position - shown when name style is not off */}
+                    {(settings.speakerDisplay?.nameStyle ?? 'off') !== 'off' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                          Name Position
+                        </label>
+                        <select
+                          value={settings.speakerDisplay?.namePosition ?? 'left'}
+                          onChange={(e) => handleChange('speakerDisplay', 'namePosition', e.target.value)}
+                          className="w-full px-3 py-2 border rounded"
+                        >
+                          <option value="left">Left</option>
+                          <option value="right">Right</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Name Color - shown when inline */}
+                    {settings.speakerDisplay?.nameStyle === 'inline' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                          Name Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={settings.speakerDisplay?.nameColor ?? '#ffffff'}
+                            onChange={(e) => handleChange('speakerDisplay', 'nameColor', e.target.value)}
+                            className="w-10 h-10 rounded border cursor-pointer"
+                          />
+                          <span className="text-xs text-gray-500">{settings.speakerDisplay?.nameColor ?? 'inherit'}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-3">
+                    {/* Graphic Position */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Portrait Position
+                      </label>
+                      <select
+                        value={settings.speakerDisplay?.graphicPosition ?? 'off'}
+                        onChange={(e) => {
+                          handleChange('speakerDisplay', 'graphicPosition', e.target.value);
+                          // Sync showGraphics toggle with graphicPosition
+                          handleChange('speakerDisplay', 'showGraphics', e.target.value !== 'off');
+                        }}
+                        className="w-full px-3 py-2 border rounded"
+                      >
+                        <option value="off">Off</option>
+                        <option value="inside-left">Inside text box (left)</option>
+                        <option value="inside-right">Inside text box (right)</option>
+                        <option value="above-left">Above text box (left)</option>
+                        <option value="above-right">Above text box (right)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Where speaker portrait appears
+                      </p>
+                    </div>
+
+                    {/* Graphic Size - shown when graphic is not off */}
+                    {(settings.speakerDisplay?.graphicPosition ?? 'off') !== 'off' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                          Portrait Size (px)
+                        </label>
+                        <input
+                          type="number"
+                          min={24}
+                          max={200}
+                          value={settings.speakerDisplay?.graphicSize ?? ((settings.speakerDisplay?.graphicPosition ?? '').startsWith('above') ? 80 : 48)}
+                          onChange={(e) => handleChange('speakerDisplay', 'graphicSize', parseInt(e.target.value) || 48)}
+                          className="w-full px-3 py-2 border rounded"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Character Portraits overview */}
+                  {characters.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-xs font-medium text-gray-600 mb-2">Character Portraits</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {characters.map((c) => (
+                          <div key={c.name} className="flex flex-col items-center gap-1 text-center">
+                            {c.portrait?.image || c.portrait?.assetId ? (
+                              <img
+                                src={c.portrait.assetId ? (assets?.find(a => a.id === c.portrait!.assetId) as any)?.url || c.portrait.image : c.portrait.image}
+                                alt={c.displayName}
+                                className="w-10 h-10 rounded-full object-cover border border-gray-300"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs border border-gray-300">
+                                ?
+                              </div>
+                            )}
+                            <span className="text-xs text-gray-600 truncate w-full">{c.displayName}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Manage portraits in Character Editor → Visual tab
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Effects Preview */}

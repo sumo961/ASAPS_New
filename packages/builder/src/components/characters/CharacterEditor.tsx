@@ -260,6 +260,60 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
         </div>
       </div>
 
+      {/* Speaker Portrait (shown for both static and sprite types) */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h4 className="font-medium mb-3 flex items-center gap-2">
+          <User className="w-4 h-4" />
+          Speaker Portrait
+        </h4>
+        <p className="text-xs text-gray-500 mb-3">Face/head image shown in text boxes during dialog when speaker display is enabled.</p>
+
+        {resolveImageUrl(editedCharacter.portrait?.assetId, editedCharacter.portrait?.image, assets) && (
+          <div className="mb-3 flex items-center gap-3">
+            <img
+              src={resolveImageUrl(editedCharacter.portrait?.assetId, editedCharacter.portrait?.image, assets)}
+              alt="Portrait"
+              className="w-16 h-16 rounded-lg object-cover border border-gray-300"
+            />
+            <button
+              onClick={() => setEditedCharacter({ ...editedCharacter, portrait: undefined })}
+              className="text-xs text-red-600 hover:text-red-700 flex items-center gap-1"
+            >
+              <Trash2 className="w-3 h-3" /> Remove
+            </button>
+          </div>
+        )}
+
+        <DirectAssetUpload
+          currentAssetUrl={resolveImageUrl(editedCharacter.portrait?.assetId, editedCharacter.portrait?.image, assets)}
+          onAssetSelect={(url, metadata) => {
+            setEditedCharacter({
+              ...editedCharacter,
+              portrait: {
+                image: url,
+                assetId: metadata?.id || undefined,
+              },
+            });
+          }}
+          onAssetAdd={onAssetAdd}
+          acceptTypes={['image/*']}
+          maxSize={5}
+          label="Upload Portrait"
+        />
+
+        {assets.length > 0 && !resolveImageUrl(editedCharacter.portrait?.assetId, editedCharacter.portrait?.image, assets) && (
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <button
+              onClick={() => setShowAssetPicker('default')}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
+            >
+              <Grid className="w-4 h-4" />
+              Browse Existing Assets ({assets.filter(a => a.type === 'image').length})
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Static Images Configuration */}
       {editedCharacter.visual.type === 'static' && (
         <div className="space-y-4">

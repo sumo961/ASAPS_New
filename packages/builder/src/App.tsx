@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
@@ -54,6 +54,8 @@ import { GitInitDialog } from './components/vcs/GitInitDialog';
 import { CloneRepoDialog } from './components/vcs/CloneRepoDialog';
 import { useTranslationState, useTranslationActions } from './contexts/TranslationContext';
 import { applyTranslationResource } from './export/StoryTranslator';
+import { extractSpeakers } from './utils/speakerUtils';
+import { getTTSService } from './services/tts';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -3718,6 +3720,8 @@ function App() {
       defaultTargetDelay: beat.defaultTargetDelay,
       showTimer: beat.showTimer,
       notes: beat.notes,
+      speaker: beat.speaker,
+      showSpeaker: beat.showSpeaker,
       timeDisplayMode: beat.timeDisplayMode,
       timeDisplayText: beat.timeDisplayText,
       overrideCountdownMeter: beat.overrideCountdownMeter,
@@ -4763,6 +4767,41 @@ function App() {
     setSelectedCluster(null);
   }, [actions, initializeStory, setIsUntitledProject]);
 
+  // Extract speakers from story for TTS voice assignment in Header
+  const storySpeakers = useMemo(() => {
+    if (!state.story) return [];
+    try {
+      return ['Narrator', ...extractSpeakers(state.story)];
+    } catch {
+      return [];
+    }
+  }, [state.story, state.beats]);
+
+  // Handle speaker voice change from Header TTS menu
+  const handleSpeakerVoiceChange = useCallback((speaker: string, voiceId: string) => {
+    setGlobalSettings(prev => ({
+      ...prev,
+      tts: {
+        ...prev.tts,
+        speakerVoices: {
+          ...(prev.tts?.speakerVoices || {}),
+          [speaker]: voiceId,
+        },
+      },
+    }));
+    // Apply immediately to TTS service
+    try {
+      if (voiceId) {
+        getTTSService().setSpeakerVoice(speaker, { voiceId });
+      } else {
+        getTTSService().setSpeakerVoice(speaker, {});
+      }
+    } catch (e) {
+      console.warn('[App] Failed to set speaker voice:', e);
+    }
+    markChanged();
+  }, [markChanged]);
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
@@ -4802,6 +4841,9 @@ function App() {
         }}
         onCurrentProjectDeleted={handleCurrentProjectDeleted}
         triggerNewProject={triggerNewProject}
+        speakers={storySpeakers}
+        speakerVoices={globalSettings?.tts?.speakerVoices ?? {}}
+        onSpeakerVoiceChange={handleSpeakerVoiceChange}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -5122,6 +5164,7 @@ function App() {
             markChanged();
           }}
           directoryPath={(currentProject as any)?.directoryPath}
+          characters={characters}
         />
       )}
 

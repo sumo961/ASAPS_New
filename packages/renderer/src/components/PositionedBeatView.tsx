@@ -436,6 +436,16 @@ export interface RenderThemeSettings {
     showInPreview: 'visible' | 'onHover' | 'invisible';  // Hotspot area visibility
     labelDisplay: 'none' | 'hover' | 'always';  // Label display mode
   };
+  /** Speaker display settings */
+  speakerDisplay?: {
+    showNames?: boolean;                       // Master toggle: show speaker names globally
+    showGraphics?: boolean;                    // Master toggle: show speaker portraits globally
+    nameStyle: 'off' | 'label' | 'inline';   // Off / label above text box / bold first line inside text box
+    namePosition: 'left' | 'right';           // Which side the name appears on
+    nameColor?: string;                       // Custom color for inline name (default: inherit)
+    graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';  // Portrait placement
+    graphicSize?: number;                     // Portrait size in px (default 48 inside, 80 above)
+  };
 }
 
 export interface PositionedBeatViewProps {
@@ -530,6 +540,8 @@ export interface PositionedBeatViewProps {
   mobileFontScale?: number;
   /** Speaker name to display as a VN-style label overlay (only when showSpeaker is true) */
   speakerName?: string;
+  /** Speaker portrait image URL (resolved from character portrait) */
+  speakerPortraitUrl?: string;
 }
 
 /**
@@ -950,6 +962,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   externalBackground = false,
   mobileFontScale = 1.0,
   speakerName,
+  speakerPortraitUrl,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -1466,15 +1479,31 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         ))}
 
         {/* Speaker name label overlay (VN-style) in preview mode */}
-        {speakerName && (
+        {speakerName && theme.speakerDisplay?.nameStyle === 'label' && (() => {
+          const namePos = theme.speakerDisplay?.namePosition ?? 'left';
+          const isLeft = textDirection === 'rtl' ? namePos === 'right' : namePos === 'left';
+          // Position label just above and aligned with first text element
+          const firstTextEl = sortedTextElements[0];
+          const firstTextY = firstTextEl?.location.y;
+          const firstTextX = firstTextEl?.location.x;
+          const firstTextW = firstTextEl?.location.width;
+          const labelTop = firstTextY != null ? Math.max(firstTextY - Math.round(28 * mobileFontScale), 4) : 12;
+          const labelLeft = isLeft
+            ? (firstTextX != null ? firstTextX + 8 : 16)
+            : undefined;
+          const labelRight = !isLeft
+            ? (firstTextX != null && firstTextW != null ? stageWidth - (firstTextX + firstTextW) + 8 : 16)
+            : undefined;
+          return (
           <div
             style={{
               position: 'absolute',
-              top: 12,
-              left: 16,
+              top: labelTop,
+              left: labelLeft,
+              right: labelRight,
               zIndex: 200,
               background: 'rgba(0, 0, 0, 0.65)',
-              color: theme.colors?.textColor || '#f0f0f0',
+              color: '#f0f0f0',
               padding: '4px 14px',
               borderRadius: 6,
               fontSize: Math.round(16 * mobileFontScale),
@@ -1487,7 +1516,35 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           >
             {speakerName}
           </div>
-        )}
+          );
+        })()}
+
+        {/* Speaker portrait above text box */}
+        {speakerName && speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'above-left' || theme.speakerDisplay?.graphicPosition === 'above-right') && (() => {
+          const isLeft = theme.speakerDisplay?.graphicPosition === 'above-left';
+          const size = theme.speakerDisplay?.graphicSize ?? 80;
+          const firstTextY = sortedTextElements[0]?.location.y;
+          const portraitTop = firstTextY != null ? Math.max(firstTextY - size - 8, 4) : 12;
+          return (
+            <img
+              src={speakerPortraitUrl}
+              alt={speakerName}
+              style={{
+                position: 'absolute',
+                top: portraitTop,
+                left: isLeft ? 16 : undefined,
+                right: isLeft ? undefined : 16,
+                width: size,
+                height: size,
+                objectFit: 'cover',
+                borderRadius: 8,
+                zIndex: 200,
+                pointerEvents: 'none',
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
+              }}
+            />
+          );
+        })()}
 
         {/* Flex container for text and buttons */}
         <div style={{
@@ -1527,6 +1584,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                 onAnimationComplete={handleAnimationComplete}
                 skipAnimation={effectiveSkipAnimation}
                 mobileFontScale={mobileFontScale}
+                speakerName={index === 0 ? speakerName : undefined}
+                speakerPortraitUrl={index === 0 ? speakerPortraitUrl : undefined}
               />
             </div>
             );
@@ -1763,16 +1822,31 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         />
       )}
       {/* Speaker name label overlay (VN-style) */}
-      {speakerName && (
+      {speakerName && theme.speakerDisplay?.nameStyle === 'label' && (() => {
+        const namePos = theme.speakerDisplay?.namePosition ?? 'left';
+        const isLeft = textDirection === 'rtl' ? namePos === 'right' : namePos === 'left';
+        // Position label just above and aligned with first text element
+        const firstTextEl = adjustedElements.find(el => el.location.kind === 'text' || el.location.kind === 'dialog');
+        const firstTextY = firstTextEl?.location.y;
+        const firstTextX = firstTextEl?.location.x;
+        const firstTextW = firstTextEl?.location.width;
+        const labelTop = firstTextY != null ? Math.max(firstTextY - Math.round(28 * mobileFontScale), 4) : 12;
+        const labelLeft = isLeft
+          ? (firstTextX != null ? firstTextX + 8 : 16)
+          : undefined;
+        const labelRight = !isLeft
+          ? (firstTextX != null && firstTextW != null ? stageWidth - (firstTextX + firstTextW) + 8 : 16)
+          : undefined;
+        return (
         <div
           style={{
             position: 'absolute',
-            top: 12,
-            left: textDirection === 'rtl' ? undefined : 16,
-            right: textDirection === 'rtl' ? 16 : undefined,
+            top: labelTop,
+            left: labelLeft,
+            right: labelRight,
             zIndex: 200,
             background: 'rgba(0, 0, 0, 0.65)',
-            color: theme.colors?.textColor || '#f0f0f0',
+            color: '#f0f0f0',
             padding: '4px 14px',
             borderRadius: 6,
             fontSize: Math.round(16 * mobileFontScale),
@@ -1785,45 +1859,83 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         >
           {speakerName}
         </div>
-      )}
-      {adjustedElements.map((element, index) => (
-        <PositionedElement
-          key={`element-${index}-${element.location.name}`}
-          element={element}
-          index={index}
-          onAction={handleAction}
-          interactive={interactive}
-          inputValue={inputValue}
-          setInputValue={setInputValue}
-          hideTextBoxes={hideTextBoxes}
-          hideButtonBoxes={hideButtonBoxes}
-          theme={theme}
-          previewMode={previewMode}
-          visitedBeats={visitedBeats}
-          visitedChoiceIds={visitedChoiceIds}
-          showTextOnHover={showTextOnHover}
-          animationDelay={animationDelayMap.get(element.location.name) || 0}
-          onAnimationComplete={handleAnimationComplete}
-          skipAnimation={effectiveSkipAnimation}
-          shouldShowButtons={shouldShowButtons}
-          soundBlobResolver={soundBlobResolver}
-          animatedPosition={getAnimatedPosition(element.location.id || element.location.name, element.location.name)}
-          onTriggerClickAnimation={() => triggerClickAnimation(element.location.id || element.location.name, element.location.name)}
-          hasPendingClickAnimation={hasPendingClickAnimation(element.location.id || element.location.name, element.location.name)}
-          characterMeterFrameResolver={characterMeterFrameResolver}
-          characterInventoryResolver={characterInventoryResolver}
-          inventoryVisible={inventoryVisible}
-          containerDimensions={{ width: stageWidth, height: stageHeight }}
-          beatType={beatType}
-          stageWidth={stageWidth}
-          stageHeight={stageHeight}
-          calculatedButtonHeight={calculatedButtonHeight}
-          editorMode={editorMode}
-          onScrolledToBottom={handleElementScrolledToBottom}
-          scrollRequirementsMet={allScrollRequirementsMet}
-          mobileFontScale={mobileFontScale}
-        />
-      ))}
+        );
+      })()}
+
+      {/* Speaker portrait above text box */}
+      {speakerName && speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'above-left' || theme.speakerDisplay?.graphicPosition === 'above-right') && (() => {
+        const isLeft = theme.speakerDisplay?.graphicPosition === 'above-left';
+        const size = theme.speakerDisplay?.graphicSize ?? 80;
+        const firstTextEl = adjustedElements.find(el => el.location.kind === 'text' || el.location.kind === 'dialog');
+        const firstTextY = firstTextEl?.location.y;
+        const portraitTop = firstTextY != null ? Math.max(firstTextY - size - 8, 4) : 12;
+        return (
+          <img
+            src={speakerPortraitUrl}
+            alt={speakerName}
+            style={{
+              position: 'absolute',
+              top: portraitTop,
+              left: isLeft ? 16 : undefined,
+              right: isLeft ? undefined : 16,
+              width: size,
+              height: size,
+              objectFit: 'cover',
+              borderRadius: 8,
+              zIndex: 200,
+              pointerEvents: 'none',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
+            }}
+          />
+        );
+      })()}
+      {(() => {
+        // Find the index of the first text element to pass speaker props only to it
+        const firstTextIdx = adjustedElements.findIndex(el => el.location.kind === 'text' || el.location.kind === 'dialog');
+        return adjustedElements.map((element, index) => {
+          const isFirstText = index === firstTextIdx && speakerName;
+          return (
+          <PositionedElement
+            key={`element-${index}-${element.location.name}`}
+            element={element}
+            index={index}
+            onAction={handleAction}
+            interactive={interactive}
+            inputValue={inputValue}
+            setInputValue={setInputValue}
+            hideTextBoxes={hideTextBoxes}
+            hideButtonBoxes={hideButtonBoxes}
+            theme={theme}
+            previewMode={previewMode}
+            visitedBeats={visitedBeats}
+            visitedChoiceIds={visitedChoiceIds}
+            showTextOnHover={showTextOnHover}
+            animationDelay={animationDelayMap.get(element.location.name) || 0}
+            onAnimationComplete={handleAnimationComplete}
+            skipAnimation={effectiveSkipAnimation}
+            shouldShowButtons={shouldShowButtons}
+            soundBlobResolver={soundBlobResolver}
+            animatedPosition={getAnimatedPosition(element.location.id || element.location.name, element.location.name)}
+            onTriggerClickAnimation={() => triggerClickAnimation(element.location.id || element.location.name, element.location.name)}
+            hasPendingClickAnimation={hasPendingClickAnimation(element.location.id || element.location.name, element.location.name)}
+            characterMeterFrameResolver={characterMeterFrameResolver}
+            characterInventoryResolver={characterInventoryResolver}
+            inventoryVisible={inventoryVisible}
+            containerDimensions={{ width: stageWidth, height: stageHeight }}
+            beatType={beatType}
+            stageWidth={stageWidth}
+            stageHeight={stageHeight}
+            calculatedButtonHeight={calculatedButtonHeight}
+            editorMode={editorMode}
+            onScrolledToBottom={handleElementScrolledToBottom}
+            scrollRequirementsMet={allScrollRequirementsMet}
+            mobileFontScale={mobileFontScale}
+            speakerName={isFirstText ? speakerName : undefined}
+            speakerPortraitUrl={isFirstText ? speakerPortraitUrl : undefined}
+          />
+          );
+        });
+      })()}
     </div>
   );
 };
@@ -1886,6 +1998,10 @@ interface PositionedElementProps {
   scrollRequirementsMet?: boolean;
   /** Mobile font scale multiplier (1.0 = normal, up to 2.0) */
   mobileFontScale?: number;
+  /** Speaker name for inline name display (only passed to first text element) */
+  speakerName?: string;
+  /** Speaker portrait URL for inside-text portrait (only passed to first text element) */
+  speakerPortraitUrl?: string;
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -1922,6 +2038,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   onScrolledToBottom,
   scrollRequirementsMet = true,
   mobileFontScale = 1.0,
+  speakerName,
+  speakerPortraitUrl,
 }) => {
   const { location, content, assetUrl, hyperlinks, description } = element;
 
@@ -2058,6 +2176,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           editorMode={editorMode}
           onScrolledToBottom={handleScrolled}
           mobileFontScale={mobileFontScale}
+          speakerName={speakerName}
+          speakerPortraitUrl={speakerPortraitUrl}
         />
       );
     }
@@ -2452,7 +2572,9 @@ const TextElement: React.FC<{
   editorMode?: boolean;  // Editor mode - cosmetic only (scroll badges, hotspot borders)
   onScrolledToBottom?: () => void;  // Callback when user scrolls to bottom
   mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0 }) => {
+  speakerName?: string;  // Speaker name for inline display
+  speakerPortraitUrl?: string;  // Speaker portrait URL for inside-text display
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const [animationStarted, setAnimationStarted] = React.useState(false);
@@ -2775,6 +2897,41 @@ const TextElement: React.FC<{
           // Only set height for scrollable content; for centered content, let it be natural
           height: needsScroll ? '100%' : undefined,
         }}>
+          {/* Speaker portrait inside text box (floated) */}
+          {speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'inside-left' || theme.speakerDisplay?.graphicPosition === 'inside-right') && (() => {
+            const isLeft = theme.speakerDisplay?.graphicPosition === 'inside-left';
+            const size = theme.speakerDisplay?.graphicSize ?? 48;
+            return (
+              <img
+                src={speakerPortraitUrl}
+                alt={speakerName || ''}
+                style={{
+                  float: isLeft ? 'left' : 'right',
+                  width: size,
+                  height: size,
+                  objectFit: 'cover',
+                  borderRadius: 6,
+                  marginRight: isLeft ? 8 : 0,
+                  marginLeft: isLeft ? 0 : 8,
+                  marginBottom: 4,
+                }}
+              />
+            );
+          })()}
+
+          {/* Speaker name inline (bold first line) */}
+          {speakerName && theme.speakerDisplay?.nameStyle === 'inline' && (
+            <div style={{
+              fontWeight: 700,
+              fontSize: `${Math.round(computedFontSize * 1.05)}px`,
+              color: theme.speakerDisplay?.nameColor || textColor,
+              marginBottom: 4,
+              textAlign: computedTextAlign,
+            }}>
+              {speakerName}
+            </div>
+          )}
+
           <span
             style={{
               display: 'block',
@@ -4859,7 +5016,9 @@ const FlexTextElement: React.FC<{
   onAnimationComplete?: () => void;  // Callback when animation finishes
   skipAnimation?: boolean;  // When true, immediately show full text
   mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
-}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, mobileFontScale = 1.0 }) => {
+  speakerName?: string;  // Speaker name for inline display
+  speakerPortraitUrl?: string;  // Speaker portrait URL for inside-text display
+}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, mobileFontScale = 1.0, speakerName, speakerPortraitUrl }) => {
   const { location, content, hyperlinks } = element;
 
   // Typewriter animation state
@@ -5049,6 +5208,41 @@ const FlexTextElement: React.FC<{
           whiteSpace: 'pre-wrap', // Preserve line breaks in imported content
         }}
       >
+        {/* Speaker portrait inside text box (floated) */}
+        {speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'inside-left' || theme.speakerDisplay?.graphicPosition === 'inside-right') && (() => {
+          const isLeft = theme.speakerDisplay?.graphicPosition === 'inside-left';
+          const size = theme.speakerDisplay?.graphicSize ?? 48;
+          return (
+            <img
+              src={speakerPortraitUrl}
+              alt={speakerName || ''}
+              style={{
+                float: isLeft ? 'left' : 'right',
+                width: size,
+                height: size,
+                objectFit: 'cover',
+                borderRadius: 6,
+                marginRight: isLeft ? 8 : 0,
+                marginLeft: isLeft ? 0 : 8,
+                marginBottom: 4,
+              }}
+            />
+          );
+        })()}
+
+        {/* Speaker name inline (bold first line) */}
+        {speakerName && theme.speakerDisplay?.nameStyle === 'inline' && (
+          <div style={{
+            fontWeight: 700,
+            fontSize: `${Math.round(computedFontSize * 1.05)}px`,
+            color: theme.speakerDisplay?.nameColor || textColor,
+            marginBottom: 4,
+            textAlign: computedTextAlign,
+          }}>
+            {speakerName}
+          </div>
+        )}
+
         {hyperlinks && hyperlinks.length > 0 && onAction ? (
           <HyperTextContent
             text={textToDisplay}

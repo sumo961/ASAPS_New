@@ -21,6 +21,7 @@ import { getSavedAIConfig } from '../hooks/useAI';
 import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider } from '../services/tts';
 import type { TTSVoiceInfo } from '../types/tts';
 import { getSavedTTSConfig } from '../hooks/useTTS';
+import { extractSpeakers, resolvePortraitUrl } from '../utils/speakerUtils';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { buildChatRequestBody } from '../services/providers/openai-utils';
@@ -459,29 +460,7 @@ function translateLoadingMessage(message: string, translations: Map<string, stri
   return message;
 }
 
-/**
- * Extract unique speaker names from all DialogTree beats in a story.
- * Walks the dialog tree recursively to find speakers in nested nodes.
- */
-function extractSpeakers(story: Story): string[] {
-  const speakers = new Set<string>();
-  const walkNode = (node: any) => {
-    if (!node) return;
-    if (node.speaker) speakers.add(node.speaker);
-    if (Array.isArray(node.choices)) {
-      for (const choice of node.choices) {
-        if (choice?.dialogNode) walkNode(choice.dialogNode);
-      }
-    }
-  };
-  for (const beat of story.getAllBeats()) {
-    if (beat.type === 'dialogTree') {
-      const params = beat.getParameters();
-      walkNode(params.dialogTree);
-    }
-  }
-  return Array.from(speakers).sort();
-}
+// extractSpeakers is now imported from '../utils/speakerUtils'
 
 export const PreviewWindow: React.FC = () => {
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
@@ -886,6 +865,13 @@ export const PreviewWindow: React.FC = () => {
         return asset ? asset.url : undefined;
       });
 
+      // Set up portrait resolver for speaker portraits in dialog
+      reactRenderer.setCharacterPortraitResolver((speakerName: string) => {
+        const pd = previewDataRef.current;
+        if (!pd?.characters?.length) return undefined;
+        return resolvePortraitUrl(speakerName, pd.characters, pd.assets || []);
+      });
+
       // Set up sound blob resolver for beat sounds
       // This fetches audio from URLs and converts to blobs for the audio manager
       // Uses ref so it always accesses latest assets
@@ -1173,6 +1159,28 @@ export const PreviewWindow: React.FC = () => {
     {
       const ttsLang = previewData.activeLanguage || previewData.settings?.translation?.sourceLanguage || 'en';
       getTTSService().setLanguage(ttsLang);
+    }
+
+    // Apply persisted speaker voices from global settings
+    {
+      const persistedVoices = previewData.settings?.tts?.speakerVoices as Record<string, string> | undefined;
+      if (persistedVoices && Object.keys(persistedVoices).length > 0) {
+        const ttsService = getTTSService();
+        for (const [speaker, voiceId] of Object.entries(persistedVoices)) {
+          if (voiceId) {
+            ttsService.setSpeakerVoice(speaker, { voiceId });
+          }
+        }
+        // Also populate local state so the UI reflects persisted assignments
+        setSpeakerVoices(prev => {
+          const merged = { ...prev };
+          for (const [speaker, voiceId] of Object.entries(persistedVoices)) {
+            if (voiceId && !merged[speaker]) merged[speaker] = voiceId;
+          }
+          return merged;
+        });
+        console.log('[PreviewWindow] Applied persisted speaker voices:', Object.keys(persistedVoices).length);
+      }
     }
 
     // Set up AI service for AI-powered beats (update on every previewData change)

@@ -112,19 +112,69 @@ function getContrastColor(hexColor: string): string {
 }
 
 /**
+ * Normalize speaker display settings, migrating old format to new.
+ * Old format: { namePosition: 'off'|'left'|'right', graphicPosition: ... }
+ * New format: { nameStyle: 'off'|'label'|'inline', namePosition: 'left'|'right', ... }
+ */
+export function normalizeSpeakerDisplay(sd: any): {
+  showNames?: boolean;
+  showGraphics?: boolean;
+  nameStyle: 'off' | 'label' | 'inline';
+  namePosition: 'left' | 'right';
+  nameColor?: string;
+  graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';
+  graphicSize?: number;
+} {
+  // Already new format
+  if (sd.nameStyle) {
+    // Derive showNames/showGraphics from style fields when absent
+    const showNames = sd.showNames ?? (sd.nameStyle !== 'off');
+    const showGraphics = sd.showGraphics ?? (sd.graphicPosition !== 'off');
+    return {
+      showNames,
+      showGraphics,
+      nameStyle: sd.nameStyle,
+      namePosition: sd.namePosition || 'left',
+      nameColor: sd.nameColor,
+      graphicPosition: sd.graphicPosition || 'off',
+      graphicSize: sd.graphicSize,
+    };
+  }
+  // Migrate old format: namePosition 'off'|'left'|'right' → nameStyle + namePosition
+  const oldNamePos = sd.namePosition as string | undefined;
+  let nameStyle: 'off' | 'label' | 'inline' = 'off';
+  let namePosition: 'left' | 'right' = 'left';
+  if (oldNamePos === 'left') {
+    nameStyle = 'label';
+    namePosition = 'left';
+  } else if (oldNamePos === 'right') {
+    nameStyle = 'label';
+    namePosition = 'right';
+  }
+  // Migrate old graphic positions (left-of-text → inside-left, right-of-text → inside-right)
+  // Also pass through new-format values that may exist in mixed-state settings
+  let graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right' = 'off';
+  const oldGraphicPos = sd.graphicPosition as string | undefined;
+  if (oldGraphicPos === 'left-of-text') graphicPosition = 'inside-left';
+  else if (oldGraphicPos === 'right-of-text') graphicPosition = 'inside-right';
+  else if (oldGraphicPos === 'above-left') graphicPosition = 'above-left';
+  else if (oldGraphicPos === 'above-right') graphicPosition = 'above-right';
+  else if (oldGraphicPos === 'inside-left') graphicPosition = 'inside-left';
+  else if (oldGraphicPos === 'inside-right') graphicPosition = 'inside-right';
+
+  // Derive showNames/showGraphics from migrated values
+  const showNames = sd.showNames ?? (nameStyle !== 'off');
+  const showGraphics = sd.showGraphics ?? (graphicPosition !== 'off');
+  return { showNames, showGraphics, nameStyle, namePosition, graphicPosition, graphicSize: sd.graphicSize };
+}
+
+/**
  * Convert GlobalSettings to RenderThemeSettings
  *
  * @param settings - Global settings from the builder
  * @returns Theme settings for the renderer
  */
 export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSettings {
-  // Debug: Log font values being converted
-  console.log('[themeConverter] Input fonts:', {
-    titleFont: settings.fonts.titleFont,
-    textFont: settings.fonts.textFont,
-    btnFont: settings.fonts.btnFont,
-  });
-
   // Calculate text colors: use explicit color if set, otherwise auto-calculate from background
   const buttonTextColor = settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor);
   const npcTextColor = settings.colors.nonptextcolor || getContrastColor(settings.colors.nonpcolor);
@@ -163,12 +213,6 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       textFontSize: settings.fonts.fontSize?.text,
       buttonFontSize: settings.fonts.fontSize?.button,
     },
-    // Debug: Log converted font families
-    ...(console.log('[themeConverter] Output fonts:', {
-      titleFont: getFontFamily(settings.fonts.titleFont),
-      textFont: getFontFamily(settings.fonts.textFont),
-      buttonFont: getFontFamily(settings.fonts.btnFont || settings.fonts.buttonFont || 'Arial'),
-    }), {}),
     textEffects: {
       animation: settings.textEffects.animation,
       typewriterSpeed: settings.textEffects.typewriterSpeed,
@@ -182,5 +226,6 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       showInPreview: settings.hotspots.showInPreview ?? 'visible',
       labelDisplay: settings.hotspots.labelDisplay ?? 'hover',
     },
+    speakerDisplay: settings.speakerDisplay ? normalizeSpeakerDisplay(settings.speakerDisplay) : undefined,
   };
 }
