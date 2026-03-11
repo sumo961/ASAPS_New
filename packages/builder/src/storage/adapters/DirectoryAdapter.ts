@@ -17,6 +17,7 @@ import {
   serializeBeat,
   serializeBeatFromJSON,
   beatFilename,
+  type DirectoryFile,
   type DirectoryReader,
   type SerializeInput,
   type DirectoryAssetManifest,
@@ -178,6 +179,9 @@ export class DirectoryAdapter implements PersistenceAdapter {
       await api.fs.writeFile(fullPath, file.content);
     }
 
+    // Clean up orphaned beat files (beats deleted from the project)
+    await this.cleanupOrphanedBeatFiles(files);
+
     // Write binary asset files
     if (assets && assets.length > 0) {
       // Build a quick lookup from assetId -> StoredAsset blob
@@ -219,6 +223,75 @@ export class DirectoryAdapter implements PersistenceAdapter {
     const fullPath = joinPath(this.projectPath, ...clusterDir.split('/'), filename);
     await api.mkdir(parentDir(fullPath));
     await api.writeFile(fullPath, deterministicStringify(serialized));
+  }
+
+  /**
+   * Delete a beat file from disk.
+   */
+  async deleteBeat(beatId: string, beatType: string, clusterId?: string): Promise<void> {
+    if (!this.projectPath) throw new Error('No project path set');
+    const api = window.electronAPI?.fs;
+    if (!api) throw new Error('Requires Electron filesystem API');
+
+    const filename = beatFilename({ type: beatType, id: beatId });
+    const clusterDir = clusterId
+      ? await this.findClusterDir(clusterId)
+      : 'clusters/_unclustered';
+
+    const fullPath = joinPath(this.projectPath, ...clusterDir.split('/'), filename);
+    if (await api.exists(fullPath)) {
+      await api.unlink(fullPath);
+      console.log(`[DirectoryAdapter] Deleted beat file: ${fullPath}`);
+    }
+  }
+
+  /**
+   * Remove beat JSON files from disk that are no longer in the project.
+   * Compares files written in this save against files on disk in cluster dirs.
+   */
+  private async cleanupOrphanedBeatFiles(writtenFiles: DirectoryFile[]): Promise<void> {
+    if (!this.projectPath) return;
+    const api = window.electronAPI?.fs;
+    if (!api) return;
+
+    // Build set of beat file paths that were just written
+    const writtenPaths = new Set(
+      writtenFiles
+        .filter(f => f.path.startsWith('clusters/') && f.path.endsWith('.json')
+          && !f.path.endsWith('cluster.json') && !f.path.endsWith('_index.json'))
+        .map(f => f.path)
+    );
+
+    // Scan cluster directories for existing beat files
+    const clustersDir = joinPath(this.projectPath, 'clusters');
+    if (!await api.exists(clustersDir)) return;
+
+    try {
+      const clusterEntries = await api.readDir(clustersDir);
+      for (const entry of clusterEntries) {
+        const isDir = typeof entry.isDirectory === 'function' ? entry.isDirectory() : !!entry.isDirectory;
+        if (!isDir) continue;
+
+        const dirPath = joinPath(clustersDir, entry.name);
+        const files = await api.readDir(dirPath);
+
+        for (const file of files) {
+          const isFile = typeof file.isDirectory === 'function' ? !file.isDirectory() : !file.isDirectory;
+          if (!isFile || !file.name.endsWith('.json')) continue;
+          if (file.name === 'cluster.json' || file.name === '_index.json') continue;
+
+          const relativePath = `clusters/${entry.name}/${file.name}`;
+          if (!writtenPaths.has(relativePath)) {
+            // This beat file is on disk but not in the current project — delete it
+            const fullPath = joinPath(dirPath, file.name);
+            await api.unlink(fullPath);
+            console.log(`[DirectoryAdapter] Cleaned up orphaned beat file: ${relativePath}`);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[DirectoryAdapter] Error during beat file cleanup:', err);
+    }
   }
 
   /**
