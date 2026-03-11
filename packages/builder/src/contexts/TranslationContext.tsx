@@ -69,6 +69,8 @@ export interface TranslationActions {
   syncAllTranslations: (projectData: any) => void;
   /** Sync translations for a single beat after source-text edits */
   syncBeatTranslations: (beatId: string, beatData: any) => void;
+  /** Remove all translation entries for a deleted beat */
+  removeBeatTranslations: (beatId: string) => void;
   /** Delete a translation language */
   deleteTranslation: (languageCode: string) => void;
   /** Clean false stale markers — convert 'stale' to 'translated', preserving 'untranslated' */
@@ -101,6 +103,7 @@ const TranslationActionsContext = createContext<TranslationActions>({
   clearTranslations: () => {},
   syncAllTranslations: () => {},
   syncBeatTranslations: () => {},
+  removeBeatTranslations: () => {},
   deleteTranslation: () => {},
   cleanStaleMarkers: () => {},
   continueTranslation: async () => {},
@@ -395,6 +398,35 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     });
   }, []);
 
+  const removeBeatTranslations = useCallback((beatId: string) => {
+    const beatKeyPrefix = `beat:${beatId}.`;
+    setTranslations(prev => {
+      if (prev.length === 0) return prev;
+
+      let anyChanged = false;
+      const updated = prev.map(resource => {
+        const keysToRemove = Object.keys(resource.strings).filter(k => k.startsWith(beatKeyPrefix));
+        const snapshotKeysToRemove = Object.keys(resource._sourceSnapshot).filter(k => k.startsWith(beatKeyPrefix));
+        if (keysToRemove.length === 0 && snapshotKeysToRemove.length === 0) return resource;
+
+        anyChanged = true;
+        const newStrings = { ...resource.strings };
+        const newSnapshot = { ...resource._sourceSnapshot };
+        keysToRemove.forEach(k => delete newStrings[k]);
+        snapshotKeysToRemove.forEach(k => delete newSnapshot[k]);
+        console.log(`[TranslationContext] removeBeat ${resource.languageName}: removed ${keysToRemove.length} entries for beat ${beatId}`);
+        return {
+          ...resource,
+          strings: newStrings,
+          _sourceSnapshot: newSnapshot,
+          modifiedAt: new Date().toISOString(),
+        };
+      });
+
+      return anyChanged ? updated : prev;
+    });
+  }, []);
+
   const deleteTranslation = useCallback((languageCode: string) => {
     setTranslations(prev => prev.filter(t => t.languageCode !== languageCode));
     setActiveLanguageRaw(prev => prev === languageCode ? null : prev);
@@ -486,6 +518,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     clearTranslations,
     syncAllTranslations,
     syncBeatTranslations,
+    removeBeatTranslations,
     deleteTranslation,
     cleanStaleMarkers,
     continueTranslation,
@@ -499,6 +532,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     clearTranslations,
     syncAllTranslations,
     syncBeatTranslations,
+    removeBeatTranslations,
     deleteTranslation,
     cleanStaleMarkers,
     continueTranslation,

@@ -56,7 +56,13 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
     if (!vcs) return;
     const confirmed = window.confirm(`Discard changes to ${files.length} file(s)? This cannot be undone.`);
     if (confirmed) {
-      await vcs.revertFiles(files);
+      const result = await vcs.revertFiles(files);
+      if (result.success) {
+        // Dispatch git-reset event so App.tsx pauses autosave and reloads
+        // the project from disk, preventing stale in-memory state from
+        // being written back over the reverted files.
+        window.dispatchEvent(new CustomEvent('asaps:git-reset'));
+      }
     }
   }, [vcs]);
 

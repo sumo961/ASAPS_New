@@ -133,7 +133,11 @@ export class AIDialogTreeBeat extends Beat {
     if (params.maxTurns !== undefined) this.maxTurns = params.maxTurns;
     if (params.presentationMode !== undefined) this.presentationMode = params.presentationMode;
     if (params.showAvatars !== undefined) this.showAvatars = params.showAvatars;
-    if (params.exitTargets !== undefined) this.exitTargets = params.exitTargets;
+    if (params.exitTargets !== undefined) {
+      this.exitTargets = params.exitTargets;
+      // Clear stored connections — getConnections() derives them from exitTargets
+      this.clearConnections();
+    }
     if (params.systemInstructions !== undefined) this.systemInstructions = params.systemInstructions;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
   }

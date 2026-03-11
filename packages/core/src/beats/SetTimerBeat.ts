@@ -42,9 +42,15 @@ export class SetTimerBeat extends Beat {
     if (params.timerTarget !== undefined) this.timerTarget = params.timerTarget;
     if (params.continueTarget !== undefined) this.continueTarget = params.continueTarget;
     if (params.target !== undefined) this.continueTarget = params.target; // alias
-    
-    // Don't manage connections here - let Inspector handle them
-    // The timer target is stored as a parameter, not a connection
+
+    // Rebuild connections from parameters
+    this.clearConnections();
+    if (this.timerTarget) {
+      this.addConnection({ targetId: this.timerTarget, label: 'Timer Target' });
+    }
+    if (this.continueTarget) {
+      this.addConnection({ targetId: this.continueTarget });
+    }
   }
 
   protected async performAction(

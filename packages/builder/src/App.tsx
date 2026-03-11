@@ -217,7 +217,10 @@ function App() {
   stableMutations.current = {
     addBeat: (beat) => actions.addExistingBeat(beat),
     updateBeat: (id, updates) => actions.updateBeat(id, updates as Partial<Beat>),
-    deleteBeat: (id) => actions.deleteBeat(id),
+    deleteBeat: (id) => {
+      actions.deleteBeat(id);
+      translationActionsRef.current?.removeBeatTranslations(id);
+    },
     moveBeat: (id, pos) => actions.moveBeat(id, pos),
   };
 
@@ -2229,26 +2232,37 @@ function App() {
             }));
           }
 
-          // Run sync to detect new/orphaned strings (updates _sourceSnapshot)
-          const projectData = {
-            project: {
-              ...currentProject,
-              story: currentProject.story,
-            },
-          };
-          translationActions.loadTranslations(translations, manifest, projectData);
+          // Run sync to detect new/orphaned strings (updates _sourceSnapshot).
+          // Skip sync after git-reset: source and translations are from the same
+          // commit, so they're already in sync. Running sync would modify
+          // _sourceSnapshot and statuses, causing the translation files to be
+          // re-dirtied on the next save.
+          if (isGitResetReload) {
+            translationActions.loadTranslations(translations, manifest);
+          } else {
+            const projectData = {
+              project: {
+                ...currentProject,
+                story: currentProject.story,
+              },
+            };
+            translationActions.loadTranslations(translations, manifest, projectData);
 
-          // For directory projects: clean any stale markers the sync just added.
-          // These are false positives from extraction differences, not real changes.
-          // New strings (status: 'untranslated') are preserved — only 'stale' is cleaned.
-          if (cleanStaleMarkers) {
-            translationActions.cleanStaleMarkers();
+            // For directory projects: clean any stale markers the sync just added.
+            // These are false positives from extraction differences, not real changes.
+            // New strings (status: 'untranslated') are preserved — only 'stale' is cleaned.
+            if (cleanStaleMarkers) {
+              translationActions.cleanStaleMarkers();
+            }
           }
 
           // Persist updated _sourceSnapshot to disk so sync doesn't re-detect
           // the same "new" strings on every load. The sync updates the snapshot
           // in memory but this is lost unless we trigger a save.
-          if (isDirectoryProject) {
+          // Skip after git-reset reload: source and translations are from the
+          // same commit, so the snapshot doesn't need updating. Writing here
+          // would re-dirty translation files that were just reverted.
+          if (isDirectoryProject && !isGitResetReload) {
             setTimeout(() => {
               markChanged();
               saveNow();

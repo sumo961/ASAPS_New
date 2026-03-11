@@ -171,6 +171,11 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
   const params = beat.parameters || beat;
   const type = beat.type || '';
 
+  // Speaker name (top-level beat property, not inside parameters)
+  if (beat.speaker && typeof beat.speaker === 'string') {
+    strings[`${prefix}.speaker`] = beat.speaker;
+  }
+
   // Common text fields present on many beat types
   const isAiBeat = type.startsWith('ai');
   const commonFields = ['text', 'buttonText', 'prompt', 'question', 'message', 'title', 'author'];

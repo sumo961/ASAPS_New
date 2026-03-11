@@ -98,13 +98,20 @@ export class AIConditionBeat extends Beat {
 
   updateParameters(params: Record<string, any>): void {
     if (params.prompt !== undefined) this.prompt = params.prompt;
-    if (params.categories !== undefined) this.categories = params.categories;
+    if (params.categories !== undefined) {
+      this.categories = params.categories;
+      // Clear stored connections — getConnections() derives them from categories
+      this.clearConnections();
+    }
     if (params.evaluateVariables !== undefined) this.evaluateVariables = params.evaluateVariables;
     if (params.evaluateInventory !== undefined) this.evaluateInventory = params.evaluateInventory;
     if (params.evaluateHistory !== undefined) this.evaluateHistory = params.evaluateHistory;
     if (params.evaluateCounters !== undefined) this.evaluateCounters = params.evaluateCounters;
     if (params.evaluateChoiceHistory !== undefined) this.evaluateChoiceHistory = params.evaluateChoiceHistory;
-    if (params.fallbackTarget !== undefined) this.aiDefaultTarget = params.fallbackTarget;
+    if (params.fallbackTarget !== undefined) {
+      this.aiDefaultTarget = params.fallbackTarget;
+      this.clearConnections();
+    }
     if (params.timeout !== undefined) this.timeout = params.timeout;
   }
 

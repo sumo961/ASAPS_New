@@ -1132,15 +1132,6 @@ export const Inspector: React.FC<InspectorProps> = ({
       }
     }
 
-    const beatAny = beat as any;
-
-    // Clear existing connections
-    if (typeof beatAny.clearConnections === 'function') {
-      beatAny.clearConnections();
-    } else {
-      beat.connections = [];
-    }
-
     // Apply all basic properties from local state
     beat.name = beatToUpdate.name;
     beat.cluster = beatToUpdate.cluster;
@@ -1177,108 +1168,32 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.updateParameters(parameters);
     }
 
-    // Use the connection type from the component scope
-    const beatDef = getBeatDefinition(beat.type);
-    const connectionType = beatDef?.connectionType || 'single';
+    // Handle connections
+    // Most beat types rebuild connections from parameters in updateParameters().
+    // For simple beats (single target, conditional), we set connections from local state.
+    const parameterDerivedTypes = new Set([
+      'dialogTree', 'pickProp', 'movementChoice',
+      'aiDialogTree', 'aiCondition', 'setTimer', 'randomTarget',
+    ]);
 
-    // Rebuild connections based on beat type
-    if (beat.type === 'dialogTree') {
-      // Use the beat's own getConnections() which correctly handles both
-      // old format (choice.target as object) and new format (choice.dialogNode).
-      // The beat's dialogTree was already updated via updateParameters() above.
-      const dialogConnections = beat.getConnections ? beat.getConnections() : [];
-      const uniqueConns = Array.from(
-        new Map(dialogConnections.map(c => [`${c.targetId}-${c.label}`, c])).values()
-      );
-      uniqueConns.forEach(conn => beat.addConnection(conn));
-
-    } else if (beat.type === 'aiDialogTree') {
-      // AI Dialog Tree connections from exitTargets
-      const exitTargets = beatToUpdate.parameters?.exitTargets || [];
-      exitTargets.forEach((target: any) => {
-        if (target.id) {
-          beat.addConnection({
-            targetId: target.id,
-            label: target.description ? target.description.substring(0, 30) + (target.description.length > 30 ? '...' : '') : 'Exit'
-          });
-        }
-      });
-
-    } else if (beat.type === 'aiCondition') {
-      // AI Condition connections from categories + fallback
-      const categories = beatToUpdate.parameters?.categories || [];
-      categories.forEach((category: any) => {
-        if (category.targetId) {
-          beat.addConnection({
-            targetId: category.targetId,
-            label: category.name || 'Category'
-          });
-        }
-      });
-      // Add fallback target
-      if (beatToUpdate.parameters?.fallbackTarget) {
-        beat.addConnection({
-          targetId: beatToUpdate.parameters.fallbackTarget,
-          label: 'Fallback'
-        });
+    if (!parameterDerivedTypes.has(beat.type)) {
+      const beatAny = beat as any;
+      if (typeof beatAny.clearConnections === 'function') {
+        beatAny.clearConnections();
+      } else {
+        beat.connections = [];
       }
 
-    } else if (beat.type === 'setTimer') {
-      // Timer target connection (from parameters)
-      if (beatToUpdate.parameters?.timerTarget) {
-        beat.addConnection({
-          targetId: beatToUpdate.parameters.timerTarget,
-          label: 'Timer Target'
-        });
+      const beatDef = getBeatDefinition(beat.type);
+      const connectionType = beatDef?.connectionType || 'single';
+
+      if (connectionType === 'single' && beatToUpdate.connections?.length > 0) {
+        beat.addConnection(beatToUpdate.connections[0]);
+      } else if (connectionType === 'conditional') {
+        beatToUpdate.connections.forEach((conn: any) => beat.addConnection(conn));
+      } else {
+        beatToUpdate.connections.forEach((conn: any) => beat.addConnection(conn));
       }
-      // Normal connection (where to continue immediately)
-      const normalConn = beatToUpdate.connections?.find((c: any) => c.label !== 'Timer Target');
-      if (normalConn) {
-        beat.addConnection(normalConn);
-      }
-
-    } else if (beat.type === 'randomTarget') {
-      // Random target connections
-      const choices = beatToUpdate.parameters?.choices || [];
-      choices.forEach((choice: any, index: number) => {
-        if (choice && choice.trim() !== '') {
-          beat.addConnection({
-            targetId: choice,
-            label: `Random ${index + 1}`
-          });
-        }
-      });
-
-    } else if (connectionType === 'single' && beatToUpdate.connections?.length > 0) {
-      beat.addConnection(beatToUpdate.connections[0]);
-
-    } else if (connectionType === 'multiple') {
-      // Handle multiple connections for choice beats
-      if (beat.type === 'movementChoice' && beatToUpdate.parameters?.choices) {
-        beatToUpdate.parameters.choices.forEach((choice: any) => {
-          if (choice.target && choice.target !== '__self__') {
-            beat.addConnection({
-              targetId: choice.target,
-              label: choice.text
-            });
-          }
-        });
-      } else if (beat.type === 'pickProp' && beatToUpdate.parameters?.props) {
-        beatToUpdate.parameters.props.forEach((prop: any) => {
-          if (prop.target) {
-            beat.addConnection({
-              targetId: prop.target,
-              label: prop.name
-            });
-          }
-        });
-      }
-
-    } else if (connectionType === 'conditional') {
-      beatToUpdate.connections.forEach((conn: any) => beat.addConnection(conn));
-
-    } else {
-      beatToUpdate.connections.forEach((conn: any) => beat.addConnection(conn));
     }
 
     // Call onUpdate with the updated beat and connections
@@ -1343,141 +1258,28 @@ export const Inspector: React.FC<InspectorProps> = ({
       }
       
       // Handle connections
-      const beatAny = beat as any;
-      if (typeof beatAny.clearConnections === 'function') {
-        beatAny.clearConnections();
-      } else {
-        beat.connections = [];
-      }
-      
-      // Add connections based on beat type
-      if (beat.type === 'dialogTree') {
-        // Handle dialog tree connections
-        const extractConnections = (node: any): any[] => {
-          const connections: any[] = [];
-          
-          if (node.choices) {
-            node.choices.forEach((choice: any) => {
-              if (typeof choice.target === 'string' && choice.target) {
-                connections.push({
-                  targetId: choice.target,
-                  label: choice.text
-                });
-              } else if (typeof choice.target === 'object' && choice.target) {
-                connections.push(...extractConnections(choice.target));
-              }
-            });
-          }
-          
-          if (typeof node.next === 'string' && node.next) {
-            connections.push({
-              targetId: node.next,
-              label: 'Continue'
-            });
-          } else if (typeof node.next === 'object' && node.next) {
-            connections.push(...extractConnections(node.next));
-          }
-          
-          return connections;
-        };
-        
-        const dialogConnections = extractConnections(localBeat.parameters.dialogTree);
-        
-        if (localBeat.connections?.length > 0) {
-          const defaultConn = localBeat.connections.find((c: any) => !c.label || c.label === 'Continue');
-          if (defaultConn) {
-            dialogConnections.push(defaultConn);
-          }
-        }
-        
-        const uniqueConns = Array.from(
-          new Map(dialogConnections.map(c => [`${c.targetId}-${c.label}`, c])).values()
-        );
-        uniqueConns.forEach(conn => beat.addConnection(conn));
+      // Most beat types rebuild connections from parameters in updateParameters().
+      // For simple beats (single target, conditional), we set connections from local state.
+      const parameterDerivedTypes = new Set([
+        'dialogTree', 'pickProp', 'movementChoice',
+        'aiDialogTree', 'aiCondition', 'setTimer', 'randomTarget',
+      ]);
 
-      } else if (beat.type === 'aiDialogTree') {
-        // AI Dialog Tree connections from exitTargets
-        const exitTargets = localBeat.parameters?.exitTargets || [];
-        exitTargets.forEach((target: any) => {
-          if (target.id) {
-            beat.addConnection({
-              targetId: target.id,
-              label: target.description ? target.description.substring(0, 30) + (target.description.length > 30 ? '...' : '') : 'Exit'
-            });
-          }
-        });
-
-      } else if (beat.type === 'aiCondition') {
-        // AI Condition connections from categories + fallback
-        const categories = localBeat.parameters?.categories || [];
-        categories.forEach((category: any) => {
-          if (category.targetId) {
-            beat.addConnection({
-              targetId: category.targetId,
-              label: category.name || 'Category'
-            });
-          }
-        });
-        // Add fallback target
-        if (localBeat.parameters?.fallbackTarget) {
-          beat.addConnection({
-            targetId: localBeat.parameters.fallbackTarget,
-            label: 'Fallback'
-          });
+      if (!parameterDerivedTypes.has(beat.type)) {
+        const beatAny = beat as any;
+        if (typeof beatAny.clearConnections === 'function') {
+          beatAny.clearConnections();
+        } else {
+          beat.connections = [];
         }
 
-      } else if (beat.type === 'setTimer') {
-        // Timer target connection (from parameters)
-        if (localBeat.parameters?.timerTarget) {
-          beat.addConnection({
-            targetId: localBeat.parameters.timerTarget,
-            label: 'Timer Target'
-          });
+        if (connectionType === 'single' && localBeat.connections.length > 0) {
+          beat.addConnection(localBeat.connections[0]);
+        } else if (connectionType === 'conditional') {
+          localBeat.connections.forEach((conn: any) => beat.addConnection(conn));
+        } else {
+          localBeat.connections.forEach((conn: any) => beat.addConnection(conn));
         }
-        // Normal connection (where to continue immediately)
-        const normalConn = localBeat.connections?.find((c: any) => c.label !== 'Timer Target');
-        if (normalConn) {
-          beat.addConnection(normalConn);
-        }
-      } else if (beat.type === 'randomTarget') {
-        // Random target connections
-        const choices = localBeat.parameters?.choices || [];
-        // Only add connections for non-empty choices
-        choices.forEach((choice: any, index: number) => {
-          if (choice && choice.trim() !== '') {
-            beat.addConnection({
-              targetId: choice,
-              label: `Random ${index + 1}`
-            });
-          }
-        });
-      } else if (connectionType === 'single' && localBeat.connections.length > 0) {
-        beat.addConnection(localBeat.connections[0]);
-      } else if (connectionType === 'multiple') {
-        // Handle multiple connections for choice beats
-        if (beat.type === 'movementChoice' && localBeat.parameters?.choices) {
-          localBeat.parameters.choices.forEach((choice: any) => {
-            if (choice.target && choice.target !== '__self__') {
-              beat.addConnection({
-                targetId: choice.target,
-                label: choice.text
-              });
-            }
-          });
-        } else if (beat.type === 'pickProp' && localBeat.parameters?.props) {
-          localBeat.parameters.props.forEach((prop: any) => {
-            if (prop.target) {
-              beat.addConnection({
-                targetId: prop.target,
-                label: prop.name
-              });
-            }
-          });
-        }
-      } else if (connectionType === 'conditional') {
-        localBeat.connections.forEach((conn: any) => beat.addConnection(conn));
-      } else {
-        localBeat.connections.forEach((conn: any) => beat.addConnection(conn));
       }
 
       // CRITICAL FIX: Extract connections and include them in the update to force React re-render
