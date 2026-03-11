@@ -350,4 +350,86 @@ describe('projectDeserializer', () => {
       expect(result.clusters[0].name).toBe('Chapter 1');
     });
   });
+
+  describe('pickProp multiple connections to same target', () => {
+    it('should preserve all connections when multiple props target the same beat', () => {
+      const beatsData = [
+        {
+          id: '5',
+          name: 'Pick something',
+          type: 'pickProp',
+          x: 100,
+          y: 800,
+          parameters: {
+            question: 'Pick an item:',
+            props: [
+              { id: '1', name: 'sweets', description: 'Candy', target: '6' },
+              { id: '2', name: 'knife', description: 'A knife', target: '6' },
+              { id: '3', name: 'book', description: 'A book', target: '6' },
+            ],
+          },
+          connections: [
+            { targetId: '6', label: 'sweets' },
+            { targetId: '6', label: 'knife' },
+            { targetId: '6', label: 'book' },
+          ],
+          locations: [],
+        },
+        {
+          id: '6',
+          name: 'Next beat',
+          type: 'infoText',
+          x: 100,
+          y: 1000,
+          parameters: { text: 'You picked something', buttonText: 'Continue' },
+          connections: [],
+          locations: [],
+        },
+      ];
+
+      const beats = deserializeBeats(beatsData);
+      const pickProp = beats.find(b => b.id === '5')!;
+
+      // All 3 connections must be preserved (same targetId, different labels)
+      expect(pickProp.connections).toHaveLength(3);
+      expect(pickProp.connections.map((c: any) => c.label)).toEqual(['sweets', 'knife', 'book']);
+    });
+
+    it('should round-trip pickProp connections through toJSON and deserialize', () => {
+      // Simulate: load → toJSON → deserialize again
+      const beatsData = [
+        {
+          id: '5',
+          name: 'Pick something',
+          type: 'pickProp',
+          parameters: {
+            question: 'Pick an item:',
+            props: [
+              { id: '1', name: 'sweets', target: '6' },
+              { id: '2', name: 'knife', target: '6' },
+              { id: '3', name: 'book', target: '6' },
+            ],
+          },
+          connections: [
+            { targetId: '6', label: 'sweets' },
+            { targetId: '6', label: 'knife' },
+            { targetId: '6', label: 'book' },
+          ],
+          locations: [],
+        },
+      ];
+
+      // First deserialize
+      const beats1 = deserializeBeats(beatsData);
+      const pickProp1 = beats1.find(b => b.id === '5')!;
+      expect(pickProp1.connections).toHaveLength(3);
+
+      // toJSON and deserialize again (simulates save/reload cycle)
+      const json = pickProp1.toJSON();
+      const beats2 = deserializeBeats([json]);
+      const pickProp2 = beats2.find(b => b.id === '5')!;
+      expect(pickProp2.connections).toHaveLength(3);
+      expect(pickProp2.connections.map((c: any) => c.label)).toEqual(['sweets', 'knife', 'book']);
+    });
+  });
 });

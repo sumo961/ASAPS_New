@@ -406,19 +406,24 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         }
       }
 
-      // 5. For beats with derived connections, deduplicate by targetId
-      // (remove connections with same target but different labels - keep only one)
+      // 5. For beats with derived connections, remove exact duplicate connections
+      // (same targetId AND same label). Do NOT deduplicate by targetId alone —
+      // beat types like pickProp can have multiple connections to the same target
+      // with different labels (e.g., sweets→6, knife→6, book→6).
+      // Connection accumulation is prevented at the Inspector level (onUpdate
+      // excludes connections for parameter-derived types).
       const BEATS_WITH_DERIVED_CONNECTIONS = ['dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'conditionBeat', 'randomTarget'];
       if (BEATS_WITH_DERIVED_CONNECTIONS.includes(beatData.type) && beatData.connections) {
-        const seenTargets = new Set<string>();
+        const seenKeys = new Set<string>();
         beatData.connections = beatData.connections.filter((conn: any) => {
           const targetId = conn.targetId || conn.target;
           if (!targetId) return false;
-          if (seenTargets.has(targetId)) {
-            console.log(`[deserializeBeats] Removed duplicate connection to ${targetId} from beat ${beatData.id}`);
+          const key = `${targetId}::${conn.label || ''}`;
+          if (seenKeys.has(key)) {
+            console.log(`[deserializeBeats] Removed exact duplicate connection ${key} from beat ${beatData.id}`);
             return false;
           }
-          seenTargets.add(targetId);
+          seenKeys.add(key);
           return true;
         });
       }
