@@ -1196,12 +1196,16 @@ export const Inspector: React.FC<InspectorProps> = ({
       }
     }
 
-    // Call onUpdate with the updated beat and connections
-    const updatedConnections = beat.getConnections ? beat.getConnections() : [];
-    onUpdate(beat.id, {
-      ...beat,
-      connections: updatedConnections
-    });
+    // For parameter-derived types, exclude connections from the update —
+    // they are derived by getConnections() and must not be written into
+    // beat.connections (Object.assign in the store would persist them).
+    if (parameterDerivedTypes.has(beat.type)) {
+      const { connections: _ignored, ...beatWithoutConnections } = beat as any;
+      onUpdate(beat.id, beatWithoutConnections);
+    } else {
+      const updatedConnections = beat.getConnections ? beat.getConnections() : [];
+      onUpdate(beat.id, { ...beat, connections: updatedConnections });
+    }
 
     // Reset hasChanges since we just saved
     setHasChanges(false);
@@ -1225,14 +1229,15 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.speaker = localBeat.speaker || '';
       beat.showSpeaker = localBeat.showSpeaker ?? undefined;
 
-      // Convert backgroundSound from parameters to proper Sound object
+      // Update sound: preserve existing properties, only update assetId and editable fields
       const bgSoundId = localBeat.parameters?.backgroundSound;
       if (bgSoundId) {
         beat.sound = {
-          file: bgSoundId,
+          ...beat.sound,            // preserve fadeIn, fadeOut, etc.
+          file: beat.sound?.file || bgSoundId,
           assetId: bgSoundId,
-          volume: localBeat.sound?.volume ?? 1.0,
-          loop: localBeat.sound?.loop ?? false,
+          volume: localBeat.sound?.volume ?? beat.sound?.volume ?? 1.0,
+          loop: localBeat.sound?.loop ?? beat.sound?.loop ?? false,
         };
       } else {
         beat.sound = undefined;
@@ -1282,13 +1287,16 @@ export const Inspector: React.FC<InspectorProps> = ({
         }
       }
 
-      // CRITICAL FIX: Extract connections and include them in the update to force React re-render
-      const updatedConnections = beat.getConnections ? beat.getConnections() : [];
-
-      onUpdate(beat.id, {
-        ...beat,
-        connections: updatedConnections
-      });
+      // For parameter-derived types, exclude connections from the update —
+      // they are derived by getConnections() and must not be written into
+      // beat.connections (Object.assign in the store would persist them).
+      if (parameterDerivedTypes.has(beat.type)) {
+        const { connections: _ignored, ...beatWithoutConnections } = beat as any;
+        onUpdate(beat.id, beatWithoutConnections);
+      } else {
+        const updatedConnections = beat.getConnections ? beat.getConnections() : [];
+        onUpdate(beat.id, { ...beat, connections: updatedConnections });
+      }
       setHasChanges(false);
       setValidationErrors([]);
     }

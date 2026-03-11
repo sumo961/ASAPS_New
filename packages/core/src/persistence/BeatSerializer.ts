@@ -149,8 +149,9 @@ export function serializeBeat(beat: Beat): SerializedBeat {
     ...(raw.defaultTargetDelay ? { defaultTargetDelay: raw.defaultTargetDelay } : {}),
     ...(raw.showTimer ? { showTimer: raw.showTimer } : {}),
     ...(raw.notes ? { notes: raw.notes } : {}),
-    ...(raw.speaker ? { speaker: raw.speaker } : {}),
-    ...(raw.showSpeaker != null ? { showSpeaker: raw.showSpeaker } : {}),
+    // Skip speaker/showSpeaker for dialogTree — speaker lives in parameters.dialogTree.speaker
+    ...(raw.speaker && raw.type !== 'dialogTree' ? { speaker: raw.speaker } : {}),
+    ...(raw.showSpeaker != null && raw.type !== 'dialogTree' ? { showSpeaker: raw.showSpeaker } : {}),
     _format: FORMAT_VERSION,
   };
 
@@ -186,8 +187,8 @@ export function serializeBeatFromJSON(raw: any): SerializedBeat {
     ...(raw.defaultTargetDelay ? { defaultTargetDelay: raw.defaultTargetDelay } : {}),
     ...(raw.showTimer ? { showTimer: raw.showTimer } : {}),
     ...(raw.notes ? { notes: raw.notes } : {}),
-    ...(raw.speaker ? { speaker: raw.speaker } : {}),
-    ...(raw.showSpeaker != null ? { showSpeaker: raw.showSpeaker } : {}),
+    ...(raw.speaker && raw.type !== 'dialogTree' ? { speaker: raw.speaker } : {}),
+    ...(raw.showSpeaker != null && raw.type !== 'dialogTree' ? { showSpeaker: raw.showSpeaker } : {}),
     _format: FORMAT_VERSION,
   };
 
