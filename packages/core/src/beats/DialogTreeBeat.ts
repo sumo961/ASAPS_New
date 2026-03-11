@@ -260,6 +260,10 @@ export class DialogTreeBeat extends Beat {
     // CRITICAL FIX: Update dialogTree first and extract properties FROM it
     // Always run migration to ensure nested dialogNodes have choices arrays
     if (params.dialogTree !== undefined) {
+      // Clear stored connections when dialogTree structure changes —
+      // getConnections() will re-derive them. Only clear here (not unconditionally)
+      // to preserve non-derived connections (e.g. from Twine import).
+      this.clearConnections();
       this.dialogTree = this.migrateDialogTree(params.dialogTree);
       // Extract speaker/text/emotion from the new dialogTree
       if (this.dialogTree.speaker !== undefined) this.speaker = this.dialogTree.speaker;

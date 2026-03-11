@@ -149,6 +149,8 @@ export function serializeBeat(beat: Beat): SerializedBeat {
     ...(raw.defaultTargetDelay ? { defaultTargetDelay: raw.defaultTargetDelay } : {}),
     ...(raw.showTimer ? { showTimer: raw.showTimer } : {}),
     ...(raw.notes ? { notes: raw.notes } : {}),
+    ...(raw.speaker ? { speaker: raw.speaker } : {}),
+    ...(raw.showSpeaker != null ? { showSpeaker: raw.showSpeaker } : {}),
     _format: FORMAT_VERSION,
   };
 
@@ -184,6 +186,8 @@ export function serializeBeatFromJSON(raw: any): SerializedBeat {
     ...(raw.defaultTargetDelay ? { defaultTargetDelay: raw.defaultTargetDelay } : {}),
     ...(raw.showTimer ? { showTimer: raw.showTimer } : {}),
     ...(raw.notes ? { notes: raw.notes } : {}),
+    ...(raw.speaker ? { speaker: raw.speaker } : {}),
+    ...(raw.showSpeaker != null ? { showSpeaker: raw.showSpeaker } : {}),
     _format: FORMAT_VERSION,
   };
 

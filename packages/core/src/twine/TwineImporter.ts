@@ -699,10 +699,9 @@ export class TwineImporter {
         }
       }
 
-      // Update beat's connections array with resolved IDs
-      beat.connections = resolvedConnections;
-
-      // Also update parameters for beat types that store connections there
+      // Update parameters first for beat types that store connections there.
+      // updateParameters() may clear/rebuild internal connections, so we set
+      // beat.connections AFTER this to preserve the full resolved set.
       const params = beat.getParameters();
 
       if (beat.type === 'dialogTree' && params.dialogTree) {
@@ -745,6 +744,9 @@ export class TwineImporter {
           beat.updateParameters(updates);
         }
       }
+
+      // Set resolved connections AFTER updateParameters (which may clear connections)
+      beat.connections = resolvedConnections;
 
       // Update defaultTarget if it's a passage name
       if (beat.defaultTarget) {
