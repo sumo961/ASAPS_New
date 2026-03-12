@@ -177,13 +177,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -236,13 +236,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -319,6 +319,12 @@
             "step": 0.5,
             "label": "NPC Response Delay (seconds)"
           }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Displays per-node speaker names as labels during dialog",
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["dialog", "choices"],
@@ -385,13 +391,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["question", "choices"],
@@ -444,13 +450,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["question", "props"],
@@ -496,13 +502,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -637,13 +643,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "restartConnection": {
           "type": "connection",
@@ -808,13 +814,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["prompt", "hotspots"],
@@ -927,13 +933,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -1137,13 +1143,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -1319,13 +1325,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["text", "hyperlinks"],

@@ -95,7 +95,7 @@ interface GlobalSettings {
     baseUrl?: string;
     defaultVoiceId?: string;
     readPrompts?: boolean;
-    speakerVoices?: Record<string, string>;
+    speakerVoices?: Record<string, Record<string, string>>;
   };
   translation?: {
     sourceLanguage: string;  // BCP 47 code, default 'en'

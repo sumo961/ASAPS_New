@@ -56,6 +56,7 @@ import { useTranslationState, useTranslationActions } from './contexts/Translati
 import { applyTranslationResource } from './export/StoryTranslator';
 import { extractSpeakers } from './utils/speakerUtils';
 import { getTTSService } from './services/tts';
+import { getSavedTTSConfig } from './hooks/useTTS';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -4747,28 +4748,74 @@ function App() {
     setSelectedCluster(null);
   }, [actions, initializeStory, setIsUntitledProject]);
 
+  // Derive active TTS provider key: localStorage (canonical) → globalSettings → fallback
+  const getActiveProviderKey = useCallback(() => {
+    return getSavedTTSConfig()?.providerType || globalSettings?.tts?.providerType || 'web-speech';
+  }, [globalSettings?.tts?.providerType]);
+
+  // Migrate speakerVoices: flat format → provider-scoped, or re-key if stored under wrong provider
+  useEffect(() => {
+    const voices = globalSettings?.tts?.speakerVoices;
+    if (!voices || Object.keys(voices).length === 0) return;
+    const providerKey = getActiveProviderKey();
+
+    // Case 1: old flat format (first value is a string instead of an object)
+    const firstVal = Object.values(voices)[0];
+    if (typeof firstVal === 'string') {
+      console.log('[App] Migrating flat speakerVoices to provider-scoped format under', providerKey);
+      setGlobalSettings(prev => ({
+        ...prev,
+        tts: {
+          ...prev.tts,
+          speakerVoices: { [providerKey]: voices as unknown as Record<string, string> },
+        },
+      }));
+      markChanged();
+      return;
+    }
+
+    // Case 2: provider-scoped but stored under wrong key (previous bug)
+    // If there's exactly one key, it doesn't match active provider, and active provider has no entries
+    const keys = Object.keys(voices);
+    if (keys.length === 1 && keys[0] !== providerKey && !voices[providerKey]) {
+      const oldKey = keys[0];
+      console.log(`[App] Re-keying speakerVoices from '${oldKey}' to '${providerKey}'`);
+      setGlobalSettings(prev => ({
+        ...prev,
+        tts: {
+          ...prev.tts,
+          speakerVoices: { [providerKey]: (prev.tts?.speakerVoices as any)?.[oldKey] || {} },
+        },
+      }));
+      markChanged();
+    }
+  }, [globalSettings?.tts?.speakerVoices]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Extract speakers from story for TTS voice assignment in Header
   const storySpeakers = useMemo(() => {
-    if (!state.story) return [];
-    try {
-      return ['Narrator', ...extractSpeakers(state.story)];
-    } catch {
-      return [];
-    }
-  }, [state.story, state.beats]);
+    if (!state.beats || state.beats.length === 0) return [];
+    return ['Narrator', ...extractSpeakers(state.beats)];
+  }, [state.beats]);
 
   // Handle speaker voice change from Header TTS menu
   const handleSpeakerVoiceChange = useCallback((speaker: string, voiceId: string) => {
-    setGlobalSettings(prev => ({
-      ...prev,
-      tts: {
-        ...prev.tts,
-        speakerVoices: {
-          ...(prev.tts?.speakerVoices || {}),
-          [speaker]: voiceId,
+    const providerKey = getActiveProviderKey();
+    setGlobalSettings(prev => {
+      const allVoices = prev.tts?.speakerVoices || {};
+      return {
+        ...prev,
+        tts: {
+          ...prev.tts,
+          speakerVoices: {
+            ...allVoices,
+            [providerKey]: {
+              ...(allVoices[providerKey] || {}),
+              [speaker]: voiceId,
+            },
+          },
         },
-      },
-    }));
+      };
+    });
     // Apply immediately to TTS service
     try {
       if (voiceId) {
@@ -4822,7 +4869,7 @@ function App() {
         onCurrentProjectDeleted={handleCurrentProjectDeleted}
         triggerNewProject={triggerNewProject}
         speakers={storySpeakers}
-        speakerVoices={globalSettings?.tts?.speakerVoices ?? {}}
+        speakerVoices={globalSettings?.tts?.speakerVoices?.[getActiveProviderKey()] ?? {}}
         onSpeakerVoiceChange={handleSpeakerVoiceChange}
       />
 

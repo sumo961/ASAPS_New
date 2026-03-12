@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Users } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech } from 'lucide-react';
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { ReactRenderer, getAudioManager } from '@asaps/renderer';
@@ -19,9 +19,8 @@ import { generatePathPresets, groupPresetsByOutcome, type GeneratedPreset, type 
 import { InputTextValuesModal } from '../components/preview/InputTextValuesModal';
 import { getSavedAIConfig } from '../hooks/useAI';
 import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider } from '../services/tts';
-import type { TTSVoiceInfo } from '../types/tts';
 import { getSavedTTSConfig } from '../hooks/useTTS';
-import { extractSpeakers, resolvePortraitUrl } from '../utils/speakerUtils';
+import { resolvePortraitUrl } from '../utils/speakerUtils';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { buildChatRequestBody } from '../services/providers/openai-utils';
@@ -460,8 +459,6 @@ function translateLoadingMessage(message: string, translations: Map<string, stri
   return message;
 }
 
-// extractSpeakers is now imported from '../utils/speakerUtils'
-
 export const PreviewWindow: React.FC = () => {
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [story, setStory] = useState<Story | null>(null);
@@ -478,9 +475,6 @@ export const PreviewWindow: React.FC = () => {
     try { return localStorage.getItem('asaps_tts_enabled') !== 'false'; } catch { return true; }
   });
   const [animationEnabled, setAnimationEnabled] = useState(true);
-  const [showVoiceSetup, setShowVoiceSetup] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState<TTSVoiceInfo[]>([]);
-  const [speakerVoices, setSpeakerVoices] = useState<Record<string, string>>({}); // speaker → voiceId
   const [inventoryVisible, setInventoryVisible] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [showBeatMenu, setShowBeatMenu] = useState(false);
@@ -503,7 +497,6 @@ export const PreviewWindow: React.FC = () => {
   }>({});
   const [activeTimers, setActiveTimers] = useState<any[]>([]);
 
-  const voiceSetupRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const previewAreaRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReactRenderer | null>(null);
@@ -1161,9 +1154,11 @@ export const PreviewWindow: React.FC = () => {
       getTTSService().setLanguage(ttsLang);
     }
 
-    // Apply persisted speaker voices from global settings
+    // Apply persisted speaker voices from global settings (provider-scoped)
     {
-      const persistedVoices = previewData.settings?.tts?.speakerVoices as Record<string, string> | undefined;
+      const allVoices = previewData.settings?.tts?.speakerVoices as Record<string, Record<string, string>> | undefined;
+      const providerKey = getSavedTTSConfig()?.providerType || previewData.settings?.tts?.providerType || 'web-speech';
+      const persistedVoices = allVoices?.[providerKey];
       if (persistedVoices && Object.keys(persistedVoices).length > 0) {
         const ttsService = getTTSService();
         for (const [speaker, voiceId] of Object.entries(persistedVoices)) {
@@ -1171,15 +1166,7 @@ export const PreviewWindow: React.FC = () => {
             ttsService.setSpeakerVoice(speaker, { voiceId });
           }
         }
-        // Also populate local state so the UI reflects persisted assignments
-        setSpeakerVoices(prev => {
-          const merged = { ...prev };
-          for (const [speaker, voiceId] of Object.entries(persistedVoices)) {
-            if (voiceId && !merged[speaker]) merged[speaker] = voiceId;
-          }
-          return merged;
-        });
-        console.log('[PreviewWindow] Applied persisted speaker voices:', Object.keys(persistedVoices).length);
+        console.log('[PreviewWindow] Applied persisted speaker voices for', providerKey + ':', Object.keys(persistedVoices).length);
       }
     }
 
@@ -1810,47 +1797,6 @@ export const PreviewWindow: React.FC = () => {
     }
   }, [ttsEnabled]);
 
-  // Extract speakers from story for voice assignment
-  const speakers = useMemo(() => {
-    if (!story) return [];
-    return ['Narrator', ...extractSpeakers(story)];
-  }, [story]);
-
-  // Load available voices when voice setup dropdown opens
-  useEffect(() => {
-    if (!showVoiceSetup) return;
-    const provider = getTTSService().getActiveProvider();
-    if (!provider) return;
-    const lang = getTTSService().getLanguage() || undefined;
-    provider.getVoices(lang).then(voices => setAvailableVoices(voices));
-  }, [showVoiceSetup]);
-
-  // Close voice setup dropdown when clicking outside
-  useEffect(() => {
-    if (!showVoiceSetup) return;
-    const handler = (e: MouseEvent) => {
-      if (voiceSetupRef.current && !voiceSetupRef.current.contains(e.target as Node)) {
-        setShowVoiceSetup(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showVoiceSetup]);
-
-  // Assign a voice to a speaker
-  const handleSpeakerVoiceChange = useCallback((speaker: string, voiceId: string) => {
-    setSpeakerVoices(prev => ({ ...prev, [speaker]: voiceId }));
-    if (voiceId) {
-      getTTSService().setSpeakerVoice(speaker, { voiceId });
-    } else {
-      getTTSService().setSpeakerVoice(speaker, {});
-    }
-  }, []);
-
-  // Test a speaker's voice
-  const handleTestVoice = useCallback((speaker: string) => {
-    getTTSService().speak(`Hello, I am ${speaker}.`, speaker);
-  }, []);
 
   // Zoom controls
   const handleZoomIn = () => { setIsAutoFit(false); setScale(prev => Math.min(prev + 0.1, 2)); };
@@ -2561,50 +2507,6 @@ export const PreviewWindow: React.FC = () => {
           >
             <Speech className="w-4 h-4" />
           </button>
-          {/* Voice Setup dropdown */}
-          {ttsEnabled && speakers.length > 1 && (
-            <div className="relative" ref={voiceSetupRef}>
-              <button
-                onClick={() => setShowVoiceSetup(!showVoiceSetup)}
-                className={`p-1.5 rounded flex items-center gap-1 text-sm ${showVoiceSetup ? 'bg-green-100 text-green-700' : 'hover:bg-gray-300'}`}
-                title="Character Voice Setup"
-              >
-                <Users className="w-4 h-4" />
-                <ChevronDown className="w-3 h-3" />
-              </button>
-              {showVoiceSetup && (
-                <div className="absolute right-0 bottom-full mb-1 w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3">
-                  <div className="text-sm font-medium text-gray-700 mb-2">Character Voices</div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {speakers.map(speaker => (
-                      <div key={speaker} className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-600 w-24 truncate flex-shrink-0" title={speaker}>
-                          {speaker}
-                        </span>
-                        <select
-                          className="min-w-0 flex-1 text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
-                          value={speakerVoices[speaker] || ''}
-                          onChange={e => handleSpeakerVoiceChange(speaker, e.target.value)}
-                        >
-                          <option value="">Auto</option>
-                          {availableVoices.map(v => (
-                            <option key={v.id} value={v.id}>{v.name}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => handleTestVoice(speaker)}
-                          className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex-shrink-0"
-                          title={`Test ${speaker}'s voice`}
-                        >
-                          Test
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
           <button
             onClick={() => setInventoryVisible(prev => !prev)}
             className={`p-1.5 rounded flex items-center gap-1 text-sm ${inventoryVisible ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-300'}`}

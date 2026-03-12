@@ -120,6 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showTTSConfig, setShowTTSConfig] = useState(false);
   const [showTTSMenu, setShowTTSMenu] = useState(false);
   const [availableVoices, setAvailableVoices] = useState<Array<{ id: string; name: string }>>([]);
+  const [activeProviderName, setActiveProviderName] = useState<string>('');
   const [ttsEnabled, setTtsEnabled] = useState(() => {
     try {
       return localStorage.getItem('asaps_tts_enabled') !== 'false';
@@ -136,6 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
         if (provider) {
           const voices = await provider.getVoices();
           setAvailableVoices(voices.map(v => ({ id: v.id, name: v.name })));
+          setActiveProviderName(provider.name);
         }
       } catch (e) {
         console.warn('[Header] Failed to load TTS voices:', e);
@@ -630,11 +632,11 @@ export const Header: React.FC<HeaderProps> = ({
                     <>
                       <div className="my-2 border-t border-gray-200" />
                       <div className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        Character Voices
+                        Character Voices{activeProviderName ? ` (${activeProviderName})` : ''}
                       </div>
                       {speakers.map(speaker => (
                         <div key={speaker} className="px-4 py-1.5 flex items-center justify-between gap-2">
-                          <span className="text-sm text-gray-700 truncate flex-shrink-0" style={{ maxWidth: '40%' }}>
+                          <span className="text-sm text-gray-700 truncate flex-shrink-0" style={{ maxWidth: '35%' }}>
                             {speaker}
                           </span>
                           <select
@@ -647,6 +649,13 @@ export const Header: React.FC<HeaderProps> = ({
                               <option key={v.id} value={v.id}>{v.name}</option>
                             ))}
                           </select>
+                          <button
+                            onClick={() => getTTSService().speak(`Hello, I am ${speaker}.`, speaker)}
+                            className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex-shrink-0"
+                            title={`Test ${speaker}'s voice`}
+                          >
+                            Test
+                          </button>
                         </div>
                       ))}
                     </>

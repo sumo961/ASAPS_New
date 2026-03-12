@@ -100,7 +100,7 @@ export interface GlobalSettings {
     baseUrl?: string;
     defaultVoiceId?: string;
     readPrompts?: boolean;
-    speakerVoices?: Record<string, string>;  // speaker name → voice ID
+    speakerVoices?: Record<string, Record<string, string>>;  // providerKey → { speaker → voiceId }
   };
   speakerDisplay?: {
     showNames?: boolean;                       // Master toggle: show speaker names globally (default derived from nameStyle)

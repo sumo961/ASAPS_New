@@ -6,14 +6,16 @@
  * Used by both the main app (Header TTS menu) and PreviewWindow.
  */
 
-import type { Story } from '@asaps/core';
+import type { Story, Beat } from '@asaps/core';
 
 /**
  * Extract unique speaker names from all beats in a story.
+ * Accepts either a Story instance or a Beat[] array.
  * Collects per-beat speakers (base Beat property) and walks
  * DialogTree nodes recursively to find nested speakers.
  */
-export function extractSpeakers(story: Story): string[] {
+export function extractSpeakers(storyOrBeats: Story | Beat[]): string[] {
+  const beats = Array.isArray(storyOrBeats) ? storyOrBeats : storyOrBeats.getAllBeats();
   const speakers = new Set<string>();
   const walkNode = (node: any) => {
     if (!node) return;
@@ -24,7 +26,7 @@ export function extractSpeakers(story: Story): string[] {
       }
     }
   };
-  for (const beat of story.getAllBeats()) {
+  for (const beat of beats) {
     // Collect per-beat speaker (base Beat property)
     if (beat.speaker && beat.speaker !== 'Narrator') {
       speakers.add(beat.speaker);

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-03-12T00:19:28.077Z
+ * Generated: 2026-03-12T20:36:58.947Z
  */
 
 // ============================================
@@ -158,6 +158,8 @@ export interface DialogTreeParameters {
   showAvatars?: boolean | undefined;
   /** Delay in seconds before NPC responds in chat mode (shows typing indicator) */
   responseDelay?: number | undefined;
+  /** Displays per-node speaker names as labels during dialog */
+  showSpeaker?: boolean | undefined;
 }
 
 /**

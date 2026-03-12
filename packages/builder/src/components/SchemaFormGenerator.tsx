@@ -15,7 +15,7 @@ interface ParameterDefinition {
   // For fields that reference beats (target selectors)
   targetField?: boolean;
   ui?: {
-    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker';
+    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility';
     options?: (string | { value: string; label: string })[];
     label?: string;
     min?: number;
@@ -34,6 +34,8 @@ interface ParameterDefinition {
     dependsOn?: { field: string; value: any };
     // Visual grouping - fields sharing the same group render inside a bordered container
     group?: string;
+    // Scope: 'beat' means this is a top-level beat property, not a parameter
+    scope?: 'beat';
   };
 }
 
@@ -62,6 +64,10 @@ interface SchemaFormGeneratorProps {
   // Translation mode: source parameter values to show as dimmed reference below text fields.
   // When set, indicates translation mode is active.
   translationSourceHints?: Record<string, any>;
+  // Top-level beat properties (speaker, showSpeaker) — values read from here, not parameters
+  beatProperties?: Record<string, any>;
+  // Callback for top-level beat property changes (scope: 'beat' fields)
+  onBeatPropertyChange?: (field: string, value: any) => void;
 }
 
 // Map alias beat types to their canonical schema types
@@ -198,6 +204,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   availableVariables = [],
   customRenderers = {},
   translationSourceHints,
+  beatProperties = {},
+  onBeatPropertyChange,
 }) => {
   // Map alias types to canonical types for schema lookup
   const canonicalType = BEAT_TYPE_ALIASES[beatType] || beatType;
@@ -205,8 +213,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   // Skip parameters that should be handled elsewhere (connections, complex types)
   // Note: 'operation' is handled inside the 'value' case for setVariable beats
   const skipParameters = ['connection', 'defaultConnection', 'trueConnection', 'falseConnection',
-    'dialogTree', 'choices', 'props', 'hyperlinks', 'restartConnection', 'operation',
-    'speaker', 'showSpeaker']; // Rendered in Inspector's common Speaker section
+    'dialogTree', 'choices', 'props', 'hyperlinks', 'restartConnection', 'operation'];
 
   const renderField = (paramName: string, paramDef: ParameterDefinition): React.ReactNode => {
     // Check for custom renderer first
@@ -219,7 +226,12 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
       return null;
     }
 
-    const value = parameters[paramName];
+    // For scope: 'beat' fields, read from beatProperties and use onBeatPropertyChange
+    const isBeatScope = paramDef.ui?.scope === 'beat';
+    const value = isBeatScope ? beatProperties[paramName] : parameters[paramName];
+    const handleChange = isBeatScope && onBeatPropertyChange
+      ? (v: any) => onBeatPropertyChange(paramName, v)
+      : (v: any) => onParameterChange(paramName, v);
     const isRequired = paramDef.required ?? false;
     const label = paramName.charAt(0).toUpperCase() + paramName.slice(1).replace(/([A-Z])/g, ' $1');
 
@@ -322,13 +334,22 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           ];
           if (characters) {
             for (const char of characters) {
-              const name = char.displayName || char.name || char.id;
-              if (name && !speakerOptions.some(o => o.value === name)) {
+              const name = typeof char === 'string' ? char : (char.displayName || char.name || char.id);
+              if (name && name !== 'Narrator' && name !== 'NPC' && !speakerOptions.some(o => o.value === name)) {
                 speakerOptions.push({ value: name, label: name });
               }
             }
           }
           const isCustom = value && !speakerOptions.some(o => o.value === value);
+
+          // Auto-enable showSpeaker when a non-default speaker is selected
+          const setSpeaker = (newVal: string) => {
+            handleChange(newVal);
+            if (newVal && newVal !== '' && onBeatPropertyChange && beatProperties.showSpeaker == null) {
+              onBeatPropertyChange('showSpeaker', true);
+            }
+          };
+
           return (
             <div key={paramName}>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -338,9 +359,9 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 value={isCustom ? '__custom__' : (value || '')}
                 onChange={(e) => {
                   if (e.target.value === '__custom__') {
-                    onParameterChange(paramName, value || '');
+                    setSpeaker(value || '');
                   } else {
-                    onParameterChange(paramName, e.target.value);
+                    setSpeaker(e.target.value);
                   }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
@@ -354,10 +375,36 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 <input
                   type="text"
                   value={isCustom ? value : ''}
-                  onChange={(e) => onParameterChange(paramName, e.target.value)}
+                  onChange={(e) => setSpeaker(e.target.value)}
                   placeholder="Enter speaker name..."
                   className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
                 />
+              )}
+            </div>
+          );
+        }
+
+        // Speaker visibility - tri-state select (default / show / hide)
+        if (paramDef.ui?.control === 'speaker-visibility') {
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                {paramDef.ui.label || label}
+              </label>
+              <select
+                value={value == null ? 'default' : value ? 'show' : 'hide'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  handleChange(val === 'default' ? undefined : val === 'show');
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="default">Default (use global setting)</option>
+                <option value="show">Always show</option>
+                <option value="hide">Always hide</option>
+              </select>
+              {paramDef.description && (
+                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
               )}
             </div>
           );
