@@ -512,6 +512,12 @@ function buildTranslationPrompt(
     prompt += `\n\nIMPORTANT — Conciseness for UI elements: Keys containing "buttonText", "restartText", "creditsText", "clearButtonText", or "placeholder" are UI labels/buttons. These MUST be kept very short — use a single word where the target language allows it (e.g., "Continue" → "weiter" in German, "continuar" in Spanish; "Restart" → "Neustart"/"Reiniciar"). Do NOT use verbose multi-word phrases for buttons.`;
   }
 
+  // Add guidance for speaker names
+  const hasSpeakerKeys = Object.keys(batch).some(k => k.endsWith('.speaker'));
+  if (hasSpeakerKeys) {
+    prompt += `\n\nKeys ending with ".speaker" are character names or nicknames used in dialog. Translate them naturally (e.g., "Gran" → "Oma" in German, "Grandma" → "Abuela" in Spanish) or keep them as-is if they are proper names.`;
+  }
+
   prompt += `\n\nRules:\n- Preserve all HTML tags exactly as they are\n- Preserve all {{variable}} references and template syntax exactly\n- Preserve any formatting markers\n- Return ONLY a valid JSON object with the same keys and translated values\n- Do not add any explanation or commentary`;
 
   return prompt;
@@ -555,7 +561,8 @@ async function translateBatch(
     // Validate that all keys from the batch are present
     const result: Record<string, string> = {};
     for (const key of Object.keys(batch)) {
-      result[key] = typeof parsed[key] === 'string' ? parsed[key] : batch[key];
+      const value = typeof parsed[key] === 'string' ? parsed[key] : batch[key];
+      result[key] = value;
     }
     return result;
   } catch (e) {
@@ -971,9 +978,11 @@ export async function updateTranslationResource(
   // 3. Collect source strings that need (re)translation
   const keysToTranslate = [...syncResult.staleStrings, ...syncResult.newStrings];
 
-  // Also include any previously untranslated strings
+  // Also include any previously untranslated or stale strings that the sync
+  // didn't re-detect (e.g., stale entries from corrupted snapshot repair
+  // where the preserved snapshot matches current source)
   for (const [key, entry] of Object.entries(resource.strings)) {
-    if (entry.status === 'untranslated' && !keysToTranslate.includes(key)) {
+    if ((entry.status === 'untranslated' || entry.status === 'stale') && !keysToTranslate.includes(key)) {
       keysToTranslate.push(key);
     }
   }

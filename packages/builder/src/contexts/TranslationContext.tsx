@@ -295,12 +295,19 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     setTranslations(prev =>
       prev.map(t => {
         if (t.languageCode !== languageCode) return t;
+        const wasStale = t.strings[key]?.status === 'stale';
+        // When a stale key is re-translated, clear its snapshot entry so the
+        // next sync will re-set it to the current source value.
+        const updatedSnapshot = wasStale
+          ? (() => { const s = { ...t._sourceSnapshot }; delete s[key]; return s; })()
+          : t._sourceSnapshot;
         return {
           ...t,
           strings: {
             ...t.strings,
             [key]: { value, status: 'translated' },
           },
+          _sourceSnapshot: updatedSnapshot,
           modifiedAt: new Date().toISOString(),
         };
       })

@@ -58,6 +58,25 @@ export function syncTranslation(
     }
   }
 
+  // Detect corrupted snapshots: entries where a previous sync updated the
+  // snapshot (so it matches current source) but the translation value was
+  // never updated. This happens when cleanStaleMarkers() wiped stale status
+  // after a sync had already updated the snapshot. Detectable pattern:
+  // translated value is all-digits but current source is not (common for
+  // speaker names that migrated from numeric indices to character names).
+  for (const key of currentKeys) {
+    if (staleStrings.includes(key) || newStrings.includes(key)) continue;
+    const entry = resource.strings[key];
+    if (!entry || entry.status !== 'translated') continue;
+    const currentValue = currentSourceStrings[key];
+    // Snapshot matches source (normal sync wouldn't flag it)
+    if (snapshot[key] !== currentValue) continue;
+    // Translated value differs from source AND is all-digits while source is not
+    if (entry.value !== currentValue && /^\d+$/.test(entry.value) && !/^\d+$/.test(currentValue)) {
+      staleStrings.push(key);
+    }
+  }
+
   // Find orphaned strings (in snapshot but not in current source)
   for (const key of snapshotKeys) {
     if (!currentKeys.has(key)) {
@@ -125,8 +144,21 @@ export function applySyncResult(
     }
   }
 
-  // Update the source snapshot and hash
-  resource._sourceSnapshot = { ...currentSourceStrings };
+  // Update the source snapshot — but preserve old values for stale keys.
+  // This ensures stale entries can be re-detected on future loads until
+  // the translation is actually updated (at which point the snapshot
+  // should be refreshed via updateTranslation or re-translation).
+  const staleSet = new Set(syncResult.staleStrings);
+  const updatedSnapshot: Record<string, string> = {};
+  for (const [key, value] of Object.entries(currentSourceStrings)) {
+    if (staleSet.has(key) && resource._sourceSnapshot[key] !== undefined) {
+      // Preserve old snapshot so stale can be re-detected
+      updatedSnapshot[key] = resource._sourceSnapshot[key];
+    } else {
+      updatedSnapshot[key] = value;
+    }
+  }
+  resource._sourceSnapshot = updatedSnapshot;
   resource.sourceHash = computeSourceHash(currentSourceStrings);
   resource.modifiedAt = new Date().toISOString();
 }

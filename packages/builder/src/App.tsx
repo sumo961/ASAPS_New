@@ -1981,17 +1981,15 @@ function App() {
 
           translationActions.loadTranslations(translations, manifest, projectData);
 
-          // For directory projects: clean false stale markers the sync just added
+          // For directory projects: persist updated _sourceSnapshot to disk
           if (isDirectoryProject) {
-            translationActions.cleanStaleMarkers();
-            // Persist updated _sourceSnapshot to disk
             setTimeout(() => {
               markChanged();
               saveNow();
               console.log('[App] >>> Persisted translation sync (updated _sourceSnapshot)');
             }, 1000);
           }
-          console.log('[App] >>> Loaded', translations.length, 'translation(s)', isDirectoryProject ? '(stale cleaned — directory)' : 'with sync');
+          console.log('[App] >>> Loaded', translations.length, 'translation(s)', 'with sync');
         } else {
           translationActions.clearTranslations();
         }
@@ -2216,23 +2214,10 @@ function App() {
         if (currentProject.translations?.length) {
           const isDirectoryProject = !!(currentProject as any).directoryPath;
           const isGitResetReload = resumeAutoSaveAfterLoadRef.current;
-          const cleanStaleMarkers = isDirectoryProject || isGitResetReload;
-          let translations = currentProject.translations;
+          const translations = currentProject.translations;
           const manifest = currentProject.translationManifest;
 
-          // Clean any stale markers baked into committed translation files BEFORE sync
-          if (cleanStaleMarkers) {
-            translations = translations.map((t: any) => ({
-              ...t,
-              strings: Object.fromEntries(
-                Object.entries(t.strings as Record<string, { value: string; status: string }>).map(
-                  ([k, v]) => [k, v.status === 'stale' ? { ...v, status: 'translated' } : v]
-                )
-              ),
-            }));
-          }
-
-          // Run sync to detect new/orphaned strings (updates _sourceSnapshot).
+          // Run sync to detect new/stale/orphaned strings (updates _sourceSnapshot).
           // Skip sync after git-reset: source and translations are from the same
           // commit, so they're already in sync. Running sync would modify
           // _sourceSnapshot and statuses, causing the translation files to be
@@ -2247,13 +2232,6 @@ function App() {
               },
             };
             translationActions.loadTranslations(translations, manifest, projectData);
-
-            // For directory projects: clean any stale markers the sync just added.
-            // These are false positives from extraction differences, not real changes.
-            // New strings (status: 'untranslated') are preserved — only 'stale' is cleaned.
-            if (cleanStaleMarkers) {
-              translationActions.cleanStaleMarkers();
-            }
           }
 
           // Persist updated _sourceSnapshot to disk so sync doesn't re-detect
@@ -2269,7 +2247,7 @@ function App() {
               console.log('[App] >>> Persisted translation sync (updated _sourceSnapshot)');
             }, 1000);
           }
-          console.log('[App] >>> Loaded', translations.length, 'translation(s)', cleanStaleMarkers ? '(stale cleaned — directory/reset)' : 'with sync');
+          console.log('[App] >>> Loaded', translations.length, 'translation(s)', isGitResetReload ? '(no sync — git reset)' : 'with sync');
         } else {
           translationActions.clearTranslations();
         }
@@ -3198,21 +3176,11 @@ function App() {
           }
 
           if (resources.length > 0) {
-            // Clean stale markers from committed translation files — they may
-            // contain stale entries from previous sessions. The disk is truth.
-            const cleanedResources = resources.map((r: any) => ({
-              ...r,
-              strings: Object.fromEntries(
-                Object.entries(r.strings as Record<string, { value: string; status: string }>).map(
-                  ([k, v]) => [k, v.status === 'stale' ? { ...v, status: 'translated' } : v]
-                )
-              ),
-            }));
-            console.log('[App] Post-VCS: Loaded', cleanedResources.length, 'translation(s) from disk:',
-              cleanedResources.map((r: any) => r.languageCode));
-            translationActionsRef.current.loadTranslations(cleanedResources, manifest);
+            console.log('[App] Post-VCS: Loaded', resources.length, 'translation(s) from disk:',
+              resources.map((r: any) => r.languageCode));
+            translationActionsRef.current.loadTranslations(resources, manifest);
             // Also update the project object so next save includes them
-            proj.translations = cleanedResources;
+            proj.translations = resources;
             proj.translationManifest = manifest;
           } else if (translationStateRef.current.translations.length > 0) {
             // Translation files were removed (e.g., reverted)
@@ -3221,13 +3189,11 @@ function App() {
             delete proj.translationManifest;
           }
 
-          // Sync to detect new/orphaned strings (e.g., pulled new beats),
-          // then clean false stale markers from extraction differences.
+          // Sync to detect new/stale/orphaned strings (e.g., pulled new beats)
           if (translationStateRef.current.translations.length > 0) {
             try {
               const projectData = await getProjectDataForExport(proj.id);
               translationActionsRef.current.syncAllTranslations(projectData);
-              translationActionsRef.current.cleanStaleMarkers();
             } catch (e) {
               console.error('[App] Post-VCS translation sync failed:', e);
             }

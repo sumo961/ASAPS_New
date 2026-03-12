@@ -160,6 +160,33 @@ describe('Translation Sync', () => {
       expect(result.orphanedStrings).toEqual(['beat:2.text']);
       expect(result.newStrings).toEqual(['beat:4.text']);
     });
+
+    it('should detect corrupted snapshots where numeric translations were not updated', () => {
+      const resource = createEmptyResource('de', 'German');
+      // Snapshot was corrupted by a previous sync+cleanStaleMarkers cycle:
+      // snapshot already matches current source, but translation value is from old source
+      resource._sourceSnapshot = {
+        'beat:422.parameters.dialogTree.speaker': 'Gran',
+        'beat:1.parameters.text': 'Hello',
+      };
+      resource.strings = {
+        'beat:422.parameters.dialogTree.speaker': { value: '1', status: 'translated' },
+        'beat:1.parameters.text': { value: 'Hallo', status: 'translated' },
+      };
+
+      const currentSource = {
+        'beat:422.parameters.dialogTree.speaker': 'Gran',
+        'beat:1.parameters.text': 'Hello',
+      };
+
+      const result = syncTranslation(resource, currentSource);
+
+      // Speaker "1" (numeric) with non-numeric source "Gran" should be detected as stale
+      expect(result.staleStrings).toContain('beat:422.parameters.dialogTree.speaker');
+      // Normal translation "Hallo" should NOT be flagged
+      expect(result.staleStrings).not.toContain('beat:1.parameters.text');
+      expect(result.hasChanges).toBe(true);
+    });
   });
 
   describe('applySyncResult', () => {
@@ -217,12 +244,16 @@ describe('Translation Sync', () => {
       expect(resource.strings['beat:1.text'].value).toBe('Hallo');
     });
 
-    it('should update source snapshot and hash', () => {
+    it('should update snapshot for non-stale keys and preserve old values for stale keys', () => {
       const resource = createEmptyResource('de', 'German');
-      resource._sourceSnapshot = { 'beat:1.text': 'Hello' };
+      resource._sourceSnapshot = { 'beat:1.text': 'Hello', 'beat:2.text': 'World' };
+      resource.strings = {
+        'beat:1.text': { value: 'Hallo', status: 'translated' },
+        'beat:2.text': { value: 'Welt', status: 'translated' },
+      };
       resource.sourceHash = 'old-hash';
 
-      const currentSource = { 'beat:1.text': 'Hello there!' };
+      const currentSource = { 'beat:1.text': 'Hello there!', 'beat:2.text': 'World' };
 
       applySyncResult(resource, {
         newStrings: [],
@@ -231,9 +262,11 @@ describe('Translation Sync', () => {
         hasChanges: true,
       }, currentSource);
 
-      expect(resource._sourceSnapshot).toEqual(currentSource);
+      // Stale key preserves old snapshot value so stale can be re-detected on future loads
+      expect(resource._sourceSnapshot['beat:1.text']).toBe('Hello');
+      // Non-stale key gets updated
+      expect(resource._sourceSnapshot['beat:2.text']).toBe('World');
       expect(resource.sourceHash).not.toBe('old-hash');
-      expect(resource.sourceHash).toBe(computeSourceHash(currentSource));
     });
 
     it('should not overwrite existing translated entries for "new" keys', () => {
