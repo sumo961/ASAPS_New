@@ -4,6 +4,9 @@
  * OpenAI-compatible API at a custom base URL (local Piper, Coqui, etc.).
  * Same interface as OpenAI TTS but no API key required and uses baseUrl directly
  * (typically localhost, so no proxy needed).
+ *
+ * Returns raw Response for streaming playback (AudioManager decides
+ * whether to use MediaSource streaming or blob fallback).
  */
 
 import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../types/tts';
@@ -12,6 +15,8 @@ import { BaseTTSProvider } from './BaseTTSProvider';
 export class CustomTTSProvider extends BaseTTSProvider {
   readonly name = 'Custom TTS';
   readonly requiresApiKey = false;
+
+  private abortController?: AbortController;
 
   protected validateConfig(config: import('../../types/tts').TTSProviderConfig): boolean {
     if (!config.baseUrl || config.baseUrl.trim() === '') {
@@ -39,10 +44,13 @@ export class CustomTTSProvider extends BaseTTSProvider {
       headers['Authorization'] = `Bearer ${this.config!.apiKey}`;
     }
 
+    this.abortController = new AbortController();
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
+      signal: this.abortController.signal,
     });
 
     if (!response.ok) {
@@ -50,12 +58,13 @@ export class CustomTTSProvider extends BaseTTSProvider {
       throw new Error(`Custom TTS error ${response.status}: ${errorText}`);
     }
 
-    const audioBlob = await response.blob();
-    return { audio: audioBlob };
+    // Return raw response for streaming playback
+    return { audio: null, response };
   }
 
   stop(): void {
-    // No-op — AudioManager manages playback lifecycle
+    this.abortController?.abort();
+    this.abortController = undefined;
   }
 
   async getVoices(_lang?: string): Promise<TTSVoiceInfo[]> {

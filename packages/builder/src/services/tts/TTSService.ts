@@ -127,10 +127,13 @@ export class TTSService {
     this._isSpeaking = true;
     try {
       const result = await this.activeProvider.synthesize(text, voiceConfig);
+      const audioManager = getAudioManager();
 
-      // Cloud providers return an audio blob — play it through AudioManager
-      if (result.audio) {
-        const audioManager = getAudioManager();
+      if (result.response) {
+        // Streaming path — AudioManager decides MediaSource vs blob fallback
+        await audioManager.playStreamingAudio(result.response, voiceConfig.volume ?? 1.0);
+      } else if (result.audio) {
+        // Blob path (legacy or WebSpeech returns null for both)
         await audioManager.playSoundFromBlob(result.audio, voiceConfig.volume ?? 1.0);
       }
     } catch (error) {

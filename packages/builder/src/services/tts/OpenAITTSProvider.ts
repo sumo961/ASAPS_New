@@ -4,6 +4,9 @@
  * Cloud TTS using OpenAI's text-to-speech API.
  * Supports tts-1 (fast) and tts-1-hd (high quality) models.
  * All voices are multilingual — no language filtering needed.
+ *
+ * Returns raw Response for streaming playback (AudioManager decides
+ * whether to use MediaSource streaming or blob fallback).
  */
 
 import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../types/tts';
@@ -32,6 +35,8 @@ export class OpenAITTSProvider extends BaseTTSProvider {
   readonly name = 'OpenAI TTS';
   readonly requiresApiKey = true;
 
+  private abortController?: AbortController;
+
   async synthesize(text: string, voiceConfig?: TTSVoiceConfig): Promise<TTSSynthesisResult> {
     this.ensureReady();
 
@@ -41,31 +46,28 @@ export class OpenAITTSProvider extends BaseTTSProvider {
 
     const requestBody = { model, input: text, voice, speed, response_format: 'mp3' };
 
-    let audioBlob: Blob;
+    this.abortController = new AbortController();
+    const { signal } = this.abortController;
+
+    let response: Response;
 
     if (isElectron()) {
       // Electron: call OpenAI API directly (no CORS)
       const baseUrl = this.config!.baseUrl || 'https://api.openai.com/v1';
       const endpoint = `${baseUrl.replace(/\/$/, '')}/audio/speech`;
 
-      const response = await fetch(endpoint, {
+      response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.config!.apiKey}`,
         },
         body: JSON.stringify(requestBody),
+        signal,
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OpenAI TTS error ${response.status}: ${errorText}`);
-      }
-
-      audioBlob = await response.blob();
     } else {
       // Browser: go through Vite dev proxy
-      const response = await fetch('/api/tts/openai', {
+      response = await fetch('/api/tts/openai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -73,21 +75,22 @@ export class OpenAITTSProvider extends BaseTTSProvider {
           apiKey: this.config!.apiKey,
           ...requestBody,
         }),
+        signal,
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OpenAI TTS proxy error ${response.status}: ${errorText}`);
-      }
-
-      audioBlob = await response.blob();
     }
 
-    return { audio: audioBlob };
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI TTS error ${response.status}: ${errorText}`);
+    }
+
+    // Return raw response for streaming playback
+    return { audio: null, response };
   }
 
   stop(): void {
-    // No-op — AudioManager manages playback lifecycle
+    this.abortController?.abort();
+    this.abortController = undefined;
   }
 
   async getVoices(_lang?: string): Promise<TTSVoiceInfo[]> {

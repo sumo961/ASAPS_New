@@ -76,6 +76,9 @@ export interface TTSSynthesisResult {
   /** Audio blob for cloud providers, null for Web Speech API (plays directly) */
   audio: Blob | null;
 
+  /** Raw fetch Response for streaming playback (cloud providers) */
+  response?: Response;
+
   /** Estimated duration in milliseconds */
   durationMs?: number;
 }

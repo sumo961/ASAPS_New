@@ -229,48 +229,121 @@ export function viteAIProxyPlugin(): Plugin {
           }
 
           if (req.url === '/api/tts/openai') {
-            // OpenAI TTS — returns binary audio/mpeg
+            // OpenAI TTS — stream audio chunks directly to client
             const effectiveBaseUrl = (baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
             const endpoint = `${effectiveBaseUrl}/audio/speech`;
+            const bodyStr = JSON.stringify(requestBody);
 
-            console.log(`[Vite TTS Proxy] OpenAI TTS → ${endpoint}`);
+            console.log(`[Vite TTS Proxy] OpenAI TTS (streaming) → ${endpoint}`);
 
-            const result = await nativeBinaryRequest(endpoint, 'POST', {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`,
-            }, JSON.stringify(requestBody));
+            const url = new URL(endpoint);
+            const isHttps = url.protocol === 'https:';
+            const requestFn = isHttps ? httpsRequest : httpRequest;
 
-            if (result.status !== 200) {
-              console.error(`[Vite TTS Proxy] OpenAI TTS error: ${result.status}`);
-              res.writeHead(result.status, { 'Content-Type': 'application/json' });
-              res.end(result.buffer.toString('utf-8'));
-              return;
-            }
+            const upstream = requestFn(
+              {
+                hostname: url.hostname,
+                port: url.port || (isHttps ? 443 : 80),
+                path: url.pathname + url.search,
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${apiKey}`,
+                  'Content-Length': Buffer.byteLength(bodyStr),
+                },
+              },
+              (upstreamRes: IncomingMessage) => {
+                const status = upstreamRes.statusCode || 500;
+                if (status !== 200) {
+                  // Error: buffer and forward
+                  const chunks: Buffer[] = [];
+                  upstreamRes.on('data', (chunk: Buffer) => chunks.push(chunk));
+                  upstreamRes.on('end', () => {
+                    console.error(`[Vite TTS Proxy] OpenAI TTS error: ${status}`);
+                    res.writeHead(status, { 'Content-Type': 'application/json' });
+                    res.end(Buffer.concat(chunks).toString('utf-8'));
+                  });
+                  return;
+                }
+                // Stream audio chunks directly to client
+                res.writeHead(200, {
+                  'Content-Type': upstreamRes.headers['content-type'] || 'audio/mpeg',
+                  'Transfer-Encoding': 'chunked',
+                });
+                upstreamRes.pipe(res);
+              }
+            );
 
-            res.writeHead(200, { 'Content-Type': 'audio/mpeg' });
-            res.end(result.buffer);
+            upstream.on('error', (err) => {
+              console.error('[Vite TTS Proxy] OpenAI TTS upstream error:', err);
+              if (!res.headersSent) {
+                res.writeHead(502, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Upstream request failed', message: err.message }));
+              }
+            });
+            upstream.setTimeout(TTS_TIMEOUT_MS, () => {
+              upstream.destroy(new Error('Request timeout'));
+            });
+            upstream.write(bodyStr);
+            upstream.end();
+            return; // Don't fall through
 
           } else if (req.url === '/api/tts/elevenlabs') {
-            // ElevenLabs TTS — returns binary audio/mpeg
+            // ElevenLabs TTS — stream audio chunks directly to client
             const vid = voiceId || 'EXAVITQu4vr4xnSDxMaL';
             const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${vid}`;
+            const bodyStr = JSON.stringify(requestBody);
 
-            console.log(`[Vite TTS Proxy] ElevenLabs TTS → ${endpoint}`);
+            console.log(`[Vite TTS Proxy] ElevenLabs TTS (streaming) → ${endpoint}`);
 
-            const result = await nativeBinaryRequest(endpoint, 'POST', {
-              'Content-Type': 'application/json',
-              'xi-api-key': apiKey,
-            }, JSON.stringify(requestBody));
+            const url = new URL(endpoint);
+            const upstream = httpsRequest(
+              {
+                hostname: url.hostname,
+                port: 443,
+                path: url.pathname + url.search,
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'xi-api-key': apiKey,
+                  'Content-Length': Buffer.byteLength(bodyStr),
+                },
+              },
+              (upstreamRes: IncomingMessage) => {
+                const status = upstreamRes.statusCode || 500;
+                if (status !== 200) {
+                  // Error: buffer and forward
+                  const chunks: Buffer[] = [];
+                  upstreamRes.on('data', (chunk: Buffer) => chunks.push(chunk));
+                  upstreamRes.on('end', () => {
+                    console.error(`[Vite TTS Proxy] ElevenLabs TTS error: ${status}`);
+                    res.writeHead(status, { 'Content-Type': 'application/json' });
+                    res.end(Buffer.concat(chunks).toString('utf-8'));
+                  });
+                  return;
+                }
+                // Stream audio chunks directly to client
+                res.writeHead(200, {
+                  'Content-Type': upstreamRes.headers['content-type'] || 'audio/mpeg',
+                  'Transfer-Encoding': 'chunked',
+                });
+                upstreamRes.pipe(res);
+              }
+            );
 
-            if (result.status !== 200) {
-              console.error(`[Vite TTS Proxy] ElevenLabs TTS error: ${result.status}`);
-              res.writeHead(result.status, { 'Content-Type': 'application/json' });
-              res.end(result.buffer.toString('utf-8'));
-              return;
-            }
-
-            res.writeHead(200, { 'Content-Type': 'audio/mpeg' });
-            res.end(result.buffer);
+            upstream.on('error', (err) => {
+              console.error('[Vite TTS Proxy] ElevenLabs TTS upstream error:', err);
+              if (!res.headersSent) {
+                res.writeHead(502, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Upstream request failed', message: err.message }));
+              }
+            });
+            upstream.setTimeout(TTS_TIMEOUT_MS, () => {
+              upstream.destroy(new Error('Request timeout'));
+            });
+            upstream.write(bodyStr);
+            upstream.end();
+            return; // Don't fall through
 
           } else if (req.url === '/api/tts/elevenlabs/voices') {
             // ElevenLabs voices list — returns JSON

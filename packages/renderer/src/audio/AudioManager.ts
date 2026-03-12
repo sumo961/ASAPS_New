@@ -33,6 +33,11 @@ export class AudioManager {
   private currentClusterSound: TrackedSound | null = null;
   private currentClusterId: string | null = null;
 
+  // Streaming TTS playback state
+  private streamingAudioElement: HTMLAudioElement | null = null;
+  private streamingReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  private streamingObjectUrl: string | null = null;
+
   constructor(options: AudioManagerOptions = {}) {
     this.masterVolume = options.masterVolume ?? 0.7;
     this.shouldPreloadSounds = options.preloadSounds ?? true;
@@ -371,9 +376,168 @@ export class AudioManager {
   }
 
   /**
+   * Play audio from a streaming Response.
+   * Uses MediaSource API for progressive playback on supported browsers (Chrome/Edge/Electron).
+   * Falls back to blob-based playback on Firefox/Safari.
+   */
+  async playStreamingAudio(response: Response, volume: number = 1.0): Promise<void> {
+    if (this.muted) return;
+
+    // Check MediaSource + audio/mpeg support (Chrome/Edge/Electron have it, Firefox/Safari don't)
+    if (typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('audio/mpeg')) {
+      return this.playWithMediaSource(response, volume);
+    }
+
+    // Fallback: collect full blob and play via existing path
+    console.log('[AudioManager] MediaSource not supported for audio/mpeg, falling back to blob playback');
+    const blob = await response.blob();
+    return this.playSoundFromBlob(blob, volume);
+  }
+
+  /**
+   * Stream audio chunks via MediaSource API for low-latency playback.
+   * Creates an <audio> element fed by a MediaSource SourceBuffer.
+   */
+  private playWithMediaSource(response: Response, volume: number): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      // Clean up any previous streaming playback
+      this.stopStreamingAudio();
+
+      const mediaSource = new MediaSource();
+      const audio = document.createElement('audio');
+      const objectUrl = URL.createObjectURL(mediaSource);
+
+      audio.src = objectUrl;
+      audio.volume = Math.max(0, Math.min(1, volume)) * this.masterVolume;
+
+      this.streamingAudioElement = audio;
+      this.streamingObjectUrl = objectUrl;
+
+      audio.addEventListener('ended', () => {
+        this.stopStreamingAudio();
+        resolve();
+      }, { once: true });
+
+      audio.addEventListener('error', () => {
+        const err = audio.error;
+        this.stopStreamingAudio();
+        reject(new Error(`Audio playback error: ${err?.message || 'unknown'}`));
+      }, { once: true });
+
+      mediaSource.addEventListener('sourceopen', async () => {
+        let sourceBuffer: SourceBuffer;
+        try {
+          sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
+        } catch (e) {
+          this.stopStreamingAudio();
+          // Fallback: collect response as blob
+          console.warn('[AudioManager] Failed to add SourceBuffer, falling back to blob');
+          try {
+            const blob = await response.blob();
+            await this.playSoundFromBlob(blob, volume);
+            resolve();
+          } catch (fallbackErr) {
+            reject(fallbackErr);
+          }
+          return;
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          this.stopStreamingAudio();
+          reject(new Error('Response body is not readable'));
+          return;
+        }
+
+        this.streamingReader = reader;
+        let started = false;
+
+        const appendChunk = (chunk: Uint8Array): Promise<void> => {
+          return new Promise<void>((res, rej) => {
+            if (mediaSource.readyState !== 'open') {
+              res();
+              return;
+            }
+            try {
+              // Cast needed: ReadableStream yields Uint8Array<ArrayBufferLike> but
+              // SourceBuffer.appendBuffer expects BufferSource (ArrayBuffer-backed).
+              // Stream chunks from fetch are always ArrayBuffer-backed in practice.
+              sourceBuffer.appendBuffer(chunk as unknown as ArrayBuffer);
+            } catch (e) {
+              rej(e);
+              return;
+            }
+            sourceBuffer.addEventListener('updateend', () => res(), { once: true });
+            sourceBuffer.addEventListener('error', () => rej(new Error('SourceBuffer error')), { once: true });
+          });
+        };
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            await appendChunk(value);
+
+            // Start playback after first chunk is buffered
+            if (!started) {
+              started = true;
+              audio.play().catch(() => {
+                // Autoplay may be blocked — user gesture required
+                console.warn('[AudioManager] Autoplay blocked for streaming audio');
+              });
+              console.log('[AudioManager] Streaming playback started');
+            }
+          }
+
+          // Signal end of stream
+          if (mediaSource.readyState === 'open') {
+            mediaSource.endOfStream();
+          }
+        } catch (error) {
+          // AbortError is expected when stop() is called
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return;
+          }
+          // Reader cancellation during stop
+          if (error instanceof TypeError && String(error.message).includes('cancel')) {
+            return;
+          }
+          console.error('[AudioManager] Streaming error:', error);
+          this.stopStreamingAudio();
+          reject(error);
+        }
+      }, { once: true });
+    });
+  }
+
+  /**
+   * Clean up streaming audio resources
+   */
+  private stopStreamingAudio(): void {
+    if (this.streamingReader) {
+      try { this.streamingReader.cancel(); } catch { /* ignore */ }
+      this.streamingReader = null;
+    }
+    if (this.streamingAudioElement) {
+      this.streamingAudioElement.pause();
+      this.streamingAudioElement.removeAttribute('src');
+      this.streamingAudioElement.load(); // Release media resources
+      this.streamingAudioElement = null;
+    }
+    if (this.streamingObjectUrl) {
+      URL.revokeObjectURL(this.streamingObjectUrl);
+      this.streamingObjectUrl = null;
+    }
+  }
+
+  /**
    * Stop all currently playing sounds
    */
   stopAllSounds(): void {
+    // Stop streaming TTS playback
+    this.stopStreamingAudio();
+
     this.activeSourceNodes.forEach(source => {
       try {
         source.stop();
@@ -691,6 +855,7 @@ export class AudioManager {
    */
   dispose(): void {
     this.stopAllSounds();
+    this.stopStreamingAudio();
     this.soundBuffers.clear();
 
     if (this.audioContext) {

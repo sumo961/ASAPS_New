@@ -3,6 +3,9 @@
  *
  * Cloud TTS using ElevenLabs' text-to-speech API.
  * Supports dynamic voice fetching and high-quality multilingual synthesis.
+ *
+ * Returns raw Response for streaming playback (AudioManager decides
+ * whether to use MediaSource streaming or blob fallback).
  */
 
 import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../types/tts';
@@ -18,6 +21,7 @@ export class ElevenLabsProvider extends BaseTTSProvider {
   readonly requiresApiKey = true;
 
   private cachedVoices: TTSVoiceInfo[] | null = null;
+  private abortController?: AbortController;
 
   async synthesize(text: string, voiceConfig?: TTSVoiceConfig): Promise<TTSSynthesisResult> {
     this.ensureReady();
@@ -27,28 +31,25 @@ export class ElevenLabsProvider extends BaseTTSProvider {
 
     const requestBody = { text, model_id: modelId };
 
-    let audioBlob: Blob;
+    this.abortController = new AbortController();
+    const { signal } = this.abortController;
+
+    let response: Response;
 
     if (isElectron()) {
       // Electron: call ElevenLabs API directly
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'xi-api-key': this.config!.apiKey!,
         },
         body: JSON.stringify(requestBody),
+        signal,
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`ElevenLabs error ${response.status}: ${errorText}`);
-      }
-
-      audioBlob = await response.blob();
     } else {
       // Browser: go through Vite dev proxy
-      const response = await fetch('/api/tts/elevenlabs', {
+      response = await fetch('/api/tts/elevenlabs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -56,21 +57,22 @@ export class ElevenLabsProvider extends BaseTTSProvider {
           voiceId,
           ...requestBody,
         }),
+        signal,
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`ElevenLabs proxy error ${response.status}: ${errorText}`);
-      }
-
-      audioBlob = await response.blob();
     }
 
-    return { audio: audioBlob };
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`ElevenLabs error ${response.status}: ${errorText}`);
+    }
+
+    // Return raw response for streaming playback
+    return { audio: null, response };
   }
 
   stop(): void {
-    // No-op — AudioManager manages playback lifecycle
+    this.abortController?.abort();
+    this.abortController = undefined;
   }
 
   async getVoices(_lang?: string): Promise<TTSVoiceInfo[]> {
