@@ -235,6 +235,33 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
     const isRequired = paramDef.required ?? false;
     const label = paramName.charAt(0).toUpperCase() + paramName.slice(1).replace(/([A-Z])/g, ' $1');
 
+    // Speaker visibility - tri-state select (default / show / hide)
+    // Checked before the type switch since showSpeaker is type "boolean" but needs custom rendering
+    if (paramDef.ui?.control === 'speaker-visibility') {
+      return (
+        <div key={paramName}>
+          <label className="block text-sm font-medium text-gray-600 mb-1">
+            {paramDef.ui.label || label}
+          </label>
+          <select
+            value={value == null ? 'default' : value ? 'show' : 'hide'}
+            onChange={(e) => {
+              const val = e.target.value;
+              handleChange(val === 'default' ? undefined : val === 'show');
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            <option value="default">Default (use global setting)</option>
+            <option value="show">Always show</option>
+            <option value="hide">Always hide</option>
+          </select>
+          {paramDef.description && (
+            <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+          )}
+        </div>
+      );
+    }
+
     // Determine field type based on parameter type
     switch (paramDef.type) {
       case 'string':
@@ -379,32 +406,6 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   placeholder="Enter speaker name..."
                   className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
                 />
-              )}
-            </div>
-          );
-        }
-
-        // Speaker visibility - tri-state select (default / show / hide)
-        if (paramDef.ui?.control === 'speaker-visibility') {
-          return (
-            <div key={paramName}>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-                {paramDef.ui.label || label}
-              </label>
-              <select
-                value={value == null ? 'default' : value ? 'show' : 'hide'}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  handleChange(val === 'default' ? undefined : val === 'show');
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              >
-                <option value="default">Default (use global setting)</option>
-                <option value="show">Always show</option>
-                <option value="hide">Always hide</option>
-              </select>
-              {paramDef.description && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
               )}
             </div>
           );

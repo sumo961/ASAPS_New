@@ -928,6 +928,14 @@ export const Inspector: React.FC<InspectorProps> = ({
         sourceParametersRef.current = {};
       }
 
+      // Auto-enable showSpeaker for beats with a non-default speaker assigned
+      if (beatData.speaker && beatData.showSpeaker == null) {
+        beatData.showSpeaker = true;
+        if (onUpdate && beat) {
+          onUpdate(beat.id, { showSpeaker: true });
+        }
+      }
+
       setLocalBeat(beatData);
       setHasChanges(false);
       setValidationErrors([]);
@@ -1470,6 +1478,27 @@ export const Inspector: React.FC<InspectorProps> = ({
                     onBeatPropertyChange={handleChange}
                   />
                 )}
+
+                {/* Speaker group for beat types excluded from full SchemaFormGenerator */}
+                {['dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'keypad', 'panorama'].includes(beat.type) && (() => {
+                  const def = getBeatDefinition(beat.type);
+                  if (!def) return null;
+                  const speakerParams = Object.fromEntries(
+                    Object.entries(def.parameters).filter(([, p]) => (p as any).ui?.group === 'Speaker')
+                  );
+                  if (Object.keys(speakerParams).length === 0) return null;
+                  return (
+                    <SchemaFormGenerator
+                      beatType={beat.type}
+                      beatDefinition={{ ...def, parameters: speakerParams }}
+                      parameters={localBeat.parameters}
+                      onParameterChange={handleParameterChange}
+                      characters={getAvailableCharacters()}
+                      beatProperties={localBeat}
+                      onBeatPropertyChange={handleChange}
+                    />
+                  );
+                })()}
 
                 {/* Condition Beat */}
                 {getCanonicalBeatType(beat.type) === 'conditionBeat' && (
@@ -3406,34 +3435,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </div>
                 )}
 
-                {/* Speaker Section - for dialogTree only (other visible beats use schema-driven Speaker group) */}
-                {getCanonicalBeatType(beat.type) === 'dialogTree' && (
-                  <div className="border-t pt-3 mt-3">
-                    <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Speaker</span>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">
-                          Show Speaker Name
-                        </label>
-                        <select
-                          value={localBeat.showSpeaker == null ? 'default' : localBeat.showSpeaker ? 'show' : 'hide'}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            handleChange('showSpeaker', val === 'default' ? undefined : val === 'show');
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        >
-                          <option value="default">Default (use global setting)</option>
-                          <option value="show">Always show</option>
-                          <option value="hide">Always hide</option>
-                        </select>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Displays per-node speaker names as labels during dialog.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Notes Section - Collapsible */}
                 <div className="border-t pt-4">
