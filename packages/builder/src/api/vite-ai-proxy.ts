@@ -220,7 +220,7 @@ export function viteAIProxyPlugin(): Plugin {
         try {
           const body = await readBody(req);
           const parsed = JSON.parse(body);
-          const { apiKey, baseUrl, voiceId, ...requestBody } = parsed;
+          const { apiKey, baseUrl, voiceId, streamUrl: clientStreamUrl, ...requestBody } = parsed;
 
           if (!apiKey) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -291,7 +291,8 @@ export function viteAIProxyPlugin(): Plugin {
           } else if (req.url === '/api/tts/elevenlabs') {
             // ElevenLabs TTS — stream audio chunks directly to client
             const vid = voiceId || 'EXAVITQu4vr4xnSDxMaL';
-            const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${vid}`;
+            // Use streaming endpoint (client provides URL with appropriate latency params)
+            const endpoint = clientStreamUrl || `https://api.elevenlabs.io/v1/text-to-speech/${vid}/stream`;
             const bodyStr = JSON.stringify(requestBody);
 
             console.log(`[Vite TTS Proxy] ElevenLabs TTS (streaming) → ${endpoint}`);

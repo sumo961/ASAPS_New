@@ -54,10 +54,12 @@ const PROVIDER_PRESETS: Record<TTSProviderTab, ProviderPreset> = {
     apiKeyPlaceholder: 'Enter your ElevenLabs API key',
     apiKeyHelp: 'Get your API key from elevenlabs.io',
     models: [
+      { id: 'eleven_v3', name: 'Eleven v3 (expressive)' },
       { id: 'eleven_multilingual_v2', name: 'Multilingual v2' },
-      { id: 'eleven_turbo_v2_5', name: 'Turbo v2.5 (fast)' },
+      { id: 'eleven_flash_v2_5', name: 'Flash v2.5 (fast, low-cost)' },
+      { id: 'eleven_turbo_v2_5', name: 'Turbo v2.5' },
     ],
-    defaultModel: 'eleven_multilingual_v2',
+    defaultModel: 'eleven_v3',
   },
   custom: {
     name: 'Custom Server',

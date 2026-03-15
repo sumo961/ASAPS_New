@@ -27,18 +27,24 @@ export class ElevenLabsProvider extends BaseTTSProvider {
     this.ensureReady();
 
     const voiceId = voiceConfig?.voiceId || 'EXAVITQu4vr4xnSDxMaL'; // "Sarah" default
-    const modelId = this.config!.model || 'eleven_multilingual_v2';
+    const modelId = this.config!.model || 'eleven_v3';
 
     const requestBody = { text, model_id: modelId };
 
     this.abortController = new AbortController();
     const { signal } = this.abortController;
 
+    // Use streaming endpoint for faster time-to-first-audio
+    // optimize_streaming_latency is not supported by eleven_v3
+    const supportsLatencyOpt = !modelId.startsWith('eleven_v3');
+    const latencyParam = supportsLatencyOpt ? '?optimize_streaming_latency=3' : '';
+    const streamUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream${latencyParam}`;
+
     let response: Response;
 
     if (isElectron()) {
       // Electron: call ElevenLabs API directly
-      response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      response = await fetch(streamUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -55,6 +61,7 @@ export class ElevenLabsProvider extends BaseTTSProvider {
         body: JSON.stringify({
           apiKey: this.config!.apiKey,
           voiceId,
+          streamUrl,
           ...requestBody,
         }),
         signal,
@@ -82,12 +89,17 @@ export class ElevenLabsProvider extends BaseTTSProvider {
 
     try {
       let data: any;
+      const apiKey = this.config!.apiKey;
+      console.log(`[ElevenLabs] Fetching voices, apiKey present: ${!!apiKey}, length: ${apiKey?.length || 0}, isElectron: ${isElectron()}`);
 
       if (isElectron()) {
         const response = await fetch('https://api.elevenlabs.io/v1/voices', {
-          headers: { 'xi-api-key': this.config!.apiKey! },
+          headers: { 'xi-api-key': apiKey! },
         });
-        if (!response.ok) throw new Error(`ElevenLabs voices error ${response.status}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`ElevenLabs voices error ${response.status}: ${errorText}`);
+        }
         data = await response.json();
       } else {
         const response = await fetch('/api/tts/elevenlabs/voices', {
