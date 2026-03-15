@@ -504,16 +504,14 @@ export class HybridStorageAdapter implements IStorageAdapter {
     // Read existing manifest or create new one
     const manifestPath = [assetsDir, '_manifest.json'].join(sep);
     let manifest: DirectoryAssetManifest;
-    try {
-      const manifestExists = await api.fs.exists(manifestPath);
-      if (manifestExists) {
-        const raw = await api.fs.readFile(manifestPath);
-        const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
-        manifest = parseManifest(text);
-      } else {
-        manifest = createEmptyManifest();
-      }
-    } catch {
+    const manifestExists = await api.fs.exists(manifestPath);
+    if (manifestExists) {
+      // Read existing manifest — do NOT silently create an empty one on failure,
+      // as that would overwrite the entire manifest and lose all existing assets.
+      const raw = await api.fs.readFile(manifestPath);
+      const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+      manifest = parseManifest(text);
+    } else {
       manifest = createEmptyManifest();
     }
 

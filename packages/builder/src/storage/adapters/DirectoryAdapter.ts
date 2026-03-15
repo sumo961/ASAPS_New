@@ -174,6 +174,24 @@ export class DirectoryAdapter implements PersistenceAdapter {
         continue;
       }
 
+      // Asset manifest: MERGE new entries into existing manifest instead of replacing.
+      // serializeToDirectory only includes newly-added assets, so a naive overwrite
+      // would delete all previously-saved assets from the manifest.
+      if (file.path === 'assets/_manifest.json' && assets && assets.length > 0) {
+        const reader = this.createReader();
+        if (await reader.exists(fullPath)) {
+          const existingManifest = parseManifest(await reader.readText(fullPath));
+          const newManifest = parseManifest(file.content);
+          // Merge: add new entries to existing manifest
+          for (const [id, entry] of Object.entries(newManifest.assets)) {
+            setManifestEntry(existingManifest, entry);
+          }
+          await api.fs.mkdir(parentDir(fullPath));
+          await api.fs.writeFile(fullPath, serializeManifest(existingManifest));
+          continue;
+        }
+      }
+
       // Ensure parent directory exists
       await api.fs.mkdir(parentDir(fullPath));
       await api.fs.writeFile(fullPath, file.content);
