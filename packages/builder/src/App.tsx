@@ -4956,6 +4956,19 @@ function App() {
         playerCharacterName={playerCharacterName}
         speakerVoices={globalSettings?.tts?.speakerVoices?.[getActiveProviderKey()] ?? {}}
         onSpeakerVoiceChange={handleSpeakerVoiceChange}
+        onTTSProviderChanged={(provider, model, baseUrl) => {
+          setGlobalSettings(prev => ({
+            ...prev,
+            tts: {
+              ...prev.tts,
+              provider: provider as any,
+              providerType: provider as any,
+              model,
+              baseUrl,
+            },
+          }));
+          markChanged();
+        }}
       />
 
       <div className="flex flex-1 overflow-hidden">

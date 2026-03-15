@@ -64,6 +64,7 @@ interface HeaderProps {
   playerCharacterName?: string;
   speakerVoices?: Record<string, string>;
   onSpeakerVoiceChange?: (speaker: string, voiceId: string) => void;
+  onTTSProviderChanged?: (provider: string, model?: string, baseUrl?: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -105,6 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
   playerCharacterName,
   speakerVoices = {},
   onSpeakerVoiceChange,
+  onTTSProviderChanged,
 }) => {
   const { status, lastSaved, error: saveError, markChanged } = useSave();
   const { load } = useProject();
@@ -824,7 +826,10 @@ export const Header: React.FC<HeaderProps> = ({
       <TTSConfigDialog
         isOpen={showTTSConfig}
         onClose={() => setShowTTSConfig(false)}
-        onConfigure={configureTTS}
+        onConfigure={(providerType, apiKey, model, baseUrl, defaultVoiceId) => {
+          configureTTS(providerType, apiKey, model, baseUrl, defaultVoiceId);
+          onTTSProviderChanged?.(providerType, model, baseUrl);
+        }}
         ttsEnabled={ttsEnabled}
         onToggleTTS={(enabled) => {
           setTtsEnabled(enabled);
