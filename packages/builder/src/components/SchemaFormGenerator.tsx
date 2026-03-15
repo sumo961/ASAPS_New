@@ -56,6 +56,7 @@ interface SchemaFormGeneratorProps {
   onParameterChange: (param: string, value: any) => void;
   availableTargets?: Beat[];
   characters?: any[];
+  playerCharacterName?: string;
   // Available counters and variables for dropdowns
   availableCounters?: AvailableCounter[];
   availableVariables?: AvailableVariable[];
@@ -200,6 +201,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   onParameterChange,
   availableTargets = [],
   characters = [],
+  playerCharacterName,
   availableCounters = [],
   availableVariables = [],
   customRenderers = {},
@@ -353,16 +355,19 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           );
         }
 
-        // Speaker control - dropdown populated from characters + Narrator + Custom
+        // Speaker control - dropdown populated from characters + Narrator + Player Character + Custom
         if (paramDef.ui?.control === 'speaker') {
+          const playerSpeakerValue = playerCharacterName || 'Interactor';
+          const playerSpeakerLabel = playerCharacterName ? `${playerCharacterName} (Player)` : 'Interactor';
           const speakerOptions: { value: string; label: string }[] = [
             { value: '', label: '(Default — Narrator)' },
             { value: 'Narrator', label: 'Narrator' },
+            { value: playerSpeakerValue, label: playerSpeakerLabel },
           ];
           if (characters) {
             for (const char of characters) {
               const name = typeof char === 'string' ? char : (char.displayName || char.name || char.id);
-              if (name && name !== 'Narrator' && name !== 'NPC' && !speakerOptions.some(o => o.value === name)) {
+              if (name && name !== 'Narrator' && name !== 'NPC' && name !== playerSpeakerValue && !speakerOptions.some(o => o.value === name)) {
                 speakerOptions.push({ value: name, label: name });
               }
             }

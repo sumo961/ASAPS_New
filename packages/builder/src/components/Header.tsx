@@ -61,6 +61,7 @@ interface HeaderProps {
   onCurrentProjectDeleted?: () => void;
   triggerNewProject?: number;
   speakers?: string[];
+  playerCharacterName?: string;
   speakerVoices?: Record<string, string>;
   onSpeakerVoiceChange?: (speaker: string, voiceId: string) => void;
 }
@@ -101,6 +102,7 @@ export const Header: React.FC<HeaderProps> = ({
   onCurrentProjectDeleted,
   triggerNewProject,
   speakers = [],
+  playerCharacterName,
   speakerVoices = {},
   onSpeakerVoiceChange,
 }) => {
@@ -634,30 +636,36 @@ export const Header: React.FC<HeaderProps> = ({
                       <div className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         Character Voices{activeProviderName ? ` (${activeProviderName})` : ''}
                       </div>
-                      {speakers.map(speaker => (
-                        <div key={speaker} className="px-4 py-1.5 flex items-center justify-between gap-2">
-                          <span className="text-sm text-gray-700 truncate flex-shrink-0" style={{ maxWidth: '35%' }}>
-                            {speaker}
-                          </span>
-                          <select
-                            value={speakerVoices[speaker] || ''}
-                            onChange={(e) => onSpeakerVoiceChange?.(speaker, e.target.value)}
-                            className="flex-1 text-xs px-2 py-1 border rounded bg-white min-w-0"
-                          >
-                            <option value="">Auto</option>
-                            {availableVoices.map(v => (
-                              <option key={v.id} value={v.id}>{v.name}</option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => getTTSService().speak(`Hello, I am ${speaker}.`, speaker)}
-                            className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex-shrink-0"
-                            title={`Test ${speaker}'s voice`}
-                          >
-                            Test
-                          </button>
-                        </div>
-                      ))}
+                      {speakers.map(speaker => {
+                        const isPlayerCharacter = speaker === 'Interactor' || (playerCharacterName && speaker === playerCharacterName);
+                        const displayName = isPlayerCharacter
+                          ? (playerCharacterName ? `${playerCharacterName} (Player)` : 'Interactor')
+                          : speaker;
+                        return (
+                          <div key={speaker} className="px-4 py-1.5 flex items-center justify-between gap-2">
+                            <span className="text-sm text-gray-700 truncate flex-shrink-0" style={{ maxWidth: '35%' }}>
+                              {displayName}
+                            </span>
+                            <select
+                              value={speakerVoices[speaker] || ''}
+                              onChange={(e) => onSpeakerVoiceChange?.(speaker, e.target.value)}
+                              className="flex-1 text-xs px-2 py-1 border rounded bg-white min-w-0"
+                            >
+                              <option value="">{isPlayerCharacter ? 'Silent' : 'Auto'}</option>
+                              {availableVoices.map(v => (
+                                <option key={v.id} value={v.id}>{v.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => getTTSService().speak(`Hello, I am ${displayName}.`, speaker)}
+                              className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex-shrink-0"
+                              title={`Test ${displayName}'s voice`}
+                            >
+                              Test
+                            </button>
+                          </div>
+                        );
+                      })}
                     </>
                   )}
                 </div>

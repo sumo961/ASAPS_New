@@ -79,6 +79,9 @@ export function extractTranslatableStrings(projectData: any): Record<string, str
       if (characters[i].name) {
         strings[`${P}.characters.${i}.name`] = characters[i].name;
       }
+      if (characters[i].displayName) {
+        strings[`${P}.characters.${i}.displayName`] = characters[i].displayName;
+      }
       // Counter display names (NOT counter.name — that's an internal identifier)
       const counters = characters[i].counters;
       if (Array.isArray(counters)) {
@@ -1090,6 +1093,26 @@ export function createManualTranslationResource(
   }
 
   return resource;
+}
+
+/**
+ * Extract translated character displayNames from a translation resource.
+ * Returns a map of character index → translated displayName.
+ */
+export function extractCharacterDisplayNameTranslations(
+  resource: TranslationResource
+): Map<number, string> {
+  const result = new Map<number, string>();
+  // Match only direct displayName keys: project.story.characters.{N}.displayName
+  // NOT nested ones like project.story.characters.0.counters.0.displayName
+  const pattern = /^project\.story\.characters\.(\d+)\.displayName$/;
+  for (const [key, entry] of Object.entries(resource.strings)) {
+    const match = key.match(pattern);
+    if (match && entry.status !== 'untranslated') {
+      result.set(parseInt(match[1], 10), entry.value);
+    }
+  }
+  return result;
 }
 
 /**

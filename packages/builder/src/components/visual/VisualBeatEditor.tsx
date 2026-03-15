@@ -37,7 +37,8 @@ import {
   type ChatMessage,
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
-import { resolvePortraitUrl, shouldShowSpeaker } from '../../utils/speakerUtils';
+import { resolvePortraitUrl, shouldShowSpeaker, resolveTranslatedSpeakerName } from '../../utils/speakerUtils';
+import { useTranslationState } from '../../contexts/TranslationContext';
 import { yawPitchToStage, stageToYawPitch, viewportSizeOnStage } from '../../utils/panoramaCoordinates';
 import {
   alignLeft, alignRight, alignTop, alignBottom,
@@ -313,6 +314,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     return resolvePortraitUrl(beatContent.speaker, characters, assets);
   }, [effectiveShowSpeaker, effectiveShowGraphics, beatContent?.speaker, characters, assets]);
 
+  // Resolve translated speaker name when a translation language is active
+  const translationState = useTranslationState();
+  const resolvedSpeakerName = React.useMemo(() => {
+    const raw = beatContent?.speaker;
+    if (!raw) return raw;
+    return resolveTranslatedSpeakerName(raw, characters, translationState.activeLanguage);
+  }, [beatContent?.speaker, characters, translationState.activeLanguage]);
 
 
   // Get stage background color from global settings (used when no background image is set)
@@ -1256,7 +1264,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         // Build preview messages from beat content
                         const msgs: ChatMessage[] = [];
                         const dialogElement = elements.find(el => el.type === 'dialog' || (el.type === 'text' && el.name?.toLowerCase().includes('dialog')));
-                        const speakerName = beatContent?.speaker || 'Character';
+                        const speakerName = resolvedSpeakerName || 'Character';
                         if (dialogElement?.text || beatContent?.text) {
                           msgs.push({
                             id: 'preview-1',
@@ -1319,7 +1327,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         elements={overlayElements}
                         interactive={false}
                         editorMode={true}
-                        speakerName={effectiveShowSpeaker && beatContent?.speaker ? beatContent.speaker : undefined}
+                        speakerName={effectiveShowSpeaker && beatContent?.speaker ? resolvedSpeakerName : undefined}
                         speakerPortraitUrl={speakerPortraitUrl}
                         theme={globalSettings ? (() => {
                           const baseTheme = convertGlobalSettingsToTheme(globalSettings);
@@ -1350,7 +1358,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   editorMode={true}
                   beatType={beatType}
                   onLayoutComputed={handleLayoutComputed}
-                  speakerName={effectiveShowSpeaker && beatContent?.speaker ? beatContent.speaker : undefined}
+                  speakerName={effectiveShowSpeaker && beatContent?.speaker ? resolvedSpeakerName : undefined}
                   speakerPortraitUrl={speakerPortraitUrl}
                   theme={globalSettings ? (() => {
                     const baseTheme = convertGlobalSettingsToTheme(globalSettings);

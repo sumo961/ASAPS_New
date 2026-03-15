@@ -1131,10 +1131,19 @@ export const PreviewWindow: React.FC = () => {
       ttsService.setEnabled(ttsEnabled);
 
       // Wire TTS callbacks to renderer
+      // Determine the player character's speaker key (their displayName, or 'Interactor' fallback)
+      const playerChar = previewData.characters?.find(c => c.role === 'player');
+      const playerSpeakerKey = playerChar ? (playerChar.displayName || playerChar.name) : 'Interactor';
+
       reactRenderer.setTTSSpeakCallback((text, speaker, isPrompt) => {
         const svc = getTTSService();
         console.log(`[PreviewWindow] TTS callback fired: speaker="${speaker}", isPrompt=${isPrompt}, enabled=${svc.isEnabled()}, text="${text.substring(0, 50)}..."`);
         if (!svc.isEnabled()) return;
+        // Player character is silent by default — skip TTS unless a voice is explicitly assigned
+        if ((speaker === playerSpeakerKey || speaker === 'Interactor') && !svc.getSpeakerVoice(playerSpeakerKey)?.voiceId) {
+          console.log(`[PreviewWindow] Skipping TTS for player character "${speaker}" (no voice assigned)`);
+          return;
+        }
         if (isPrompt) {
           svc.speakPrompt(text, speaker);
         } else {
@@ -1142,6 +1151,29 @@ export const PreviewWindow: React.FC = () => {
         }
       });
       reactRenderer.setTTSStopCallback(() => getTTSService().stop());
+
+      // Resolve speaker names to translated display names when a language is active
+      if (previewData.activeLanguage && previewData.characters?.length) {
+        const lang = previewData.activeLanguage;
+        const chars = previewData.characters;
+        reactRenderer.setSpeakerNameResolver((speaker: string) => {
+          const lowerSpeaker = speaker.toLowerCase();
+          const char = chars.find(
+            (c: any) => c.displayName?.toLowerCase() === lowerSpeaker || c.name?.toLowerCase() === lowerSpeaker
+          );
+          return char?.translations?.[lang]?.displayName || speaker;
+        });
+      }
+
+      // Speak clicked choice text with player character voice when enabled
+      reactRenderer.setTTSChoiceSpeakCallback((text: string) => {
+        const svc = getTTSService();
+        if (!svc.isEnabled()) return;
+        const voice = svc.getSpeakerVoice(playerSpeakerKey);
+        if (!voice?.voiceId) return;
+        console.log(`[PreviewWindow] Speaking choice text as player character: "${text.substring(0, 50)}..."`);
+        svc.speak(text, playerSpeakerKey);
+      });
 
       const engine = new StoryEngine(reactRenderer as any);
       rendererRef.current = reactRenderer;

@@ -25,10 +25,12 @@ import {
   BarChart3,
   ArrowLeftRight,
   ArrowUpDown,
-  Hash
+  Hash,
+  Globe
 } from 'lucide-react';
 import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG, InventoryFrameConfig, DEFAULT_INVENTORY_FRAME_CONFIG } from '../../types/character';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
+import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
 
 /**
@@ -66,11 +68,12 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   assets = [],
   onAssetAdd
 }) => {
-  const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'translations'>('basic');
   const [editedCharacter, setEditedCharacter] = useState<Character>(character);
   const [hasChanges, setHasChanges] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
+  const translationState = useTranslationState();
 
   // Update editedCharacter when character prop changes
   // This fixes the race condition where saved changes weren't being reflected
@@ -1807,6 +1810,60 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
     );
   };
 
+  const renderTranslationsTab = () => {
+    const projectLanguages = translationState.translations;
+    if (projectLanguages.length === 0) {
+      return (
+        <div className="text-center py-12 text-gray-500">
+          <Globe className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          <p className="text-lg font-medium mb-1">No translations configured</p>
+          <p className="text-sm">Add translation languages in the Translation settings to translate character names.</p>
+        </div>
+      );
+    }
+
+    const charTranslations = editedCharacter.translations || {};
+
+    return (
+      <div className="space-y-4">
+        <div className="text-sm text-gray-600 mb-4">
+          Translate the display name for each language. The translated name will be shown as the speaker label when that language is active.
+        </div>
+        <div className="space-y-3">
+          {projectLanguages.map(lang => {
+            const translated = charTranslations[lang.languageCode]?.displayName || '';
+            return (
+              <div key={lang.languageCode} className="flex items-center gap-3">
+                <label className="w-40 text-sm font-medium text-gray-700 flex-shrink-0">
+                  {lang.languageName}
+                  <span className="text-gray-400 ml-1 text-xs">({lang.languageCode})</span>
+                </label>
+                <input
+                  type="text"
+                  value={translated}
+                  onChange={(e) => {
+                    const newTranslations = { ...charTranslations };
+                    if (e.target.value) {
+                      newTranslations[lang.languageCode] = { displayName: e.target.value };
+                    } else {
+                      delete newTranslations[lang.languageCode];
+                    }
+                    setEditedCharacter(prev => ({
+                      ...prev,
+                      translations: Object.keys(newTranslations).length > 0 ? newTranslations : undefined,
+                    }));
+                  }}
+                  placeholder={editedCharacter.displayName}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
       <div className="bg-white rounded-lg w-full max-w-4xl h-[85vh] flex flex-col">
@@ -1851,6 +1908,9 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             { id: 'states' as const, label: 'States', icon: Layers },
             { id: 'counters' as const, label: 'Counters', icon: Calculator },
             { id: 'inventory' as const, label: 'Inventory', icon: Package },
+            ...(translationState.translations.length > 0
+              ? [{ id: 'translations' as const, label: 'Translations', icon: Globe }]
+              : []),
           ].map(tab => (
             <button
               key={tab.id}
@@ -1874,6 +1934,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
           {activeTab === 'states' && renderStatesTab()}
           {activeTab === 'counters' && renderCountersTab()}
           {activeTab === 'inventory' && renderInventoryTab()}
+          {activeTab === 'translations' && renderTranslationsTab()}
         </div>
 
         {/* Footer */}

@@ -280,6 +280,12 @@ export const Inspector: React.FC<InspectorProps> = ({
     return BEAT_TYPE_ALIASES[beatType] || beatType;
   };
 
+  // Get the player character's display name (if any)
+  const playerCharacterName = useMemo(() => {
+    const pc = characters.find(c => c.role === 'player');
+    return pc ? (pc.displayName || pc.name) : undefined;
+  }, [characters]);
+
   // Get available characters - NPCs who can speak
   const getAvailableCharacters = (): string[] => {
     // Filter to NPCs only (exclude player characters)
@@ -928,6 +934,14 @@ export const Inspector: React.FC<InspectorProps> = ({
         sourceParametersRef.current = {};
       }
 
+      // Migrate legacy "Interactor" speaker value to actual player character name
+      if (beatData.speaker === 'Interactor' && playerCharacterName) {
+        beatData.speaker = playerCharacterName;
+        if (onUpdate && beat) {
+          onUpdate(beat.id, { speaker: playerCharacterName });
+        }
+      }
+
       // Auto-enable showSpeaker for beats with a non-default speaker assigned
       if (beatData.speaker && beatData.showSpeaker == null) {
         beatData.showSpeaker = true;
@@ -1469,6 +1483,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     onParameterChange={handleParameterChange}
                     availableTargets={availableTargets}
                     characters={getAvailableCharacters()}
+                    playerCharacterName={playerCharacterName}
                     availableCounters={availableCounters}
                     availableVariables={availableVariables}
                     translationSourceHints={
@@ -1494,6 +1509,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       parameters={localBeat.parameters}
                       onParameterChange={handleParameterChange}
                       characters={getAvailableCharacters()}
+                      playerCharacterName={playerCharacterName}
                       beatProperties={localBeat}
                       onBeatPropertyChange={handleChange}
                     />

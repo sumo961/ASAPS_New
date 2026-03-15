@@ -46,6 +46,9 @@ export interface Character {
   createdAt: string;
   updatedAt: string;
 
+  // Translated display names per language code (e.g., { de: { displayName: 'Rot' } })
+  translations?: Record<string, { displayName: string }>;
+
   // Meter Frame Configuration
   /** Configuration for grouped meter display (HUD overlay) */
   meterFrame?: MeterFrameConfig;

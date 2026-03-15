@@ -855,6 +855,9 @@ export class ReactRenderer extends BaseRenderer {
   protected mobileFontScale: number = 1.0;  // Font scale multiplier for mobile (1.0-2.0)
   private ttsSpeakCallback: ((text: string, speaker?: string, isPrompt?: boolean) => void) | null = null;
   private ttsStopCallback: (() => void) | null = null;
+  private choiceTextMap: Map<string, string> = new Map(); // actionId → choice text for TTS
+  private ttsChoiceSpeakCallback: ((text: string) => void) | null = null;
+  private speakerNameResolver: ((speaker: string) => string) | null = null;
 
   /** Get the current beat's speaker from renderer state, falling back to 'Narrator' */
   private get currentSpeaker(): string {
@@ -1020,6 +1023,13 @@ export class ReactRenderer extends BaseRenderer {
     // Stop any in-progress TTS when user advances
     this.ttsStopCallback?.();
 
+    // Speak the clicked choice text if interactor TTS is enabled
+    const choiceText = this.choiceTextMap.get(id);
+    if (choiceText && this.ttsChoiceSpeakCallback) {
+      this.ttsChoiceSpeakCallback(choiceText);
+    }
+    this.choiceTextMap.clear();
+
     if (this.resolveAction) {
       this.resolveAction(id);
       this.resolveAction = null;
@@ -1063,6 +1073,21 @@ export class ReactRenderer extends BaseRenderer {
    */
   setTTSStopCallback(callback: (() => void) | null): void {
     this.ttsStopCallback = callback;
+  }
+
+  /**
+   * Set a resolver that maps speaker names to translated display names.
+   */
+  setSpeakerNameResolver(resolver: ((speaker: string) => string) | null): void {
+    this.speakerNameResolver = resolver;
+  }
+
+  /**
+   * Set callback for speaking clicked choice text (interactor TTS).
+   * Called fire-and-forget when a choice button is clicked.
+   */
+  setTTSChoiceSpeakCallback(callback: ((text: string) => void) | null): void {
+    this.ttsChoiceSpeakCallback = callback;
   }
 
   /**
@@ -1497,7 +1522,9 @@ export class ReactRenderer extends BaseRenderer {
                 const beatOverride = this.getState('showSpeaker') as boolean | undefined;
                 const globalShowNames = this.theme?.speakerDisplay?.showNames ?? false;
                 const show = beatOverride === true ? true : beatOverride === false ? false : globalShowNames;
-                return show ? (this.getState('beatSpeaker') as string) || undefined : undefined;
+                if (!show) return undefined;
+                const raw = (this.getState('beatSpeaker') as string) || undefined;
+                return raw && this.speakerNameResolver ? this.speakerNameResolver(raw) : raw;
               })()}
               speakerPortraitUrl={(() => {
                 const beatOverride = this.getState('showSpeaker') as boolean | undefined;
@@ -1736,6 +1763,12 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
+    // Store choice text for interactor TTS on click
+    this.choiceTextMap.clear();
+    for (const c of choices) {
+      this.choiceTextMap.set(c.id, c.text);
+    }
+
     // Get dialog context from prior renderDialog call
     const dialogContext = this.getState('dialogContext') || {};
 
@@ -1889,6 +1922,12 @@ export class ReactRenderer extends BaseRenderer {
     const content = { question, choices, markVisited };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('movementChoice', content);
 
+    // Store choice text for interactor TTS on click
+    this.choiceTextMap.clear();
+    for (const c of choices) {
+      this.choiceTextMap.set(c.id, c.displayText || c.text);
+    }
+
     this.ttsSpeakCallback?.(question, this.currentSpeaker, true);
     return this.renderPositionedBeat('movementChoice', content, effectiveLocations, true);
   }
@@ -1904,6 +1943,12 @@ export class ReactRenderer extends BaseRenderer {
     // Use provided locations or generate default locations from schema
     const content = { question, props, markVisited };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('pickProp', content);
+
+    // Store choice text for interactor TTS on click
+    this.choiceTextMap.clear();
+    for (const p of props) {
+      this.choiceTextMap.set(p.id, p.displayName || p.name);
+    }
 
     this.ttsSpeakCallback?.(question, this.currentSpeaker, true);
     return this.renderPositionedBeat('pickProp', content, effectiveLocations, true);

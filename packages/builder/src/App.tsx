@@ -53,7 +53,7 @@ import { VCSToast } from './components/vcs/VCSToast';
 import { GitInitDialog } from './components/vcs/GitInitDialog';
 import { CloneRepoDialog } from './components/vcs/CloneRepoDialog';
 import { useTranslationState, useTranslationActions } from './contexts/TranslationContext';
-import { applyTranslationResource } from './export/StoryTranslator';
+import { applyTranslationResource, extractCharacterDisplayNameTranslations } from './export/StoryTranslator';
 import { extractSpeakers } from './utils/speakerUtils';
 import { getTTSService } from './services/tts';
 import { getSavedTTSConfig } from './hooks/useTTS';
@@ -1217,6 +1217,17 @@ function App() {
       const storyCharacters = story.characters && Array.isArray(story.characters)
         ? story.characters
         : characters; // Keep existing characters if none provided
+
+      // Migrate legacy "Interactor" speaker values to actual player character name
+      const pc = storyCharacters.find((c: any) => c.role === 'player');
+      if (pc) {
+        const pcName = pc.displayName || pc.name;
+        for (const beat of createdBeats) {
+          if (beat.speaker === 'Interactor') {
+            beat.speaker = pcName;
+          }
+        }
+      }
 
       // CRITICAL: Add connections to beat instances BEFORE loading story data
       // The GraphEditor reads connections from beat.getConnections(), not state.connections
@@ -3967,7 +3978,19 @@ function App() {
   const handleCharactersChange = useCallback((newCharacters: Character[]) => {
     setCharacters(newCharacters);
     markChanged();
-  }, [markChanged]);
+
+    // Sync character name translations to translation resources
+    for (let i = 0; i < newCharacters.length; i++) {
+      const char = newCharacters[i];
+      if (!char.translations) continue;
+      const key = `project.story.characters.${i}.displayName`;
+      for (const [langCode, val] of Object.entries(char.translations)) {
+        if (val.displayName) {
+          translationActions.updateTranslation(langCode, key, val.displayName);
+        }
+      }
+    }
+  }, [markChanged, translationActions]);
 
   const handleOpenCharacterManager = useCallback((callback?: (character: Character) => void) => {
     // Store the callback so we can call it when a character is selected
@@ -4791,11 +4814,60 @@ function App() {
     }
   }, [globalSettings?.tts?.speakerVoices]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Player character name for display purposes (e.g., "Red" instead of "Interactor")
+  const playerCharacterName = useMemo(() => {
+    const pc = characters.find(c => c.role === 'player');
+    return pc ? (pc.displayName || pc.name) : undefined;
+  }, [characters]);
+
   // Extract speakers from story for TTS voice assignment in Header
   const storySpeakers = useMemo(() => {
     if (!state.beats || state.beats.length === 0) return [];
-    return ['Narrator', ...extractSpeakers(state.beats)];
-  }, [state.beats]);
+    const playerKey = playerCharacterName || 'Interactor';
+    return ['Narrator', playerKey, ...extractSpeakers(state.beats, playerCharacterName)];
+  }, [state.beats, playerCharacterName]);
+
+  // Populate character.translations from translation resources when translations are generated.
+  // Also cleans up any invalid translations (e.g. from prior bug that matched counter displayNames).
+  useEffect(() => {
+    if (characters.length === 0) return;
+    let updated = false;
+    const newCharacters = characters.map((char, index) => {
+      const translations: Record<string, { displayName: string }> = {};
+      // Build translations from resources only (authoritative source)
+      for (const resource of translationState.translations) {
+        const langCode = resource.languageCode;
+        const map = extractCharacterDisplayNameTranslations(resource);
+        const translated = map.get(index);
+        if (translated && translated !== char.displayName) {
+          translations[langCode] = { displayName: translated };
+        }
+        // Preserve manually-entered translations that aren't in the resource
+        else if (char.translations?.[langCode]?.displayName && !map.has(index)) {
+          translations[langCode] = char.translations[langCode];
+        }
+      }
+      // For languages not in any resource, keep existing manual translations
+      if (char.translations) {
+        const resourceLangs = new Set(translationState.translations.map(r => r.languageCode));
+        for (const [lang, val] of Object.entries(char.translations)) {
+          if (!resourceLangs.has(lang) && val.displayName) {
+            translations[lang] = val;
+          }
+        }
+      }
+      const newTranslations = Object.keys(translations).length > 0 ? translations : undefined;
+      if (JSON.stringify(newTranslations) !== JSON.stringify(char.translations)) {
+        updated = true;
+        return { ...char, translations: newTranslations };
+      }
+      return char;
+    });
+    if (updated) {
+      setCharacters(newCharacters);
+      markChanged();
+    }
+  }, [translationState.translations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle speaker voice change from Header TTS menu
   const handleSpeakerVoiceChange = useCallback((speaker: string, voiceId: string) => {
@@ -4869,6 +4941,7 @@ function App() {
         onCurrentProjectDeleted={handleCurrentProjectDeleted}
         triggerNewProject={triggerNewProject}
         speakers={storySpeakers}
+        playerCharacterName={playerCharacterName}
         speakerVoices={globalSettings?.tts?.speakerVoices?.[getActiveProviderKey()] ?? {}}
         onSpeakerVoiceChange={handleSpeakerVoiceChange}
       />
