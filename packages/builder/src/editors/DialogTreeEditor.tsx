@@ -73,6 +73,8 @@ interface DialogTreeEditorProps {
   availableInventoryItems?: AvailableInventoryItem[];
   allBeats?: Beat[];
   expanded?: boolean;
+  /** Resolve speaker names to translated display names (for active translation language) */
+  speakerNameResolver?: (name: string) => string;
 }
 
 // Speaker color palette - consistent colors for each speaker
@@ -109,7 +111,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   availableVariables: availableVariablesProp,
   availableInventoryItems: availableInventoryItemsProp,
   allBeats = [],
-  expanded = false
+  expanded = false,
+  speakerNameResolver,
 }) => {
   // Custom speaker input state
   const [customSpeakerValue, setCustomSpeakerValue] = useState<string>('');
@@ -417,7 +420,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                 <div className={`w-1.5 h-4 rounded-full ${speakerColor.accent}`} />
               )}
               {isNPC ? <Users className={`w-4 h-4 ${speakerColor?.text || 'text-blue-600'}`} /> : <User className="w-4 h-4 text-orange-600" />}
-              <span className={`font-medium text-sm ${isNPC && speakerColor ? speakerColor.text : ''}`}>{node.speaker}</span>
+              <span className={`font-medium text-sm ${isNPC && speakerColor ? speakerColor.text : ''}`}>{speakerNameResolver ? speakerNameResolver(node.speaker) : node.speaker}</span>
               {/* Only show choice count for root node where collapse/expand is available */}
               {hasChoices && depth === 0 && (
                 <span className="text-xs text-gray-500">

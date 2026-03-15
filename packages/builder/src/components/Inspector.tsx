@@ -13,6 +13,7 @@ import type { BeatDefinition } from './SchemaFormGenerator';
 import type { Asset } from './assets/AssetManager';
 import type { Character } from '../types/character';
 import { useAvailableCounters, useAvailableVariables, useAvailableInventoryItems } from '../hooks/useAvailableCountersAndVariables';
+import { resolveTranslatedSpeakerName } from '../utils/speakerUtils';
 import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
 import { TextFieldWithVariables } from '../editors/TextFieldWithVariables';
@@ -285,6 +286,12 @@ export const Inspector: React.FC<InspectorProps> = ({
     const pc = characters.find(c => c.role === 'player');
     return pc ? (pc.displayName || pc.name) : undefined;
   }, [characters]);
+
+  // Resolve speaker names to translated display names when a translation language is active
+  const speakerNameResolver = useMemo(() => {
+    if (!translationState.activeLanguage || !characters.length) return undefined;
+    return (name: string) => resolveTranslatedSpeakerName(name, characters, translationState.activeLanguage) || name;
+  }, [translationState.activeLanguage, characters]);
 
   // Get available characters - NPCs who can speak
   const getAvailableCharacters = (): string[] => {
@@ -2447,6 +2454,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       variables={availableVariables.map(v => v.name)}
                       availableCounters={availableCounters}
                       availableVariables={availableVariables}
+                      speakerNameResolver={speakerNameResolver}
                       availableInventoryItems={availableInventoryItems}
                     />
 

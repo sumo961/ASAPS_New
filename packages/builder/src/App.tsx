@@ -3979,18 +3979,30 @@ function App() {
     setCharacters(newCharacters);
     markChanged();
 
-    // Sync character name translations to translation resources
+    // Sync character name translations to translation resources:
+    // Update both the character displayName entry AND all speaker references
     for (let i = 0; i < newCharacters.length; i++) {
       const char = newCharacters[i];
       if (!char.translations) continue;
-      const key = `project.story.characters.${i}.displayName`;
+      const displayNameKey = `project.story.characters.${i}.displayName`;
       for (const [langCode, val] of Object.entries(char.translations)) {
-        if (val.displayName) {
-          translationActions.updateTranslation(langCode, key, val.displayName);
+        if (!val.displayName) continue;
+        // Update the character's own displayName entry
+        translationActions.updateTranslation(langCode, displayNameKey, val.displayName);
+        // Update all speaker entries that reference this character
+        const resource = translationState.translations.find(t => t.languageCode === langCode);
+        if (resource) {
+          for (const [key, entry] of Object.entries(resource.strings)) {
+            if (key.endsWith('.speaker') && resource._sourceSnapshot?.[key] === char.displayName) {
+              if (entry.value !== val.displayName) {
+                translationActions.updateTranslation(langCode, key, val.displayName);
+              }
+            }
+          }
         }
       }
     }
-  }, [markChanged, translationActions]);
+  }, [markChanged, translationActions, translationState.translations]);
 
   const handleOpenCharacterManager = useCallback((callback?: (character: Character) => void) => {
     // Store the callback so we can call it when a character is selected
