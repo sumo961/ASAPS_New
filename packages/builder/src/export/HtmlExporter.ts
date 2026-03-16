@@ -121,6 +121,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       storyUrl: '{{STORY_URL}}',
       storyData: '{{STORY_DATA}}',
       aiConfig: {{AI_CONFIG}},
+      ttsConfig: {{TTS_CONFIG}},
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
     };
@@ -297,6 +298,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       enableAI: {{ENABLE_AI}},
       storyData: '{{ORIGINAL_STORY_DATA}}',
       aiConfig: {{AI_CONFIG}},
+      ttsConfig: {{TTS_CONFIG}},
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
     };
@@ -786,6 +788,18 @@ export interface HtmlExportOptions {
   aiBaseUrl?: string;
   /** Model override (e.g., 'gpt-5.2', 'claude-sonnet-4-20250514') */
   aiModel?: string;
+  /** TTS provider type */
+  ttsProvider?: string;
+  /** TTS API key to embed */
+  ttsApiKey?: string;
+  /** TTS model */
+  ttsModel?: string;
+  /** TTS base URL (for custom providers) */
+  ttsBaseUrl?: string;
+  /** Speaker → voice ID mapping */
+  ttsSpeakerVoices?: Record<string, string>;
+  /** Default voice ID */
+  ttsDefaultVoiceId?: string;
   /** Pre-made translations to bundle with the export */
   existingTranslations?: TranslationResource[];
   /** Enable AI on-the-fly translation in the exported player */
@@ -889,6 +903,20 @@ async function exportAsSingleFile(
       })
     : 'null';
 
+  // Build TTS config object (or null if not provided)
+  const ttsConfig = options.ttsProvider && options.ttsProvider !== 'web-speech'
+    ? JSON.stringify({
+        provider: options.ttsProvider,
+        apiKey: options.ttsApiKey || undefined,
+        model: options.ttsModel || undefined,
+        baseUrl: options.ttsBaseUrl || undefined,
+        speakerVoices: options.ttsSpeakerVoices || undefined,
+        defaultVoiceId: options.ttsDefaultVoiceId || undefined,
+      })
+    : options.ttsProvider === 'web-speech'
+      ? JSON.stringify({ provider: 'web-speech' })
+      : 'null';
+
   // Get mobile settings from project
   const mobileScalingMode = project.globalSettings?.project?.mobileScalingMode || 'auto';
   const mobileFontScale = project.globalSettings?.project?.mobileFontScale || 1.0;
@@ -901,6 +929,7 @@ async function exportAsSingleFile(
     .replace("'{{STORY_URL}}'", "''")  // Empty for single-file mode
     .replace("'{{STORY_DATA}}'", `'${storyBase64}'`)
     .replace('{{AI_CONFIG}}', aiConfig)
+    .replace('{{TTS_CONFIG}}', ttsConfig)
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{PLAYER_SCRIPT}}', playerScript);
@@ -1195,6 +1224,20 @@ export async function downloadHtmlExport(
   // Build AI section (or empty)
   const aiSectionHtml = hasAIOnTheFly ? AI_TRANSLATION_SECTION : '';
 
+  // Build TTS config object
+  const ttsConfig = options.ttsProvider && options.ttsProvider !== 'web-speech'
+    ? JSON.stringify({
+        provider: options.ttsProvider,
+        apiKey: options.ttsApiKey || undefined,
+        model: options.ttsModel || undefined,
+        baseUrl: options.ttsBaseUrl || undefined,
+        speakerVoices: options.ttsSpeakerVoices || undefined,
+        defaultVoiceId: options.ttsDefaultVoiceId || undefined,
+      })
+    : options.ttsProvider === 'web-speech'
+      ? JSON.stringify({ provider: 'web-speech' })
+      : 'null';
+
   // Get mobile settings from project
   const mobileScalingMode = project.globalSettings?.project?.mobileScalingMode || 'auto';
   const mobileFontScale = project.globalSettings?.project?.mobileFontScale || 1.0;
@@ -1207,6 +1250,7 @@ export async function downloadHtmlExport(
     .replace('{{ENABLE_AI}}', String(options.enableAI))
     .replace("'{{ORIGINAL_STORY_DATA}}'", `'${originalBase64}'`)
     .replace('{{AI_CONFIG}}', aiConfig)
+    .replace('{{TTS_CONFIG}}', ttsConfig)
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{LANGUAGE_OPTIONS}}', languageOptionsHtml)

@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
 import { ReactRenderer, type RenderContext } from '@asaps/renderer';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
+import { WebTTSService } from './WebTTSProvider';
 
 export interface WebPlayerProps {
   /** Story data as ArrayBuffer, base64 string, or URL */
@@ -174,6 +175,21 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           console.log('[WebPlayer] Setting up AI service...');
           const aiService = new WebAIService();
           renderer.setState('aiService', aiService);
+        }
+
+        // Set up TTS service if configured
+        const ttsService = new WebTTSService();
+        if (ttsService.isConfigured()) {
+          console.log('[WebPlayer] Setting up TTS service...');
+          renderer.setTTSSpeakCallback((text, speaker) => {
+            if (ttsService.isEnabled()) {
+              ttsService.speak(text, speaker);
+            }
+          });
+          renderer.setTTSStopCallback(() => ttsService.stop());
+          // Set TTS language from project settings
+          const ttsLang = (window as any).ASAPS_CONFIG?.ttsLanguage || 'en';
+          ttsService.setLanguage(ttsLang);
         }
 
         // Create player

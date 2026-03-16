@@ -6,6 +6,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Settings, Globe, Sparkles } from 'lucide-react';
 import { downloadHtmlExport, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
 import { getSavedAIConfig } from '../../hooks/useAI';
+import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { buildManifestEntry, type TranslationResource } from '@asaps/core';
 
@@ -111,6 +112,15 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
       // AI on-the-fly needs AI config
       const needsAIConfig = (enableAI && hasAIConfig) || enableAIOnTheFly;
 
+      // Get TTS config to embed (includes API key for cloud providers)
+      const savedTTS = getSavedTTSConfig();
+      // Get speaker voice mapping from project global settings
+      const { getStorageManager } = await import('../../storage');
+      const projResult = await getStorageManager().getProject(projectId);
+      const ttsSettings = projResult.data?.globalSettings?.tts;
+      const providerKey = savedTTS?.providerType || 'web-speech';
+      const speakerVoices = ttsSettings?.speakerVoices?.[providerKey];
+
       const options: HtmlExportOptions = {
         mode,
         responsive: true,
@@ -120,6 +130,12 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiApiKey: needsAIConfig && aiApiKey ? aiApiKey : undefined,
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
+        ttsProvider: savedTTS?.providerType,
+        ttsApiKey: savedTTS?.apiKey,
+        ttsModel: savedTTS?.model,
+        ttsBaseUrl: savedTTS?.baseUrl,
+        ttsDefaultVoiceId: savedTTS?.defaultVoiceId,
+        ttsSpeakerVoices: speakerVoices,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
       };
