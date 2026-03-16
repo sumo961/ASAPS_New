@@ -105,7 +105,9 @@ export function calculateSmartTextBoxDimensions(
   padding: number,
   buttonHeight: number,
   stageWidth: number,
-  stageHeight: number
+  stageHeight: number,
+  /** Extra horizontal space consumed by inline content (e.g., speaker portrait) */
+  inlineContentWidth: number = 0
 ): { width: number; height: number; needsScroll: boolean; xOffset: number; yOffset: number } {
   // Estimate text dimensions
   // Use 0.42 ratio for proportional fonts - measured from actual rendering
@@ -113,8 +115,11 @@ export function calculateSmartTextBoxDimensions(
   const lineHeight = fontSize * 1.5;
   const contentPadding = padding * 2; // Padding on both sides
 
+  // Expand location width to accommodate inline content (e.g., speaker portrait)
+  const expandedWidth = location.width + inlineContentWidth;
+
   // Calculate available content area
-  const availableContentWidth = location.width - contentPadding;
+  const availableContentWidth = expandedWidth - contentPadding - inlineContentWidth;
 
   // Estimate how many lines the text needs at current width
   const estimatedCharsPerLine = Math.floor(availableContentWidth / charWidth);
@@ -123,13 +128,13 @@ export function calculateSmartTextBoxDimensions(
   const estimatedTotalHeight = estimatedContentHeight + contentPadding;
 
   const contentPreview = content.substring(0, 50).replace(/\n/g, '\\n');
-  console.log(`[SmartTextBox] Input: loc(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}), fontSize=${fontSize}, content="${contentPreview}..." (${content.length} chars)`);
+  console.log(`[SmartTextBox-v2] Input: loc(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}), fontSize=${fontSize}, content="${contentPreview}..." (${content.length} chars), inlineContent=${inlineContentWidth}, expandedWidth=${expandedWidth}`);
   console.log(`[SmartTextBox] Estimates: charWidth=${charWidth.toFixed(1)}, lineHeight=${lineHeight.toFixed(1)}, charsPerLine=${estimatedCharsPerLine}, lines=${estimatedLines}, neededHeight=${estimatedTotalHeight.toFixed(1)}`);
 
-  // Check if content fits in original dimensions
+  // Check if content fits in expanded dimensions
   if (estimatedTotalHeight <= location.height) {
-    console.log(`[SmartTextBox] ✓ Content fits in original dimensions (${location.width}x${location.height})`);
-    return { width: location.width, height: location.height, needsScroll: false, xOffset: 0, yOffset: 0 };
+    console.log(`[SmartTextBox] ✓ Content fits in dimensions (${expandedWidth}x${location.height})`);
+    return { width: expandedWidth, height: location.height, needsScroll: false, xOffset: 0, yOffset: 0 };
   }
 
   // Calculate maximum allowed dimensions
@@ -2807,11 +2812,12 @@ const TextElement: React.FC<{
   let dimensionStyle: React.CSSProperties;
   let needsScroll = false;
   if (location.manuallyResized) {
-    // User manually resized: use stored dimensions directly
+    // User manually resized: use stored dimensions as minimum, allow growth for content
     dimensionStyle = {
       left: `${location.x}px`,
       width: `${location.width}px`,
-      height: `${location.height}px`,
+      height: 'auto',
+      minHeight: `${location.height}px`,
       overflowY: 'auto',
     };
   } else {
@@ -2822,6 +2828,10 @@ const TextElement: React.FC<{
       ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
       : 0;
 
+    // Calculate portrait inline width for smart sizing
+    const hasInlinePortrait = speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'inside-left' || theme.speakerDisplay?.graphicPosition === 'inside-right');
+    const portraitInlineWidth = hasInlinePortrait ? (theme.speakerDisplay?.graphicSize ?? 48) + 8 : 0;
+
     // Calculate smart dimensions
     const smartDims = calculateSmartTextBoxDimensions(
       content,
@@ -2830,7 +2840,8 @@ const TextElement: React.FC<{
       padding,
       effectiveButtonHeight,
       stageWidth,
-      stageHeight
+      stageHeight,
+      portraitInlineWidth
     );
 
     console.log(`[TextElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}, yOffset=${smartDims.yOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
@@ -3612,11 +3623,12 @@ const DialogElement: React.FC<{
   let dimensionStyle: React.CSSProperties;
   let needsScroll = false;
   if (location.manuallyResized) {
-    // User manually resized: use stored dimensions directly
+    // User manually resized: use stored dimensions as minimum, allow growth for content
     dimensionStyle = {
       left: `${location.x}px`,
       width: `${location.width}px`,
-      height: `${location.height}px`,
+      height: 'auto',
+      minHeight: `${location.height}px`,
       overflowY: 'auto',
     };
   } else {
@@ -3627,6 +3639,10 @@ const DialogElement: React.FC<{
       ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
       : 0;
 
+    // Calculate portrait inline width for smart sizing
+    const hasDialogInlinePortrait = speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'inside-left' || theme.speakerDisplay?.graphicPosition === 'inside-right');
+    const dialogPortraitInlineWidth = hasDialogInlinePortrait ? (theme.speakerDisplay?.graphicSize ?? 48) + 8 : 0;
+
     const smartDims = calculateSmartTextBoxDimensions(
       content,
       computedFontSize,
@@ -3634,7 +3650,8 @@ const DialogElement: React.FC<{
       totalPadding,
       effectiveButtonHeight,
       stageWidth,
-      stageHeight
+      stageHeight,
+      dialogPortraitInlineWidth
     );
 
     console.log(`[DialogElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}, yOffset=${smartDims.yOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
