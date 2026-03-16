@@ -115,11 +115,8 @@ export function calculateSmartTextBoxDimensions(
   const lineHeight = fontSize * 1.5;
   const contentPadding = padding * 2; // Padding on both sides
 
-  // Expand location width to accommodate inline content (e.g., speaker portrait)
-  const expandedWidth = location.width + inlineContentWidth;
-
-  // Calculate available content area
-  const availableContentWidth = expandedWidth - contentPadding - inlineContentWidth;
+  // Calculate available content area (subtract portrait width — text wraps in remaining space)
+  const availableContentWidth = location.width - contentPadding - inlineContentWidth;
 
   // Estimate how many lines the text needs at current width
   const estimatedCharsPerLine = Math.floor(availableContentWidth / charWidth);
@@ -128,13 +125,12 @@ export function calculateSmartTextBoxDimensions(
   const estimatedTotalHeight = estimatedContentHeight + contentPadding;
 
   const contentPreview = content.substring(0, 50).replace(/\n/g, '\\n');
-  console.log(`[SmartTextBox-v2] Input: loc(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}), fontSize=${fontSize}, content="${contentPreview}..." (${content.length} chars), inlineContent=${inlineContentWidth}, expandedWidth=${expandedWidth}`);
+  console.log(`[SmartTextBox] Input: loc(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}), fontSize=${fontSize}, content="${contentPreview}..." (${content.length} chars), inlineContent=${inlineContentWidth}`);
   console.log(`[SmartTextBox] Estimates: charWidth=${charWidth.toFixed(1)}, lineHeight=${lineHeight.toFixed(1)}, charsPerLine=${estimatedCharsPerLine}, lines=${estimatedLines}, neededHeight=${estimatedTotalHeight.toFixed(1)}`);
 
-  // Check if content fits in expanded dimensions
+  // Check if content fits in original dimensions
   if (estimatedTotalHeight <= location.height) {
-    console.log(`[SmartTextBox] ✓ Content fits in dimensions (${expandedWidth}x${location.height})`);
-    return { width: expandedWidth, height: location.height, needsScroll: false, xOffset: 0, yOffset: 0 };
+    return { width: location.width, height: location.height, needsScroll: false, xOffset: 0, yOffset: 0 };
   }
 
   // Calculate maximum allowed dimensions
@@ -190,7 +186,7 @@ export function calculateSmartTextBoxDimensions(
   // Step 2: Check if content fits at current width, grow if needed
   if (newWidth < maxWidth) {
     for (let testWidth = newWidth; testWidth <= maxWidth; testWidth += 50) {
-      const testContentWidth = testWidth - contentPadding;
+      const testContentWidth = testWidth - contentPadding - inlineContentWidth;
       const testCharsPerLine = Math.floor(testContentWidth / charWidth);
       const testLines = testCharsPerLine > 0 ? Math.ceil(content.length / testCharsPerLine) : 1;
       const testContentHeight = testLines * lineHeight;
@@ -261,7 +257,7 @@ export function calculateSmartTextBoxDimensions(
   }
 
   // Step 3: Calculate needed height at max width
-  const finalContentWidth = newWidth - contentPadding;
+  const finalContentWidth = newWidth - contentPadding - inlineContentWidth;
   const finalCharsPerLine = Math.floor(finalContentWidth / charWidth);
   const finalLines = finalCharsPerLine > 0 ? Math.ceil(content.length / finalCharsPerLine) : 1;
   const finalContentHeight = finalLines * lineHeight + contentPadding;
