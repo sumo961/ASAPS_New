@@ -1602,6 +1602,9 @@ export class ReactRenderer extends BaseRenderer {
       this.currentShowAvatars = showAvatars;
     }
 
+    // Update beatSpeaker so portrait resolver uses the current dialog node's speaker
+    this.setState('beatSpeaker', speaker);
+
     // Store dialog context for renderChoices to use later
     this.setState('dialogContext', { speaker, text, emotion });
 

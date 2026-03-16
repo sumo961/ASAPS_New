@@ -310,8 +310,21 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const effectiveShowGraphics = globalSettings?.speakerDisplay?.showGraphics ?? false;
 
   const speakerPortraitUrl = React.useMemo(() => {
-    if (!effectiveShowSpeaker || !effectiveShowGraphics || !beatContent?.speaker) return undefined;
-    return resolvePortraitUrl(beatContent.speaker, characters, assets);
+    if (!effectiveShowSpeaker || !effectiveShowGraphics || !beatContent?.speaker) {
+      if (beatContent?.speaker) {
+        console.log(`[VBE] Portrait skipped: showSpeaker=${effectiveShowSpeaker}, showGraphics=${effectiveShowGraphics}, speaker="${beatContent?.speaker}"`);
+      }
+      return undefined;
+    }
+    const url = resolvePortraitUrl(beatContent.speaker, characters, assets);
+    const graphicPos = globalSettings?.speakerDisplay?.graphicPosition;
+    console.log(`[VBE] Portrait resolve: speaker="${beatContent.speaker}", url=${url ? 'found' : 'NOT FOUND'}, graphicPosition="${graphicPos}", showGraphics=${effectiveShowGraphics}`);
+    if (!url && characters?.length && beatContent.speaker) {
+      const spk = beatContent.speaker;
+      const char = characters.find(c => c.displayName?.toLowerCase() === spk.toLowerCase() || c.name?.toLowerCase() === spk.toLowerCase());
+      console.log(`[VBE] Character match:`, char ? { name: char.displayName, hasPortrait: !!char.portrait, assetId: char.portrait?.assetId } : 'NO MATCH');
+    }
+    return url;
   }, [effectiveShowSpeaker, effectiveShowGraphics, beatContent?.speaker, characters, assets]);
 
   // Resolve translated speaker name when a translation language is active

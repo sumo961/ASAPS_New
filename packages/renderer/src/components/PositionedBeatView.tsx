@@ -1892,6 +1892,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       {(() => {
         // Find the index of the first text element to pass speaker props only to it
         const firstTextIdx = adjustedElements.findIndex(el => el.location.kind === 'text' || el.location.kind === 'dialog');
+        if (speakerPortraitUrl) {
+          console.log(`[PBV] Portrait: firstTextIdx=${firstTextIdx}, beatType=${beatType}, elements=${adjustedElements.map(e => e.location.kind).join(',')}, speakerName=${speakerName}, url=${speakerPortraitUrl ? 'yes' : 'no'}`);
+        }
         return adjustedElements.map((element, index) => {
           const isFirstText = index === firstTextIdx && speakerName;
           return (
@@ -2379,6 +2382,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           editorMode={editorMode}
           onScrolledToBottom={handleDialogScrolled}
           mobileFontScale={mobileFontScale}
+          speakerName={speakerName}
+          speakerPortraitUrl={speakerPortraitUrl}
         />
       );
     }
@@ -3430,7 +3435,9 @@ const DialogElement: React.FC<{
   editorMode?: boolean;  // Editor mode - cosmetic only (scroll badges, hotspot borders)
   onScrolledToBottom?: () => void;  // Callback when user scrolls to bottom
   mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0 }) => {
+  speakerName?: string;
+  speakerPortraitUrl?: string;
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const hasCalledCompleteRef = React.useRef(false);
@@ -3698,6 +3705,38 @@ const DialogElement: React.FC<{
         // Only set height for scrollable content
         height: needsScroll ? '100%' : undefined,
       }}>
+        {/* Speaker portrait inside dialog box (floated) */}
+        {speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'inside-left' || theme.speakerDisplay?.graphicPosition === 'inside-right') && (() => {
+          const isLeft = theme.speakerDisplay?.graphicPosition === 'inside-left';
+          const size = theme.speakerDisplay?.graphicSize ?? 48;
+          return (
+            <img
+              src={speakerPortraitUrl}
+              alt={speakerName || ''}
+              style={{
+                float: isLeft ? 'left' : 'right',
+                width: size,
+                height: size,
+                objectFit: 'cover',
+                borderRadius: 6,
+                marginRight: isLeft ? 8 : 0,
+                marginLeft: isLeft ? 0 : 8,
+                marginBottom: 4,
+              }}
+            />
+          );
+        })()}
+        {/* Speaker name inline (bold first line) */}
+        {speakerName && theme.speakerDisplay?.nameStyle === 'inline' && (
+          <div style={{
+            fontWeight: 700,
+            fontSize: `${Math.round((location.fontSize ?? theme.fonts?.textFontSize ?? 16) * 1.1 * mobileFontScale)}px`,
+            marginBottom: 4,
+            color: theme.speakerDisplay?.nameColor || undefined,
+          }}>
+            {speakerName}
+          </div>
+        )}
         <span style={{ display: 'block', width: '100%', textAlign: computedTextAlign }}>
           {animation === 'typewriter' ? (
             hyperlinks && hyperlinks.length > 0 && onAction ? (
