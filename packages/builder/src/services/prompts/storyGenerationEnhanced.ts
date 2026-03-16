@@ -671,6 +671,102 @@ Each beat can override the Timer HUD content via timeDisplayMode:
 - "manual": Show custom text from timeDisplayText field (e.g., "Meanwhile...")
 - "none": Hide the Timer HUD on this beat entirely
 
+## Character & Speaker System
+
+Characters define the cast of your story. Each character has a role, displayName, and optional counters/inventory.
+
+### Character Roles
+- **player**: The protagonist/interactor. There should be exactly one player character.
+- **npc**: Non-player characters the player interacts with (merchants, enemies, quest givers).
+- **companion**: Allies who may travel with the player.
+
+### Character JSON Format
+Include characters in the "characters" array of your output:
+\`\`\`json
+{
+  "characters": [
+    {
+      "id": "char_player",
+      "name": "Red",
+      "displayName": "Red",
+      "role": "player",
+      "description": "A brave young girl on an errand",
+      "counters": [
+        { "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 }
+      ]
+    },
+    {
+      "id": "char_wolf",
+      "name": "Big Bad Wolf",
+      "displayName": "Wolf",
+      "role": "npc",
+      "description": "A cunning wolf lurking in the forest",
+      "counters": [
+        { "name": "suspicion", "displayName": "Suspicion", "value": 0, "min": 0, "max": 100 }
+      ]
+    }
+  ]
+}
+\`\`\`
+
+### Speaker System on Beats
+Visible beats (titleScreen, infoText, durScreen, dialogTree, movementChoice, pickProp, endScreen, videoBeat, inputText, hyperText) have a **speaker** property that controls who is "speaking" the beat's text.
+
+- The **speaker** value is a character's **displayName** (e.g., "Red", "Mom", "Woodsman")
+- **"Narrator"** is the built-in default speaker (used when speaker is empty or "Narrator")
+- The player character's displayName should be used as the speaker value when the player is speaking
+- **showSpeaker** controls visibility: true = always show speaker label, false = always hide, omit = use global setting
+- When a speaker is set, the speaker name appears as a label above the text box
+
+### Speaker on Beat Examples
+\`\`\`json
+{
+  "id": "beat_1",
+  "type": "infoText",
+  "parameters": {
+    "text": "Welcome to my shop! What can I do for you?",
+    "speaker": "Merchant",
+    "buttonText": "Continue"
+  }
+}
+\`\`\`
+
+### Speaker in DialogTree
+In dialogTree beats, each dialog node has its own **speaker** field. This allows back-and-forth conversation:
+\`\`\`json
+{
+  "dialogTree": {
+    "id": "root",
+    "speaker": "Merchant",
+    "text": "Welcome! What brings you here?",
+    "choices": [
+      {
+        "id": "c1",
+        "text": "I need a sword.",
+        "dialogNode": {
+          "id": "n1",
+          "speaker": "Merchant",
+          "text": "I have just the thing!",
+          "choices": [{ "id": "c2", "text": "How much?", "target": "beat_next" }]
+        }
+      }
+    ]
+  }
+}
+\`\`\`
+
+### Character Translations
+Characters support translated display names per language:
+\`\`\`json
+{
+  "id": "char_player",
+  "name": "Red",
+  "displayName": "Red",
+  "role": "player",
+  "translations": { "de": { "displayName": "Rotkäppchen" }, "fr": { "displayName": "Rouge" } }
+}
+\`\`\`
+
 ## Character Counters (Centralized System)
 
 Counters should be defined on characters, then referenced consistently in choices:
@@ -1304,6 +1400,8 @@ Generate complete, sophisticated interactive story structures that:
     {
       "id": "char_player",
       "name": "Hero",
+      "displayName": "Hero",
+      "role": "player",
       "description": "The protagonist",
       "counters": [
         { "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 },
@@ -1313,6 +1411,8 @@ Generate complete, sophisticated interactive story structures that:
     {
       "id": "char_npc",
       "name": "Merchant",
+      "displayName": "Merchant",
+      "role": "npc",
       "description": "A traveling merchant",
       "counters": [
         { "name": "trust", "displayName": "Trust", "value": 0, "min": -100, "max": 100 }

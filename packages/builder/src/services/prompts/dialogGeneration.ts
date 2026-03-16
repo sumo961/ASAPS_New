@@ -58,6 +58,13 @@ Respond with JSON in this exact structure:
   "reasoning": "Brief explanation"
 }
 
+## Speaker & Character Rules
+- The "speaker" field on each dialogNode must match a character's **displayName** (e.g., "Jenkins", "Dr. Grey")
+- "Narrator" is the built-in default speaker (used when speaker is empty or set to "Narrator")
+- The player character's displayName should be used when the player is speaking (not "You" or "Player" unless that is their actual displayName)
+- Each dialogNode can have a different speaker, enabling back-and-forth conversations between multiple characters
+- When story context provides character names, use those exact displayNames as speaker values
+
 ## CRITICAL Structure Rules
 1. Every dialogNode has: id, speaker, text, and choices array
 2. Each choice has text (player's line) and EITHER 'target' (beat ID) OR 'dialogNode' (NPC responds)
@@ -67,6 +74,7 @@ Respond with JSON in this exact structure:
 4. NEVER use "[Continue]" or placeholder text - choices should contain meaningful player dialogue
 5. When conversation ends, the FINAL choice text is the player's last line + target to exit
 6. DO NOT create extra nesting just for continuation - keep trees as flat as possible
+7. The speaker field on every dialogNode should be a character displayName from the story's characters list
 
 ## Presentation Modes
 The dialogTree supports different presentation styles via "presentationMode" parameter:

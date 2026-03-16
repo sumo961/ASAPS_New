@@ -87,7 +87,8 @@ const getBeatSchemaTool: Tool = {
   description:
     'Get the complete schema for all ASAPS beat types. ' +
     'This tells you what beat types are available, their parameters, ' +
-    'and how to structure story data. Call this before creating a story.',
+    'and how to structure story data. Visible beats support an optional "speaker" parameter ' +
+    '(character displayName) to attribute text to a character. Call this before creating a story.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -102,7 +103,8 @@ const getExampleStoryTool: Tool = {
   name: 'asaps_get_example_story',
   description:
     'Get an example story structure showing the correct format ' +
-    'for beats, connections, and metadata. Use this as a template.',
+    'for beats, connections, characters, and metadata. Includes character definitions ' +
+    'with speaker assignments on beats. Use this as a template.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -150,7 +152,7 @@ const injectStoryTool: Tool = {
       },
       beats: {
         type: 'array',
-        description: 'Array of beat objects. Each beat needs: id, type, name, parameters, x, y',
+        description: 'Array of beat objects. Each beat needs: id, type, name, parameters, x, y. Visible beats can include a "speaker" parameter (character displayName) to attribute text.',
         items: {
           type: 'object',
           properties: {
@@ -185,13 +187,33 @@ const injectStoryTool: Tool = {
       },
       characters: {
         type: 'array',
-        description: 'Optional array of character definitions',
+        description:
+          'Optional array of character definitions. Each character has an id, name, displayName, and role. ' +
+          'The displayName is used as the "speaker" value on beats to attribute text to that character. ' +
+          '"Narrator" is the default speaker when none is specified. ' +
+          'The player character (role: "player") represents the interactor.',
         items: {
           type: 'object',
           properties: {
-            id: { type: 'string' },
-            name: { type: 'string' },
-            displayName: { type: 'string' },
+            id: { type: 'string', description: 'Unique character ID (e.g., "char_player")' },
+            name: { type: 'string', description: 'Internal name' },
+            displayName: { type: 'string', description: 'Display name shown in-game and used as speaker value on beats' },
+            role: { type: 'string', description: 'Character role: "player", "npc", or "companion"' },
+            counters: {
+              type: 'array',
+              description: 'Numeric counters for tracking values (health, trust, etc.)',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  displayName: { type: 'string' },
+                  value: { type: 'number' },
+                  min: { type: 'number' },
+                  max: { type: 'number' },
+                },
+              },
+            },
+            inventory: { type: 'array', description: 'Starting inventory items', items: { type: 'object' } },
           },
         },
       },

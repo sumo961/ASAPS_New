@@ -131,11 +131,19 @@
  *   - Design alternatives: "ALTERNATIVE: Could branch to romance path here"
  * - Example: { "notes": "ASSET: Throne room. CHARACTER: Villain menacing. REVIEW: Player needs enough clues here." }
  *
+ * CHARACTERS AND SPEAKERS:
+ * Stories include a "characters" array with character definitions:
+ * - Each character: { id, name, displayName, role ("player"|"npc"|"companion"), counters, inventory }
+ * - Visible beats have an optional "speaker" parameter set to a character's displayName
+ * - Default speaker is "Narrator" when no speaker is specified
+ * - The player character (role: "player") displayName is used as speaker for player-spoken beats
+ * - dialogTree nodes support per-node speaker fields for multi-character conversations
+ *
  * CHARACTER COUNTERS (Centralized System):
  * Counters should be defined on characters, then referenced consistently in choices:
  * - Define counters in the characters array: { "counters": [{ "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 }] }
  * - These counters become available in ALL choice-type beats (dialogTree, movementChoice, pickProp)
- * - Example character: { "id": "player", "name": "Hero", "counters": [{ "name": "courage", ... }, { "name": "health", ... }] }
+ * - Example character: { "id": "player", "name": "Hero", "displayName": "Hero", "role": "player", "counters": [{ "name": "courage", ... }] }
  * - Example choice with counter effect: { "text": "Stand your ground", "target": "fight", "counter": "courage", "counterOperation": "change", "counterValue": 10 }
  * - Best practice: Define all counters you plan to use on relevant characters first
  *
@@ -233,6 +241,8 @@ export interface GeneratedStory {
   characters?: Array<{
     id: string;
     name: string;
+    displayName: string;
+    role: 'player' | 'npc' | 'companion';
     description: string;
     counters?: Array<{
       name: string;
@@ -299,6 +309,7 @@ Return a JSON object with this structure:
       "type": "titleScreen",  // 🚨 MANDATORY: First beat MUST be titleScreen, NEVER infoText!
       "label": "Title",
       "parameters": { "title": "...", "author": "...", "buttonText": "Begin" },
+      "speaker": "optional character displayName (default: Narrator)",
       "notes": "Optional author annotations (not shown to player)",
       "cluster": "optional-cluster-name"
     }
@@ -311,10 +322,16 @@ Return a JSON object with this structure:
   ],
   "characters": [
     {
-      "id": "char_player", "name": "Hero", "description": "The protagonist",
+      "id": "char_player", "name": "Hero", "displayName": "Hero", "role": "player",
+      "description": "The protagonist",
       "counters": [
         { "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 }
       ]
+    },
+    {
+      "id": "char_guide", "name": "Old Guide", "displayName": "Old Guide", "role": "npc",
+      "description": "A mysterious guide",
+      "counters": []
     }
   ],
   "reasoning": "Explain story structure, branching strategy, and how beat types work together"
@@ -432,6 +449,18 @@ FICTIONAL TIME SYSTEM:
   - { "condition": { "type": "fictionalTime", "operator": ">", "compareTime": { "year": 1969, "month": 1, "day": 1, "hour": 0, "minute": 0 } } }
 - Display: Shows in Timer HUD when enabled in global settings
 - Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
+
+CHARACTERS AND SPEAKERS:
+- The "characters" array defines all characters in the story
+- Each character has: id, name, displayName, role ("player"|"npc"|"companion"), counters, inventory
+- The player character (role: "player") represents the interactor/reader
+- Visible beats have an optional "speaker" parameter (string) set to a character's displayName
+- If no speaker is set, "Narrator" is used as the default speaker
+- The player character's displayName is used as speaker for beats spoken by the player
+- dialogTree nodes have per-node speaker fields: each dialogTree.choices[] entry and the root dialogTree object can have a "speaker" field
+- Use speakers to attribute narration and dialogue to specific characters
+- Example beat with speaker: { "type": "infoText", "parameters": { "text": "Welcome to my shop!", "speaker": "Merchant" } }
+- Example character: { "id": "char_merchant", "name": "merchant", "displayName": "Merchant", "role": "npc", "counters": [], "inventory": [] }
 
 CHARACTER COUNTERS:
 - Define counters on characters first, then reference them in choices

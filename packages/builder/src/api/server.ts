@@ -651,8 +651,26 @@ export class APIServer {
         metadata: {
           title: 'The Crossroads Decision',
           author: 'Claude Desktop',
-          description: 'A short interactive narrative demonstrating ASAPS beat types',
+          description: 'A short interactive narrative demonstrating ASAPS beat types with characters and speakers',
         },
+        characters: [
+          {
+            id: 'char_traveler',
+            name: 'Traveler',
+            displayName: 'Traveler',
+            role: 'player',
+            counters: [],
+            inventory: [],
+          },
+          {
+            id: 'char_guide',
+            name: 'Old Guide',
+            displayName: 'Old Guide',
+            role: 'npc',
+            counters: [],
+            inventory: [],
+          },
+        ],
         beats: [
           {
             id: 'beat_0',
@@ -670,6 +688,7 @@ export class APIServer {
             id: 'beat_1',
             type: 'infoText',
             name: 'Introduction',
+            speaker: 'Old Guide',
             parameters: {
               text: 'You stand at a crossroads. The morning mist swirls around your feet as you consider your options.',
               buttonText: 'Look around',
@@ -706,6 +725,7 @@ export class APIServer {
             id: 'beat_4',
             type: 'infoText',
             name: 'Mountain Road',
+            speaker: 'Old Guide',
             parameters: {
               text: 'The mountain road climbs steadily upward. The air grows thin but the view is breathtaking.',
               buttonText: 'Continue',

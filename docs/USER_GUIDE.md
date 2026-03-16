@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Version 0.9.23*
+*Version 0.9.28*
 
 ---
 
@@ -708,6 +708,38 @@ What can this character carry?
 
 During the story, use Inventory beats to give or take items.
 
+### Speaker Portraits
+
+Give your characters a face that appears alongside their dialog. Speaker portraits are small images (typically a face or headshot) that display inside or above the text box whenever that character speaks.
+
+1. Open a character in the Character Editor
+2. Switch to the **Visual** tab
+3. Scroll down to **Speaker Portrait**
+4. Upload a portrait image (square or near-square works best)
+
+To enable portraits globally, go to **Settings → Speaker Display** and check **Show speaker portraits**. You can also choose where portraits appear and how large they are — see [Speaker Display Settings](#speaker-display) for details.
+
+**Tip:** Portraits are different from character appearances. Appearances are the full-body images placed on the visual stage; portraits are small face images shown in the text box during dialog.
+
+### Character Name Translations
+
+When your project has translation languages configured, the Character Editor gains a **Translations** tab (marked with a globe icon). This lets you enter translated display names for each character, per language.
+
+1. Make sure you have at least one translation language configured (see [Multi-Language Translation](#multi-language-translation))
+2. Open a character in the Character Editor
+3. Click the **Translations** tab
+4. Enter the translated display name for each language
+
+When AI translation runs on your project, character name translations are auto-populated and kept in sync with translation resource files. During playback with a translation active, the translated name appears as the speaker label in text boxes.
+
+### The Player Character as Speaker
+
+Your player character (the character with the "Player" role) automatically appears as a built-in option in beat speaker dropdowns. You'll see it listed by its display name with "(Player)" appended — for example, **Red (Player)**.
+
+When you assign the player character as a beat's speaker, the character's actual display name is stored (not the generic "Interactor"). This means speaker labels and portraits work naturally for the player character, just like any other character.
+
+**TTS behavior:** The player character is silent by default in text-to-speech mode. If you assign a TTS voice to the player character, their text will be spoken — and in multi-choice beats (like Dialog Trees), clicked choices are spoken aloud in the player character's voice.
+
 ### Character Templates
 
 Start faster with pre-made templates:
@@ -1138,6 +1170,48 @@ Checks for common errors:
 - Missing assets
 - Invalid conditions
 
+## Text-to-Speech (TTS)
+
+ASAPS Modern can read your story aloud using text-to-speech. This is useful for testing how dialog flows, for accessibility, and for creating voice-driven experiences.
+
+### Setting Up TTS
+
+1. Click the **volume icon** in the header toolbar to open the TTS dropdown
+2. Click **Enable TTS** to turn on text-to-speech
+3. Click **Configure Provider** to open the provider settings dialog
+4. Choose a **TTS provider**:
+   - **Web Speech** — Free, built into your browser. Quality varies by OS and browser.
+   - **ElevenLabs** — High-quality cloud voices. Requires an API key from [elevenlabs.io](https://elevenlabs.io).
+   - **OpenAI** — Cloud TTS via OpenAI. Requires an API key.
+   - **Custom Server** — Connect to your own TTS endpoint.
+5. Enter your API key if using a cloud provider
+6. Select a **model** (for providers that offer multiple models)
+
+**ElevenLabs Models:**
+| Model | Description |
+|-------|-------------|
+| **Eleven v3** | Most expressive, highest quality (default) |
+| **Multilingual v2** | Good quality, supports many languages |
+| **Flash v2.5** | Fastest response time, lowest cost |
+| **Turbo v2.5** | Fast with good quality |
+
+ElevenLabs uses audio streaming for faster time-to-first-audio, so you hear speech begin almost immediately rather than waiting for the full audio to generate.
+
+### Assigning Character Voices
+
+Each character in your story can have a distinct TTS voice:
+
+1. Open the TTS menu from the header
+2. Under **Character Voices**, you'll see all speakers in your story
+3. Use the dropdown next to each name to assign a voice
+4. Available voices depend on your chosen TTS provider
+
+Built-in speakers like **Narrator** appear automatically. Your player character appears with "(Player)" next to their name. The player character is silent by default — assign a voice to enable speech for the player's text and clicked dialog choices.
+
+### TTS in Project Settings
+
+Your chosen TTS provider type and model are saved with the project, so collaborators automatically use the same configuration. API keys are **not** saved in the project — they stay in your browser's local storage for security.
+
 ## Saving Your Project
 
 ### Quick Save
@@ -1319,6 +1393,23 @@ Use sprite sheets for frame-by-frame animation:
 
 **Settings → Sound:**
 - Background music and volume settings
+
+<a id="speaker-display"></a>
+**Settings → Speaker Display:**
+- **Show speaker names** — Master toggle for displaying character names during dialog
+- **Show speaker portraits** — Master toggle for character portrait images in text boxes
+- **Name style** — How the speaker name appears:
+  - *Label* — Name shown above the text box
+  - *Inline* — Name shown bold at the start of the text inside the box
+  - *Off* — Name hidden
+- **Name position** — Left or right alignment for the speaker name
+- **Name color** — Custom color for the speaker name text
+- **Portrait position** — Where the portrait image appears:
+  - *Inside left / Inside right* — Small portrait inside the text box
+  - *Above left / Above right* — Larger portrait above the text box
+- **Portrait size** — Size in pixels (default: 48px inside, 80px above)
+
+Individual beats can override these global settings. This lets you hide the speaker name for narration beats while showing it for dialog, for example.
 
 **Settings → Variables:**
 - Define global variables for tracking story state
@@ -1720,6 +1811,10 @@ Quick reference for all beat types.
 **Visual Editor** - The WYSIWYG interface for designing beat appearances.
 
 **Choice Effects** - Variable, counter, or inventory changes that trigger immediately when a dialog or movement choice is selected.
+
+**Speaker Portrait** - A small face/head image assigned to a character that appears in or above the text box during dialog. Configured in the Character Editor's Visual tab.
+
+**TTS (Text-to-Speech)** - The system that reads story text aloud using synthesized voices. Supports multiple providers including ElevenLabs, OpenAI, Web Speech, and custom servers.
 
 **Fictional Time** - An in-story date/time value independent of real-world time. Used for day/night cycles, deadlines, and time-based branching.
 

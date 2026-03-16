@@ -65,6 +65,14 @@ dialogTree, movementChoice, and pickProp choices can modify counters:
 - "counter": counter name, "counterOperation": "change" or "set", "counterValue": number
 - "soundEffect": filename to play when choice is selected
 
+## Character & Speaker System
+- Characters have: id, name, displayName, role ('player' | 'npc' | 'companion'), description, counters, translations
+- The player character's displayName is used as the speaker value on beats
+- NPC characters are available as speakers in dialog
+- "Narrator" is the built-in default speaker (when speaker is empty)
+- Visible beats have a "speaker" property set to a character's displayName (e.g., "Red", "Merchant")
+- In dialogTree beats, each dialog node has its own "speaker" field
+
 ## Output Format
 Respond with JSON in this exact structure:
 {
@@ -95,8 +103,13 @@ Respond with JSON in this exact structure:
   ],
   "characters": [
     {
-      "id": "char_1", "name": "Detective Holmes", "description": "Sharp-witted investigator",
+      "id": "char_1", "name": "Detective Holmes", "displayName": "Holmes", "role": "player",
+      "description": "Sharp-witted investigator",
       "counters": [{ "name": "trust", "displayName": "Trust", "value": 0, "min": 0, "max": 100 }]
+    },
+    {
+      "id": "char_2", "name": "Mrs. Watson", "displayName": "Watson", "role": "npc",
+      "description": "A reliable witness"
     }
   ],
   "translations": [
@@ -252,9 +265,10 @@ export function getStoryGenerationExample(): { user: string; assistant: string }
         { name: "cluesFound", "initialValue": 0, "description": "Number of clues discovered" }
       ],
       characters: [
-        { id: "butler", name: "Mr. Jenkins", description: "The loyal butler" },
-        { id: "maid", name: "Mrs. White", description: "The nervous maid" },
-        { id: "guest", name: "Dr. Grey", description: "The mysterious guest" }
+        { id: "player", name: "Detective", displayName: "Detective", role: "player", description: "The investigating detective" },
+        { id: "butler", name: "Mr. Jenkins", displayName: "Jenkins", role: "npc", description: "The loyal butler" },
+        { id: "maid", name: "Mrs. White", displayName: "Mrs. White", role: "npc", description: "The nervous maid" },
+        { id: "guest", name: "Dr. Grey", displayName: "Dr. Grey", role: "npc", description: "The mysterious guest" }
       ],
       reasoning: "Story uses movementChoice to let player explore different rooms and discover clues about the three suspects."
     }, null, 2)
