@@ -1520,12 +1520,21 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           );
         })()}
 
-        {/* Speaker portrait above text box */}
+        {/* Speaker portrait above text box — flush on top, aligned with text box edges */}
         {speakerName && speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'above-left' || theme.speakerDisplay?.graphicPosition === 'above-right') && (() => {
           const isLeft = theme.speakerDisplay?.graphicPosition === 'above-left';
           const size = theme.speakerDisplay?.graphicSize ?? 80;
-          const firstTextY = sortedTextElements[0]?.location.y;
-          const portraitTop = firstTextY != null ? Math.max(firstTextY - size - 8, 4) : 12;
+          const firstEl = sortedTextElements[0];
+          const firstTextY = firstEl?.location.y;
+          const firstTextX = firstEl?.location.x;
+          const firstTextW = firstEl?.location.width;
+          const portraitTop = firstTextY != null ? Math.max(firstTextY - size, 0) : 0;
+          const portraitLeft = isLeft
+            ? (firstTextX != null ? firstTextX + 8 : 16)
+            : undefined;
+          const portraitRight = !isLeft
+            ? (firstTextX != null && firstTextW != null ? stageWidth - (firstTextX + firstTextW) + 8 : 16)
+            : undefined;
           return (
             <img
               src={speakerPortraitUrl}
@@ -1533,8 +1542,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
               style={{
                 position: 'absolute',
                 top: portraitTop,
-                left: isLeft ? 16 : undefined,
-                right: isLeft ? undefined : 16,
+                left: portraitLeft,
+                right: portraitRight,
                 width: size,
                 height: size,
                 objectFit: 'cover',
@@ -1688,7 +1697,23 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
 
   // Apply collision detection to adjust button positions when text boxes grow
   // Always run in both editor and preview modes for unified layout
-  const adjustedElements = adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY, beatType);
+  let adjustedElements = adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY, beatType);
+
+  // When portrait is "above" text box, ensure text elements are pushed down if portrait would clip at top
+  if (speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'above-left' || theme.speakerDisplay?.graphicPosition === 'above-right')) {
+    const abovePortraitSize = theme.speakerDisplay?.graphicSize ?? 80;
+    const firstTextEl = adjustedElements.find(el => el.location.kind === 'text' || el.location.kind === 'dialog');
+    if (firstTextEl) {
+      const neededTop = abovePortraitSize + 4; // portrait height + small margin
+      if (firstTextEl.location.y < neededTop) {
+        const shift = neededTop - firstTextEl.location.y;
+        adjustedElements = adjustedElements.map(el => ({
+          ...el,
+          location: { ...el.location, y: el.location.y + shift },
+        }));
+      }
+    }
+  }
 
   // Report computed layout positions to parent (for editor selection handles)
   const onLayoutComputedRef = React.useRef(onLayoutComputed);
@@ -1863,13 +1888,21 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         );
       })()}
 
-      {/* Speaker portrait above text box */}
+      {/* Speaker portrait above text box — flush on top, aligned with text box edges */}
       {speakerName && speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'above-left' || theme.speakerDisplay?.graphicPosition === 'above-right') && (() => {
         const isLeft = theme.speakerDisplay?.graphicPosition === 'above-left';
         const size = theme.speakerDisplay?.graphicSize ?? 80;
         const firstTextEl = adjustedElements.find(el => el.location.kind === 'text' || el.location.kind === 'dialog');
         const firstTextY = firstTextEl?.location.y;
-        const portraitTop = firstTextY != null ? Math.max(firstTextY - size - 8, 4) : 12;
+        const firstTextX = firstTextEl?.location.x;
+        const firstTextW = firstTextEl?.location.width;
+        const portraitTop = firstTextY != null ? Math.max(firstTextY - size, 0) : 0;
+        const portraitLeft = isLeft
+          ? (firstTextX != null ? firstTextX + 8 : 16)
+          : undefined;
+        const portraitRight = !isLeft
+          ? (firstTextX != null && firstTextW != null ? stageWidth - (firstTextX + firstTextW) + 8 : 16)
+          : undefined;
         return (
           <img
             src={speakerPortraitUrl}
@@ -1877,8 +1910,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             style={{
               position: 'absolute',
               top: portraitTop,
-              left: isLeft ? 16 : undefined,
-              right: isLeft ? undefined : 16,
+              left: portraitLeft,
+              right: portraitRight,
               width: size,
               height: size,
               objectFit: 'cover',
