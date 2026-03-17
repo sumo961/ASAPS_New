@@ -77,6 +77,15 @@ interface GlobalSettings {
       showInTimerHud?: boolean;
     };
   };
+  speakerDisplay?: {
+    showNames?: boolean;
+    showGraphics?: boolean;
+    nameStyle?: string;
+    namePosition?: string;
+    nameColor?: string;
+    graphicPosition?: string;
+    graphicSize?: number;
+  };
 }
 
 /**
@@ -198,6 +207,14 @@ function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSett
       showInPreview: settings.hotspots.showInPreview ?? 'visible',
       labelDisplay: settings.hotspots.labelDisplay ?? 'hover',
     } : undefined,
+    speakerDisplay: settings.speakerDisplay ? (() => {
+      const sd = settings.speakerDisplay as any;
+      const nameStyle = sd.nameStyle || (sd.namePosition === 'off' ? 'off' : 'label');
+      const showNames = sd.showNames ?? (nameStyle !== 'off');
+      const graphicPosition = sd.graphicPosition || 'off';
+      const showGraphics = sd.showGraphics ?? (graphicPosition !== 'off');
+      return { showNames, showGraphics, nameStyle, namePosition: sd.namePosition || 'left', nameColor: sd.nameColor, graphicPosition, graphicSize: sd.graphicSize };
+    })() : undefined,
   };
 }
 
@@ -440,6 +457,12 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
           if (beatData.notes) {
             (beat as any).notes = beatData.notes;
           }
+          if (beatData.speaker) {
+            beat.speaker = beatData.speaker;
+          }
+          if (beatData.showSpeaker != null) {
+            beat.showSpeaker = beatData.showSpeaker;
+          }
 
           story.addBeat(beat);
         } catch (error) {
@@ -635,13 +658,33 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
       try {
         const theme = convertGlobalSettingsToTheme(this.globalSettings);
         renderer.setTheme(theme);
-        console.log('[PlayerEngine] Applied theme settings:', theme);
+        console.log('[PlayerEngine] Applied theme with speakerDisplay:', JSON.stringify(theme.speakerDisplay));
+        console.log('[PlayerEngine] globalSettings.speakerDisplay:', JSON.stringify(this.globalSettings.speakerDisplay));
       } catch (err) {
         console.warn('[PlayerEngine] Failed to apply theme settings:', err);
       }
+    } else {
+      console.warn('[PlayerEngine] No globalSettings or setTheme not available:', { hasGS: !!this.globalSettings, hasSetTheme: !!renderer && 'setTheme' in renderer });
     }
     if (characters.length > 0) {
       console.log(`[PlayerEngine] Characters:`, characters.map((c: any) => ({ id: c.id, name: c.name, states: c.states?.length || 0 })));
+    }
+
+    // Character portrait resolver for speaker portraits
+    if ('setCharacterPortraitResolver' in renderer && characters.length > 0) {
+      renderer.setCharacterPortraitResolver((speakerName: string): string | undefined => {
+        if (!speakerName) return undefined;
+        const lower = speakerName.toLowerCase();
+        const char = characters.find((c: any) =>
+          c.displayName?.toLowerCase() === lower || c.name?.toLowerCase() === lower
+        );
+        if (!char?.portrait) return undefined;
+        if (char.portrait.assetId && this.assetMap.has(char.portrait.assetId)) {
+          return this.assetMap.get(char.portrait.assetId);
+        }
+        return char.portrait.image;
+      });
+      console.log('[PlayerEngine] Set up character portrait resolver');
     }
 
     // Asset resolver - resolves asset IDs to blob URLs
@@ -1029,9 +1072,10 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
     this.currentVolume = volume;
     const normalizedVolume = Math.max(0, Math.min(100, volume)) / 100;
 
-    // Set background music volume
+    // Set background music volume (master × per-track volume)
     if (this.backgroundMusicAudio) {
-      this.backgroundMusicAudio.volume = normalizedVolume;
+      const bgVolume = (this.globalSettings?.sound?.backgroundVolume ?? 50) / 100;
+      this.backgroundMusicAudio.volume = normalizedVolume * bgVolume;
     }
 
     // Set volume for any audio elements in the container

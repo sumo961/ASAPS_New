@@ -6,7 +6,6 @@
  * Uses streaming audio via AudioManager for low-latency playback.
  */
 
-import { getAudioManager } from '@asaps/renderer';
 
 export interface TTSConfig {
   provider: 'elevenlabs' | 'openai' | 'web-speech' | 'custom';
@@ -72,6 +71,10 @@ export class WebTTSService {
     this.speaking = false;
     this.abortController?.abort();
     this.abortController = undefined;
+    if (this._audioElement) {
+      this._audioElement.pause();
+      this._audioElement = undefined;
+    }
     if (this.utterance) {
       window.speechSynthesis?.cancel();
       this.utterance = undefined;
@@ -150,9 +153,10 @@ export class WebTTSService {
         return;
       }
 
-      // Stream audio via AudioManager
-      const audioManager = getAudioManager();
-      await audioManager.playStreamingAudio(response, 1.0);
+      // Play audio — use blob approach for compatibility with file:// origins
+      // (MediaSource streaming doesn't work with null origins)
+      const blob = await response.blob();
+      await this.playAudioBlob(blob);
       this.speaking = false;
     } catch (err: any) {
       if (err?.name !== 'AbortError') {
@@ -161,6 +165,22 @@ export class WebTTSService {
       this.speaking = false;
     }
   }
+
+  /** Play audio from a Blob using a temporary Audio element */
+  private playAudioBlob(blob: Blob): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const audio = new Audio();
+      const url = URL.createObjectURL(blob);
+      audio.src = url;
+      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+      audio.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Audio playback failed')); };
+      // Store for stop()
+      this._audioElement = audio;
+      audio.play().catch(reject);
+    });
+  }
+
+  private _audioElement?: HTMLAudioElement;
 
   /** Speak using browser Web Speech API (no API key needed) */
   private speakWebSpeech(text: string, _speaker?: string): Promise<void> {

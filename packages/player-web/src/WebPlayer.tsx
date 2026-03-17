@@ -32,6 +32,7 @@ export interface WebPlayerProps {
 
 type PlayerState = 'splash' | 'loading' | 'playing' | 'error' | 'ended';
 
+
 // Splash screen duration in milliseconds
 const SPLASH_DURATION = 2000;
 
@@ -219,6 +220,9 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
 
           // Set up global settings for layout and HUD
           const gs = player.getGlobalSettings?.() || (player as any).globalSettings;
+
+          // Note: PlayerEngine.setupResolvers() handles theme (incl. speakerDisplay),
+          // character portrait resolver, and asset resolver — no need to duplicate here.
 
           // Set stage size state (used by DialogTreeBeat for layout)
           renderer.setState('stageSize', {
