@@ -1016,8 +1016,33 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
       this.backgroundMusicAudio.volume = (soundSettings?.backgroundVolume ?? 50) / 100;
 
       // Play the audio
-      await this.backgroundMusicAudio.play();
-      console.log('[PlayerEngine] Background music started');
+      try {
+        await this.backgroundMusicAudio.play();
+        console.log('[PlayerEngine] Background music started');
+      } catch (playErr: any) {
+        if (playErr?.name === 'NotAllowedError') {
+          // Browser autoplay policy blocked playback — defer until first user interaction
+          console.log('[PlayerEngine] Autoplay blocked, deferring background music to first user interaction');
+          const audio = this.backgroundMusicAudio;
+          const self = this;
+          const resumeAudio = () => {
+            // Only resume if this audio element is still the active background music
+            if (audio && audio === self.backgroundMusicAudio && audio.paused) {
+              audio.play().then(() => {
+                console.log('[PlayerEngine] Background music started after user interaction');
+              }).catch(() => {});
+            }
+            document.removeEventListener('click', resumeAudio);
+            document.removeEventListener('keydown', resumeAudio);
+            document.removeEventListener('touchstart', resumeAudio);
+          };
+          document.addEventListener('click', resumeAudio, { once: true });
+          document.addEventListener('keydown', resumeAudio, { once: true });
+          document.addEventListener('touchstart', resumeAudio, { once: true });
+        } else {
+          throw playErr;
+        }
+      }
     } catch (err) {
       console.warn('[PlayerEngine] Failed to start background music:', err);
     }
