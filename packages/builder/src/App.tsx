@@ -672,6 +672,11 @@ function App() {
     const unsubscribeOpenFolder = window.electronAPI.onProjectOpenFolder?.(async (folderPath: string) => {
       console.log('[Electron] Opening project folder:', folderPath);
       try {
+        // Pause auto-save so stale in-memory state isn't written to disk
+        // before the load effect updates refs from the new project
+        pauseAutoSave();
+        resumeAutoSaveAfterLoadRef.current = true;
+        loadedProjectIdRef.current = null;
         const success = await openDirectoryProject(folderPath);
         if (success) {
           console.log('[Electron] Directory project opened successfully');
@@ -680,10 +685,14 @@ function App() {
             await vcs.initialize(folderPath);
           }
         } else {
+          resumeAutoSaveAfterLoadRef.current = false;
+          resumeAutoSave();
           alert('Failed to open project folder. Make sure it contains a valid ASAPS project.');
         }
       } catch (error) {
         console.error('[Electron] Failed to open project folder:', error);
+        resumeAutoSaveAfterLoadRef.current = false;
+        resumeAutoSave();
         alert(`Failed to open project folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     });
@@ -5428,16 +5437,23 @@ function App() {
               // git grep scan that checks every file's content (causes crashes on
               // slow filesystems like Parallels shared folders).
               console.log('[App] Opening cloned project as directory...');
+              pauseAutoSave();
+              resumeAutoSaveAfterLoadRef.current = true;
+              loadedProjectIdRef.current = null;
               const success = await openDirectoryProject(clonedPath);
               if (success) {
                 console.log('[App] Cloned project opened successfully');
               } else {
+                resumeAutoSaveAfterLoadRef.current = false;
+                resumeAutoSave();
                 console.warn('[App] Not a valid ASAPS directory project:', clonedPath);
                 alert('Repository cloned successfully!\n\nNote: This does not appear to be an ASAPS directory-format project.');
               }
               // VCS will be auto-initialized by the projectFormat/projectPath effect
               console.log('[App] Post-clone setup complete (VCS auto-init will follow)');
             } catch (error) {
+              resumeAutoSaveAfterLoadRef.current = false;
+              resumeAutoSave();
               console.error('[App] Failed to open cloned project:', error);
               alert(`Failed to open cloned project: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }

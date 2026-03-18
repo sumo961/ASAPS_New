@@ -453,16 +453,20 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
           setProjectFormat('directory');
           setProjectPath(dirPath);
 
-          // Re-read translations from disk (IndexedDB copy may be stale)
+          // Re-read full project from disk (IndexedDB copy may be stale after
+          // external changes, e.g. git operations outside the app)
           try {
             const freshProject = await adapter.openProject(dirPath);
+            // Merge all data from disk into the loaded project
+            if (freshProject.story) loadedProject.story = freshProject.story;
+            if (freshProject.settings) loadedProject.settings = freshProject.settings;
             if (freshProject.translations && freshProject.translations.length > 0) {
               loadedProject.translations = freshProject.translations;
               loadedProject.translationManifest = freshProject.translationManifest;
-              console.log('[PersistenceProvider] Loaded', freshProject.translations.length, 'translation(s) from disk');
             }
+            console.log('[PersistenceProvider] Restored directory project from disk:', dirPath);
           } catch (e) {
-            console.warn('[PersistenceProvider] Failed to re-read translations from disk:', e);
+            console.warn('[PersistenceProvider] Failed to re-read project from disk:', e);
           }
         } else {
           // Directory no longer exists — fall back to IndexedDB mode
