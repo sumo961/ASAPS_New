@@ -172,11 +172,13 @@ The ASAPS logo, version number, and a large text field where you can type or edi
 | **Debug** | Testing and troubleshooting tools (gray button) |
 | **Preview** | Test your system (green button) |
 
-**Row 3 -- AI and Language:**
+**Row 3 -- AI, TTS, and Language:**
 
 | Button | What it Does |
 |--------|--------------|
 | **AI** | Dropdown: Generate Story, Create Beat from Description, Configure AI |
+| **VCS Status** | Git status (only visible for directory projects under version control) |
+| **TTS** | Text-to-Speech toggle and configuration (right side) |
 | **Source (English)** | Language selector for translations (far right) |
 
 ## The Left Sidebar: Beat List
@@ -467,7 +469,7 @@ The final beat. Display an ending message with options to restart or view a dedi
 - **Message** - Your ending message (defaults to "The End")
 - **Show Restart** - Display a "Play Again" button. You can customize the button label with the **Restart Text** field.
 - **Show Credits** - Display a "Credits" button that opens a scrollable credits page. Customize the button label with the **Credits Text** field.
-- **Reset on Restart** - When enabled, clears story state before restarting. You can choose exactly what gets reset (see below).
+- **Reset on Restart** - When enabled, clears story state when the interactor clicks "Play Again" (not when the End Screen first appears). You can choose exactly what gets reset (see below).
 
 **Granular Reset Options:**
 
@@ -1044,7 +1046,7 @@ The Preview Window is your primary tool for testing your interactive narrative. 
 2. The preview window opens in a new panel
 3. Click anywhere on the stage to begin, or use the controls
 
-**Pro Tip:** You can preview from any beat in your story—just right-click a beat in the flowchart and select "Preview from here."
+**Pro Tip:** You can preview from any beat in your story—just select a beat in the flowchart and open the Preview window. The preview automatically navigates to the selected beat.
 
 ![Preview Running](images/09-preview-running.png)
 *Preview mode showing the experience in action*
@@ -1075,7 +1077,7 @@ When previewing from a beat other than the start, ASAPS Modern intelligently ana
 
 **Using Path Presets:**
 
-1. Right-click a beat and select **Preview from here**
+1. Select a beat in the flowchart and open the Preview window
 2. Click the **Path Presets** dropdown in the toolbar
 3. Browse presets grouped by ending/outcome:
    - Each preset shows the path taken (e.g., "Via Forest → Bridge")
@@ -1176,7 +1178,7 @@ ASAPS Modern can read your story aloud using text-to-speech. This is useful for 
 
 ### Setting Up TTS
 
-1. Click the **volume icon** in the header toolbar to open the TTS dropdown
+1. Click the **TTS** button in the header toolbar (top-right area, with a volume icon) to open the TTS dropdown
 2. Click **Enable TTS** to turn on text-to-speech
 3. Click **Configure Provider** to open the provider settings dialog
 4. Choose a **TTS provider**:
@@ -1207,6 +1209,15 @@ Each character in your story can have a distinct TTS voice:
 4. Available voices depend on your chosen TTS provider
 
 Built-in speakers like **Narrator** appear automatically. Your player character appears with "(Player)" next to their name. The player character is silent by default — assign a voice to enable speech for the player's text and clicked dialog choices.
+
+### TTS Language Awareness
+
+TTS automatically adapts to the active language when translations are in use:
+
+- **In the Preview Window** -- When you switch the translation language, TTS immediately updates to speak in the new language. This happens on every preview data change, so you always hear the correct language.
+- **In HTML exports** -- The project's source language is embedded in the export. When the exported story includes bundled translations and the interactor switches languages, TTS switches language accordingly.
+
+This means you do not need to configure TTS language manually -- it follows your translation settings.
 
 ### TTS in Project Settings
 
@@ -1243,6 +1254,7 @@ The resulting HTML file includes the full renderer, all story data, and embedded
 **Advanced HTML Export Options:**
 - **Mobile-responsive** - Automatic font scaling and layout adaptation on phones/tablets
 - **Bundled translations** - Include multiple language versions with a language selector
+- **TTS language** - The project's source language is automatically embedded; when translations are bundled, switching languages also switches TTS speech language
 - **Save/resume** - Interactors can save progress and resume later (via browser storage)
 - **AI translation on-the-fly** - Optionally embed an API key for runtime AI translation to any language
 
@@ -1393,6 +1405,7 @@ Use sprite sheets for frame-by-frame animation:
 
 **Settings → Sound:**
 - Background music and volume settings
+- Background music respects browser autoplay policies -- if the browser blocks automatic playback (common on first page load), playback starts automatically on the interactor's first click, keypress, or tap
 
 <a id="speaker-display"></a>
 **Settings → Speaker Display:**
@@ -1759,8 +1772,8 @@ Quick reference for all beat types.
 | Ctrl/Cmd + Z | Undo |
 | Ctrl/Cmd + Shift + Z | Redo |
 | Ctrl/Cmd + F | Search & Replace |
-| Ctrl/Cmd + Shift + G | Toggle VCS panel |
 | Ctrl/Cmd + Shift + P | Open Preview window |
+| Ctrl/Cmd + Shift + K | Open Transformations panel |
 | Ctrl/Cmd + I | Toggle inventory (in preview) |
 | Delete | Delete selected beat |
 | Escape | Deselect / Close panel |
@@ -1820,7 +1833,7 @@ Quick reference for all beat types.
 
 **Timer HUD** - A heads-up display overlay showing either a real-time countdown or fictional time in a corner of the screen.
 
-**VCS** - Version Control System. Git or Perforce integration for tracking changes and collaborating.
+**VCS** - Version Control System. Git integration for tracking changes and collaborating.
 
 **Waypoint** - A point along an animation path.
 
