@@ -677,6 +677,9 @@ export class StoryContext extends EventEmitter {
   }
 
   reset(): void {
+    // Capture counter names before clearing so we can emit change events
+    const oldCounterNames = Object.keys(this.state.counters);
+
     this.timerManager.stopAllTimers();
     this.state = {
       currentBeatId: this.story?.getFirstBeatId() || '0',
@@ -691,6 +694,12 @@ export class StoryContext extends EventEmitter {
     this.history = [];
     this.choiceHistory = [];
     this.emit('reset');
+
+    // Emit change events so UI listeners (countdown meter, debug panel) update
+    for (const name of oldCounterNames) {
+      this.emit('counterChanged', { name, value: 0 });
+    }
+    this.emit('inventoryChanged');
   }
 
   /**
@@ -698,6 +707,8 @@ export class StoryContext extends EventEmitter {
    * Allows EndScreen beats to preserve certain state (e.g. keep variables but reset counters).
    */
   selectiveReset(options: ResetOptions): void {
+    const oldCounterNames = options.counters ? Object.keys(this.state.counters) : [];
+
     if (options.variables) {
       this.state.variables = {};
     }
@@ -725,6 +736,14 @@ export class StoryContext extends EventEmitter {
     }
     this.state.currentBeatId = this.story?.getFirstBeatId() || '0';
     this.emit('selectiveReset', options);
+
+    // Emit change events so UI listeners (countdown meter, debug panel) update
+    for (const name of oldCounterNames) {
+      this.emit('counterChanged', { name, value: 0 });
+    }
+    if (options.inventory) {
+      this.emit('inventoryChanged');
+    }
   }
 
   getStory(): Story {

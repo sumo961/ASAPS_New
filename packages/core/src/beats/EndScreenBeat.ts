@@ -111,25 +111,6 @@ export class EndScreenBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
-    if (this.reset) {
-      // If all sub-options are true, use full reset for efficiency
-      const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
-        this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
-      if (allTrue) {
-        context.reset();
-      } else {
-        context.selectiveReset({
-          variables: this.resetVariables,
-          counters: this.resetCounters,
-          inventory: this.resetInventory,
-          timers: this.resetTimers,
-          fictionalTime: this.resetFictionalTime,
-          visitedTracking: this.resetVisitedTracking,
-          history: this.resetHistory,
-        });
-      }
-    }
-
     // Background is now handled centrally in Beat.execute()
 
     // Set button text in renderer state so it can be used by schema mapping
@@ -161,11 +142,17 @@ export class EndScreenBeat extends Beat {
     const actionLower = (action || '').toLowerCase();
     console.log('[EndScreenBeat] Action lower:', actionLower);
 
+    // Helper: perform reset and return restart target
+    const doRestart = (): string => {
+      this.applyReset(context);
+      const target = this.getNextBeat(context) || context.getStory().getFirstBeatId();
+      console.log('[EndScreenBeat] Restarting - navigating to:', target);
+      return target;
+    };
+
     // Check for explicit restart patterns
     if (actionLower.includes('restart') || actionLower.includes('play') || actionLower.includes('again')) {
-      const restartTarget = this.getNextBeat(context) || context.getStory().getFirstBeatId();
-      console.log('[EndScreenBeat] User requested restart (explicit pattern) - navigating to:', restartTarget);
-      return restartTarget;
+      return doRestart();
     }
 
     // Check for credits patterns
@@ -182,9 +169,7 @@ export class EndScreenBeat extends Beat {
     // button1 is typically restart, button2 is typically credits
     if (actionLower === 'button1' || actionLower === 'button 1') {
       if (this.showRestart) {
-        const restartTarget = this.getNextBeat(context) || context.getStory().getFirstBeatId();
-        console.log('[EndScreenBeat] User clicked button1 with showRestart=true - navigating to:', restartTarget);
-        return restartTarget;
+        return doRestart();
       }
     }
 
@@ -199,13 +184,35 @@ export class EndScreenBeat extends Beat {
 
     // If only one button exists and showRestart is true, any button click should restart
     if (this.showRestart && !this.showCredits) {
-      const restartTarget = this.getNextBeat(context) || context.getStory().getFirstBeatId();
-      console.log('[EndScreenBeat] Single button with showRestart=true - navigating to:', restartTarget);
-      return restartTarget;
+      return doRestart();
     }
 
     console.log('[EndScreenBeat] No restart detected, returning null');
     return null;
+  }
+
+  /**
+   * Apply reset (full or selective) based on beat configuration.
+   * Called just before navigating away from the EndScreen on restart.
+   */
+  private applyReset(context: StoryContext): void {
+    if (!this.reset) return;
+
+    const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
+      this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
+    if (allTrue) {
+      context.reset();
+    } else {
+      context.selectiveReset({
+        variables: this.resetVariables,
+        counters: this.resetCounters,
+        inventory: this.resetInventory,
+        timers: this.resetTimers,
+        fictionalTime: this.resetFictionalTime,
+        visitedTracking: this.resetVisitedTracking,
+        history: this.resetHistory,
+      });
+    }
   }
 
   private async showCreditsPage(context: StoryContext, renderer: IRenderer): Promise<void> {

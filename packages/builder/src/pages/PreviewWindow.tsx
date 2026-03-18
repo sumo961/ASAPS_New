@@ -1422,10 +1422,8 @@ export const PreviewWindow: React.FC = () => {
         const counters = ctx.getCounters();
         const timers = ctx.getTimers();
 
-        // Update countersRef for counter resolver
-        Object.entries(counters).forEach(([key, value]) => {
-          countersRef.current[key] = value;
-        });
+        // Replace countersRef with current context state (ensures reset clears old values)
+        countersRef.current = { ...counters };
 
         setDebugInfo({
           visitedBeats: ctx.getVisitedBeats(),
@@ -1509,6 +1507,8 @@ export const PreviewWindow: React.FC = () => {
       context.on('variableChanged', updateDebugInfo);
       context.on('counterChanged', updateDebugInfo);
       context.on('inventoryChanged', updateDebugInfo);
+      context.on('reset', updateDebugInfo);
+      context.on('selectiveReset', updateDebugInfo);
 
       // Listen for fictional time changes and update renderer
       context.on('fictionalTimeChanged', () => {
