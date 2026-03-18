@@ -1346,6 +1346,14 @@ export const PreviewWindow: React.FC = () => {
       }
     }
 
+    // Update TTS language on every previewData change (e.g., language switch)
+    // This runs outside the renderer init block so it applies even when the
+    // renderer already exists
+    {
+      const ttsLang = previewData.activeLanguage || previewData.settings?.translation?.sourceLanguage || 'en';
+      getTTSService().setLanguage(ttsLang);
+    }
+
     return () => {
       if (engineRef.current) {
         engineRef.current.stop();

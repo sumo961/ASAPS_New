@@ -24,6 +24,8 @@ export interface WebPlayerProps {
   mobileMode?: boolean;
   /** Font scale multiplier (pre-computed: > 1.0 on mobile, 1.0 on desktop) */
   mobileFontScale?: number;
+  /** Language code for TTS (e.g., 'en', 'de', 'ja') — updated on translation switch */
+  language?: string;
   /** Callback when story ends */
   onEnd?: () => void;
   /** Callback when error occurs */
@@ -44,6 +46,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   showUI = true,
   mobileMode = false,
   mobileFontScale = 1.0,
+  language,
   onEnd,
   onError,
 }) => {
@@ -188,8 +191,9 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             }
           });
           renderer.setTTSStopCallback(() => ttsService.stop());
-          // Set TTS language from project settings
-          const ttsLang = (window as any).ASAPS_CONFIG?.ttsLanguage || 'en';
+          // Set TTS language: use explicit language prop (from translation switch),
+          // fall back to project config, then default to 'en'
+          const ttsLang = language || (window as any).ASAPS_CONFIG?.ttsLanguage || 'en';
           ttsService.setLanguage(ttsLang);
         }
 
@@ -477,7 +481,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         rendererRef.current = null;
       }
     };
-  }, [state, story, enableAI, mobileMode, mobileFontScale, onEnd, onError]);
+  }, [state, story, enableAI, mobileMode, mobileFontScale, language, onEnd, onError]);
 
   // Note: Container resize is handled internally by ScaledStage component
   // via its own ResizeObserver

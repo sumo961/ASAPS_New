@@ -124,6 +124,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       ttsConfig: {{TTS_CONFIG}},
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
+      ttsLanguage: '{{TTS_LANGUAGE}}',
     };
   </script>
 
@@ -162,6 +163,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
           enableAI: window.ASAPS_CONFIG.enableAI,
           mobileMode: mobileMode,
           mobileFontScale: effectiveFontScale,
+          language: window.ASAPS_CONFIG.ttsLanguage,
         });
       } else {
         console.error('ASAPS Player not loaded');
@@ -301,6 +303,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       ttsConfig: {{TTS_CONFIG}},
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
+      ttsLanguage: '{{TTS_LANGUAGE}}',
     };
 
     window.ASAPS_TRANSLATIONS = {
@@ -364,11 +367,14 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
           ? window.ASAPS_CONFIG.mobileFontScale : 1.0;
 
         if (typeof ASAPSPlayer !== 'undefined') {
+          // Pass language code so TTS knows which language to speak
+          var ttsLang = (lang === 'original') ? window.ASAPS_CONFIG.ttsLanguage : lang;
           window._asapsPlayerInstance = ASAPSPlayer.init('#player', {
             story: storySource,
             enableAI: window.ASAPS_CONFIG.enableAI,
             mobileMode: mobileMode,
             mobileFontScale: effectiveFontScale,
+            language: ttsLang,
           });
         }
       };
@@ -395,6 +401,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
           enableAI: window.ASAPS_CONFIG.enableAI,
           mobileMode: mobileMode,
           mobileFontScale: effectiveFontScale,
+          language: window.ASAPS_CONFIG.ttsLanguage,
         });
       }
     })();
@@ -930,6 +937,7 @@ async function exportAsSingleFile(
     .replace("'{{STORY_DATA}}'", `'${storyBase64}'`)
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
+    .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{PLAYER_SCRIPT}}', playerScript);
@@ -1251,6 +1259,7 @@ export async function downloadHtmlExport(
     .replace("'{{ORIGINAL_STORY_DATA}}'", `'${originalBase64}'`)
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
+    .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{LANGUAGE_OPTIONS}}', languageOptionsHtml)
