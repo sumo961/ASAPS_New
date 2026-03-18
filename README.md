@@ -16,12 +16,17 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.28)
+## ⚠️ Development Status (v0.9.29)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Text-to-Speech** | **v0.9.29**: Cloud TTS (OpenAI, ElevenLabs) and Web Speech API with streaming audio, per-speaker voice routing |
+| **Speaker System** | **v0.9.29**: Per-beat speaker assignment with portrait display, translatable names, TTS voice mapping |
+| **TTS in HTML Export** | **v0.9.29**: Embedded TTS with language-aware voice switching on translation change |
+| **EndScreen Reset Fix** | **v0.9.29**: State properly resets on restart, deferred to Play Again click, selective reset working |
+| **Directory Project Safety** | **v0.9.29**: Full disk read on session restore prevents data loss from stale IndexedDB |
 | **360° Panorama Beat** | **v0.9.28**: New interactive beat type with hotspot navigation, equirectangular/cylindrical projections, Photo Sphere Viewer |
 | **Panorama Visual Editor** | **v0.9.28**: Drag-and-drop hotspot placement, location assignment, image markers, per-element overrides |
 | **Panorama HTML Export** | **v0.9.28**: Fixed asset ID extraction, environment node URL resolution, and blob URL handling for file:// contexts |

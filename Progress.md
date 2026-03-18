@@ -1,5 +1,110 @@
 # ASAPS Modern - Progress Log
 
+## 2026-03-18: Text-to-Speech, Speaker System & Bug Fixes (v0.9.29)
+
+### Overview
+
+This release adds a comprehensive **Text-to-Speech (TTS) system** with cloud provider support (OpenAI, ElevenLabs, Web Speech API), a **per-beat speaker assignment system** with TTS voice routing and portrait display, **TTS in HTML exports** with embedded API keys, and **language-aware TTS** that switches voice language when translations are active. Also includes critical bug fixes for **EndScreen state reset**, **Chrome autoplay policy**, **directory project data preservation**, and **speaker display in exports**.
+
+### Text-to-Speech System
+
+Full TTS integration with multiple cloud providers and streaming audio playback.
+
+- OpenAI TTS and ElevenLabs providers with streaming endpoint support
+- Web Speech API fallback for zero-config local TTS
+- Low-latency streaming audio playback
+- Provider and model persistence to project settings
+- TTS configuration dialog in header toolbar
+- Comprehensive test suite for providers and service
+
+**Files modified:**
+- `packages/builder/src/services/tts/TTSService.ts` — Core TTS service with provider registry and language override
+- `packages/builder/src/services/tts/providers/` — OpenAI, ElevenLabs, WebSpeech provider implementations
+- `packages/builder/src/components/tts/TTSConfigDialog.tsx` — Configuration UI
+- `packages/builder/src/hooks/useTTS.ts` — React hook for TTS integration
+
+### Per-Beat Speaker Assignment
+
+Speaker identification system with TTS voice routing and visual display.
+
+- Per-beat speaker field with character selection dropdown
+- Global speaker display toggles (name label, inline, off) with per-beat override
+- Speaker portrait rendering above text boxes with position controls
+- TTS voice routing per speaker character
+- Schema-driven speaker controls in beat inspector
+- Player character as speaker with translatable character names
+- Speaker name translation propagation across all beat types
+
+**Files modified:**
+- `packages/core/src/beats/Beat.ts` — Speaker and showSpeaker fields on base beat class
+- `packages/renderer/src/components/PositionedBeatView.tsx` — Speaker portrait and name rendering
+- `packages/renderer/src/renderers/ReactRenderer.tsx` — Speaker display resolver, portrait resolver
+- `packages/builder/src/components/visual/VisualBeatEditor.tsx` — Speaker portrait in visual editor
+- `beat-definitions/core-beats.json` — Speaker/showSpeaker fields on all beat types
+
+### TTS in HTML Export
+
+TTS support embedded directly in exported HTML files.
+
+- Embedded API key for cloud TTS providers
+- Language-aware TTS: switches voice language on translation switch
+- `ttsLanguage` config derived from project source language
+- WebTTSProvider for HTML export player with language support
+
+**Files modified:**
+- `packages/builder/src/export/HtmlExporter.ts` — TTS config, language placeholder, init params
+- `packages/player-web/src/WebPlayer.tsx` — Language prop for TTS routing
+- `packages/player-web/src/WebTTSProvider.ts` — TTS provider for web player
+
+### EndScreen Reset Fix
+
+Fixed state not resetting on story restart from EndScreen.
+
+- `StoryContext.reset()` and `selectiveReset()` now emit `counterChanged` and `inventoryChanged` events
+- PreviewWindow `countersRef` replaced entirely on update instead of merging (stale values no longer persist)
+- Reset deferred to when user clicks "Play Again" — final values remain visible on the End Screen
+- Selective reset (per-category) preserved and working correctly
+
+**Files modified:**
+- `packages/core/src/engine/StoryContext.ts` — Emit change events from reset/selectiveReset
+- `packages/core/src/beats/EndScreenBeat.ts` — Defer reset to restart action via applyReset()
+- `packages/builder/src/pages/PreviewWindow.tsx` — Replace countersRef, subscribe to reset events
+
+### Chrome Autoplay & Export Fixes
+
+- Background music defers to first user interaction when Chrome blocks autoplay
+- Speaker display and theme settings restored in HTML export player
+- Above-portrait positioning flush with text box, shift down when clipped
+
+**Files modified:**
+- `packages/player/src/PlayerEngine.ts` — NotAllowedError handling with deferred playback
+- `packages/player/src/PlayerEngine.ts` — Speaker display and theme setup in resolvers
+
+### Directory Project Data Preservation
+
+Fixed critical data loss when restoring directory projects on app restart.
+
+- Session restore now reads full project (story, settings, translations) from disk instead of stale IndexedDB
+- Auto-save paused during "Open Project Folder" and clone operations
+- Prevents stale in-memory state from overwriting current files
+
+**Files modified:**
+- `packages/builder/src/contexts/PersistenceContext.tsx` — Full disk read on session restore
+- `packages/builder/src/App.tsx` — Pause auto-save during folder open/clone
+
+### Additional Fixes
+
+- Connection management unified — beat types own their connections, preventing accumulation
+- PickProp connections preserved when multiple props target the same beat
+- Z-order changes persist immediately to beat locations
+- Orphaned beat files deleted when saving directory projects
+- Translation staleness detection and corrupted snapshot recovery
+- External assets folder support for large files in Electron
+- Panorama hotspot text extraction for translation
+- Asset validator looks in correct subdirectory
+
+---
+
 ## 2026-03-04: 360° Panorama Beat & HTML Export Fixes (v0.9.28)
 
 ### Overview
