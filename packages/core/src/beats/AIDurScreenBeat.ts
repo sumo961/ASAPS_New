@@ -187,6 +187,16 @@ export class AIDurScreenBeat extends Beat {
         }
       }
 
+      // Record AI output for session logging
+      if (this.generatedText) {
+        context.recordAIOutput({
+          beatId: this.id,
+          beatName: this.name || this.id,
+          beatType: 'aiDurScreen',
+          text: this.generatedText,
+        });
+      }
+
       // Render the generated text
       const displayText = this.generatedText || this.fallbackText;
       const processedText = this.processText(displayText, context);
@@ -203,6 +213,29 @@ export class AIDurScreenBeat extends Beat {
       const duration = this.calculateDuration(processedFallback);
       await renderer.renderDurScreen(processedFallback, duration, locations);
       return this.getNextBeat(context);
+    }
+  }
+
+  /**
+   * Prefetch AI content in the background so it's cached when the beat executes.
+   * Called by StoryEngine when this beat is the next beat to be executed.
+   * Does NOT render anything - only generates and caches text.
+   */
+  async prefetch(context: StoryContext, renderer: IRenderer): Promise<void> {
+    try {
+      const aiService = renderer.getState('aiService');
+      if (!aiService || typeof aiService.generateContent !== 'function') return;
+
+      const contextHash = this.createContextHash(context);
+      if (this.generatedText && this.lastContextHash === contextHash) return; // already cached
+
+      console.log(`[AIDurScreenBeat ${this.id}] Prefetching content...`);
+      this.generatedText = await this.generateText(context, aiService, renderer);
+      this.lastContextHash = contextHash;
+      console.log(`[AIDurScreenBeat ${this.id}] Prefetch complete`);
+    } catch (err) {
+      // Prefetch failure is non-fatal - will retry on execute
+      console.log(`[AIDurScreenBeat ${this.id}] Prefetch failed (will retry on execute):`, err);
     }
   }
 

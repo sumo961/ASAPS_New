@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download } from 'lucide-react';
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { ReactRenderer, getAudioManager } from '@asaps/renderer';
@@ -1837,6 +1837,140 @@ export const PreviewWindow: React.FC = () => {
     }
   }, [ttsEnabled]);
 
+  // Export play session log
+  const exportSessionLog = useCallback(() => {
+    const context = engineRef.current?.getContext();
+    if (!context) return;
+
+    const storyObj = context.getStory();
+    const timeline = context.getTimeline();
+    const variables = context.getVariables();
+    const counters = context.getCounters();
+    const inventory = context.getInventoryEntries();
+    const visitedBeats = context.getVisitedBeats();
+    const timers = context.getTimers();
+    const fictionalTime = context.getFictionalTime?.();
+
+    const lines: string[] = [];
+    const now = new Date().toISOString();
+    const storyTitle = previewData?.storyData?.title || 'Untitled';
+    const fmt = (ts: number) => new Date(ts).toLocaleTimeString();
+
+    lines.push(`ASAPS Play Session Log`);
+    lines.push(`======================`);
+    lines.push(`Story: ${storyTitle}`);
+    lines.push(`Exported: ${now}`);
+    lines.push(`Current Beat: ${currentBeat?.name || 'none'} (${currentBeat?.id || '-'})`);
+    lines.push(``);
+
+    // ── SECTION 1: OVERVIEW ──────────────────────────────
+    lines.push(`════════════════════════════════════════════`);
+    lines.push(`OVERVIEW`);
+    lines.push(`════════════════════════════════════════════`);
+    lines.push(``);
+
+    // Beat path (compact)
+    const beatEvents = timeline.filter(e => e.type === 'beat-enter');
+    lines.push(`Beat Path (${beatEvents.length} beats)`);
+    lines.push(`-------------------------------------------`);
+    beatEvents.forEach((e, i) => {
+      lines.push(`  ${i + 1}. [${fmt(e.timestamp)}] [${e.beatType}] ${e.beatName || e.beatId}`);
+    });
+    lines.push(``);
+
+    // Final state
+    const varEntries = Object.entries(variables);
+    const counterEntries = Object.entries(counters);
+    if (varEntries.length > 0 || counterEntries.length > 0 || inventory.length > 0) {
+      lines.push(`Final State`);
+      lines.push(`-------------------------------------------`);
+      varEntries.forEach(([k, v]) => lines.push(`  var  ${k} = ${JSON.stringify(v)}`));
+      counterEntries.forEach(([k, v]) => lines.push(`  ctr  ${k} = ${v}`));
+      inventory.forEach(item => lines.push(`  inv  ${item.name}${item.quantity > 1 ? ` x${item.quantity}` : ''}`));
+      const timerEntries = Object.entries(timers);
+      timerEntries.forEach(([k, t]) => lines.push(`  tmr  ${k}: ${(t as any).value}s${(t as any).target ? ` -> ${(t as any).target}` : ''}`));
+      if (fictionalTime) lines.push(`  time ${JSON.stringify(fictionalTime)}`);
+      lines.push(``);
+    }
+
+    // Summary stats
+    const choiceCount = timeline.filter(e => e.type === 'choice').length;
+    const branchCount = timeline.filter(e => e.type === 'branch').length;
+    const aiCount = timeline.filter(e => e.type === 'ai-output').length;
+    lines.push(`Statistics`);
+    lines.push(`-------------------------------------------`);
+    lines.push(`  Unique beats visited: ${visitedBeats.length}`);
+    lines.push(`  Total beat transitions: ${beatEvents.length}`);
+    lines.push(`  Choices made: ${choiceCount}`);
+    lines.push(`  Branch decisions: ${branchCount}`);
+    lines.push(`  AI outputs: ${aiCount}`);
+    lines.push(``);
+
+    // ── SECTION 2: DETAILED TIMELINE ─────────────────────
+    lines.push(`════════════════════════════════════════════`);
+    lines.push(`DETAILED TIMELINE`);
+    lines.push(`════════════════════════════════════════════`);
+    lines.push(``);
+
+    let eventNum = 0;
+    for (const event of timeline) {
+      eventNum++;
+      const time = fmt(event.timestamp);
+
+      switch (event.type) {
+        case 'beat-enter':
+          lines.push(`${eventNum}. [${time}] [${event.beatType}] ${event.beatName || event.beatId} (${event.beatId})`);
+          break;
+
+        case 'choice':
+          lines.push(`${eventNum}. [${time}] CHOICE at ${event.beatName || event.beatId}`);
+          if (event.choiceContext) {
+            lines.push(`     Q: ${event.choiceContext}`);
+          }
+          lines.push(`     -> "${event.choiceText}"`);
+          break;
+
+        case 'branch': {
+          const target = event.targetBeatName || event.targetBeatId || '?';
+          lines.push(`${eventNum}. [${time}] [${event.beatType}] ${event.beatName || event.beatId} branched to ${target}`);
+          if (event.reason) {
+            lines.push(`     because: ${event.reason}`);
+          }
+          break;
+        }
+
+        case 'ai-output':
+          lines.push(`${eventNum}. [${time}] [${event.beatType}] ${event.beatName || event.beatId} generated:`);
+          if (event.text) {
+            // Indent and truncate long AI output for readability
+            const textPreview = event.text.length > 300
+              ? event.text.substring(0, 300) + '...'
+              : event.text;
+            textPreview.split('\n').forEach(line => {
+              lines.push(`     ${line}`);
+            });
+          }
+          break;
+
+        case 'state-change':
+          lines.push(`${eventNum}. [${time}] STATE: ${event.stateChange}`);
+          break;
+      }
+    }
+    lines.push(``);
+
+    // Download as text file
+    const text = lines.join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `session-log-${storyTitle.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [currentBeat, previewData]);
 
   // Zoom controls
   const handleZoomIn = () => { setIsAutoFit(false); setScale(prev => Math.min(prev + 0.1, 2)); };
@@ -2231,6 +2365,14 @@ export const PreviewWindow: React.FC = () => {
                 <RotateCcw className="w-4 h-4" />
                 Restart
               </button>
+              <button
+                onClick={exportSessionLog}
+                className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 flex items-center gap-2"
+                title="Save play session log"
+              >
+                <Download className="w-4 h-4" />
+                Save Log
+              </button>
               <div className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded flex items-center gap-1">
                 <Pause className="w-3 h-3" />
                 Paused
@@ -2258,6 +2400,14 @@ export const PreviewWindow: React.FC = () => {
               >
                 <RotateCcw className="w-4 h-4" />
                 Restart
+              </button>
+              <button
+                onClick={exportSessionLog}
+                className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 flex items-center gap-2"
+                title="Save play session log"
+              >
+                <Download className="w-4 h-4" />
+                Save Log
               </button>
             </>
           )}

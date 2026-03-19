@@ -124,7 +124,11 @@ export class WebTTSService {
               'Content-Type': 'application/json',
               'xi-api-key': this.config!.apiKey!,
             },
-            body: JSON.stringify({ text, model_id: modelId }),
+            body: JSON.stringify({
+              text,
+              model_id: modelId,
+              ...(this.language ? { language_code: this.language } : {}),
+            }),
             signal: this.abortController.signal,
           }
         );

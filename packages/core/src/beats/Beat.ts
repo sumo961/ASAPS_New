@@ -202,8 +202,12 @@ export abstract class Beat {
       // This ensures the background is cleared when a beat doesn't have one
       renderer.setState('backgroundAssetId', this.node || null);
       
+      // Prefetch: while the user reads/interacts with this beat, start generating
+      // content for any connected AI beats in the background
+      this.prefetchConnectedBeats(context, renderer);
+
       const nextBeatId = await this.performAction(context, renderer);
-      
+
       await this.onExit(context, renderer);
       
       context.markBeatVisited(this.id);
@@ -263,6 +267,42 @@ export abstract class Beat {
       // Stop the timer to prevent it from firing after user makes a choice
       timerManager.stopTimer(timerName);
       console.log(`[Beat ${this.id}] Stopped default target timer: ${timerName}`);
+    }
+  }
+
+  private static readonly PREFETCHABLE_TYPES = new Set([
+    'aiInfoText', 'aiDurScreen', 'aiDialogTree', 'aiSummary', 'onlineContent',
+  ]);
+
+  /**
+   * Fire-and-forget prefetch of AI content for connected beats.
+   * Called at the start of execute(), so API calls run while the user
+   * reads/interacts with the current beat.
+   */
+  private prefetchConnectedBeats(context: StoryContext, renderer: IRenderer): void {
+    try {
+      const story = context.getStory();
+      // Collect unique target beat IDs from connections + defaultTarget
+      const targetIds = new Set<string>();
+      for (const conn of this.connections) {
+        if (conn.targetId) targetIds.add(conn.targetId);
+      }
+      if (this.defaultTarget) targetIds.add(this.defaultTarget);
+
+      for (const targetId of targetIds) {
+        const targetBeat = story.getBeat(targetId);
+        if (!targetBeat || !Beat.PREFETCHABLE_TYPES.has(targetBeat.type)) continue;
+
+        const prefetchable = targetBeat as Beat & { prefetch?: (ctx: StoryContext, r: IRenderer) => Promise<void> };
+        if (typeof prefetchable.prefetch !== 'function') continue;
+
+        console.log(`[Beat ${this.id}] Prefetching connected AI beat: ${targetId} (${targetBeat.type})`);
+        prefetchable.prefetch(context, renderer).catch(() => {
+          // Non-fatal — will retry on execute
+        });
+      }
+    } catch {
+      // Never let prefetch errors affect the current beat
     }
   }
 
@@ -360,6 +400,13 @@ export abstract class Beat {
     // Replace $variableName$ format (legacy)
     text = text.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)\$/g, (match, varName) => {
       const value = context.getVariable(varName);
+      return value !== undefined && value !== null ? String(value) : match;
+    });
+
+    // Replace {variableName} format (AI-generated content often uses this)
+    // Only match if the variable exists to avoid replacing unrelated braces
+    text = text.replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (match, varName) => {
+      const value = context.getVariable(varName.trim());
       return value !== undefined && value !== null ? String(value) : match;
     });
 

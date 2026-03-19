@@ -82,6 +82,7 @@ export class AIDialogTreeBeat extends Beat {
   private generatedTree: DialogNode | null = null;
   private currentNode: DialogNode | null = null;
   private lastContextHash: string | null = null; // Track context to detect changes
+  private lastRoutingPlan: string | null = null; // AI's exit routing reasoning
 
   constructor(config: BeatConfig & {
     parameters?: Partial<AIDialogTreeBeatParams>;
@@ -167,6 +168,29 @@ export class AIDialogTreeBeat extends Beat {
     return connections;
   }
 
+  /**
+   * Prefetch AI content in the background so it's cached when the beat executes.
+   * Called by StoryEngine when this beat is the next beat to be executed.
+   * Does NOT render anything - only generates and caches the dialog tree.
+   */
+  async prefetch(context: StoryContext, renderer: IRenderer): Promise<void> {
+    try {
+      const aiService = renderer.getState('aiService');
+      if (!aiService || typeof aiService.generateDialog !== 'function') return;
+
+      const contextHash = this.createContextHash(context);
+      if (this.generatedTree && this.lastContextHash === contextHash) return; // already cached
+
+      console.log(`[AIDialogTreeBeat ${this.id}] Prefetching dialog tree...`);
+      this.generatedTree = await this.generateDialogTree(context, aiService);
+      this.lastContextHash = contextHash;
+      console.log(`[AIDialogTreeBeat ${this.id}] Prefetch complete`);
+    } catch (err) {
+      // Prefetch failure is non-fatal - will retry on execute
+      console.log(`[AIDialogTreeBeat ${this.id}] Prefetch failed (will retry on execute):`, err);
+    }
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer
@@ -236,6 +260,25 @@ export class AIDialogTreeBeat extends Beat {
         this.generatedTree = await this.generateDialogTree(context, aiService);
         this.lastContextHash = contextHash;
       }
+
+      // Always log routing plan and tree (even when prefetched)
+      if (this.lastRoutingPlan) {
+        context.recordTimelineEvent({
+          type: 'ai-output',
+          beatId: this.id,
+          beatName: this.name || this.id,
+          beatType: 'aiDialogTree',
+          text: `[Routing Plan] ${this.lastRoutingPlan}`,
+        });
+      }
+
+      context.recordTimelineEvent({
+        type: 'ai-output',
+        beatId: this.id,
+        beatName: this.name || this.id,
+        beatType: 'aiDialogTree',
+        text: JSON.stringify(this.generatedTree),
+      });
 
       // Execute the dialog tree
       const result = await this.executeDialogTree(context, renderer);
@@ -315,7 +358,7 @@ ${this.npcPersonality ? `PERSONALITY: ${this.npcPersonality}` : ''}
 PLAYER CONTEXT:
 ${playerContext}
 
-EXIT TARGETS (when the conversation should end):
+EXIT CONDITIONS (treat these as rules — route to an exit when the condition is clearly met):
 ${exitDescriptions}
 
 ${this.systemInstructions ? `ADDITIONAL INSTRUCTIONS: ${this.systemInstructions}` : ''}
@@ -325,31 +368,19 @@ REQUIREMENTS:
 2. The NPC should respond based on the player's known state (name, choices, inventory)
 3. Each dialog node has: speaker, text, and 2-4 player choices
 4. Each choice should lead to either another dialog node OR an exit target
-5. Personalize the dialog based on player variables (e.g., use their name, reference their profession)
+5. PERSONALIZATION IS CRITICAL: Use the player's actual name, location, profession, and other details from the PLAYER CONTEXT above. Write them directly into the NPC's dialog text (e.g., "Welcome to Stockholm, Mirjam!" not "Welcome to your city!"). Never use placeholder syntax like {playerName}. If you don't know a value, omit it gracefully
 6. Make the conversation feel natural and engaging
+7. For every choice that has a "target" (exits the conversation), include an "exitReason" field — a concrete explanation of what the player said or expressed that satisfies the exit condition. Be specific, not vague.
+8. IMPORTANT: Include a top-level "routingPlan" field that explains your reasoning: how you mapped each exit condition to conversation branches, what player signals you look for, and which context (variables, history) influenced your decisions. This helps authors debug and refine the conversation design.
 
 CRITICAL STRUCTURE RULES:
 - The "text" field contains EVERYTHING the NPC says, including greetings AND follow-up questions
 - The "choices" array contains ONLY what the PLAYER would say in response
 - If the NPC asks a question, put the question IN THE TEXT FIELD, then put possible player ANSWERS in choices
 
-WRONG EXAMPLE (NPC question in choices):
-{
-  "text": "Hello! Nice to meet you.",
-  "choices": [{ "text": "What brings you here today?" }]  // WRONG! This is NPC asking, not player!
-}
-
-CORRECT EXAMPLE (NPC question in text, player answers in choices):
-{
-  "text": "Hello! Nice to meet you. What brings you here today?",
-  "choices": [
-    { "text": "I'm looking for information about transportation." },  // Player's answer
-    { "text": "Just browsing, thanks." }  // Player's answer
-  ]
-}
-
 Return a JSON object with this structure:
 {
+  "routingPlan": "Explain how you designed the exit routing. E.g.: 'Player context shows location=Sao Paulo. I route to environmental_path when the player asks about pollution or sustainability. I route to economic_path when they focus on cost of living or employment. The farewell exit triggers when the player explicitly ends the conversation.'",
   "id": "root",
   "speaker": "NPC Name",
   "text": "NPC's complete speech including any questions they ask",
@@ -362,7 +393,8 @@ Return a JSON object with this structure:
     {
       "id": "c2",
       "text": "Alternative PLAYER response",
-      "target": "exit_target_id"
+      "target": "exit_target_id",
+      "exitReason": "Specific reason: e.g. 'Player expressed concern about air quality, satisfying the environmental interest condition'"
     }
   ]
 }`;
@@ -391,6 +423,12 @@ Return a JSON object with this structure:
       }
     } else {
       dialogTree = response;
+    }
+
+    // Extract and store routing plan before validation strips it
+    if (dialogTree.routingPlan) {
+      this.lastRoutingPlan = dialogTree.routingPlan;
+      console.log(`[AIDialogTreeBeat ${this.id}] Routing plan: ${this.lastRoutingPlan}`);
     }
 
     // Validate and fix the dialog tree
@@ -511,6 +549,10 @@ Return a JSON object with this structure:
             // If not a valid exit, treat as the first exit target
             validChoice.target = this.exitTargets[0]?.id;
           }
+          // Preserve the AI-generated exit reason
+          if (choice.exitReason) {
+            (validChoice as any).exitReason = choice.exitReason;
+          }
         }
 
         // Handle nested dialog node
@@ -608,6 +650,23 @@ Return a JSON object with this structure:
         return this.exitTargets[0]?.id || this.getNextBeat(context);
       }
 
+      // Record the player's choice for AI context and session logging
+      context.recordChoice({
+        beatId: this.id,
+        beatName: this.name || this.id,
+        beatType: 'aiDialogTree',
+        choiceText: chosen.text,
+        choiceContext: `${processedSpeaker}: ${processedText}`,
+      });
+
+      // Record the NPC's dialog as AI output for session logging
+      context.recordAIOutput({
+        beatId: this.id,
+        beatName: this.name || this.id,
+        beatType: 'aiDialogTree',
+        text: `${processedSpeaker}: ${processedText}`,
+      });
+
       // Apply any effects from the choice
       if (chosen.effects) {
         for (const effect of chosen.effects) {
@@ -617,6 +676,17 @@ Return a JSON object with this structure:
 
       // Check if this choice exits to a beat
       if (chosen.target) {
+        const exitReason = (chosen as any).exitReason;
+        const targetBeat = context.getStory().getBeat(chosen.target);
+        context.recordTimelineEvent({
+          type: 'branch',
+          beatId: this.id,
+          beatName: this.name || this.id,
+          beatType: 'aiDialogTree',
+          targetBeatId: chosen.target,
+          targetBeatName: targetBeat?.name || chosen.target,
+          reason: exitReason || `Player chose: "${chosen.text}"`,
+        });
         return chosen.target;
       }
 

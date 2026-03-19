@@ -113,6 +113,31 @@ export class OnlineContentBeat extends Beat {
     if (params.errorTarget !== undefined) this.errorTarget = params.errorTarget;
   }
 
+  // Cache for prefetched AI content
+  private prefetchedContent: string | null = null;
+
+  /**
+   * Prefetch AI content in the background so it's cached when the beat executes.
+   * Only works for 'ai-query' source type. API fetches are not prefetched
+   * since they may have side effects or require fresh data.
+   */
+  async prefetch(context: StoryContext, renderer: IRenderer): Promise<void> {
+    if (this.sourceType !== 'ai-query') return;
+
+    try {
+      const aiService = renderer.getState('aiService');
+      if (!aiService || typeof aiService.generateContent !== 'function') return;
+      if (this.prefetchedContent) return; // already cached
+
+      console.log(`[OnlineContentBeat ${this.id}] Prefetching AI content...`);
+      this.prefetchedContent = await this.fetchAIContent(context, renderer);
+      console.log(`[OnlineContentBeat ${this.id}] Prefetch complete`);
+    } catch (err) {
+      // Prefetch failure is non-fatal - will retry on execute
+      console.log(`[OnlineContentBeat ${this.id}] Prefetch failed (will retry on execute):`, err);
+    }
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer
@@ -146,7 +171,12 @@ export class OnlineContentBeat extends Beat {
         }
       }
 
-      if (this.sourceType === 'api') {
+      if (this.prefetchedContent) {
+        // Use prefetched content from background generation
+        console.log(`[OnlineContentBeat ${this.id}] Using prefetched content`);
+        content = this.prefetchedContent;
+        this.prefetchedContent = null; // Clear after use
+      } else if (this.sourceType === 'api') {
         content = await this.fetchApiContent(context, renderer);
       } else {
         content = await this.fetchAIContent(context, renderer);
@@ -161,6 +191,14 @@ export class OnlineContentBeat extends Beat {
         title = this.deriveTitle(processedQuery);
       }
 
+      // Record content for session logging
+      context.recordAIOutput({
+        beatId: this.id,
+        beatName: this.name || this.id,
+        beatType: 'onlineContent',
+        text: content,
+      });
+
       // Apply display template
       const displayText = this.displayTemplate?.replace('{{data}}', content) || content;
       const processedText = this.processText(displayText, context);
@@ -168,26 +206,34 @@ export class OnlineContentBeat extends Beat {
       const processedTitle = title ? this.processText(title, context) : '';
 
       // Update location content - title and text should be separate
+      // NOTE: Map keys are element IDs, use loc.name for display name matching
       console.log(`[OnlineContentBeat ${this.id}] Updating locations, count=${this.locations.size}`);
-      for (const [name, loc] of this.locations) {
-        const nameLower = name.toLowerCase();
+      for (const [, loc] of this.locations) {
+        const nameLower = (loc.name || '').toLowerCase();
         if (nameLower === 'title' || nameLower.includes('title')) {
           (loc as any).content = processedTitle;
-          console.log(`[OnlineContentBeat ${this.id}] Location "${name}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height} -> TITLE`);
+          console.log(`[OnlineContentBeat ${this.id}] Location "${loc.name}" -> TITLE`);
         } else if (nameLower === 'text' || nameLower.includes('text')) {
-          (loc as any).content = processedText; // Content WITHOUT title
-          console.log(`[OnlineContentBeat ${this.id}] Location "${name}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height} -> TEXT (${processedText.length} chars)`);
+          (loc as any).content = processedText;
+          console.log(`[OnlineContentBeat ${this.id}] Location "${loc.name}" -> TEXT (${processedText.length} chars)`);
         } else if (nameLower.includes('button') || nameLower.includes('continue')) {
           (loc as any).content = processedButtonText;
-          console.log(`[OnlineContentBeat ${this.id}] Location "${name}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height} -> BUTTON`);
+          console.log(`[OnlineContentBeat ${this.id}] Location "${loc.name}" -> BUTTON`);
         } else {
-          console.log(`[OnlineContentBeat ${this.id}] Location "${name}": x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height} -> UNMATCHED`);
+          console.log(`[OnlineContentBeat ${this.id}] Location "${loc.name}" -> UNMATCHED`);
         }
       }
 
-      // Render as text display - pass content (not title) as main text
+      // Render as text display
+      // Pass title separately in the locations so PositionedBeatView can distinguish title from text
       const locations = Array.from(this.locations.values());
-      console.log(`[OnlineContentBeat ${this.id}] Calling renderText with ${locations.length} locations`);
+      console.log(`[OnlineContentBeat ${this.id}] Calling renderText with ${locations.length} locations, title="${processedTitle}"`);
+
+      // Verify location content was set correctly
+      for (const loc of locations) {
+        console.log(`[OnlineContentBeat ${this.id}] Location "${loc.name}" content="${((loc as any).content || '').substring(0, 50)}..."`);
+      }
+
       await renderer.renderText(processedText, processedButtonText, locations);
 
       return this.getNextBeat(context);

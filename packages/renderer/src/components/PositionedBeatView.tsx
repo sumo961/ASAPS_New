@@ -670,10 +670,14 @@ export function adjustElementsForCollisions(
       );
 
       // Use the smart-sized dimensions and apply offsets for collision detection
-      height = smartDims.height;
+      // For dynamic content beats, reduce the estimated height since we skip minHeight
+      // on the actual element (height:auto sizes tighter than the buffered estimate)
+      const DYNAMIC_BEATS = ['aiInfoText', 'aiDurScreen', 'aiDialogTree', 'aiSummary', 'onlineContent'];
+      const isDynamic = beatType ? DYNAMIC_BEATS.includes(beatType) : false;
+      height = isDynamic ? Math.round(smartDims.height / 1.15) : smartDims.height;
       effectiveX = el.location.x + (smartDims.xOffset || 0);
       effectiveWidth = smartDims.width;
-      yOffset = smartDims.yOffset || 0;
+      yOffset = isDynamic ? 0 : (smartDims.yOffset || 0);
     }
 
     // Calculate bounds using smart-sized dimensions (account for upward growth via yOffset)
@@ -2184,8 +2188,6 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         ...baseStyle,
         left: `${effectiveLeft}px`,
         width: `${effectiveWidth}px`,
-        // Unified height: auto with minHeight ensures content fits in both modes
-        // Smart sizing pre-computes dimensions, so auto naturally matches
         height: 'auto',
         minHeight: `${location.height}px`,
       };
@@ -2879,12 +2881,16 @@ const TextElement: React.FC<{
     // Adjust position when box expands beyond original bounds
     const adjustedLeft = location.x - smartDims.xOffset;
     const adjustedTop = location.y - (smartDims.yOffset || 0);
+
+    const DYNAMIC_BEATS = ['aiInfoText', 'aiDurScreen', 'aiDialogTree', 'aiSummary', 'onlineContent'];
+    const skipMinHeight = beatType ? DYNAMIC_BEATS.includes(beatType) : false;
+
     dimensionStyle = {
       left: `${adjustedLeft}px`,
       top: `${adjustedTop}px`,
       width: `${smartDims.width}px`,
       height: 'auto',
-      minHeight: `${smartDims.height}px`,
+      minHeight: skipMinHeight ? undefined : `${smartDims.height}px`,
       overflowY: 'auto',
     };
   }
@@ -3688,12 +3694,18 @@ const DialogElement: React.FC<{
     needsScroll = smartDims.needsScroll;
     const adjustedLeft = location.x - smartDims.xOffset;
     const adjustedTop = location.y - (smartDims.yOffset || 0);
+
+    // For dynamically generated content, skip minHeight — the 15% height buffer
+    // in smart sizing overshoots for AI/online content. Let height:auto fit exactly.
+    const DYNAMIC_BEATS = ['aiInfoText', 'aiDurScreen', 'aiDialogTree', 'aiSummary', 'onlineContent'];
+    const skipMinHeight = beatType ? DYNAMIC_BEATS.includes(beatType) : false;
+
     dimensionStyle = {
       left: `${adjustedLeft}px`,
       top: `${adjustedTop}px`,
       width: `${smartDims.width}px`,
       height: 'auto',
-      minHeight: `${smartDims.height}px`,
+      minHeight: skipMinHeight ? undefined : `${smartDims.height}px`,
       overflowY: 'auto',
     };
   }

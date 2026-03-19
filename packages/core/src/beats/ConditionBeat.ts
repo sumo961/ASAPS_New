@@ -428,21 +428,39 @@ export class ConditionBeat extends Beat {
     try {
       const conditionResult = context.checkCondition(this.condition);
       
-      // Log condition evaluation based on type
+      // Build a human-readable reason for the branch decision
       const varName = this.variableName || this.variable;
       const compareValue = this.value ?? this.val;
+      let reason: string;
       if (this.conditionType === 'counterCompare') {
-        console.log(`ConditionBeat ${this.id}: ${this.counter1} ${this.operator} ${this.counter2} = ${conditionResult}`);
+        reason = `${this.counter1} ${this.operator} ${this.counter2} = ${conditionResult}`;
       } else if (this.conditionType === 'timer') {
-        console.log(`ConditionBeat ${this.id}: timer ${this.timer} ${this.operator} ${compareValue} = ${conditionResult}`);
+        reason = `timer ${this.timer} ${this.operator} ${compareValue} = ${conditionResult}`;
       } else if (this.conditionType === 'visitedBeat') {
-        console.log(`ConditionBeat ${this.id}: visitedBeat ${this.beatId || varName} = ${conditionResult}`);
+        reason = `visitedBeat ${this.beatId || varName} = ${conditionResult}`;
       } else if (this.conditionType === 'fictionalTime') {
-        console.log(`ConditionBeat ${this.id}: fictionalTime ${this.operator} ${this.timeDay}/${this.timeMonth}/${this.timeYear} ${this.timeHour}:${this.timeMinute} = ${conditionResult}`);
+        reason = `fictionalTime ${this.operator} ${this.timeDay}/${this.timeMonth}/${this.timeYear} ${this.timeHour}:${this.timeMinute} = ${conditionResult}`;
       } else {
-        console.log(`ConditionBeat ${this.id}: ${varName} ${this.operator} ${compareValue} = ${conditionResult}`);
+        const currentValue = this.conditionType === 'counter'
+          ? context.getCounter(varName || '')
+          : context.getVariable(varName || '');
+        reason = `${varName} (${JSON.stringify(currentValue)}) ${this.operator} ${JSON.stringify(compareValue)} = ${conditionResult}`;
       }
-      
+
+      console.log(`ConditionBeat ${this.id}: ${reason}`);
+
+      const targetId = conditionResult ? this.trueTarget : (this.falseTarget || this.getNextBeat(context));
+      const targetBeat = targetId ? context.getStory().getBeat(targetId) : undefined;
+      context.recordTimelineEvent({
+        type: 'branch',
+        beatId: this.id,
+        beatName: this.name || this.id,
+        beatType: 'condition',
+        targetBeatId: targetId || undefined,
+        targetBeatName: targetBeat?.name,
+        reason,
+      });
+
       if (conditionResult) {
         return this.trueTarget;
       } else if (this.falseTarget) {

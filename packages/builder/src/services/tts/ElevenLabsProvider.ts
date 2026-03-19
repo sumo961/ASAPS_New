@@ -29,7 +29,11 @@ export class ElevenLabsProvider extends BaseTTSProvider {
     const voiceId = voiceConfig?.voiceId || 'EXAVITQu4vr4xnSDxMaL'; // "Sarah" default
     const modelId = this.config!.model || 'eleven_v3';
 
-    const requestBody = { text, model_id: modelId };
+    const requestBody: Record<string, any> = { text, model_id: modelId };
+    // Pass language_code for multilingual models (e.g. eleven_multilingual_v2, eleven_v3)
+    if (voiceConfig?.lang) {
+      requestBody.language_code = voiceConfig.lang;
+    }
 
     this.abortController = new AbortController();
     const { signal } = this.abortController;

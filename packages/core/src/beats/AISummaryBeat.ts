@@ -202,6 +202,26 @@ export class AISummaryBeat extends Beat {
     if (params.creditsCloseText !== undefined) this.creditsCloseText = params.creditsCloseText;
   }
 
+  /**
+   * Prefetch AI content in the background so it's cached when the beat executes.
+   * Called by StoryEngine when this beat is the next beat to be executed.
+   * Does NOT render anything - only generates and caches the summary.
+   */
+  async prefetch(context: StoryContext, renderer: IRenderer): Promise<void> {
+    try {
+      const aiService = renderer.getState('aiService');
+      if (!aiService || typeof aiService.generateContent !== 'function') return;
+      if (this.generatedSummary) return; // already cached
+
+      console.log(`[AISummaryBeat ${this.id}] Prefetching summary...`);
+      this.generatedSummary = await this.generateAISummary(context, aiService);
+      console.log(`[AISummaryBeat ${this.id}] Prefetch complete`);
+    } catch (err) {
+      // Prefetch failure is non-fatal - will retry on execute
+      console.log(`[AISummaryBeat ${this.id}] Prefetch failed (will retry on execute):`, err);
+    }
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer
@@ -212,33 +232,47 @@ export class AISummaryBeat extends Beat {
     const aiService = renderer.getState('aiService');
 
     if (aiService && typeof aiService.generateContent === 'function') {
-      // Show loading indicator while generating summary
-      if (renderer.renderLoading) {
-        const loadingMessages = [
-          "Let me reflect on your journey...",
-          "Summarizing your experience...",
-          "Reviewing your choices...",
-          "Creating your personal summary...",
-        ];
-        const message = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
-        renderer.renderLoading(message, {
-          subMessage: 'This will just take a moment',
-          spinnerType: 'pulse',
-        });
-      }
+      // Use prefetched summary if available
+      if (this.generatedSummary) {
+        console.log(`[AISummaryBeat ${this.id}] Using prefetched summary`);
+        summaryText = this.generatedSummary;
+      } else {
+        // Show loading indicator while generating summary
+        if (renderer.renderLoading) {
+          const loadingMessages = [
+            "Let me reflect on your journey...",
+            "Summarizing your experience...",
+            "Reviewing your choices...",
+            "Creating your personal summary...",
+          ];
+          const message = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+          renderer.renderLoading(message, {
+            subMessage: 'This will just take a moment',
+            spinnerType: 'pulse',
+          });
+        }
 
-      try {
-        // Generate AI summary
-        summaryText = await this.generateAISummary(context, aiService);
-      } catch (error) {
-        console.error(`[AISummaryBeat ${this.id}] AI generation failed:`, error);
-        // Fall back to static summary
-        summaryText = this.generateStaticSummary(context);
+        try {
+          // Generate AI summary
+          summaryText = await this.generateAISummary(context, aiService);
+        } catch (error) {
+          console.error(`[AISummaryBeat ${this.id}] AI generation failed:`, error);
+          // Fall back to static summary
+          summaryText = this.generateStaticSummary(context);
+        }
       }
     } else {
       console.warn(`[AISummaryBeat ${this.id}] AI service not configured, using static summary`);
       summaryText = this.generateStaticSummary(context);
     }
+
+    // Record AI output for session logging
+    context.recordAIOutput({
+      beatId: this.id,
+      beatName: this.name || this.id,
+      beatType: 'aiSummary',
+      text: summaryText,
+    });
 
     // Process text with variable interpolation
     const processedTitle = this.processText(this.title || 'Your Journey', context);

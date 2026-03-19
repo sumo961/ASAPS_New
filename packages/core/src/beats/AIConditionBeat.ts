@@ -213,10 +213,29 @@ Respond with ONLY the category name, nothing else.`;
 
       if (matchedCategory) {
         console.log(`[AIConditionBeat ${this.id}] AI chose: "${matchedCategory.name}" → ${matchedCategory.targetId}`);
+        const targetBeat = context.getStory().getBeat(matchedCategory.targetId);
+        context.recordTimelineEvent({
+          type: 'branch',
+          beatId: this.id,
+          beatName: this.name || this.id,
+          beatType: 'aiCondition',
+          targetBeatId: matchedCategory.targetId,
+          targetBeatName: targetBeat?.name,
+          reason: `AI chose "${matchedCategory.name}": ${matchedCategory.description}`,
+        });
         return matchedCategory.targetId;
       } else {
         console.warn(`[AIConditionBeat ${this.id}] AI returned unknown category: "${chosenCategory}"`);
-        return this.aiDefaultTarget || this.getNextBeat(context);
+        const fallback = this.aiDefaultTarget || this.getNextBeat(context);
+        context.recordTimelineEvent({
+          type: 'branch',
+          beatId: this.id,
+          beatName: this.name || this.id,
+          beatType: 'aiCondition',
+          targetBeatId: fallback || undefined,
+          reason: `AI returned unknown category "${chosenCategory}", using fallback`,
+        });
+        return fallback;
       }
     } catch (error) {
       console.error(`[AIConditionBeat ${this.id}] Error:`, error);

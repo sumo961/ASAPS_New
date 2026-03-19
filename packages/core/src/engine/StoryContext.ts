@@ -106,10 +106,42 @@ interface AISuggestion {
   data?: any;
 }
 
+export interface AIOutputRecord {
+  beatId: string;
+  beatName?: string;
+  beatType: string;
+  text: string;
+  timestamp: number;
+}
+
+export type TimelineEventType = 'beat-enter' | 'choice' | 'ai-output' | 'branch' | 'state-change';
+
+export interface TimelineEvent {
+  type: TimelineEventType;
+  timestamp: number;
+  beatId: string;
+  beatName?: string;
+  beatType?: string;
+  /** For 'choice': what the player chose */
+  choiceText?: string;
+  /** For 'choice': the question/context */
+  choiceContext?: string;
+  /** For 'ai-output': the generated text */
+  text?: string;
+  /** For 'branch': which target was chosen and why */
+  targetBeatId?: string;
+  targetBeatName?: string;
+  reason?: string;
+  /** For 'state-change': what changed */
+  stateChange?: string;
+}
+
 export class StoryContext extends EventEmitter {
   private state: StoryState;
   private history: string[] = [];
   private choiceHistory: ChoiceRecord[] = [];
+  private aiOutputHistory: AIOutputRecord[] = [];
+  private timeline: TimelineEvent[] = [];
   private story?: Story;
   private timerManager: TimerManager;
 
@@ -585,6 +617,15 @@ export class StoryContext extends EventEmitter {
   markBeatVisited(beatId: string): void {
     this.state.visitedBeats.add(beatId);
     this.history.push(beatId);
+    // Also record in timeline with beat metadata
+    const beat = this.story?.getBeat(beatId);
+    this.timeline.push({
+      type: 'beat-enter',
+      timestamp: Date.now(),
+      beatId,
+      beatName: beat?.name,
+      beatType: beat?.type,
+    });
   }
 
   markChoiceVisited(beatId: string, choiceId: string): void {
@@ -603,9 +644,16 @@ export class StoryContext extends EventEmitter {
    * Called by choice beats (DialogTree, MovementChoice, PickProp, HyperText)
    */
   recordChoice(choice: Omit<ChoiceRecord, 'timestamp'>): void {
-    this.choiceHistory.push({
-      ...choice,
-      timestamp: Date.now(),
+    const ts = Date.now();
+    this.choiceHistory.push({ ...choice, timestamp: ts });
+    this.timeline.push({
+      type: 'choice',
+      timestamp: ts,
+      beatId: choice.beatId,
+      beatName: choice.beatName,
+      beatType: choice.beatType,
+      choiceText: choice.choiceText,
+      choiceContext: choice.choiceContext,
     });
   }
 
@@ -621,6 +669,46 @@ export class StoryContext extends EventEmitter {
    */
   getRecentChoices(limit: number = 10): ChoiceRecord[] {
     return this.choiceHistory.slice(-limit);
+  }
+
+  /**
+   * Record AI-generated output for session logging and future AI context
+   */
+  recordAIOutput(output: Omit<AIOutputRecord, 'timestamp'>): void {
+    const ts = Date.now();
+    this.aiOutputHistory.push({ ...output, timestamp: ts });
+    this.timeline.push({
+      type: 'ai-output',
+      timestamp: ts,
+      beatId: output.beatId,
+      beatName: output.beatName,
+      beatType: output.beatType,
+      text: output.text,
+    });
+  }
+
+  /**
+   * Get all AI output history
+   */
+  getAIOutputHistory(): AIOutputRecord[] {
+    return [...this.aiOutputHistory];
+  }
+
+  /**
+   * Record a timeline event for the unified session log
+   */
+  recordTimelineEvent(event: Omit<TimelineEvent, 'timestamp'>): void {
+    this.timeline.push({
+      ...event,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Get the full timeline of events
+   */
+  getTimeline(): TimelineEvent[] {
+    return [...this.timeline];
   }
 
   private resolveValue(ref: string | undefined): any {
@@ -693,6 +781,8 @@ export class StoryContext extends EventEmitter {
     };
     this.history = [];
     this.choiceHistory = [];
+    this.aiOutputHistory = [];
+    this.timeline = [];
     this.emit('reset');
 
     // Emit change events so UI listeners (countdown meter, debug panel) update
@@ -733,6 +823,8 @@ export class StoryContext extends EventEmitter {
     if (options.history) {
       this.history = [];
       this.choiceHistory = [];
+      this.aiOutputHistory = [];
+      this.timeline = [];
     }
     this.state.currentBeatId = this.story?.getFirstBeatId() || '0';
     this.emit('selectiveReset', options);
