@@ -182,7 +182,13 @@ export class AIDialogTreeBeat extends Beat {
       if (this.generatedTree && this.lastContextHash === contextHash) return; // already cached
 
       console.log(`[AIDialogTreeBeat ${this.id}] Prefetching dialog tree...`);
-      this.generatedTree = await this.generateDialogTree(context, aiService);
+      try {
+        this.generatedTree = await this.generateDialogTree(context, aiService);
+      } catch (firstErr) {
+        // JSON parse errors are common with complex dialog trees — retry once
+        console.log(`[AIDialogTreeBeat ${this.id}] Prefetch attempt 1 failed (${(firstErr as Error).message}), retrying...`);
+        this.generatedTree = await this.generateDialogTree(context, aiService);
+      }
       this.lastContextHash = contextHash;
       console.log(`[AIDialogTreeBeat ${this.id}] Prefetch complete`);
     } catch (err) {
@@ -257,7 +263,13 @@ export class AIDialogTreeBeat extends Beat {
           });
         }
 
-        this.generatedTree = await this.generateDialogTree(context, aiService);
+        try {
+          this.generatedTree = await this.generateDialogTree(context, aiService);
+        } catch (firstErr) {
+          // JSON parse errors are common — retry once
+          console.log(`[AIDialogTreeBeat ${this.id}] Generation attempt 1 failed (${(firstErr as Error).message}), retrying...`);
+          this.generatedTree = await this.generateDialogTree(context, aiService);
+        }
         this.lastContextHash = contextHash;
       }
 

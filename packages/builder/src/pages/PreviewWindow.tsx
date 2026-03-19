@@ -1869,13 +1869,18 @@ export const PreviewWindow: React.FC = () => {
     lines.push(`════════════════════════════════════════════`);
     lines.push(``);
 
-    // Beat path (compact)
+    // Beat path (compact) — include current beat even if not yet in timeline
     const beatEvents = timeline.filter(e => e.type === 'beat-enter');
-    lines.push(`Beat Path (${beatEvents.length} beats)`);
+    const currentBeatInTimeline = currentBeat && beatEvents.some(e => e.beatId === currentBeat.id);
+    const totalBeats = beatEvents.length + (currentBeat && !currentBeatInTimeline ? 1 : 0);
+    lines.push(`Beat Path (${totalBeats} beats)`);
     lines.push(`-------------------------------------------`);
     beatEvents.forEach((e, i) => {
       lines.push(`  ${i + 1}. [${fmt(e.timestamp)}] [${e.beatType}] ${e.beatName || e.beatId}`);
     });
+    if (currentBeat && !currentBeatInTimeline) {
+      lines.push(`  ${beatEvents.length + 1}. [${fmt(Date.now())}] [${currentBeat.type}] ${currentBeat.name} (current)`);
+    }
     lines.push(``);
 
     // Final state
@@ -1939,18 +1944,29 @@ export const PreviewWindow: React.FC = () => {
           break;
         }
 
-        case 'ai-output':
-          lines.push(`${eventNum}. [${time}] [${event.beatType}] ${event.beatName || event.beatId} generated:`);
+        case 'ai-output': {
+          // Skip raw dialog tree JSON — internal structure, not useful in log
+          if (event.text?.startsWith('{"id":')) {
+            eventNum--;
+            break;
+          }
+          // Skip per-turn NPC speech from aiDialogTree — already visible in choice context
+          if (event.beatType === 'aiDialogTree' && event.text && !event.text.startsWith('[Routing Plan]')) {
+            eventNum--;
+            break;
+          }
+          // Label routing plans distinctly
+          const isRoutingPlan = event.text?.startsWith('[Routing Plan]');
+          const label = isRoutingPlan ? 'routing plan' : 'generated';
+          lines.push(`${eventNum}. [${time}] [${event.beatType}] ${event.beatName || event.beatId} ${label}:`);
           if (event.text) {
-            // Indent and truncate long AI output for readability
-            const textPreview = event.text.length > 300
-              ? event.text.substring(0, 300) + '...'
-              : event.text;
-            textPreview.split('\n').forEach(line => {
+            // Full text — no truncation, for quality assessment
+            event.text.split('\n').forEach(line => {
               lines.push(`     ${line}`);
             });
           }
           break;
+        }
 
         case 'state-change':
           lines.push(`${eventNum}. [${time}] STATE: ${event.stateChange}`);
