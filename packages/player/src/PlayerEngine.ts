@@ -1336,6 +1336,13 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
   }
 
   /**
+   * Get the story title
+   */
+  getStoryTitle(): string {
+    return this.storyTitle;
+  }
+
+  /**
    * Get stage dimensions from the loaded story's globalSettings
    * Returns the project's configured width/height, or defaults (1024x768)
    */
@@ -1378,6 +1385,136 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
    */
   isPaused(): boolean {
     return this.engine?.isPaused() || false;
+  }
+
+  /**
+   * Generate a session log as a text string.
+   * Contains an overview (beat path, final state, stats) and a detailed timeline.
+   */
+  generateSessionLog(): string {
+    const context = this.engine?.getContext();
+    if (!context) return 'No story loaded.';
+
+    const storyObj = context.getStory();
+    const timeline = context.getTimeline();
+    const variables = context.getVariables();
+    const counters = context.getCounters();
+    const inventory = context.getInventoryEntries();
+    const visitedBeats = context.getVisitedBeats();
+    const timers = context.getTimers();
+    const fictionalTime = context.getFictionalTime?.();
+
+    const lines: string[] = [];
+    const now = new Date().toISOString();
+    const fmt = (ts: number) => new Date(ts).toLocaleTimeString();
+
+    lines.push('ASAPS Play Session Log');
+    lines.push('======================');
+    lines.push(`Story: ${this.storyTitle || 'Untitled'}`);
+    lines.push(`Exported: ${now}`);
+
+    // Current beat
+    const currentBeatId = context.getCurrentBeatId();
+    const currentBeat = currentBeatId ? storyObj?.getBeat(currentBeatId) : null;
+    lines.push(`Current Beat: ${currentBeat?.name || 'none'} (${currentBeatId || '-'})`);
+    lines.push('');
+
+    // ── OVERVIEW ──
+    lines.push('════════════════════════════════════════════');
+    lines.push('OVERVIEW');
+    lines.push('════════════════════════════════════════════');
+    lines.push('');
+
+    const beatEvents = timeline.filter(e => e.type === 'beat-enter');
+    const currentInTimeline = currentBeat && beatEvents.some(e => e.beatId === currentBeatId);
+    const totalBeats = beatEvents.length + (currentBeat && !currentInTimeline ? 1 : 0);
+    lines.push(`Beat Path (${totalBeats} beats)`);
+    lines.push('-------------------------------------------');
+    beatEvents.forEach((e, i) => {
+      lines.push(`  ${i + 1}. [${fmt(e.timestamp)}] [${e.beatType}] ${e.beatName || e.beatId}`);
+    });
+    if (currentBeat && !currentInTimeline) {
+      lines.push(`  ${beatEvents.length + 1}. [${fmt(Date.now())}] [${currentBeat.type}] ${currentBeat.name} (current)`);
+    }
+    lines.push('');
+
+    // Final state
+    const varEntries = Object.entries(variables);
+    const counterEntries = Object.entries(counters);
+    if (varEntries.length > 0 || counterEntries.length > 0 || inventory.length > 0) {
+      lines.push('Final State');
+      lines.push('-------------------------------------------');
+      varEntries.forEach(([k, v]) => lines.push(`  var  ${k} = ${JSON.stringify(v)}`));
+      counterEntries.forEach(([k, v]) => lines.push(`  ctr  ${k} = ${v}`));
+      inventory.forEach(item => lines.push(`  inv  ${item.name}${item.quantity > 1 ? ` x${item.quantity}` : ''}`));
+      const timerEntries = Object.entries(timers);
+      timerEntries.forEach(([k, t]) => lines.push(`  tmr  ${k}: ${(t as any).value}s${(t as any).target ? ` -> ${(t as any).target}` : ''}`));
+      if (fictionalTime) lines.push(`  time ${JSON.stringify(fictionalTime)}`);
+      lines.push('');
+    }
+
+    // Stats
+    const choiceCount = timeline.filter(e => e.type === 'choice').length;
+    const branchCount = timeline.filter(e => e.type === 'branch').length;
+    const aiCount = timeline.filter(e => e.type === 'ai-output').length;
+    lines.push('Statistics');
+    lines.push('-------------------------------------------');
+    lines.push(`  Unique beats visited: ${visitedBeats.length}`);
+    lines.push(`  Total beat transitions: ${beatEvents.length}`);
+    lines.push(`  Choices made: ${choiceCount}`);
+    lines.push(`  Branch decisions: ${branchCount}`);
+    lines.push(`  AI outputs: ${aiCount}`);
+    lines.push('');
+
+    // ── DETAILED TIMELINE ──
+    lines.push('════════════════════════════════════════════');
+    lines.push('DETAILED TIMELINE');
+    lines.push('════════════════════════════════════════════');
+    lines.push('');
+
+    let eventNum = 0;
+    for (const event of timeline) {
+      eventNum++;
+      const time = fmt(event.timestamp);
+
+      switch (event.type) {
+        case 'beat-enter':
+          lines.push(`${eventNum}. [${time}] [${event.beatType}] ${event.beatName || event.beatId} (${event.beatId})`);
+          break;
+
+        case 'choice':
+          lines.push(`${eventNum}. [${time}] CHOICE at ${event.beatName || event.beatId}`);
+          if (event.choiceContext) lines.push(`     Q: ${event.choiceContext}`);
+          lines.push(`     -> "${event.choiceText}"`);
+          break;
+
+        case 'branch': {
+          const target = event.targetBeatName || event.targetBeatId || '?';
+          lines.push(`${eventNum}. [${time}] [${event.beatType}] ${event.beatName || event.beatId} branched to ${target}`);
+          if (event.reason) lines.push(`     because: ${event.reason}`);
+          break;
+        }
+
+        case 'ai-output': {
+          if (event.text?.startsWith('{"id":')) { eventNum--; break; }
+          if (event.beatType === 'aiDialogTree' && event.text && !event.text.startsWith('[Routing Plan]')) { eventNum--; break; }
+          const isRoutingPlan = event.text?.startsWith('[Routing Plan]');
+          const label = isRoutingPlan ? 'routing plan' : 'generated';
+          lines.push(`${eventNum}. [${time}] [${event.beatType}] ${event.beatName || event.beatId} ${label}:`);
+          if (event.text) {
+            event.text.split('\n').forEach(line => lines.push(`     ${line}`));
+          }
+          break;
+        }
+
+        case 'state-change':
+          lines.push(`${eventNum}. [${time}] STATE: ${event.stateChange}`);
+          break;
+      }
+    }
+    lines.push('');
+
+    return lines.join('\n');
   }
 
   /**

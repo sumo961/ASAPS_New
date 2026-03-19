@@ -125,6 +125,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
       ttsLanguage: '{{TTS_LANGUAGE}}',
+      showSessionLog: {{SHOW_SESSION_LOG}},
     };
   </script>
 
@@ -164,6 +165,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
           mobileMode: mobileMode,
           mobileFontScale: effectiveFontScale,
           language: window.ASAPS_CONFIG.ttsLanguage,
+          showSessionLog: window.ASAPS_CONFIG.showSessionLog,
         });
       } else {
         console.error('ASAPS Player not loaded');
@@ -304,6 +306,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
       ttsLanguage: '{{TTS_LANGUAGE}}',
+      showSessionLog: {{SHOW_SESSION_LOG}},
     };
 
     window.ASAPS_TRANSLATIONS = {
@@ -375,6 +378,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
             mobileMode: mobileMode,
             mobileFontScale: effectiveFontScale,
             language: ttsLang,
+            showSessionLog: window.ASAPS_CONFIG.showSessionLog,
           });
         }
       };
@@ -811,6 +815,8 @@ export interface HtmlExportOptions {
   existingTranslations?: TranslationResource[];
   /** Enable AI on-the-fly translation in the exported player */
   enableAIOnTheFly?: boolean;
+  /** Show session log export button in player menu */
+  showSessionLog?: boolean;
 }
 
 export interface HtmlExportResult {
@@ -938,6 +944,7 @@ async function exportAsSingleFile(
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
     .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
+    .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{PLAYER_SCRIPT}}', playerScript);
@@ -1260,6 +1267,7 @@ export async function downloadHtmlExport(
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
     .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
+    .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{LANGUAGE_OPTIONS}}', languageOptionsHtml)

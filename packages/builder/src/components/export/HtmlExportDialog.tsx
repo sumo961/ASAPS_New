@@ -35,6 +35,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [usingGlobalConfig, setUsingGlobalConfig] = useState(false);
   const [enableAIOnTheFly, setEnableAIOnTheFly] = useState(false);
+  const [showSessionLog, setShowSessionLog] = useState(false);
   const [includedTranslations, setIncludedTranslations] = useState<Set<string>>(new Set());
   const hasPopulatedRef = useRef(false);
 
@@ -138,6 +139,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         ttsSpeakerVoices: speakerVoices,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
+        showSessionLog,
       };
 
       await downloadHtmlExport(projectId, projectName, options);
@@ -152,7 +154,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, translationState.translations]);
+  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations]);
 
   const toggleTranslation = useCallback((code: string) => {
     setIncludedTranslations(prev => {
@@ -495,6 +497,27 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     Configure an AI provider with API key above to enable this.
                   </div>
                 )}
+              </div>
+            </label>
+          </div>
+
+          {/* Session Log Option */}
+          <div className="border rounded-lg p-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showSessionLog}
+                onChange={e => setShowSessionLog(e.target.checked)}
+                className="mt-1"
+              />
+              <div>
+                <div className="text-sm font-medium text-gray-900">
+                  Enable session log export
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  Adds a "Save Log" button to the player menu. Interactors can download
+                  a detailed log of their play session (beat path, choices, AI outputs).
+                </div>
               </div>
             </label>
           </div>

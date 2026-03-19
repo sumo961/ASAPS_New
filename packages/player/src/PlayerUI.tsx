@@ -8,6 +8,8 @@ import type { SaveSlot } from './SaveSystem';
 export interface PlayerUIConfig {
   /** Show save/load buttons */
   showSaveLoad?: boolean;
+  /** Show session log export button */
+  showSessionLog?: boolean;
   /** Show settings button */
   showSettings?: boolean;
   /** Show fullscreen button */
@@ -54,6 +56,7 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
 }) => {
   const {
     showSaveLoad = true,
+    showSessionLog = false,
     showSettings = true,
     showFullscreen = true,
     showPlayTime = true,
@@ -239,6 +242,20 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
       setActivePanel('none');
       setIsMenuOpen(false);
     }
+  };
+
+  const handleSaveLog = () => {
+    const logText = player.generateSessionLog();
+    const blob = new Blob([logText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const title = player.getStoryTitle?.() || 'story';
+    a.download = `session-log-${title.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const updateSetting = <K extends keyof PlayerSettings>(key: K, value: PlayerSettings[K]) => {
@@ -431,6 +448,11 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
           <button style={styles.button} onClick={handleRestart}>
             Restart
           </button>
+          {showSessionLog && (
+            <button style={styles.button} onClick={handleSaveLog}>
+              Save Log
+            </button>
+          )}
           {showFullscreen && (
             <button style={styles.button} onClick={toggleFullscreen}>
               {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}

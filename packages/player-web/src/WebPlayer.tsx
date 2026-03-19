@@ -26,6 +26,8 @@ export interface WebPlayerProps {
   mobileFontScale?: number;
   /** Language code for TTS (e.g., 'en', 'de', 'ja') — updated on translation switch */
   language?: string;
+  /** Show session log export button in player menu */
+  showSessionLog?: boolean;
   /** Callback when story ends */
   onEnd?: () => void;
   /** Callback when error occurs */
@@ -47,6 +49,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   mobileMode = false,
   mobileFontScale = 1.0,
   language,
+  showSessionLog = false,
   onEnd,
   onError,
 }) => {
@@ -619,6 +622,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           player={playerRef.current}
           config={{
             showSaveLoad: true,
+            showSessionLog,
             showSettings: true,
             showFullscreen: true,
             showPlayTime: true,
