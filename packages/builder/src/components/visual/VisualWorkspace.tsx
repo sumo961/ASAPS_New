@@ -21,6 +21,8 @@ import '@photo-sphere-viewer/core/index.css';
 import '@photo-sphere-viewer/markers-plugin/index.css';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
+import { useTranslationState } from '../../contexts/TranslationContext';
+import { getTranslationsForBeat } from '../../export/StoryTranslator';
 
 import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
 import type { Character } from '../../types/character';
@@ -846,6 +848,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     startWidth: number;
     startHeight: number;
   } | null>(null);
+
+  // Translation state for showing translated text in VE
+  const translationState = useTranslationState();
 
   // Use refs to track current state for cleanup
   const beatRef = useRef(beat);
@@ -3347,70 +3352,99 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     prevParamsRef.current = paramsJson;
   }, [beat, beat?.id, beatVersion, selectedPhaseId, projectSettings, renderTheme]); // beatVersion triggers on param changes, selectedPhaseId for phase-aware sync
 
-  // Get beat content for display
+  // Get beat content for display, with translation overlay when active
   const getBeatContent = () => {
     if (!beat) return undefined;
     const params = beat.getParameters ? beat.getParameters() : {};
-    
+
+    // When a translation is active, get translated values for this beat
+    // and create a helper to look them up by parameter path
+    const activeResource = translationState.activeLanguage
+      ? translationState.translations.find(r => r.languageCode === translationState.activeLanguage)
+      : null;
+    const translations = activeResource ? getTranslationsForBeat(activeResource, beat.id) : {};
+    const t = (path: string, fallback: string) => translations[path] ?? fallback;
+
     switch (beat.type) {
       case 'titleScreen':
         return {
-          title: params.title || 'Untitled',
-          author: params.author || 'Unknown',
-          buttonText: params.buttonText || 'Start'
+          title: t('title', params.title || 'Untitled'),
+          author: t('author', params.author || 'Unknown'),
+          buttonText: t('buttonText', params.buttonText || 'Start')
         };
       case 'infoText':
         return {
-          text: params.text || '',
-          buttonText: params.buttonText || 'Continue'
+          text: t('text', params.text || ''),
+          buttonText: t('buttonText', params.buttonText || 'Continue')
         };
       case 'durScreen':
         return {
-          text: params.text || '',
-          // DurScreen should NOT have a button - it auto-advances
+          text: t('text', params.text || ''),
         };
       case 'endScreen':
-        // If in credits phase, return credits page content
         if (selectedPhaseId === 'credits') {
           return {
-            creditsTitle: params.creditsPageTitle || 'Credits',
-            creditsBody: params.creditsPageBody || '',
-            creditsCloseText: params.creditsCloseText || 'Close',
+            creditsTitle: t('creditsPageTitle', params.creditsPageTitle || 'Credits'),
+            creditsBody: t('creditsPageBody', params.creditsPageBody || ''),
+            creditsCloseText: t('creditsCloseText', params.creditsCloseText || 'Close'),
           };
         }
         return {
-          message: params.message || 'The End',
+          message: t('message', params.message || 'The End'),
           showRestart: params.showRestart !== false,
           showCredits: params.showCredits || false,
-          restartText: params.restartText || 'Play Again',
-          creditsText: params.creditsText || 'Credits',
-          buttonText: params.buttonText
+          restartText: t('restartText', params.restartText || 'Play Again'),
+          creditsText: t('creditsText', params.creditsText || 'Credits'),
+          buttonText: params.buttonText ? t('buttonText', params.buttonText) : undefined
         };
-      case 'dialogTree':
+      case 'dialogTree': {
+        const rawText = params.text || params.dialogTree?.text || '';
+        const rawChoices = params.dialogTree?.choices || [];
+        const translatedChoices = rawChoices.map((c: any, i: number) => ({
+          ...c,
+          text: translations[`dialogTree.choices.${i}.text`] ?? c.text,
+          displayText: translations[`dialogTree.choices.${i}.displayText`] ?? c.displayText,
+        }));
         return {
           speaker: params.speaker || params.dialogTree?.speaker || 'Character',
-          text: params.text || params.dialogTree?.text || '',
-          choices: params.dialogTree?.choices || []
+          text: t('text', rawText) || translations['dialogTree.text'] || rawText,
+          choices: translatedChoices
         };
-      case 'movementChoice':
+      }
+      case 'movementChoice': {
+        const rawChoices = params.choices || [];
+        const translatedChoices = rawChoices.map((c: any, i: number) => ({
+          ...c,
+          text: translations[`choices.${i}.text`] ?? c.text,
+          displayText: translations[`choices.${i}.displayText`] ?? c.displayText,
+        }));
         return {
-          question: params.question || 'Where do you want to go?',
-          choices: params.choices || []
+          question: t('question', params.question || 'Where do you want to go?'),
+          choices: translatedChoices
         };
-      case 'pickProp':
+      }
+      case 'pickProp': {
+        const rawProps = params.props || [];
+        const translatedProps = rawProps.map((p: any, i: number) => ({
+          ...p,
+          name: translations[`props.${i}.name`] ?? p.name,
+          displayName: translations[`props.${i}.displayName`] ?? p.displayName,
+          description: translations[`props.${i}.description`] ?? p.description,
+        }));
         return {
-          question: params.question || 'What do you want to interact with?',
-          props: params.props || []
+          question: t('question', params.question || 'What do you want to interact with?'),
+          props: translatedProps
         };
+      }
       case 'inputText':
         return {
-          prompt: params.prompt || 'Please enter your response:',
-          placeholder: params.placeholder || 'Type here...',
-          buttonText: params.buttonText || 'Continue'
+          prompt: t('prompt', params.prompt || 'Please enter your response:'),
+          placeholder: t('placeholder', params.placeholder || 'Type here...'),
+          buttonText: t('buttonText', params.buttonText || 'Continue')
         };
       case 'hyperText':
         return {
-          text: params.text || 'Click on any word to explore.',
+          text: t('text', params.text || 'Click on any word to explore.'),
           hyperlinks: params.hyperlinks || []
         };
       case 'video':

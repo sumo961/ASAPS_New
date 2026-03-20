@@ -509,8 +509,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       // Only autosize if font is not explicitly overridden
       autosize: !el.fontOverridden || el.fontSize === undefined,
       // Pass content directly from visual element (for phase-aware rendering)
-      // Use el.content if explicitly set, otherwise fall back to el.text
-      content: el.content || el.text,
+      // When a translation is active, omit content so createPositionedElementData
+      // falls through to getContentForLocation() which uses the translated beatContent
+      content: translationState.activeLanguage ? undefined : (el.content || el.text),
       // Meter-specific fields
       counterName: el.counterName,
       meterOrientation: el.meterOrientation,
