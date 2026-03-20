@@ -1279,8 +1279,15 @@ function App() {
       });
 
       // Update characters state separately (for App-level character management)
+      // Normalize: ensure required arrays exist (AI may omit them)
       if (story.characters && Array.isArray(story.characters)) {
-        setCharacters(story.characters);
+        const normalized = story.characters.map((c: any) => ({
+          ...c,
+          states: c.states || [],
+          counters: c.counters || [],
+          inventory: c.inventory || [],
+        }));
+        setCharacters(normalized);
       }
 
       // NOTE: Don't call markChanged() here - we'll save the project immediately

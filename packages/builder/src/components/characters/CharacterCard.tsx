@@ -114,8 +114,8 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
 
         {/* Stats */}
         <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between text-xs text-gray-500">
-          <span>{character.states.length} states</span>
-          <span>{character.counters.length} counters</span>
+          <span>{character.states?.length || 0} states</span>
+          <span>{character.counters?.length || 0} counters</span>
         </div>
 
         {/* Color indicator if set */}
