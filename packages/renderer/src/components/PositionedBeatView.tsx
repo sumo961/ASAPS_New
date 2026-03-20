@@ -11,6 +11,7 @@ import { TimerHudDisplay } from './TimerHudDisplay';
 import { CountdownMeterHud } from './CountdownMeterHud';
 import { KeypadElement } from './KeypadElement';
 import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
+import { renderMarkdownLite } from '../utils/markdownLite';
 
 // Default stage dimensions (can be overridden by project settings)
 const DEFAULT_STAGE_WIDTH = 1024;
@@ -2998,7 +2999,7 @@ const TextElement: React.FC<{
                 <span style={{ color: 'transparent' }}>{content.substring(revealedLength)}</span>
               </>
             ) : (
-              displayedText
+              <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(displayedText) }} />
             )}
           </span>
           {/* Scroll indicators - only show when scrolling is enabled, hide once user starts scrolling */}
@@ -3820,7 +3821,7 @@ const DialogElement: React.FC<{
                 onLinkClick={onAction}
               />
             ) : (
-              displayedText
+              <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(displayedText) }} />
             )
           )}
         </span>

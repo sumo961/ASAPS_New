@@ -35,3 +35,6 @@ export { PanoramaView, type PanoramaViewProps, type PanoramaHotspotData, type Pa
 
 // Export mobile detection utilities
 export { isMobileDevice, getDeviceScalingInfo, type DeviceScalingInfo } from './utils/mobileDetection';
+
+// Export markdown-lite renderer
+export { renderMarkdownLite } from './utils/markdownLite';
