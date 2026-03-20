@@ -1,5 +1,114 @@
 # ASAPS Modern - Progress Log
 
+## 2026-03-20: AI Prefetching, Session Logging, Rich Text & VE Translation (v0.9.30)
+
+### Overview
+
+This release adds **AI content prefetching** for faster AI beat execution, **play session logging** in both the Preview Window and HTML exports, **markdown-lite rich text** in text boxes, and **translated text display in the Visual Editor**. Also includes AI dialog tree improvements (exit reasoning, routing plans, personalization), ElevenLabs multilingual support, and UI refinements.
+
+### AI Beat Prefetching
+
+Background content generation starts while the user reads the current beat, hiding API latency.
+
+- All AI beats (AIInfoText, AIDurScreen, AIDialogTree, AISummary, OnlineContent) support `prefetch()` method
+- `Beat.execute()` prefetches connected AI beats before `performAction()` — generation runs while user interacts
+- Prefetched content is cached via context hash mechanism; beats skip loading spinner when content is ready
+- AIDialogTree retries once on JSON parse failure (both prefetch and execute)
+
+**Files modified:**
+- `packages/core/src/beats/Beat.ts` — `prefetchConnectedBeats()` with PREFETCHABLE_TYPES set
+- `packages/core/src/beats/AIInfoTextBeat.ts`, `AIDurScreenBeat.ts`, `AISummaryBeat.ts`, `AIDialogTreeBeat.ts`, `OnlineContentBeat.ts` — `prefetch()` methods
+
+### AI Dialog Tree Improvements
+
+Transparent exit routing, personalization, and routing plan generation.
+
+- Exit conditions reframed as evaluable rules in the generation prompt
+- AI generates `routingPlan` explaining exit mapping decisions (logged to session timeline)
+- `exitReason` on each exit choice for transparent branching
+- Personalization prompt strengthened: "use actual names/locations from player context"
+- `{variable}` single-brace interpolation in `processText()` as safety net for AI-generated content
+
+**Files modified:**
+- `packages/core/src/beats/AIDialogTreeBeat.ts` — Prompt rewrite, routingPlan, exitReason, retry
+- `packages/core/src/beats/Beat.ts` — `{variable}` format support in `processText()`
+
+### Play Session Logging
+
+Detailed session logs exportable from Preview Window and HTML export player.
+
+- Unified `TimelineEvent` system in StoryContext tracks beat-enter, choice, branch, ai-output, state-change events
+- All beats get timestamped `beat-enter` events via `markBeatVisited`
+- ConditionBeat and AIConditionBeat log branch decisions with reasoning
+- All AI beats record generated content to timeline
+- OnlineContentBeat records fetched/generated content
+- Two-section log format: Overview (beat path, final state, stats) + Detailed Timeline
+- "Save Log" button in PW toolbar and HTML export player menu (opt-in via export dialog)
+- `PlayerEngine.generateSessionLog()` for HTML export context
+
+**Files modified:**
+- `packages/core/src/engine/StoryContext.ts` — `TimelineEvent`, `AIOutputRecord`, `recordTimelineEvent()`, `getTimeline()`
+- `packages/core/src/beats/ConditionBeat.ts`, `AIConditionBeat.ts` — Branch logging
+- `packages/core/src/beats/AISummaryBeat.ts`, `AIInfoTextBeat.ts`, `AIDurScreenBeat.ts`, `OnlineContentBeat.ts` — AI output recording
+- `packages/builder/src/pages/PreviewWindow.tsx` — Session log export function, Save Log button
+- `packages/player/src/PlayerEngine.ts` — `generateSessionLog()`, `getStoryTitle()`
+- `packages/player/src/PlayerUI.tsx` — Save Log button, `showSessionLog` config
+- `packages/player-web/src/WebPlayer.tsx` — `showSessionLog` prop
+- `packages/builder/src/export/HtmlExporter.ts` — `showSessionLog` config and template
+- `packages/builder/src/components/export/HtmlExportDialog.tsx` — Session log checkbox
+
+### Markdown-Lite Rich Text
+
+Support for bold, italic, and strikethrough in text boxes.
+
+- `**bold**`, `*italic*`, `~~strikethrough~~` rendered in VE and Preview
+- New `renderMarkdownLite()` utility with XSS-safe HTML escaping
+- TextElement and DialogElement use `dangerouslySetInnerHTML` for non-typewriter rendering
+- No changes to storage, translation, or TTS — markdown is part of the string
+
+**Files modified:**
+- `packages/renderer/src/utils/markdownLite.ts` — New markdown renderer
+- `packages/renderer/src/components/PositionedBeatView.tsx` — TextElement and DialogElement rendering
+
+### Visual Editor Translation Display
+
+VE now shows translated text when a translation language is active.
+
+- `VisualWorkspace` uses `getTranslationsForBeat()` to overlay translated values onto beat content
+- All beat types supported: text, buttons, choices, props, dialog, credits
+- VBE skips setting `location.content` from raw text when translation is active
+
+**Files modified:**
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — Translation overlay in `getBeatContent()`
+- `packages/builder/src/components/visual/VisualBeatEditor.tsx` — Skip raw content when translating
+
+### ElevenLabs Language Support & Dynamic Content Rendering
+
+- ElevenLabs API now receives `language_code` for multilingual models
+- Dynamic content beats (AI, onlineContent) skip `minHeight` buffer for tighter text boxes
+- Collision detection uses unbuffered height for dynamic content beats
+- OnlineContentBeat location matching fixed (uses `loc.name` instead of Map key)
+
+**Files modified:**
+- `packages/builder/src/services/tts/ElevenLabsProvider.ts` — `language_code` parameter
+- `packages/player-web/src/WebTTSProvider.ts` — Same fix for HTML export
+- `packages/renderer/src/components/PositionedBeatView.tsx` — Dynamic content sizing fixes
+
+### UI Improvements & Bug Fixes
+
+- Header title input auto-grows with content length
+- Sidebar divider between clusters and unclustered beats is resizable (20-80%)
+- CharacterCard crash fixed when AI-generated characters lack states/counters arrays
+- AI-generated characters normalized with default empty arrays on story injection
+
+**Files modified:**
+- `packages/builder/src/components/Header.tsx` — Title input `size` attribute
+- `packages/builder/src/components/Sidebar.tsx` — Resizable divider with drag handle
+- `packages/builder/src/components/characters/CharacterCard.tsx` — Optional chaining
+- `packages/builder/src/App.tsx` — Character normalization on AI story injection
+
+---
+
 ## 2026-03-18: Text-to-Speech, Speaker System & Bug Fixes (v0.9.29)
 
 ### Overview

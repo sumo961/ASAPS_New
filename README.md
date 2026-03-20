@@ -16,12 +16,17 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.29)
+## ⚠️ Development Status (v0.9.30)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **AI Prefetching** | **v0.9.30**: Background content generation for AI beats — starts while user reads previous beat, hides API latency |
+| **Session Logging** | **v0.9.30**: Exportable play session logs (beat path, choices, AI outputs, branch decisions) in PW and HTML exports |
+| **Rich Text** | **v0.9.30**: Markdown-lite formatting (**bold**, *italic*, ~~strikethrough~~) in text boxes — VE and Preview |
+| **VE Translation** | **v0.9.30**: Visual Editor shows translated text when a translation language is active |
+| **AI Dialog Reasoning** | **v0.9.30**: Routing plans, exit reasons, personalization improvements for AIDialogTree |
 | **Text-to-Speech** | **v0.9.29**: Cloud TTS (OpenAI, ElevenLabs) and Web Speech API with streaming audio, per-speaker voice routing |
 | **Speaker System** | **v0.9.29**: Per-beat speaker assignment with portrait display, translatable names, TTS voice mapping |
 | **TTS in HTML Export** | **v0.9.29**: Embedded TTS with language-aware voice switching on translation change |
