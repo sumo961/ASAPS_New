@@ -191,7 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
 
-          {/* Story Title - More prominent, no-drag so it's editable */}
+          {/* Story Title - Auto-grows with content, no-drag so it's editable */}
           <input
             type="text"
             value={title}
@@ -199,6 +199,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="px-3 py-1.5 text-lg font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
             placeholder="Story Title"
             title="Enter the title that will appear on your story's title screen"
+            size={Math.max(15, (title || '').length + 2)}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           />
         </div>

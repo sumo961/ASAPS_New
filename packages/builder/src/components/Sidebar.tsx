@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Beat, Cluster } from '@asaps/core';
 import { Plus, Search, ChevronRight, ChevronDown, ChevronLeft, List, Folder, FolderPlus } from 'lucide-react';
 
@@ -35,6 +35,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [expandedClusters, setExpandedClusters] = React.useState<Set<string>>(new Set());
+  const [clusterRatio, setClusterRatio] = useState(50); // Percentage of space for clusters
+  const dividerContainerRef = useRef<HTMLDivElement>(null);
+
+  // Resizable divider between clusters and unclustered beats
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const container = dividerContainerRef.current;
+    if (!container) return;
+
+    const startY = e.clientY;
+    const containerRect = container.getBoundingClientRect();
+    const startRatio = clusterRatio;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const deltaPercent = (deltaY / containerRect.height) * 100;
+      const newRatio = Math.min(80, Math.max(20, startRatio + deltaPercent));
+      setClusterRatio(newRatio);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [clusterRatio]);
 
   // Handle drag and drop for moving beats into clusters
   const handleDragStart = (e: React.DragEvent, beat: Beat) => {
@@ -330,10 +358,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ) : (
           // Show beats organized by clusters - each section scrolls independently
-          <div className="flex-1 flex flex-col overflow-hidden space-y-2">
-            {/* Clusters Section - Show as folders, max 50% height */}
+          <div ref={dividerContainerRef} className="flex-1 flex flex-col overflow-hidden">
+            {/* Clusters Section - Show as folders */}
             {clusters.length > 0 && (
-              <div className="flex flex-col min-h-0 flex-shrink-0" style={{ maxHeight: '50%' }}>
+              <div className="flex flex-col min-h-0 flex-shrink-0" style={{ maxHeight: `${clusterRatio}%` }}>
                 <div className="flex items-center justify-between mb-2 flex-shrink-0">
                   <h4 className="text-xs font-semibold text-gray-500 uppercase">Clusters</h4>
                   {onAddCluster && (
@@ -432,9 +460,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
 
+            {/* Resizable Divider */}
+            {clusters.length > 0 && unclusteredBeats.length > 0 && (
+              <div
+                onMouseDown={handleDividerMouseDown}
+                className="flex-shrink-0 flex items-center justify-center cursor-row-resize group py-1"
+                title="Drag to resize"
+              >
+                <div className="w-12 h-1 bg-gray-300 rounded-full group-hover:bg-blue-400 transition-colors" />
+              </div>
+            )}
+
             {/* Unclustered Beats Section - takes remaining space */}
             {unclusteredBeats.length > 0 && (
-              <div className="flex flex-col min-h-0 flex-1 border-t border-gray-200 pt-2 overflow-hidden">
+              <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 flex-shrink-0">Unclustered Beats</h4>
                 <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
                   {unclusteredBeats.map(beat => (
