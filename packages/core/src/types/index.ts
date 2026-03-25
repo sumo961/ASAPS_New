@@ -430,11 +430,26 @@ export interface ConversationAction {
   /** Target beat ID to exit to (exit) */
   exitTarget?: string;
 
+  /**
+   * Optional NPC farewell/confirmation prompt for exit actions.
+   * When set, the NPC generates a final message from this prompt before exiting.
+   * Example: "confirm the order enthusiastically and say you'll get it started"
+   */
+  exitMessage?: string;
+
   /** Variable name to set (set-variable) */
   variableName?: string;
 
-  /** Variable value to set (set-variable) */
+  /** Variable value to set — static value (set-variable) */
   variableValue?: any;
+
+  /**
+   * AI extraction prompt for dynamic variable values (set-variable).
+   * When set, the AI extracts the value from the conversation history
+   * instead of using the static variableValue.
+   * Example: "summarize the complete chicken wing order"
+   */
+  extractionPrompt?: string;
 
   /** Composed actions (multi) */
   actions?: ConversationAction[];

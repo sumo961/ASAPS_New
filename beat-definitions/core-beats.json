@@ -2328,6 +2328,18 @@
                 "dependsOn": { "field": "actionType", "value": "exit" }
               }
             },
+            "actionExitMessage": {
+              "type": "string",
+              "required": false,
+              "description": "Optional NPC farewell message prompt before exiting",
+              "ui": {
+                "control": "textarea",
+                "rows": 2,
+                "label": "NPC Exit Message (optional)",
+                "placeholder": "e.g. confirm the order enthusiastically",
+                "dependsOn": { "field": "actionType", "value": "exit" }
+              }
+            },
             "actionVariableName": {
               "type": "string",
               "required": false,
@@ -2337,8 +2349,19 @@
             "actionVariableValue": {
               "type": "string",
               "required": false,
-              "description": "Value to set",
-              "ui": { "label": "Variable Value" }
+              "description": "Static value to set (leave empty to use AI extraction)",
+              "ui": { "label": "Variable Value (static)" }
+            },
+            "actionExtractionPrompt": {
+              "type": "string",
+              "required": false,
+              "description": "AI extracts the value from the conversation. Use instead of a static value.",
+              "ui": {
+                "control": "textarea",
+                "rows": 2,
+                "label": "Extract Value (AI)",
+                "placeholder": "e.g. summarize the complete food order"
+              }
             },
             "once": {
               "type": "boolean",

@@ -973,15 +973,21 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
 
-  // Reset inputValue when the beat changes or input element's content (prompt) changes
-  // This ensures consecutive inputText beats show empty input with placeholder
-  // Detection matches render logic: name contains 'input' (not kind === 'input')
+  // Reset inputValue when the beat changes or input element's content (prompt) changes.
+  // If the content looks like a resolved variable (non-empty, not a raw ${...} reference),
+  // pre-populate the input with it so users can edit an existing value.
   const inputElement = elements.find(el => el.location.name.toLowerCase().includes('input'));
   const inputPrompt = inputElement?.content;
-  // Create a unique key from elements to detect beat changes (even if prompt is the same)
   const inputResetKey = elements.map(el => `${el.location.name}:${el.content?.substring(0, 20)}`).join('|');
   React.useEffect(() => {
-    setInputValue('');
+    const content = inputPrompt || '';
+    // If content is non-empty and doesn't look like an unresolved variable reference,
+    // use it as the initial editable value (e.g., resolved ${order_content})
+    if (content && !content.startsWith('${') && !content.startsWith('$') && content.trim().length > 0) {
+      setInputValue(content);
+    } else {
+      setInputValue('');
+    }
   }, [inputPrompt, inputResetKey]);
 
   // State for timer - subscribes to updates for real-time progress bar animation
@@ -3317,6 +3323,7 @@ const InputFieldElement: React.FC<{
   theme: RenderThemeSettings;
   mobileFontScale?: number;
 }> = ({ style, content, location, onAction, interactive, inputValue = '', setInputValue, theme, mobileFontScale = 1.0 }) => {
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Calculate font size based on autosize setting or explicit fontSize
   let computedFontSize: number;
@@ -3341,7 +3348,10 @@ const InputFieldElement: React.FC<{
   const paddingHorizontal = Math.max(Math.floor(location.width * 0.03), 12);
   const paddingVertical = Math.max(Math.floor(location.height * 0.15), 8);
 
-  const inputStyle: React.CSSProperties = {
+  // Determine if content is multi-line or long enough to need a textarea
+  const needsTextarea = inputValue.includes('\n') || inputValue.length > 50 || content.includes('\n') || content.length > 50;
+
+  const baseStyle: React.CSSProperties = {
     ...style,
     backgroundColor: '#fff',
     color: '#000',
@@ -3357,10 +3367,42 @@ const InputFieldElement: React.FC<{
     outline: 'none',
   };
 
+  // Auto-grow textarea to fit content
+  React.useEffect(() => {
+    if (textareaRef.current && needsTextarea) {
+      const el = textareaRef.current;
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(el.scrollHeight, location.height)}px`;
+    }
+  }, [inputValue, needsTextarea, location.height]);
+
+  if (needsTextarea) {
+    return (
+      <textarea
+        ref={textareaRef}
+        style={{
+          ...baseStyle,
+          resize: 'none',
+          overflow: 'hidden',
+          minHeight: `${location.height}px`,
+          lineHeight: '1.4',
+        }}
+        placeholder={content}
+        value={inputValue}
+        onChange={(e) => {
+          setInputValue?.(e.target.value);
+        }}
+        disabled={!interactive}
+        autoFocus={interactive}
+        data-input-field="true"
+      />
+    );
+  }
+
   return (
     <input
       type="text"
-      style={inputStyle}
+      style={baseStyle}
       placeholder={content}
       value={inputValue}
       onChange={(e) => setInputValue?.(e.target.value)}

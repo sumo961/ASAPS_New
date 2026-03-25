@@ -2486,7 +2486,8 @@ export class ReactRenderer extends BaseRenderer {
     };
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('inputText', content);
 
-    this.ttsSpeakCallback?.(prompt, this.currentSpeaker, true);
+    // Speak the prompt as regular dialog (not as a UI prompt that requires readPrompts)
+    this.ttsSpeakCallback?.(prompt, this.currentSpeaker);
 
     // renderPositionedBeat returns a Promise<void>, but we need Promise<string>
     // So we wrap it and return the input value from resolveAction

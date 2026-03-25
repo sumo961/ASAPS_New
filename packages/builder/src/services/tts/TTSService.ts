@@ -148,7 +148,12 @@ export class TTSService {
         console.log('[TTSService] No audio/response returned — provider plays directly');
       }
     } catch (error) {
-      console.error('[TTSService] Speech failed:', error);
+      // AbortError is expected when a new speak() cancels the previous one via stop()
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        // Silently ignore — this is normal during speech transitions
+      } else {
+        console.error('[TTSService] Speech failed:', error);
+      }
     } finally {
       // Only clear if no newer speak() has started
       if (this._speakGeneration === gen) {
@@ -173,7 +178,11 @@ export class TTSService {
    */
   stop(): void {
     this._speakGeneration++; // Invalidate any running speak() finally block
-    this.activeProvider?.stop();
+    try {
+      this.activeProvider?.stop();
+    } catch {
+      // AbortError is expected when cancelling in-progress synthesis
+    }
     this._isSpeaking = false;
   }
 }

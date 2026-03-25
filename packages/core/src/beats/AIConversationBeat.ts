@@ -28,6 +28,7 @@ import {
   buildDirectionEvaluationPrompt,
   parseDirectionEvaluationResponse,
   collectActions,
+  buildExtractionPrompt,
   type ConversationTurn,
 } from '../utils/ConversationPromptBuilder';
 
@@ -164,14 +165,16 @@ export class AIConversationBeat extends Beat {
    * Convert nested ConversationDirection to flat inspector format
    */
   private static flattenDirection(d: ConversationDirection): Record<string, any> {
-    // Extract variable name/value from action (may be in multi-action)
+    // Extract variable name/value/extraction from action (may be in multi-action)
     let varName = d.action.variableName || '';
     let varValue = d.action.variableValue != null ? String(d.action.variableValue) : '';
+    let extractionPrompt = d.action.extractionPrompt || '';
     if (d.action.type === 'multi' && d.action.actions) {
       const setVar = d.action.actions.find(a => a.type === 'set-variable');
       if (setVar) {
         varName = setVar.variableName || '';
         varValue = setVar.variableValue != null ? String(setVar.variableValue) : '';
+        extractionPrompt = setVar.extractionPrompt || '';
       }
     }
 
@@ -201,8 +204,12 @@ export class AIConversationBeat extends Beat {
       actionExitTarget: d.action.exitTarget || (d.action.type === 'multi'
         ? d.action.actions?.find(a => a.type === 'exit')?.exitTarget || ''
         : ''),
+      actionExitMessage: d.action.exitMessage || (d.action.type === 'multi'
+        ? d.action.actions?.find(a => a.type === 'exit')?.exitMessage || ''
+        : ''),
       actionVariableName: varName,
       actionVariableValue: varValue,
+      actionExtractionPrompt: extractionPrompt,
       once: d.once ?? false,
     };
     return flat;
@@ -243,16 +250,26 @@ export class AIConversationBeat extends Beat {
       primaryAction.instruction = flat.actionInstruction || '';
     } else if (primaryType === 'exit') {
       primaryAction.exitTarget = flat.actionExitTarget || '';
+      if (flat.actionExitMessage?.trim()) {
+        primaryAction.exitMessage = flat.actionExitMessage;
+      }
     }
 
     if (hasVariable) {
       // Compose multi-action: primary + set-variable
+      const setVarAction: any = {
+        type: 'set-variable',
+        variableName: flat.actionVariableName,
+        variableValue: flat.actionVariableValue || '',
+      };
+      // If extraction prompt is set, use AI extraction instead of static value
+      if (flat.actionExtractionPrompt?.trim()) {
+        setVarAction.extractionPrompt = flat.actionExtractionPrompt;
+        delete setVarAction.variableValue; // extraction takes precedence
+      }
       action = {
         type: 'multi',
-        actions: [
-          primaryAction,
-          { type: 'set-variable', variableName: flat.actionVariableName, variableValue: flat.actionVariableValue || '' },
-        ],
+        actions: [primaryAction, setVarAction],
       };
     } else {
       action = primaryAction;
@@ -452,22 +469,33 @@ export class AIConversationBeat extends Beat {
 
         // Evaluate directions against player input
         const activeDirections = this.directions.filter(d => {
-          if (d.once && firedOnceDirections.has(d.id)) return false;
+          if (d.once && firedOnceDirections.has(d.id)) {
+            console.log(`[AIConversationBeat ${this.id}] Direction ${d.id} skipped (already fired once)`);
+            return false;
+          }
           // Check variable guard — filter out directions whose guard isn't met
           if (d.requiresVariable) {
             const actualVal = context.getVariable(d.requiresVariable);
             if (d.requiresVariableValue !== undefined && d.requiresVariableValue !== '') {
-              if (String(actualVal) !== String(d.requiresVariableValue)) return false;
+              if (String(actualVal) !== String(d.requiresVariableValue)) {
+                console.log(`[AIConversationBeat ${this.id}] Direction ${d.id} skipped (${d.requiresVariable}="${actualVal}" ≠ "${d.requiresVariableValue}")`);
+                return false;
+              }
             } else {
-              // Just check existence (any truthy value)
-              if (!actualVal) return false;
+              if (!actualVal) {
+                console.log(`[AIConversationBeat ${this.id}] Direction ${d.id} skipped (${d.requiresVariable} not set)`);
+                return false;
+              }
             }
           }
           return true;
         });
 
+        console.log(`[AIConversationBeat ${this.id}] Active directions: ${activeDirections.length}/${this.directions.length} (${activeDirections.map(d => d.id).join(', ')})`);
+
         let steeringInstructions: string[] = [];
         let exitTarget: string | null = null;
+        let exitMessagePrompt: string | null = null;
         const variableSets: Array<{ name: string; value: any }> = [];
 
         if (activeDirections.length > 0) {
@@ -487,7 +515,28 @@ export class AIConversationBeat extends Beat {
               const actions = collectActions(activeDirections, triggeredIndices);
               steeringInstructions = actions.steeringInstructions;
               exitTarget = actions.exitTarget;
+              exitMessagePrompt = actions.exitMessage;
               variableSets.push(...actions.variableSets);
+
+              // Resolve AI-extracted variable values
+              if (actions.extractions.length > 0) {
+                try {
+                  const extractPrompt = buildExtractionPrompt(actions.extractions, conversationHistory);
+                  const extractResponse = await this.callAI(aiService, extractPrompt, 'Extract variable values');
+                  const match = extractResponse.match(/\{[\s\S]*\}/);
+                  if (match) {
+                    const extracted = JSON.parse(match[0]);
+                    for (const ext of actions.extractions) {
+                      if (extracted[ext.name] !== undefined) {
+                        variableSets.push({ name: ext.name, value: extracted[ext.name] });
+                        console.log(`[AIConversationBeat ${this.id}] Extracted ${ext.name} = "${extracted[ext.name]}"`);
+                      }
+                    }
+                  }
+                } catch (extractErr) {
+                  console.warn(`[AIConversationBeat ${this.id}] Variable extraction failed:`, extractErr);
+                }
+              }
 
               // Mark once-only directions as fired
               for (const idx of triggeredIndices) {
@@ -503,14 +552,112 @@ export class AIConversationBeat extends Beat {
           }
         }
 
-        // Apply variable sets
+        // Apply variable sets (static + extracted)
         for (const { name, value } of variableSets) {
           context.setVariable(name, value);
+          console.log(`[AIConversationBeat ${this.id}] Set variable: ${name} = "${value}"`);
+        }
+
+        // Re-evaluate: if variables changed, check if previously-guarded directions
+        // are now active and should fire in the same turn.
+        if (variableSets.length > 0 && !exitTarget) {
+          const newlyActive = this.directions.filter(d => {
+            if (activeDirections.includes(d)) return false;
+            if (d.once && firedOnceDirections.has(d.id)) return false;
+            if (d.requiresVariable) {
+              const actualVal = context.getVariable(d.requiresVariable);
+              if (d.requiresVariableValue !== undefined && d.requiresVariableValue !== '') {
+                if (String(actualVal) !== String(d.requiresVariableValue)) return false;
+              } else {
+                if (!actualVal) return false;
+              }
+            }
+            return true;
+          });
+
+          if (newlyActive.length > 0) {
+            console.log(`[AIConversationBeat ${this.id}] Re-evaluating ${newlyActive.length} newly-active directions`);
+            try {
+              const reEvalPrompt = buildDirectionEvaluationPrompt(
+                playerInput, newlyActive, conversationHistory, turnNumber,
+              );
+              const reEvalResponse = await this.callAI(aiService, reEvalPrompt, 'Re-evaluate directions');
+              const reTriggered = parseDirectionEvaluationResponse(reEvalResponse);
+
+              if (reTriggered.length > 0) {
+                const reActions = collectActions(newlyActive, reTriggered);
+                steeringInstructions.push(...reActions.steeringInstructions);
+                if (reActions.exitTarget) {
+                  exitTarget = reActions.exitTarget;
+                  exitMessagePrompt = reActions.exitMessage;
+                }
+
+                // Handle extractions
+                if (reActions.extractions.length > 0) {
+                  try {
+                    const extractPrompt = buildExtractionPrompt(reActions.extractions, conversationHistory);
+                    const extractResponse = await this.callAI(aiService, extractPrompt, 'Extract variable values');
+                    const match = extractResponse.match(/\{[\s\S]*\}/);
+                    if (match) {
+                      const extracted = JSON.parse(match[0]);
+                      for (const ext of reActions.extractions) {
+                        if (extracted[ext.name] !== undefined) {
+                          context.setVariable(ext.name, extracted[ext.name]);
+                          console.log(`[AIConversationBeat ${this.id}] Extracted ${ext.name} = "${extracted[ext.name]}"`);
+                        }
+                      }
+                    }
+                  } catch (extractErr) {
+                    console.warn(`[AIConversationBeat ${this.id}] Re-eval extraction failed:`, extractErr);
+                  }
+                }
+
+                for (const { name, value } of reActions.variableSets) {
+                  context.setVariable(name, value);
+                }
+
+                for (const idx of reTriggered) {
+                  const dir = newlyActive[idx];
+                  if (dir?.once) firedOnceDirections.add(dir.id);
+                }
+                console.log(`[AIConversationBeat ${this.id}] Re-eval triggered: ${reTriggered.join(', ')}`);
+              }
+            } catch (err) {
+              console.warn(`[AIConversationBeat ${this.id}] Re-evaluation failed:`, err);
+            }
+          }
         }
 
         // Check for exit
         if (exitTarget) {
-          // Record exit in timeline
+          // Generate NPC exit message if a prompt is provided
+          if (exitMessagePrompt) {
+            try {
+              const exitSystemPrompt = `You are ${this.npcName}. ${this.npcPersonality || ''}\n\n` +
+                `Generate a brief farewell/confirmation message. Instruction: ${exitMessagePrompt}\n` +
+                `Respond with ONLY the dialog text — no JSON, no metadata, no stage directions.`;
+              const exitMsg = await this.generateNPCResponse(aiService, exitSystemPrompt, conversationHistory);
+              if (exitMsg.trim()) {
+                conversationHistory.push({ role: 'npc', text: exitMsg, turnNumber });
+                await renderer.renderDialog(this.npcName, exitMsg, undefined, Array.from(this.locations.values()));
+                console.log(`[AIConversationBeat ${this.id}] NPC exit message: "${exitMsg.substring(0, 80)}..."`);
+
+                // Wait for TTS to finish speaking the exit message before transitioning
+                const ttsService = renderer.getState('ttsService') as any;
+                if (ttsService?.isSpeaking?.()) {
+                  console.log(`[AIConversationBeat ${this.id}] Waiting for exit message TTS...`);
+                  while (ttsService.isSpeaking()) {
+                    await new Promise(r => setTimeout(r, 200));
+                  }
+                  // Brief pause after TTS finishes for natural pacing
+                  await new Promise(r => setTimeout(r, 500));
+                }
+              }
+            } catch (err) {
+              console.warn(`[AIConversationBeat ${this.id}] Exit message generation failed:`, err);
+            }
+          }
+
           context.recordTimelineEvent({
             type: 'branch',
             beatId: this.id,
