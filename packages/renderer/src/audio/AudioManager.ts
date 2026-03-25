@@ -388,10 +388,11 @@ export class AudioManager {
       return this.playWithMediaSource(response, volume);
     }
 
-    // Fallback: collect full blob and play via existing path
+    // Fallback: collect full blob and play — must wait for playback to finish
+    // so that TTSService.isSpeaking() stays true until audio actually ends
     console.log('[AudioManager] MediaSource not supported for audio/mpeg, falling back to blob playback');
     const blob = await response.blob();
-    return this.playSoundFromBlob(blob, volume);
+    return this.playSoundFromBlobAndWait(blob, volume);
   }
 
   /**

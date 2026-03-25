@@ -1210,6 +1210,413 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Render a conversation input (text field + optional mic button).
+   * Used by AIConversationBeat for real-time AI conversations.
+   * Renders inline within the chat view, preserving chat history.
+   * Returns the player's text input.
+   */
+  async renderConversationInput(options: {
+    prompt?: string;
+    placeholder?: string;
+    showMic?: boolean;
+    language?: string;
+  }): Promise<string> {
+    return new Promise<string>(resolve => {
+      // Render the chat view with an inline text input instead of choice buttons
+      const placeholder = options.placeholder || 'Type your response...';
+
+      // Determine background
+      const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+      const backgroundColor = this.backgroundImageUrl
+        ? 'transparent'
+        : (this.theme?.backgroundColor || defaultGradient);
+
+      const stageWidth = this.context.width;
+      const stageHeight = this.context.height;
+      const disableScaling = this.getState('disableScaling') as boolean | undefined;
+      const scalingMode = this.mobileMode ? 'cover' as const : 'fit' as const;
+      const useMobileBg = this.mobileMode && scalingMode === 'cover';
+
+      // Get STT and TTS services from renderer state (set by PreviewWindow/WebPlayer)
+      const sttService = options.showMic ? this.getState('sttService') as any : null;
+      const ttsService = this.getState('ttsService') as any;
+      const sttLanguage = options.language;
+
+      // Wire up TTS service to WhisperCpp provider so it can pause during playback
+      if (sttService && ttsService) {
+        const provider = sttService.getActiveProvider?.();
+        if (provider?.setTTSService) {
+          provider.setTTSService(ttsService);
+        }
+      }
+
+      const handleSubmit = (text: string) => {
+        if (!text.trim()) return;
+
+        // Stop STT immediately — don't let it keep recording after submit
+        if (sttService) {
+          sttService.stopListening();
+        }
+
+        // Add player message to chat history
+        const playerName = (this.getState('playerName') as string) || 'You';
+        const displayName = playerName.length > 12
+          ? (playerName.split(' ')[0] || playerName.charAt(0))
+          : playerName;
+
+        this.chatMessages.push({
+          id: `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+          speaker: displayName,
+          text: text.trim(),
+          isPlayer: true,
+        });
+
+        resolve(text.trim());
+      };
+
+      // Check if browser has native SpeechRecognition (fallback for streaming auto-listen)
+      const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      // Check if the configured STT service supports streaming (Vosk, Whisper.cpp, Web Speech)
+      const activeSTTProvider = sttService?.getActiveProvider?.();
+      const sttSupportsStreaming = activeSTTProvider?.supportsStreaming === true;
+      console.log(`[ConversationInput] STT service: ${sttService ? 'yes' : 'no'}, provider: ${activeSTTProvider?.name || 'none'}, streaming: ${sttSupportsStreaming}`);
+
+      // Inline input component with optional mic button and auto-listen mode
+      const ConversationInput = () => {
+        const [inputText, setInputText] = React.useState('');
+        const [isListening, setIsListening] = React.useState(false);
+        const [interimText, setInterimText] = React.useState('');
+        const inputRef = React.useRef<HTMLInputElement>(null);
+        const autoSubmitTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+        const accumulatedTextRef = React.useRef('');
+        const hasSubmittedRef = React.useRef(false);
+
+        const showMicButton = !!(sttService || SpeechRecognitionClass);
+        const recognitionRef = React.useRef<any>(null);
+        const unmountedRef = React.useRef(false);
+        const stoppingRef = React.useRef(false); // true when stopListening was called intentionally
+
+        // Auto-submit after silence: when we get a final result, wait 2s for more speech.
+        // If no new speech arrives, auto-submit.
+        const scheduleAutoSubmit = React.useCallback((text: string) => {
+          if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+          autoSubmitTimerRef.current = setTimeout(() => {
+            if (text.trim() && !hasSubmittedRef.current) {
+              hasSubmittedRef.current = true;
+              // Stop recognition before submitting
+              if (recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch { /* ignore */ }
+                recognitionRef.current = null;
+              }
+              setIsListening(false);
+              setInterimText('');
+              handleSubmit(text.trim());
+            }
+          }, 2000);
+        }, []);
+
+        // Start listening — use streaming STT service (Vosk) if available, else browser SpeechRecognition
+        const startListening = React.useCallback(() => {
+          if (isListening) return;
+
+          setIsListening(true);
+          setInterimText('');
+          accumulatedTextRef.current = inputText;
+          hasSubmittedRef.current = false;
+
+          if (sttSupportsStreaming && sttService) {
+            // Use the configured streaming STT service (Vosk, Whisper.cpp, Web Speech STT provider)
+            console.log(`[ConversationInput] Starting streaming STT via service: ${activeSTTProvider?.name}`);
+            recognitionRef.current = 'stt-service'; // marker
+            sttService.startListening({
+              language: sttLanguage,
+              onResult: (result: any) => {
+                if (result.isFinal) {
+                  const combined = accumulatedTextRef.current
+                    ? accumulatedTextRef.current + ' ' + result.text
+                    : result.text;
+                  accumulatedTextRef.current = combined;
+                  setInputText(combined);
+                  setInterimText('');
+                  scheduleAutoSubmit(combined);
+                } else {
+                  setInterimText(result.text);
+                  if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+                }
+              },
+              onError: () => {
+                setIsListening(false);
+                setInterimText('');
+                recognitionRef.current = null;
+              },
+              onEnd: () => {
+                recognitionRef.current = null;
+                if (unmountedRef.current || stoppingRef.current) return; // intentional stop or unmounted
+                const text = accumulatedTextRef.current;
+                if (text.trim() && !hasSubmittedRef.current) {
+                  setIsListening(false);
+                  setInterimText('');
+                  hasSubmittedRef.current = true;
+                  handleSubmit(text.trim());
+                } else if (!hasSubmittedRef.current) {
+                  // Ended without speech — auto-restart
+                  setIsListening(false);
+                  setInterimText('');
+                  setTimeout(() => {
+                    if (!hasSubmittedRef.current && !unmountedRef.current) startListening();
+                  }, 500);
+                }
+              },
+            });
+          } else if (SpeechRecognitionClass) {
+            // Fallback: use browser SpeechRecognition directly
+            console.log('[ConversationInput] Using browser SpeechRecognition fallback');
+            const recognition = new SpeechRecognitionClass();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = sttLanguage || 'en-US';
+            recognition.maxAlternatives = 1;
+            recognitionRef.current = recognition;
+
+            recognition.onresult = (event: any) => {
+              let interim = '';
+              for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                if (result.isFinal) {
+                  const finalText = result[0].transcript;
+                  const combined = accumulatedTextRef.current
+                    ? accumulatedTextRef.current + ' ' + finalText
+                    : finalText;
+                  accumulatedTextRef.current = combined;
+                  setInputText(combined);
+                  setInterimText('');
+                  scheduleAutoSubmit(combined);
+                } else {
+                  interim += result[0].transcript;
+                }
+              }
+              if (interim) {
+                setInterimText(interim);
+                if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+              }
+            };
+
+            recognition.onerror = (event: any) => {
+              if (event.error === 'no-speech' || event.error === 'aborted') {
+                // No speech detected or aborted — will auto-restart via onend
+                return;
+              }
+              console.warn('[ConversationInput] SpeechRecognition error:', event.error);
+              setIsListening(false);
+              setInterimText('');
+              recognitionRef.current = null;
+            };
+
+            recognition.onend = () => {
+              recognitionRef.current = null;
+              if (unmountedRef.current || stoppingRef.current) return; // intentional stop or unmounted
+              const text = accumulatedTextRef.current;
+              if (text.trim() && !hasSubmittedRef.current) {
+                // User spoke, then paused — auto-submit
+                setIsListening(false);
+                setInterimText('');
+                hasSubmittedRef.current = true;
+                handleSubmit(text.trim());
+              } else if (!hasSubmittedRef.current) {
+                // Recognition ended without any speech (timeout, TTS interference, etc.)
+                // Auto-restart after a brief delay
+                setIsListening(false);
+                setInterimText('');
+                setTimeout(() => {
+                  if (!hasSubmittedRef.current && !unmountedRef.current) startListening();
+                }, 500);
+              }
+            };
+
+            recognition.start();
+          }
+        }, [isListening, inputText, scheduleAutoSubmit]);
+
+        const stopListening = React.useCallback(() => {
+          stoppingRef.current = true;
+          if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+          if (recognitionRef.current === 'stt-service' && sttService) {
+            sttService.stopListening();
+          } else if (recognitionRef.current && recognitionRef.current !== 'stt-service') {
+            try { recognitionRef.current.stop(); } catch { /* ignore */ }
+          }
+          recognitionRef.current = null;
+          setIsListening(false);
+          setInterimText('');
+          // Allow re-starting after a brief delay (stoppingRef is a one-shot guard)
+          setTimeout(() => { stoppingRef.current = false; }, 100);
+        }, []);
+
+        // Auto-start listening when component mounts, but wait for TTS to finish first.
+        // This prevents STT from hearing the NPC's TTS playback.
+        React.useEffect(() => {
+          if (showMicButton && (sttSupportsStreaming || SpeechRecognitionClass)) {
+            let cancelled = false;
+
+            const waitForTTSAndStart = () => {
+              if (cancelled) return;
+              if (ttsService?.isSpeaking?.()) {
+                // TTS still playing — poll until it finishes
+                setTimeout(waitForTTSAndStart, 200);
+              } else {
+                // TTS done (or no TTS) — small delay then start listening
+                setTimeout(() => {
+                  if (!cancelled && !hasSubmittedRef.current) startListening();
+                }, 400);
+              }
+            };
+
+            // Initial delay to let NPC message render, then wait for TTS
+            setTimeout(waitForTTSAndStart, 300);
+            return () => { cancelled = true; };
+          } else {
+            inputRef.current?.focus();
+          }
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, []);
+
+        // TTS awareness is handled inside the WhisperCpp provider via setTTSService().
+        // The provider pauses recording when TTS is speaking — no React polling needed.
+
+        // Clean up on unmount — mark as unmounted so onEnd callbacks don't restart
+        React.useEffect(() => {
+          return () => {
+            unmountedRef.current = true;
+            if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+            if (recognitionRef.current === 'stt-service' && sttService) {
+              sttService.stopListening();
+            } else if (recognitionRef.current && recognitionRef.current !== 'stt-service') {
+              try { recognitionRef.current.abort(); } catch { /* ignore */ }
+            }
+            recognitionRef.current = null;
+          };
+        }, []);
+
+        const onSubmit = () => {
+          const text = inputText.trim();
+          if (!text) return;
+          hasSubmittedRef.current = true;
+          if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+          if (isListening && sttService) {
+            sttService.stopListening();
+            setIsListening(false);
+          }
+          handleSubmit(text);
+        };
+
+        const toggleMic = () => {
+          if (isListening) {
+            stopListening();
+          } else {
+            startListening();
+          }
+        };
+
+        return (
+          <div style={{
+            display: 'flex', gap: 8, padding: '8px 16px',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            alignItems: 'center',
+          }}>
+            {showMicButton && (
+              <button
+                onClick={toggleMic}
+                style={{
+                  width: 40, height: 40, borderRadius: '50%', border: 'none',
+                  backgroundColor: isListening ? '#ef4444' : 'rgba(255,255,255,0.15)',
+                  color: 'white', cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}
+                title={isListening ? 'Stop listening' : 'Start voice input'}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {isListening ? (
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  ) : (
+                    <>
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" x2="12" y1="19" y2="22" />
+                    </>
+                  )}
+                </svg>
+              </button>
+            )}
+            <input
+              ref={inputRef}
+              type="text"
+              value={isListening && interimText ? interimText + '...' : inputText}
+              onChange={(e) => { if (!isListening) setInputText(e.target.value); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && inputText.trim()) onSubmit(); }}
+              placeholder={isListening ? 'Listening...' : placeholder}
+              readOnly={isListening}
+              style={{
+                flex: 1, padding: '10px 14px', borderRadius: 20,
+                border: isListening ? '2px solid #ef4444' : '1px solid rgba(255,255,255,0.2)',
+                backgroundColor: isListening ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.95)',
+                fontSize: 14, outline: 'none', color: '#1a1a1a',
+                fontStyle: isListening && interimText ? 'italic' : 'normal',
+              }}
+            />
+            <button
+              onClick={onSubmit}
+              disabled={!inputText.trim()}
+              style={{
+                padding: '10px 20px', borderRadius: 20,
+                backgroundColor: inputText.trim() ? '#0a66c2' : '#555',
+                color: 'white', border: 'none', cursor: inputText.trim() ? 'pointer' : 'default',
+                fontSize: 14, fontWeight: 600, flexShrink: 0,
+              }}
+            >
+              Send
+            </button>
+          </div>
+        );
+      };
+
+      this.renderComponent(
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <ScaledStage
+            width={stageWidth}
+            height={stageHeight}
+            disableScaling={disableScaling}
+            scalingMode={scalingMode}
+            backgroundUrl={useMobileBg ? this.backgroundImageUrl : undefined}
+            backgroundColor={useMobileBg ? backgroundColor : undefined}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <ChatDialogView
+                  messages={[...this.chatMessages]}
+                  choices={[]}
+                  mode={'chat-scroll'}
+                  showAvatars={this.currentShowAvatars}
+                  theme={this.theme}
+                  backgroundUrl={this.backgroundImageUrl}
+                  backgroundColor={backgroundColor}
+                  onChoiceSelect={() => {}}
+                  stageWidth={stageWidth}
+                  stageHeight={stageHeight - 60}
+                  characterAvatarResolver={this.characterAvatarResolver || undefined}
+                  showTypingIndicator={false}
+                  fontScale={this.mobileFontScale}
+                />
+              </div>
+              <ConversationInput />
+            </div>
+          </ScaledStage>
+        </div>
+      );
+    });
+  }
+
+  /**
    * Set the sound blob resolver function
    * This allows the renderer to load sound blobs from storage for playback
    * Avoids stale blob URL issues by loading fresh blob data when needed

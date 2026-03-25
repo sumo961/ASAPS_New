@@ -177,13 +177,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -236,13 +236,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -319,6 +319,12 @@
             "step": 0.5,
             "label": "NPC Response Delay (seconds)"
           }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Displays per-node speaker names as labels during dialog",
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["dialog", "choices"],
@@ -385,13 +391,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["question", "choices"],
@@ -444,13 +450,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["question", "props"],
@@ -496,13 +502,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -637,13 +643,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "restartConnection": {
           "type": "connection",
@@ -808,13 +814,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["prompt", "hotspots"],
@@ -927,13 +933,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -1137,13 +1143,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         },
         "connection": {
           "type": "connection",
@@ -1319,13 +1325,13 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker" }
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "label": "Show Speaker Name", "group": "Speaker" }
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
         }
       },
       "locations": ["text", "hyperlinks"],
@@ -1565,7 +1571,11 @@
           "type": "string",
           "required": true,
           "default": "Character",
-          "description": "NPC name the player is talking to"
+          "description": "NPC name the player is talking to",
+          "ui": {
+            "control": "npc-character",
+            "label": "NPC Character"
+          }
         },
         "npcPersonality": {
           "type": "string",
@@ -2114,6 +2124,308 @@
       "aiNotes": {
         "purpose": "Auto-advancing text screen with AI-generated content and calculated reading time",
         "examples": ["Atmospheric description", "Time-passing narrative", "Brief status update based on player state"]
+      }
+    },
+
+    "aiConversation": {
+      "category": "visible",
+      "displayName": "AI Conversation",
+      "icon": "🤖💬",
+      "description": "Real-time AI conversation with author-defined steering rules. Each NPC response is generated fresh based on full conversation history and active directions.",
+      "connectionType": "multiple",
+      "parameters": {
+        "scenario": {
+          "type": "string",
+          "required": true,
+          "description": "Scene description for the conversation",
+          "ui": {
+            "control": "textarea",
+            "rows": 3,
+            "label": "Scenario"
+          }
+        },
+        "npcName": {
+          "type": "string",
+          "required": true,
+          "default": "Character",
+          "description": "Name of the NPC the player is talking to",
+          "ui": {
+            "control": "npc-character",
+            "label": "NPC Character"
+          }
+        },
+        "npcPersonality": {
+          "type": "string",
+          "required": false,
+          "description": "NPC personality traits and behavior guidelines",
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "NPC Personality"
+          }
+        },
+        "openingLine": {
+          "type": "string",
+          "required": false,
+          "description": "NPC's opening line (if empty, AI generates one)",
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "Opening Line"
+          }
+        },
+        "directions": {
+          "type": "array<object>",
+          "required": false,
+          "default": [],
+          "description": "Conversation directions: trigger + action pairs that steer the conversation dynamically",
+          "ui": {
+            "label": "Conversation Directions",
+            "addLabel": "Add Direction",
+            "itemLabel": "Direction"
+          },
+          "itemSchema": {
+            "id": {
+              "type": "string",
+              "required": true,
+              "description": "Unique direction ID",
+              "ui": { "label": "ID" }
+            },
+            "triggerType": {
+              "type": "string",
+              "required": true,
+              "default": "topic-mention",
+              "description": "When this direction activates",
+              "ui": {
+                "label": "Trigger",
+                "control": "select",
+                "options": [
+                  { "value": "topic-mention", "label": "Topic Mentioned" },
+                  { "value": "sentiment", "label": "Player Sentiment" },
+                  { "value": "turn-count", "label": "After N Turns" },
+                  { "value": "variable", "label": "Variable Check" },
+                  { "value": "custom", "label": "Custom (AI-evaluated)" }
+                ]
+              }
+            },
+            "triggerNegate": {
+              "type": "boolean",
+              "required": false,
+              "default": false,
+              "description": "Invert the trigger (fires when condition is NOT met)",
+              "ui": { "label": "Negate (NOT)" }
+            },
+            "triggerKeywords": {
+              "type": "string",
+              "required": false,
+              "description": "Comma-separated keywords (e.g. sword, weapon, blade)",
+              "ui": {
+                "label": "Keywords",
+                "dependsOn": { "field": "triggerType", "value": "topic-mention" }
+              }
+            },
+            "triggerSentiment": {
+              "type": "string",
+              "required": false,
+              "description": "Sentiment to detect",
+              "ui": {
+                "label": "Sentiment",
+                "control": "select",
+                "options": [
+                  { "value": "positive", "label": "Positive" },
+                  { "value": "negative", "label": "Negative" },
+                  { "value": "angry", "label": "Angry" },
+                  { "value": "curious", "label": "Curious" }
+                ],
+                "dependsOn": { "field": "triggerType", "value": "sentiment" }
+              }
+            },
+            "triggerTurnCount": {
+              "type": "number",
+              "required": false,
+              "default": 3,
+              "description": "Trigger after this many turns",
+              "ui": {
+                "label": "After Turn",
+                "min": 1,
+                "max": 50,
+                "dependsOn": { "field": "triggerType", "value": "turn-count" }
+              }
+            },
+            "triggerVariableName": {
+              "type": "string",
+              "required": false,
+              "description": "Variable name to check",
+              "ui": {
+                "label": "Variable Name",
+                "dependsOn": { "field": "triggerType", "value": "variable" }
+              }
+            },
+            "triggerVariableValue": {
+              "type": "string",
+              "required": false,
+              "description": "Expected variable value",
+              "ui": {
+                "label": "Expected Value",
+                "dependsOn": { "field": "triggerType", "value": "variable" }
+              }
+            },
+            "triggerDescription": {
+              "type": "string",
+              "required": false,
+              "description": "Freeform condition for AI to evaluate",
+              "ui": {
+                "control": "textarea",
+                "rows": 2,
+                "label": "Condition",
+                "dependsOn": { "field": "triggerType", "value": "custom" }
+              }
+            },
+            "requiresVariable": {
+              "type": "string",
+              "required": false,
+              "description": "Additional guard: only fire if this variable is set (enables chaining directions)",
+              "ui": { "label": "Requires Variable (optional)" }
+            },
+            "requiresVariableValue": {
+              "type": "string",
+              "required": false,
+              "description": "Expected value (leave empty to just check existence)",
+              "ui": { "label": "Required Value" }
+            },
+            "actionType": {
+              "type": "string",
+              "required": true,
+              "default": "steer",
+              "description": "What happens when triggered",
+              "ui": {
+                "label": "Action",
+                "control": "select",
+                "options": [
+                  { "value": "steer", "label": "Steer Conversation" },
+                  { "value": "exit", "label": "Exit to Beat" }
+                ]
+              }
+            },
+            "actionInstruction": {
+              "type": "string",
+              "required": false,
+              "description": "Instruction for how the NPC should respond",
+              "ui": {
+                "control": "textarea",
+                "rows": 2,
+                "label": "Steering Instruction",
+                "dependsOn": { "field": "actionType", "value": "steer" }
+              }
+            },
+            "actionExitTarget": {
+              "type": "string",
+              "required": false,
+              "targetField": true,
+              "description": "Target beat to exit to",
+              "ui": {
+                "label": "Exit Target",
+                "dependsOn": { "field": "actionType", "value": "exit" }
+              }
+            },
+            "actionVariableName": {
+              "type": "string",
+              "required": false,
+              "description": "Optionally set a variable when this direction triggers",
+              "ui": { "label": "Set Variable (optional)" }
+            },
+            "actionVariableValue": {
+              "type": "string",
+              "required": false,
+              "description": "Value to set",
+              "ui": { "label": "Variable Value" }
+            },
+            "once": {
+              "type": "boolean",
+              "required": false,
+              "default": false,
+              "description": "Only trigger once per conversation",
+              "ui": {
+                "label": "Once only",
+                "dependsOn": { "field": "actionType", "value": "steer" }
+              }
+            }
+          }
+        },
+        "maxTurns": {
+          "type": "number",
+          "required": false,
+          "default": 10,
+          "description": "Maximum conversation turns before fallback exit",
+          "ui": {
+            "control": "number",
+            "min": 1,
+            "max": 50,
+            "label": "Max Turns"
+          }
+        },
+        "fallbackExitTarget": {
+          "type": "connection",
+          "required": false,
+          "description": "Target beat when max turns reached"
+        },
+        "includeVariables": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include player variables in AI context"
+        },
+        "includeInventory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include player inventory in AI context"
+        },
+        "includeVisitedBeats": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include visited beats in AI context"
+        },
+        "includeChoiceHistory": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include rich choice history in AI context"
+        },
+        "enableVoiceInput": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Show microphone button for voice input"
+        },
+        "language": {
+          "type": "string",
+          "required": false,
+          "description": "Language for speech recognition (BCP 47, e.g., 'en-US')"
+        },
+        "systemInstructions": {
+          "type": "string",
+          "required": false,
+          "description": "Custom system instructions for the AI",
+          "ui": {
+            "control": "textarea",
+            "rows": 3,
+            "label": "System Instructions"
+          }
+        }
+      },
+      "locations": ["text"],
+      "transitions": true,
+      "sound": true,
+      "renderer": "conversation",
+      "aiNotes": {
+        "purpose": "Real-time AI conversation with NPC using author-defined conversation directions for steering dialog dynamically",
+        "examples": [
+          "Interrogation scene where player must extract information",
+          "NPC merchant negotiation with dynamic pricing",
+          "Character who reveals different story paths based on player's approach"
+        ]
       }
     }
   },

@@ -7,7 +7,7 @@
 /**
  * Supported TTS provider types
  */
-export type TTSProviderType = 'web-speech' | 'openai' | 'elevenlabs' | 'custom';
+export type TTSProviderType = 'web-speech' | 'openai' | 'elevenlabs' | 'custom' | 'local';
 
 /**
  * TTS provider configuration
@@ -27,6 +27,15 @@ export interface TTSProviderConfig {
 
   /** Default voice ID to use when no speaker-specific voice is set */
   defaultVoiceId?: string;
+
+  /** Preset ID for local TTS providers */
+  localPreset?: string;
+
+  /** Custom request template for local TTS providers */
+  localTemplate?: LocalTTSRequestTemplate;
+
+  /** Reference audio files for voice cloning (e.g., Chatterbox) */
+  referenceAudios?: File[];
 }
 
 /**
@@ -107,4 +116,64 @@ export interface ITTSProvider {
 
   /** Get available voices, optionally filtered by language prefix */
   getVoices(lang?: string): Promise<TTSVoiceInfo[]>;
+}
+
+/**
+ * Request template for local TTS providers.
+ * Describes how to call any TTS endpoint using interpolation variables:
+ * {text}, {voice}, {speed}, {lang}, {model}
+ */
+export interface LocalTTSRequestTemplate {
+  /** HTTP method */
+  method: 'GET' | 'POST';
+
+  /** URL path appended to baseUrl. Supports interpolation: e.g. /api/tts?text={text}&voice={voice} */
+  path: string;
+
+  /** Content type: 'json' for JSON body, 'multipart' for FormData */
+  contentType?: 'json' | 'multipart';
+
+  /** JSON body template. Supports interpolation variables. */
+  body?: Record<string, any>;
+
+  /** Custom headers */
+  headers?: Record<string, string>;
+
+  /** Response format */
+  responseType?: 'audio' | 'json';
+
+  /** If responseType is 'json', path to the audio URL in response */
+  audioUrlField?: string;
+
+  /** Field name for reference audio in multipart requests (voice cloning) */
+  referenceAudioField?: string;
+
+  /** Endpoint to list available voices (relative to baseUrl) */
+  voiceListEndpoint?: string;
+
+  /** JSON path to voice array in voice list response */
+  voiceListPath?: string;
+}
+
+/**
+ * Built-in preset for a local TTS server
+ */
+export interface LocalTTSPreset {
+  /** Unique preset ID */
+  id: string;
+
+  /** Display name */
+  name: string;
+
+  /** Short description */
+  description: string;
+
+  /** Default base URL */
+  defaultBaseUrl: string;
+
+  /** Request template */
+  template: LocalTTSRequestTemplate;
+
+  /** Whether this preset supports voice cloning via reference audio */
+  supportsVoiceCloning?: boolean;
 }

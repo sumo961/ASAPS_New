@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff } from 'lucide-react';
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { ReactRenderer, getAudioManager } from '@asaps/renderer';
@@ -20,6 +20,8 @@ import { InputTextValuesModal } from '../components/preview/InputTextValuesModal
 import { getSavedAIConfig } from '../hooks/useAI';
 import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider } from '../services/tts';
 import { getSavedTTSConfig } from '../hooks/useTTS';
+import { getSTTService, WebSpeechSTTProvider, WhisperSTTProvider, LocalSTTProvider, VoskSTTProvider, WhisperCppSTTProvider } from '../services/stt';
+import { getSavedSTTConfig } from '../hooks/useSTT';
 import { resolvePortraitUrl } from '../utils/speakerUtils';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
@@ -200,6 +202,31 @@ function createAIServiceAdapter(): IAIService | null {
         return JSON.parse(jsonStr);
       },
 
+      async generateConversationTurn(request: { systemPrompt: string; messages: Array<{ role: string; content: string }> }): Promise<{ text: string }> {
+        const claudeMessages = request.messages
+          .filter(m => m.role !== 'system')
+          .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+        const requestBody = {
+          model,
+          max_tokens: 1000,
+          system: request.systemPrompt,
+          messages: claudeMessages.length > 0 ? claudeMessages : [{ role: 'user' as const, content: 'Begin.' }],
+        };
+
+        let response;
+        if (useProxy) {
+          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+        } else {
+          const apiResponse = await client!.messages.create(requestBody as any);
+          response = { content: apiResponse.content };
+        }
+
+        const content = response.content[0];
+        if (content.type === 'text') return { text: content.text.trim() };
+        throw new Error('Unexpected response type from Claude');
+      },
+
       async classifyContent(prompt: string, categories: string[]): Promise<string> {
         const systemPrompt = `You are a classifier. Classify into ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name.`;
         const requestBody = {
@@ -281,6 +308,33 @@ function createAIServiceAdapter(): IAIService | null {
         return JSON.parse(jsonStr);
       },
 
+      async generateConversationTurn(request: { systemPrompt: string; messages: Array<{ role: string; content: string }> }): Promise<{ text: string }> {
+        const messages = [
+          { role: 'system' as const, content: request.systemPrompt },
+          ...request.messages.map(m => ({
+            role: m.role as 'system' | 'user' | 'assistant',
+            content: m.content,
+          })),
+        ];
+        // Ensure at least one user message
+        if (!messages.some(m => m.role === 'user')) {
+          messages.push({ role: 'user' as const, content: 'Begin.' });
+        }
+
+        const requestBody = buildChatRequestBody(model, messages, 1000);
+
+        let content: string;
+        if (useProxy) {
+          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+          content = response.choices?.[0]?.message?.content || '';
+        } else {
+          const response = await client!.chat.completions.create(requestBody as any);
+          content = response.choices[0]?.message?.content || '';
+        }
+
+        return { text: stripThinkingBlocks(content).trim() };
+      },
+
       async classifyContent(prompt: string, categories: string[]): Promise<string> {
         const systemPrompt = `You are a classifier. Classify into ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name.`;
         const requestBody = buildChatRequestBody(
@@ -351,6 +405,15 @@ function createLanguageAwareAdapter(
       return adapter.generateDialog({
         ...request,
         prompt: request.prompt + directive,
+      });
+    },
+
+    async generateConversationTurn(request) {
+      if (!adapter.generateConversationTurn) throw new Error('generateConversationTurn not available');
+      const directive = `\nYou MUST respond entirely in ${targetLang}.`;
+      return adapter.generateConversationTurn({
+        ...request,
+        systemPrompt: request.systemPrompt + directive,
       });
     },
 
@@ -473,6 +536,9 @@ export const PreviewWindow: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(() => {
     try { return localStorage.getItem('asaps_tts_enabled') !== 'false'; } catch { return true; }
+  });
+  const [sttEnabled, setSttEnabled] = useState(() => {
+    try { return localStorage.getItem('asaps_stt_enabled') === 'true'; } catch { return false; }
   });
   const [animationEnabled, setAnimationEnabled] = useState(true);
   const [inventoryVisible, setInventoryVisible] = useState(false);
@@ -1175,6 +1241,43 @@ export const PreviewWindow: React.FC = () => {
         svc.speak(text, playerSpeakerKey);
       });
 
+      // Initialize STT service — restore saved provider or fall back to Web Speech
+      const sttService = getSTTService();
+      if (sttService.getAvailableProviders().length === 0) {
+        const savedSTT = getSavedSTTConfig();
+        let sttProvider;
+
+        if (savedSTT?.providerType === 'whisper-cpp' && savedSTT.baseUrl) {
+          sttProvider = new WhisperCppSTTProvider();
+        } else if (savedSTT?.providerType === 'vosk' && savedSTT.baseUrl) {
+          sttProvider = new VoskSTTProvider();
+        } else if (savedSTT?.providerType === 'whisper' && savedSTT.apiKey) {
+          sttProvider = new WhisperSTTProvider();
+        } else if (savedSTT?.providerType === 'local' && savedSTT.baseUrl) {
+          sttProvider = new LocalSTTProvider();
+        } else if (window.SpeechRecognition || (window as any).webkitSpeechRecognition) {
+          sttProvider = new WebSpeechSTTProvider();
+        }
+
+        if (sttProvider) {
+          sttProvider.configure({
+            provider: savedSTT?.providerType || 'web-speech',
+            apiKey: savedSTT?.apiKey,
+            model: savedSTT?.model,
+            baseUrl: savedSTT?.baseUrl,
+            language: savedSTT?.language,
+          });
+          sttService.registerProvider(sttProvider);
+          sttService.setProvider(sttProvider.name);
+          console.log(`[PreviewWindow] STT initialized with ${sttProvider.name}`);
+        }
+      }
+      sttService.setEnabled(sttEnabled);
+
+      // Pass STT and TTS services to renderer state so AIConversationBeat can coordinate them
+      reactRenderer.setState('sttService', sttService);
+      reactRenderer.setState('ttsService', getTTSService());
+
       const engine = new StoryEngine(reactRenderer as any);
       rendererRef.current = reactRenderer;
       engineRef.current = engine;
@@ -1184,6 +1287,8 @@ export const PreviewWindow: React.FC = () => {
     {
       const ttsLang = previewData.activeLanguage || previewData.settings?.translation?.sourceLanguage || 'en';
       getTTSService().setLanguage(ttsLang);
+      // Also set STT language
+      getSTTService().setLanguage(ttsLang);
     }
 
     // Apply persisted speaker voices from global settings (provider-scoped)
@@ -1836,6 +1941,18 @@ export const PreviewWindow: React.FC = () => {
       console.warn('[PreviewWindow] Error toggling TTS:', error);
     }
   }, [ttsEnabled]);
+
+  const handleSTTToggle = useCallback(() => {
+    const newEnabled = !sttEnabled;
+    setSttEnabled(newEnabled);
+    try {
+      getSTTService().setEnabled(newEnabled);
+      localStorage.setItem('asaps_stt_enabled', String(newEnabled));
+      if (!newEnabled) getSTTService().stopListening();
+    } catch (error) {
+      console.warn('[PreviewWindow] Error toggling STT:', error);
+    }
+  }, [sttEnabled]);
 
   // Export play session log
   const exportSessionLog = useCallback(() => {
@@ -2712,6 +2829,13 @@ export const PreviewWindow: React.FC = () => {
             title={ttsEnabled ? 'Disable Text-to-Speech' : 'Enable Text-to-Speech'}
           >
             <Speech className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleSTTToggle}
+            className={`p-1.5 rounded flex items-center gap-1 text-sm ${sttEnabled ? 'bg-rose-100 text-rose-700' : 'hover:bg-gray-300'}`}
+            title={sttEnabled ? 'Disable Speech-to-Text' : 'Enable Speech-to-Text'}
+          >
+            {sttEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
           </button>
           <button
             onClick={() => setInventoryVisible(prev => !prev)}

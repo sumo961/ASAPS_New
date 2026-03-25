@@ -71,6 +71,7 @@ visual-patches/
 !api-proxy.ts
 
 # Root-level temp/test files
+/*.wav
 /*.png
 /*.xml
 /*.json

@@ -8,6 +8,7 @@ import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
 import { ReactRenderer, type RenderContext } from '@asaps/renderer';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
+import { WebSTTService } from './WebSTTProvider';
 
 export interface WebPlayerProps {
   /** Story data as ArrayBuffer, base64 string, or URL */
@@ -198,6 +199,17 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           // fall back to project config, then default to 'en'
           const ttsLang = language || (window as any).ASAPS_CONFIG?.ttsLanguage || 'en';
           ttsService.setLanguage(ttsLang);
+          // Pass TTS service to renderer so ConversationInput can wait for TTS to finish
+          renderer.setState('ttsService', ttsService);
+        }
+
+        // Set up STT service if available
+        const sttService = new WebSTTService();
+        if (sttService.isConfigured()) {
+          console.log('[WebPlayer] Setting up STT service...');
+          const sttLang = language || (window as any).ASAPS_CONFIG?.sttLanguage || 'en-US';
+          sttService.setLanguage(sttLang);
+          renderer.setState('sttService', sttService);
         }
 
         // Create player

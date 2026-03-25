@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-03-19T20:29:38.219Z
+ * Generated: 2026-03-25T08:07:01.692Z
  */
 
 // ============================================
@@ -712,6 +712,42 @@ export interface AiDurScreenParameters {
   connection?: Connection | undefined;
 }
 
+/**
+ * AI Conversation - Real-time AI conversation with author-defined steering rules. Each NPC response is generated fresh based on full conversation history and active directions.
+ * Category: visible
+ * Connection Type: multiple
+ */
+export interface AiConversationParameters {
+  /** Scene description for the conversation */
+  scenario: string;
+  /** Name of the NPC the player is talking to */
+  npcName: string;
+  /** NPC personality traits and behavior guidelines */
+  npcPersonality?: string | undefined;
+  /** NPC's opening line (if empty, AI generates one) */
+  openingLine?: string | undefined;
+  /** Conversation directions: trigger + action pairs that steer the conversation dynamically */
+  directions?: object[] | undefined;
+  /** Maximum conversation turns before fallback exit */
+  maxTurns?: number | undefined;
+  /** Target beat when max turns reached */
+  fallbackExitTarget?: Connection | undefined;
+  /** Include player variables in AI context */
+  includeVariables?: boolean | undefined;
+  /** Include player inventory in AI context */
+  includeInventory?: boolean | undefined;
+  /** Include visited beats in AI context */
+  includeVisitedBeats?: boolean | undefined;
+  /** Include rich choice history in AI context */
+  includeChoiceHistory?: boolean | undefined;
+  /** Show microphone button for voice input */
+  enableVoiceInput?: boolean | undefined;
+  /** Language for speech recognition (BCP 47, e.g., 'en-US') */
+  language?: string | undefined;
+  /** Custom system instructions for the AI */
+  systemInstructions?: string | undefined;
+}
+
 // ============================================
 // Beat Type Union and Maps
 // ============================================
@@ -742,7 +778,8 @@ export type BeatType =
   | 'aiDialogTree'
   | 'aiSummary'
   | 'aiInfoText'
-  | 'aiDurScreen';
+  | 'aiDurScreen'
+  | 'aiConversation';
 
 /**
  * Map of beat type name to its parameter interface
@@ -771,6 +808,7 @@ export interface BeatParameterMap {
   'aiSummary': AiSummaryParameters;
   'aiInfoText': AiInfoTextParameters;
   'aiDurScreen': AiDurScreenParameters;
+  'aiConversation': AiConversationParameters;
 }
 
 // ============================================

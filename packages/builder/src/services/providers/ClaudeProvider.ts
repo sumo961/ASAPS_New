@@ -437,4 +437,45 @@ Respond with JSON in this format:
       return beatData as NaturalLanguageBeatResponse;
     });
   }
+
+  /**
+   * Generate a single conversation turn for AIConversationBeat
+   */
+  async generateConversationTurn(request: {
+    systemPrompt: string;
+    messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+  }): Promise<{ text: string }> {
+    this.ensureReady();
+
+    // Convert messages to Claude format (user/assistant only, system goes to system field)
+    const claudeMessages = request.messages
+      .filter(m => m.role !== 'system')
+      .map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+
+    const requestBody = {
+      model: this.model,
+      max_tokens: 1000,
+      temperature: this.config?.temperature ?? 0.8,
+      system: request.systemPrompt,
+      messages: claudeMessages,
+    };
+
+    let response;
+    if (this.useProxy) {
+      response = await this.makeProxyRequest(requestBody);
+    } else {
+      const apiResponse = await this.client!.messages.create(requestBody as any);
+      response = { content: apiResponse.content };
+    }
+
+    const content = response.content[0];
+    if (content.type !== 'text') {
+      throw new Error('Unexpected response type from Claude');
+    }
+
+    return { text: content.text.trim() };
+  }
 }

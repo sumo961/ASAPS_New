@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider } from '../services/tts';
+import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider, LocalTTSProvider } from '../services/tts';
 import type { TTSProviderType } from '../types/tts';
 
 const TTS_CONFIG_STORAGE_KEY = 'asaps_tts_config';
@@ -24,6 +24,7 @@ export interface SavedTTSConfig {
   model?: string;
   baseUrl?: string;
   defaultVoiceId?: string;
+  localPreset?: string;
 }
 
 function loadSavedConfig(): SavedTTSConfig | null {
@@ -86,6 +87,7 @@ export function useTTS() {
     model?: string,
     baseUrl?: string,
     defaultVoiceId?: string,
+    localPreset?: string,
   ) => {
     let provider;
     if (providerType === 'web-speech') {
@@ -96,6 +98,8 @@ export function useTTS() {
       provider = new ElevenLabsProvider();
     } else if (providerType === 'custom') {
       provider = new CustomTTSProvider();
+    } else if (providerType === 'local') {
+      provider = new LocalTTSProvider();
     } else {
       throw new Error(`TTS provider "${providerType}" not supported`);
     }
@@ -106,6 +110,7 @@ export function useTTS() {
       model,
       baseUrl,
       defaultVoiceId,
+      localPreset,
     });
 
     ttsService.registerProvider(provider);
@@ -146,7 +151,7 @@ export function useTTS() {
       if (saved) {
         console.log('[useTTS] Restoring saved configuration for:', saved.providerType);
         try {
-          configureProvider(saved.providerType, saved.apiKey, saved.model, saved.baseUrl, saved.defaultVoiceId);
+          configureProvider(saved.providerType, saved.apiKey, saved.model, saved.baseUrl, saved.defaultVoiceId, saved.localPreset);
         } catch (error) {
           console.warn('[useTTS] Failed to restore saved config, falling back to Web Speech:', error);
           configureProvider('web-speech');
@@ -172,9 +177,10 @@ export function useTTS() {
     model?: string,
     baseUrl?: string,
     defaultVoiceId?: string,
+    localPreset?: string,
   ) => {
     try {
-      configureProvider(providerType, apiKey, model, baseUrl, defaultVoiceId);
+      configureProvider(providerType, apiKey, model, baseUrl, defaultVoiceId, localPreset);
 
       saveConfig({
         provider: providerType,
@@ -183,6 +189,7 @@ export function useTTS() {
         model,
         baseUrl,
         defaultVoiceId,
+        localPreset,
       });
     } catch (error) {
       setState(prev => ({

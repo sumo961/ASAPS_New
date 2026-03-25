@@ -124,6 +124,8 @@ interface InspectorProps {
   onOpenAssetManager?: () => void;
   onAssetSelect?: (type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => void;
   onOpenCharacterManager?: (callback?: (character: any) => void) => void;
+  /** Sync NPC name/personality back to character definitions. Creates new NPC if not found. */
+  onCharacterSync?: (npcName: string, updates: { description?: string }) => void;
   // For counter/variable dropdowns
   characters?: Character[];
   globalSettings?: {
@@ -156,6 +158,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   onOpenAssetManager,
   onAssetSelect,
   onOpenCharacterManager,
+  onCharacterSync,
   characters = [],
   globalSettings,
   width: externalWidth,
@@ -1493,6 +1496,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                     playerCharacterName={playerCharacterName}
                     availableCounters={availableCounters}
                     availableVariables={availableVariables}
+                    characterObjects={characters}
+                    onCharacterSync={onCharacterSync}
                     translationSourceHints={
                       translationState.activeLanguage ? sourceParametersRef.current : undefined
                     }

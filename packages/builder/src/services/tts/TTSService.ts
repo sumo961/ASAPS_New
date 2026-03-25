@@ -14,6 +14,8 @@ export class TTSService {
   private _enabled: boolean = true;
   private _readPrompts: boolean = false;
   private _isSpeaking: boolean = false;
+  /** Generation counter — prevents old speak() finally blocks from clearing the flag */
+  private _speakGeneration: number = 0;
   private _language: string | null = null;
   private speakerVoices: Map<string, TTSVoiceConfig> = new Map();
   private defaultVoiceConfig: TTSVoiceConfig = {};
@@ -124,7 +126,12 @@ export class TTSService {
       voiceConfig.lang = this._language;
     }
 
+    // Capture generation so old speak() calls don't clobber _isSpeaking.
+    // Race: new speak() → stop() → old finally runs → sets _isSpeaking=false
+    // after new speak() already set it true. The generation counter prevents this.
+    const gen = ++this._speakGeneration;
     this._isSpeaking = true;
+    console.log(`[TTSService] isSpeaking → true (gen ${gen})`);
     try {
       const result = await this.activeProvider.synthesize(text, voiceConfig);
       const audioManager = getAudioManager();
@@ -133,13 +140,23 @@ export class TTSService {
         // Streaming path — AudioManager decides MediaSource vs blob fallback
         await audioManager.playStreamingAudio(result.response, voiceConfig.volume ?? 1.0);
       } else if (result.audio) {
-        // Blob path (legacy or WebSpeech returns null for both)
-        await audioManager.playSoundFromBlob(result.audio, voiceConfig.volume ?? 1.0);
+        // Blob path — must wait for playback to finish so isSpeaking() stays true
+        await audioManager.playSoundFromBlobAndWait(result.audio, voiceConfig.volume ?? 1.0);
+      } else {
+        // WebSpeech or similar — no audio object returned, provider plays directly.
+        // We don't know when it finishes, but the provider should handle its own state.
+        console.log('[TTSService] No audio/response returned — provider plays directly');
       }
     } catch (error) {
       console.error('[TTSService] Speech failed:', error);
     } finally {
-      this._isSpeaking = false;
+      // Only clear if no newer speak() has started
+      if (this._speakGeneration === gen) {
+        this._isSpeaking = false;
+        console.log(`[TTSService] isSpeaking → false (gen ${gen})`);
+      } else {
+        console.log(`[TTSService] Skipping isSpeaking reset — stale gen ${gen}, current ${this._speakGeneration}`);
+      }
     }
   }
 
@@ -155,6 +172,7 @@ export class TTSService {
    * Stop any in-progress speech.
    */
   stop(): void {
+    this._speakGeneration++; // Invalidate any running speak() finally block
     this.activeProvider?.stop();
     this._isSpeaking = false;
   }

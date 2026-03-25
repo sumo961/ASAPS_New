@@ -1157,4 +1157,38 @@ Respond with JSON in this format:
       return beatData as NaturalLanguageBeatResponse;
     });
   }
+
+  /**
+   * Generate a single conversation turn for AIConversationBeat
+   */
+  async generateConversationTurn(request: {
+    systemPrompt: string;
+    messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+  }): Promise<{ text: string }> {
+    this.ensureReady();
+
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      { role: 'system', content: request.systemPrompt },
+      ...request.messages.map(m => ({
+        role: m.role as 'system' | 'user' | 'assistant',
+        content: m.content,
+      })),
+    ];
+
+    const requestBody = this.buildChatRequest(messages as any, 1000, 0.8);
+
+    let response;
+    if (this.useProxy) {
+      response = await this.makeProxyRequest(requestBody);
+    } else {
+      response = await this.client!.chat.completions.create(requestBody);
+    }
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('No response from OpenAI');
+    }
+
+    return { text: content.trim() };
+  }
 }

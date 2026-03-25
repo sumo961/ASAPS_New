@@ -4852,8 +4852,27 @@ function App() {
   const storySpeakers = useMemo(() => {
     if (!state.beats || state.beats.length === 0) return [];
     const playerKey = playerCharacterName || 'Interactor';
-    return ['Narrator', playerKey, ...extractSpeakers(state.beats, playerCharacterName)];
-  }, [state.beats, playerCharacterName]);
+    const beatSpeakers = extractSpeakers(state.beats, playerCharacterName);
+
+    // Also include NPC characters from the character manager
+    const charNames = characters
+      .filter(c => c.role !== 'player')
+      .map(c => c.displayName || c.name)
+      .filter(name => name && name.trim() !== '');
+
+    // Also include npcName from AI conversation/dialog beats
+    for (const beat of state.beats) {
+      const params = typeof beat.getParameters === 'function' ? beat.getParameters() : (beat as any).parameters;
+      const npcName = params?.npcName;
+      if (npcName && typeof npcName === 'string' && npcName.trim()) {
+        if (!charNames.includes(npcName)) charNames.push(npcName);
+      }
+    }
+
+    // Deduplicate: combine beat speakers + character names
+    const allSpeakers = new Set([...beatSpeakers, ...charNames]);
+    return ['Narrator', playerKey, ...allSpeakers];
+  }, [state.beats, playerCharacterName, characters]);
 
   // Populate character.translations from translation resources when translations are generated.
   // Also cleans up any invalid translations (e.g. from prior bug that matched counter displayNames).
@@ -5151,6 +5170,40 @@ function App() {
               assets={assets}
               onAssetSelect={handleAssetSelect}
               onOpenCharacterManager={handleOpenCharacterManager}
+              onCharacterSync={(npcName, updates) => {
+                const existing = characters.find(c =>
+                  (c.displayName || c.name) === npcName
+                );
+                if (existing) {
+                  // Update existing character's description if provided
+                  if (updates.description) {
+                    const updated = characters.map(c =>
+                      c.id === existing.id
+                        ? { ...c, description: updates.description || c.description }
+                        : c
+                    );
+                    handleCharactersChange(updated);
+                  }
+                } else {
+                  // Create new NPC character
+                  const now = new Date().toISOString();
+                  const newChar: Character = {
+                    id: `char_${Date.now()}`,
+                    name: npcName.toLowerCase().replace(/\s+/g, '_'),
+                    displayName: npcName,
+                    role: 'npc',
+                    description: updates.description || '',
+                    visual: { type: 'static' },
+                    states: [],
+                    defaultState: '',
+                    counters: [],
+                    inventory: [],
+                    createdAt: now,
+                    updatedAt: now,
+                  };
+                  handleCharactersChange([...characters, newChar]);
+                }
+              }}
               characters={characters}
               globalSettings={globalSettings}
             />

@@ -8,7 +8,7 @@
 
 
 export interface TTSConfig {
-  provider: 'elevenlabs' | 'openai' | 'web-speech' | 'custom';
+  provider: 'elevenlabs' | 'openai' | 'web-speech' | 'custom' | 'local';
   apiKey?: string;
   model?: string;
   baseUrl?: string;
@@ -16,6 +16,14 @@ export interface TTSConfig {
   speakerVoices?: Record<string, string>;
   /** Default voice ID */
   defaultVoiceId?: string;
+  /** Local TTS request template */
+  localTemplate?: {
+    method: 'GET' | 'POST';
+    path: string;
+    contentType?: 'json' | 'multipart';
+    body?: Record<string, any>;
+    headers?: Record<string, string>;
+  };
 }
 
 // Read embedded TTS config from window.ASAPS_CONFIG
@@ -132,7 +140,37 @@ export class WebTTSService {
             signal: this.abortController.signal,
           }
         );
-      } else if (provider === 'openai' || provider === 'custom') {
+      } else if (provider === 'local' && this.config!.localTemplate) {
+        const tmpl = this.config!.localTemplate;
+        const baseUrl = (this.config!.baseUrl || 'http://localhost:5002').replace(/\/$/, '');
+        const interpolate = (s: string) => s
+          .replace(/\{text\}/g, encodeURIComponent(text))
+          .replace(/\{voice\}/g, encodeURIComponent(voiceId || 'default'))
+          .replace(/\{speed\}/g, '1.0')
+          .replace(/\{lang\}/g, 'en')
+          .replace(/\{model\}/g, this.config!.model || 'default');
+        const url = baseUrl + interpolate(tmpl.path);
+        const headers: Record<string, string> = { ...(tmpl.headers || {}) };
+        if (this.config!.apiKey) headers['Authorization'] = `Bearer ${this.config!.apiKey}`;
+
+        if (tmpl.method === 'GET') {
+          response = await fetch(url, { method: 'GET', headers, signal: this.abortController.signal });
+        } else {
+          headers['Content-Type'] = 'application/json';
+          const body: Record<string, any> = {};
+          if (tmpl.body) {
+            for (const [k, v] of Object.entries(tmpl.body)) {
+              body[k] = typeof v === 'string' ? interpolate(v) : v;
+            }
+          }
+          response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+            signal: this.abortController.signal,
+          });
+        }
+      } else if (provider === 'openai' || provider === 'custom' || provider === 'local') {
         const baseUrl = (this.config!.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
         response = await fetch(`${baseUrl}/audio/speech`, {
           method: 'POST',

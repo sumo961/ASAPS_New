@@ -350,6 +350,32 @@ export interface AIServiceOptions {
 }
 
 // ============================================================================
+// Conversation Turn Types (for AIConversationBeat)
+// ============================================================================
+
+/**
+ * Request to generate a single conversation turn
+ */
+export interface ConversationTurnRequest {
+  /** System prompt with scenario, NPC personality, directions */
+  systemPrompt: string;
+
+  /** Conversation history as messages */
+  messages: Array<{
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+  }>;
+}
+
+/**
+ * Response from generating a conversation turn
+ */
+export interface ConversationTurnResponse {
+  /** The NPC's response text */
+  text: string;
+}
+
+// ============================================================================
 // Helper Command Types (for AI-powered bulk operations)
 // ============================================================================
 

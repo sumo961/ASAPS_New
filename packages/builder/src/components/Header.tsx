@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
@@ -9,6 +9,7 @@ import { AIConfigDialog } from './ai/AIConfigDialog';
 import { StoryGenerator } from './ai/StoryGenerator';
 import { NaturalLanguageBeatCreator } from './ai/NaturalLanguageBeatCreator';
 import { TTSConfigDialog } from './tts/TTSConfigDialog';
+import { STTConfigDialog } from './stt/STTConfigDialog';
 import { LanguageSelector } from './translation/LanguageSelector';
 import { useSave, useProject, usePersistence } from '../contexts/PersistenceContext';
 import { useTranslationState, useTranslationActions } from '../contexts/TranslationContext';
@@ -17,6 +18,8 @@ import { getProjectDataForExport } from '../utils/projectZipManager';
 import { getSavedAIConfig } from '../hooks/useAI';
 import { useTTS } from '../hooks/useTTS';
 import { getTTSService } from '../services/tts';
+import { useSTT } from '../hooks/useSTT';
+import { getSTTService } from '../services/stt';
 
 interface HeaderProps {
   title: string;
@@ -131,6 +134,16 @@ export const Header: React.FC<HeaderProps> = ({
     } catch { return true; }
   });
   const { configure: configureTTS } = useTTS();
+
+  // STT state
+  const [showSTTConfig, setShowSTTConfig] = useState(false);
+  const [showSTTMenu, setShowSTTMenu] = useState(false);
+  const [sttEnabled, setSttEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('asaps_stt_enabled') === 'true';
+    } catch { return false; }
+  });
+  const { configure: configureSTT } = useSTT();
 
   // Load available voices when TTS menu opens
   useEffect(() => {
@@ -676,6 +689,60 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
+          {/* STT Menu Button */}
+          <div className="relative">
+            <button
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                sttEnabled
+                  ? 'bg-rose-500 text-white hover:bg-rose-600'
+                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+              }`}
+              onClick={() => setShowSTTMenu(!showSTTMenu)}
+              title={sttEnabled ? 'STT enabled' : 'STT disabled'}
+            >
+              {sttEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+              STT
+              <ChevronDown className="w-3 h-3" />
+            </button>
+
+            {/* STT Dropdown Menu */}
+            {showSTTMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowSTTMenu(false)}
+                />
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                  {/* Toggle STT */}
+                  <button
+                    onClick={() => {
+                      const newEnabled = !sttEnabled;
+                      setSttEnabled(newEnabled);
+                      getSTTService().setEnabled(newEnabled);
+                      localStorage.setItem('asaps_stt_enabled', String(newEnabled));
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-700 transition-colors flex items-center gap-3"
+                  >
+                    {sttEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                    {sttEnabled ? 'Disable STT' : 'Enable STT'}
+                  </button>
+
+                  {/* Configure Provider */}
+                  <button
+                    onClick={() => {
+                      setShowSTTConfig(true);
+                      setShowSTTMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-700 transition-colors flex items-center gap-3"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Configure Microphone
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Language Selector */}
           <LanguageSelector
             sourceLanguage="en"
@@ -837,6 +904,20 @@ export const Header: React.FC<HeaderProps> = ({
           getTTSService().setEnabled(enabled);
           localStorage.setItem('asaps_tts_enabled', String(enabled));
           if (!enabled) getTTSService().stop();
+        }}
+      />
+
+      <STTConfigDialog
+        isOpen={showSTTConfig}
+        onClose={() => setShowSTTConfig(false)}
+        onConfigure={(providerType, apiKey, model, baseUrl, language) => {
+          configureSTT(providerType, apiKey, model, baseUrl, language);
+        }}
+        sttEnabled={sttEnabled}
+        onToggleSTT={(enabled) => {
+          setSttEnabled(enabled);
+          getSTTService().setEnabled(enabled);
+          localStorage.setItem('asaps_stt_enabled', String(enabled));
         }}
       />
 

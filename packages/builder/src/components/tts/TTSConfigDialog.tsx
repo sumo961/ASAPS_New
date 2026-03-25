@@ -6,12 +6,12 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Key, CheckCircle, AlertCircle, Server, Trash2, Play, Volume2 } from 'lucide-react';
+import { X, Key, CheckCircle, AlertCircle, Server, Trash2, Play, Volume2, Cpu } from 'lucide-react';
 import { getSavedTTSConfig, clearSavedTTSConfig } from '../../hooks/useTTS';
-import { getTTSService, WebSpeechProvider } from '../../services/tts';
+import { getTTSService, WebSpeechProvider, LOCAL_TTS_PRESETS } from '../../services/tts';
 import type { TTSProviderType, TTSVoiceInfo } from '../../types/tts';
 
-type TTSProviderTab = 'web-speech' | 'openai' | 'elevenlabs' | 'custom';
+type TTSProviderTab = 'web-speech' | 'openai' | 'elevenlabs' | 'custom' | 'local';
 
 interface ProviderPreset {
   name: string;
@@ -72,6 +72,17 @@ const PROVIDER_PRESETS: Record<TTSProviderTab, ProviderPreset> = {
     baseUrlRequired: true,
     baseUrlPlaceholder: 'http://localhost:8080/v1',
   },
+  local: {
+    name: 'Local TTS',
+    description: 'Open-source models',
+    apiKeyRequired: false,
+    apiKeyPlaceholder: 'Optional API key',
+    apiKeyHelp: 'Most local servers don\'t need this',
+    models: [],
+    defaultModel: '',
+    baseUrlRequired: true,
+    baseUrlPlaceholder: 'http://localhost:5002',
+  },
 };
 
 export interface TTSConfigDialogProps {
@@ -84,6 +95,7 @@ export interface TTSConfigDialogProps {
     model?: string,
     baseUrl?: string,
     defaultVoiceId?: string,
+    localPreset?: string,
   ) => void;
   /** Current TTS enabled state */
   ttsEnabled: boolean;
@@ -108,6 +120,7 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
   const [hasLoadedSaved, setHasLoadedSaved] = useState(false);
   const [voices, setVoices] = useState<TTSVoiceInfo[]>([]);
   const [isTesting, setIsTesting] = useState(false);
+  const [localPreset, setLocalPreset] = useState(LOCAL_TTS_PRESETS[0].id);
 
   const preset = PROVIDER_PRESETS[provider];
 
@@ -121,6 +134,7 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
         setModel(saved.model || '');
         setBaseUrl(saved.baseUrl || '');
         setDefaultVoiceId(saved.defaultVoiceId || '');
+        if (saved.localPreset) setLocalPreset(saved.localPreset);
       }
       setHasLoadedSaved(true);
     }
@@ -175,8 +189,13 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
     setDefaultVoiceId('');
     setError('');
     setSuccess(false);
-    const newPreset = PROVIDER_PRESETS[newProvider];
-    setBaseUrl(newPreset.baseUrlPlaceholder || '');
+    if (newProvider === 'local') {
+      const lp = LOCAL_TTS_PRESETS.find(p => p.id === localPreset) || LOCAL_TTS_PRESETS[0];
+      setBaseUrl(lp.defaultBaseUrl);
+    } else {
+      const newPreset = PROVIDER_PRESETS[newProvider];
+      setBaseUrl(newPreset.baseUrlPlaceholder || '');
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -202,6 +221,7 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
         model || preset.defaultModel || undefined,
         baseUrl || undefined,
         defaultVoiceId || undefined,
+        provider === 'local' ? localPreset : undefined,
       );
       setSuccess(true);
 
@@ -248,6 +268,7 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
           model || preset.defaultModel || undefined,
           baseUrl || undefined,
           defaultVoiceId || undefined,
+          provider === 'local' ? localPreset : undefined,
         );
         // Small delay for provider to initialize
         await new Promise(r => setTimeout(r, 100));
@@ -330,7 +351,7 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Voice Provider
             </label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {(Object.entries(PROVIDER_PRESETS) as [TTSProviderTab, ProviderPreset][]).map(([key, p]) => (
                 <button
                   key={key}
@@ -342,6 +363,7 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
+                  {key === 'local' && <Cpu className="w-4 h-4 mx-auto mb-1 text-gray-600" />}
                   {key === 'custom' && <Server className="w-4 h-4 mx-auto mb-1 text-gray-600" />}
                   <p className="font-medium text-gray-900 text-xs leading-tight">{p.name}</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">{p.description}</p>
@@ -350,8 +372,34 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
             </div>
           </div>
 
+          {/* Local TTS Preset Selector */}
+          {provider === 'local' && (
+            <div>
+              <label htmlFor="ttsLocalPreset" className="block text-sm font-medium text-gray-700 mb-2">
+                Server Type
+              </label>
+              <select
+                id="ttsLocalPreset"
+                value={localPreset}
+                onChange={e => {
+                  const presetId = e.target.value;
+                  setLocalPreset(presetId);
+                  const lp = LOCAL_TTS_PRESETS.find(p => p.id === presetId);
+                  if (lp) setBaseUrl(lp.defaultBaseUrl);
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                {LOCAL_TTS_PRESETS.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {p.description}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* API Key (for providers that need it) */}
-          {(preset.apiKeyRequired || provider === 'custom') && (
+          {(preset.apiKeyRequired || provider === 'custom' || provider === 'local') && (
             <div>
               <label htmlFor="ttsApiKey" className="block text-sm font-medium text-gray-700 mb-2">
                 API Key {!preset.apiKeyRequired && <span className="text-gray-400">(Optional)</span>}
@@ -392,8 +440,8 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
             </div>
           )}
 
-          {/* Base URL (for custom provider) */}
-          {preset.baseUrlRequired && (
+          {/* Base URL (for custom and local providers) */}
+          {(preset.baseUrlRequired || provider === 'local') && (
             <div>
               <label htmlFor="ttsBaseUrl" className="block text-sm font-medium text-gray-700 mb-2">
                 Base URL

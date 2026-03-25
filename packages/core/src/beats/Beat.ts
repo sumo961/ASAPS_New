@@ -271,7 +271,7 @@ export abstract class Beat {
   }
 
   private static readonly PREFETCHABLE_TYPES = new Set([
-    'aiInfoText', 'aiDurScreen', 'aiDialogTree', 'aiSummary', 'onlineContent',
+    'aiInfoText', 'aiDurScreen', 'aiDialogTree', 'aiConversation', 'aiSummary', 'onlineContent',
   ]);
 
   /**

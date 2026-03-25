@@ -193,6 +193,12 @@ export interface IAIService {
 
   /** Classify content into one of the provided categories */
   classifyContent(prompt: string, categories: string[]): Promise<string>;
+
+  /** Generate a single conversation turn (for AIConversationBeat) */
+  generateConversationTurn?(request: {
+    systemPrompt: string;
+    messages: Array<{ role: string; content: string }>;
+  }): Promise<{ text: string }>;
 }
 
 /**
@@ -313,6 +319,14 @@ export interface IRenderer {
   // Chat mode support
   clearChatHistory?(): void;
 
+  // AI Conversation input (text + mic for real-time conversation beats)
+  renderConversationInput?(options: {
+    prompt?: string;
+    placeholder?: string;
+    showMic?: boolean;
+    language?: string;
+  }): Promise<string>;
+
   // Per-choice visited tracking for recursive dialogs
   setVisitedChoiceIds?(choiceIds: string[]): void;
 
@@ -341,4 +355,87 @@ export interface BeatTypeDefinition {
   transitions?: boolean;
   sound?: boolean;
   renderer?: string;
+}
+
+// ============================================================================
+// Conversation Direction Types (for AIConversationBeat)
+// ============================================================================
+
+/**
+ * A conversation direction: trigger + action pair for steering AI conversations.
+ * Structured data (not prompt strings) for future extensibility.
+ */
+export interface ConversationDirection {
+  /** Unique identifier */
+  id: string;
+
+  /** When this direction activates */
+  trigger: ConversationTrigger;
+
+  /** What happens when triggered */
+  action: ConversationAction;
+
+  /** Priority (higher = checked first). Default 0 */
+  priority?: number;
+
+  /** If true, direction fires at most once per conversation */
+  once?: boolean;
+
+  /** Additional guard: only fire if this variable has the expected value */
+  requiresVariable?: string;
+
+  /** Expected value for the guard variable (if empty, just checks existence) */
+  requiresVariableValue?: any;
+}
+
+/**
+ * Trigger conditions for conversation directions
+ */
+export interface ConversationTrigger {
+  /** Trigger type */
+  type: 'topic-mention' | 'sentiment' | 'turn-count' | 'variable' | 'silence' | 'custom';
+
+  /** If true, invert the trigger (fires when condition is NOT met) */
+  negate?: boolean;
+
+  /** Keywords to detect (topic-mention) */
+  keywords?: string[];
+
+  /** Sentiment to detect (sentiment) */
+  sentiment?: 'positive' | 'negative' | 'neutral' | 'angry' | 'curious';
+
+  /** Turn count threshold (turn-count) */
+  turnCount?: number;
+
+  /** Variable name to check (variable) */
+  variableName?: string;
+
+  /** Variable value to compare (variable) */
+  variableValue?: any;
+
+  /** Freeform description for AI evaluation (custom) */
+  description?: string;
+}
+
+/**
+ * Actions taken when a conversation direction triggers
+ */
+export interface ConversationAction {
+  /** Action type */
+  type: 'steer' | 'exit' | 'set-variable' | 'multi';
+
+  /** Steering instruction for the NPC (steer) */
+  instruction?: string;
+
+  /** Target beat ID to exit to (exit) */
+  exitTarget?: string;
+
+  /** Variable name to set (set-variable) */
+  variableName?: string;
+
+  /** Variable value to set (set-variable) */
+  variableValue?: any;
+
+  /** Composed actions (multi) */
+  actions?: ConversationAction[];
 }

@@ -15,7 +15,7 @@ interface ParameterDefinition {
   // For fields that reference beats (target selectors)
   targetField?: boolean;
   ui?: {
-    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility';
+    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character';
     options?: (string | { value: string; label: string })[];
     label?: string;
     min?: number;
@@ -65,6 +65,10 @@ interface SchemaFormGeneratorProps {
   // Translation mode: source parameter values to show as dimmed reference below text fields.
   // When set, indicates translation mode is active.
   translationSourceHints?: Record<string, any>;
+  // Full character objects for npc-character control (sync personality, etc.)
+  characterObjects?: Array<{ id: string; name: string; displayName?: string; role?: string; description?: string }>;
+  // Callback to sync NPC name/personality back to character definitions
+  onCharacterSync?: (npcName: string, updates: { description?: string }) => void;
   // Top-level beat properties (speaker, showSpeaker) — values read from here, not parameters
   beatProperties?: Record<string, any>;
   // Callback for top-level beat property changes (scope: 'beat' fields)
@@ -206,6 +210,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   availableVariables = [],
   customRenderers = {},
   translationSourceHints,
+  characterObjects = [],
+  onCharacterSync,
   beatProperties = {},
   onBeatPropertyChange,
 }) => {
@@ -309,6 +315,14 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               <textarea
                 value={value || paramDef.default || ''}
                 onChange={(e) => onParameterChange(paramName, e.target.value)}
+                onBlur={paramName === 'npcPersonality' && onCharacterSync && parameters.npcName
+                  ? () => {
+                      const npcName = parameters.npcName;
+                      if (npcName && value) {
+                        onCharacterSync(npcName, { description: value });
+                      }
+                    }
+                  : undefined}
                 rows={rows}
                 className={`w-full px-3 py-2 border rounded-lg text-sm ${
                   translationSourceHints ? 'border-blue-300 bg-blue-50/30' : 'border-gray-300'
@@ -411,6 +425,90 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   placeholder="Enter speaker name..."
                   className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
                 />
+              )}
+            </div>
+          );
+        }
+
+        // NPC Character control - dropdown from characters with freeform entry and sync-back
+        if (paramDef.ui?.control === 'npc-character') {
+          const npcOptions: { value: string; label: string }[] = [];
+
+          // Populate from character objects (NPCs and companions)
+          for (const char of characterObjects) {
+            if (char.role === 'player') continue;
+            const name = char.displayName || char.name;
+            if (name && !npcOptions.some(o => o.value === name)) {
+              npcOptions.push({ value: name, label: name });
+            }
+          }
+          // Also include string-based characters if characterObjects is empty
+          if (npcOptions.length === 0 && characters) {
+            for (const char of characters) {
+              const name = typeof char === 'string' ? char : (char.displayName || char.name);
+              if (name && name !== 'Narrator' && !npcOptions.some(o => o.value === name)) {
+                npcOptions.push({ value: name, label: name });
+              }
+            }
+          }
+
+          const isCustom = value && !npcOptions.some(o => o.value === value);
+
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {paramDef.ui.label || label}
+                {paramDef.required && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              <select
+                value={isCustom ? '__custom__' : (value || '')}
+                onChange={(e) => {
+                  if (e.target.value === '__custom__') {
+                    handleChange(value || '');
+                  } else {
+                    handleChange(e.target.value);
+                    // When selecting an existing character, load their description into personality if it's empty
+                    if (onCharacterSync && e.target.value) {
+                      const char = characterObjects.find(c =>
+                        (c.displayName || c.name) === e.target.value
+                      );
+                      if (char?.description && !parameters.npcPersonality) {
+                        onParameterChange('npcPersonality', char.description);
+                      }
+                    }
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="">Select character...</option>
+                {npcOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+                <option value="__custom__">New character...</option>
+              </select>
+              {(isCustom || value === '__custom__') && (
+                <input
+                  type="text"
+                  value={isCustom ? value : ''}
+                  onChange={(e) => handleChange(e.target.value)}
+                  onBlur={(e) => {
+                    // Sync new character name back to character definitions
+                    // Skip default values like "Character" — only sync intentional names
+                    const name = e.target.value.trim();
+                    const isDefault = name === (paramDef.default || 'Character');
+                    if (name && !isDefault && onCharacterSync) {
+                      onCharacterSync(name, {
+                        description: parameters.npcPersonality || undefined,
+                      });
+                    }
+                  }}
+                  placeholder="Enter new NPC name..."
+                  className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
+                  autoFocus
+                />
+              )}
+              {paramDef.description && (
+                <p className="mt-1 text-xs text-gray-500">{paramDef.description}</p>
               )}
             </div>
           );
@@ -1069,6 +1167,17 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                       const fieldLabel = fieldDef.ui?.label ||
                         fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/([A-Z])/g, ' $1');
 
+                      // Check dependsOn within array items (references other fields on the same item)
+                      if (fieldDef.ui?.dependsOn) {
+                        const { field, value: depValue } = fieldDef.ui.dependsOn;
+                        const actualValue = item[field];
+                        if (Array.isArray(depValue)) {
+                          if (!depValue.includes(actualValue)) return null;
+                        } else if (actualValue !== depValue) {
+                          return null;
+                        }
+                      }
+
                       // Handle targetField - show beat selector
                       if (fieldDef.targetField) {
                         return (
@@ -1165,7 +1274,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                         );
                       }
 
-                      // Default: text input
+                      // Default: text or number input
                       return (
                         <div key={fieldName}>
                           <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1175,10 +1284,13 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                           <input
                             type={fieldDef.type === 'number' ? 'number' : 'text'}
                             value={fieldValue ?? fieldDef.default ?? ''}
+                            min={fieldDef.ui?.min}
+                            max={fieldDef.ui?.max}
+                            step={fieldDef.ui?.step}
                             onChange={(e) => {
                               const newItems = [...items];
                               const newValue = fieldDef.type === 'number'
-                                ? parseFloat(e.target.value)
+                                ? (e.target.value === '' ? undefined : parseFloat(e.target.value))
                                 : e.target.value;
                               newItems[index] = { ...item, [fieldName]: newValue };
                               onParameterChange(paramName, newItems);

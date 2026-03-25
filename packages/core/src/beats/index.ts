@@ -25,6 +25,7 @@ export { BeatTypeRegistry } from './BeatRegistry';
 export { OnlineContentBeat, type OnlineContentBeatParams } from './OnlineContentBeat';
 export { AIConditionBeat, type AIConditionCategory, type AIConditionBeatParams } from './AIConditionBeat';
 export { AIDialogTreeBeat, type AIDialogExitTarget, type AIDialogTreeBeatParams } from './AIDialogTreeBeat';
+export { AIConversationBeat, type AIConversationBeatParams } from './AIConversationBeat';
 export { AISummaryBeat, type AISummaryBeatParams } from './AISummaryBeat';
 export { AIInfoTextBeat, type AIInfoTextBeatParams } from './AIInfoTextBeat';
 export { AIDurScreenBeat, type AIDurScreenBeatParams } from './AIDurScreenBeat';

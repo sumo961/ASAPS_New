@@ -22,6 +22,7 @@ import { PanoramaBeat } from './PanoramaBeat';
 import { OnlineContentBeat } from './OnlineContentBeat';
 import { AIConditionBeat } from './AIConditionBeat';
 import { AIDialogTreeBeat } from './AIDialogTreeBeat';
+import { AIConversationBeat } from './AIConversationBeat';
 import { AISummaryBeat } from './AISummaryBeat';
 import { AIInfoTextBeat } from './AIInfoTextBeat';
 import { AIDurScreenBeat } from './AIDurScreenBeat';
@@ -97,6 +98,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('aiSummary', AISummaryBeat);
     this.registerBeatType('aiInfoText', AIInfoTextBeat);
     this.registerBeatType('aiDurScreen', AIDurScreenBeat);
+    this.registerBeatType('aiConversation', AIConversationBeat);
   }
 
   registerBeatType(type: string, constructor: BeatConstructor): void {
