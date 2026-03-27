@@ -438,8 +438,10 @@ Return a JSON object with this structure:
     }
 
     // Extract and store routing plan before validation strips it
-    if (dialogTree.routingPlan) {
-      this.lastRoutingPlan = dialogTree.routingPlan;
+    // The AI response includes routingPlan as a top-level field alongside DialogNode fields
+    const rawTree = dialogTree as DialogNode & { routingPlan?: string };
+    if (rawTree.routingPlan) {
+      this.lastRoutingPlan = rawTree.routingPlan;
       console.log(`[AIDialogTreeBeat ${this.id}] Routing plan: ${this.lastRoutingPlan}`);
     }
 
