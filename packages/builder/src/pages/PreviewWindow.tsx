@@ -18,7 +18,7 @@ import type { Character } from '../types/character';
 import { generatePathPresets, groupPresetsByOutcome, type GeneratedPreset, type InputTextBeatInfo } from '../services/PathBasedPresetGenerator';
 import { InputTextValuesModal } from '../components/preview/InputTextValuesModal';
 import { getSavedAIConfig } from '../hooks/useAI';
-import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider } from '../services/tts';
+import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider, LocalTTSProvider } from '../services/tts';
 import { getSavedTTSConfig } from '../hooks/useTTS';
 import { getSTTService, WebSpeechSTTProvider, WhisperSTTProvider, LocalSTTProvider, VoskSTTProvider, WhisperCppSTTProvider } from '../services/stt';
 import { getSavedSTTConfig } from '../hooks/useSTT';
@@ -1172,6 +1172,8 @@ export const PreviewWindow: React.FC = () => {
           provider = new ElevenLabsProvider();
         } else if (savedTTS?.providerType === 'custom' && savedTTS.baseUrl) {
           provider = new CustomTTSProvider();
+        } else if (savedTTS?.providerType === 'local' && savedTTS.baseUrl) {
+          provider = new LocalTTSProvider();
         } else {
           provider = new WebSpeechProvider();
         }
@@ -1184,6 +1186,7 @@ export const PreviewWindow: React.FC = () => {
           model: savedTTS?.model,
           baseUrl: savedTTS?.baseUrl,
           defaultVoiceId: savedTTS?.defaultVoiceId,
+          localPreset: savedTTS?.localPreset,
         });
         ttsService.registerProvider(provider);
         ttsService.setProvider(provider.name);

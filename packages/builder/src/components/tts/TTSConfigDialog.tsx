@@ -422,7 +422,7 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
           )}
 
           {/* Model Selection */}
-          {preset.models.length > 0 && (
+          {preset.models.length > 0 ? (
             <div>
               <label htmlFor="ttsModel" className="block text-sm font-medium text-gray-700 mb-2">
                 Model
@@ -437,6 +437,23 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
+            </div>
+          ) : (provider === 'local' || provider === 'custom') && (
+            <div>
+              <label htmlFor="ttsModel" className="block text-sm font-medium text-gray-700 mb-2">
+                Model <span className="text-gray-400">(Optional)</span>
+              </label>
+              <input
+                id="ttsModel"
+                type="text"
+                value={model}
+                onChange={e => setModel(e.target.value)}
+                placeholder="e.g. mlx-community/Kokoro-82M-bf16"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Model name sent to the server (leave empty if server uses a default)
+              </p>
             </div>
           )}
 

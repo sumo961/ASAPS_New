@@ -18,6 +18,41 @@ import type {
 } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
 
+/** Built-in Kokoro voice list (used when server doesn't provide /voices endpoint) */
+const KOKORO_VOICES: TTSVoiceInfo[] = [
+  // American Female
+  { id: 'af_heart', name: 'Heart (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_alloy', name: 'Alloy (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_aoede', name: 'Aoede (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_bella', name: 'Bella (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_jessica', name: 'Jessica (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_kore', name: 'Kore (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_nicole', name: 'Nicole (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_nova', name: 'Nova (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_river', name: 'River (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_sarah', name: 'Sarah (American F)', lang: 'en', gender: 'female' },
+  { id: 'af_sky', name: 'Sky (American F)', lang: 'en', gender: 'female' },
+  // American Male
+  { id: 'am_adam', name: 'Adam (American M)', lang: 'en', gender: 'male' },
+  { id: 'am_echo', name: 'Echo (American M)', lang: 'en', gender: 'male' },
+  { id: 'am_eric', name: 'Eric (American M)', lang: 'en', gender: 'male' },
+  { id: 'am_fenrir', name: 'Fenrir (American M)', lang: 'en', gender: 'male' },
+  { id: 'am_liam', name: 'Liam (American M)', lang: 'en', gender: 'male' },
+  { id: 'am_michael', name: 'Michael (American M)', lang: 'en', gender: 'male' },
+  { id: 'am_onyx', name: 'Onyx (American M)', lang: 'en', gender: 'male' },
+  { id: 'am_puck', name: 'Puck (American M)', lang: 'en', gender: 'male' },
+  // British Female
+  { id: 'bf_emma', name: 'Emma (British F)', lang: 'en', gender: 'female' },
+  { id: 'bf_alice', name: 'Alice (British F)', lang: 'en', gender: 'female' },
+  { id: 'bf_isabella', name: 'Isabella (British F)', lang: 'en', gender: 'female' },
+  { id: 'bf_lily', name: 'Lily (British F)', lang: 'en', gender: 'female' },
+  // British Male
+  { id: 'bm_george', name: 'George (British M)', lang: 'en', gender: 'male' },
+  { id: 'bm_daniel', name: 'Daniel (British M)', lang: 'en', gender: 'male' },
+  { id: 'bm_fable', name: 'Fable (British M)', lang: 'en', gender: 'male' },
+  { id: 'bm_lewis', name: 'Lewis (British M)', lang: 'en', gender: 'male' },
+];
+
 /** Built-in presets for common local TTS servers */
 export const LOCAL_TTS_PRESETS: LocalTTSPreset[] = [
   {
@@ -159,7 +194,7 @@ export class LocalTTSProvider extends BaseTTSProvider {
       voice: voiceConfig?.voiceId || this.config!.defaultVoiceId || 'default',
       speed: String(voiceConfig?.rate ?? 1.0),
       lang: voiceConfig?.lang || 'en',
-      model: this.config!.model || 'default',
+      model: (this.config!.model || 'default').trim(),
     };
 
     const url = baseUrl + this.interpolate(this.template.path, vars);
@@ -239,42 +274,55 @@ export class LocalTTSProvider extends BaseTTSProvider {
 
   async getVoices(_lang?: string): Promise<TTSVoiceInfo[]> {
     const baseUrl = this.config?.baseUrl?.replace(/\/$/, '');
-    if (!baseUrl || !this.template?.voiceListEndpoint) return [];
+    if (!baseUrl) return [];
 
-    try {
-      const headers: Record<string, string> = {};
-      if (this.config!.apiKey) {
-        headers['Authorization'] = `Bearer ${this.config!.apiKey}`;
-      }
-
-      const response = await fetch(`${baseUrl}${this.template.voiceListEndpoint}`, { headers });
-      if (!response.ok) return [];
-
-      const data = await response.json();
-
-      // Navigate to voice list using voiceListPath if specified
-      let voiceList: any[];
-      if (this.template.voiceListPath) {
-        const pathParts = this.template.voiceListPath.split('.');
-        let current = data;
-        for (const part of pathParts) {
-          current = current?.[part];
+    // Try fetching from server first
+    if (this.template?.voiceListEndpoint) {
+      try {
+        const headers: Record<string, string> = {};
+        if (this.config!.apiKey) {
+          headers['Authorization'] = `Bearer ${this.config!.apiKey}`;
         }
-        voiceList = Array.isArray(current) ? current : [];
-      } else {
-        // Support common response formats
-        voiceList = Array.isArray(data) ? data : data.voices || data.speakers || [];
-      }
 
-      return voiceList.map((v: any) => ({
-        id: typeof v === 'string' ? v : v.id || v.voice_id || v.name,
-        name: typeof v === 'string' ? v : v.name || v.id || v.voice_id,
-        lang: typeof v === 'string' ? 'mul' : v.lang || v.language || 'mul',
-        gender: typeof v === 'string' ? undefined : v.gender as 'male' | 'female' | 'neutral' | undefined,
-      }));
-    } catch {
-      return [];
+        const response = await fetch(`${baseUrl}${this.template.voiceListEndpoint}`, { headers });
+        if (response.ok) {
+          const data = await response.json();
+
+          // Navigate to voice list using voiceListPath if specified
+          let voiceList: any[];
+          if (this.template.voiceListPath) {
+            const pathParts = this.template.voiceListPath.split('.');
+            let current = data;
+            for (const part of pathParts) {
+              current = current?.[part];
+            }
+            voiceList = Array.isArray(current) ? current : [];
+          } else {
+            // Support common response formats
+            voiceList = Array.isArray(data) ? data : data.voices || data.speakers || [];
+          }
+
+          if (voiceList.length > 0) {
+            return voiceList.map((v: any) => ({
+              id: typeof v === 'string' ? v : v.id || v.voice_id || v.name,
+              name: typeof v === 'string' ? v : v.name || v.id || v.voice_id,
+              lang: typeof v === 'string' ? 'mul' : v.lang || v.language || 'mul',
+              gender: typeof v === 'string' ? undefined : v.gender as 'male' | 'female' | 'neutral' | undefined,
+            }));
+          }
+        }
+      } catch {
+        // Fall through to built-in voices
+      }
     }
+
+    // Fall back to built-in voice list for known models
+    const model = (this.config?.model || '').toLowerCase();
+    if (model.includes('kokoro')) {
+      return KOKORO_VOICES;
+    }
+
+    return [];
   }
 
   /** Set reference audio files for voice cloning */

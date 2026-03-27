@@ -29,7 +29,14 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    open: true
+    open: true,
+    proxy: {
+      '/local-tts': {
+        target: 'http://localhost:4123',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/local-tts/, ''),
+      },
+    },
   },
   base: './',
   build: {
