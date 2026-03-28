@@ -1238,7 +1238,9 @@ export class ReactRenderer extends BaseRenderer {
       const useMobileBg = this.mobileMode && scalingMode === 'cover';
 
       // Get STT and TTS services from renderer state (set by PreviewWindow/WebPlayer)
-      const sttService = options.showMic ? this.getState('sttService') as any : null;
+      // Only use STT if voice input is requested AND service is enabled
+      const rawSttService = options.showMic !== false ? this.getState('sttService') as any : null;
+      const sttService = rawSttService?.isEnabled?.() ? rawSttService : null;
       const ttsService = this.getState('ttsService') as any;
       const sttLanguage = options.language;
 
@@ -1275,7 +1277,10 @@ export class ReactRenderer extends BaseRenderer {
       };
 
       // Check if browser has native SpeechRecognition (fallback for streaming auto-listen)
-      const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      // Only use if voice input is enabled (options.showMic)
+      const SpeechRecognitionClass = options.showMic !== false
+        ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
+        : null;
       // Check if the configured STT service supports streaming (Vosk, Whisper.cpp, Web Speech)
       const activeSTTProvider = sttService?.getActiveProvider?.();
       const sttSupportsStreaming = activeSTTProvider?.supportsStreaming === true;
@@ -1291,7 +1296,7 @@ export class ReactRenderer extends BaseRenderer {
         const accumulatedTextRef = React.useRef('');
         const hasSubmittedRef = React.useRef(false);
 
-        const showMicButton = !!(sttService || SpeechRecognitionClass);
+        const showMicButton = options.showMic !== false && !!(sttService || SpeechRecognitionClass);
         const recognitionRef = React.useRef<any>(null);
         const unmountedRef = React.useRef(false);
         const stoppingRef = React.useRef(false); // true when stopListening was called intentionally

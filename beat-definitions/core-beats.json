@@ -15,7 +15,7 @@
 
   "customTypes": {
     "dialogNode": {
-      "description": "A node in a dialog tree representing NPC/system output. Always followed by player choices.",
+      "description": "A node in a dialog tree representing NPC/system output. Followed by player choices, or auto-advances if target is set with no choices.",
       "schema": {
         "id": "string",
         "speaker": "string",
@@ -23,9 +23,10 @@
         "emotion": "string?",
         "conditions": "condition[]?",
         "choices": "dialogChoice[]",
-        "effects": "effect[]?"
+        "effects": "effect[]?",
+        "target": "string?"
       },
-      "notes": "dialogNode displays text and waits for player to click a choice. No auto-advance."
+      "notes": "dialogNode displays text. If 'target' is set and no visible choices exist, auto-advances to the target beat after a delay (NPC exit). Otherwise waits for player to click a choice."
     },
     "dialogChoice": {
       "description": "A player choice in dialog. Can exit to a beat or continue with nested dialog.",
@@ -1640,6 +1641,12 @@
               "required": true,
               "description": "When to use this exit (for AI)",
               "ui": { "control": "textarea", "rows": 2, "label": "When to Use" }
+            },
+            "npcExitMessage": {
+              "type": "string",
+              "required": false,
+              "description": "Prompt for AI to generate a farewell NPC message when exiting via this target. If set, the NPC delivers a final line before transitioning.",
+              "ui": { "control": "textarea", "rows": 2, "label": "NPC Exit Message Prompt" }
             }
           }
         },

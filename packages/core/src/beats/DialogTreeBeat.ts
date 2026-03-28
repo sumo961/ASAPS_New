@@ -5,6 +5,7 @@ import { StoryContext } from '../engine/StoryContext';
 import type { DialogTreeParameters, DialogNode, DialogChoice } from '../generated/beat-types';
 import { computeDialogTreeLayout, type DialogTreeLayoutTheme } from '../layout';
 import { migrateDialogTreeEffects } from '../migration/effectsMigration';
+import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
 
 /**
  * Phase layout override - stores position adjustments for elements that
@@ -176,6 +177,18 @@ export class DialogTreeBeat extends Beat {
       }
 
       try {
+        // Check node-level target (NPC exit)
+        if (node.target && typeof node.target === 'string' && node.target !== '__self__') {
+          const connectionKey = `${node.target}-[NPC exit]`;
+          if (!seenConnections.has(connectionKey)) {
+            seenConnections.add(connectionKey);
+            connections.push({
+              targetId: node.target,
+              label: `[NPC exit] ${node.speaker || 'NPC'}`,
+            });
+          }
+        }
+
         // Check choices for targets
         if (node.choices && Array.isArray(node.choices)) {
           node.choices.forEach((choice) => {
@@ -448,6 +461,23 @@ export class DialogTreeBeat extends Beat {
         locations
       );
 
+      // Check for NPC exit node: has target but no choices
+      if (this.currentNode.target && (!this.currentNode.choices || this.currentNode.choices.length === 0)) {
+        // NPC exit — auto-advance after TTS/reading delay
+        await waitForTTS(renderer);
+        await waitForReadingTime(renderer, processedText);
+
+        if (this.currentNode.target === '__self__') {
+          this.currentNode = this.dialogTree;
+          nodePath = 'root';
+          continue;
+        }
+        console.log(`[DialogTreeBeat] NPC exit node → ${this.currentNode.target}`);
+        exitTargetBeatId = this.currentNode.target;
+        this.currentNode = null;
+        continue;
+      }
+
       // Every node must have choices (new simplified format)
       // Player must click a choice to continue or exit
       if (this.currentNode.choices && this.currentNode.choices.length > 0) {
@@ -457,7 +487,20 @@ export class DialogTreeBeat extends Beat {
         );
 
         if (visibleChoices.length === 0) {
-          // No visible choices - dialog ends here
+          // No visible choices — fall back to node-level target if available
+          if (this.currentNode.target) {
+            await waitForTTS(renderer);
+            await waitForReadingTime(renderer, processedText);
+            if (this.currentNode.target === '__self__') {
+              this.currentNode = this.dialogTree;
+              nodePath = 'root';
+              continue;
+            }
+            console.log(`[DialogTreeBeat] All choices filtered, NPC exit → ${this.currentNode.target}`);
+            exitTargetBeatId = this.currentNode.target;
+            this.currentNode = null;
+            continue;
+          }
           break;
         }
 

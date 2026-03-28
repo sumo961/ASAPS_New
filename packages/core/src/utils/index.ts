@@ -1,4 +1,5 @@
 export { PlayerContextBuilder, type PlayerContextOptions, type PlayerContextData } from './PlayerContextBuilder';
+export { waitForTTS, waitForReadingTime } from './ttsWait';
 export {
   // Types
   type AIProxyRequest,

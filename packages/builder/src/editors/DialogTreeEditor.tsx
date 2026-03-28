@@ -36,6 +36,7 @@ interface DialogNode {
   conditions?: Condition[];
   choices: DialogChoice[];  // Required - always followed by player choices
   effects?: Effect[];
+  target?: string;  // Beat ID for NPC-initiated exit (auto-advance, no choices needed)
 }
 
 interface DialogChoice {
@@ -427,6 +428,13 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                   ({node.choices?.length} choice{node.choices?.length !== 1 ? 's' : ''})
                 </span>
               )}
+              {/* NPC exit badge */}
+              {node.target && (!node.choices || node.choices.length === 0) && (
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <ArrowRight className="w-3 h-3" />
+                  {node.target === '__self__' ? 'Loop to start' : (allBeats?.find(b => b.id === node.target)?.name || node.target)}
+                </span>
+              )}
             </div>
             <p className="text-sm text-gray-700 break-words whitespace-pre-wrap">{node.text}</p>
           </div>
@@ -755,6 +763,32 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               />
             </div>
             
+            {/* NPC Exit Target */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                NPC Auto-Exit <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-1">
+                If set and no choices exist, the NPC delivers this message and auto-advances.
+              </p>
+              <select
+                value={node.target || ''}
+                onChange={(e) => {
+                  const updated = { ...node, target: e.target.value || undefined };
+                  setEditingNode({ node: updated, path });
+                }}
+                className="w-full px-2 py-1 border rounded text-sm"
+              >
+                <option value="">None (player must click a choice)</option>
+                <option value="__self__">↩ Return to initial choices</option>
+                <optgroup label="Connect to beat">
+                  {allBeats?.map(beat => (
+                    <option key={beat.id} value={beat.id}>→ {beat.name} ({beat.id})</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+
             {/* Buttons */}
             <div className="flex gap-2 justify-end mt-4">
               <button
@@ -769,7 +803,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                     // Create a partial update with only the fields we're editing
                     const updates: Partial<DialogNode> = {
                       speaker: editingNode.node.speaker,
-                      text: editingNode.node.text
+                      text: editingNode.node.text,
+                      target: editingNode.node.target,
                     };
                     const updated = updateNodeAtPath(dialogTree, editingNode.path, updates);
                     onChange(updated);

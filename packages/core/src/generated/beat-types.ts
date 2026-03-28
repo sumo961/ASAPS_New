@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-03-25T21:08:17.790Z
+ * Generated: 2026-03-27T18:58:28.711Z
  */
 
 // ============================================
@@ -13,7 +13,7 @@
 import type { Connection, Condition, Effect } from '../types';
 
 /**
- * A node in a dialog tree representing NPC/system output. Always followed by player choices.
+ * A node in a dialog tree representing NPC/system output. Followed by player choices, or auto-advances if target is set with no choices.
  */
 export interface DialogNode {
   id: string;
@@ -23,6 +23,7 @@ export interface DialogNode {
   conditions?: Condition[];
   choices: DialogChoice[];
   effects?: Effect[];
+  target?: string;
 }
 
 /**
