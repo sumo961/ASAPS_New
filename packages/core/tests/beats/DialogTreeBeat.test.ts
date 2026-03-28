@@ -357,5 +357,206 @@ describe('DialogTreeBeat', () => {
       expect(targetIds).toContain('beat_b');
       expect(targetIds).toContain('beat_c');
     });
+
+    it('should extract node-level NPC exit targets', () => {
+      const beat = new DialogTreeBeat({
+        id: 'dialog_npc_exit_conn',
+        name: 'NPC Exit Connection Test',
+        type: 'dialogTree',
+        dialogTree: {
+          id: 'root',
+          speaker: 'NPC',
+          text: 'Root',
+          choices: [
+            {
+              id: 'c1',
+              text: 'Ask question',
+              dialogNode: {
+                id: 'n1',
+                speaker: 'NPC',
+                text: 'Goodbye, I have nothing more to say.',
+                choices: [],
+                target: 'beat_farewell'
+              }
+            },
+            { id: 'c2', text: 'Leave', target: 'beat_exit' }
+          ]
+        }
+      });
+
+      const connections = beat.getConnections();
+      const targetIds = connections.map(c => c.targetId);
+      expect(targetIds).toContain('beat_farewell');
+      expect(targetIds).toContain('beat_exit');
+
+      // NPC exit should have a label containing [NPC exit]
+      const npcExitConn = connections.find(c => c.targetId === 'beat_farewell');
+      expect(npcExitConn?.label).toContain('[NPC exit]');
+    });
+  });
+
+  describe('NPC Exit Nodes', () => {
+    it('should auto-advance when node has target and no choices', async () => {
+      const beat = new DialogTreeBeat({
+        id: 'dialog_npc_exit',
+        name: 'NPC Exit Dialog',
+        type: 'dialogTree',
+        dialogTree: {
+          id: 'root',
+          speaker: 'Guard',
+          text: 'Go away! I do not want to talk to you.',
+          choices: [],
+          target: 'beat_kicked_out'
+        }
+      });
+
+      const result = await beat.execute(context, mockRenderer.renderer);
+
+      // Should render dialog once, no choices
+      expect(mockRenderer.getDialogCalls().length).toBe(1);
+      expect(mockRenderer.getDialogCalls()[0].text).toBe('Go away! I do not want to talk to you.');
+      expect(mockRenderer.getChoicesCalls().length).toBe(0);
+      expect(result).toBe('beat_kicked_out');
+    });
+
+    it('should auto-advance to NPC exit after nested dialog', async () => {
+      const beat = new DialogTreeBeat({
+        id: 'dialog_nested_npc_exit',
+        name: 'Nested NPC Exit',
+        type: 'dialogTree',
+        dialogTree: {
+          id: 'root',
+          speaker: 'Wizard',
+          text: 'What do you want?',
+          choices: [
+            {
+              id: 'c1',
+              text: 'Insult the wizard',
+              dialogNode: {
+                id: 'n1',
+                speaker: 'Wizard',
+                text: 'How dare you! Leave my tower at once!',
+                choices: [],
+                target: 'beat_expelled'
+              }
+            },
+            {
+              id: 'c2',
+              text: 'Ask politely',
+              target: 'beat_continue'
+            }
+          ]
+        }
+      });
+
+      // Choose the path leading to NPC exit
+      mockRenderer.queueChoice('c1');
+
+      const result = await beat.execute(context, mockRenderer.renderer);
+
+      // Should render root dialog + choices, then NPC exit dialog (no choices for exit node)
+      expect(mockRenderer.getDialogCalls().length).toBe(2);
+      expect(mockRenderer.getDialogCalls()[1].text).toBe('How dare you! Leave my tower at once!');
+      expect(mockRenderer.getChoicesCalls().length).toBe(1); // Only root choices
+      expect(result).toBe('beat_expelled');
+    });
+
+    it('should fall back to node target when all choices are filtered', async () => {
+      const beat = new DialogTreeBeat({
+        id: 'dialog_filtered',
+        name: 'Filtered Choices',
+        type: 'dialogTree',
+        dialogTree: {
+          id: 'root',
+          speaker: 'NPC',
+          text: 'Hmm, there is nothing I can offer you.',
+          choices: [
+            {
+              id: 'c1',
+              text: 'Hidden option',
+              target: 'beat_hidden',
+              visible: false
+            }
+          ],
+          target: 'beat_fallback'
+        }
+      });
+
+      const result = await beat.execute(context, mockRenderer.renderer);
+
+      // All choices filtered → should use node-level target
+      expect(mockRenderer.getDialogCalls().length).toBe(1);
+      expect(mockRenderer.getChoicesCalls().length).toBe(0);
+      expect(result).toBe('beat_fallback');
+    });
+
+    it('should show choices when node has both target and visible choices', async () => {
+      const beat = new DialogTreeBeat({
+        id: 'dialog_both',
+        name: 'Target With Choices',
+        type: 'dialogTree',
+        dialogTree: {
+          id: 'root',
+          speaker: 'NPC',
+          text: 'Make your choice',
+          choices: [
+            { id: 'c1', text: 'Option A', target: 'beat_a' },
+            { id: 'c2', text: 'Option B', target: 'beat_b' }
+          ],
+          target: 'beat_fallback' // Should be ignored since choices exist
+        }
+      });
+
+      mockRenderer.queueChoice('c1');
+
+      const result = await beat.execute(context, mockRenderer.renderer);
+
+      // Should use player's choice, not the node target
+      expect(mockRenderer.getChoicesCalls().length).toBe(1);
+      expect(result).toBe('beat_a');
+    });
+
+    it('should handle __self__ target on NPC exit node (loop to root)', async () => {
+      const beat = new DialogTreeBeat({
+        id: 'dialog_self_loop',
+        name: 'Self Loop',
+        type: 'dialogTree',
+        dialogTree: {
+          id: 'root',
+          speaker: 'NPC',
+          text: 'Choose wisely',
+          choices: [
+            {
+              id: 'c1',
+              text: 'Ask something',
+              dialogNode: {
+                id: 'n1',
+                speaker: 'NPC',
+                text: 'Let me think... Actually, ask me again.',
+                choices: [],
+                target: '__self__'
+              }
+            },
+            {
+              id: 'c2',
+              text: 'Leave',
+              target: 'beat_exit'
+            }
+          ]
+        }
+      });
+
+      // First loop: ask something → NPC loops back → then leave
+      mockRenderer.queueChoices(['c1', 'c2']);
+
+      const result = await beat.execute(context, mockRenderer.renderer);
+
+      // Should render: root dialog, NPC loop-back dialog, root dialog again
+      expect(mockRenderer.getDialogCalls().length).toBe(3);
+      expect(mockRenderer.getDialogCalls()[0].text).toBe('Choose wisely');
+      expect(mockRenderer.getDialogCalls()[1].text).toBe('Let me think... Actually, ask me again.');
+      expect(mockRenderer.getDialogCalls()[2].text).toBe('Choose wisely');
+      expect(result).toBe('beat_exit');
+    });
   });
 });

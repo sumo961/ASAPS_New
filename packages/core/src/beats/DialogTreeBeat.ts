@@ -87,7 +87,8 @@ export class DialogTreeBeat extends Beat {
       emotion: node.emotion,
       conditions: node.conditions,
       effects: node.effects,
-      choices: []
+      choices: [],
+      target: typeof node.target === 'string' ? node.target : undefined,
     };
 
     // Migrate choices
