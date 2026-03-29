@@ -490,7 +490,8 @@ describe('DialogTreeBeat', () => {
       expect(result).toBe('beat_fallback');
     });
 
-    it('should show choices when node has both target and visible choices', async () => {
+    it('should auto-advance via NPC exit target even when choices exist', async () => {
+      // When a node has target set, it auto-advances (choices are unreachable)
       const beat = new DialogTreeBeat({
         id: 'dialog_both',
         name: 'Target With Choices',
@@ -498,22 +499,20 @@ describe('DialogTreeBeat', () => {
         dialogTree: {
           id: 'root',
           speaker: 'NPC',
-          text: 'Make your choice',
+          text: 'I have made up my mind!',
           choices: [
             { id: 'c1', text: 'Option A', target: 'beat_a' },
             { id: 'c2', text: 'Option B', target: 'beat_b' }
           ],
-          target: 'beat_fallback' // Should be ignored since choices exist
+          target: 'beat_fallback' // NPC exit takes priority over choices
         }
       });
 
-      mockRenderer.queueChoice('c1');
-
       const result = await beat.execute(context, mockRenderer.renderer);
 
-      // Should use player's choice, not the node target
-      expect(mockRenderer.getChoicesCalls().length).toBe(1);
-      expect(result).toBe('beat_a');
+      // NPC exit target takes priority — no choices shown
+      expect(mockRenderer.getChoicesCalls().length).toBe(0);
+      expect(result).toBe('beat_fallback');
     });
 
     it('should handle __self__ target on NPC exit node (loop to root)', async () => {
