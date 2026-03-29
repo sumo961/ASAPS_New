@@ -462,8 +462,8 @@ export class DialogTreeBeat extends Beat {
         locations
       );
 
-      // Check for NPC exit node: has target but no choices
-      if (this.currentNode.target && (!this.currentNode.choices || this.currentNode.choices.length === 0)) {
+      // Check for NPC exit node: has target set (choices are unreachable when target is set)
+      if (this.currentNode.target) {
         // NPC exit — auto-advance after TTS/reading delay
         await waitForTTS(renderer);
         await waitForReadingTime(renderer, processedText);

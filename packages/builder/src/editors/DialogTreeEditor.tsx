@@ -429,7 +429,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                 </span>
               )}
               {/* NPC exit badge */}
-              {node.target && (!node.choices || node.choices.length === 0) && (
+              {node.target && (
                 <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded flex items-center gap-1">
                   <ArrowRight className="w-3 h-3" />
                   {node.target === '__self__' ? 'Loop to start' : (allBeats?.find(b => b.id === node.target)?.name || node.target)}
@@ -458,7 +458,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         </div>
         
         {/* Choices (Player responses) - show if expanded OR if it's an NPC without choices */}
-        {(shouldShowContent) && (
+        {/* Hide choices when NPC auto-exit is set (they are unreachable) */}
+        {(shouldShowContent) && !node.target && (
           <div className="ml-6 border-l-2 border-gray-200 pl-2">
             {node.choices && node.choices.map((choice, index) => {
               const choiceId = `${nodeId}.choice_${index}`;
@@ -801,10 +802,12 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                 onClick={() => {
                   if (editingNode) {
                     // Create a partial update with only the fields we're editing
+                    // When NPC exit target is set, clear choices (they're unreachable)
                     const updates: Partial<DialogNode> = {
                       speaker: editingNode.node.speaker,
                       text: editingNode.node.text,
                       target: editingNode.node.target,
+                      ...(editingNode.node.target ? { choices: [] } : {}),
                     };
                     const updated = updateNodeAtPath(dialogTree, editingNode.path, updates);
                     onChange(updated);

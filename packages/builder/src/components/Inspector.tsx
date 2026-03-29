@@ -396,16 +396,6 @@ export const Inspector: React.FC<InspectorProps> = ({
     }
 
     handleParameterChange('dialogTree', newDialogTree);
-
-    // Rebuild connections immediately when dialog tree changes
-    const updatedBeat = {
-      ...localBeat,
-      parameters: {
-        ...localBeat.parameters,
-        dialogTree: newDialogTree
-      }
-    };
-    rebuildConnectionsAndUpdate(updatedBeat);
   };
 
   const handleAddConnection = (targetId: string, label?: string) => {
