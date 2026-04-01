@@ -29,7 +29,7 @@ export async function waitForReadingTime(
   minDelayMs = 2000,
 ): Promise<void> {
   const ttsService = renderer.getState('ttsService') as any;
-  if (ttsService?.isEnabled?.() && ttsService?.isSpeaking?.()) {
+  if (ttsService?.isEnabled?.()) {
     // TTS is handling timing — skip reading delay
     return;
   }

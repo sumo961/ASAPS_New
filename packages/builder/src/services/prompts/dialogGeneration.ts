@@ -75,6 +75,11 @@ Respond with JSON in this exact structure:
 5. When conversation ends, the FINAL choice text is the player's last line + target to exit
 6. DO NOT create extra nesting just for continuation - keep trees as flat as possible
 7. The speaker field on every dialogNode should be a character displayName from the story's characters list
+8. NPC AUTO-EXIT: A dialogNode can have a "target" field to auto-advance WITHOUT showing choices:
+   - The NPC delivers the text, then the story auto-advances to the target beat
+   - Useful for: NPC dismissals, forced exits, NPC-initiated endings
+   - When "target" is set on a node, choices on that node are ignored
+   - Example: { "id": "n1", "speaker": "Guard", "text": "Go away!", "target": "beat_kicked_out", "choices": [] }
 
 ## Presentation Modes
 The dialogTree supports different presentation styles via "presentationMode" parameter:

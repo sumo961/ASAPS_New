@@ -179,11 +179,14 @@ function createAIServiceAdapter(): IAIService | null {
         throw new Error('Unexpected response type from Claude');
       },
 
-      async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
-        const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.`;
+      async generateDialog(request: { prompt: string; format: string; maxTurns?: number }): Promise<any> {
+        const isTextFormat = request.format === 'text';
+        const systemPrompt = isTextFormat
+          ? `You are a character in an interactive story. Respond with ONLY dialog text.`
+          : `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.`;
         const requestBody = {
           model,
-          max_tokens: 8192,
+          max_tokens: isTextFormat ? 1024 : 8192,
           system: systemPrompt,
           messages: [{ role: 'user' as const, content: request.prompt }],
         };
@@ -198,7 +201,18 @@ function createAIServiceAdapter(): IAIService | null {
 
         const content = response.content[0];
         if (content.type !== 'text') throw new Error('Unexpected response type from Claude');
-        const jsonStr = extractJSON(content.text);
+        const text = stripThinkingBlocks(content.text);
+
+        if (isTextFormat) {
+          // Try JSON first (AI might wrap text in an object), fall back to raw text
+          try {
+            const jsonStr = extractJSON(text);
+            return JSON.parse(jsonStr);
+          } catch {
+            return text;
+          }
+        }
+        const jsonStr = extractJSON(text);
         return JSON.parse(jsonStr);
       },
 
@@ -283,15 +297,18 @@ function createAIServiceAdapter(): IAIService | null {
         return stripThinkingBlocks(content);
       },
 
-      async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
-        const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.`;
+      async generateDialog(request: { prompt: string; format: string; maxTurns?: number }): Promise<any> {
+        const isTextFormat = request.format === 'text';
+        const systemPrompt = isTextFormat
+          ? `You are a character in an interactive story. Respond with ONLY dialog text.`
+          : `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.`;
         const requestBody = buildChatRequestBody(
           model,
           [
             { role: 'system' as const, content: systemPrompt },
             { role: 'user' as const, content: request.prompt },
           ],
-          8192
+          isTextFormat ? 1024 : 8192
         );
 
         let content: string;
@@ -304,6 +321,16 @@ function createAIServiceAdapter(): IAIService | null {
         }
 
         content = stripThinkingBlocks(content);
+
+        if (isTextFormat) {
+          // Try JSON first (AI might wrap text in an object), fall back to raw text
+          try {
+            const jsonStr = extractJSON(content);
+            return JSON.parse(jsonStr);
+          } catch {
+            return content;
+          }
+        }
         const jsonStr = extractJSON(content);
         return JSON.parse(jsonStr);
       },

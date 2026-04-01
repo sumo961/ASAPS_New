@@ -31,6 +31,7 @@ import {
   buildExtractionPrompt,
   type ConversationTurn,
 } from '../utils/ConversationPromptBuilder';
+import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
 
 export interface AIConversationBeatParams {
   /** Scene description */
@@ -634,24 +635,17 @@ export class AIConversationBeat extends Beat {
           if (exitMessagePrompt) {
             try {
               const exitSystemPrompt = `You are ${this.npcName}. ${this.npcPersonality || ''}\n\n` +
-                `Generate a brief farewell/confirmation message. Instruction: ${exitMessagePrompt}\n` +
+                `SCENARIO: ${this.scenario}\n\n` +
+                `Generate a brief farewell/response that DIRECTLY acknowledges what the player just said. Instruction: ${exitMessagePrompt}\n` +
+                `Keep it to 1-2 sentences. Respond in the SAME LANGUAGE as the conversation.\n` +
                 `Respond with ONLY the dialog text — no JSON, no metadata, no stage directions.`;
               const exitMsg = await this.generateNPCResponse(aiService, exitSystemPrompt, conversationHistory);
               if (exitMsg.trim()) {
                 conversationHistory.push({ role: 'npc', text: exitMsg, turnNumber });
                 await renderer.renderDialog(this.npcName, exitMsg, undefined, Array.from(this.locations.values()));
                 console.log(`[AIConversationBeat ${this.id}] NPC exit message: "${exitMsg.substring(0, 80)}..."`);
-
-                // Wait for TTS to finish speaking the exit message before transitioning
-                const ttsService = renderer.getState('ttsService') as any;
-                if (ttsService?.isSpeaking?.()) {
-                  console.log(`[AIConversationBeat ${this.id}] Waiting for exit message TTS...`);
-                  while (ttsService.isSpeaking()) {
-                    await new Promise(r => setTimeout(r, 200));
-                  }
-                  // Brief pause after TTS finishes for natural pacing
-                  await new Promise(r => setTimeout(r, 500));
-                }
+                await waitForTTS(renderer);
+                await waitForReadingTime(renderer, exitMsg);
               }
             } catch (err) {
               console.warn(`[AIConversationBeat ${this.id}] Exit message generation failed:`, err);

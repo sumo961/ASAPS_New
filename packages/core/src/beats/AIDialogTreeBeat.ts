@@ -3,7 +3,7 @@ import type { BeatConfig, Location } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { PlayerContextBuilder } from '../utils/PlayerContextBuilder';
-import { waitForTTS } from '../utils/ttsWait';
+import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
 import type { DialogNode, DialogChoice } from '../generated/beat-types';
 
 export interface AIDialogExitTarget {
@@ -361,7 +361,7 @@ export class AIDialogTreeBeat extends Beat {
     const exitDescriptions = this.exitTargets
       .map(t => {
         let desc = `- "${t.id}": ${t.description}`;
-        if (t.npcExitMessage) desc += ` [NPC will deliver a farewell message upon exit]`;
+        if (t.npcExitMessage) desc += ` [NPC will deliver a personalized farewell/response upon exit — the exit choice text should set up a natural lead-in for this]`;
         return desc;
       })
       .join('\n');
@@ -703,7 +703,11 @@ Return a JSON object with this structure:
         if (exitConfig?.npcExitMessage && aiService) {
           try {
             const exitPrompt = `You are ${this.npcName}. ${this.npcPersonality || ''}\n\n` +
-              `Generate a brief farewell/confirmation message. Instruction: ${exitConfig.npcExitMessage}\n` +
+              `SCENARIO: ${this.scenario}\n\n` +
+              `The NPC just said: "${processedText}"\n` +
+              `The player responded: "${chosen.text}"\n\n` +
+              `Generate a brief farewell/response that DIRECTLY acknowledges what the player just said. Instruction: ${exitConfig.npcExitMessage}\n` +
+              `Keep it to 1-2 sentences. Respond in the SAME LANGUAGE as the scenario above.\n` +
               `Respond with ONLY the dialog text — no JSON, no metadata, no stage directions.`;
             const exitResponse = await aiService.generateDialog({
               prompt: exitPrompt,
@@ -714,6 +718,7 @@ Return a JSON object with this structure:
               await renderer.renderDialog(this.npcName, exitText.trim(), undefined, locations);
               console.log(`[AIDialogTreeBeat ${this.id}] NPC exit message: "${exitText.trim().substring(0, 80)}..."`);
               await waitForTTS(renderer);
+              await waitForReadingTime(renderer, exitText.trim());
             }
           } catch (err) {
             console.warn(`[AIDialogTreeBeat ${this.id}] NPC exit message generation failed:`, err);

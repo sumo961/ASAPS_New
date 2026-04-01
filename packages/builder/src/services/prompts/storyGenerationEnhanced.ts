@@ -155,6 +155,12 @@ const BEAT_TYPE_GUIDE = `
 - SOUND EFFECTS: Choices can play a sound when selected
   { "id": "c1", "text": "I accept your offer.", "target": "beat_5", "soundEffect": "handshake.mp3" }
 - IMPORTANT: Choice text IS what the player says. Never use "[Continue]" - use actual dialogue.
+- NPC AUTO-EXIT: A dialog node can have a "target" field to auto-advance WITHOUT showing choices:
+  - The NPC delivers the text, then the story auto-advances to the target beat
+  - Useful for: NPC dismissals, forced exits, NPC-initiated endings
+  - When "target" is set on a node, any choices on that node are ignored
+  - Example: { "id": "n1", "speaker": "Guard", "text": "Go away!", "target": "beat_kicked_out", "choices": [] }
+  - Use target: "__self__" on a node to loop back to the root of the same dialogTree beat
 - RECURSIVE DIALOGS: A choice can use target: "__self__" to loop back to the SAME dialogTree beat:
   - Useful for: interrogation, browsing a shop, asking multiple questions before leaving
   - The dialog re-displays with the same speaker/text and choices
@@ -558,6 +564,37 @@ Fictional time condition example (CORRECT format):
 **aiDialogTree** - AI-generated branching dialogue at runtime
 - Use: Dynamic conversations that adapt to context and player history
 - Creates personalized NPC responses based on player state
+- Parameters:
+  - scenario: Scene description for context
+  - npcName: NPC the player talks to
+  - npcPersonality: Character traits (optional)
+  - maxTurns: Maximum conversation depth (default: 3)
+  - exitTargets: Array of exit destinations, each with:
+    - id: Target beat ID
+    - description: When to route here (AI uses this to decide)
+    - npcExitMessage: Optional prompt for AI to generate a farewell message when exiting via this target
+  - includeVariables, includeInventory, includeVisitedBeats, includeChoiceHistory: Context toggles
+  - systemInstructions: Additional instructions for the AI
+  - presentationMode: "positioned" | "chat-scroll" | "chat-bubble"
+- Connections: Multiple → one per exit target
+
+**aiConversation** - Real-time AI conversation with steering rules
+- Use: Open-ended NPC conversations where the AI generates each response live
+- Unlike aiDialogTree (pre-generated tree), each NPC turn is generated fresh
+- Parameters:
+  - scenario: Scene description
+  - npcName: NPC the player talks to
+  - npcPersonality: Character traits (optional)
+  - maxTurns: Maximum conversation turns before fallback exit
+  - directions: Array of steering rules that guide the AI, each with:
+    - trigger: When this direction activates (topic-mention, sentiment, turn-count, variable, custom)
+    - action: What happens (steer the conversation, exit to a beat, set a variable, or combinations)
+    - npcExitMessage: Optional prompt for farewell when exiting via this direction
+  - fallbackExitTarget: Beat to go to when maxTurns reached
+  - openingLine: Fixed opening NPC line (if empty, AI generates one)
+  - systemInstructions: Additional instructions for the AI
+- Connections: Multiple → one per exit direction + fallback
+- Requires text input from the player (free-form typing, not pre-authored choices)
 
 **aiSummary** - AI-generated narrative summary
 - Use: Recap the player's journey at endings or checkpoints
@@ -1875,11 +1912,13 @@ You may use these advanced beat types that leverage AI at runtime:
   Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences
 - **aiDurScreen**: Generate contextual text with automatic duration based on reading speed (like durScreen but dynamic)
   Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, wordsPerMinute, minDuration, maxDuration
+- **aiConversation**: Real-time AI conversation with author-defined steering rules
+  Parameters: scenario, npcName, npcPersonality, maxTurns, directions (steering rules with triggers and actions), fallbackExitTarget, openingLine, systemInstructions
 
 Use these sparingly for dynamic, personalized experiences. They require an AI API key and internet at runtime.`);
   } else {
     parts.push(`🚫 AI-POWERED BEATS DISABLED
-Do NOT use these beat types: onlineContent, aiCondition, aiDialogTree, aiSummary, aiInfoText, aiDurScreen
+Do NOT use these beat types: onlineContent, aiCondition, aiDialogTree, aiSummary, aiInfoText, aiDurScreen, aiConversation
 Use only standard beat types that work offline.`);
   }
 

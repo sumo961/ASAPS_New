@@ -42,6 +42,7 @@ Generate complete interactive story structures with:
 - **dialogTree**: Use for conversations. Supports choiceDelay, markVisited, presentationMode
   - Choices can have counter/counterOperation/counterValue and soundEffect
   - Use target "__self__" for recursive dialogs (interrogation, shopping)
+  - NPC auto-exit: set "target" on a dialogNode to auto-advance without showing choices (NPC dismissals)
 - **movementChoice**: For navigation. Include id, text, location, target on each choice
   - Supports choiceDelay, markVisited, showTextOnHover
   - Choices can have counter effects and sound effects

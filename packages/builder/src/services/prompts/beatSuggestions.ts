@@ -95,11 +95,16 @@ Suggest fictional time beats when the story involves date/time progression.
 When suggesting beats, consider AI-powered options:
 - **aiInfoText**: AI-generated contextual text (needs fallbackText)
 - **aiDurScreen**: AI-generated auto-advance text (needs fallbackText)
-- **aiDialogTree**: AI-generated branching dialogue
+- **aiDialogTree**: AI-generated branching dialogue with exit targets and optional NPC farewell messages
+- **aiConversation**: Real-time AI conversation with author-defined steering rules and free-form player input
 - **aiCondition**: AI-driven branching based on accumulated player behavior
 - **aiSummary**: AI-generated narrative summary of player's journey
 - **onlineContent**: Fetch real-time data from APIs or AI search
-Suggest AI runtime beats when dynamic, context-aware content would enhance the experience.`;
+Suggest AI runtime beats when dynamic, context-aware content would enhance the experience.
+
+## NPC Auto-Exit on DialogTree
+DialogTree nodes can have a "target" field for NPC-initiated exits (auto-advance without choices).
+Useful after dialogTree when the NPC dismisses the player or forces an exit.`;
 }
 
 /**
