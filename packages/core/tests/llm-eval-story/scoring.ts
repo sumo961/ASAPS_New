@@ -393,10 +393,14 @@ function buildReport(
     if (d.passed) totalScore += d.weight;
   }
 
+  // Critical checks that auto-fail regardless of total score
+  const criticalChecks = ['json-valid', 'beats-array', 'no-dangling-targets', 'all-reachable'];
+  const hasCriticalFailure = details.some(d => criticalChecks.includes(d.check) && !d.passed);
+
   return {
     scenario: scenario.id,
     model: result.model,
-    passed: maxScore > 0 ? (totalScore / maxScore) >= 0.7 : false,
+    passed: hasCriticalFailure ? false : (maxScore > 0 ? (totalScore / maxScore) >= 0.7 : false),
     totalScore,
     maxScore,
     details,
