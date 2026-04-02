@@ -275,7 +275,7 @@ export function scoreStory(scenario: StoryScenario, result: StoryResult): StoryS
     weight: 1,
   });
 
-  // 9. All referenced targets exist (weight: 3)
+  // 9. All referenced targets exist (weight: 5 — dangling targets break navigation)
   const beatIds = new Set(beats.map(b => b.id));
   const allTargets = collectTargetIds(beats);
   const danglingTargets = [...allTargets].filter(t => !beatIds.has(t));
@@ -285,10 +285,10 @@ export function scoreStory(scenario: StoryScenario, result: StoryResult): StoryS
     message: danglingTargets.length === 0
       ? `All ${allTargets.size} target references resolve`
       : `Dangling targets: ${danglingTargets.slice(0, 5).join(', ')}${danglingTargets.length > 5 ? ` (+${danglingTargets.length - 5} more)` : ''}`,
-    weight: 3,
+    weight: 5,
   });
 
-  // 10. All beats reachable from beat_0 (weight: 2)
+  // 10. All beats reachable from beat_0 (weight: 5 — unreachable beats are dead content)
   const reachable = findReachableBeats(beats);
   const unreachable = beats.filter(b => !reachable.has(b.id));
   details.push({
@@ -297,10 +297,10 @@ export function scoreStory(scenario: StoryScenario, result: StoryResult): StoryS
     message: unreachable.length === 0
       ? `All ${beats.length} beats reachable`
       : `${unreachable.length} unreachable: ${unreachable.map(b => b.id).slice(0, 5).join(', ')}`,
-    weight: 2,
+    weight: 5,
   });
 
-  // 11. Single-connection beats don't have multiple connections (weight: 2)
+  // 11. Single-connection beats don't have multiple connections (weight: 3 — breaks story flow)
   const overConnected = beats.filter(b =>
     SINGLE_CONNECTION_TYPES.has(b.type) &&
     b.connections && b.connections.length > 1
@@ -311,10 +311,10 @@ export function scoreStory(scenario: StoryScenario, result: StoryResult): StoryS
     message: overConnected.length === 0
       ? 'Single-connection beats OK'
       : `Over-connected: ${overConnected.map(b => `${b.id}(${b.type}):${b.connections.length}`).join(', ')}`,
-    weight: 2,
+    weight: 3,
   });
 
-  // 12. Multi-connection beats use parameter targets, not connections array (weight: 2)
+  // 12. Multi-connection beats use parameter targets, not connections array (weight: 3 — wrong format breaks import)
   const badMultiConn = beats.filter(b =>
     PARAMETER_TARGET_TYPES.has(b.type) &&
     b.connections && b.connections.length > 0
@@ -359,7 +359,7 @@ export function scoreStory(scenario: StoryScenario, result: StoryResult): StoryS
     weight: 1,
   });
 
-  // 16. DialogTree structural check (weight: 2)
+  // 16. DialogTree structural check (weight: 3 — missing fields means dialog won't render)
   const dtBeats = beats.filter(b => b.type === 'dialogTree');
   if (dtBeats.length > 0) {
     const dtOk = dtBeats.every(b => {
@@ -372,7 +372,7 @@ export function scoreStory(scenario: StoryScenario, result: StoryResult): StoryS
       message: dtOk
         ? `${dtBeats.length} dialogTree(s) properly structured`
         : 'Some dialogTree beats missing required fields (id, speaker, text, choices)',
-      weight: 2,
+      weight: 3,
     });
   }
 

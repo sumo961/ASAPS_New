@@ -52,15 +52,15 @@ npx tsx packages/core/tests/llm-eval-story/run-eval.ts --model my-model --endpoi
 | `json-valid` | 5 | Response is parseable JSON |
 | `beats-array` | 3 | Has non-empty beats array |
 | `beat0-titlescreen` | 3 | beat_0 exists and is titleScreen |
-| `no-dangling-targets` | 3 | All target IDs reference existing beats |
+| `no-dangling-targets` | 5 | All target IDs reference existing beats — dangling targets break navigation |
+| `all-reachable` | 5 | All beats reachable from beat_0 via BFS — unreachable beats are dead content |
 | `valid-types` | 2 | All beat types are recognized ASAPS types |
 | `endscreen` | 2 | Has endScreen with showRestart: true |
 | `required-types` | 2 | Scenario-specific required beat types present |
-| `all-reachable` | 2 | All beats reachable from beat_0 via BFS |
-| `single-connection` | 2 | Single-connection beats have ≤1 connection |
-| `param-targets` | 2 | Multi-connection beats use parameter targets, not connections array |
+| `single-connection` | 3 | Single-connection beats have ≤1 connection — breaks story flow |
+| `param-targets` | 3 | Multi-connection beats use parameter targets, not connections array |
 | `id-type` | 2 | Every beat has id and type fields |
-| `dialogtree-structure` | 2 | DialogTree has id, speaker, text, choices |
+| `dialogtree-structure` | 3 | DialogTree has id, speaker, text, choices — missing fields break rendering |
 | `metadata` | 1 | Has metadata with title |
 | `beat-count` | 1 | Beat count in expected range for story length |
 | `multiple-endings` | 1 | Multiple endScreens when scenario expects them |
