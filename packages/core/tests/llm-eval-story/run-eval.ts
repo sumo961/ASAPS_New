@@ -174,7 +174,8 @@ async function runScenario(model: string, scenario: StoryScenario): Promise<Stor
         { role: 'system', content: (noThink ? '/no_think\n' : '') + STORY_GENERATION_SYSTEM },
         { role: 'user', content: userPrompt },
       ],
-      scenario.length === 'short' ? 4096 : 8192,
+      // Thinking models need more output tokens (thinking counts toward num_predict)
+      scenario.length === 'short' ? (numCtx > 0 ? 16384 : 4096) : (numCtx > 0 ? 32768 : 8192),
     );
 
     return {
