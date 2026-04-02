@@ -241,16 +241,16 @@ export function scoreStory(scenario: StoryScenario, result: StoryResult): StoryS
     weight: 2,
   });
 
-  // 6. Has endScreen with showRestart (weight: 2)
-  const endScreens = beats.filter(b => b.type === 'endScreen');
-  const hasEndScreen = endScreens.length > 0;
-  const allShowRestart = endScreens.every(b => b.parameters?.showRestart === true);
+  // 6. Has ending beat (endScreen or aiSummary) with showRestart (weight: 2)
+  const endingBeats = beats.filter(b => b.type === 'endScreen' || b.type === 'aiSummary');
+  const hasEnding = endingBeats.length > 0;
+  const allShowRestart = endingBeats.every(b => b.parameters?.showRestart === true);
   details.push({
     check: 'endscreen',
-    passed: hasEndScreen,
-    message: hasEndScreen
-      ? `${endScreens.length} endScreen(s)${allShowRestart ? ', all with showRestart' : ' ⚠️ missing showRestart'}`
-      : 'No endScreen beat',
+    passed: hasEnding,
+    message: hasEnding
+      ? `${endingBeats.length} ending(s)${allShowRestart ? ', all with showRestart' : ' ⚠️ missing showRestart'}`
+      : 'No endScreen or aiSummary beat',
     weight: 2,
   });
 
@@ -341,11 +341,11 @@ export function scoreStory(scenario: StoryScenario, result: StoryResult): StoryS
 
   // 14. Multiple endings if expected (weight: 1)
   if (scenario.multipleEndings) {
-    const multiEnd = endScreens.length >= 2;
+    const multiEnd = endingBeats.length >= 2;
     details.push({
       check: 'multiple-endings',
       passed: multiEnd,
-      message: multiEnd ? `${endScreens.length} endings` : `Only ${endScreens.length} ending (expected 2+)`,
+      message: multiEnd ? `${endingBeats.length} endings` : `Only ${endingBeats.length} ending (expected 2+)`,
       weight: 1,
     });
   }

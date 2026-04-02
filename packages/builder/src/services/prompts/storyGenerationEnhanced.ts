@@ -596,12 +596,15 @@ Fictional time condition example (CORRECT format):
 - Connections: Multiple → one per exit direction + fallback
 - Requires text input from the player (free-form typing, not pre-authored choices)
 
-**aiSummary** - AI-generated narrative summary
-- Use: Recap the player's journey at endings or checkpoints
-- Summarizes key choices and their consequences
+**aiSummary** - AI-generated narrative summary (CAN REPLACE endScreen as story ending!)
+- Use: Personalized recap of the player's journey — ideal for endings, epilogues, or checkpoints
+- The AI generates a summary based on the player's actual choices, variables, and inventory
+- Has ALL the same ending capabilities as endScreen: showRestart, showCredits, resetOnRestart
 - Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength, includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory
 - Supports showRestart, showCredits, resetOnRestart with granular reset sub-options (resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory)
 - Credits page: creditsPageTitle, creditsPageBody, creditsCloseText
+- When used as an ending: set showRestart: true and connect to beat_0 (titleScreen) for restart, same as endScreen.
+- Advantage over endScreen: the player sees a personalized recap of what they did, not just a static message
 
 **aiCondition** - AI-driven branching that analyzes player state
 - Use: Complex branching based on accumulated player behavior/personality
@@ -1710,7 +1713,7 @@ These are single-path beats that need "connections" to specify the next beat.
 - pickProp → targets are in props[].target (NO connections array!)
 - hyperText → targets are in hyperlinks[].targetBeatId (NO connections array!)
 - conditionBeat → targets are in trueConnection/falseConnection (NO connections array!)
-- endScreen → terminal beat, no connections needed
+- endScreen / aiSummary → ending beats, connect to beat_0 for restart
 
 🚨 **VALIDATION ERROR: Adding "connections" to choice-based beats causes "Connection missing targetId" errors!**
 🚨 **The system expects "targetId" in connections, not "target"!**
@@ -1906,8 +1909,9 @@ You may use these advanced beat types that leverage AI at runtime:
 - **onlineContent**: Fetch and display real-time data from web APIs or AI queries
 - **aiCondition**: AI-driven branching that analyzes player state to determine path
 - **aiDialogTree**: Generate personalized dialog trees at runtime using AI
-- **aiSummary**: Generate a narrative summary of the player's journey at the end
+- **aiSummary**: AI-generated personalized summary — can REPLACE endScreen as story ending!
   Parameters: prompt, title, summaryStyle, maxLength, includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart, showCredits, resetOnRestart (with granular sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText
+  Use instead of endScreen when you want the player to see a recap of their choices and consequences
 - **aiInfoText**: Generate contextual 1-2 sentence text using AI based on player state (like infoText but dynamic)
   Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences
 - **aiDurScreen**: Generate contextual text with automatic duration based on reading speed (like durScreen but dynamic)
@@ -1948,10 +1952,16 @@ IMPORTANT: Respond with ONLY valid JSON. Ensure:
 - No trailing commas
 - All brackets and braces are properly closed
 
-🔍 BEFORE FINALIZING:
-- Does the story length feel right for the requested size (short/medium/long)?
-- For "long" stories: don't artificially cut short - develop the world fully!
-- Does the branching complexity match what was requested?
+🔍 VERIFICATION CHECKLIST (check each before outputting):
+1. beat_0 is titleScreen
+2. Story ends with endScreen or aiSummary beats, each with showRestart: true
+3. EVERY target ID (in choices[].target, connections[].targetId, trueConnection.target, falseConnection.target) references an actual beat ID in the beats array — no dangling references
+4. EVERY beat (except beat_0) is reachable — at least one other beat has it as a target
+5. dialogTree beats have: dialogTree.id, dialogTree.speaker, dialogTree.text, dialogTree.choices (array)
+6. Single-connection beats (infoText, durScreen, setVariable, etc.) use connections array with ONE entry
+7. Multi-connection beats (dialogTree, movementChoice, pickProp) have targets INSIDE parameters — NO connections array
+8. Does the story length feel right for the requested size (short/medium/long)?
+9. Does the branching complexity match what was requested?
 
 Generate the complete story structure as JSON.`);
 

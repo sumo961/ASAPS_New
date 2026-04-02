@@ -43,50 +43,72 @@ export interface StoryResult {
 
 export const STORY_GENERATION_SYSTEM = `You are an expert interactive story designer. Generate a complete interactive story as JSON.
 
-## Available Beat Types
+## Beat Types
 
-### Visible Beats (player sees these)
-- **titleScreen**: MUST be beat_0. Parameters: title, author, subtitle, buttonText
-- **infoText**: Narrative text + Continue button. SINGLE CONNECTION only. Parameters: text, buttonText, speaker
-- **durScreen**: Timed auto-advance text. SINGLE CONNECTION. Parameters: text, duration (ms)
-- **dialogTree**: Branching conversation. Parameters: dialogTree with {id, speaker, text, choices: [{id, text, target|dialogNode}]}. Dialog nodes can have a "target" field for NPC auto-exit (no choices shown). Targets go in choices, NOT in connections array.
-- **movementChoice**: Location choices. Parameters: question, choices: [{id, text, location, target}]. Targets in choices, NOT connections.
-- **pickProp**: Item selection. Parameters: question, props: [{id, name, description, target}]. AUTO-ADDS to inventory. Targets in props, NOT connections.
-- **inputText**: Text input. SINGLE CONNECTION. Parameters: prompt, placeholder, variable
-- **endScreen**: Story ending. Parameters: message, showRestart (ALWAYS true)
+### Visible Beats
+- **titleScreen**: MUST be beat_0. Parameters: title, buttonText. Uses connections array.
+- **infoText**: Narrative text + Continue. Uses connections array. ONE connection only.
+- **durScreen**: Timed auto-advance. Uses connections array. ONE connection only.
+- **dialogTree**: Branching conversation. Targets go in choices[].target INSIDE parameters. NO connections array.
+- **movementChoice**: Location choices. Targets go in choices[].target INSIDE parameters. NO connections array.
+- **pickProp**: Item selection (auto-adds to inventory). Targets go in props[].target INSIDE parameters. NO connections array.
+- **inputText**: Text input. Uses connections array. ONE connection only.
+- **endScreen**: Story ending. Parameters: message, showRestart: true. Connect to beat_0 for restart.
 
-### Invisible Beats (logic)
-- **setVariable**: Set state. SINGLE CONNECTION. Parameters: type ("variable"|"counter"), name, value, operation
-- **conditionBeat**: Branch on state. Parameters: condition {type, variable/counter, operator, value}, trueConnection {target}, falseConnection {target}
-- **addRemoveInventory**: Modify inventory. Parameters: action ("add"|"remove"), item
+### Logic Beats
+- **setVariable**: Set state. Uses connections array. ONE connection only.
+- **conditionBeat**: Branch on state. Uses trueConnection/falseConnection in parameters. NO connections array.
+- **addRemoveInventory**: Modify inventory. Uses connections array.
 
-## Critical Rules
-1. beat_0 MUST be titleScreen
-2. End with endScreen (showRestart: true)
-3. SINGLE CONNECTION beats: titleScreen, infoText, durScreen, endScreen, setVariable, inputText, addRemoveInventory — use "connections" array with ONE entry
-4. MULTIPLE CONNECTION beats: dialogTree, movementChoice, pickProp — put targets IN parameters (choices[].target), do NOT add connections array
-5. conditionBeat: uses trueConnection/falseConnection in parameters, no connections array
-6. Every beat must be reachable from beat_0
-7. Every target ID must reference an actual beat
-8. Use sequential IDs: beat_0, beat_1, beat_2...
+## CONNECTION RULES (CRITICAL — most common failure)
 
-## Characters
-Include a "characters" array: [{id, name, displayName, role: "player"|"npc"}]
-Use character displayName as "speaker" on visible beats.
+There are TWO connection patterns. Using the wrong one breaks the story:
 
-## Output Format
+**Pattern A — connections array** (for single-target beats):
+\`\`\`json
+{ "id": "beat_1", "type": "infoText", "parameters": { "text": "..." }, "connections": [{ "targetId": "beat_2" }] }
+\`\`\`
+
+**Pattern B — targets inside parameters** (for branching beats — NO connections array!):
 \`\`\`json
 {
-  "metadata": { "title": "...", "author": "AI Assistant", "description": "...", "genre": "..." },
-  "beats": [
-    { "id": "beat_0", "name": "Title", "type": "titleScreen", "parameters": { "title": "...", "buttonText": "Start" }, "connections": [{ "targetId": "beat_1" }] },
-    { "id": "beat_1", "name": "...", "type": "infoText", "parameters": { "text": "...", "speaker": "Narrator" }, "connections": [{ "targetId": "beat_2" }] }
-  ],
-  "characters": [{ "id": "char_player", "name": "Hero", "displayName": "Hero", "role": "player" }]
+  "id": "beat_2", "type": "dialogTree", "parameters": {
+    "dialogTree": {
+      "id": "root", "speaker": "Merchant", "text": "What would you like?",
+      "choices": [
+        { "id": "c1", "text": "Show me swords", "target": "beat_3" },
+        { "id": "c2", "text": "Goodbye", "target": "beat_4" }
+      ]
+    }
+  }
 }
 \`\`\`
 
-Respond with ONLY valid JSON. No explanation, no markdown fences.`;
+\`\`\`json
+{
+  "id": "beat_5", "type": "movementChoice", "parameters": {
+    "question": "Where to?",
+    "choices": [
+      { "id": "c1", "text": "Forest", "location": "Forest", "target": "beat_6" },
+      { "id": "c2", "text": "Cave", "location": "Cave", "target": "beat_7" }
+    ]
+  }
+}
+\`\`\`
+
+## VERIFICATION CHECKLIST (check before outputting)
+1. beat_0 is titleScreen
+2. Story ends with endScreen(s) that have showRestart: true
+3. EVERY target ID (in choices[].target, connections[].targetId, trueConnection.target, falseConnection.target) references an actual beat ID in the beats array
+4. EVERY beat (except beat_0) is reachable — some other beat must have it as a target
+5. dialogTree parameters include: dialogTree.id, dialogTree.speaker, dialogTree.text, dialogTree.choices (array)
+6. Sequential IDs: beat_0, beat_1, beat_2, ...
+
+## Characters
+Include: [{ "id": "char_player", "name": "Hero", "displayName": "Hero", "role": "player" }]
+
+## Output
+Respond with ONLY valid JSON. No explanation, no markdown fences, no code blocks.`;
 
 // ---------------------------------------------------------------------------
 // Test scenarios

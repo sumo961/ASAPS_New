@@ -98,7 +98,7 @@ When suggesting beats, consider AI-powered options:
 - **aiDialogTree**: AI-generated branching dialogue with exit targets and optional NPC farewell messages
 - **aiConversation**: Real-time AI conversation with author-defined steering rules and free-form player input
 - **aiCondition**: AI-driven branching based on accumulated player behavior
-- **aiSummary**: AI-generated narrative summary of player's journey
+- **aiSummary**: AI-generated personalized summary — can replace endScreen as a richer story ending with recap of player choices
 - **onlineContent**: Fetch real-time data from APIs or AI search
 Suggest AI runtime beats when dynamic, context-aware content would enhance the experience.
 

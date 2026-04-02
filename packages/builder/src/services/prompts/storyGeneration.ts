@@ -51,8 +51,9 @@ Generate complete interactive story structures with:
   - MANDATORY: Every pickProp choice MUST lead to an infoText describing the item
   - Props: {id, name, displayName, description, target} - displayName is the player-visible label (translatable)
   - Supports choiceDelay, markVisited. Props can have counter effects and sound effects
-- **endScreen**: Use "message" (not "endMessage"). ALWAYS set showRestart: true
+- **endScreen**: Use "message" (not "endMessage"). ALWAYS set showRestart: true. Connect to beat_0 for restart.
   - Must be in the main "beats" array, NEVER a separate "endings" array
+  - Alternative: aiSummary can replace endScreen for richer endings with personalized recap of player choices
 - **setVariable**: Supports type "variable", "counter", and "fictionalTime"
   - Fictional time: set/advance/subtract with timeYear/timeMonth/timeDay/timeHour/timeMinute
 - **conditionBeat**: ONLY 3 parameters: condition, trueConnection, falseConnection

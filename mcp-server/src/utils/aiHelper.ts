@@ -180,7 +180,7 @@ export const BEAT_TYPES = {
   aiDurScreen: 'AI-generated text with auto-advance based on reading speed. Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables, wordsPerMinute (default 200), minDuration (ms), maxDuration (ms). SINGLE CONNECTION.',
   aiDialogTree: 'AI-generated branching dialogue at runtime. Creates personalized conversations based on player state. Parameters: scenario, npcName, npcPersonality, maxTurns, exitTargets (array of {id, description, npcExitMessage?}), includeVariables, includeInventory, includeVisitedBeats, includeChoiceHistory, systemInstructions, presentationMode, showAvatars. MULTIPLE CONNECTIONS via exitTargets. npcExitMessage: optional prompt for AI to generate a farewell that acknowledges the player\'s last choice.',
   aiConversation: 'Real-time AI conversation with author-defined steering rules. Each NPC response generated live based on conversation history + active directions. Parameters: scenario, npcName, npcPersonality, maxTurns, directions (array of steering rules with triggers and actions), fallbackExitTarget, openingLine, systemInstructions. MULTIPLE CONNECTIONS via exit directions + fallback. Directions can steer conversation, exit to a beat, set variables, or combine actions. Supports npcExitMessage for farewell responses.',
-  aiSummary: 'AI-generated narrative summary of the player\'s journey. Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength ("short"|"medium"|"long"), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart (boolean), showCredits (boolean), resetOnRestart (boolean), resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory (granular reset sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText. SINGLE CONNECTION.',
+  aiSummary: 'AI-generated personalized summary of the player\'s journey — can REPLACE endScreen as story ending! Generates a recap based on the player\'s actual choices, variables, and inventory. Has ALL the same ending capabilities as endScreen. Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength ("short"|"medium"|"long"), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart (boolean, ALWAYS true when used as ending), showCredits (boolean), resetOnRestart (boolean), resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory (granular reset sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText. Connect to beat_0 (titleScreen) for restart when used as ending.',
   aiCondition: 'AI-driven branching that analyzes player state to determine path. Parameters: prompt (what AI evaluates), categories (array of {name, description, targetId}), evaluateVariables, evaluateInventory, evaluateHistory, evaluateCounters, evaluateChoiceHistory, fallbackTarget, timeout. MULTIPLE CONNECTIONS via categories. AI classifies player state and routes to appropriate category target.',
   onlineContent: 'Fetch and display real-time data from web APIs or AI queries. Parameters: sourceType ("api" or "ai-query"), apiUrl, apiParams, jsonPath, query, title, maxWords, fallbackText, buttonText. SINGLE CONNECTION. For dynamic content like weather, news, or AI-generated facts.',
 } as const;
@@ -632,7 +632,16 @@ Important:
 - Ensure all beat IDs are unique and all connections reference valid beat IDs
 - Include "suggestedTheme" with a theme ID and reason based on genre/style
 - EVERY beat must be reachable - some other beat must connect TO it (except titleScreen)
-- Don't artificially truncate long stories - let the story develop naturally`;
+- Don't artificially truncate long stories - let the story develop naturally
+- When AI beats are available, consider using aiSummary instead of endScreen for richer endings
+
+VERIFICATION CHECKLIST (check each before outputting):
+1. beat_0 is titleScreen
+2. Story ends with endScreen or aiSummary beats, each with showRestart: true
+3. EVERY target ID references an actual beat ID in the beats array — no dangling references
+4. EVERY beat (except beat_0) is reachable — at least one other beat has it as a target
+5. dialogTree.id, dialogTree.speaker, dialogTree.text, dialogTree.choices are all present
+6. Single-connection beats use connections array; multi-connection beats have targets INSIDE parameters`;
 
   const userPrompt = `Create an interactive story with these requirements:
 
