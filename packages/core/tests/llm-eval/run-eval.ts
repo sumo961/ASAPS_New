@@ -29,6 +29,7 @@ const compareModels = getArg('compare')?.split(',').map(m => m.trim());
 const filterCategory = getArg('category'); // e.g. "dialogTree"
 const verbose = args.includes('--verbose');
 const timeout = parseInt(getArg('timeout') || '120000', 10);
+const numCtx = parseInt(getArg('context') || '0', 10);
 
 const models = compareModels || (singleModel ? [singleModel] : null);
 
@@ -63,6 +64,34 @@ async function chatCompletion(
   messages: { role: string; content: string }[],
   maxTokens: number,
 ): Promise<{ text: string; latencyMs: number; tokensPerSec?: number }> {
+  // Use native Ollama API when context size is specified
+  if (numCtx > 0) {
+    const url = `${endpoint}/api/chat`;
+    const start = Date.now();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model, messages,
+          options: { num_ctx: numCtx, num_predict: maxTokens, temperature: 0.7 },
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json() as any;
+      const latencyMs = Date.now() - start;
+      const text = data.message?.content || '';
+      const totalTokens = data.eval_count || 0;
+      const tokensPerSec = totalTokens > 0 && data.eval_duration
+        ? (totalTokens / (data.eval_duration / 1e9)) : undefined;
+      return { text, latencyMs, tokensPerSec };
+    } finally { clearTimeout(timer); }
+  }
+
   const url = `${endpoint}/v1/chat/completions`;
   const start = Date.now();
 
@@ -90,7 +119,8 @@ async function chatCompletion(
 
     const data = await res.json() as any;
     const latencyMs = Date.now() - start;
-    const text = data.choices?.[0]?.message?.content || '';
+    const msg = data.choices?.[0]?.message;
+    const text = msg?.content || msg?.reasoning || '';
     const totalTokens = data.usage?.completion_tokens || 0;
     const tokensPerSec = totalTokens > 0 ? (totalTokens / (latencyMs / 1000)) : undefined;
 
