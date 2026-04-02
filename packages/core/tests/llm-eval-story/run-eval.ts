@@ -28,6 +28,7 @@ const filterScenario = getArg('scenario');
 const verbose = args.includes('--verbose');
 const timeout = parseInt(getArg('timeout') || '180000', 10);
 const numCtx = parseInt(getArg('context') || '0', 10); // Ollama context window size (0 = default)
+const noThink = args.includes('--no-think'); // Prepend /no_think to disable thinking mode
 
 const models = compareModels || (singleModel ? [singleModel] : null);
 
@@ -170,7 +171,7 @@ async function runScenario(model: string, scenario: StoryScenario): Promise<Stor
     const { text: rawText, latencyMs, tokensPerSec } = await chatCompletion(
       model,
       [
-        { role: 'system', content: STORY_GENERATION_SYSTEM },
+        { role: 'system', content: (noThink ? '/no_think\n' : '') + STORY_GENERATION_SYSTEM },
         { role: 'user', content: userPrompt },
       ],
       scenario.length === 'short' ? 4096 : 8192,

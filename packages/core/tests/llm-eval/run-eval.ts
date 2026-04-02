@@ -30,6 +30,7 @@ const filterCategory = getArg('category'); // e.g. "dialogTree"
 const verbose = args.includes('--verbose');
 const timeout = parseInt(getArg('timeout') || '120000', 10);
 const numCtx = parseInt(getArg('context') || '0', 10);
+const noThink = args.includes('--no-think');
 
 const models = compareModels || (singleModel ? [singleModel] : null);
 
@@ -146,7 +147,7 @@ function stripThinking(text: string): string {
 // ---------------------------------------------------------------------------
 async function runTest(model: string, scenario: TestScenario): Promise<TestResult> {
   const messages = [
-    { role: 'system', content: scenario.systemPrompt },
+    { role: 'system', content: (noThink ? '/no_think\n' : '') + scenario.systemPrompt },
     { role: 'user', content: scenario.userPrompt },
   ];
 
