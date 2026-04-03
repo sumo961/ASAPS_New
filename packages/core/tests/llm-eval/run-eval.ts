@@ -1,4 +1,6 @@
 #!/usr/bin/env npx tsx
+import * as fs from 'fs';
+import * as path from 'path';
 /**
  * LLM Evaluation Harness for ASAPS Embedded Playback Engine
  *
@@ -31,6 +33,7 @@ const verbose = args.includes('--verbose');
 const timeout = parseInt(getArg('timeout') || '120000', 10);
 const numCtx = parseInt(getArg('context') || '0', 10);
 const noThink = args.includes('--no-think');
+const saveDir = getArg('save'); // Directory to save responses for quality review
 
 const models = compareModels || (singleModel ? [singleModel] : null);
 
@@ -340,6 +343,78 @@ async function main() {
     const pct = total > 0 ? Math.round((passed / total) * 100) : 0;
     console.log(`${model}: ${passed}/${total} passed (${pct}%)`);
   }
+
+  // Save responses and generate HTML report
+  if (saveDir) {
+    fs.mkdirSync(saveDir, { recursive: true });
+
+    // Save raw responses as JSON
+    const responsesFile = path.join(saveDir, 'responses.json');
+    fs.writeFileSync(responsesFile, JSON.stringify(allResults, null, 2));
+    console.log(`\n📁 Responses saved to ${responsesFile}`);
+
+    // Generate HTML report
+    const htmlFile = path.join(saveDir, 'report.html');
+    const html = generateHTMLReport(activeScenarios, allResults, allScores, models!);
+    fs.writeFileSync(htmlFile, html);
+    console.log(`📊 HTML report: ${htmlFile}`);
+  }
+}
+
+function generateHTMLReport(
+  scenarios: TestScenario[],
+  results: TestResult[],
+  scores: Map<string, ScoreReport[]>,
+  models: string[],
+): string {
+  const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const ts = new Date().toISOString().slice(0, 16).replace('T', ' ');
+
+  let rows = '';
+  for (const scenario of scenarios) {
+    rows += `<tr class="scenario-header"><td colspan="${models.length + 1}"><strong>${escHtml(scenario.category)} / ${escHtml(scenario.id)}</strong> — ${escHtml(scenario.description)}</td></tr>\n`;
+    rows += `<tr class="prompt-row"><td colspan="${models.length + 1}"><details><summary>Prompt</summary><pre>${escHtml(scenario.userPrompt)}</pre></details></td></tr>\n`;
+    rows += '<tr>';
+    rows += '<td class="label">Response</td>';
+    for (const model of models) {
+      const result = results.find(r => r.model === model && r.scenario === scenario.id);
+      const report = scores.get(model)?.find(s => s.scenario === scenario.id);
+      const pct = report && report.maxScore > 0 ? Math.round((report.totalScore / report.maxScore) * 100) : 0;
+      const icon = report?.passed ? '✅' : pct >= 50 ? '⚠️' : '❌';
+      const latency = result?.latencyMs ? `${(result.latencyMs / 1000).toFixed(1)}s` : '-';
+
+      if (result?.error) {
+        rows += `<td class="response error"><div class="score">${icon} ERROR</div><pre>${escHtml(result.error)}</pre></td>`;
+      } else {
+        rows += `<td class="response"><div class="score">${icon} ${pct}% · ${latency}</div><pre>${escHtml(result?.cleanResponse || '(empty)')}</pre></td>`;
+      }
+    }
+    rows += '</tr>\n';
+  }
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ASAPS LLM Beat Eval — ${ts}</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 20px; background: #f8f9fa; }
+  h1 { font-size: 1.4em; }
+  table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; vertical-align: top; }
+  th { background: #343a40; color: white; position: sticky; top: 0; }
+  .scenario-header { background: #e9ecef; }
+  .prompt-row td { background: #f8f9fa; }
+  .label { font-weight: 600; width: 80px; background: #f1f3f5; }
+  .response { min-width: 300px; max-width: 500px; }
+  .response pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; max-height: 400px; overflow-y: auto; margin: 4px 0 0; }
+  .response.error pre { color: #c00; }
+  .score { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  details summary { cursor: pointer; color: #666; font-size: 12px; }
+  details pre { font-size: 11px; color: #555; max-height: 200px; overflow-y: auto; }
+</style></head><body>
+<h1>🧪 ASAPS LLM Beat Evaluation — ${ts}</h1>
+<table>
+<tr><th>Scenario</th>${models.map(m => `<th>${escHtml(m)}</th>`).join('')}</tr>
+${rows}
+</table></body></html>`;
 }
 
 main().catch(err => {

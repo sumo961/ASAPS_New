@@ -1,4 +1,6 @@
 #!/usr/bin/env npx tsx
+import * as fs from 'fs';
+import * as path from 'path';
 /**
  * Story Generation LLM Evaluation Harness
  *
@@ -29,6 +31,7 @@ const verbose = args.includes('--verbose');
 const timeout = parseInt(getArg('timeout') || '180000', 10);
 const numCtx = parseInt(getArg('context') || '0', 10); // Ollama context window size (0 = default)
 const noThink = args.includes('--no-think'); // Prepend /no_think to disable thinking mode
+const saveDir = getArg('save'); // Directory to save responses for quality review
 
 const models = compareModels || (singleModel ? [singleModel] : null);
 
@@ -325,6 +328,84 @@ async function main() {
     const passed = scores.filter(s => s.passed).length;
     console.log(`${model}: ${passed}/${scores.length} passed (${Math.round((passed / scores.length) * 100)}%)`);
   }
+
+  // Save responses and generate HTML report
+  if (saveDir) {
+    fs.mkdirSync(saveDir, { recursive: true });
+
+    const responsesFile = path.join(saveDir, 'responses.json');
+    fs.writeFileSync(responsesFile, JSON.stringify(allResults, null, 2));
+    console.log(`\n📁 Responses saved to ${responsesFile}`);
+
+    const htmlFile = path.join(saveDir, 'report.html');
+    const html = generateStoryHTMLReport(active, allResults, allScores, models!);
+    fs.writeFileSync(htmlFile, html);
+    console.log(`📊 HTML report: ${htmlFile}`);
+  }
+}
+
+function generateStoryHTMLReport(
+  scenarios: StoryScenario[],
+  results: StoryResult[],
+  scores: Map<string, StoryScoreReport[]>,
+  models: string[],
+): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const ts = new Date().toISOString().slice(0, 16).replace('T', ' ');
+
+  let rows = '';
+  for (const scenario of scenarios) {
+    rows += `<tr class="scenario-header"><td colspan="${models.length + 1}"><strong>${esc(scenario.id)}</strong> — ${esc(scenario.description)}<br><em>${esc(scenario.prompt.slice(0, 120))}...</em></td></tr>\n`;
+    rows += '<tr><td class="label">Response</td>';
+    for (const model of models) {
+      const result = results.find(r => r.model === model && r.scenario === scenario.id);
+      const report = scores.get(model)?.find(s => s.scenario === scenario.id);
+      const pct = report && report.maxScore > 0 ? Math.round((report.totalScore / report.maxScore) * 100) : 0;
+      const icon = report?.passed ? '✅' : pct >= 50 ? '⚠️' : '❌';
+      const latency = result?.latencyMs ? `${(result.latencyMs / 1000).toFixed(1)}s` : '-';
+      const beats = report ? `${report.beatCount} beats: ${report.beatTypes.join(', ')}` : '';
+
+      if (result?.error) {
+        rows += `<td class="response error"><div class="score">${icon} ERROR · ${latency}</div><pre>${esc(result.error)}</pre></td>`;
+      } else {
+        // Pretty-print JSON if possible
+        let display = result?.cleanResponse || '(empty)';
+        try { display = JSON.stringify(JSON.parse(display), null, 2); } catch {}
+        rows += `<td class="response"><div class="score">${icon} ${pct}% · ${latency} · ${beats}</div>`;
+        // Show failed checks
+        if (report) {
+          const fails = report.details.filter(d => !d.passed);
+          if (fails.length > 0) {
+            rows += `<div class="fails">${fails.map(f => `✗ ${esc(f.check)}: ${esc(f.message)}`).join('<br>')}</div>`;
+          }
+        }
+        rows += `<pre>${esc(display)}</pre></td>`;
+      }
+    }
+    rows += '</tr>\n';
+  }
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ASAPS Story Gen Eval — ${ts}</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 20px; background: #f8f9fa; }
+  h1 { font-size: 1.4em; }
+  table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; vertical-align: top; }
+  th { background: #343a40; color: white; position: sticky; top: 0; }
+  .scenario-header { background: #e9ecef; }
+  .label { font-weight: 600; width: 80px; background: #f1f3f5; }
+  .response { min-width: 400px; }
+  .response pre { white-space: pre-wrap; word-break: break-word; font-size: 11px; max-height: 600px; overflow-y: auto; margin: 4px 0 0; }
+  .response.error pre { color: #c00; }
+  .score { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  .fails { font-size: 11px; color: #c00; margin: 4px 0; }
+</style></head><body>
+<h1>📖 ASAPS Story Generation Evaluation — ${ts}</h1>
+<table>
+<tr><th>Scenario</th>${models.map(m => `<th>${esc(m)}</th>`).join('')}</tr>
+${rows}
+</table></body></html>`;
 }
 
 main().catch(err => {
