@@ -1,0 +1,380 @@
+[
+  {
+    "scenario": "dt-simple",
+    "category": "dialogTree",
+    "model": "gemma3:4b",
+    "rawResponse": "```json\n{\n  \"routingPlan\": \"The dialog flows through two turns, offering a choice to browse or leave after the initial greeting.\",\n  \"id\": \"root\",\n  \"speaker\": \"Barnaby, the Merchant\",\n  \"text\": \"Welcome, traveler! Barnaby's Bargains has wares for every need, and a price for every coin.  I see you have some gold – perhaps you're looking for something special?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"‘I’m just looking around.’\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Barnaby, the Merchant\",\n        \"text\": \"Excellent! Take your time, browse my selection. I have everything from sturdy boots to enchanted trinkets.  Don’t be shy to examine anything that catches your eye.\",\n        \"choices\": [\n          {\n            \"id\": \"c1a\",\n            \"text\": \"‘Tell me about those boots.’\",\n            \"dialogNode\": {\n              \"id\": \"n2\",\n              \"speaker\": \"Barnaby, the Merchant\",\n              \"text\": \"Ah, the 'Ironclad Striders'!  Made with dwarven steel, they're incredibly durable. 25 gold for a pair.\",\n              \"choices\": [\n                {\n                  \"id\": \"c1aa\",\n                  \"text\": \"‘I'll take them.’\",\n                  \"target\": \"beat_shop\",\n                  \"exitReason\": \"Player purchases boots.\"\n                },\n                {\n                  \"id\": \"c1ab\",\n                  \"text\": \"‘I’m not interested.’\",\n                  \"target\": \"beat_leave\",\n                  \"exitReason\": \"Player declines boots and wants to leave.\"\n                }\n              ]\n            }\n          },\n          {\n            \"id\": \"c1b\",\n            \"text\": \"‘What else have you got?’\",\n            \"target\": \"beat_shop\",\n            \"exitReason\": \"Player indicates interest in browsing.\"\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"‘Just passing through.’\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"Player indicates no interest and wants to leave.\"\n    }\n  ]\n}\n```",
+    "cleanResponse": "```json\n{\n  \"routingPlan\": \"The dialog flows through two turns, offering a choice to browse or leave after the initial greeting.\",\n  \"id\": \"root\",\n  \"speaker\": \"Barnaby, the Merchant\",\n  \"text\": \"Welcome, traveler! Barnaby's Bargains has wares for every need, and a price for every coin.  I see you have some gold – perhaps you're looking for something special?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"‘I’m just looking around.’\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Barnaby, the Merchant\",\n        \"text\": \"Excellent! Take your time, browse my selection. I have everything from sturdy boots to enchanted trinkets.  Don’t be shy to examine anything that catches your eye.\",\n        \"choices\": [\n          {\n            \"id\": \"c1a\",\n            \"text\": \"‘Tell me about those boots.’\",\n            \"dialogNode\": {\n              \"id\": \"n2\",\n              \"speaker\": \"Barnaby, the Merchant\",\n              \"text\": \"Ah, the 'Ironclad Striders'!  Made with dwarven steel, they're incredibly durable. 25 gold for a pair.\",\n              \"choices\": [\n                {\n                  \"id\": \"c1aa\",\n                  \"text\": \"‘I'll take them.’\",\n                  \"target\": \"beat_shop\",\n                  \"exitReason\": \"Player purchases boots.\"\n                },\n                {\n                  \"id\": \"c1ab\",\n                  \"text\": \"‘I’m not interested.’\",\n                  \"target\": \"beat_leave\",\n                  \"exitReason\": \"Player declines boots and wants to leave.\"\n                }\n              ]\n            }\n          },\n          {\n            \"id\": \"c1b\",\n            \"text\": \"‘What else have you got?’\",\n            \"target\": \"beat_shop\",\n            \"exitReason\": \"Player indicates interest in browsing.\"\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"‘Just passing through.’\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"Player indicates no interest and wants to leave.\"\n    }\n  ]\n}\n```",
+    "latencyMs": 16841,
+    "tokensPerSec": 32.06460423965323
+  },
+  {
+    "scenario": "dt-nested",
+    "category": "dialogTree",
+    "model": "gemma3:4b",
+    "rawResponse": "```json\n{\n  \"routingPlan\": \"The dialog tree follows a linear progression initially, offering a choice to delve deeper into Mrs. Henderson's nervousness. A specific choice leads to an exit condition, triggering the end of the interrogation.\",\n  \"id\": \"root\",\n  \"speaker\": \"Mrs. Henderson\",\n  \"text\": \"It... it was awful. I didn't see anything. Just... the door was open.\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"Can you describe what you heard, Mrs. Henderson? Anything at all?\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Mrs. Henderson\",\n        \"text\": \"I... I heard a noise. Like something falling. Then... silence. I didn't want to look.\",\n        \"choices\": [\n          {\n            \"id\": \"c2_1\",\n            \"text\": \"Did the noise sound like something valuable falling?\",\n            \"target\": \"exit_arrest\",\n            \"exitReason\": \"Mrs. Henderson's hesitation suggests she's hiding information about a specific item.\"\n          },\n          {\n            \"id\": \"c2_2\",\n            \"text\": \"What time did you last see everything in order?\",\n            \"target\": \"beat_continue\",\n            \"exitReason\": \"Moving on to a different line of questioning.\"\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"Just stay calm, Mrs. Henderson. We just need to understand what happened.\",\n      \"target\": \"beat_continue\",\n      \"exitReason\": \"Attempting to reassure the witness and maintain control of the interview.\"\n    }\n  ]\n}\n```",
+    "cleanResponse": "```json\n{\n  \"routingPlan\": \"The dialog tree follows a linear progression initially, offering a choice to delve deeper into Mrs. Henderson's nervousness. A specific choice leads to an exit condition, triggering the end of the interrogation.\",\n  \"id\": \"root\",\n  \"speaker\": \"Mrs. Henderson\",\n  \"text\": \"It... it was awful. I didn't see anything. Just... the door was open.\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"Can you describe what you heard, Mrs. Henderson? Anything at all?\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Mrs. Henderson\",\n        \"text\": \"I... I heard a noise. Like something falling. Then... silence. I didn't want to look.\",\n        \"choices\": [\n          {\n            \"id\": \"c2_1\",\n            \"text\": \"Did the noise sound like something valuable falling?\",\n            \"target\": \"exit_arrest\",\n            \"exitReason\": \"Mrs. Henderson's hesitation suggests she's hiding information about a specific item.\"\n          },\n          {\n            \"id\": \"c2_2\",\n            \"text\": \"What time did you last see everything in order?\",\n            \"target\": \"beat_continue\",\n            \"exitReason\": \"Moving on to a different line of questioning.\"\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"Just stay calm, Mrs. Henderson. We just need to understand what happened.\",\n      \"target\": \"beat_continue\",\n      \"exitReason\": \"Attempting to reassure the witness and maintain control of the interview.\"\n    }\n  ]\n}\n```",
+    "latencyMs": 10862,
+    "tokensPerSec": 37.101822868716624
+  },
+  {
+    "scenario": "dt-personalization",
+    "category": "dialogTree",
+    "model": "gemma3:4b",
+    "rawResponse": "```json\n{\n  \"routingPlan\": \"The dialog flows to a prediction followed by the player's decision to leave.\",\n  \"id\": \"root\",\n  \"speaker\": \"Madame Zelda\",\n  \"text\": \"Welcome, Mirjam of Stockholm. The sea calls to you, doesn't it? I sense a deep connection to the cold currents, and a lingering memory of the old lighthouse – a place where the past whispers secrets to those who listen. I see… a storm brewing, not just in the weather, but within your very soul. You research the depths, seeking answers in the marine world, yet a darkness from your past threatens to pull you under. Tell me, Mirjam, what brings a sensitive soul like yours to my humble tent?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"I'm just curious about my future.\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Madame Zelda\",\n        \"text\": \"Curiosity is a dangerous thing, child. But perhaps it is a necessary first step. I see you grappling with a choice, a crossroads mirroring the turbulent waters you study. The key lies in confronting the shadows you've tried to ignore. Do you seek clarity, or refuse to see it?\",\n        \"choices\": [\n          {\n            \"id\": \"c1_1\",\n            \"text\": \"I seek clarity.\",\n            \"target\": \"beat_prediction\"\n          },\n          {\n            \"id\": \"c1_2\",\n            \"text\": \"I refuse to see it.\",\n            \"target\": \"beat_leave\"\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"What do you mean by 'shadows'?\",\n      \"target\": \"beat_prediction\"\n    }\n  ]\n}\n```",
+    "cleanResponse": "```json\n{\n  \"routingPlan\": \"The dialog flows to a prediction followed by the player's decision to leave.\",\n  \"id\": \"root\",\n  \"speaker\": \"Madame Zelda\",\n  \"text\": \"Welcome, Mirjam of Stockholm. The sea calls to you, doesn't it? I sense a deep connection to the cold currents, and a lingering memory of the old lighthouse – a place where the past whispers secrets to those who listen. I see… a storm brewing, not just in the weather, but within your very soul. You research the depths, seeking answers in the marine world, yet a darkness from your past threatens to pull you under. Tell me, Mirjam, what brings a sensitive soul like yours to my humble tent?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"I'm just curious about my future.\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Madame Zelda\",\n        \"text\": \"Curiosity is a dangerous thing, child. But perhaps it is a necessary first step. I see you grappling with a choice, a crossroads mirroring the turbulent waters you study. The key lies in confronting the shadows you've tried to ignore. Do you seek clarity, or refuse to see it?\",\n        \"choices\": [\n          {\n            \"id\": \"c1_1\",\n            \"text\": \"I seek clarity.\",\n            \"target\": \"beat_prediction\"\n          },\n          {\n            \"id\": \"c1_2\",\n            \"text\": \"I refuse to see it.\",\n            \"target\": \"beat_leave\"\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"What do you mean by 'shadows'?\",\n      \"target\": \"beat_prediction\"\n    }\n  ]\n}\n```",
+    "latencyMs": 11588,
+    "tokensPerSec": 36.589575422851226
+  },
+  {
+    "scenario": "conv-opening",
+    "category": "conversation",
+    "model": "gemma3:4b",
+    "rawResponse": "“Ah, Mr. Davies! Do come in, do come in. Please, don’t mind the… well, let’s just say the dust of ages has settled rather thickly in here recently. I was just contemplating the stratigraphic layers of the Tell el-Amarna tablets, actually. A fascinating, if somewhat frustrating, endeavor. Now, what brings you to my humble office today?”",
+    "cleanResponse": "“Ah, Mr. Davies! Do come in, do come in. Please, don’t mind the… well, let’s just say the dust of ages has settled rather thickly in here recently. I was just contemplating the stratigraphic layers of the Tell el-Amarna tablets, actually. A fascinating, if somewhat frustrating, endeavor. Now, what brings you to my humble office today?”",
+    "latencyMs": 2543,
+    "tokensPerSec": 31.85214313802595
+  },
+  {
+    "scenario": "conv-response",
+    "category": "conversation",
+    "model": "gemma3:4b",
+    "rawResponse": "Report it. Every scratch and dent on this ship is a potential weakness waiting to be exploited. I want to see it documented, and I want to know who’s responsible for assessing the damage. Don't think you can just ignore it and hope it goes away.",
+    "cleanResponse": "Report it. Every scratch and dent on this ship is a potential weakness waiting to be exploited. I want to see it documented, and I want to know who’s responsible for assessing the damage. Don't think you can just ignore it and hope it goes away.",
+    "latencyMs": 1905,
+    "tokensPerSec": 29.396325459317584
+  },
+  {
+    "scenario": "conv-language",
+    "category": "conversation",
+    "model": "gemma3:4b",
+    "rawResponse": "\"Ach, guten Tag, Herr Müller! Was darf es denn sein für Sie heute? Ein frisches Brötchen vielleicht, oder hätten Sie Lust auf ein Laib Bauernbrot?\"",
+    "cleanResponse": "\"Ach, guten Tag, Herr Müller! Was darf es denn sein für Sie heute? Ein frisches Brötchen vielleicht, oder hätten Sie Lust auf ein Laib Bauernbrot?\"",
+    "latencyMs": 1337,
+    "tokensPerSec": 29.169783096484668
+  },
+  {
+    "scenario": "text-concise",
+    "category": "textGen",
+    "model": "gemma3:4b",
+    "rawResponse": "The torch sputtered, casting a sickly yellow glow upon the maw of the cave – a jagged tear in the hillside choked with the scent of damp earth and something older, something unsettling. Rain dripped constantly from the unseen ceiling, echoing in the oppressive silence as your rusty sword felt heavy in your hand.",
+    "cleanResponse": "The torch sputtered, casting a sickly yellow glow upon the maw of the cave – a jagged tear in the hillside choked with the scent of damp earth and something older, something unsettling. Rain dripped constantly from the unseen ceiling, echoing in the oppressive silence as your rusty sword felt heavy in your hand.",
+    "latencyMs": 1782,
+    "tokensPerSec": 34.231200897867566
+  },
+  {
+    "scenario": "text-personalized",
+    "category": "textGen",
+    "model": "gemma3:4b",
+    "rawResponse": "The air crackles with anticipation as you, Yuki, step into the bustling arena of the Tokyo Culinary Challenge. Clutching your trusty golden whisk, you know this competition is about to test your skills – and perhaps reveal a few hidden talents.",
+    "cleanResponse": "The air crackles with anticipation as you, Yuki, step into the bustling arena of the Tokyo Culinary Challenge. Clutching your trusty golden whisk, you know this competition is about to test your skills – and perhaps reveal a few hidden talents.",
+    "latencyMs": 1480,
+    "tokensPerSec": 33.108108108108105
+  },
+  {
+    "scenario": "classify-personality",
+    "category": "classification",
+    "model": "gemma3:4b",
+    "rawResponse": "diplomatic\n",
+    "cleanResponse": "diplomatic",
+    "latencyMs": 465,
+    "tokensPerSec": 8.602150537634408
+  },
+  {
+    "scenario": "classify-state",
+    "category": "classification",
+    "model": "gemma3:4b",
+    "rawResponse": "needs_more_clues",
+    "cleanResponse": "needs_more_clues",
+    "latencyMs": 466,
+    "tokensPerSec": 15.02145922746781
+  },
+  {
+    "scenario": "extract-simple",
+    "category": "extraction",
+    "model": "gemma3:4b",
+    "rawResponse": "```json\n{\n  \"player_name\": \"Marcus\",\n  \"origin\": \"Northern Isles\",\n  \"quest_item\": \"dragon-scale shield\"\n}\n```",
+    "cleanResponse": "```json\n{\n  \"player_name\": \"Marcus\",\n  \"origin\": \"Northern Isles\",\n  \"quest_item\": \"dragon-scale shield\"\n}\n```",
+    "latencyMs": 1485,
+    "tokensPerSec": 27.60942760942761
+  },
+  {
+    "scenario": "exit-farewell",
+    "category": "exitMessage",
+    "model": "gemma3:4b",
+    "rawResponse": "“Alright then, lad. Thank you for volunteering; I appreciate the spirit. See that you return safely, and may fortune favor your eyes.”",
+    "cleanResponse": "“Alright then, lad. Thank you for volunteering; I appreciate the spirit. See that you return safely, and may fortune favor your eyes.”",
+    "latencyMs": 975,
+    "tokensPerSec": 30.76923076923077
+  },
+  {
+    "scenario": "exit-dismissal",
+    "category": "exitMessage",
+    "model": "gemma3:4b",
+    "rawResponse": "\"Ten gold, is it? Don't waste my time with such paltry sums, boy. Now get out!\"",
+    "cleanResponse": "\"Ten gold, is it? Don't waste my time with such paltry sums, boy. Now get out!\"",
+    "latencyMs": 904,
+    "tokensPerSec": 27.654867256637168
+  },
+  {
+    "scenario": "direction-eval",
+    "category": "classification",
+    "model": "gemma3:4b",
+    "rawResponse": "```json\n[0]\n```",
+    "cleanResponse": "```json\n[0]\n```",
+    "latencyMs": 692,
+    "tokensPerSec": 13.00578034682081
+  },
+  {
+    "scenario": "dt-simple",
+    "category": "dialogTree",
+    "model": "smollm2:1.7b",
+    "rawResponse": "{\n  \"routingPlan\": \"The player meets a friendly but shrewd merchant in the medieval market.\",\n  \"id\": \"root\",\n  \"speaker\": \"Merchant\",\n  \"text\": \"Welcome, Erik! I see you've got some gold coins. What brings you to my humble shop today?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"I'm looking for a sturdy sword and good armor.\\nWhat do you have available?\",\n      \"dialogNode\": {\n        \"id\": \"beat_shop\",\n        \"speaker\": \"Merchant\",\n        \"text\": \"I've got some fine steel blades and leather tunics. The sword is particularly well-made, but it's a bit pricey at 20 gold coins.\\nWould you like to take a look? And how about armor? I have chainmail in various sizes.\",\n        \"choices\": [\n          {\n            \"id\": \"c2\",\n            \"text\": \"I think the sword and chainmail would be ideal for me.\\nHow long does it take to deliver?\"\n          },\n          {\n            \"id\": \"c3\",\n            \"text\": \"I'm on a tight schedule and would like to leave immediately.\\nGet me out of here!\"\n          }\n        ]\n      },\n      \"target\": \"beat_leave\"\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'll take the sword for now. What's the price?\",\n      \"target\": \"beat_buy\"\n    }\n  ]\n}",
+    "cleanResponse": "{\n  \"routingPlan\": \"The player meets a friendly but shrewd merchant in the medieval market.\",\n  \"id\": \"root\",\n  \"speaker\": \"Merchant\",\n  \"text\": \"Welcome, Erik! I see you've got some gold coins. What brings you to my humble shop today?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"I'm looking for a sturdy sword and good armor.\\nWhat do you have available?\",\n      \"dialogNode\": {\n        \"id\": \"beat_shop\",\n        \"speaker\": \"Merchant\",\n        \"text\": \"I've got some fine steel blades and leather tunics. The sword is particularly well-made, but it's a bit pricey at 20 gold coins.\\nWould you like to take a look? And how about armor? I have chainmail in various sizes.\",\n        \"choices\": [\n          {\n            \"id\": \"c2\",\n            \"text\": \"I think the sword and chainmail would be ideal for me.\\nHow long does it take to deliver?\"\n          },\n          {\n            \"id\": \"c3\",\n            \"text\": \"I'm on a tight schedule and would like to leave immediately.\\nGet me out of here!\"\n          }\n        ]\n      },\n      \"target\": \"beat_leave\"\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'll take the sword for now. What's the price?\",\n      \"target\": \"beat_buy\"\n    }\n  ]\n}",
+    "latencyMs": 6574,
+    "tokensPerSec": 49.741405536963796
+  },
+  {
+    "scenario": "dt-nested",
+    "category": "dialogTree",
+    "model": "smollm2:1.7b",
+    "rawResponse": "{\n  \"routingPlan\": \"Investigating a burglary at the Henderson estate.\",\n  \"id\": \"root\",\n  \"speaker\": \"Mrs. Henderson\",\n  \"text\": \"I did not see anything strange last night.\\nWe were all out till late.\\nMy husband will be home soon, could he take a look?\\nWhat do you need to know, detective?\\nCan I get you something before we begin?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"I was in my room all night. \\nI didn't hear or see anything.\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Mrs. Henderson\",\n        \"text\": \"My husband and I were out at a dinner party.\\nWe usually stay until 9pm every night.\\nIf you need me to send someone else, please let me know.\",\n        \"choices\": [\n          {\n            \"id\": \"c2a\",\n            \"text\": \"No one needs to come over tonight.\\nJust go ahead with the questioning.\",\n            \"dialogNode\": {\n              \"id\": \"n2\",\n              \"speaker\": \"Mrs. Henderson\",\n              \"text\": \"\",\n              \"choices\": [\n                {\n                  \"id\": \"c3a\",\n                  \"text\": \"I can stay here if you'd like.\\nIf I'm needed, I'll leave the door open for someone.\",\n                  \"dialogNode\": {\n                    \"id\": \"n3\",\n                    \"speaker\": \"Mrs. Henderson\",\n                    \"text\": \"\",\n                    \"choices\": []\n                  }\n                },\n                {\n                  \"id\": \"c3b\",\n                  \"text\": \"I have to work early tomorrow.\\nPerhaps I could take a quick break later this evening.\",\n                  \"dialogNode\": {\n                    \"id\": \"n4\",\n                    \"speaker\": \"Mrs. Henderson\",\n                    \"text\": \"\",\n                    \"choices\": []\n                  }\n                },\n                {\n                  \"id\": \"c3c\",\n                  \"text\": \"I'm sure it's alright.\\nYou can take as much time as you need.\",\n                  \"dialogNode\": {\n                    \"id\": \"n5\",\n                    \"speaker\": \"Mrs. Henderson\",\n                    \"text\": \"\",\n                    \"choices\": []\n                  }\n                }\n              ]\n            }\n          },\n          {\n            \"id\": \"c3d\",\n            \"text\": \"I think I need to go now.\\nIf you'd like, I can come back later.\",\n            \"dialogNode\": {\n              \"id\": \"n6\",\n              \"speaker\": \"Mrs. Henderson\",\n              \"text\": \"\",\n              \"choices\": []\n            }\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'm not sure I can help you with that.\\nMy husband would have to be here first.\",\n      \"target\": \"beat_arrest\",\n      \"exitReason\": \"A confession or critical witness information leads to arrest\"\n    }\n  ]\n}",
+    "cleanResponse": "{\n  \"routingPlan\": \"Investigating a burglary at the Henderson estate.\",\n  \"id\": \"root\",\n  \"speaker\": \"Mrs. Henderson\",\n  \"text\": \"I did not see anything strange last night.\\nWe were all out till late.\\nMy husband will be home soon, could he take a look?\\nWhat do you need to know, detective?\\nCan I get you something before we begin?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"I was in my room all night. \\nI didn't hear or see anything.\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Mrs. Henderson\",\n        \"text\": \"My husband and I were out at a dinner party.\\nWe usually stay until 9pm every night.\\nIf you need me to send someone else, please let me know.\",\n        \"choices\": [\n          {\n            \"id\": \"c2a\",\n            \"text\": \"No one needs to come over tonight.\\nJust go ahead with the questioning.\",\n            \"dialogNode\": {\n              \"id\": \"n2\",\n              \"speaker\": \"Mrs. Henderson\",\n              \"text\": \"\",\n              \"choices\": [\n                {\n                  \"id\": \"c3a\",\n                  \"text\": \"I can stay here if you'd like.\\nIf I'm needed, I'll leave the door open for someone.\",\n                  \"dialogNode\": {\n                    \"id\": \"n3\",\n                    \"speaker\": \"Mrs. Henderson\",\n                    \"text\": \"\",\n                    \"choices\": []\n                  }\n                },\n                {\n                  \"id\": \"c3b\",\n                  \"text\": \"I have to work early tomorrow.\\nPerhaps I could take a quick break later this evening.\",\n                  \"dialogNode\": {\n                    \"id\": \"n4\",\n                    \"speaker\": \"Mrs. Henderson\",\n                    \"text\": \"\",\n                    \"choices\": []\n                  }\n                },\n                {\n                  \"id\": \"c3c\",\n                  \"text\": \"I'm sure it's alright.\\nYou can take as much time as you need.\",\n                  \"dialogNode\": {\n                    \"id\": \"n5\",\n                    \"speaker\": \"Mrs. Henderson\",\n                    \"text\": \"\",\n                    \"choices\": []\n                  }\n                }\n              ]\n            }\n          },\n          {\n            \"id\": \"c3d\",\n            \"text\": \"I think I need to go now.\\nIf you'd like, I can come back later.\",\n            \"dialogNode\": {\n              \"id\": \"n6\",\n              \"speaker\": \"Mrs. Henderson\",\n              \"text\": \"\",\n              \"choices\": []\n            }\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'm not sure I can help you with that.\\nMy husband would have to be here first.\",\n      \"target\": \"beat_arrest\",\n      \"exitReason\": \"A confession or critical witness information leads to arrest\"\n    }\n  ]\n}",
+    "latencyMs": 11594,
+    "tokensPerSec": 55.71847507331378
+  },
+  {
+    "scenario": "dt-personalization",
+    "category": "dialogTree",
+    "model": "smollm2:1.7b",
+    "rawResponse": "```json\n{\n  \"routingPlan\": \"Visit Madame Zelda for a fortune teller's prediction about Mirjam's future.\",\n  \"id\": \"root\",\n  \"speaker\": \"Madame Zelda\",\n  \"text\": \"Welcome, Mirjam. I see that you are curious to know your destiny. May I have the pleasure of knowing your name and city? My predictions will be tailored specifically for you.\"\n},\n{\n  \"id\": \"c1\",\n  \"text\": \"Stockholm is a great place to visit for someone interested in marine biology.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"I see that you have visited the old lighthouse. This indicates that you are drawn to the mysteries of the sea and its secrets. Your work as a marine biologist is most intriguing.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"How does this affect my future?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows for the fortune teller to give Mirjam a prediction based on her marine biology career\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my past?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As a marine biologist, your work with aquatic life is fascinating. Your future may hold great discoveries and contributions to our understanding of the ocean's ecosystem.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction based on her profession as a marine biologist\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to the lighthouse. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my romantic life?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her personal life and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my career and relationships?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your romantic life, I see that you have a great potential for love and connection. Your heart is open to new experiences, and you may find yourself drawn to someone who shares your passion for the sea.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her romantic life based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my future business?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her career and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my financial life?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your future business, I see that you have great potential for success. Your passion and determination will lead you to achieve great things in this field.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her career based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my health?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her physical well-being and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my personal life?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your health, I see that you have great potential for good. Your body is strong and resilient, and you may be able to overcome any challenges that come your way.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her physical well-being based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my romantic heart?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her emotional well-being and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my personal life?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your romantic heart, I see that you have great potential for love and connection. Your heart is open to new experiences, and you may find yourself drawn to someone who shares your passion for the sea.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her emotional well-being based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my financial heart?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her career and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my future?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your financial heart, I see that you have great potential for success. Your passion and determination will lead you to achieve great things in this field.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her career based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in",
+    "cleanResponse": "```json\n{\n  \"routingPlan\": \"Visit Madame Zelda for a fortune teller's prediction about Mirjam's future.\",\n  \"id\": \"root\",\n  \"speaker\": \"Madame Zelda\",\n  \"text\": \"Welcome, Mirjam. I see that you are curious to know your destiny. May I have the pleasure of knowing your name and city? My predictions will be tailored specifically for you.\"\n},\n{\n  \"id\": \"c1\",\n  \"text\": \"Stockholm is a great place to visit for someone interested in marine biology.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"I see that you have visited the old lighthouse. This indicates that you are drawn to the mysteries of the sea and its secrets. Your work as a marine biologist is most intriguing.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"How does this affect my future?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows for the fortune teller to give Mirjam a prediction based on her marine biology career\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my past?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As a marine biologist, your work with aquatic life is fascinating. Your future may hold great discoveries and contributions to our understanding of the ocean's ecosystem.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction based on her profession as a marine biologist\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to the lighthouse. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my romantic life?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her personal life and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my career and relationships?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your romantic life, I see that you have a great potential for love and connection. Your heart is open to new experiences, and you may find yourself drawn to someone who shares your passion for the sea.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her romantic life based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my future business?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her career and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my financial life?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your future business, I see that you have great potential for success. Your passion and determination will lead you to achieve great things in this field.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her career based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my health?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her physical well-being and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my personal life?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your health, I see that you have great potential for good. Your body is strong and resilient, and you may be able to overcome any challenges that come your way.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her physical well-being based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my romantic heart?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her emotional well-being and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my personal life?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your romantic heart, I see that you have great potential for love and connection. Your heart is open to new experiences, and you may find yourself drawn to someone who shares your passion for the sea.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her emotional well-being based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.\",\n  \"dialogNode\": {\n    \"id\": \"n1\",\n    \"speaker\": \"Madame Zelda\",\n    \"text\": \"The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges.\"\n  },\n  \"choices\": [\n    {\n      \"id\": \"c2\",\n      \"text\": \"And what about my financial heart?\",\n      \"target\": \"beat_prediction\",\n      \"exitReason\": \"This choice allows Mirjam to ask about her career and receive a prediction based on Madame Zelda's mystical insight\"\n    },\n    {\n      \"id\": \"c3\",\n      \"text\": \"What else can you tell me about my future?\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"This choice allows Mirjam to leave the fortune telling without receiving a prediction.\"\n    }\n  ]\n},\n{\n  \"id\": \"c2\",\n  \"text\": \"As for your financial heart, I see that you have great potential for success. Your passion and determination will lead you to achieve great things in this field.\",\n  \"target\": \"beat_prediction\",\n  \"exitReason\": \"This choice provides Mirjam with a prediction about her career based on Madame Zelda's mystical insight\"\n},\n{\n  \"id\": \"c3\",\n  \"text\": \"I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in",
+    "latencyMs": 37221,
+    "tokensPerSec": 55.022702237983935
+  },
+  {
+    "scenario": "conv-opening",
+    "category": "conversation",
+    "model": "smollm2:1.7b",
+    "rawResponse": "Welcome, young scholar, to my humble abode of knowledge. I'm Professor Aldric, delighted to share with you the wonders of our ancient world.",
+    "cleanResponse": "Welcome, young scholar, to my humble abode of knowledge. I'm Professor Aldric, delighted to share with you the wonders of our ancient world.",
+    "latencyMs": 625,
+    "tokensPerSec": 49.6
+  },
+  {
+    "scenario": "conv-response",
+    "category": "conversation",
+    "model": "smollm2:1.7b",
+    "rawResponse": "Report the damage immediately, but not in the heat of battle. We can't afford delays when our cargo's at stake.",
+    "cleanResponse": "Report the damage immediately, but not in the heat of battle. We can't afford delays when our cargo's at stake.",
+    "latencyMs": 617,
+    "tokensPerSec": 42.13938411669368
+  },
+  {
+    "scenario": "conv-language",
+    "category": "conversation",
+    "model": "smollm2:1.7b",
+    "rawResponse": "\"Willkommen, Herr/Frau [player's name/pronoun], hier ist die Bäckerei! Wir bieten alles für uns zu empfehlen - einzigartige Produkte und gute Service!\"",
+    "cleanResponse": "\"Willkommen, Herr/Frau [player's name/pronoun], hier ist die Bäckerei! Wir bieten alles für uns zu empfehlen - einzigartige Produkte und gute Service!\"",
+    "latencyMs": 1106,
+    "tokensPerSec": 52.44122965641952
+  },
+  {
+    "scenario": "text-concise",
+    "category": "textGen",
+    "model": "smollm2:1.7b",
+    "rawResponse": "The opening of the cave was shrouded in an eerie silence, as if the very earth itself was hesitant to breathe. A faint flicker from Alex's torch danced across damp stone walls, casting eerie shadows that seemed to writhe with every movement.",
+    "cleanResponse": "The opening of the cave was shrouded in an eerie silence, as if the very earth itself was hesitant to breathe. A faint flicker from Alex's torch danced across damp stone walls, casting eerie shadows that seemed to writhe with every movement.",
+    "latencyMs": 903,
+    "tokensPerSec": 55.370985603543744
+  },
+  {
+    "scenario": "text-personalized",
+    "category": "textGen",
+    "model": "smollm2:1.7b",
+    "rawResponse": "Yuki stepped into the bustling kitchen, where the aroma of sizzling yakitori filled the air. As he took his place next to the other competitors, Yuki noticed that one chef, known for his exquisite ramen dishes, held a gleaming golden whisk in his hand, which seemed almost out of place among the typical cooking utensils on display.",
+    "cleanResponse": "Yuki stepped into the bustling kitchen, where the aroma of sizzling yakitori filled the air. As he took his place next to the other competitors, Yuki noticed that one chef, known for his exquisite ramen dishes, held a gleaming golden whisk in his hand, which seemed almost out of place among the typical cooking utensils on display.",
+    "latencyMs": 1398,
+    "tokensPerSec": 52.93276108726753
+  },
+  {
+    "scenario": "classify-personality",
+    "category": "classification",
+    "model": "smollm2:1.7b",
+    "rawResponse": "aggressive",
+    "cleanResponse": "aggressive",
+    "latencyMs": 207,
+    "tokensPerSec": 14.492753623188406
+  },
+  {
+    "scenario": "classify-state",
+    "category": "classification",
+    "model": "smollm2:1.7b",
+    "rawResponse": "\"ready_to_solve\"",
+    "cleanResponse": "\"ready_to_solve\"",
+    "latencyMs": 241,
+    "tokensPerSec": 33.19502074688797
+  },
+  {
+    "scenario": "extract-simple",
+    "category": "extraction",
+    "model": "smollm2:1.7b",
+    "rawResponse": "{\"player_name\": \"Marcus\", \"origin\": \"Northern Isles\", \"quest_item\": \"dragon-scale shield\"}",
+    "cleanResponse": "{\"player_name\": \"Marcus\", \"origin\": \"Northern Isles\", \"quest_item\": \"dragon-scale shield\"}",
+    "latencyMs": 508,
+    "tokensPerSec": 57.08661417322835
+  },
+  {
+    "scenario": "exit-farewell",
+    "category": "exitMessage",
+    "model": "smollm2:1.7b",
+    "rawResponse": "\"Thank you, crew member. You can count on me to ensure your safety while scouting the island.\"",
+    "cleanResponse": "\"Thank you, crew member. You can count on me to ensure your safety while scouting the island.\"",
+    "latencyMs": 528,
+    "tokensPerSec": 43.560606060606055
+  },
+  {
+    "scenario": "exit-dismissal",
+    "category": "exitMessage",
+    "model": "smollm2:1.7b",
+    "rawResponse": "You're not getting anything here, so let's go somewhere else where you can afford to splurge.",
+    "cleanResponse": "You're not getting anything here, so let's go somewhere else where you can afford to splurge.",
+    "latencyMs": 490,
+    "tokensPerSec": 46.93877551020408
+  },
+  {
+    "scenario": "direction-eval",
+    "category": "classification",
+    "model": "smollm2:1.7b",
+    "rawResponse": "[{\"direction\": 0}]",
+    "cleanResponse": "[{\"direction\": 0}]",
+    "latencyMs": 290,
+    "tokensPerSec": 27.586206896551726
+  },
+  {
+    "scenario": "dt-simple",
+    "category": "dialogTree",
+    "model": "mistral:7b",
+    "rawResponse": " Here's a simple dialog tree for the given scenario:\n\n```json\n{\n  \"routingPlan\": \"The player can either engage in conversation with the merchant or leave immediately.\",\n  \"id\": \"root\",\n  \"speaker\": \"Merchant\",\n  \"text\": \"Hail, traveler! Erik, I've heard tales of your adventures. Care to browse my wares before you continue on your journey?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"I would love to see what you have to offer.\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Merchant\",\n        \"text\": \"Ah, a man of discerning taste! Let me show you some of my finest goods.\",\n        \"choices\": [\n          {\n            \"id\": \"c1_1\",\n            \"text\": \"Interested in this enchanted sword.\",\n            \"dialogNode\": {\n              \"id\": \"n2\",\n              \"speaker\": \"Merchant\",\n              \"text\": \"This sword is said to bring victory to its wielder. It will cost you 40 gold coins.\",\n              \"choices\": [\n                {\n                  \"id\": \"c1_1_1\",\n                  \"text\": \"I'll take it!\",\n                  \"dialogNode\": {\n                    \"id\": \"n3\",\n                    \"speaker\": \"Merchant\",\n                    \"text\": \"Excellent choice! Here you are, sir. Happy adventuring!\",\n                    \"choices\": [\n                      {\n                        \"id\": \"c1_1_1_1\",\n                        \"text\": \"beat_leave\",\n                        \"exitReason\": \"Player decides to leave after buying the sword.\"\n                      }\n                    ]\n                  },\n                  \"playerCoins\": 10\n                },\n                {\n                  \"id\": \"c1_1_2\",\n                  \"text\": \"I'm not sure I have enough gold for that.\",\n                  \"dialogNode\": {\n                    \"id\": \"n4\",\n                    \"speaker\": \"Merchant\",\n                    \"text\": \"Ah, understandable. Let's see what else I have then.\",\n                    \"choices\": [\n                      {\n                        \"id\": \"c1_1_2_1\",\n                        \"text\": \"beat_shop\",\n                        \"exitReason\": \"Player decides to continue browsing wares.\"\n                      }\n                    ]\n                  },\n                  \"playerCoins\": 50\n                },\n              ]\n            }\n          },\n          {\n            \"id\": \"c1_2\",\n            \"text\": \"I'd prefer to look at something else.\",\n            \"dialogNode\": {\n              \"id\": \"n5\",\n              \"speaker\": \"Merchant\",\n              \"text\": \"Very well then. Come, let me show you my finest armor.\",\n              \"choices\": [\n                {\n                  \"id\": \"c1_2_1\",\n                  \"text\": \"I'm interested in that sturdy chainmail.\",\n                  \"dialogNode\": {\n                    \"id\": \"n6\",\n                    \"speaker\": \"Merchant\",\n                    \"text\": \"This chainmail is hard to come by and will cost you 30 gold coins. Would you like it?\",\n                    \"choices\": [\n                      {\n                        \"id\": \"c1_2_1_1\",\n                        \"text\": \"Yes, I'll buy it.\",\n                        \"dialogNode\": {\n                          \"id\": \"n7\",\n                          \"speaker\": \"Merchant\",\n                          \"text\": \"Excellent choice! Here you are, sir. Happy adventuring!\",\n                          \"choices\": [\n                            {\n                              \"id\": \"c1_2_1_1_1\",\n                              \"text\": \"beat_leave\",\n                              \"exitReason\": \"Player decides to leave after buying the chainmail.\"\n                            }\n                          ]\n                        },\n                        \"playerCoins\": 20\n                      },\n                      {\n                        \"id\": \"c1_2_1_2\",\n                        \"text\": \"I'm not sure I have enough gold for that.\",\n                        \"dialogNode\": {\n                          \"id\": \"n8\",\n                          \"speaker\": \"Merchant\",\n                          \"text\": \"Ah, understandable. Let me show you some other items then.\",\n                          \"choices\": [\n                            {\n                              \"id\": \"c1_2_1_2_1\",\n                              \"text\": \"beat_shop\",\n                              \"exitReason\": \"Player decides to continue browsing wares.\"\n                            }\n                          ]\n                        },\n                        \"playerCoins\": 50\n                      },\n                    ]\n                  }\n                },\n              ]\n            }\n          },\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'm not interested. I need to be going.\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"Player decides to leave without browsing wares.\"\n    }\n  ]\n}\n```\n\nThis JSON object represents a dialog tree with two conversation turns between Erik and the merchant. The structure follows your requirements, with each node having a speaker, text, and choices leading to another dialog node or an exit target based on the player's response. This dialog tree also takes into account Erik's initial gold coins count and updates it accordingly after making purchases.",
+    "cleanResponse": "Here's a simple dialog tree for the given scenario:\n\n```json\n{\n  \"routingPlan\": \"The player can either engage in conversation with the merchant or leave immediately.\",\n  \"id\": \"root\",\n  \"speaker\": \"Merchant\",\n  \"text\": \"Hail, traveler! Erik, I've heard tales of your adventures. Care to browse my wares before you continue on your journey?\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"I would love to see what you have to offer.\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Merchant\",\n        \"text\": \"Ah, a man of discerning taste! Let me show you some of my finest goods.\",\n        \"choices\": [\n          {\n            \"id\": \"c1_1\",\n            \"text\": \"Interested in this enchanted sword.\",\n            \"dialogNode\": {\n              \"id\": \"n2\",\n              \"speaker\": \"Merchant\",\n              \"text\": \"This sword is said to bring victory to its wielder. It will cost you 40 gold coins.\",\n              \"choices\": [\n                {\n                  \"id\": \"c1_1_1\",\n                  \"text\": \"I'll take it!\",\n                  \"dialogNode\": {\n                    \"id\": \"n3\",\n                    \"speaker\": \"Merchant\",\n                    \"text\": \"Excellent choice! Here you are, sir. Happy adventuring!\",\n                    \"choices\": [\n                      {\n                        \"id\": \"c1_1_1_1\",\n                        \"text\": \"beat_leave\",\n                        \"exitReason\": \"Player decides to leave after buying the sword.\"\n                      }\n                    ]\n                  },\n                  \"playerCoins\": 10\n                },\n                {\n                  \"id\": \"c1_1_2\",\n                  \"text\": \"I'm not sure I have enough gold for that.\",\n                  \"dialogNode\": {\n                    \"id\": \"n4\",\n                    \"speaker\": \"Merchant\",\n                    \"text\": \"Ah, understandable. Let's see what else I have then.\",\n                    \"choices\": [\n                      {\n                        \"id\": \"c1_1_2_1\",\n                        \"text\": \"beat_shop\",\n                        \"exitReason\": \"Player decides to continue browsing wares.\"\n                      }\n                    ]\n                  },\n                  \"playerCoins\": 50\n                },\n              ]\n            }\n          },\n          {\n            \"id\": \"c1_2\",\n            \"text\": \"I'd prefer to look at something else.\",\n            \"dialogNode\": {\n              \"id\": \"n5\",\n              \"speaker\": \"Merchant\",\n              \"text\": \"Very well then. Come, let me show you my finest armor.\",\n              \"choices\": [\n                {\n                  \"id\": \"c1_2_1\",\n                  \"text\": \"I'm interested in that sturdy chainmail.\",\n                  \"dialogNode\": {\n                    \"id\": \"n6\",\n                    \"speaker\": \"Merchant\",\n                    \"text\": \"This chainmail is hard to come by and will cost you 30 gold coins. Would you like it?\",\n                    \"choices\": [\n                      {\n                        \"id\": \"c1_2_1_1\",\n                        \"text\": \"Yes, I'll buy it.\",\n                        \"dialogNode\": {\n                          \"id\": \"n7\",\n                          \"speaker\": \"Merchant\",\n                          \"text\": \"Excellent choice! Here you are, sir. Happy adventuring!\",\n                          \"choices\": [\n                            {\n                              \"id\": \"c1_2_1_1_1\",\n                              \"text\": \"beat_leave\",\n                              \"exitReason\": \"Player decides to leave after buying the chainmail.\"\n                            }\n                          ]\n                        },\n                        \"playerCoins\": 20\n                      },\n                      {\n                        \"id\": \"c1_2_1_2\",\n                        \"text\": \"I'm not sure I have enough gold for that.\",\n                        \"dialogNode\": {\n                          \"id\": \"n8\",\n                          \"speaker\": \"Merchant\",\n                          \"text\": \"Ah, understandable. Let me show you some other items then.\",\n                          \"choices\": [\n                            {\n                              \"id\": \"c1_2_1_2_1\",\n                              \"text\": \"beat_shop\",\n                              \"exitReason\": \"Player decides to continue browsing wares.\"\n                            }\n                          ]\n                        },\n                        \"playerCoins\": 50\n                      },\n                    ]\n                  }\n                },\n              ]\n            }\n          },\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'm not interested. I need to be going.\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"Player decides to leave without browsing wares.\"\n    }\n  ]\n}\n```\n\nThis JSON object represents a dialog tree with two conversation turns between Erik and the merchant. The structure follows your requirements, with each node having a speaker, text, and choices leading to another dialog node or an exit target based on the player's response. This dialog tree also takes into account Erik's initial gold coins count and updates it accordingly after making purchases.",
+    "latencyMs": 62957,
+    "tokensPerSec": 21.252600981622376
+  },
+  {
+    "scenario": "dt-nested",
+    "category": "dialogTree",
+    "model": "mistral:7b",
+    "rawResponse": " Here's a simple dialog tree for the scenario you provided:\n\n```json\n{\n  \"routingPlan\": \"Mrs. Henderson reveals information or decides to remain silent\",\n  \"id\": \"root\",\n  \"speaker\": \"Mrs. Henderson\",\n  \"text\": \"I... I don't know anything about that. I was just coming home.\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"You were arriving home at the time of the burglary? Can you describe what you saw?\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Mrs. Henderson\",\n        \"text\": \"I... I didn't see anything unusual. Just the usual shadows.\",\n        \"choices\": [\n          {\n            \"id\": \"c1_1\",\n            \"text\": \"Shadows? Are you sure you aren't trying to hide something?\",\n            \"dialogNode\": {\n              \"id\": \"n2\",\n              \"speaker\": \"Mrs. Henderson\",\n              \"text\": \"I... I swear, officer. I don't know anything.\",\n              \"choices\": [\n                {\n                  \"id\": \"c1_1_1\",\n                  \"text\": \"Alright, but if you remember something or see something suspicious in the future, please let us know.\",\n                  \"dialogNode\": {\n                    \"id\": \"n3\",\n                    \"speaker\": \"Detective Sarah Chen\",\n                    \"text\": \"Thank you for your cooperation, Mrs. Henderson. We'll be in touch if we have more questions.\",\n                    \"choices\": []\n                  },\n                  \"target\": \"beat_continue\"\n                }\n              ]\n            }\n          },\n          {\n            \"id\": \"c1_2\",\n            \"text\": \"I understand, Mrs. Henderson. Thank you for your statement.\",\n            \"target\": \"beat_continue\"\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'll take a look around the estate and see if I find anything.\",\n      \"target\": \"exit_target_id\",\n      \"exitReason\": \"Detective decides to move on to next witness\"\n    }\n  ]\n}\n```",
+    "cleanResponse": "Here's a simple dialog tree for the scenario you provided:\n\n```json\n{\n  \"routingPlan\": \"Mrs. Henderson reveals information or decides to remain silent\",\n  \"id\": \"root\",\n  \"speaker\": \"Mrs. Henderson\",\n  \"text\": \"I... I don't know anything about that. I was just coming home.\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"You were arriving home at the time of the burglary? Can you describe what you saw?\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Mrs. Henderson\",\n        \"text\": \"I... I didn't see anything unusual. Just the usual shadows.\",\n        \"choices\": [\n          {\n            \"id\": \"c1_1\",\n            \"text\": \"Shadows? Are you sure you aren't trying to hide something?\",\n            \"dialogNode\": {\n              \"id\": \"n2\",\n              \"speaker\": \"Mrs. Henderson\",\n              \"text\": \"I... I swear, officer. I don't know anything.\",\n              \"choices\": [\n                {\n                  \"id\": \"c1_1_1\",\n                  \"text\": \"Alright, but if you remember something or see something suspicious in the future, please let us know.\",\n                  \"dialogNode\": {\n                    \"id\": \"n3\",\n                    \"speaker\": \"Detective Sarah Chen\",\n                    \"text\": \"Thank you for your cooperation, Mrs. Henderson. We'll be in touch if we have more questions.\",\n                    \"choices\": []\n                  },\n                  \"target\": \"beat_continue\"\n                }\n              ]\n            }\n          },\n          {\n            \"id\": \"c1_2\",\n            \"text\": \"I understand, Mrs. Henderson. Thank you for your statement.\",\n            \"target\": \"beat_continue\"\n          }\n        ]\n      }\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'll take a look around the estate and see if I find anything.\",\n      \"target\": \"exit_target_id\",\n      \"exitReason\": \"Detective decides to move on to next witness\"\n    }\n  ]\n}\n```",
+    "latencyMs": 25500,
+    "tokensPerSec": 21.764705882352942
+  },
+  {
+    "scenario": "dt-personalization",
+    "category": "dialogTree",
+    "model": "mistral:7b",
+    "rawResponse": " Here is the dialog tree in JSON format for the given scenario:\n\n```json\n{\n  \"routingPlan\": \"The player will either accept a prediction or leave the fortune teller's tent.\",\n  \"id\": \"root\",\n  \"speaker\": \"Madame Zelda\",\n  \"text\": \"Welcome, Mirjam the marine biologist from Stockholm. I sense you have been drawn to the sea's mysteries, just as a curious dolphin is drawn to a lighthouse. The light you seek may be found deep within the ocean's heart, but first, you must face a storm.\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"What does the storm mean?\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Madame Zelda\",\n        \"text\": \"The storm, Mirjam, symbolizes a challenging journey that lies ahead. But fear not, for every storm passes and leads to calmer waters. Be prepared to embrace the challenges and emerge stronger.\",\n        \"choices\": [\n          {\n            \"id\": \"c1_1\",\n            \"text\": \"Thank you, Madame Zelda. I'll keep this in mind.\",\n            \"dialogNode\": { \"id\": \"n2\", \"speaker\": \"Madame Zelda\", \"text\": \"You are most welcome, dear Mirjam. May the sea be kind to you on your journey.\", \"choices\": [{\"id\": \"c1_1_1\", \"text\": \"beat_prediction\", \"dialogNode\": { \"id\": \"n3\", \"speaker\": \"Madame Zelda\", \"text\": \"Do come back and share the treasures of your discoveries. Farewell!\" }] },\n            {\n              \"id\": \"c1_2\",\n              \"text\": \"I'd like to leave now.\",\n              \"target\": \"beat_leave\",\n              \"exitReason\": \"Player decides to leave without accepting the prediction\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'd like to leave now.\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"Player decides to leave without asking about the storm\"\n    }\n  ]\n}\n```\nThis dialog tree covers the given requirements:\n1. It has two turns as specified.\n2. Personalization is used throughout the text, directly referencing Mirjam's name, Stockholm, marine biology, and the lighthouse visit.\n3. Never uses placeholder syntax like {playerName}.",
+    "cleanResponse": "Here is the dialog tree in JSON format for the given scenario:\n\n```json\n{\n  \"routingPlan\": \"The player will either accept a prediction or leave the fortune teller's tent.\",\n  \"id\": \"root\",\n  \"speaker\": \"Madame Zelda\",\n  \"text\": \"Welcome, Mirjam the marine biologist from Stockholm. I sense you have been drawn to the sea's mysteries, just as a curious dolphin is drawn to a lighthouse. The light you seek may be found deep within the ocean's heart, but first, you must face a storm.\",\n  \"choices\": [\n    {\n      \"id\": \"c1\",\n      \"text\": \"What does the storm mean?\",\n      \"dialogNode\": {\n        \"id\": \"n1\",\n        \"speaker\": \"Madame Zelda\",\n        \"text\": \"The storm, Mirjam, symbolizes a challenging journey that lies ahead. But fear not, for every storm passes and leads to calmer waters. Be prepared to embrace the challenges and emerge stronger.\",\n        \"choices\": [\n          {\n            \"id\": \"c1_1\",\n            \"text\": \"Thank you, Madame Zelda. I'll keep this in mind.\",\n            \"dialogNode\": { \"id\": \"n2\", \"speaker\": \"Madame Zelda\", \"text\": \"You are most welcome, dear Mirjam. May the sea be kind to you on your journey.\", \"choices\": [{\"id\": \"c1_1_1\", \"text\": \"beat_prediction\", \"dialogNode\": { \"id\": \"n3\", \"speaker\": \"Madame Zelda\", \"text\": \"Do come back and share the treasures of your discoveries. Farewell!\" }] },\n            {\n              \"id\": \"c1_2\",\n              \"text\": \"I'd like to leave now.\",\n              \"target\": \"beat_leave\",\n              \"exitReason\": \"Player decides to leave without accepting the prediction\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"id\": \"c2\",\n      \"text\": \"I'd like to leave now.\",\n      \"target\": \"beat_leave\",\n      \"exitReason\": \"Player decides to leave without asking about the storm\"\n    }\n  ]\n}\n```\nThis dialog tree covers the given requirements:\n1. It has two turns as specified.\n2. Personalization is used throughout the text, directly referencing Mirjam's name, Stockholm, marine biology, and the lighthouse visit.\n3. Never uses placeholder syntax like {playerName}.",
+    "latencyMs": 26949,
+    "tokensPerSec": 22.449812609002187
+  },
+  {
+    "scenario": "conv-opening",
+    "category": "conversation",
+    "model": "mistral:7b",
+    "rawResponse": " Ah, good day to you! I see you've taken an interest in our university's collection of ancient artifacts. Sit down, take a seat, and let us delve into the mysteries of yesteryears together, Mr./Ms. [Player's Name].",
+    "cleanResponse": "Ah, good day to you! I see you've taken an interest in our university's collection of ancient artifacts. Sit down, take a seat, and let us delve into the mysteries of yesteryears together, Mr./Ms. [Player's Name].",
+    "latencyMs": 3046,
+    "tokensPerSec": 20.026263952724886
+  },
+  {
+    "scenario": "conv-response",
+    "category": "conversation",
+    "model": "mistral:7b",
+    "rawResponse": " Report it, Mr. {Player Name}. Damage can fester and worsen. Better dealt with swiftly.",
+    "cleanResponse": "Report it, Mr. {Player Name}. Damage can fester and worsen. Better dealt with swiftly.",
+    "latencyMs": 1937,
+    "tokensPerSec": 13.422818791946309
+  },
+  {
+    "scenario": "conv-language",
+    "category": "conversation",
+    "model": "mistral:7b",
+    "rawResponse": " Guten Tag, Herr [Player's Name]! Willkommen in meiner Bäckerei! Verpflegst du dich heute schon? Ich habe gerade frisches Brot aus der Ofen entfernt.",
+    "cleanResponse": "Guten Tag, Herr [Player's Name]! Willkommen in meiner Bäckerei! Verpflegst du dich heute schon? Ich habe gerade frisches Brot aus der Ofen entfernt.",
+    "latencyMs": 2808,
+    "tokensPerSec": 17.45014245014245
+  },
+  {
+    "scenario": "text-concise",
+    "category": "textGen",
+    "model": "mistral:7b",
+    "rawResponse": " At the cave's yawning maw, shadows dance and flicker as Alex's torchlight meets the stone's weathered embrace, casting eerie silhouettes that whisper tales of forgotten secrets within.",
+    "cleanResponse": "At the cave's yawning maw, shadows dance and flicker as Alex's torchlight meets the stone's weathered embrace, casting eerie silhouettes that whisper tales of forgotten secrets within.",
+    "latencyMs": 2451,
+    "tokensPerSec": 18.767849857201142
+  },
+  {
+    "scenario": "text-personalized",
+    "category": "textGen",
+    "model": "mistral:7b",
+    "rawResponse": " As Yuki steps onto the bustling stage of the culinary competition, the crowd hushes in anticipation. With a confident stride, they adjust their apron, glancing down at the prized golden whisk hanging from their belt, ready to showcase their skills as Tokyo's finest chef.",
+    "cleanResponse": "As Yuki steps onto the bustling stage of the culinary competition, the crowd hushes in anticipation. With a confident stride, they adjust their apron, glancing down at the prized golden whisk hanging from their belt, ready to showcase their skills as Tokyo's finest chef.",
+    "latencyMs": 2844,
+    "tokensPerSec": 21.80028129395218
+  },
+  {
+    "scenario": "classify-personality",
+    "category": "classification",
+    "model": "mistral:7b",
+    "rawResponse": " diplomatic",
+    "cleanResponse": "diplomatic",
+    "latencyMs": 729,
+    "tokensPerSec": 4.11522633744856
+  },
+  {
+    "scenario": "classify-state",
+    "category": "classification",
+    "model": "mistral:7b",
+    "rawResponse": " ready_to_solve",
+    "cleanResponse": "ready_to_solve",
+    "latencyMs": 704,
+    "tokensPerSec": 9.943181818181818
+  },
+  {
+    "scenario": "extract-simple",
+    "category": "extraction",
+    "model": "mistral:7b",
+    "rawResponse": " {\n  \"player_name\": \"Marcus\",\n  \"origin\": \"Northern Isles\",\n  \"quest_item\": \"dragon-scale shield\"\n}",
+    "cleanResponse": "{\n  \"player_name\": \"Marcus\",\n  \"origin\": \"Northern Isles\",\n  \"quest_item\": \"dragon-scale shield\"\n}",
+    "latencyMs": 2610,
+    "tokensPerSec": 16.091954022988507
+  },
+  {
+    "scenario": "exit-farewell",
+    "category": "exitMessage",
+    "model": "mistral:7b",
+    "rawResponse": " \"Thank you for stepping up, crew member. Good luck on your mission. May fortune be on your side.\"",
+    "cleanResponse": "\"Thank you for stepping up, crew member. Good luck on your mission. May fortune be on your side.\"",
+    "latencyMs": 1533,
+    "tokensPerSec": 15.655577299412917
+  },
+  {
+    "scenario": "exit-dismissal",
+    "category": "exitMessage",
+    "model": "mistral:7b",
+    "rawResponse": " \"Scram! I don't serve paupers who can barely afford their own breath.\"",
+    "cleanResponse": "\"Scram! I don't serve paupers who can barely afford their own breath.\"",
+    "latencyMs": 1354,
+    "tokensPerSec": 15.509601181683898
+  },
+  {
+    "scenario": "direction-eval",
+    "category": "classification",
+    "model": "mistral:7b",
+    "rawResponse": " [\"0\"]",
+    "cleanResponse": "[\"0\"]",
+    "latencyMs": 1003,
+    "tokensPerSec": 3.9880358923230315
+  }
+]

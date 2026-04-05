@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ASAPS LLM Beat Eval — 2026-04-03 02:46</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 20px; background: #f8f9fa; }
+  h1 { font-size: 1.4em; }
+  table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  th, td { border: 1px solid #dee2e6; padding: 8px; text-align: left; vertical-align: top; }
+  th { background: #343a40; color: white; position: sticky; top: 0; }
+  .scenario-header { background: #e9ecef; }
+  .prompt-row td { background: #f8f9fa; }
+  .label { font-weight: 600; width: 80px; background: #f1f3f5; }
+  .response { min-width: 300px; max-width: 500px; }
+  .response pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; max-height: 400px; overflow-y: auto; margin: 4px 0 0; }
+  .response.error pre { color: #c00; }
+  .score { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  details summary { cursor: pointer; color: #666; font-size: 12px; }
+  details pre { font-size: 11px; color: #555; max-height: 200px; overflow-y: auto; }
+</style></head><body>
+<h1>🧪 ASAPS LLM Beat Evaluation — 2026-04-03 02:46</h1>
+<table>
+<tr><th>Scenario</th><th>gemma3:4b</th><th>smollm2:1.7b</th><th>mistral:7b</th></tr>
+<tr class="scenario-header"><td colspan="4"><strong>dialogTree / dt-simple</strong> — Generate a simple 2-choice dialog tree</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>Generate a dialog tree for the following scenario:
+
+SCENARIO: A player meets a merchant in a medieval market.
+
+NPC: Merchant
+PERSONALITY: Friendly but shrewd trader
+
+PLAYER CONTEXT:
+Player name: Erik. Has 50 gold coins.
+
+EXIT CONDITIONS:
+- "beat_shop": Player wants to browse wares
+- "beat_leave": Player wants to leave
+
+REQUIREMENTS:
+1. Generate a branching dialog tree with up to 2 conversation turns
+2. Each dialog node has: speaker, text, and 2-3 player choices
+3. Each choice leads to either another dialog node OR an exit target
+
+Return a JSON object with this structure:
+{
+  "routingPlan": "Brief explanation of exit routing",
+  "id": "root",
+  "speaker": "NPC Name",
+  "text": "NPC's complete speech including any questions",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "What the PLAYER says in response",
+      "dialogNode": { "id": "n1", "speaker": "NPC Name", "text": "NPC response", "choices": [...] }
+    },
+    {
+      "id": "c2",
+      "text": "Alternative PLAYER response",
+      "target": "exit_target_id",
+      "exitReason": "Why this choice exits"
+    }
+  ]
+}</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 16.8s</div><pre>```json
+{
+  "routingPlan": "The dialog flows through two turns, offering a choice to browse or leave after the initial greeting.",
+  "id": "root",
+  "speaker": "Barnaby, the Merchant",
+  "text": "Welcome, traveler! Barnaby's Bargains has wares for every need, and a price for every coin.  I see you have some gold – perhaps you're looking for something special?",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "‘I’m just looking around.’",
+      "dialogNode": {
+        "id": "n1",
+        "speaker": "Barnaby, the Merchant",
+        "text": "Excellent! Take your time, browse my selection. I have everything from sturdy boots to enchanted trinkets.  Don’t be shy to examine anything that catches your eye.",
+        "choices": [
+          {
+            "id": "c1a",
+            "text": "‘Tell me about those boots.’",
+            "dialogNode": {
+              "id": "n2",
+              "speaker": "Barnaby, the Merchant",
+              "text": "Ah, the 'Ironclad Striders'!  Made with dwarven steel, they're incredibly durable. 25 gold for a pair.",
+              "choices": [
+                {
+                  "id": "c1aa",
+                  "text": "‘I'll take them.’",
+                  "target": "beat_shop",
+                  "exitReason": "Player purchases boots."
+                },
+                {
+                  "id": "c1ab",
+                  "text": "‘I’m not interested.’",
+                  "target": "beat_leave",
+                  "exitReason": "Player declines boots and wants to leave."
+                }
+              ]
+            }
+          },
+          {
+            "id": "c1b",
+            "text": "‘What else have you got?’",
+            "target": "beat_shop",
+            "exitReason": "Player indicates interest in browsing."
+          }
+        ]
+      }
+    },
+    {
+      "id": "c2",
+      "text": "‘Just passing through.’",
+      "target": "beat_leave",
+      "exitReason": "Player indicates no interest and wants to leave."
+    }
+  ]
+}
+```</pre></td><td class="response"><div class="score">✅ 100% · 6.6s</div><pre>{
+  "routingPlan": "The player meets a friendly but shrewd merchant in the medieval market.",
+  "id": "root",
+  "speaker": "Merchant",
+  "text": "Welcome, Erik! I see you've got some gold coins. What brings you to my humble shop today?",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "I'm looking for a sturdy sword and good armor.\nWhat do you have available?",
+      "dialogNode": {
+        "id": "beat_shop",
+        "speaker": "Merchant",
+        "text": "I've got some fine steel blades and leather tunics. The sword is particularly well-made, but it's a bit pricey at 20 gold coins.\nWould you like to take a look? And how about armor? I have chainmail in various sizes.",
+        "choices": [
+          {
+            "id": "c2",
+            "text": "I think the sword and chainmail would be ideal for me.\nHow long does it take to deliver?"
+          },
+          {
+            "id": "c3",
+            "text": "I'm on a tight schedule and would like to leave immediately.\nGet me out of here!"
+          }
+        ]
+      },
+      "target": "beat_leave"
+    },
+    {
+      "id": "c2",
+      "text": "I'll take the sword for now. What's the price?",
+      "target": "beat_buy"
+    }
+  ]
+}</pre></td><td class="response"><div class="score">❌ 22% · 63.0s</div><pre>Here's a simple dialog tree for the given scenario:
+
+```json
+{
+  "routingPlan": "The player can either engage in conversation with the merchant or leave immediately.",
+  "id": "root",
+  "speaker": "Merchant",
+  "text": "Hail, traveler! Erik, I've heard tales of your adventures. Care to browse my wares before you continue on your journey?",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "I would love to see what you have to offer.",
+      "dialogNode": {
+        "id": "n1",
+        "speaker": "Merchant",
+        "text": "Ah, a man of discerning taste! Let me show you some of my finest goods.",
+        "choices": [
+          {
+            "id": "c1_1",
+            "text": "Interested in this enchanted sword.",
+            "dialogNode": {
+              "id": "n2",
+              "speaker": "Merchant",
+              "text": "This sword is said to bring victory to its wielder. It will cost you 40 gold coins.",
+              "choices": [
+                {
+                  "id": "c1_1_1",
+                  "text": "I'll take it!",
+                  "dialogNode": {
+                    "id": "n3",
+                    "speaker": "Merchant",
+                    "text": "Excellent choice! Here you are, sir. Happy adventuring!",
+                    "choices": [
+                      {
+                        "id": "c1_1_1_1",
+                        "text": "beat_leave",
+                        "exitReason": "Player decides to leave after buying the sword."
+                      }
+                    ]
+                  },
+                  "playerCoins": 10
+                },
+                {
+                  "id": "c1_1_2",
+                  "text": "I'm not sure I have enough gold for that.",
+                  "dialogNode": {
+                    "id": "n4",
+                    "speaker": "Merchant",
+                    "text": "Ah, understandable. Let's see what else I have then.",
+                    "choices": [
+                      {
+                        "id": "c1_1_2_1",
+                        "text": "beat_shop",
+                        "exitReason": "Player decides to continue browsing wares."
+                      }
+                    ]
+                  },
+                  "playerCoins": 50
+                },
+              ]
+            }
+          },
+          {
+            "id": "c1_2",
+            "text": "I'd prefer to look at something else.",
+            "dialogNode": {
+              "id": "n5",
+              "speaker": "Merchant",
+              "text": "Very well then. Come, let me show you my finest armor.",
+              "choices": [
+                {
+                  "id": "c1_2_1",
+                  "text": "I'm interested in that sturdy chainmail.",
+                  "dialogNode": {
+                    "id": "n6",
+                    "speaker": "Merchant",
+                    "text": "This chainmail is hard to come by and will cost you 30 gold coins. Would you like it?",
+                    "choices": [
+                      {
+                        "id": "c1_2_1_1",
+                        "text": "Yes, I'll buy it.",
+                        "dialogNode": {
+                          "id": "n7",
+                          "speaker": "Merchant",
+                          "text": "Excellent choice! Here you are, sir. Happy adventuring!",
+                          "choices": [
+                            {
+                              "id": "c1_2_1_1_1",
+                              "text": "beat_leave",
+                              "exitReason": "Player decides to leave after buying the chainmail."
+                            }
+                          ]
+                        },
+                        "playerCoins": 20
+                      },
+                      {
+                        "id": "c1_2_1_2",
+                        "text": "I'm not sure I have enough gold for that.",
+                        "dialogNode": {
+                          "id": "n8",
+                          "speaker": "Merchant",
+                          "text": "Ah, understandable. Let me show you some other items then.",
+                          "choices": [
+                            {
+                              "id": "c1_2_1_2_1",
+                              "text": "beat_shop",
+                              "exitReason": "Player decides to continue browsing wares."
+                            }
+                          ]
+                        },
+                        "playerCoins": 50
+                      },
+                    ]
+                  }
+                },
+              ]
+            }
+          },
+        ]
+      }
+    },
+    {
+      "id": "c2",
+      "text": "I'm not interested. I need to be going.",
+      "target": "beat_leave",
+      "exitReason": "Player decides to leave without browsing wares."
+    }
+  ]
+}
+```
+
+This JSON object represents a dialog tree with two conversation turns between Erik and the merchant. The structure follows your requirements, with each node having a speaker, text, and choices leading to another dialog node or an exit target based on the player's response. This dialog tree also takes into account Erik's initial gold coins count and updates it accordingly after making purchases.</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>dialogTree / dt-nested</strong> — Generate a dialog tree with nested dialog nodes</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>Generate a dialog tree for the following scenario:
+
+SCENARIO: A detective interrogates a nervous witness at a crime scene.
+
+NPC: Mrs. Henderson
+PERSONALITY: Anxious, hides something, speaks in short sentences
+
+PLAYER CONTEXT:
+Detective Sarah Chen. Investigating a burglary at the Henderson estate.
+
+EXIT CONDITIONS:
+- "beat_arrest": Witness confesses or reveals critical information
+- "beat_continue": Detective decides to move on to next witness
+
+REQUIREMENTS:
+1. Generate a branching dialog tree with up to 3 conversation turns
+2. At least one choice should lead to a nested dialogNode (NPC responds, then more choices)
+3. Include exitReason for exit choices
+
+CRITICAL STRUCTURE RULES:
+- The "text" field contains EVERYTHING the NPC says
+- The "choices" array contains ONLY what the PLAYER says
+
+Return a JSON object with this structure:
+{
+  "routingPlan": "Brief explanation of exit routing",
+  "id": "root",
+  "speaker": "NPC Name",
+  "text": "NPC's complete speech including any questions",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "What the PLAYER says in response",
+      "dialogNode": { "id": "n1", "speaker": "NPC Name", "text": "NPC response", "choices": [...] }
+    },
+    {
+      "id": "c2",
+      "text": "Alternative PLAYER response",
+      "target": "exit_target_id",
+      "exitReason": "Why this choice exits"
+    }
+  ]
+}</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 10.9s</div><pre>```json
+{
+  "routingPlan": "The dialog tree follows a linear progression initially, offering a choice to delve deeper into Mrs. Henderson's nervousness. A specific choice leads to an exit condition, triggering the end of the interrogation.",
+  "id": "root",
+  "speaker": "Mrs. Henderson",
+  "text": "It... it was awful. I didn't see anything. Just... the door was open.",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "Can you describe what you heard, Mrs. Henderson? Anything at all?",
+      "dialogNode": {
+        "id": "n1",
+        "speaker": "Mrs. Henderson",
+        "text": "I... I heard a noise. Like something falling. Then... silence. I didn't want to look.",
+        "choices": [
+          {
+            "id": "c2_1",
+            "text": "Did the noise sound like something valuable falling?",
+            "target": "exit_arrest",
+            "exitReason": "Mrs. Henderson's hesitation suggests she's hiding information about a specific item."
+          },
+          {
+            "id": "c2_2",
+            "text": "What time did you last see everything in order?",
+            "target": "beat_continue",
+            "exitReason": "Moving on to a different line of questioning."
+          }
+        ]
+      }
+    },
+    {
+      "id": "c2",
+      "text": "Just stay calm, Mrs. Henderson. We just need to understand what happened.",
+      "target": "beat_continue",
+      "exitReason": "Attempting to reassure the witness and maintain control of the interview."
+    }
+  ]
+}
+```</pre></td><td class="response"><div class="score">✅ 100% · 11.6s</div><pre>{
+  "routingPlan": "Investigating a burglary at the Henderson estate.",
+  "id": "root",
+  "speaker": "Mrs. Henderson",
+  "text": "I did not see anything strange last night.\nWe were all out till late.\nMy husband will be home soon, could he take a look?\nWhat do you need to know, detective?\nCan I get you something before we begin?",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "I was in my room all night. \nI didn't hear or see anything.",
+      "dialogNode": {
+        "id": "n1",
+        "speaker": "Mrs. Henderson",
+        "text": "My husband and I were out at a dinner party.\nWe usually stay until 9pm every night.\nIf you need me to send someone else, please let me know.",
+        "choices": [
+          {
+            "id": "c2a",
+            "text": "No one needs to come over tonight.\nJust go ahead with the questioning.",
+            "dialogNode": {
+              "id": "n2",
+              "speaker": "Mrs. Henderson",
+              "text": "",
+              "choices": [
+                {
+                  "id": "c3a",
+                  "text": "I can stay here if you'd like.\nIf I'm needed, I'll leave the door open for someone.",
+                  "dialogNode": {
+                    "id": "n3",
+                    "speaker": "Mrs. Henderson",
+                    "text": "",
+                    "choices": []
+                  }
+                },
+                {
+                  "id": "c3b",
+                  "text": "I have to work early tomorrow.\nPerhaps I could take a quick break later this evening.",
+                  "dialogNode": {
+                    "id": "n4",
+                    "speaker": "Mrs. Henderson",
+                    "text": "",
+                    "choices": []
+                  }
+                },
+                {
+                  "id": "c3c",
+                  "text": "I'm sure it's alright.\nYou can take as much time as you need.",
+                  "dialogNode": {
+                    "id": "n5",
+                    "speaker": "Mrs. Henderson",
+                    "text": "",
+                    "choices": []
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "c3d",
+            "text": "I think I need to go now.\nIf you'd like, I can come back later.",
+            "dialogNode": {
+              "id": "n6",
+              "speaker": "Mrs. Henderson",
+              "text": "",
+              "choices": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "c2",
+      "text": "I'm not sure I can help you with that.\nMy husband would have to be here first.",
+      "target": "beat_arrest",
+      "exitReason": "A confession or critical witness information leads to arrest"
+    }
+  ]
+}</pre></td><td class="response"><div class="score">✅ 100% · 25.5s</div><pre>Here's a simple dialog tree for the scenario you provided:
+
+```json
+{
+  "routingPlan": "Mrs. Henderson reveals information or decides to remain silent",
+  "id": "root",
+  "speaker": "Mrs. Henderson",
+  "text": "I... I don't know anything about that. I was just coming home.",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "You were arriving home at the time of the burglary? Can you describe what you saw?",
+      "dialogNode": {
+        "id": "n1",
+        "speaker": "Mrs. Henderson",
+        "text": "I... I didn't see anything unusual. Just the usual shadows.",
+        "choices": [
+          {
+            "id": "c1_1",
+            "text": "Shadows? Are you sure you aren't trying to hide something?",
+            "dialogNode": {
+              "id": "n2",
+              "speaker": "Mrs. Henderson",
+              "text": "I... I swear, officer. I don't know anything.",
+              "choices": [
+                {
+                  "id": "c1_1_1",
+                  "text": "Alright, but if you remember something or see something suspicious in the future, please let us know.",
+                  "dialogNode": {
+                    "id": "n3",
+                    "speaker": "Detective Sarah Chen",
+                    "text": "Thank you for your cooperation, Mrs. Henderson. We'll be in touch if we have more questions.",
+                    "choices": []
+                  },
+                  "target": "beat_continue"
+                }
+              ]
+            }
+          },
+          {
+            "id": "c1_2",
+            "text": "I understand, Mrs. Henderson. Thank you for your statement.",
+            "target": "beat_continue"
+          }
+        ]
+      }
+    },
+    {
+      "id": "c2",
+      "text": "I'll take a look around the estate and see if I find anything.",
+      "target": "exit_target_id",
+      "exitReason": "Detective decides to move on to next witness"
+    }
+  ]
+}
+```</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>dialogTree / dt-personalization</strong> — Check if the model personalizes dialog with player context</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>Generate a dialog tree for the following scenario:
+
+SCENARIO: Player visits a fortune teller in a carnival tent.
+
+NPC: Madame Zelda
+PERSONALITY: Mysterious, dramatic, uses player's personal details in predictions
+
+PLAYER CONTEXT:
+Player name: Mirjam. Lives in Stockholm. Profession: Marine biologist. Has visited the old lighthouse.
+
+EXIT CONDITIONS:
+- "beat_prediction": The fortune teller gives a prediction
+- "beat_leave": Player leaves
+
+REQUIREMENTS:
+1. Generate a dialog tree with 2 turns
+2. PERSONALIZATION IS CRITICAL: Use Mirjam's name, Stockholm, marine biology, and the lighthouse visit directly in the NPC's text
+3. Never use placeholder syntax like {playerName}
+
+Return a JSON object with this structure:
+{
+  "routingPlan": "Brief explanation of exit routing",
+  "id": "root",
+  "speaker": "NPC Name",
+  "text": "NPC's complete speech including any questions",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "What the PLAYER says in response",
+      "dialogNode": { "id": "n1", "speaker": "NPC Name", "text": "NPC response", "choices": [...] }
+    },
+    {
+      "id": "c2",
+      "text": "Alternative PLAYER response",
+      "target": "exit_target_id",
+      "exitReason": "Why this choice exits"
+    }
+  ]
+}</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 11.6s</div><pre>```json
+{
+  "routingPlan": "The dialog flows to a prediction followed by the player's decision to leave.",
+  "id": "root",
+  "speaker": "Madame Zelda",
+  "text": "Welcome, Mirjam of Stockholm. The sea calls to you, doesn't it? I sense a deep connection to the cold currents, and a lingering memory of the old lighthouse – a place where the past whispers secrets to those who listen. I see… a storm brewing, not just in the weather, but within your very soul. You research the depths, seeking answers in the marine world, yet a darkness from your past threatens to pull you under. Tell me, Mirjam, what brings a sensitive soul like yours to my humble tent?",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "I'm just curious about my future.",
+      "dialogNode": {
+        "id": "n1",
+        "speaker": "Madame Zelda",
+        "text": "Curiosity is a dangerous thing, child. But perhaps it is a necessary first step. I see you grappling with a choice, a crossroads mirroring the turbulent waters you study. The key lies in confronting the shadows you've tried to ignore. Do you seek clarity, or refuse to see it?",
+        "choices": [
+          {
+            "id": "c1_1",
+            "text": "I seek clarity.",
+            "target": "beat_prediction"
+          },
+          {
+            "id": "c1_2",
+            "text": "I refuse to see it.",
+            "target": "beat_leave"
+          }
+        ]
+      }
+    },
+    {
+      "id": "c2",
+      "text": "What do you mean by 'shadows'?",
+      "target": "beat_prediction"
+    }
+  ]
+}
+```</pre></td><td class="response"><div class="score">❌ 44% · 37.2s</div><pre>```json
+{
+  "routingPlan": "Visit Madame Zelda for a fortune teller's prediction about Mirjam's future.",
+  "id": "root",
+  "speaker": "Madame Zelda",
+  "text": "Welcome, Mirjam. I see that you are curious to know your destiny. May I have the pleasure of knowing your name and city? My predictions will be tailored specifically for you."
+},
+{
+  "id": "c1",
+  "text": "Stockholm is a great place to visit for someone interested in marine biology.",
+  "dialogNode": {
+    "id": "n1",
+    "speaker": "Madame Zelda",
+    "text": "I see that you have visited the old lighthouse. This indicates that you are drawn to the mysteries of the sea and its secrets. Your work as a marine biologist is most intriguing."
+  },
+  "choices": [
+    {
+      "id": "c2",
+      "text": "How does this affect my future?",
+      "target": "beat_prediction",
+      "exitReason": "This choice allows for the fortune teller to give Mirjam a prediction based on her marine biology career"
+    },
+    {
+      "id": "c3",
+      "text": "What else can you tell me about my past?",
+      "target": "beat_leave",
+      "exitReason": "This choice allows Mirjam to leave the fortune telling without receiving a prediction."
+    }
+  ]
+},
+{
+  "id": "c2",
+  "text": "As a marine biologist, your work with aquatic life is fascinating. Your future may hold great discoveries and contributions to our understanding of the ocean's ecosystem.",
+  "target": "beat_prediction",
+  "exitReason": "This choice provides Mirjam with a prediction based on her profession as a marine biologist"
+},
+{
+  "id": "c3",
+  "text": "I see that you have been drawn to the lighthouse. This could be a great place for you to seek inspiration and guidance in your career.",
+  "dialogNode": {
+    "id": "n1",
+    "speaker": "Madame Zelda",
+    "text": "The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges."
+  },
+  "choices": [
+    {
+      "id": "c2",
+      "text": "And what about my romantic life?",
+      "target": "beat_prediction",
+      "exitReason": "This choice allows Mirjam to ask about her personal life and receive a prediction based on Madame Zelda's mystical insight"
+    },
+    {
+      "id": "c3",
+      "text": "What else can you tell me about my career and relationships?",
+      "target": "beat_leave",
+      "exitReason": "This choice allows Mirjam to leave the fortune telling without receiving a prediction."
+    }
+  ]
+},
+{
+  "id": "c2",
+  "text": "As for your romantic life, I see that you have a great potential for love and connection. Your heart is open to new experiences, and you may find yourself drawn to someone who shares your passion for the sea.",
+  "target": "beat_prediction",
+  "exitReason": "This choice provides Mirjam with a prediction about her romantic life based on Madame Zelda's mystical insight"
+},
+{
+  "id": "c3",
+  "text": "I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.",
+  "dialogNode": {
+    "id": "n1",
+    "speaker": "Madame Zelda",
+    "text": "The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges."
+  },
+  "choices": [
+    {
+      "id": "c2",
+      "text": "And what about my future business?",
+      "target": "beat_prediction",
+      "exitReason": "This choice allows Mirjam to ask about her career and receive a prediction based on Madame Zelda's mystical insight"
+    },
+    {
+      "id": "c3",
+      "text": "What else can you tell me about my financial life?",
+      "target": "beat_leave",
+      "exitReason": "This choice allows Mirjam to leave the fortune telling without receiving a prediction."
+    }
+  ]
+},
+{
+  "id": "c2",
+  "text": "As for your future business, I see that you have great potential for success. Your passion and determination will lead you to achieve great things in this field.",
+  "target": "beat_prediction",
+  "exitReason": "This choice provides Mirjam with a prediction about her career based on Madame Zelda's mystical insight"
+},
+{
+  "id": "c3",
+  "text": "I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.",
+  "dialogNode": {
+    "id": "n1",
+    "speaker": "Madame Zelda",
+    "text": "The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges."
+  },
+  "choices": [
+    {
+      "id": "c2",
+      "text": "And what about my health?",
+      "target": "beat_prediction",
+      "exitReason": "This choice allows Mirjam to ask about her physical well-being and receive a prediction based on Madame Zelda's mystical insight"
+    },
+    {
+      "id": "c3",
+      "text": "What else can you tell me about my personal life?",
+      "target": "beat_leave",
+      "exitReason": "This choice allows Mirjam to leave the fortune telling without receiving a prediction."
+    }
+  ]
+},
+{
+  "id": "c2",
+  "text": "As for your health, I see that you have great potential for good. Your body is strong and resilient, and you may be able to overcome any challenges that come your way.",
+  "target": "beat_prediction",
+  "exitReason": "This choice provides Mirjam with a prediction about her physical well-being based on Madame Zelda's mystical insight"
+},
+{
+  "id": "c3",
+  "text": "I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.",
+  "dialogNode": {
+    "id": "n1",
+    "speaker": "Madame Zelda",
+    "text": "The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges."
+  },
+  "choices": [
+    {
+      "id": "c2",
+      "text": "And what about my romantic heart?",
+      "target": "beat_prediction",
+      "exitReason": "This choice allows Mirjam to ask about her emotional well-being and receive a prediction based on Madame Zelda's mystical insight"
+    },
+    {
+      "id": "c3",
+      "text": "What else can you tell me about my personal life?",
+      "target": "beat_leave",
+      "exitReason": "This choice allows Mirjam to leave the fortune telling without receiving a prediction."
+    }
+  ]
+},
+{
+  "id": "c2",
+  "text": "As for your romantic heart, I see that you have great potential for love and connection. Your heart is open to new experiences, and you may find yourself drawn to someone who shares your passion for the sea.",
+  "target": "beat_prediction",
+  "exitReason": "This choice provides Mirjam with a prediction about her emotional well-being based on Madame Zelda's mystical insight"
+},
+{
+  "id": "c3",
+  "text": "I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in your career.",
+  "dialogNode": {
+    "id": "n1",
+    "speaker": "Madame Zelda",
+    "text": "The lighthouse is indeed a symbol of strength, resilience, and guidance. May its light guide you through life's challenges."
+  },
+  "choices": [
+    {
+      "id": "c2",
+      "text": "And what about my financial heart?",
+      "target": "beat_prediction",
+      "exitReason": "This choice allows Mirjam to ask about her career and receive a prediction based on Madame Zelda's mystical insight"
+    },
+    {
+      "id": "c3",
+      "text": "What else can you tell me about my future?",
+      "target": "beat_leave",
+      "exitReason": "This choice allows Mirjam to leave the fortune telling without receiving a prediction."
+    }
+  ]
+},
+{
+  "id": "c2",
+  "text": "As for your financial heart, I see that you have great potential for success. Your passion and determination will lead you to achieve great things in this field.",
+  "target": "beat_prediction",
+  "exitReason": "This choice provides Mirjam with a prediction about her career based on Madame Zelda's mystical insight"
+},
+{
+  "id": "c3",
+  "text": "I see that you have been drawn to lighthouse as a place of guidance. This could be a great place for you to seek inspiration and guidance in</pre></td><td class="response"><div class="score">❌ 22% · 26.9s</div><pre>Here is the dialog tree in JSON format for the given scenario:
+
+```json
+{
+  "routingPlan": "The player will either accept a prediction or leave the fortune teller's tent.",
+  "id": "root",
+  "speaker": "Madame Zelda",
+  "text": "Welcome, Mirjam the marine biologist from Stockholm. I sense you have been drawn to the sea's mysteries, just as a curious dolphin is drawn to a lighthouse. The light you seek may be found deep within the ocean's heart, but first, you must face a storm.",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "What does the storm mean?",
+      "dialogNode": {
+        "id": "n1",
+        "speaker": "Madame Zelda",
+        "text": "The storm, Mirjam, symbolizes a challenging journey that lies ahead. But fear not, for every storm passes and leads to calmer waters. Be prepared to embrace the challenges and emerge stronger.",
+        "choices": [
+          {
+            "id": "c1_1",
+            "text": "Thank you, Madame Zelda. I'll keep this in mind.",
+            "dialogNode": { "id": "n2", "speaker": "Madame Zelda", "text": "You are most welcome, dear Mirjam. May the sea be kind to you on your journey.", "choices": [{"id": "c1_1_1", "text": "beat_prediction", "dialogNode": { "id": "n3", "speaker": "Madame Zelda", "text": "Do come back and share the treasures of your discoveries. Farewell!" }] },
+            {
+              "id": "c1_2",
+              "text": "I'd like to leave now.",
+              "target": "beat_leave",
+              "exitReason": "Player decides to leave without accepting the prediction"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "I'd like to leave now.",
+      "target": "beat_leave",
+      "exitReason": "Player decides to leave without asking about the storm"
+    }
+  ]
+}
+```
+This dialog tree covers the given requirements:
+1. It has two turns as specified.
+2. Personalization is used throughout the text, directly referencing Mirjam's name, Stockholm, marine biology, and the lighthouse visit.
+3. Never uses placeholder syntax like {playerName}.</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>conversation / conv-opening</strong> — Generate an NPC opening line for a conversation</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>Generate the NPC's opening line to start the conversation. The player just entered the professor's office.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 2.5s</div><pre>“Ah, Mr. Davies! Do come in, do come in. Please, don’t mind the… well, let’s just say the dust of ages has settled rather thickly in here recently. I was just contemplating the stratigraphic layers of the Tell el-Amarna tablets, actually. A fascinating, if somewhat frustrating, endeavor. Now, what brings you to my humble office today?”</pre></td><td class="response"><div class="score">✅ 100% · 0.6s</div><pre>Welcome, young scholar, to my humble abode of knowledge. I'm Professor Aldric, delighted to share with you the wonders of our ancient world.</pre></td><td class="response"><div class="score">✅ 100% · 3.0s</div><pre>Ah, good day to you! I see you've taken an interest in our university's collection of ancient artifacts. Sit down, take a seat, and let us delve into the mysteries of yesteryears together, Mr./Ms. [Player's Name].</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>conversation / conv-response</strong> — Generate an NPC response to player input</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>Generate the NPC response.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 1.9s</div><pre>Report it. Every scratch and dent on this ship is a potential weakness waiting to be exploited. I want to see it documented, and I want to know who’s responsible for assessing the damage. Don't think you can just ignore it and hope it goes away.</pre></td><td class="response"><div class="score">✅ 100% · 0.6s</div><pre>Report the damage immediately, but not in the heat of battle. We can't afford delays when our cargo's at stake.</pre></td><td class="response"><div class="score">❌ 33% · 1.9s</div><pre>Report it, Mr. {Player Name}. Damage can fester and worsen. Better dealt with swiftly.</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>conversation / conv-language</strong> — Generate response in the same language as scenario (German)</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>Generate the NPC's opening line. The player just entered the bakery.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 1.3s</div><pre>"Ach, guten Tag, Herr Müller! Was darf es denn sein für Sie heute? Ein frisches Brötchen vielleicht, oder hätten Sie Lust auf ein Laib Bauernbrot?"</pre></td><td class="response"><div class="score">✅ 100% · 1.1s</div><pre>"Willkommen, Herr/Frau [player's name/pronoun], hier ist die Bäckerei! Wir bieten alles für uns zu empfehlen - einzigartige Produkte und gute Service!"</pre></td><td class="response"><div class="score">✅ 100% · 2.8s</div><pre>Guten Tag, Herr [Player's Name]! Willkommen in meiner Bäckerei! Verpflegst du dich heute schon? Ich habe gerade frisches Brot aus der Ofen entfernt.</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>textGen / text-concise</strong> — Generate concise contextual text (1-2 sentences)</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>Generate 1-2 sentences of atmospheric narrative.
+
+CONTEXT: The player (named Alex) enters a dark cave after escaping from bandits. They have a torch and a rusty sword.
+
+INSTRUCTION: Describe the cave entrance. Keep it to 1-2 sentences maximum.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 1.8s</div><pre>The torch sputtered, casting a sickly yellow glow upon the maw of the cave – a jagged tear in the hillside choked with the scent of damp earth and something older, something unsettling. Rain dripped constantly from the unseen ceiling, echoing in the oppressive silence as your rusty sword felt heavy in your hand.</pre></td><td class="response"><div class="score">✅ 100% · 0.9s</div><pre>The opening of the cave was shrouded in an eerie silence, as if the very earth itself was hesitant to breathe. A faint flicker from Alex's torch danced across damp stone walls, casting eerie shadows that seemed to writhe with every movement.</pre></td><td class="response"><div class="score">✅ 100% · 2.5s</div><pre>At the cave's yawning maw, shadows dance and flicker as Alex's torchlight meets the stone's weathered embrace, casting eerie silhouettes that whisper tales of forgotten secrets within.</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>textGen / text-personalized</strong> — Generate personalized narrative using player variables</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>Generate 1-2 sentences.
+
+PLAYER STATE:
+- Name: Yuki
+- Location: Tokyo
+- Profession: Chef
+- Has item: Golden whisk
+
+INSTRUCTION: The player arrives at a cooking competition. Reference their name and the golden whisk.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 1.5s</div><pre>The air crackles with anticipation as you, Yuki, step into the bustling arena of the Tokyo Culinary Challenge. Clutching your trusty golden whisk, you know this competition is about to test your skills – and perhaps reveal a few hidden talents.</pre></td><td class="response"><div class="score">✅ 100% · 1.4s</div><pre>Yuki stepped into the bustling kitchen, where the aroma of sizzling yakitori filled the air. As he took his place next to the other competitors, Yuki noticed that one chef, known for his exquisite ramen dishes, held a gleaming golden whisk in his hand, which seemed almost out of place among the typical cooking utensils on display.</pre></td><td class="response"><div class="score">✅ 100% · 2.8s</div><pre>As Yuki steps onto the bustling stage of the culinary competition, the crowd hushes in anticipation. With a confident stride, they adjust their apron, glancing down at the prized golden whisk hanging from their belt, ready to showcase their skills as Tokyo's finest chef.</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>classification / classify-personality</strong> — Classify player personality based on choice history</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>PLAYER CHOICES:
+- Helped the old woman carry groceries
+- Gave gold to the beggar
+- Refused to fight the dragon, tried to negotiate
+- Shared food with the prisoner
+
+CATEGORIES:
+- "aggressive": Player makes combative, hostile choices
+- "diplomatic": Player prefers peaceful solutions and helping others
+- "cautious": Player avoids risk, self-preserving choices
+
+Respond with ONLY one category name.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 0.5s</div><pre>diplomatic</pre></td><td class="response"><div class="score">✅ 100% · 0.2s</div><pre>aggressive</pre></td><td class="response"><div class="score">✅ 100% · 0.7s</div><pre>diplomatic</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>classification / classify-state</strong> — Classify game state for branching</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>PLAYER STATE:
+- Clues found: 4 out of 5
+- Has key evidence: murder weapon, witness testimony
+- Visited: crime scene, suspect's house, police station
+- Missing: motive evidence
+
+CATEGORIES:
+- "ready_to_solve": Player has enough evidence (3+ clues including key evidence)
+- "needs_more_clues": Player is missing critical evidence
+- "wrong_track": Player has mostly wrong leads
+
+Respond with ONLY one category name.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 0.5s</div><pre>needs_more_clues</pre></td><td class="response"><div class="score">✅ 100% · 0.2s</div><pre>"ready_to_solve"</pre></td><td class="response"><div class="score">✅ 100% · 0.7s</div><pre>ready_to_solve</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>extraction / extract-simple</strong> — Extract variables from conversation</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>CONVERSATION:
+  NPC: Welcome to the tavern! What's your name, traveler?
+  Player: I'm Marcus, from the Northern Isles.
+  NPC: Marcus! A long way from home. What brings you here?
+  Player: I'm looking for a blacksmith who can forge a dragon-scale shield.
+
+EXTRACT:
+  0. Variable "player_name": The player's name
+  1. Variable "origin": Where the player is from
+  2. Variable "quest_item": What item the player is seeking
+
+Return a JSON object mapping variable names to extracted values.
+Example: {"player_name": "value", "origin": "value", "quest_item": "value"}</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 1.5s</div><pre>```json
+{
+  "player_name": "Marcus",
+  "origin": "Northern Isles",
+  "quest_item": "dragon-scale shield"
+}
+```</pre></td><td class="response"><div class="score">✅ 100% · 0.5s</div><pre>{"player_name": "Marcus", "origin": "Northern Isles", "quest_item": "dragon-scale shield"}</pre></td><td class="response"><div class="score">✅ 100% · 2.6s</div><pre>{
+  "player_name": "Marcus",
+  "origin": "Northern Isles",
+  "quest_item": "dragon-scale shield"
+}</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>exitMessage / exit-farewell</strong> — Generate contextual NPC farewell acknowledging player choice</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>SCENARIO: The player is a crew member on a merchant vessel.
+
+The NPC just said: "We need someone to scout the island. It could be dangerous, but the reward is worth it."
+The player responded: "I'll volunteer for the scouting mission."
+
+Generate a brief farewell/response that DIRECTLY acknowledges what the player just said. Instruction: Thank them for volunteering and wish them luck.
+Keep it to 1-2 sentences. Respond with ONLY the dialog text.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 1.0s</div><pre>“Alright then, lad. Thank you for volunteering; I appreciate the spirit. See that you return safely, and may fortune favor your eyes.”</pre></td><td class="response"><div class="score">✅ 100% · 0.5s</div><pre>"Thank you, crew member. You can count on me to ensure your safety while scouting the island."</pre></td><td class="response"><div class="score">✅ 100% · 1.5s</div><pre>"Thank you for stepping up, crew member. Good luck on your mission. May fortune be on your side."</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>exitMessage / exit-dismissal</strong> — Generate NPC dismissal message</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>SCENARIO: A player visits a potion shop but can't afford anything.
+
+The NPC just said: "Everything here costs at least 100 gold. No exceptions."
+The player responded: "I only have 10 gold..."
+
+Generate a brief farewell/response that DIRECTLY acknowledges what the player just said. Instruction: Dismiss them rudely.
+Keep it to 1-2 sentences. Respond with ONLY the dialog text.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 0.9s</div><pre>"Ten gold, is it? Don't waste my time with such paltry sums, boy. Now get out!"</pre></td><td class="response"><div class="score">✅ 100% · 0.5s</div><pre>You're not getting anything here, so let's go somewhere else where you can afford to splurge.</pre></td><td class="response"><div class="score">✅ 100% · 1.4s</div><pre>"Scram! I don't serve paupers who can barely afford their own breath."</pre></td></tr>
+<tr class="scenario-header"><td colspan="4"><strong>classification / direction-eval</strong> — Evaluate which conversation directions are triggered</td></tr>
+<tr class="prompt-row"><td colspan="4"><details><summary>Prompt</summary><pre>PLAYER INPUT: "I'm really worried about the pollution in my neighborhood. The factory smoke is getting worse."
+
+CONVERSATION HISTORY:
+  NPC: Welcome! I'm here to discuss environmental issues in your area.
+  Player: Hi, I live near the industrial district.
+
+CURRENT TURN: 2
+
+DIRECTIONS TO EVALUATE:
+  0: Player mentions pollution, air quality, or environmental health concerns
+  1: Player asks about economic impacts or job market
+  2: Player wants to end the conversation or says goodbye
+  3: Player mentions water quality or drinking water
+
+Return a JSON array of triggered direction indices.</pre></details></td></tr>
+<tr><td class="label">Response</td><td class="response"><div class="score">✅ 100% · 0.7s</div><pre>```json
+[0]
+```</pre></td><td class="response"><div class="score">⚠️ 60% · 0.3s</div><pre>[{"direction": 0}]</pre></td><td class="response"><div class="score">⚠️ 60% · 1.0s</div><pre>["0"]</pre></td></tr>
+
+</table></body></html>
