@@ -2806,14 +2806,27 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       elements = schemaElements;
     }
 
-    // VideoBeat: set the video asset ID and type on the video element
-    if (beat.type === 'videoBeat' && params.videoAssetId) {
-      const videoEl = elements.find((e: VisualElement) =>
-        e.name === 'video' || e.name === 'Video' || e.type === 'prop'
+    // VideoBeat: keep only the video element, remove stale elements (e.g. old "Controls" text)
+    if (beat.type === 'videoBeat') {
+      const stale = elements.filter((e: VisualElement) =>
+        e.type !== 'prop' && e.name !== 'video' && e.name !== 'Video'
       );
-      if (videoEl) {
-        videoEl.assetId = params.videoAssetId;
-        (videoEl as any).assetType = 'video';
+      // Clean stale locations from beat
+      for (const el of stale) {
+        const key = el.name || el.id;
+        if (beat.locations.has(key)) beat.locations.delete(key);
+      }
+      elements = elements.filter((e: VisualElement) =>
+        e.type === 'prop' || e.name === 'video' || e.name === 'Video'
+      );
+      if (params.videoAssetId) {
+        const videoEl = elements.find((e: VisualElement) =>
+          e.name === 'video' || e.name === 'Video' || e.type === 'prop'
+        );
+        if (videoEl) {
+          videoEl.assetId = params.videoAssetId;
+          (videoEl as any).assetType = 'video';
+        }
       }
     }
 
