@@ -14,6 +14,7 @@ export interface Location {
   height: number;
   zIndex?: number;
   assetId?: string;  // Asset reference for character/prop elements
+  assetType?: 'image' | 'audio' | 'video' | 'font';  // Asset type for rendering (video renders as <video> instead of <img>)
   imageUrl?: string;  // Direct image URL (for base64 data or when assetId is not available)
   sound?: string;    // Sound to play when element is interacted with
   // Transform properties for visual elements
@@ -221,7 +222,7 @@ export interface IRenderer {
   renderChoices(choices: { id: string; text: string }[], locations?: Location[]): Promise<string>;
   renderMovement(question: string, choices: { id: string; text: string; displayText?: string; location: string; locationName?: string }[], locations?: Location[]): Promise<string>;
   renderPropSelection(question: string, props: { id: string; name: string; displayName?: string; description: string; locationName?: string }[], locations?: Location[]): Promise<string>;
-  renderVideo(videoFile: string, autoplay: boolean, controls: boolean): Promise<void>;
+  renderVideo(videoFile: string, autoplay: boolean, controls: boolean, locations?: Location[], skipButton?: boolean): Promise<void>;
   renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<string>;
   renderAISummary?(data: {
     title: string;

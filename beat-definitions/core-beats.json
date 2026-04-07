@@ -475,29 +475,40 @@
       "icon": "🎥",
       "description": "Video playback with optional controls",
       "connectionType": "single",
+      "locations": ["video"],
       "parameters": {
         "videoFile": {
           "type": "string",
-          "required": true,
-          "description": "Path to video file"
+          "required": false,
+          "description": "Direct URL/path to video file (legacy — prefer videoAssetId)",
+          "ui": { "hidden": true }
+        },
+        "videoAssetId": {
+          "type": "string",
+          "required": false,
+          "description": "Asset ID referencing the video file",
+          "ui": { "hidden": true }
         },
         "autoplay": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Start playing automatically"
+          "description": "Start playing automatically",
+          "ui": { "hidden": true }
         },
         "controls": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Show video controls"
+          "description": "Show video controls",
+          "ui": { "hidden": true }
         },
         "skipButton": {
           "type": "boolean",
-          "required": false, 
+          "required": false,
           "default": true,
-          "description": "Allow skipping video"
+          "description": "Allow skipping video",
+          "ui": { "hidden": true }
         },
         "speaker": {
           "type": "string",

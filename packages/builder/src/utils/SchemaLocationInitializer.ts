@@ -39,7 +39,7 @@ export interface VisualElement {
 
 interface LocationDefinition {
   name: string;
-  type: 'text' | 'dialog' | 'button' | 'hotspot';
+  type: 'text' | 'dialog' | 'button' | 'hotspot' | 'prop';
   defaultText?: string;
   defaultX?: number;
   defaultY?: number;
@@ -91,8 +91,7 @@ const LOCATION_TYPE_MAP: Record<string, Partial<LocationDefinition>> = {
   'props': { type: 'button', defaultWidth: 180, defaultHeight: 50, fontSize: 16 },
 
   // Video/media
-  'video': { type: 'hotspot', defaultWidth: 800, defaultHeight: 600 },
-  'controls': { type: 'hotspot', defaultWidth: 800, defaultHeight: 50 },
+  'video': { type: 'prop', defaultWidth: 800, defaultHeight: 450 },
 
   // Keypad
   'keypadGrid': { type: 'keypad' as any, defaultWidth: 240, defaultHeight: 360 },

@@ -597,6 +597,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         const asset = assets.find(a => a.id === el.location.assetId);
         if (asset) {
           el.assetUrl = asset.url;
+          // Propagate asset type so renderer knows how to display (video vs image)
+          if (asset.type) el.location.assetType = asset.type as any;
         }
       }
       // Try by prop name if assetId didn't work
@@ -608,6 +610,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         );
         if (asset) {
           el.assetUrl = asset.url;
+          if (asset.type) el.location.assetType = asset.type as any;
         }
       }
     }

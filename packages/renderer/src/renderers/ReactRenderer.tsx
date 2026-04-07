@@ -2369,27 +2369,62 @@ export class ReactRenderer extends BaseRenderer {
     return this.renderPositionedBeat('pickProp', content, effectiveLocations, true);
   }
 
-  async renderVideo(videoFile: string, autoplay: boolean, controls: boolean): Promise<void> {
+  async renderVideo(videoFile: string, autoplay: boolean, controls: boolean, locations?: Location[], skipButton?: boolean): Promise<void> {
+    const backgroundAssetId = this.getState('backgroundAssetId');
+    this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+
+    // Resolve video URL: try asset resolver for fresh URL (blob URLs expire), fall back to provided URL
+    const videoAssetId = this.getState('videoAssetId') as string | null;
+    let resolvedVideoUrl = videoFile;
+    if (videoAssetId) {
+      const freshUrl = this.resolveAssetUrl(videoAssetId);
+      if (freshUrl) resolvedVideoUrl = freshUrl;
+    }
+    console.log(`[ReactRenderer] renderVideo: resolved="${resolvedVideoUrl?.substring(0, 80)}", autoplay=${autoplay}, controls=${controls}, skipButton=${skipButton}`);
+
+    // Find video element position from locations
+    const videoLoc = locations?.find(l => l.name === 'video' || l.name === 'Video' || l.kind === 'prop');
+
     return new Promise(resolve => {
-      const VideoDisplay: React.FC = () => (
-        <div className="flex items-center justify-center h-screen bg-black">
-          <video 
-            src={videoFile}
-            autoPlay={autoplay}
-            controls={controls}
-            className="max-w-full max-h-full"
-            onEnded={() => resolve()}
-          />
-          {!controls && (
-            <button 
-              onClick={() => resolve()}
-              className="absolute bottom-8 right-8 px-6 py-3 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-lg font-semibold transition-all"
-            >
-              Skip
-            </button>
-          )}
-        </div>
-      );
+      const VideoDisplay: React.FC = () => {
+        const videoStyle: React.CSSProperties = videoLoc ? {
+          position: 'absolute',
+          left: `${videoLoc.x}px`,
+          top: `${videoLoc.y}px`,
+          width: `${videoLoc.width}px`,
+          height: `${videoLoc.height}px`,
+        } : {
+          maxWidth: '100%',
+          maxHeight: '100%',
+        };
+
+        return (
+          <div className={`relative ${videoLoc ? '' : 'flex items-center justify-center'} h-full w-full`}
+            style={this.backgroundImageUrl ? {
+              backgroundImage: `url(${this.backgroundImageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            } : { backgroundColor: 'black' }}
+          >
+            <video
+              src={resolvedVideoUrl}
+              autoPlay={autoplay}
+              controls={controls}
+              style={videoStyle}
+              className={videoLoc ? 'object-contain' : ''}
+              onEnded={() => resolve()}
+            />
+            {skipButton && (
+              <button
+                onClick={() => resolve()}
+                className="absolute bottom-8 right-8 px-6 py-3 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-lg font-semibold transition-all z-10"
+              >
+                Skip
+              </button>
+            )}
+          </div>
+        );
+      };
       this.renderComponent(<VideoDisplay />);
     });
   }

@@ -2547,6 +2547,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           style={baseStyle}
           assetUrl={assetUrl}
           assetId={location.assetId}
+          assetType={location.assetType}
+          editorMode={editorMode}
           name={location.name}
           kind={location.kind}
           size={location.size}
@@ -4145,6 +4147,8 @@ const AssetElement: React.FC<{
   style: React.CSSProperties;
   assetUrl?: string;
   assetId?: string;
+  assetType?: 'image' | 'audio' | 'video' | 'font';  // Asset type for rendering
+  editorMode?: boolean;  // True when in Visual Editor (show first frame, no autoplay)
   name: string;
   kind: string;
   size?: number;  // Character-specific: scale percentage (e.g., 90 = 90% scale)
@@ -4156,7 +4160,7 @@ const AssetElement: React.FC<{
   spriteSheet?: SpriteSheetData;  // Sprite sheet configuration for character sprites
   description?: string;  // Tooltip text shown on hover (e.g., pickProp item description)
   theme?: RenderThemeSettings;  // Theme for tooltip styling
-}> = ({ style, assetUrl, assetId, name, kind, size, interactive, actionId, onAction, sound, soundBlobResolver, spriteSheet, description, theme }) => {
+}> = ({ style, assetUrl, assetId, assetType, editorMode, name, kind, size, interactive, actionId, onAction, sound, soundBlobResolver, spriteSheet, description, theme }) => {
   const [isHovered, setIsHovered] = React.useState(false);
   const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
   const showTooltip = interactive && description && description.length > 0 && isHovered;
@@ -4318,6 +4322,31 @@ const AssetElement: React.FC<{
             }
           }}
         />
+      );
+    }
+
+    // Video rendering — detect by asset type or URL extension
+    const isVideo = assetType === 'video' || /\.(mp4|webm|mov|ogv)(\?|$)/i.test(assetUrl);
+    if (isVideo) {
+      return (
+        <>
+          <video
+            src={assetUrl}
+            style={{
+              ...finalStyle,
+              objectFit: 'contain',
+              cursor: isClickable ? 'pointer' : 'default',
+            }}
+            muted={editorMode}
+            autoPlay={!editorMode}
+            loop={editorMode}
+            playsInline
+            preload="metadata"
+            draggable={false}
+            onClick={handleClick}
+          />
+          {tooltipPortal}
+        </>
       );
     }
 

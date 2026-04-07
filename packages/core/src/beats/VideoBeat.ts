@@ -7,6 +7,7 @@ import type { VideoBeatParameters } from '../generated/beat-types';
 
 export class VideoBeat extends Beat {
   public videoFile: string;
+  public videoAssetId?: string;
   public autoplay: boolean;
   public controls: boolean;
   public skipButton: boolean;
@@ -16,6 +17,7 @@ export class VideoBeat extends Beat {
   } & Partial<VideoBeatParameters>) {
     super(config);
     this.videoFile = config.videoFile || config.parameters?.videoFile || '';
+    this.videoAssetId = config.videoAssetId || config.parameters?.videoAssetId;
     this.autoplay = config.autoplay ?? config.parameters?.autoplay ?? true;
     this.controls = config.controls ?? config.parameters?.controls ?? true;
     this.skipButton = config.skipButton ?? config.parameters?.skipButton ?? true;
@@ -24,6 +26,7 @@ export class VideoBeat extends Beat {
   getParameters(): Record<string, any> {
     return {
       videoFile: this.videoFile,
+      videoAssetId: this.videoAssetId,
       autoplay: this.autoplay,
       controls: this.controls,
       skipButton: this.skipButton
@@ -32,6 +35,7 @@ export class VideoBeat extends Beat {
 
   updateParameters(params: Record<string, any>): void {
     if (params.videoFile !== undefined) this.videoFile = params.videoFile;
+    if (params.videoAssetId !== undefined) this.videoAssetId = params.videoAssetId;
     if (params.autoplay !== undefined) this.autoplay = params.autoplay;
     if (params.controls !== undefined) this.controls = params.controls;
     if (params.skipButton !== undefined) this.skipButton = params.skipButton;
@@ -42,58 +46,27 @@ export class VideoBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
-    // Background is now handled centrally in Beat.execute()
+    // Set videoAssetId on renderer state so renderer can resolve a fresh URL
+    // (blob URLs from the builder expire across window boundaries)
+    if (this.videoAssetId) {
+      renderer.setState('videoAssetId', this.videoAssetId);
+    }
 
-    if (!this.videoFile) {
+    // Use stored videoFile as fallback (may be a blob URL that's still valid)
+    const videoUrl = this.videoFile || this.node || '';
+
+    if (!videoUrl) {
       console.error(`VideoBeat ${this.id} has no video file specified`);
       return this.getNextBeat(context);
     }
 
     try {
-      // Create video element and configure
-      const video = document.createElement('video');
-      video.src = this.videoFile;
-      video.autoplay = this.autoplay;
-      video.controls = this.controls;
-      video.style.width = '100%';
-      video.style.height = 'auto';
-      
-      // Clear renderer and add video
-      renderer.clear();
-      const container = document.getElementById('story-container');
-      if (container) {
-        container.appendChild(video);
-        
-        // Add skip button if enabled
-        if (this.skipButton) {
-          const skipBtn = document.createElement('button');
-          skipBtn.textContent = 'Skip';
-          skipBtn.className = 'skip-video-btn';
-          skipBtn.onclick = () => {
-            video.remove();
-            skipBtn.remove();
-          };
-          container.appendChild(skipBtn);
-        }
-      }
-
-      // Wait for video to end or be skipped
-      return new Promise((resolve) => {
-        video.onended = () => {
-          video.remove();
-          resolve(this.getNextBeat(context));
-        };
-        
-        video.onerror = () => {
-          console.error(`Failed to load video: ${this.videoFile}`);
-          video.remove();
-          resolve(this.getNextBeat(context));
-        };
-      });
-      
+      const locations = Array.from(this.locations.values());
+      await renderer.renderVideo(videoUrl, this.autoplay, this.controls, locations, this.skipButton);
     } catch (error) {
       console.error(`Error playing video in beat ${this.id}:`, error);
-      return this.getNextBeat(context);
     }
+
+    return this.getNextBeat(context);
   }
 }

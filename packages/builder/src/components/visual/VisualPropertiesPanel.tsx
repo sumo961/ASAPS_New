@@ -81,6 +81,11 @@ interface VisualPropertiesPanelProps {
   onPanoramaCameraChange?: (settings: { initialPitch?: number; initialYaw?: number; hfov?: number; minHfov?: number; maxHfov?: number; zoomSpeed?: number }) => void;
   onPromptDisplayChange?: (display: 'static' | 'pinned') => void;
   onProjectionTypeChange?: (type: 'equirectangular' | 'cylindrical') => void;
+  // VideoBeat props
+  videoAssetId?: string;
+  videoSettings?: { autoplay: boolean; controls: boolean; skipButton: boolean };
+  onSelectVideo?: () => void;
+  onVideoSettingsChange?: (settings: { autoplay?: boolean; controls?: boolean; skipButton?: boolean }) => void;
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -125,6 +130,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onPanoramaCameraChange,
   onPromptDisplayChange,
   onProjectionTypeChange,
+  videoAssetId,
+  videoSettings,
+  onSelectVideo,
+  onVideoSettingsChange,
 }) => {
   // Get available fonts (built-in + custom from assets)
   const { fonts } = useFonts(assets);
@@ -229,8 +238,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
-        {/* Background Section */}
-        <div className="border-b border-gray-200">
+        {/* Background Section (hidden for videoBeat — has its own Video section) */}
+        {beatType !== 'videoBeat' && <div className="border-b border-gray-200">
           <button
             onClick={() => toggleSection('background')}
             className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
@@ -486,7 +495,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
               )}
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Transition Section - Beat-level setting */}
         {onBeatTransitionChange && (
@@ -642,6 +651,94 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                     <p className="text-xs text-gray-500 mt-1">
                       Adds a natural pause before NPC responds. Shows typing indicator during delay.
                     </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Video Section — only for videoBeat */}
+        {beatType === 'videoBeat' && onSelectVideo && (
+          <div className="border-b border-gray-200">
+            <button
+              onClick={() => toggleSection('background')}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+            >
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4" />
+                <span className="font-medium text-sm">Video</span>
+              </div>
+            </button>
+            {expandedSections.background && (
+              <div className="px-4 pb-4 space-y-3">
+                {/* Video asset selector */}
+                {(() => {
+                  const videoAsset = videoAssetId ? assets.find(a => a.id === videoAssetId) : null;
+                  return videoAsset ? (
+                    <div className="space-y-2">
+                      <div
+                        className="w-full py-4 rounded border border-gray-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-colors bg-gray-900 text-white text-sm"
+                        onClick={onSelectVideo}
+                      >
+                        🎬 {videoAsset.name}
+                      </div>
+                      <button
+                        onClick={onSelectVideo}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors"
+                      >
+                        Change Video
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={onSelectVideo}
+                      className="w-full py-8 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm"
+                    >
+                      Select Video File
+                    </button>
+                  );
+                })()}
+
+                {/* Video playback options */}
+                {videoSettings && onVideoSettingsChange && (
+                  <div className="space-y-2 pt-2 border-t border-gray-200">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={videoSettings.autoplay}
+                        onChange={(e) => onVideoSettingsChange({ autoplay: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Autoplay</span>
+                        <p className="text-xs text-gray-500">Start playing automatically</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={videoSettings.controls}
+                        onChange={(e) => onVideoSettingsChange({ controls: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Controls</span>
+                        <p className="text-xs text-gray-500">Show video controls</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={videoSettings.skipButton}
+                        onChange={(e) => onVideoSettingsChange({ skipButton: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Skip Button</span>
+                        <p className="text-xs text-gray-500">Allow skipping video</p>
+                      </div>
+                    </label>
                   </div>
                 )}
               </div>

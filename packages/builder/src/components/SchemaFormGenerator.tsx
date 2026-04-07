@@ -234,6 +234,11 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
       return null;
     }
 
+    // Skip fields marked as hidden in schema
+    if (paramDef.ui?.hidden) {
+      return null;
+    }
+
     // For scope: 'beat' fields, read from beatProperties and use onBeatPropertyChange
     const isBeatScope = paramDef.ui?.scope === 'beat';
     const value = isBeatScope ? beatProperties[paramName] : parameters[paramName];

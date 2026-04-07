@@ -1016,7 +1016,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Asset selection modal state
   const [assetModal, setAssetModal] = useState<{
     isOpen: boolean;
-    type: 'background' | 'character' | 'prop' | 'sound' | null;
+    type: 'background' | 'character' | 'prop' | 'sound' | 'video' | null;
     callback: ((asset: Asset) => void) | null;
   }>({ isOpen: false, type: null, callback: null });
 
@@ -1674,6 +1674,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
         // Add optional properties
         if (el.assetId) location.assetId = el.assetId;
+        if ((el as any).assetType) location.assetType = (el as any).assetType;
         if (el.imageUrl) location.imageUrl = el.imageUrl;  // Preserve direct image URL (ASML imports)
         if (el.sound) location.sound = el.sound;
         if (el.fontOverridden && el.font) location.font = el.font;
@@ -2805,6 +2806,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       elements = schemaElements;
     }
 
+    // VideoBeat: set the video asset ID and type on the video element
+    if (beat.type === 'videoBeat' && params.videoAssetId) {
+      const videoEl = elements.find((e: VisualElement) =>
+        e.name === 'video' || e.name === 'Video' || e.type === 'prop'
+      );
+      if (videoEl) {
+        videoEl.assetId = params.videoAssetId;
+        (videoEl as any).assetType = 'video';
+      }
+    }
+
     // Panorama hotspot sync: ensure each hotspot in beat.parameters.hotspots
     // has a matching VisualElement with the correct ID
     if (beat.type === 'panorama' && params.hotspots && params.hotspots.length > 0) {
@@ -3501,7 +3513,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
   // Handle asset selection
   const handleAssetSelection = useCallback((
-    type: 'background' | 'character' | 'prop' | 'sound',
+    type: 'background' | 'character' | 'prop' | 'sound' | 'video',
     callback: (asset: Asset) => void
   ) => {
     setAssetModal({
@@ -4497,6 +4509,28 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   }
                   setHasChanges(true);
                 } : undefined}
+                videoAssetId={beat?.type === 'videoBeat' ? beat.getParameters().videoAssetId : undefined}
+                videoSettings={beat?.type === 'videoBeat' ? {
+                  autoplay: beat.getParameters().autoplay ?? true,
+                  controls: beat.getParameters().controls ?? true,
+                  skipButton: beat.getParameters().skipButton ?? true,
+                } : undefined}
+                onSelectVideo={beat?.type === 'videoBeat' ? () => {
+                  handleAssetSelection('video', (asset) => {
+                    beat.updateParameters({ videoAssetId: asset.id, videoFile: asset.url });
+                    if (onBeatUpdate) {
+                      onBeatUpdate(beat.id, { parameters: beat.getParameters() } as any);
+                    }
+                    setHasChanges(true);
+                  });
+                } : undefined}
+                onVideoSettingsChange={beat?.type === 'videoBeat' ? (settings) => {
+                  beat.updateParameters(settings);
+                  if (onBeatUpdate) {
+                    onBeatUpdate(beat.id, { parameters: beat.getParameters() } as any);
+                  }
+                  setHasChanges(true);
+                } : undefined}
                 onProjectionTypeChange={isPanoramaBeat ? (type) => {
                   beat.updateParameters({ projectionType: type });
                   setHasChanges(true);
@@ -4636,7 +4670,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         onAssetAdd={onAssetAdd!}
         onAssetRemove={onAssetRemove!}
         onAssetUpdate={onAssetUpdate!}
-        assetType={assetModal.type === 'sound' ? 'audio' : 'image'}
+        assetType={assetModal.type === 'sound' ? 'audio' : assetModal.type === 'video' ? 'video' : 'image'}
         assetSubType={assetModal.type === 'sound' ? 'sfx' : assetModal.type ?? undefined}
         title={`Select ${assetModal.type || 'Asset'}`}
       />
