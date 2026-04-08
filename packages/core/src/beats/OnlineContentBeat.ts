@@ -443,7 +443,7 @@ Write a brief, engaging response that:
 - Does NOT start with "Based on my research..." or similar phrases
 - Does NOT use bullet points or lists - write in flowing prose
 - Does NOT include citations, URLs, or "According to..." attributions
-- Is approximately ${this.maxWords} words (${Math.round(this.maxWords * 0.8)}-${Math.round(this.maxWords * 1.2)} words acceptable)
+- Is MAXIMUM ${this.maxWords} words — do not exceed this limit
 
 IMPORTANT: Start your response with a short, descriptive title on its own line (no formatting prefix, no colon, no quotes), followed by an empty line, then the content. The title should summarize the topic.
 
@@ -536,6 +536,21 @@ The city's transportation network features...`,
     // Ensure content starts with a capital letter
     if (cleaned.length > 0) {
       cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+
+    // Enforce word limit: truncate at the last complete sentence within maxWords
+    const words = cleaned.split(/\s+/);
+    if (words.length > this.maxWords) {
+      const truncated = words.slice(0, this.maxWords).join(' ');
+      // Find the last sentence boundary (. ! ?) within the truncated text
+      const lastSentenceEnd = truncated.search(/[.!?][^.!?]*$/);
+      if (lastSentenceEnd > truncated.length * 0.5) {
+        // Cut at the last sentence boundary if it's past the halfway point
+        cleaned = truncated.slice(0, lastSentenceEnd + 1).trim();
+      } else {
+        // Otherwise just use the word-truncated version with ellipsis
+        cleaned = truncated.trim() + '…';
+      }
     }
 
     return cleaned;
