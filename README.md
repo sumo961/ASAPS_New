@@ -23,9 +23,10 @@ This is a **beta release**. Core functionality works, but some features are inco
 | Feature | Status |
 |---------|--------|
 | **AI Conversation Beat** | **v0.9.31**: Real-time AI conversations with author-defined steering rules (directions, triggers, actions) and free-form/voice input |
+| **Speech-to-Text (NEW)** | **v0.9.31**: Voice input for AI Conversation beats — Web Speech API (browser-native), whisper.cpp, Vosk, or OpenAI Whisper |
 | **NPC Auto-Exit** | **v0.9.31**: DialogTree/AIDialogTree nodes can auto-advance without showing choices (NPC dismissals, forced exits) |
 | **VideoBeat VE** | **v0.9.31**: Video selection and playback config fully in Visual Editor, respects position/size, first-frame preview in editor |
-| **Local TTS/STT** | **v0.9.31**: Self-hosted voice via mlx-audio (Kokoro TTS) and whisper.cpp STT — no cloud dependency |
+| **Local TTS/STT** | **v0.9.31**: Optional self-hosted voice via mlx-audio (Kokoro TTS) and whisper.cpp STT — zero cloud dependency for fully offline stories |
 | **LLM Eval Harness** | **v0.9.31**: Automated test suites for benchmarking local LLMs (embedded playback + story generation) |
 | **AI Prompt Checklist** | **v0.9.31**: Verification checklist in AI generation prompts (structural integrity, reachability, connection rules) |
 | **AI Prefetching** | **v0.9.30**: Background content generation for AI beats — starts while user reads previous beat, hides API latency |
