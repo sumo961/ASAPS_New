@@ -1,5 +1,163 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-09: AI Conversation, NPC Exits, VideoBeat VE, Local TTS/STT & LLM Eval (v0.9.31)
+
+### Overview
+
+This release introduces the **AI Conversation Beat** for real-time steered AI dialogue, **NPC-initiated exits** for DialogTree/AIDialogTree, a **rewritten VideoBeat with full Visual Editor integration**, **Local TTS/STT** support (Kokoro, whisper.cpp), and a comprehensive **LLM evaluation harness** for benchmarking small local models for embedded playback. Also includes significant AI generation prompt improvements and 16 new tests.
+
+### AI Conversation Beat (New)
+
+Real-time AI conversations with author-defined steering rules, replacing pre-generated dialog trees where dynamic open-ended dialogue is needed.
+
+- New `aiConversation` beat type with free-form player text input (and optional voice input via STT)
+- **Conversation directions**: structured trigger/action rules that steer the AI mid-conversation
+  - Triggers: topic-mention, sentiment, turn-count, variable, silence, custom
+  - Actions: steer conversation, exit to beat, set variable, or multi-action combinations
+  - Variable guards (`requiresVariable`) and once-only firing supported
+- NPC opening line (optional, AI generates if empty)
+- Fallback exit target when `maxTurns` reached
+- AI generates farewell messages via `npcExitMessage` when exiting via a direction
+
+**Files modified:**
+- `packages/core/src/beats/AIConversationBeat.ts` — New beat implementation
+- `packages/core/src/utils/ConversationPromptBuilder.ts` — System prompt, direction evaluation, variable extraction
+- `packages/core/src/types/index.ts` — `ConversationDirection`, `ConversationTrigger`, `ConversationAction` types
+- `beat-definitions/core-beats.json` — Beat definition
+
+### NPC-Initiated Exits
+
+DialogTree and AIDialogTree nodes can now auto-advance without showing choices (NPC dismissals, forced exits).
+
+- New `target` field on DialogNode — when set, NPC delivers the line and auto-advances to the target beat
+- Editor hides unreachable choices when auto-exit is set, shows green exit badge on the NPC node
+- Choices are cleared from the data on save (not just hidden) to keep the model clean
+- Runtime auto-advances via `waitForTTS` + `waitForReadingTime` utilities
+- `AIDialogTreeBeat` exit messages now include NPC's last text + player's choice for contextual farewells
+- `AIConversationBeat` exit messages use shared TTS wait utilities
+
+**Files modified:**
+- `packages/core/src/beats/DialogTreeBeat.ts` — `node.target` auto-exit in `performAction()`
+- `packages/core/src/beats/AIDialogTreeBeat.ts` — Contextual exit message prompts
+- `packages/core/src/beats/AIConversationBeat.ts` — Shared TTS wait utilities
+- `packages/core/src/utils/ttsWait.ts` — Skip reading delay when TTS is enabled
+- `packages/builder/src/editors/DialogTreeEditor.tsx` — Editor UI for NPC exit badges and choice hiding
+- `packages/builder/src/components/Inspector.tsx` — Remove redundant `rebuildConnectionsAndUpdate` call
+
+### VideoBeat Visual Editor Integration
+
+VideoBeat rewritten to use the Visual Editor for media selection and playback configuration.
+
+- `videoAssetId` parameter added alongside legacy `videoFile`
+- `VideoBeat.performAction()` now uses `renderer.renderVideo()` instead of direct DOM manipulation
+- New Video section in VE properties panel with asset selector and playback checkboxes
+- Video element shown on the canvas at user-defined position and size
+- First frame preview in editor mode (paused, muted), full playback in Preview
+- Skip button controlled by dedicated `skipButton` parameter
+- Asset type propagates to renderer for proper `<video>` vs `<img>` rendering
+- Fresh URL resolution via asset resolver (blob URLs expire across window boundaries)
+
+**Files modified:**
+- `packages/core/src/beats/VideoBeat.ts` — Rewrite to use renderer + state-based URL resolution
+- `packages/core/src/types/index.ts` — `Location.assetType` field, `renderVideo` signature with locations + skipButton
+- `packages/renderer/src/renderers/ReactRenderer.tsx` — Positioned video rendering with asset resolver
+- `packages/renderer/src/components/PositionedBeatView.tsx` — `AssetElement` detects video via `assetType`
+- `packages/builder/src/components/visual/VisualPropertiesPanel.tsx` — Video section UI
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — Video element setup, stale element cleanup
+- `packages/builder/src/components/visual/VisualBeatEditor.tsx` — Asset type propagation
+- `packages/builder/src/utils/SchemaLocationInitializer.ts` — `video` location type
+- `packages/builder/src/components/SchemaFormGenerator.tsx` — Respect `ui.hidden` flag
+- `beat-definitions/core-beats.json` — Hide video params from Inspector, add `locations: ["video"]`
+
+### Local TTS & STT
+
+Self-contained voice support via local servers — no cloud dependency.
+
+- **Local TTS**: mlx-audio with Kokoro voices on port 4123 (OpenAI-compatible `/v1/audio/speech`)
+- **Local STT**: whisper.cpp on port 8178 (`/v1/audio/transcriptions`)
+- TTS provider options: OpenAI, ElevenLabs, Local, OpenAI-Compatible
+- Kokoro voice picker with per-region options (`am_adam`, `af_heart`, etc.)
+- Model field for custom voice cloning models
+- STT config includes language (BCP 47) for multi-language transcription
+- HTML export player includes `WebSTTProvider` with browser SpeechRecognition fallback
+
+**Files modified:**
+- `packages/builder/src/services/tts/LocalTTSProvider.ts` — Kokoro integration
+- `packages/player-web/src/WebSTTProvider.ts` — New STT provider for HTML export
+- `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` — Local TTS/STT config UI
+
+### AI Generation Prompt Improvements
+
+All AI generation paths (internal + MCP) updated with clearer structural rules and a verification checklist.
+
+- Explicit **two connection patterns** documented: connections array vs targets-in-parameters
+- **Verification checklist** — AI checks structural integrity before outputting (beat_0 titleScreen, reachability, dangling targets, dialogTree structure)
+- **aiSummary as ending** — documented as richer alternative to endScreen with restart to beat_0
+- **aiConversation** beat added to story generation prompts
+- **NPC auto-exit on DialogTree** documented
+- **Exit message improvements** — prompts now include conversation context for contextual farewells
+- `generateDialog` in PreviewWindow handles `format: 'text'` for exit messages (Claude + OpenAI paths)
+
+**Files modified:**
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`
+- `packages/builder/src/services/prompts/storyGeneration.ts`
+- `packages/builder/src/services/prompts/dialogGeneration.ts`
+- `packages/builder/src/services/prompts/beatSuggestions.ts`
+- `mcp-server/src/utils/aiHelper.ts`
+- `packages/builder/src/pages/PreviewWindow.tsx`
+
+### LLM Evaluation Harness
+
+Two automated test suites for evaluating local LLMs — one for beat-level AI tasks (embedded use), one for full story generation.
+
+- **Beat eval** (`packages/core/tests/llm-eval/`) — 14 scenarios across 6 categories: dialogTree, conversation, textGen, classification, extraction, exitMessage
+- **Story eval** (`packages/core/tests/llm-eval-story/`) — 6 scenarios with 16 weighted structural checks
+- CLI flags: `--model`, `--compare`, `--endpoint`, `--context`, `--no-think`, `--save`, `--verbose`
+- Automated scoring (JSON validity, word count, required fields, reachability, connection integrity)
+- Critical failure detection: unreachable beats and dangling targets auto-fail regardless of score
+- HTML report generation for side-by-side quality review
+- Support for Ollama native API (for models with large context needs) and thinking model detection
+
+**Findings for embedded playback (beat eval):**
+- **gemma3:4b**: 100% structural, highest creative quality, best overall
+- **smollm2:1.7b**: 100% structural at 1.8GB — smallest viable model
+- **mistral:7b**: 100% structural, good creativity
+
+**Findings for story generation:**
+- **Qwen3-30B-A3B** (MoE): 6/6 scenarios passed at 62s avg — best value
+- **mixtral:8x7b** (MoE): 6/6 passed at 54s
+- **qwen3.5:35b-a3b thinking**: 6/6 at 98% quality (slower)
+- **phi4:14b**: 5/6 passed at 42s — best mid-size
+- MoE architecture dominates; thinking doesn't help when prompt provides structural checklist
+
+**Files added:**
+- `packages/core/tests/llm-eval/` — Beat eval harness (scenarios, scoring, runner, README)
+- `packages/core/tests/llm-eval-story/` — Story eval harness (scenarios, scoring, runner, README)
+
+### OnlineContent Word Limit Enforcement
+
+- Prompt changed from "approximately N words" to "MAXIMUM N words — do not exceed this limit"
+- Post-generation truncation at last complete sentence within `maxWords`
+- Falls back to word-cut with ellipsis if no sentence boundary past halfway
+
+**Files modified:**
+- `packages/core/src/beats/OnlineContentBeat.ts`
+
+### Tests Added
+
+- **DialogTreeBeat NPC exit nodes** (6 tests)
+- **AIDialogTreeBeat** (9 tests): exit messages, dialog execution, validateDialogTree
+- **VideoBeat** (9 tests): constructor, parameters, performAction
+- **OnlineContentBeat** (7 tests): word limit truncation
+- All 38 tests pass. Lint: 0 errors.
+
+**Files added:**
+- `packages/core/tests/beats/VideoBeat.test.ts`
+- `packages/core/tests/beats/OnlineContentBeat.test.ts`
+- `packages/core/tests/beats/AIDialogTreeBeat.test.ts`
+
+---
+
 ## 2026-03-20: AI Prefetching, Session Logging, Rich Text & VE Translation (v0.9.30)
 
 ### Overview
