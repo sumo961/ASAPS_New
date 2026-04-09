@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Version 0.9.28*
+*Version 0.9.30*
 
 ---
 
@@ -24,7 +24,7 @@ Think of this guide as your companion in learning to think like a system builder
 - [Part 3: Understanding Beats](#part-3-understanding-beats) - The building blocks of your system
 - [Part 4: Characters & Assets](#part-4-characters--assets) - Bringing your world to life
 - [Part 5: Visual Design](#part-5-visual-design) - Making it look gorgeous
-- [Part 6: AI Features](#part-6-ai-features) - AI-assisted system building
+- [Part 6: AI Features](#part-6-ai-features) - AI-assisted system building (including AI Conversation)
 - [Part 7: Testing & Publishing](#part-7-testing--publishing) - Sharing your creation
 - [Part 8: Advanced Techniques](#part-8-advanced-techniques) - Level up your skills
 - [Part 9: Version Control & Collaboration](#part-9-version-control--collaboration) - Git integration and team workflows
@@ -151,7 +151,7 @@ Let's take a tour of your system-building workspace. Don't worry about memorizin
 The header spans the top of the screen in three rows:
 
 **Row 1 -- Branding and Title:**
-The ASAPS logo, version number, and a large text field where you can type or edit your project's title directly.
+The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.30.79), and a large text field where you can type or edit your project's title directly.
 
 **Row 2 -- Main Controls:**
 
@@ -172,13 +172,14 @@ The ASAPS logo, version number, and a large text field where you can type or edi
 | **Debug** | Testing and troubleshooting tools (gray button) |
 | **Preview** | Test your system (green button) |
 
-**Row 3 -- AI, TTS, and Language:**
+**Row 3 -- AI, TTS/STT, and Language:**
 
 | Button | What it Does |
 |--------|--------------|
 | **AI** | Dropdown: Generate Story, Create Beat from Description, Configure AI |
 | **VCS Status** | Git status (only visible for directory projects under version control) |
-| **TTS** | Text-to-Speech toggle and configuration (right side) |
+| **TTS** | Text-to-Speech toggle and configuration (speaker icon, right side) |
+| **STT** | Speech-to-Text toggle and configuration (microphone icon, right side) |
 | **Source (English)** | Language selector for translations (far right) |
 
 ## The Left Sidebar: Beat List
@@ -215,6 +216,8 @@ Design what a specific beat looks like on screen. Position characters, add backg
 - Creating hotspots (clickable areas)
 - Designing UI elements
 
+When a **translation language** is active, the Visual Editor overlays translated text on top of the source text, so you can see how your layout looks in different languages without leaving the editor.
+
 ![Visual Editor](images/06-visual-editor.png)
 *The Visual Editor lets you design how beats appear*
 
@@ -237,9 +240,9 @@ The Inspector changes based on what you've selected. Select a Dialog Tree and yo
 Your beat shopping catalog, docked to the right edge of the flowchart. Drag any beat type onto the canvas to add it to your system. Click the collapse arrow to hide it when you need more canvas space.
 
 The palette is organized into three categories:
-- **Visible Beats** - Moments the interactor encounters (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Video Beat, End Screen, Duration Screen, Input Text, Keypad, Hyper Text)
+- **Visible Beats** - Moments the interactor encounters (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Video Beat, End Screen, Duration Screen, Input Text, Keypad, Hyper Text, 360 Panorama)
 - **Logic Beats** - Behind-the-scenes processing (Set Variable/Counter, Condition Check, Random Target, Set Timer, Inventory Management)
-- **AI Beats** - AI-powered dynamic content (Online Content, AI Condition, AI Dialog Tree, AI Summary, AI Info Text, AI Duration Screen)
+- **AI Beats** - AI-powered dynamic content (Online Content, AI Condition, AI Dialog Tree, AI Conversation, AI Summary, AI Info Text, AI Duration Screen)
 
 We'll explore every beat type in detail in [Part 3](#part-3-understanding-beats).
 
@@ -313,6 +316,11 @@ This is where interactivity shines. Present text and multiple choices, each pote
 **When to Use:** Conversations, decision points, anywhere the interactor needs options.
 
 **Pro Tip:** Use conditions to hide choices the player hasn't unlocked. Found a secret note? Show the "Ask about the mysterious symbol" option.
+
+**NPC Auto-Exit:** Dialog nodes can have an **NPC Auto-Exit** target set. When a node has an auto-exit target, the NPC delivers their line and then automatically advances to the target beat without showing any choices. In the Dialog Tree Editor, nodes with an auto-exit show a green badge with the target beat name, and the choices list is hidden (since they are unreachable). Use this for NPC-initiated dismissals, forced exits, or transitions where the player has no say.
+
+- Set auto-exit to a beat to advance there after the NPC speaks
+- Set auto-exit to **Return to initial choices** (`__self__`) to loop back to the root of the dialog tree
 
 **Recursive Dialogs:** Set a choice's target to `__self__` to loop back to the root of the dialog tree. This is powerful for "hub" conversations where the interactor can ask multiple questions before leaving. Combined with **per-choice visited tracking** (`markVisited`), choices the interactor has already picked can be visually dimmed or hidden.
 
@@ -456,6 +464,22 @@ On the desk sat a [letter], a [photograph], and a [strange key].
 ```
 
 Each bracketed word can lead to a different beat.
+
+---
+
+### 360 Panorama
+
+**Purpose:** Immersive panoramic exploration.
+
+Drop the interactor into a 360-degree scene they can look around in. Place interactive hotspots at specific positions within the panorama for navigation or interaction.
+
+**Key Settings:**
+- **Panorama Image** - An equirectangular image for the 360-degree view
+- **Hotspots** - Clickable points placed at pitch/yaw coordinates
+- **Starting Orientation** - Where the camera faces initially
+- **Field of View** - How wide the view is
+
+**When to Use:** Virtual tours, immersive environments, location-based exploration, escape rooms.
 
 ---
 
@@ -619,16 +643,88 @@ Let AI analyze the player's current state (variables, inventory, history) and ch
 
 ### AI Dialog Tree
 
-**Purpose:** AI-generated conversations.
+**Purpose:** AI-generated conversations with pre-built branching.
 
-Instead of scripting every possible response, let AI generate contextually appropriate dialog based on the conversation so far.
+Instead of scripting every possible response, let AI generate a contextually appropriate dialog tree at runtime. The AI produces a complete branching conversation with multiple choices, tailored to the player's current state.
 
 **Key Settings:**
+- **Scenario** - Scene description providing context
+- **NPC Name** - Who the player is talking to
 - **NPC Personality** - How the AI should "act"
-- **Context** - What the AI knows about the situation
+- **Exit Targets** - Named exits with descriptions telling the AI when to use each one
 - **Max Turns** - Limit conversation length
+- **Presentation Mode** - Positioned, chat scroll, or chat bubble
+- **Context Toggles** - Include variables, inventory, visited beats, choice history
+
+**Exit Target Features:**
+- **NPC Exit Message** - Each exit target can have an optional `npcExitMessage` prompt. When set, the AI generates a farewell line that directly acknowledges the player's last choice before transitioning. This makes exits feel natural rather than abrupt.
+- **Exit Reason Tracking** - The AI includes an `exitReason` for each exit choice, explaining what the player said or expressed to satisfy the exit condition. This helps authors debug conversation flow.
+- **Routing Plan** - The AI generates a `routingPlan` explaining its reasoning: how it mapped exit conditions to conversation branches and what player signals it looks for. This is logged in the session timeline for debugging.
+
+**AI Prefetching:** The AI DialogTree supports background prefetching. When the story engine knows this beat is coming next, it generates the dialog tree in the background before the beat executes. This eliminates the loading delay the player would otherwise see, making AI conversations feel instantaneous.
 
 **When to Use:** NPCs that feel alive, unlimited dialog, personalized responses.
+
+---
+
+### AI Conversation
+
+**Purpose:** Real-time, free-form AI conversations with author-defined steering rules.
+
+Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation generates each NPC response live based on what the player actually types. The author controls the conversation through **directions** -- rules that steer the AI based on what the player says.
+
+**Key Settings:**
+- **Scenario** - Scene description
+- **NPC Name** and **NPC Personality** - Character definition
+- **Opening Line** - Fixed first line (if empty, the AI generates one)
+- **Max Turns** - Conversation length before fallback exit
+- **Fallback Exit Target** - Where to go when max turns are reached
+- **Enable Voice Input** - Show a microphone button for speech-to-text input
+- **Context Toggles** - Include variables, inventory, visited beats, choice history
+- **System Instructions** - Additional rules for the AI
+
+**Conversation Directions:**
+
+Directions are the heart of AI Conversation. Each direction has a **trigger** and an **action**:
+
+**Trigger Types:**
+| Trigger | What It Detects |
+|---------|----------------|
+| **Topic Mention** | Player mentions specific keywords |
+| **Sentiment** | Player's emotional tone (positive, negative, angry, curious) |
+| **Turn Count** | Conversation reaches a certain number of turns |
+| **Variable** | A story variable has a specific value |
+| **Custom** | Free-text description evaluated by AI |
+
+**Action Types:**
+| Action | What Happens |
+|--------|-------------|
+| **Steer** | Give the AI a steering instruction (e.g., "mention the hidden passage") |
+| **Exit** | End the conversation and go to a target beat |
+| **Set Variable** | Set a story variable based on the conversation |
+| **Multi-Action** | Combine actions (e.g., steer + set variable, or exit + set variable) |
+
+**Advanced Direction Features:**
+- **Variable Guards** - Directions can require a specific variable value before they activate (e.g., only trigger the "secret info" direction if `hasKey` is true)
+- **Once-Only** - Mark a direction to fire at most once per conversation
+- **Negate Triggers** - Invert a trigger (fires when the condition is NOT met)
+- **AI Value Extraction** - Instead of setting a static variable value, provide an extraction prompt and let the AI determine the value from the conversation context
+- **Exit Messages** - When an exit direction fires, the NPC can deliver a farewell line that acknowledges what the player just said
+
+**When to Use:** Open-ended conversations, investigation scenes where the player can ask anything, therapy/counseling simulations, NPC shopkeepers, any scenario where pre-scripted branches feel too limiting.
+
+**Example Setup:**
+```
+Scenario: "The player meets a merchant in a bazaar"
+NPC: "Fatima", personality: "shrewd but fair, loves haggling"
+
+Directions:
+  1. Topic "price, cost, expensive" → Steer: "offer a 10% discount"
+  2. Sentiment "angry" → Steer: "apologize and offer a gift"
+  3. Topic "secret, hidden, special" + requires secretContact=true
+     → Exit to "Back Room" beat + set variable visitedBackRoom=true
+  4. Turn count >= 5 → Exit to "Market Square" beat
+```
 
 ---
 
@@ -930,9 +1026,10 @@ Describe what you want in plain English:
 
 The AI Dialog Tree beat generates conversations on the fly during play:
 
-- Readers get personalized responses
-- NPC "remembers" previous exchanges
-- Conversations adapt to story state
+- Interactors get personalized responses
+- NPC "remembers" previous exchanges and references the player's name, location, and other context
+- Conversations adapt to story state (variables, inventory, history)
+- Exit routing is intelligent -- the AI explains its reasoning via a routing plan
 
 Configure with personality prompts:
 ```
@@ -940,6 +1037,8 @@ You are Marcus, a gruff bartender who knows everyone's secrets
 but rarely shares them. Speak in short sentences. You're
 suspicious of newcomers but respect those who buy good whiskey.
 ```
+
+For real-time conversations where you want the player to type freely (instead of picking from pre-generated choices), use the **AI Conversation** beat instead. See [AI Conversation](#ai-conversation) in the beat reference above.
 
 ## AI Condition Evaluation
 
@@ -1027,6 +1126,30 @@ For random variety without AI, both **Info Text** and **Duration Screen** beats 
 
 At runtime, one text is randomly selected from the main text plus all variations.
 
+## Rich Text Formatting
+
+Text boxes in ASAPS Modern support a lightweight markdown syntax for basic formatting. This works in any text field that displays to the interactor -- Info Text, Dialog Tree NPC lines, Duration Screen, and more.
+
+**Supported Syntax:**
+
+| Syntax | Result |
+|--------|--------|
+| `**bold**` or `__bold__` | **bold** text |
+| `*italic*` or `_italic_` | *italic* text |
+| `~~strikethrough~~` | ~~strikethrough~~ text |
+| Line breaks (Enter key) | New paragraphs |
+| `\n` (literal) | Line break |
+
+**Example:**
+```
+**"Listen carefully,"** the old woman said, her voice barely a whisper.
+*"The forest remembers everything."*
+
+She paused, then added: "~~Especially~~ **especially** those who forget."
+```
+
+This renders with proper bold, italic, and strikethrough formatting in the preview and exported stories. HTML entities are safely escaped, so you cannot inject raw HTML.
+
 ---
 
 # Part 7: Testing & Publishing
@@ -1098,6 +1221,12 @@ When a path includes **inputText** beats (where the interactor types input), ASA
 - Values are merged into the state before preview starts
 
 This ensures variables like `playerName` or `playerGender` have realistic values when testing later parts of your story.
+
+### Session Timeline
+
+As the interactor plays through your story, ASAPS Modern records a timeline of significant events: beat transitions, player choices, AI-generated content, branching decisions, and exit reasons. This session log is particularly useful for debugging AI beats, where you can see the AI's routing plan, which directions triggered, and what variables were set during a conversation.
+
+The timeline is accessible through the debug panel and is recorded automatically -- you do not need to enable it.
 
 ### Debug Panel
 
@@ -1185,7 +1314,8 @@ ASAPS Modern can read your story aloud using text-to-speech. This is useful for 
    - **Web Speech** — Free, built into your browser. Quality varies by OS and browser.
    - **ElevenLabs** — High-quality cloud voices. Requires an API key from [elevenlabs.io](https://elevenlabs.io).
    - **OpenAI** — Cloud TTS via OpenAI. Requires an API key.
-   - **Custom Server** — Connect to your own TTS endpoint.
+   - **Local TTS** — Run open-source TTS models on your own machine. Supports Kokoro (via mlx-audio), Coqui, Piper, and Chatterbox with built-in presets. No API key needed.
+   - **Custom Server** — Connect to any OpenAI-compatible TTS endpoint.
 5. Enter your API key if using a cloud provider
 6. Select a **model** (for providers that offer multiple models)
 
@@ -1198,6 +1328,18 @@ ASAPS Modern can read your story aloud using text-to-speech. This is useful for 
 | **Turbo v2.5** | Fast with good quality |
 
 ElevenLabs uses audio streaming for faster time-to-first-audio, so you hear speech begin almost immediately rather than waiting for the full audio to generate.
+
+**Local TTS with Kokoro:**
+
+The Local TTS provider comes with built-in presets for popular open-source TTS servers. The recommended setup is **Kokoro** via mlx-audio (runs on Apple Silicon Macs):
+
+1. Select the **Local TTS** tab in the TTS configuration
+2. Choose the **Kokoro** preset from the server presets dropdown
+3. The base URL auto-fills to `http://localhost:8880/v1`
+4. Start your local Kokoro server (see the mlx-audio documentation)
+5. A curated list of Kokoro voices appears automatically -- male and female voices in American, British, and other accents
+
+Other presets include Coqui TTS, Piper, and Chatterbox. You can also enter a custom base URL for any OpenAI-compatible TTS server.
 
 ### Assigning Character Voices
 
@@ -1222,6 +1364,27 @@ This means you do not need to configure TTS language manually -- it follows your
 ### TTS in Project Settings
 
 Your chosen TTS provider type and model are saved with the project, so collaborators automatically use the same configuration. API keys are **not** saved in the project — they stay in your browser's local storage for security.
+
+## Speech-to-Text (STT)
+
+ASAPS Modern supports voice input for AI Conversation beats and other text entry scenarios. When STT is configured, a microphone button appears in the header and inside conversation beats.
+
+### Setting Up STT
+
+1. Click the **Mic** button in the header toolbar (next to the TTS button)
+2. Configure a **STT provider**:
+   - **Web Speech** — Free, built into your browser. Real-time streaming, but quality varies.
+   - **Whisper (OpenAI)** — Cloud-based, high accuracy. Requires an OpenAI API key.
+   - **Local Server** — Self-hosted Whisper server (any OpenAI-compatible endpoint).
+   - **Vosk** — Offline streaming recognition via WebSocket.
+   - **Whisper.cpp** — Local whisper.cpp server for accurate offline recognition (default port: 8178).
+3. Select a recognition **language** (English, German, French, Spanish, and more)
+
+### STT in AI Conversations
+
+When an AI Conversation beat has **Enable Voice Input** turned on, a microphone button appears next to the text input. The interactor can click it to speak their response instead of typing. The transcribed text fills the input field, and the interactor can edit it before sending.
+
+This creates a natural voice-driven conversation flow, especially when combined with TTS -- the NPC speaks, the player responds by voice, and the NPC replies.
 
 ## Saving Your Project
 
@@ -1731,7 +1894,7 @@ Quick reference for all beat types.
 |------|---------|--------------|
 | Title Screen | Story opening | title, subtitle, author, button text |
 | Info Text | Narration | text, button text, textVariations (optional array for random selection) |
-| Dialog Tree | Choices | prompt, choices (each with text, target, condition) |
+| Dialog Tree | Choices | prompt, choices (each with text, target, condition), NPC auto-exit target, presentation mode, markVisited, choice effects |
 | Movement Choice | Navigation | description, destinations |
 | Pick Prop | Item selection | prompt, props, display mode |
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
@@ -1739,6 +1902,7 @@ Quick reference for all beat types.
 | Input Text | Text entry | prompt, placeholder, validation, save target |
 | Keypad | Numeric input | prompt, layout (phone/numeric/pin), correct code, max attempts, min/max digits, mask input, save to |
 | Hyper Text | Clickable text | text with links, link targets |
+| 360 Panorama | Panoramic view | panorama image, hotspots (pitch/yaw), starting orientation, field of view |
 | End Screen | Story ending | message, show restart, show credits, reset (with granular sub-options: variables, counters, inventory, timers, fictional time, visited tracking, history), restart text, credits text, credits page title, credits page body, credits close text |
 | Online Content | Live web data | mode (API/AI), query, template |
 
@@ -1759,7 +1923,8 @@ Quick reference for all beat types.
 | AI Info Text | Dynamic narrative text | prompt, fallbackText, buttonText, includeVariables, includeInventory, includeHistory, maxSentences |
 | AI Duration Screen | Dynamic timed text | prompt, fallbackText, wordsPerMinute, minDuration, maxDuration, context options |
 | AI Condition | AI branching | prompt, categories, fallback |
-| AI Dialog Tree | AI conversation | personality, context, max turns |
+| AI Dialog Tree | AI pre-generated conversation | scenario, npcName, npcPersonality, exitTargets (with npcExitMessage), maxTurns, presentationMode, prefetch support |
+| AI Conversation | Real-time AI conversation | scenario, npcName, npcPersonality, directions (trigger + action), maxTurns, fallbackExitTarget, enableVoiceInput, openingLine |
 | AI Summary | Journey recap | style, length, include options |
 
 ---
@@ -1823,11 +1988,23 @@ Quick reference for all beat types.
 
 **Visual Editor** - The WYSIWYG interface for designing beat appearances.
 
+**AI Conversation** - A beat type that enables real-time, free-form AI-powered conversations steered by author-defined directions.
+
+**Conversation Direction** - A trigger + action rule that steers an AI Conversation. Triggers detect what the player says; actions control how the AI responds or where the story goes next.
+
 **Choice Effects** - Variable, counter, or inventory changes that trigger immediately when a dialog or movement choice is selected.
+
+**NPC Auto-Exit** - A Dialog Tree feature where a dialog node automatically advances to a target beat after the NPC speaks, without showing choices to the player.
+
+**Session Timeline** - An automatic log of significant events during story playback, including beat transitions, player choices, AI outputs, and branching decisions.
+
+**Markdown-Lite** - Lightweight text formatting supported in text boxes: `**bold**`, `*italic*`, `~~strikethrough~~`, and line breaks.
 
 **Speaker Portrait** - A small face/head image assigned to a character that appears in or above the text box during dialog. Configured in the Character Editor's Visual tab.
 
-**TTS (Text-to-Speech)** - The system that reads story text aloud using synthesized voices. Supports multiple providers including ElevenLabs, OpenAI, Web Speech, and custom servers.
+**STT (Speech-to-Text)** - Voice input that converts spoken words to text. Used in AI Conversation beats and other input scenarios. Supports Web Speech, Whisper (OpenAI), local Whisper servers, Vosk, and whisper.cpp.
+
+**TTS (Text-to-Speech)** - The system that reads story text aloud using synthesized voices. Supports multiple providers including ElevenLabs, OpenAI, Web Speech, Local TTS (Kokoro, Coqui, Piper), and custom servers.
 
 **Fictional Time** - An in-story date/time value independent of real-world time. Used for day/night cycles, deadlines, and time-based branching.
 
@@ -1860,7 +2037,13 @@ Export regularly as ASAPS Project (.zip). These files contain everything needed 
 Yes! Use Import → Import Twine (HTML). SugarCube format is supported, though complex macros may need manual adjustment.
 
 ### Do AI features require an API key?
-AI features can work with cloud services (Claude or OpenAI) which require an API key and may incur costs. However, you can also use **local LLMs via Ollama** for free—story generation may not work as well with smaller local models, but it's usable for many features.
+AI features can work with cloud services (Claude or OpenAI) which require an API key and may incur costs. However, you can also use **local LLMs via Ollama** for free -- story generation may not work as well with smaller local models, but it's usable for many features.
+
+### What is the difference between AI Dialog Tree and AI Conversation?
+**AI Dialog Tree** pre-generates a complete branching conversation tree before the player sees it. The player picks from AI-generated choices. **AI Conversation** generates each NPC response in real time based on what the player types. Use AI Dialog Tree for structured conversations with clear branches; use AI Conversation for open-ended, free-form dialog.
+
+### Can I use voice input and output together?
+Yes! Configure TTS for voice output and STT for voice input. In AI Conversation beats with voice input enabled, the NPC speaks via TTS, the player responds by voice (STT), and the cycle continues naturally. This works with both cloud and local providers.
 
 ### How do I share my story with others?
 Use **Export → Export as HTML** to create a standalone playable file. Recipients just open it in any browser—no ASAPS installation needed.

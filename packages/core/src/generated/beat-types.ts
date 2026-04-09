@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-03-27T18:58:28.711Z
+ * Generated: 2026-04-07T00:19:29.109Z
  */
 
 // ============================================
@@ -211,8 +211,10 @@ export interface PickPropParameters {
  * Connection Type: single
  */
 export interface VideoBeatParameters {
-  /** Path to video file */
-  videoFile: string;
+  /** Direct URL/path to video file (legacy — prefer videoAssetId) */
+  videoFile?: string | undefined;
+  /** Asset ID referencing the video file */
+  videoAssetId?: string | undefined;
   /** Start playing automatically */
   autoplay?: boolean | undefined;
   /** Show video controls */
