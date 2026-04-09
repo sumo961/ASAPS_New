@@ -36,6 +36,8 @@ interface ParameterDefinition {
     group?: string;
     // Scope: 'beat' means this is a top-level beat property, not a parameter
     scope?: 'beat';
+    // Hide field from the Inspector (managed elsewhere, e.g. in the Visual Editor)
+    hidden?: boolean;
   };
 }
 
