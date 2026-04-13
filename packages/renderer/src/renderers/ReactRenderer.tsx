@@ -1059,12 +1059,15 @@ export class ReactRenderer extends BaseRenderer {
     this.ttsStopCallback?.();
 
     if (this._originalHandleAction) {
+      // handleAction is currently a wrapper created by renderKeypad / renderInputText
+      // that holds the outer promise's resolver. We must CALL it (not just discard it)
+      // so the outer promise resolves and the engine's await beat.execute() can return.
+      const wrappedHandler = this.handleAction;
       this.handleAction = this._originalHandleAction;
       this._originalHandleAction = null;
-    }
-    if (this.resolveAction) {
-      // Resolve (not just null) so the engine's beat.execute() can return
-      // and the engine loop can process the timer interrupt
+      wrappedHandler('__timer_interrupt__');
+    } else if (this.resolveAction) {
+      // Standard renderPositionedBeat case — resolve the pending promise directly.
       this.resolveAction('__timer_interrupt__');
     }
     this.resolveAction = null;

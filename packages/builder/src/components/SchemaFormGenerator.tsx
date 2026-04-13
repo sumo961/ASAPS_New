@@ -905,6 +905,32 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           </div>
         );
 
+      case 'connection':
+        // Render a beat-picker select for named connection parameters that are not
+        // covered by the generic connection section (e.g. fallbackExitTarget on aiConversation).
+        return (
+          <div key={paramName}>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {paramDef.ui?.label || label} {isRequired && <span className="text-red-500">*</span>}
+            </label>
+            <select
+              value={value || ''}
+              onChange={(e) => onParameterChange(paramName, e.target.value || undefined)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="">None (optional)</option>
+              {availableTargets.map((target) => (
+                <option key={target.id} value={target.id}>
+                  {target.name || target.id} ({target.type})
+                </option>
+              ))}
+            </select>
+            {paramDef.description && (
+              <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+            )}
+          </div>
+        );
+
       case 'any':
         // For setVariable 'value' parameter, determine type based on 'type' parameter
         if (paramName === 'value' && beatType === 'setVariable') {

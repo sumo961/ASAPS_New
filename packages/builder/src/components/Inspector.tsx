@@ -831,6 +831,11 @@ export const Inspector: React.FC<InspectorProps> = ({
         if (beatData.parameters.value === undefined) {
           beatData.parameters.value = beatParams.value ?? 60;
         }
+        // Sync continueTarget so the Inspector form reflects the beat's actual continue
+        // connection (the constructor now derives this from connections if params lack it)
+        if (!beatData.parameters.continueTarget) {
+          beatData.parameters.continueTarget = beatParams.continueTarget || '';
+        }
       }
       //}
 
@@ -2037,13 +2042,20 @@ export const Inspector: React.FC<InspectorProps> = ({
                           const targetId = e.target.value;
 
                           const timerConn = localBeat.connections?.find((c: any) => c.label === 'Timer Target');
-                          // const newConnections = [];
                           const newConnections: { targetId: string; label: string }[] = [];
                           if (timerConn) newConnections.push(timerConn);
                           if (targetId) {
                             newConnections.push({ targetId, label: '' });
                           }
-                          const updatedBeat = { ...localBeat, connections: newConnections };
+                          // Also keep parameters.continueTarget in sync so that
+                          // rebuildConnectionsAndUpdate passes the new value to
+                          // SetTimerBeat.updateParameters (which rebuilds connections
+                          // from parameters, not from localBeat.connections).
+                          const updatedBeat = {
+                            ...localBeat,
+                            connections: newConnections,
+                            parameters: { ...localBeat.parameters, continueTarget: targetId }
+                          };
                           setLocalBeat(updatedBeat);
                           setHasChanges(true);
 

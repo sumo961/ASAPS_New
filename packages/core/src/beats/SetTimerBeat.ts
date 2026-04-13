@@ -24,6 +24,16 @@ export class SetTimerBeat extends Beat {
     this.timerName = params.name || params.timerName || config.timerName || '';
     this.timerValue = params.value ?? config.value ?? 0;
     this.timerTarget = params.timerTarget || config.target || config.timerTarget || '';
+
+    // Initialize continueTarget from parameters. If not in params (e.g., story saved
+    // before this field was properly serialized), derive it from the unlabeled connection.
+    this.continueTarget = params.continueTarget || (config as any).continueTarget || '';
+    if (!this.continueTarget && config.connections) {
+      const continueConn = config.connections.find((c: any) => !c.label || c.label === '');
+      if (continueConn) {
+        this.continueTarget = continueConn.targetId;
+      }
+    }
   }
 
   getParameters(): Record<string, any> {
