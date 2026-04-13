@@ -40,6 +40,7 @@ import { getSavedAIConfig } from './hooks/useAI';
 import { useCommandManager } from './hooks/useCommandManager';
 import { getCommandManager } from './commands/CommandManager';
 import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, type BeatStateMutations } from './commands/BeatCommands';
+import { UpdateCharactersCommand, UpdateGlobalSettingsCommand } from './commands/ProjectStateCommands';
 import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
 import { HtmlExportDialog } from './components/export/HtmlExportDialog';
@@ -3991,7 +3992,9 @@ function App() {
     markChanged();
   }, [markChanged]);
 
-  const handleCharactersChange = useCallback((newCharacters: Character[]) => {
+  // Apply a character list update without touching the command history.
+  // Used as the mutation callback by UpdateCharactersCommand.
+  const applyCharactersChange = useCallback((newCharacters: Character[]) => {
     setCharacters(newCharacters);
     markChanged();
 
@@ -4019,6 +4022,41 @@ function App() {
       }
     }
   }, [markChanged, translationActions, translationState.translations]);
+
+  // Stable mutation ref so undo/redo always sees the latest applyCharactersChange
+  const charactersMutationsRef = useRef({ setCharacters: applyCharactersChange });
+  useEffect(() => {
+    charactersMutationsRef.current.setCharacters = applyCharactersChange;
+  }, [applyCharactersChange]);
+
+  const handleCharactersChange = useCallback((newCharacters: Character[]) => {
+    // Snapshot previous characters BEFORE applying, so undo can restore them.
+    const oldCharacters = characters;
+    applyCharactersChange(newCharacters);
+    const cmd = new UpdateCharactersCommand(
+      oldCharacters,
+      newCharacters,
+      charactersMutationsRef.current,
+      'Edit characters'
+    );
+    getCommandManager().pushWithoutExecute(cmd);
+  }, [characters, applyCharactersChange]);
+
+  // Apply a global-settings update without touching the command history.
+  // Used as the mutation callback by UpdateGlobalSettingsCommand.
+  const applyGlobalSettingsChange = useCallback((newSettings: GlobalSettings) => {
+    setGlobalSettings(newSettings);
+    // CRITICAL: Also persist to project immediately, not just React state
+    // This ensures hotspot settings (showInPreview, labelDisplay) and other
+    // global settings are saved when user clicks "Save Settings"
+    updateGlobalSettings(newSettings);
+    markChanged();
+  }, [updateGlobalSettings, markChanged]);
+
+  const globalSettingsMutationsRef = useRef({ setGlobalSettings: applyGlobalSettingsChange });
+  useEffect(() => {
+    globalSettingsMutationsRef.current.setGlobalSettings = applyGlobalSettingsChange;
+  }, [applyGlobalSettingsChange]);
 
   const handleOpenCharacterManager = useCallback((callback?: (character: Character) => void) => {
     // Store the callback so we can call it when a character is selected
@@ -5340,12 +5378,15 @@ function App() {
         <GlobalSettingsInspector
           settings={globalSettings}
           onUpdate={(newSettings) => {
-            setGlobalSettings(newSettings);
-            // CRITICAL: Also persist to project immediately, not just React state
-            // This ensures hotspot settings (showInPreview, labelDisplay) and other
-            // global settings are saved when user clicks "Save Settings"
-            updateGlobalSettings(newSettings);
-            markChanged();
+            const oldSettings = globalSettings;
+            applyGlobalSettingsChange(newSettings);
+            const cmd = new UpdateGlobalSettingsCommand(
+              oldSettings,
+              newSettings,
+              globalSettingsMutationsRef.current,
+              'Update global settings'
+            );
+            getCommandManager().pushWithoutExecute(cmd);
           }}
           onClose={handleCloseSettings}
           assets={assets}
