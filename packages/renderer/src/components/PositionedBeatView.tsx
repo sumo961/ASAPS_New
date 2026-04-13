@@ -3327,17 +3327,27 @@ const InputFieldElement: React.FC<{
 }> = ({ style, content, location, onAction, interactive, inputValue = '', setInputValue, theme, mobileFontScale = 1.0 }) => {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  // Tracks whether we've done the one-time auto-select for this beat's input.
+  const hasAutoSelectedRef = React.useRef(false);
 
-  // Auto-focus the field and select any pre-filled sample text on mount so
-  // interactors can start typing (or overwrite the sample) immediately.
+  // Auto-focus and select pre-filled sample text so interactors can type immediately.
+  // Depends on inputValue because the parent sets it asynchronously in its own useEffect
+  // (after this component has already mounted). Depending only on [interactive] meant
+  // el.select() fired on an empty value and was then wiped when the value arrived.
   React.useEffect(() => {
     if (!interactive) return;
     const el = textareaRef.current || inputRef.current;
     if (!el) return;
     el.focus();
+    if (!inputValue) {
+      // Value just reset (new beat starting) — clear flag so next populated value triggers select
+      hasAutoSelectedRef.current = false;
+      return;
+    }
+    if (hasAutoSelectedRef.current) return; // Already selected for this beat
     try { el.select(); } catch { /* ignore if unsupported */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interactive]);
+    hasAutoSelectedRef.current = true;
+  }, [interactive, inputValue]);
 
   // Calculate font size based on autosize setting or explicit fontSize
   let computedFontSize: number;
