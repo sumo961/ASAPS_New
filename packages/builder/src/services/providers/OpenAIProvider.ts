@@ -329,6 +329,79 @@ export class OpenAIProvider extends BaseAIProvider {
       }
     }
 
+    // Step 1c: Fix unescaped double quotes inside string values (common with Kimi K2.5).
+    // Pattern: "text": "He said "something" and..." — the inner quotes break JSON parsing.
+    // Strategy: when inside a string value, a `"` that is NOT immediately followed by a JSON
+    // structural character (`,`, `}`, `]`, `\n`, `\r`, or end-of-input) is an interior quote
+    // and should be escaped.
+    {
+      let result = '';
+      let i = 0;
+      let fixCount = 0;
+
+      while (i < repaired.length) {
+        const char = repaired[i];
+
+        // Pass through already-escaped sequences unchanged
+        if (char === '\\' && i + 1 < repaired.length) {
+          result += char + repaired[i + 1];
+          i += 2;
+          continue;
+        }
+
+        // Opening quote of a string
+        if (char === '"') {
+          result += char;
+          i++;
+
+          // Read string content, deciding for each `"` whether it closes the string
+          while (i < repaired.length) {
+            const sc = repaired[i];
+
+            if (sc === '\\' && i + 1 < repaired.length) {
+              result += sc + repaired[i + 1];
+              i += 2;
+              continue;
+            }
+
+            if (sc === '"') {
+              // Peek at the first non-space/tab character after this quote
+              let j = i + 1;
+              while (j < repaired.length && (repaired[j] === ' ' || repaired[j] === '\t')) j++;
+              const next = j < repaired.length ? repaired[j] : '';
+
+              // These characters mean the string value is legitimately over
+              const isStructural = next === ',' || next === '}' || next === ']' ||
+                                   next === '\n' || next === '\r' || next === '';
+
+              if (isStructural) {
+                result += sc; // closing quote
+                i++;
+                break;
+              } else {
+                result += '\\"'; // interior quote — escape it
+                fixCount++;
+                i++;
+              }
+              continue;
+            }
+
+            result += sc;
+            i++;
+          }
+          continue;
+        }
+
+        result += char;
+        i++;
+      }
+
+      if (fixCount > 0) {
+        repairs.push(`escaped ${fixCount} unescaped interior quotes in strings`);
+        repaired = result;
+      }
+    }
+
     // Step 2: Fix unquoted property names (common LLM error)
     // Match: { key: or , key: where key is not quoted
     // Be careful not to match inside strings

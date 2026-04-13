@@ -125,7 +125,7 @@ function nativeBinaryRequest(
   });
 }
 
-const AI_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const AI_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes (reasoning models like Kimi K2 need extra time)
 const TTS_TIMEOUT_MS = 30 * 1000; // 30 seconds
 
 /**

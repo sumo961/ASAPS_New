@@ -31,6 +31,7 @@ export function isReasoningModel(model: string, reasoningEffort?: string): boole
   return m.startsWith('o1') ||
          m.startsWith('o3') ||
          m.startsWith('gpt-5') ||
+         m.includes('kimi-k2') ||   // Kimi K2 is a reasoning model (temperature must be 1)
          !!reasoningEffort;
 }
 
