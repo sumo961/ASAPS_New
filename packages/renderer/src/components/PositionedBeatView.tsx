@@ -3326,6 +3326,18 @@ const InputFieldElement: React.FC<{
   mobileFontScale?: number;
 }> = ({ style, content, location, onAction, interactive, inputValue = '', setInputValue, theme, mobileFontScale = 1.0 }) => {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Auto-focus the field and select any pre-filled sample text on mount so
+  // interactors can start typing (or overwrite the sample) immediately.
+  React.useEffect(() => {
+    if (!interactive) return;
+    const el = textareaRef.current || inputRef.current;
+    if (!el) return;
+    el.focus();
+    try { el.select(); } catch { /* ignore if unsupported */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interactive]);
 
   // Calculate font size based on autosize setting or explicit fontSize
   let computedFontSize: number;
@@ -3395,7 +3407,6 @@ const InputFieldElement: React.FC<{
           setInputValue?.(e.target.value);
         }}
         disabled={!interactive}
-        autoFocus={interactive}
         data-input-field="true"
       />
     );
@@ -3403,13 +3414,13 @@ const InputFieldElement: React.FC<{
 
   return (
     <input
+      ref={inputRef}
       type="text"
       style={baseStyle}
       placeholder={content}
       value={inputValue}
       onChange={(e) => setInputValue?.(e.target.value)}
       disabled={!interactive}
-      autoFocus={interactive}
       data-input-field="true"
     />
   );

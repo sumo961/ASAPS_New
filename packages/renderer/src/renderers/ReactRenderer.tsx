@@ -468,6 +468,16 @@ const InputText: React.FC<{
 } & ScreenProps> = ({ prompt, placeholder, buttonText = 'Continue', options = {}, onAction }) => {
   const [inputValue, setInputValue] = React.useState('');
   const [error, setError] = React.useState('');
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Auto-focus and select any pre-filled sample text on mount so interactors
+  // can start typing immediately without clicking.
+  React.useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    try { el.select(); } catch { /* ignore */ }
+  }, []);
 
   const validateInput = (value: string): boolean => {
     if (options.required !== false && !value.trim()) {
@@ -518,12 +528,12 @@ const InputText: React.FC<{
       <div className="max-w-2xl w-full bg-white rounded-lg shadow-2xl p-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">{prompt}</h2>
         <input
+          ref={inputRef}
           type="text"
           value={inputValue}
           onChange={(e) => { setInputValue(e.target.value); setError(''); }}
           onKeyPress={(e) => { if (e.key === 'Enter') handleSubmit(); }}
           placeholder={placeholder}
-          autoFocus
           className={`w-full px-4 py-3 text-lg border-2 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
             error ? 'border-red-500' : 'border-gray-300'
           }`}
@@ -1480,7 +1490,13 @@ export class ReactRenderer extends BaseRenderer {
             setTimeout(waitForTTSAndStart, 300);
             return () => { cancelled = true; };
           } else {
-            inputRef.current?.focus();
+            // No STT — focus the text input so the interactor can start typing
+            // immediately. Also select any pre-filled sample text.
+            const el = inputRef.current;
+            if (el) {
+              el.focus();
+              try { el.select(); } catch { /* ignore */ }
+            }
           }
           // eslint-disable-next-line react-hooks/exhaustive-deps
         }, []);
