@@ -165,7 +165,7 @@ BEAT TYPES AND CONNECTION RULES:
 SINGLE CONNECTION beats (only ONE target in connections array):
 - titleScreen: Start screen. Parameters: { title, author, buttonText }
 - infoText: Narrative text with Continue. Parameters: { text }
-- endScreen: Story ending. Parameters: { message, showRestart (ALWAYS true), showCredits }
+- endScreen: Story ending. Parameters: { message, showRestart (ALWAYS true), showCredits }. 🚨 When showRestart is true, MUST include "connections": [{ "targetId": "beat_0" }] so the restart button works. Same rule for aiSummary used as an ending.
 - durScreen: Timed auto-advance. Parameters: { text, duration }
 - videoBeat: Video playback. Parameters: { videoFile (NOT "videoUrl" or "videoAssetId"), autoplay, controls, skipButton }
 - inputText: Text input. Parameters: { prompt, variable (NOT "variableName"), saveToType: "variable" (REQUIRED), submitButtonText }
@@ -174,8 +174,8 @@ SINGLE CONNECTION beats (only ONE target in connections array):
 - setTimer: Timer control. Parameters: { name (NOT "timerName"), value in seconds (NOT "duration"), timerTarget }
 
 MULTIPLE CONNECTION beats (targets in PARAMETERS, NOT connections array):
-- dialogTree: Branching dialogue. Parameters: { dialogTree: { id: "root", speaker, text, choices: [{ id, text, target | dialogNode: { id, speaker, text, choices } }] } }. Choice text IS the player's line. Use __self__ target for loops (interrogation, shopping).
-- movementChoice: Location/action choices. Parameters: { choices: [{ id, text, location, target }] }
+- dialogTree: 🚨 DEFAULT for ANY multi-option choice (conversations, decisions, actions, branches). Shows visible buttons. For non-NPC branching use a SHALLOW dialogTree: speaker="" (empty), text=scene/question, 2-4 options as top-level choices. Parameters: { dialogTree: { id: "root", speaker, text, choices: [{ id, text, target | dialogNode: { id, speaker, text, choices } }] } }. Choice text IS the player's line. Use __self__ target for loops (interrogation, shopping).
+- movementChoice: 🚨 SPECIALIZED — invisible hotspots on a background scene. Only use when choices map to spatial locations on an image. For abstract choices, use dialogTree. Parameters: { choices: [{ id, text, location, target }] }
 - pickProp: Prop selection. Parameters: { question, props: [{ id, name, description, target }] }. pickProp AUTOMATICALLY adds selected item to inventory - do NOT follow with addRemoveInventory add!
 - hyperText: Clickable text. Parameters: { text, hyperlinks: [{ word, targetBeatId }] }
 - conditionBeat: Conditional branch. ONLY 3 parameters allowed: { condition: { type, variable/item, operator, value, compareTime? }, trueConnection: { target }, falseConnection: { target } }. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat, fictionalTime. Use "target" NOT "targetId" in connections!

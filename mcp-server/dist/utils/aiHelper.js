@@ -130,11 +130,19 @@
  *   - Design alternatives: "ALTERNATIVE: Could branch to romance path here"
  * - Example: { "notes": "ASSET: Throne room. CHARACTER: Villain menacing. REVIEW: Player needs enough clues here." }
  *
+ * CHARACTERS AND SPEAKERS:
+ * Stories include a "characters" array with character definitions:
+ * - Each character: { id, name, displayName, role ("player"|"npc"|"companion"), counters, inventory }
+ * - Visible beats have an optional "speaker" parameter set to a character's displayName
+ * - Default speaker is "Narrator" when no speaker is specified
+ * - The player character (role: "player") displayName is used as speaker for player-spoken beats
+ * - dialogTree nodes support per-node speaker fields for multi-character conversations
+ *
  * CHARACTER COUNTERS (Centralized System):
  * Counters should be defined on characters, then referenced consistently in choices:
  * - Define counters in the characters array: { "counters": [{ "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 }] }
  * - These counters become available in ALL choice-type beats (dialogTree, movementChoice, pickProp)
- * - Example character: { "id": "player", "name": "Hero", "counters": [{ "name": "courage", ... }, { "name": "health", ... }] }
+ * - Example character: { "id": "player", "name": "Hero", "displayName": "Hero", "role": "player", "counters": [{ "name": "courage", ... }] }
  * - Example choice with counter effect: { "text": "Stand your ground", "target": "fight", "counter": "courage", "counterOperation": "change", "counterValue": 10 }
  * - Best practice: Define all counters you plan to use on relevant characters first
  *
@@ -145,10 +153,10 @@ export const BEAT_TYPES = {
     // 🚨🚨🚨 MANDATORY: beat_0 MUST be titleScreen - NEVER start with infoText! 🚨🚨🚨
     titleScreen: '🚨 MANDATORY FIRST BEAT (beat_0)! Start screen with title and author. SINGLE CONNECTION: only one target via connections array.',
     infoText: 'Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: infoText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead. Optional: textVariations (array) for random text selection at runtime.',
-    endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Optional credits page: showCredits (boolean), creditsPageTitle (default "Credits"), creditsPageBody (text content), creditsCloseText (default "Close"), creditsText (button label). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Created by..." } }',
+    endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true AND add a connection back to beat_0 (titleScreen) so the restart button works: "connections": [{ "targetId": "beat_0" }]. Use "message" parameter (not "endMessage"). Optional credits page: showCredits (boolean), creditsPageTitle (default "Credits"), creditsPageBody (text content), creditsCloseText (default "Close"), creditsText (button label). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Created by..." }, "connections": [{ "targetId": "beat_0" }] }',
     // Interactive content - MULTIPLE CONNECTIONS via parameters
-    dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean for per-choice visited tracking). Choices can modify counters via counter/counterOperation/counterValue properties. RECURSIVE DIALOGS: use target "__self__" to loop back to the same dialogTree (e.g., interrogation, shopping).',
-    movementChoice: 'Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. IMPORTANT: Each choice needs { id, text, location, target } - always set "location" to same value as "text" for hover labels! Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).',
+    dialogTree: '🚨 DEFAULT CHOICE BEAT — use this for ANY multi-option choice (conversations, decisions, actions, story branches). Shows choices as visible buttons. For simple non-NPC branching, use a SHALLOW dialogTree: set speaker to "" (empty), text to the scene/question, and put 2-4 options as top-level choices. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean for per-choice visited tracking). Choices can modify counters via counter/counterOperation/counterValue properties. RECURSIVE DIALOGS: use target "__self__" to loop back to the same dialogTree (e.g., interrogation, shopping). NPC AUTO-EXIT: A dialog node can have a "target" field to auto-advance WITHOUT showing choices (NPC dismissals, forced exits). When "target" is set on a node, choices are ignored. Example shallow (general branching): { "dialogTree": { "id": "root", "speaker": "", "text": "You stand at a crossroads.", "choices": [{ "id": "c1", "text": "Take the forest path", "target": "beat_forest" }, { "id": "c2", "text": "Follow the river", "target": "beat_river" }] } }.',
+    movementChoice: '🚨 SPECIALIZED — NOT the default multi-choice beat! Renders choices as INVISIBLE HOTSPOTS on a background scene. Only use when the scene has a background image AND each choice maps to a spatial location on that image (e.g., clicking the library door, staircase, garden gate). For abstract choices (actions, answers, decisions), use dialogTree instead. When in doubt: use dialogTree. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. Each choice needs { id, text, location, target } - always set "location" to same value as "text". Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).',
     pickProp: 'Interactive prop/item selection. MULTIPLE TARGETS: define targets in props[].target parameter. IMPORTANT: prop "name" should be ITEM NAMES ONLY (e.g., "Silver Key", "Lantern"), NOT action descriptions (e.g., "Take the key" is WRONG). For actions, use movementChoice instead. Supports: choiceDelay (seconds), markVisited (boolean).',
     hyperText: 'Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Links can have custom styling (color, underline, bold). Supports optional defaultTarget for timed auto-advance.',
     inputText: 'Player text input. Save to: variable (default), characterName (update display name), or counter (numeric). Validation: none, numeric, email, alphanumeric. Properties: minLength, maxLength, required. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance.',
@@ -165,8 +173,9 @@ export const BEAT_TYPES = {
     // AI-powered beats (require AI service at runtime)
     aiInfoText: 'AI-generated contextual text with Continue button. Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables. SINGLE CONNECTION. Generates personalized 1-2 sentences based on player state.',
     aiDurScreen: 'AI-generated text with auto-advance based on reading speed. Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, contextVariables, wordsPerMinute (default 200), minDuration (ms), maxDuration (ms). SINGLE CONNECTION.',
-    aiDialogTree: 'AI-generated branching dialogue at runtime. Creates personalized conversations based on player state and context.',
-    aiSummary: 'AI-generated narrative summary of the player\'s journey. Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength ("short"|"medium"|"long"), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart (boolean), showCredits (boolean), resetOnRestart (boolean), resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory (granular reset sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText. SINGLE CONNECTION.',
+    aiDialogTree: 'AI-generated branching dialogue at runtime. Creates personalized conversations based on player state. Parameters: scenario, npcName, npcPersonality, maxTurns, exitTargets (array of {id, description, npcExitMessage?}), includeVariables, includeInventory, includeVisitedBeats, includeChoiceHistory, systemInstructions, presentationMode, showAvatars. MULTIPLE CONNECTIONS via exitTargets. npcExitMessage: optional prompt for AI to generate a farewell that acknowledges the player\'s last choice.',
+    aiConversation: 'Real-time AI conversation with author-defined steering rules. Each NPC response generated live based on conversation history + active directions. Parameters: scenario, npcName, npcPersonality, maxTurns, directions (array of steering rules with triggers and actions), fallbackExitTarget, openingLine, systemInstructions. MULTIPLE CONNECTIONS via exit directions + fallback. Directions can steer conversation, exit to a beat, set variables, or combine actions. Supports npcExitMessage for farewell responses.',
+    aiSummary: 'AI-generated personalized summary of the player\'s journey — can REPLACE endScreen as story ending! Generates a recap based on the player\'s actual choices, variables, and inventory. Has ALL the same ending capabilities as endScreen. Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength ("short"|"medium"|"long"), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart (boolean, ALWAYS true when used as ending), showCredits (boolean), resetOnRestart (boolean), resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory (granular reset sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText. Connect to beat_0 (titleScreen) for restart when used as ending.',
     aiCondition: 'AI-driven branching that analyzes player state to determine path. Parameters: prompt (what AI evaluates), categories (array of {name, description, targetId}), evaluateVariables, evaluateInventory, evaluateHistory, evaluateCounters, evaluateChoiceHistory, fallbackTarget, timeout. MULTIPLE CONNECTIONS via categories. AI classifies player state and routes to appropriate category target.',
     onlineContent: 'Fetch and display real-time data from web APIs or AI queries. Parameters: sourceType ("api" or "ai-query"), apiUrl, apiParams, jsonPath, query, title, maxWords, fallbackText, buttonText. SINGLE CONNECTION. For dynamic content like weather, news, or AI-generated facts.',
 };
@@ -185,6 +194,39 @@ export async function generateStory(config) {
     catch (error) {
         console.error('[AI] Failed to generate with AI, falling back to simulation:', error);
         return generateStorySimulation(config);
+    }
+}
+/**
+ * Auto-fix ending beats (endScreen, aiSummary) missing their restart connection back
+ * to the title screen. AI models often create these with showRestart:true but no
+ * outgoing connection. The engine has a fallback, but the connection should be explicit
+ * so it renders as a graph edge in the visual editor.
+ */
+function autoFixEndingRestartConnections(generated) {
+    if (!generated?.beats || !Array.isArray(generated.beats))
+        return;
+    const titleScreen = generated.beats.find((b) => b.type === 'titleScreen');
+    if (!titleScreen)
+        return;
+    const endingBeatTypes = new Set(['endScreen', 'aiSummary']);
+    let fixCount = 0;
+    for (const beat of generated.beats) {
+        if (!endingBeatTypes.has(beat.type))
+            continue;
+        const showRestart = beat.parameters?.showRestart ?? true;
+        if (!showRestart)
+            continue;
+        const hasConnection = beat.connections && Array.isArray(beat.connections) && beat.connections.length > 0;
+        if (hasConnection)
+            continue;
+        if (!beat.connections)
+            beat.connections = [];
+        beat.connections.push({ targetId: titleScreen.id });
+        console.error(`[aiHelper.autoFix] ✓ Added restart connection: ${beat.type} ${beat.id} → ${titleScreen.id}`);
+        fixCount++;
+    }
+    if (fixCount > 0) {
+        console.error(`[aiHelper.autoFix] Auto-fixed ${fixCount} ending beats missing restart connections`);
     }
 }
 /**
@@ -220,6 +262,7 @@ Return a JSON object with this structure:
       "type": "titleScreen",  // 🚨 MANDATORY: First beat MUST be titleScreen, NEVER infoText!
       "label": "Title",
       "parameters": { "title": "...", "author": "...", "buttonText": "Begin" },
+      "speaker": "optional character displayName (default: Narrator)",
       "notes": "Optional author annotations (not shown to player)",
       "cluster": "optional-cluster-name"
     }
@@ -232,10 +275,16 @@ Return a JSON object with this structure:
   ],
   "characters": [
     {
-      "id": "char_player", "name": "Hero", "description": "The protagonist",
+      "id": "char_player", "name": "Hero", "displayName": "Hero", "role": "player",
+      "description": "The protagonist",
       "counters": [
         { "name": "courage", "displayName": "Courage", "value": 50, "min": 0, "max": 100 }
       ]
+    },
+    {
+      "id": "char_guide", "name": "Old Guide", "displayName": "Old Guide", "role": "npc",
+      "description": "A mysterious guide",
+      "counters": []
     }
   ],
   "reasoning": "Explain story structure, branching strategy, and how beat types work together"
@@ -353,6 +402,18 @@ FICTIONAL TIME SYSTEM:
   - { "condition": { "type": "fictionalTime", "operator": ">", "compareTime": { "year": 1969, "month": 1, "day": 1, "hour": 0, "minute": 0 } } }
 - Display: Shows in Timer HUD when enabled in global settings
 - Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
+
+CHARACTERS AND SPEAKERS:
+- The "characters" array defines all characters in the story
+- Each character has: id, name, displayName, role ("player"|"npc"|"companion"), counters, inventory
+- The player character (role: "player") represents the interactor/reader
+- Visible beats have an optional "speaker" parameter (string) set to a character's displayName
+- If no speaker is set, "Narrator" is used as the default speaker
+- The player character's displayName is used as speaker for beats spoken by the player
+- dialogTree nodes have per-node speaker fields: each dialogTree.choices[] entry and the root dialogTree object can have a "speaker" field
+- Use speakers to attribute narration and dialogue to specific characters
+- Example beat with speaker: { "type": "infoText", "parameters": { "text": "Welcome to my shop!", "speaker": "Merchant" } }
+- Example character: { "id": "char_merchant", "name": "merchant", "displayName": "Merchant", "role": "npc", "counters": [], "inventory": [] }
 
 CHARACTER COUNTERS:
 - Define counters on characters first, then reference them in choices
@@ -480,6 +541,7 @@ CRITICAL ANTI-PATTERNS TO AVOID:
 
 CORRECT PARAMETER NAMES (MUST use exactly these):
 - endScreen: { message (NOT "endText"), showRestart: true (ALWAYS), showCredits, creditsPageTitle, creditsPageBody, creditsCloseText, creditsText }
+  🚨 CRITICAL: When showRestart is true, endScreen MUST have a connection back to the titleScreen (beat_0). Example: "connections": [{ "targetId": "beat_0" }]. Same rule applies to aiSummary when used as an ending.
 - keypad: { prompt, layout ("numeric"|"phone"|"pin"), maxDigits, minDigits, correctCode, failTarget, maxAttempts, maskInput, saveToType, variable, buttonText, clearButtonText }
 - inputText: { prompt, variable (NOT "variableName"), saveToType: "variable" (REQUIRED), submitButtonText }
 - setVariable: { type: "variable"|"counter"|"fictionalTime", name (variable name, NOT "variableName"), value, operation }
@@ -505,7 +567,7 @@ Note: quantityValue can also reference a variable with $ prefix: "$requiredAmoun
 
 conditionBeat (counterCompare): { "parameters": { "condition": { "type": "counterCompare", "counter1": "strength", "counter2": "threshold", "operator": ">=" }, "trueConnection": { "target": "beat_pass" }, "falseConnection": { "target": "beat_fail" } } }
 
-endScreen: { "id": "beat_end", "type": "endScreen", "label": "The End", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\nDesigned by..." } }
+endScreen: { "id": "beat_end", "type": "endScreen", "label": "The End", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\nDesigned by..." }, "connections": [{ "targetId": "beat_0" }] }
 
 keypad: { "id": "beat_safe", "type": "keypad", "label": "Safe Lock", "parameters": { "prompt": "Enter the combination:", "layout": "numeric", "maxDigits": 4, "correctCode": "1847", "failTarget": "beat_wrong_code", "maxAttempts": 3, "maskInput": true }, "connections": [{ "targetId": "beat_safe_open" }] }
 
@@ -523,7 +585,16 @@ Important:
 - Ensure all beat IDs are unique and all connections reference valid beat IDs
 - Include "suggestedTheme" with a theme ID and reason based on genre/style
 - EVERY beat must be reachable - some other beat must connect TO it (except titleScreen)
-- Don't artificially truncate long stories - let the story develop naturally`;
+- Don't artificially truncate long stories - let the story develop naturally
+- When AI beats are available, consider using aiSummary instead of endScreen for richer endings
+
+VERIFICATION CHECKLIST (check each before outputting):
+1. beat_0 is titleScreen
+2. Story ends with endScreen or aiSummary beats, each with showRestart: true
+3. EVERY target ID references an actual beat ID in the beats array — no dangling references
+4. EVERY beat (except beat_0) is reachable — at least one other beat has it as a target
+5. dialogTree.id, dialogTree.speaker, dialogTree.text, dialogTree.choices are all present
+6. Single-connection beats use connections array; multi-connection beats have targets INSIDE parameters`;
     const userPrompt = `Create an interactive story with these requirements:
 
 Prompt: ${prompt}
@@ -559,6 +630,9 @@ Generate a complete, engaging interactive story structure.`;
     const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, content];
     const jsonStr = jsonMatch[1] || content;
     const generated = JSON.parse(jsonStr);
+    // Auto-fix: ensure ending beats (endScreen, aiSummary) with showRestart:true have
+    // an explicit connection back to the titleScreen so the restart edge appears in the graph.
+    autoFixEndingRestartConnections(generated);
     // Add placeholder positions to beats if not present
     // Note: The builder's TreeLayoutAlgorithm will recalculate proper tree positions
     // based on connections when the story is injected

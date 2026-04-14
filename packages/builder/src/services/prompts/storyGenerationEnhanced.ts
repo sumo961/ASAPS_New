@@ -111,10 +111,10 @@ const BEAT_TYPE_GUIDE = `
   At runtime, randomly selects from: ["Hello!", "Hi there!", "Greetings!"]
 - Connections: Single → next beat (ONLY ONE connection allowed!)
 - ⚠️ CRITICAL: infoText can ONLY connect to ONE beat!
-- ❌ WRONG: infoText with 2+ connections (use movementChoice for branching!)
+- ❌ WRONG: infoText with 2+ connections (use dialogTree for branching!)
 - ✓ CORRECT: infoText → one target beat
-- For branching choices, use movementChoice or dialogTree instead!
-- Example: "You arrive at the mansion..." → movementChoice (for choices)
+- For branching choices, use dialogTree (DEFAULT — shows visible buttons). Only use movementChoice if the choices are spatial hotspots on a background image.
+- Example: "You arrive at the mansion..." → dialogTree (shallow, empty speaker, text as scene, top-level choices as options)
 
 **durScreen** - Timed auto-advance text
 - Use: Quick transitions, atmosphere, montages
@@ -128,8 +128,17 @@ const BEAT_TYPE_GUIDE = `
 - Connections: Single → auto-advances after duration
 - Example: "Three days later..." (3s) → dialogTree
 
-**dialogTree** - Branching conversations
-- Use: Character interactions, interrogations, negotiations
+**dialogTree** - Branching choices (DEFAULT for presenting multiple options to the player!)
+- 🚨 PREFERRED CHOICE BEAT: Use dialogTree for ANY situation where you want to present 2+ options to the player — conversations, decisions, actions, reactions, story branches.
+- Why: dialogTree shows choices directly as visible buttons. movementChoice uses invisible hotspots by default and is confusing for most content.
+- Use: Character interactions, interrogations, negotiations, AND general "what do you do?" branching
+- Pattern for simple multi-choice (no NPC): set speaker to "" (empty), text to the scene description / question, and put the 2-4 options as top-level choices. This is a "shallow dialogTree" and is the DEFAULT way to present choices.
+- Example (shallow, for general branching):
+  { "dialogTree": { "id": "root", "speaker": "", "text": "You stand at a crossroads. Three paths lie before you.", "choices": [
+    { "id": "c1", "text": "Take the forest path", "target": "beat_forest" },
+    { "id": "c2", "text": "Follow the river", "target": "beat_river" },
+    { "id": "c3", "text": "Climb the mountain", "target": "beat_mountain" }
+  ] } }
 - Parameters: dialogTree with this EXACT structure (NO "root" wrapper!):
   {
     "dialogTree": {
@@ -169,8 +178,12 @@ const BEAT_TYPE_GUIDE = `
   - At least one choice should have a real target to exit the loop
 - Example: NPC asks question → [Player response A | Player response B] → NPC responds
 
-**movementChoice** - Location/direction selection
-- Use: Exploration, navigation, choosing paths
+**movementChoice** - Spatial navigation via on-scene hotspots (SPECIALIZED — not the default!)
+- 🚨 DO NOT use movementChoice as a generic "multiple choices" beat. Use dialogTree instead for that.
+- movementChoice renders choices as INVISIBLE HOTSPOTS placed on a background scene. Players have to hover or click on regions of the image to reveal them. This is confusing when there's no meaningful spatial layout.
+- Only use movementChoice when: the scene has a background image AND each choice maps to a spatial location in that image (e.g., clicking on the library door, the staircase, the garden gate). If the choices are abstract (actions, answers, decisions), use dialogTree.
+- Use: Exploration on a visual map/scene where clicking parts of the image is the point
+- When in doubt: use dialogTree.
 - Parameters: question, choices (array of {id, text, location, target})
   - id: Unique identifier for the choice (e.g., "choice_library", "c1")
   - text: What the player sees (e.g., "Go to the Library")
@@ -356,7 +369,7 @@ Good item descriptions should:
   - creditsText: Label for the credits button (default: "Credits")
 - ⚠️ CRITICAL: Use "message", NOT "endMessage"!
 - ⚠️ CRITICAL: ALWAYS set "showRestart": true - player must be able to replay!
-- Connections: None (terminal beat)
+- 🚨 CRITICAL: When showRestart is true, you MUST add a connection back to the titleScreen (beat_0) so the restart button works and shows up as a graph edge. Example: "connections": [{ "targetId": "beat_0" }]
 - Pattern: Multiple endScreens for different endings
 - 🚨🚨🚨 CRITICAL: endScreen must be in the main "beats" array! 🚨🚨🚨
 - ❌ WRONG: Creating a separate "endings" array (this is NOT recognized!)
@@ -364,7 +377,7 @@ Good item descriptions should:
 - ✓ CORRECT: Put ALL endScreen beats in the main "beats" array:
   { "id": "beat_end_good", "type": "endScreen", "parameters": { "message": "...", "showRestart": true } }
 - 🚨 NEVER create an "endings" array - it will be IGNORED! All endings go in "beats"!
-- Example: { "id": "beat_ending_good", "type": "endScreen", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\\nDesigned by..." } }
+- Example: { "id": "beat_ending_good", "type": "endScreen", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\\nDesigned by..." }, "connections": [{ "targetId": "beat_0" }] }
 
 ### INVISIBLE BEATS (Logic/Background Operations)
 
@@ -603,7 +616,8 @@ Fictional time condition example (CORRECT format):
 - Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength, includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory
 - Supports showRestart, showCredits, resetOnRestart with granular reset sub-options (resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory)
 - Credits page: creditsPageTitle, creditsPageBody, creditsCloseText
-- When used as an ending: set showRestart: true and connect to beat_0 (titleScreen) for restart, same as endScreen.
+- When used as an ending: set showRestart: true AND add a connection back to the titleScreen (beat_0) so the restart button works and shows up as a graph edge. Example: "connections": [{ "targetId": "beat_0" }]
+- 🚨 CRITICAL: Same rule as endScreen — showRestart:true REQUIRES an explicit connection to beat_0.
 - Advantage over endScreen: the player sees a personalized recap of what they did, not just a static message
 
 **aiCondition** - AI-driven branching that analyzes player state
@@ -1426,7 +1440,8 @@ Generate complete, sophisticated interactive story structures that:
       "id": "beat_end_good",
       "name": "Good Ending",
       "type": "endScreen",
-      "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by..." }
+      "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by..." },
+      "connections": [{ "targetId": "beat_0" }]
     }
   ],
   "variables": [
@@ -1931,7 +1946,7 @@ Remember to:
 - Use invisible beats (setVariable, conditionBeat) for logic
 - Create reconvergent paths (branches that merge back)
 - Track important decisions in variables
-- Use appropriate beat types (dialogTree for conversations, movementChoice for exploration, etc.)
+- Use appropriate beat types: dialogTree is the DEFAULT for ANY multi-option choice (conversations, decisions, actions, branches). Only use movementChoice when choices are spatial hotspots on a background image.
 - Design multiple endings based on accumulated state
 - For puzzles/codes: inputText → conditionBeat (inputText stores answer, conditionBeat checks it!)
 
@@ -2198,7 +2213,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             showRestart: true,
             showCredits: false
           },
-          connections: []
+          connections: [{ targetId: "beat_0" }]
         },
         {
           id: "beat_16",
@@ -2226,7 +2241,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             showRestart: true,
             showCredits: false
           },
-          connections: []
+          connections: [{ targetId: "beat_0" }]
         },
         {
           id: "beat_18",
@@ -2238,7 +2253,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             showRestart: true,
             showCredits: true
           },
-          connections: []
+          connections: [{ targetId: "beat_0" }]
         },
         {
           id: "beat_19",
@@ -2250,7 +2265,7 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
             showRestart: true,
             showCredits: false
           },
-          connections: []
+          connections: [{ targetId: "beat_0" }]
         }
       ],
       variables: [

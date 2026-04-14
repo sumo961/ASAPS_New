@@ -1124,6 +1124,50 @@ export class AIService {
   }
 
   /**
+   * Auto-fix ending beats (endScreen, aiSummary) missing their restart connection back
+   * to the title screen. AI models often create these beats with showRestart:true but no
+   * outgoing connection. The engine has a fallback (getFirstBeatId), but the connection
+   * should be explicit so it shows up as a graph edge in the visual editor.
+   */
+  private autoFixEndScreenConnections(response: StoryGenerationResponse): void {
+    if (!response.beats || !Array.isArray(response.beats)) return;
+
+    // Find the title screen (first beat, always the restart target)
+    const titleScreen = response.beats.find(b => b.type === 'titleScreen');
+    if (!titleScreen) {
+      console.log('[AIService.autoFix] No titleScreen found, skipping ending-beat restart fix');
+      return;
+    }
+
+    const endingBeatTypes = new Set(['endScreen', 'aiSummary']);
+    let fixCount = 0;
+
+    for (const beat of response.beats) {
+      if (!endingBeatTypes.has(beat.type)) continue;
+
+      const showRestart = beat.parameters?.showRestart ?? true; // default true per schema
+      if (!showRestart) continue;
+
+      // Check if there's already a connection
+      const hasConnection = beat.connections && Array.isArray(beat.connections) && beat.connections.length > 0;
+      if (hasConnection) {
+        console.log(`[AIService.autoFix] ${beat.type} ${beat.id} already has connection, skipping`);
+        continue;
+      }
+
+      // Add restart connection back to title screen
+      if (!beat.connections) beat.connections = [];
+      beat.connections.push({ targetId: titleScreen.id });
+      console.log(`[AIService.autoFix] ✓ Added restart connection: ${beat.type} ${beat.id} → ${titleScreen.id}`);
+      fixCount++;
+    }
+
+    if (fixCount > 0) {
+      console.log(`[AIService.autoFix] Auto-fixed ${fixCount} ending beats missing restart connections`);
+    }
+  }
+
+  /**
    * Helper to collect all targets from a dialogTree recursively
    */
   private collectDialogTreeTargets(node: any, targets: Set<string>): void {
@@ -1162,6 +1206,9 @@ export class AIService {
 
       // Auto-fix missing connections on linear beats (common smaller model issue)
       this.autoFixMissingConnections(response);
+
+      // Auto-fix EndScreen beats missing restart connection back to title screen
+      this.autoFixEndScreenConnections(response);
 
       // Validate if enabled
       let validationErrors: any[] = [];

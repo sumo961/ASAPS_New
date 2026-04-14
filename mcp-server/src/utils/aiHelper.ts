@@ -154,11 +154,11 @@ export const BEAT_TYPES = {
   // 🚨🚨🚨 MANDATORY: beat_0 MUST be titleScreen - NEVER start with infoText! 🚨🚨🚨
   titleScreen: '🚨 MANDATORY FIRST BEAT (beat_0)! Start screen with title and author. SINGLE CONNECTION: only one target via connections array.',
   infoText: 'Narrative text with Continue button. SINGLE CONNECTION ONLY: can only connect to ONE target! ❌ WRONG: infoText with 2+ connections. ✓ For branching, use movementChoice or dialogTree instead. Optional: textVariations (array) for random text selection at runtime.',
-  endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true. Use "message" parameter (not "endMessage"). Optional credits page: showCredits (boolean), creditsPageTitle (default "Credits"), creditsPageBody (text content), creditsCloseText (default "Close"), creditsText (button label). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Created by..." } }',
+  endScreen: 'End screen with message. 🚨 MUST be actual beats in beats array, NOT an "endings" metadata array! ALWAYS set showRestart: true AND add a connection back to beat_0 (titleScreen) so the restart button works: "connections": [{ "targetId": "beat_0" }]. Use "message" parameter (not "endMessage"). Optional credits page: showCredits (boolean), creditsPageTitle (default "Credits"), creditsPageBody (text content), creditsCloseText (default "Close"), creditsText (button label). Example: { "id": "end_bad", "type": "endScreen", "parameters": { "message": "You lost!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Created by..." }, "connections": [{ "targetId": "beat_0" }] }',
 
   // Interactive content - MULTIPLE CONNECTIONS via parameters
-  dialogTree: 'Branching dialogue with character conversations. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean for per-choice visited tracking). Choices can modify counters via counter/counterOperation/counterValue properties. RECURSIVE DIALOGS: use target "__self__" to loop back to the same dialogTree (e.g., interrogation, shopping). NPC AUTO-EXIT: A dialog node can have a "target" field to auto-advance WITHOUT showing choices (NPC dismissals, forced exits). When "target" is set on a node, choices are ignored. Example: { "id": "n1", "speaker": "Guard", "text": "Go away!", "target": "beat_kicked_out", "choices": [] }.',
-  movementChoice: 'Choice of locations/actions. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. IMPORTANT: Each choice needs { id, text, location, target } - always set "location" to same value as "text" for hover labels! Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).',
+  dialogTree: '🚨 DEFAULT CHOICE BEAT — use this for ANY multi-option choice (conversations, decisions, actions, story branches). Shows choices as visible buttons. For simple non-NPC branching, use a SHALLOW dialogTree: set speaker to "" (empty), text to the scene/question, and put 2-4 options as top-level choices. MULTIPLE TARGETS: define targets in dialogTree.choices[].target parameter, NOT in connections array. Supports: choiceDelay (seconds), presentationMode ("positioned"/"chat-scroll"/"chat-bubble"), showAvatars (boolean), responseDelay (seconds for NPC typing indicator), markVisited (boolean for per-choice visited tracking). Choices can modify counters via counter/counterOperation/counterValue properties. RECURSIVE DIALOGS: use target "__self__" to loop back to the same dialogTree (e.g., interrogation, shopping). NPC AUTO-EXIT: A dialog node can have a "target" field to auto-advance WITHOUT showing choices (NPC dismissals, forced exits). When "target" is set on a node, choices are ignored. Example shallow (general branching): { "dialogTree": { "id": "root", "speaker": "", "text": "You stand at a crossroads.", "choices": [{ "id": "c1", "text": "Take the forest path", "target": "beat_forest" }, { "id": "c2", "text": "Follow the river", "target": "beat_river" }] } }.',
+  movementChoice: '🚨 SPECIALIZED — NOT the default multi-choice beat! Renders choices as INVISIBLE HOTSPOTS on a background scene. Only use when the scene has a background image AND each choice maps to a spatial location on that image (e.g., clicking the library door, staircase, garden gate). For abstract choices (actions, answers, decisions), use dialogTree instead. When in doubt: use dialogTree. MULTIPLE TARGETS: define targets in choices[].target parameter, NOT in connections array. Each choice needs { id, text, location, target } - always set "location" to same value as "text". Supports: choiceDelay (seconds), markVisited (boolean), showTextOnHover (boolean).',
   pickProp: 'Interactive prop/item selection. MULTIPLE TARGETS: define targets in props[].target parameter. IMPORTANT: prop "name" should be ITEM NAMES ONLY (e.g., "Silver Key", "Lantern"), NOT action descriptions (e.g., "Take the key" is WRONG). For actions, use movementChoice instead. Supports: choiceDelay (seconds), markVisited (boolean).',
   hyperText: 'Text with clickable words leading to different beats. MULTIPLE TARGETS: define in hyperlinks[].targetBeatId. Links can have custom styling (color, underline, bold). Supports optional defaultTarget for timed auto-advance.',
   inputText: 'Player text input. Save to: variable (default), characterName (update display name), or counter (numeric). Validation: none, numeric, email, alphanumeric. Properties: minLength, maxLength, required. SINGLE CONNECTION: only one target. Supports optional defaultTarget for timed auto-advance.',
@@ -272,6 +272,41 @@ export async function generateStory(config: StoryConfig): Promise<GeneratedStory
   } catch (error) {
     console.error('[AI] Failed to generate with AI, falling back to simulation:', error);
     return generateStorySimulation(config);
+  }
+}
+
+/**
+ * Auto-fix ending beats (endScreen, aiSummary) missing their restart connection back
+ * to the title screen. AI models often create these with showRestart:true but no
+ * outgoing connection. The engine has a fallback, but the connection should be explicit
+ * so it renders as a graph edge in the visual editor.
+ */
+function autoFixEndingRestartConnections(generated: any): void {
+  if (!generated?.beats || !Array.isArray(generated.beats)) return;
+
+  const titleScreen = generated.beats.find((b: any) => b.type === 'titleScreen');
+  if (!titleScreen) return;
+
+  const endingBeatTypes = new Set(['endScreen', 'aiSummary']);
+  let fixCount = 0;
+
+  for (const beat of generated.beats) {
+    if (!endingBeatTypes.has(beat.type)) continue;
+
+    const showRestart = beat.parameters?.showRestart ?? true;
+    if (!showRestart) continue;
+
+    const hasConnection = beat.connections && Array.isArray(beat.connections) && beat.connections.length > 0;
+    if (hasConnection) continue;
+
+    if (!beat.connections) beat.connections = [];
+    beat.connections.push({ targetId: titleScreen.id });
+    console.error(`[aiHelper.autoFix] ✓ Added restart connection: ${beat.type} ${beat.id} → ${titleScreen.id}`);
+    fixCount++;
+  }
+
+  if (fixCount > 0) {
+    console.error(`[aiHelper.autoFix] Auto-fixed ${fixCount} ending beats missing restart connections`);
   }
 }
 
@@ -589,6 +624,7 @@ CRITICAL ANTI-PATTERNS TO AVOID:
 
 CORRECT PARAMETER NAMES (MUST use exactly these):
 - endScreen: { message (NOT "endText"), showRestart: true (ALWAYS), showCredits, creditsPageTitle, creditsPageBody, creditsCloseText, creditsText }
+  🚨 CRITICAL: When showRestart is true, endScreen MUST have a connection back to the titleScreen (beat_0). Example: "connections": [{ "targetId": "beat_0" }]. Same rule applies to aiSummary when used as an ending.
 - keypad: { prompt, layout ("numeric"|"phone"|"pin"), maxDigits, minDigits, correctCode, failTarget, maxAttempts, maskInput, saveToType, variable, buttonText, clearButtonText }
 - inputText: { prompt, variable (NOT "variableName"), saveToType: "variable" (REQUIRED), submitButtonText }
 - setVariable: { type: "variable"|"counter"|"fictionalTime", name (variable name, NOT "variableName"), value, operation }
@@ -614,7 +650,7 @@ Note: quantityValue can also reference a variable with $ prefix: "$requiredAmoun
 
 conditionBeat (counterCompare): { "parameters": { "condition": { "type": "counterCompare", "counter1": "strength", "counter2": "threshold", "operator": ">=" }, "trueConnection": { "target": "beat_pass" }, "falseConnection": { "target": "beat_fail" } } }
 
-endScreen: { "id": "beat_end", "type": "endScreen", "label": "The End", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\nDesigned by..." } }
+endScreen: { "id": "beat_end", "type": "endScreen", "label": "The End", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\nDesigned by..." }, "connections": [{ "targetId": "beat_0" }] }
 
 keypad: { "id": "beat_safe", "type": "keypad", "label": "Safe Lock", "parameters": { "prompt": "Enter the combination:", "layout": "numeric", "maxDigits": 4, "correctCode": "1847", "failTarget": "beat_wrong_code", "maxAttempts": 3, "maskInput": true }, "connections": [{ "targetId": "beat_safe_open" }] }
 
@@ -683,6 +719,10 @@ Generate a complete, engaging interactive story structure.`;
   const jsonStr = jsonMatch[1] || content;
 
   const generated = JSON.parse(jsonStr);
+
+  // Auto-fix: ensure ending beats (endScreen, aiSummary) with showRestart:true have
+  // an explicit connection back to the titleScreen so the restart edge appears in the graph.
+  autoFixEndingRestartConnections(generated);
 
   // Add placeholder positions to beats if not present
   // Note: The builder's TreeLayoutAlgorithm will recalculate proper tree positions

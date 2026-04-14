@@ -365,14 +365,26 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             <label htmlFor="baseUrl" className="block text-sm font-medium text-gray-700 mb-2">
               Base URL {provider !== 'local' && <span className="text-gray-400">(Optional)</span>}
             </label>
-            <input
-              id="baseUrl"
-              type="text"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder={preset.defaultBaseUrl || (provider === 'claude' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
+            <div className="relative">
+              <input
+                id="baseUrl"
+                type="text"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder={preset.defaultBaseUrl || (provider === 'claude' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 pr-10"
+              />
+              {baseUrl && (
+                <button
+                  type="button"
+                  onClick={() => setBaseUrl('')}
+                  title="Clear to use default endpoint"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <p className="mt-1 text-xs text-gray-500">
               {provider === 'local'
                 ? 'Ollama default: localhost:11434. For remote: http://your-server:11434/v1'
