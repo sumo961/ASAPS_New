@@ -16,12 +16,17 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.31)
+## ⚠️ Development Status (v0.9.32)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **Kimi K2.5 Support** | **v0.9.32**: Full end-to-end support for Kimi K2.5 as an OpenAI-compatible story generation provider (reasoning model handling, 10-minute proxy timeout, JSON repair for unescaped dialogue quotes) |
+| **AI Prompt Fixes** | **v0.9.32**: EndScreen/aiSummary now get explicit restart edges to beat_0 (prompt + auto-fix); dialogTree is the default multi-choice beat, movementChoice reserved for spatial hotspots |
+| **Undo/Redo for Characters & Global Settings** | **v0.9.32**: Character Editor and Global Settings edits now flow through the command system — Ctrl/Cmd+Z works for these too |
+| **InputText Auto-Focus** | **v0.9.32**: Text input beats auto-focus and select sample text on entry — no extra click needed, works for consecutive InputText beats and in HTML exports |
+| **SetTimer Expiry Fix** | **v0.9.32**: SetTimer continue connection no longer silently drops on save/load; keypad and inputText beats no longer block the engine on cancel |
 | **AI Conversation Beat** | **v0.9.31**: Real-time AI conversations with author-defined steering rules (directions, triggers, actions) and free-form/voice input |
 | **Speech-to-Text (NEW)** | **v0.9.31**: Voice input for AI Conversation beats — Web Speech API (browser-native), whisper.cpp, Vosk, or OpenAI Whisper |
 | **NPC Auto-Exit** | **v0.9.31**: DialogTree/AIDialogTree nodes can auto-advance without showing choices (NPC dismissals, forced exits) |

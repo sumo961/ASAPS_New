@@ -1,5 +1,84 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-14: Kimi K2.5, AI Prompt Fixes, Undo/Redo & Input UX (v0.9.32)
+
+### Overview
+
+A stability and polish release focused on AI story generation quality and author/player UX. Adds full **Kimi K2.5** support as a story-generation provider, fixes several **AI prompt defects** that produced broken graphs (missing EndScreen restart edges, overuse of invisible-hotspot movementChoice), restores **undo/redo** for Character and Global Settings edits, and fixes several fiddly **input/interaction** bugs (InputText auto-select, SetTimer expiry, keypad/inputText engine block).
+
+### Kimi K2.5 Support
+
+Kimi K2.5 now works end-to-end as an OpenAI-compatible story generation provider.
+
+- `kimi-k2*` models recognised as reasoning models → temperature is omitted (Kimi rejects any value other than 1)
+- AI proxy timeout increased from 5 → 10 minutes so reasoning models have room to finish long generations
+- New JSON repair pass in `OpenAIProvider` escapes unescaped interior double quotes in string values — a common Kimi K2.5 output quirk where dialogue text contains literal `"` that would break `JSON.parse`
+- AI Config Dialog: new clear (×) button on the Base URL field so users can easily reset to default OpenAI after using a custom endpoint like `https://api.moonshot.ai/v1`
+
+**Files modified:**
+- `packages/builder/src/services/providers/openai-utils.ts`
+- `packages/builder/src/services/providers/OpenAIProvider.ts`
+- `packages/builder/src/api/vite-ai-proxy.ts`
+- `packages/builder/src/components/ai/AIConfigDialog.tsx`
+
+### AI Story Generation Prompt Fixes
+
+Two long-standing defects in AI-generated stories, fixed in both the internal (`AIService`) and MCP (`aiHelper`) generation paths.
+
+**EndScreen / aiSummary restart connections:**
+- Prompts were telling the AI that endScreen has "no connections (terminal beat)" — but when `showRestart: true`, the restart button needs an explicit edge back to `beat_0` to show up in the graph
+- All prompt sections, examples, and inline snippets updated to require `"connections": [{ "targetId": "beat_0" }]` for both `endScreen` and `aiSummary` when used as endings
+- Safety-net auto-fix added — scans generated stories and injects the restart connection if the model still misses it
+
+**dialogTree is the default choice beat:**
+- AI was consistently using `movementChoice` for any multi-option branching, which renders as invisible hotspots on a background — confusing when there's no meaningful spatial layout
+- Prompts reframe `dialogTree` as the default for any multi-option choice (conversations, decisions, actions, branches) with visible buttons
+- "Shallow dialogTree" pattern documented (empty speaker + scene text + top-level choices) as the drop-in replacement for generic `movementChoice` usage
+- `movementChoice` reframed as specialised — only for scenes where choices map to spatial hotspots on a background image
+
+**Files modified:**
+- `packages/builder/src/services/AIService.ts` — `autoFixEndScreenConnections()`
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`
+- `mcp-server/src/utils/aiHelper.ts` — `autoFixEndingRestartConnections()`
+- `mcp-server/src/tools/applyStoryChanges.ts`
+
+### Undo/Redo for Character Editor and Global Settings
+
+Character and global-settings saves previously mutated state directly, bypassing the command system — so Ctrl/Cmd+Z had no effect on those edits. Now both go through the CommandManager.
+
+- New `UpdateCharactersCommand` and `UpdateGlobalSettingsCommand` (whole-slice snapshot commands)
+- Pushed via `CommandManager` on every save from the respective inspectors
+
+### InputText Auto-Focus and Auto-Select
+
+Interactors no longer need to click into the text field before typing. On mount, the input is focused and any pre-filled sample text is selected. Applies to:
+
+- InputText beat (both dialog and positioned/canvas layouts)
+- AI Conversation beat when STT is disabled
+- In-app preview AND the HTML export player (`player-web.js` rebuilt)
+
+Also includes a follow-up fix for consecutive InputText beats: uses `inputValue === content` as the initialisation signal so selection fires on every fresh beat, not just the first.
+
+**Files modified:**
+- `packages/renderer/src/components/PositionedBeatView.tsx`
+- `packages/builder/public/player-web.js`
+
+### SetTimer Expiry, Keypad & InputText Engine Block
+
+Three related fixes where beats could silently stall the story engine:
+
+1. **SetTimerBeat** — constructor now initialises `continueTarget` from parameters with a fallback to the unlabelled connection. Previously the field was always `''` after a save/load cycle; any Inspector edit would then silently drop the continue connection, so `getNextBeat()` returned null and the engine exited before the timer fired.
+2. **ReactRenderer.cancelPendingAction** — now resolves the outer wrapped handler instead of only the inner `resolveAction`. The old code left `renderKeypad` and `renderInputText` promises permanently blocked.
+3. **SchemaFormGenerator** — now renders `type:'connection'` parameters (e.g. `fallbackExitTarget` on `aiConversation`) as a beat-picker. Previously they fell through the switch and returned null.
+
+**Files modified:**
+- `packages/core/src/beats/SetTimerBeat.ts`
+- `packages/renderer/src/renderers/ReactRenderer.tsx`
+- `packages/builder/src/components/SchemaFormGenerator.tsx`
+- `packages/builder/src/components/Inspector.tsx`
+
+---
+
 ## 2026-04-09: AI Conversation, NPC Exits, VideoBeat VE, Local TTS/STT & LLM Eval (v0.9.31)
 
 ### Overview
