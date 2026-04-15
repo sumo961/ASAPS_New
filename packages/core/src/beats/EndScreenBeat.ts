@@ -131,64 +131,53 @@ export class EndScreenBeat extends Beat {
     const processedMessage = this.processText(this.message, context);
 
     const locations = Array.from(this.locations.values());
-    console.log('[EndScreenBeat] Rendering with locations:', locations.map(l => ({ name: l.name, kind: l.kind })));
-    console.log('[EndScreenBeat] showRestart:', this.showRestart, 'showCredits:', this.showCredits);
-
-    const action = await renderer.renderEndScreen(processedMessage, this.showRestart, this.showCredits, locations);
-    console.log('[EndScreenBeat] Received action from renderer:', JSON.stringify(action));
-
-    // Check if user clicked restart (action could be 'restart', 'Play Again', 'restartButton', 'button1', etc.)
-    // Return the action so the engine/player can handle it
-    const actionLower = (action || '').toLowerCase();
-    console.log('[EndScreenBeat] Action lower:', actionLower);
 
     // Helper: perform reset and return restart target
     const doRestart = (): string => {
       this.applyReset(context);
       const target = this.getNextBeat(context) || context.getStory().getFirstBeatId();
-      console.log('[EndScreenBeat] Restarting - navigating to:', target);
       return target;
     };
 
-    // Check for explicit restart patterns
-    if (actionLower.includes('restart') || actionLower.includes('play') || actionLower.includes('again')) {
-      return doRestart();
-    }
+    // Loop so the EndScreen re-renders after the credits page is closed.
+    while (true) {
+      const action = await renderer.renderEndScreen(processedMessage, this.showRestart, this.showCredits, locations);
+      const actionLower = (action || '').toLowerCase();
 
-    // Check for credits patterns
-    if (actionLower.includes('credit')) {
-      if (this.showCredits) {
-        console.log('[EndScreenBeat] User requested credits');
-        await this.showCreditsPage(context, renderer);
-      }
-      console.log('[EndScreenBeat] Credits clicked, returning null');
-      return null;
-    }
-
-    // Handle generic button names from visual editor (button1, button2, etc.)
-    // button1 is typically restart, button2 is typically credits
-    if (actionLower === 'button1' || actionLower === 'button 1') {
-      if (this.showRestart) {
+      // Explicit restart patterns
+      if (actionLower.includes('restart') || actionLower.includes('play') || actionLower.includes('again')) {
         return doRestart();
       }
-    }
 
-    if (actionLower === 'button2' || actionLower === 'button 2') {
-      if (this.showCredits) {
-        console.log('[EndScreenBeat] User clicked button2 with showCredits=true - showing credits');
-        await this.showCreditsPage(context, renderer);
+      // Credits patterns
+      if (actionLower.includes('credit')) {
+        if (this.showCredits) {
+          await this.showCreditsPage(context, renderer);
+          continue; // re-render EndScreen after credits close
+        }
+        return null;
       }
-      console.log('[EndScreenBeat] Button2/credits clicked, returning null');
+
+      // Generic button names from visual editor (button1 = restart, button2 = credits)
+      if (actionLower === 'button1' || actionLower === 'button 1') {
+        if (this.showRestart) return doRestart();
+      }
+
+      if (actionLower === 'button2' || actionLower === 'button 2') {
+        if (this.showCredits) {
+          await this.showCreditsPage(context, renderer);
+          continue;
+        }
+        return null;
+      }
+
+      // If only one button exists and showRestart is true, any click should restart
+      if (this.showRestart && !this.showCredits) {
+        return doRestart();
+      }
+
       return null;
     }
-
-    // If only one button exists and showRestart is true, any button click should restart
-    if (this.showRestart && !this.showCredits) {
-      return doRestart();
-    }
-
-    console.log('[EndScreenBeat] No restart detected, returning null');
-    return null;
   }
 
   /**

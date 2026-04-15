@@ -280,32 +280,10 @@ export class AISummaryBeat extends Beat {
     const processedRestartText = this.processText(this.restartText, context);
     const processedCreditsText = this.processText(this.creditsText, context);
 
-    // Use dedicated AI Summary renderer if available, otherwise fall back to end screen
-    let result: string;
-    if (renderer.renderAISummary) {
-      result = await renderer.renderAISummary({
-        title: processedTitle,
-        summary: processedSummary,
-        showRestart: this.showRestart,
-        showCredits: this.showCredits,
-        restartText: processedRestartText,
-        creditsText: processedCreditsText,
-      }, Array.from(this.locations.values()));
-    } else {
-      // Fallback: combine title and summary for legacy renderers
-      const fullMessage = `${processedTitle}\n\n${processedSummary}`;
-      result = await renderer.renderEndScreen(
-        fullMessage,
-        this.showRestart,
-        this.showCredits,
-        Array.from(this.locations.values())
-      );
-    }
+    const locs = Array.from(this.locations.values());
 
-    // Handle restart
-    if (result === 'restart') {
+    const doRestart = (): string => {
       if (this.resetOnRestart) {
-        // If all sub-options are true, use full reset for efficiency
         const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
           this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
         if (allTrue) {
@@ -323,17 +301,57 @@ export class AISummaryBeat extends Beat {
         }
       }
       return this.restartTarget || context.getStory().getFirstBeatId();
-    }
+    };
 
-    // Handle credits
-    if (result === 'credits') {
-      if (this.showCredits) {
-        await this.showCreditsPage(context, renderer);
+    // Loop so the AI summary re-renders after the credits page is closed.
+    while (true) {
+      let result: string;
+      if (renderer.renderAISummary) {
+        result = await renderer.renderAISummary({
+          title: processedTitle,
+          summary: processedSummary,
+          showRestart: this.showRestart,
+          showCredits: this.showCredits,
+          restartText: processedRestartText,
+          creditsText: processedCreditsText,
+        }, locs);
+      } else {
+        const fullMessage = `${processedTitle}\n\n${processedSummary}`;
+        result = await renderer.renderEndScreen(fullMessage, this.showRestart, this.showCredits, locs);
       }
-      return null;
-    }
 
-    return this.getNextBeat(context);
+      const resultLower = (result || '').toLowerCase();
+
+      if (resultLower.includes('restart') || resultLower.includes('play') || resultLower.includes('again')) {
+        return doRestart();
+      }
+
+      if (resultLower.includes('credit')) {
+        if (this.showCredits) {
+          await this.showCreditsPage(context, renderer);
+          continue; // re-render summary after credits close
+        }
+        return null;
+      }
+
+      if (resultLower === 'button1' || resultLower === 'button 1') {
+        if (this.showRestart) return doRestart();
+      }
+
+      if (resultLower === 'button2' || resultLower === 'button 2') {
+        if (this.showCredits) {
+          await this.showCreditsPage(context, renderer);
+          continue;
+        }
+        return null;
+      }
+
+      if (this.showRestart && !this.showCredits) {
+        return doRestart();
+      }
+
+      return this.getNextBeat(context);
+    }
   }
 
   private async showCreditsPage(context: StoryContext, renderer: IRenderer): Promise<void> {
