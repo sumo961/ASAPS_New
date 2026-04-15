@@ -283,6 +283,12 @@ export class AISummaryBeat extends Beat {
     const locs = Array.from(this.locations.values());
 
     const doRestart = (): string => {
+      // Always clear HUD overlay state on restart so a stale real-time timer
+      // readout doesn't persist into the next playthrough.
+      const r = renderer as any;
+      r.setTimerHudState?.(undefined);
+      r.setTimerHudOverrideText?.(undefined);
+      r.setTimerState?.(undefined);
       if (this.resetOnRestart) {
         const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
           this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;

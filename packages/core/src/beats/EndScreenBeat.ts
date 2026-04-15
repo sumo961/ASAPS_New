@@ -135,6 +135,12 @@ export class EndScreenBeat extends Beat {
     // Helper: perform reset and return restart target
     const doRestart = (): string => {
       this.applyReset(context);
+      // Always clear HUD overlay state on restart, even if reset=false, so a
+      // stale real-time timer readout doesn't persist into the next playthrough.
+      const r = renderer as any;
+      r.setTimerHudState?.(undefined);
+      r.setTimerHudOverrideText?.(undefined);
+      r.setTimerState?.(undefined);
       const target = this.getNextBeat(context) || context.getStory().getFirstBeatId();
       return target;
     };

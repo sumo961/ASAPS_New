@@ -1653,6 +1653,31 @@ export const PreviewWindow: React.FC = () => {
       context.on('reset', updateDebugInfo);
       context.on('selectiveReset', updateDebugInfo);
 
+      // On in-story restart (EndScreen/AISummary → context.reset / selectiveReset),
+      // the renderer's HUD state is not cleared automatically. Clear stale timer
+      // HUD state and restore the fictional-time display from global config.
+      const onStoryReset = () => {
+        if (!rendererRef.current) return;
+        (rendererRef.current as any).setTimerHudState?.(undefined);
+        (rendererRef.current as any).setTimerHudOverrideText?.(undefined);
+        const ftCfg = (rendererRef.current as any)?._fictionalTimeConfig;
+        if (ftCfg?.enabled && ftCfg.initialTime) {
+          context.setFictionalTime(ftCfg.initialTime);
+          if (ftCfg.showInTimerHud) {
+            const formatted = context.formatFictionalTime(ftCfg.displayFormat, ftCfg.initialTime);
+            (rendererRef.current as any).setFictionalTimeText?.(formatted);
+          } else {
+            (rendererRef.current as any).setFictionalTimeText?.(undefined);
+          }
+        } else {
+          (rendererRef.current as any).setFictionalTimeText?.(undefined);
+        }
+      };
+      context.on('reset', onStoryReset);
+      context.on('selectiveReset', (options: any) => {
+        if (options?.timers || options?.fictionalTime) onStoryReset();
+      });
+
       // Listen for fictional time changes and update renderer
       context.on('fictionalTimeChanged', () => {
         if (!rendererRef.current) return;

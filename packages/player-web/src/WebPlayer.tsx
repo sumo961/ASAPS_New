@@ -419,6 +419,30 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           context.on('counterChanged', updateCountdownMeter);
           updateCountdownMeter();
 
+          // On in-story restart (EndScreen/AISummary → context.reset / selectiveReset),
+          // clear stale timer HUD state and restore fictional-time display.
+          const onStoryReset = () => {
+            if (!rendererRef.current) return;
+            (rendererRef.current as any).setTimerHudState?.(undefined);
+            (rendererRef.current as any).setTimerHudOverrideText?.(undefined);
+            const cfg = (rendererRef.current as any)?._fictionalTimeConfig;
+            if (cfg?.enabled && cfg.initialTime) {
+              context.setFictionalTime(cfg.initialTime);
+              if (cfg.showInTimerHud) {
+                const formatted = context.formatFictionalTime(cfg.displayFormat, cfg.initialTime);
+                (rendererRef.current as any).setFictionalTimeText?.(formatted);
+              } else {
+                (rendererRef.current as any).setFictionalTimeText?.(undefined);
+              }
+            } else {
+              (rendererRef.current as any).setFictionalTimeText?.(undefined);
+            }
+          };
+          context.on('reset', onStoryReset);
+          context.on('selectiveReset', (options: any) => {
+            if (options?.timers || options?.fictionalTime) onStoryReset();
+          });
+
           // Handle timer expiration - navigate to target beat
           // This is crucial for defaultTarget functionality when timer expires
           timerManager.on('timerExpired', async ({ name, targetBeat }: { name: string; targetBeat?: string }) => {
