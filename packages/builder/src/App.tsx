@@ -4476,6 +4476,76 @@ function App() {
       }
     }
 
+    // Auto-enable fictional-time HUD overlay if (and only if) the story actually
+    // uses fictional time. AI reliably sets up the data-side (setVariable type
+    // fictionalTime, conditionBeat type fictionalTime) but forgets the display
+    // toggle in global settings, leaving the in-story clock invisible.
+    if (Array.isArray(story.beats)) {
+      let usesFictionalTime = false;
+      let earliestSetTime: { year: number; month: number; day: number; hour: number; minute: number } | null = null;
+
+      for (const b of story.beats) {
+        const t = b?.type;
+        const p = b?.parameters || {};
+        if (t === 'setVariable' && p.type === 'fictionalTime') {
+          usesFictionalTime = true;
+          if (p.operation === 'set' && earliestSetTime == null) {
+            earliestSetTime = {
+              year: Number(p.timeYear ?? 2024),
+              month: Number(p.timeMonth ?? 1),
+              day: Number(p.timeDay ?? 1),
+              hour: Number(p.timeHour ?? 9),
+              minute: Number(p.timeMinute ?? 0),
+            };
+          }
+        }
+        if (t === 'conditionBeat') {
+          const cond = p.condition || p;
+          if (cond?.type === 'fictionalTime') usesFictionalTime = true;
+        }
+      }
+
+      if (usesFictionalTime) {
+        setGlobalSettings(prev => {
+          // Only inject defaults if the user hasn't already configured fictional-time HUD
+          if (prev.hudOverlays?.fictionalTime?.enabled) return prev;
+          const initialTime = earliestSetTime || { year: 2024, month: 1, day: 1, hour: 9, minute: 0 };
+          console.log('[App] Auto-enabling fictional-time HUD for generated story (initialTime=', initialTime, ')');
+          return {
+            ...prev,
+            hudOverlays: {
+              ...(prev.hudOverlays || {}),
+              fictionalTime: {
+                enabled: true,
+                initialTime,
+                displayFormat: 'datetime-12h',
+                showInTimerHud: true,
+              },
+              // Ensure Timer HUD container is on too (required to render anything)
+              timerHud: prev.hudOverlays?.timerHud?.enabled
+                ? prev.hudOverlays.timerHud
+                : {
+                    enabled: true,
+                    timerName: '',
+                    staticText: '',
+                    position: 'top-right',
+                    style: 'digital',
+                    fontSize: 18,
+                    textColor: '#FFFFFF',
+                    backgroundColor: '#000000',
+                    backgroundOpacity: 70,
+                    borderRadius: 6,
+                    padding: 8,
+                    showLabel: false,
+                    label: '',
+                    showWhenInactive: false,
+                  },
+            },
+          };
+        });
+      }
+    }
+
     // Apply tree layout to position beats based on their connections
     // Pass both beats (for parameter-embedded connections) and the connections array (for external connections)
     const externalConnections = story.connections && Array.isArray(story.connections)

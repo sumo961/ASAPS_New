@@ -32,11 +32,13 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   const [selectedBackwardBeat, setSelectedBackwardBeat] = useState<string | null>(null);
   const [expandedBackwardPath, setExpandedBackwardPath] = useState<number | null>(null);
 
-  // Use state-based simulation analyzer for more accurate path analysis
+  // Use state-based simulation analyzer for more accurate path analysis.
+  // Default maxPaths (50k) is needed for real AI stories with wide hub-and-spoke
+  // structures — narrow condition-gated endings sit deep in the BFS queue and a
+  // small budget exhausts before they are dequeued.
   const simulationAnalyzer = useMemo(() => {
     return new StateSimulationAnalyzer(story, {
-      maxDepth: 200,
-      maxPaths: 500,
+      maxDepth: 300,
     });
   }, [story]);
 

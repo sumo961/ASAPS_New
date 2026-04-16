@@ -1,0 +1,784 @@
+{
+  "title": "The Blackwood Adjustment",
+  "generatedAt": "2026-04-13T22:04:34.943Z",
+  "status": "success",
+  "beatCount": 29,
+  "beatTypes": [
+    "titleScreen",
+    "infoText",
+    "movementChoice",
+    "infoText",
+    "setVariable",
+    "infoText",
+    "setVariable",
+    "infoText",
+    "setVariable",
+    "infoText",
+    "movementChoice",
+    "pickProp",
+    "infoText",
+    "setVariable",
+    "infoText",
+    "setVariable",
+    "conditionBeat",
+    "infoText",
+    "infoText",
+    "setVariable",
+    "infoText",
+    "setVariable",
+    "infoText",
+    "dialogTree",
+    "conditionBeat",
+    "conditionBeat",
+    "endScreen",
+    "endScreen",
+    "endScreen"
+  ],
+  "errors": [],
+  "warnings": [],
+  "story": {
+    "metadata": {
+      "title": "The Blackwood Adjustment",
+      "author": "Interactive Narrative Designer",
+      "description": "A 1920s cosmic horror mystery following a private investigator who discovers that an insurance fraud case leads to geometries that violate reality itself.",
+      "genre": "horror"
+    },
+    "suggestedTheme": {
+      "themeId": "builtin-twine",
+      "reason": "The literary, text-heavy nature of cosmic horror requires atmospheric prose and minimal UI distraction. The dark background with light text creates the oppressive, claustrophobic mood essential for the genre, while the serif typography evokes the 1920s period setting."
+    },
+    "characters": [
+      {
+        "id": "char_investigator",
+        "name": "Investigator",
+        "displayName": "You",
+        "role": "player",
+        "description": "A private investigator seeking mundane fraud, finding cosmic truth",
+        "counters": [
+          {
+            "name": "horrorExposure",
+            "displayName": "Cosmic Insight",
+            "value": 0,
+            "min": 0,
+            "max": 10
+          }
+        ]
+      },
+      {
+        "id": "char_blackwood",
+        "name": "Mr. Blackwood",
+        "displayName": "Mr. Blackwood",
+        "role": "npc",
+        "description": "The client who is not entirely human"
+      }
+    ],
+    "variables": [
+      {
+        "name": "hasKey",
+        "initialValue": false,
+        "description": "Whether the player has found the rusted iron key"
+      }
+    ],
+    "beats": [
+      {
+        "id": "beat_0",
+        "name": "Title Screen",
+        "type": "titleScreen",
+        "position": {
+          "x": 100,
+          "y": 300
+        },
+        "parameters": {
+          "title": "The Blackwood Adjustment",
+          "author": "Interactive Narrative",
+          "connection": {
+            "target": "beat_1"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_1"
+          }
+        ]
+      },
+      {
+        "id": "beat_1",
+        "name": "Arrival at Estate",
+        "type": "infoText",
+        "position": {
+          "x": 400,
+          "y": 300
+        },
+        "notes": "ASSET: Rain-streaked mansion exterior, 1920s New England architecture. AUDIO: Distant thunder, rain against windows.",
+        "parameters": {
+          "text": "September 1923. The Blackwood Estate looms against a bruised New England sky, its gables dripping with rain that seems to fall at wrong angles. You've been hired to investigate a suspicious insurance claim—apparently, the east wing burned in a fire that left no ash. Mr. Blackwood meets you at the door, his smile too wide. 'Just a simple case of fraud, I assure you,' he says. The angles of the doorway seem to hurt your eyes if you stare too long.",
+          "connection": {
+            "target": "beat_2"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_2"
+          }
+        ]
+      },
+      {
+        "id": "beat_2",
+        "name": "First Investigation Choice",
+        "type": "movementChoice",
+        "position": {
+          "x": 700,
+          "y": 300
+        },
+        "notes": "Hub for initial exploration. Player chooses where to begin investigation.",
+        "parameters": {
+          "question": "Where do you investigate first?",
+          "choices": [
+            {
+              "id": "c_library",
+              "text": "The Library",
+              "location": "The Library",
+              "target": "beat_3"
+            },
+            {
+              "id": "c_greenhouse",
+              "text": "The Greenhouse",
+              "location": "The Greenhouse",
+              "target": "beat_4"
+            },
+            {
+              "id": "c_eastwing",
+              "text": "The East Wing",
+              "location": "The East Wing",
+              "target": "beat_5"
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_3"
+          },
+          {
+            "targetId": "beat_4"
+          },
+          {
+            "targetId": "beat_5"
+          }
+        ]
+      },
+      {
+        "id": "beat_3",
+        "name": "Library Discovery",
+        "type": "infoText",
+        "position": {
+          "x": 1000,
+          "y": 100
+        },
+        "notes": "ASSET: Dusty library with books that seem too tall. CHARACTER: Show investigator looking disturbed.",
+        "parameters": {
+          "text": "Dust motes dance in shafts of sickly green light that shouldn't exist on a rainy afternoon. The books are... wrong. One journal details the 'Adjustment of 1920'—a ritual to 'correct the angles between worlds.' The handwriting degenerates into spirals that continue into the margin, off the page, and into the woodgrain of the desk. You feel a pressure behind your eyes.",
+          "connection": {
+            "target": "beat_3a"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3a"
+          }
+        ]
+      },
+      {
+        "id": "beat_3a",
+        "name": "Increment Horror - Library",
+        "type": "setVariable",
+        "position": {
+          "x": 1300,
+          "y": 100
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "horrorExposure",
+          "value": 1,
+          "operation": "add",
+          "connection": {
+            "target": "beat_6"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_6"
+          }
+        ]
+      },
+      {
+        "id": "beat_4",
+        "name": "Greenhouse Horrors",
+        "type": "infoText",
+        "position": {
+          "x": 1000,
+          "y": 300
+        },
+        "notes": "ASSET: Victorian greenhouse with impossible geometries. Colors that don't exist in normal spectrum.",
+        "parameters": {
+          "text": "Humidity wraps around you like a shroud. The glass panes are angled such that you can see multiple reflections of yourself, each one delayed by half a second. Plants grow in geometries that violate Euclidean space—a fern that unfolds into seven dimensions. A fungal bloom pulses with bioluminescence, casting shadows that move independently of any light source. The air tastes of copper and distant stars.",
+          "connection": {
+            "target": "beat_4a"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_4a"
+          }
+        ]
+      },
+      {
+        "id": "beat_4a",
+        "name": "Increment Horror - Greenhouse",
+        "type": "setVariable",
+        "position": {
+          "x": 1300,
+          "y": 300
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "horrorExposure",
+          "value": 2,
+          "operation": "add",
+          "connection": {
+            "target": "beat_6"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_6"
+          }
+        ]
+      },
+      {
+        "id": "beat_5",
+        "name": "East Wing Fire Damage",
+        "type": "infoText",
+        "position": {
+          "x": 1000,
+          "y": 500
+        },
+        "notes": "ASSET: Burned room with scorch marks forming patterns. No ash on the floor.",
+        "parameters": {
+          "text": "The 'fire damage' is visible—blackened stone, scorched wood. But the scorch patterns form symbols you've seen in nightmares you haven't had yet. The center of the room is pristine, as if the flames worshipped what stands there. The air smells of ozone, not smoke. You find no ash. Fire always leaves ash.",
+          "connection": {
+            "target": "beat_5a"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_5a"
+          }
+        ]
+      },
+      {
+        "id": "beat_5a",
+        "name": "Increment Horror - East Wing",
+        "type": "setVariable",
+        "position": {
+          "x": 1300,
+          "y": 500
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "horrorExposure",
+          "value": 1,
+          "operation": "add",
+          "connection": {
+            "target": "beat_6"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_6"
+          }
+        ]
+      },
+      {
+        "id": "beat_6",
+        "name": "Reconvergence - Return to Hall",
+        "type": "infoText",
+        "position": {
+          "x": 1600,
+          "y": 300
+        },
+        "notes": "REVIEW: Check that horrorExposure counter is working correctly before proceeding.",
+        "parameters": {
+          "text": "You step back into the main hall. The afternoon light has shifted to an unhealthy yellow that makes the wallpaper crawl at the edges of your vision. You have the distinct sensation of being watched by something that predates human curiosity—something that has waited in angles and corners since before mammals walked the earth.",
+          "connection": {
+            "target": "beat_7"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_7",
+        "name": "Second Investigation Phase",
+        "type": "movementChoice",
+        "position": {
+          "x": 1900,
+          "y": 300
+        },
+        "parameters": {
+          "question": "What do you examine next?",
+          "choices": [
+            {
+              "id": "c_attic",
+              "text": "The Attic",
+              "location": "The Attic",
+              "target": "beat_8"
+            },
+            {
+              "id": "c_basement",
+              "text": "The Basement Door",
+              "location": "The Basement Door",
+              "target": "beat_9_check"
+            },
+            {
+              "id": "c_garden",
+              "text": "The Garden Statuary",
+              "location": "The Garden Statuary",
+              "target": "beat_10"
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_8"
+          },
+          {
+            "targetId": "beat_9_check"
+          },
+          {
+            "targetId": "beat_10"
+          }
+        ]
+      },
+      {
+        "id": "beat_8",
+        "name": "Attic Search",
+        "type": "pickProp",
+        "position": {
+          "x": 2200,
+          "y": 100
+        },
+        "notes": "ASSET: Dusty attic with strange items. Shadows in corners.",
+        "parameters": {
+          "question": "What do you examine in the attic?",
+          "props": [
+            {
+              "id": "prop_key",
+              "name": "Rusted Key",
+              "description": "An iron key that vibrates at a frequency you feel in your teeth rather than hear",
+              "target": "beat_8a"
+            },
+            {
+              "id": "prop_chart",
+              "name": "Star Chart",
+              "description": "A map of constellations that don't match any sky you've seen",
+              "target": "beat_8b"
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_8a"
+          },
+          {
+            "targetId": "beat_8b"
+          }
+        ]
+      },
+      {
+        "id": "beat_8a",
+        "name": "Key Discovery",
+        "type": "infoText",
+        "position": {
+          "x": 2500,
+          "y": 50
+        },
+        "parameters": {
+          "text": "The key is cold—colder than iron should be in this humid attic. Symbols etched along its shaft seem to shift when viewed peripherally, resolving into angles that make your stomach lurch. This opens something important. You sense it opens more than just a door.",
+          "connection": {
+            "target": "beat_8a_set"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_8a_set"
+          }
+        ]
+      },
+      {
+        "id": "beat_8a_set",
+        "name": "Set HasKey Variable",
+        "type": "setVariable",
+        "position": {
+          "x": 2800,
+          "y": 50
+        },
+        "parameters": {
+          "type": "variable",
+          "name": "hasKey",
+          "value": true,
+          "operation": "set",
+          "connection": {
+            "target": "beat_11"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_11"
+          }
+        ]
+      },
+      {
+        "id": "beat_8b",
+        "name": "Star Chart Discovery",
+        "type": "infoText",
+        "position": {
+          "x": 2500,
+          "y": 150
+        },
+        "parameters": {
+          "text": "The chart shows a sky devoid of familiar stars. Instead, spiraling vortices of light cluster around what appears to be... the Blackwood Estate. The estate is marked not as a location, but as a wound—a tear where something is pushing through. The date on the chart is next Tuesday.",
+          "connection": {
+            "target": "beat_8b_set"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_8b_set"
+          }
+        ]
+      },
+      {
+        "id": "beat_8b_set",
+        "name": "Increment Horror - Star Chart",
+        "type": "setVariable",
+        "position": {
+          "x": 2800,
+          "y": 150
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "horrorExposure",
+          "value": 1,
+          "operation": "add",
+          "connection": {
+            "target": "beat_11"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_11"
+          }
+        ]
+      },
+      {
+        "id": "beat_9_check",
+        "name": "Check for Key",
+        "type": "conditionBeat",
+        "position": {
+          "x": 2200,
+          "y": 300
+        },
+        "parameters": {
+          "condition": {
+            "type": "variable",
+            "variable": "hasKey",
+            "operator": "==",
+            "value": true
+          },
+          "trueConnection": {
+            "target": "beat_9_inside",
+            "label": "Unlock the door"
+          },
+          "falseConnection": {
+            "target": "beat_9_locked",
+            "label": "Door is locked"
+          }
+        }
+      },
+      {
+        "id": "beat_9_locked",
+        "name": "Locked Basement",
+        "type": "infoText",
+        "position": {
+          "x": 2500,
+          "y": 250
+        },
+        "parameters": {
+          "text": "The basement door is secured with a massive iron lock that seems to absorb light. The metal is cold to the touch—colder than the autumn air should allow. You'll need a key to proceed, or perhaps tools you don't have. You sense that forcing it would be unwise.",
+          "connection": {
+            "target": "beat_7"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_9_inside",
+        "name": "Basement Revelation",
+        "type": "infoText",
+        "position": {
+          "x": 2500,
+          "y": 350
+        },
+        "notes": "ASSET: Non-euclidean space, impossible architecture. Cosmic horror reveal.",
+        "parameters": {
+          "text": "The stairs descend into a space that violates the architecture of the house above. The walls angle inward and outward simultaneously, creating corners where geometry weeps. At the center, a presence—not a creature, but a rent in reality—pulses with the rhythm of a dying star. You understand now: there was no fire. There was an awakening. The insurance claim is a code, a signal, a ritual repetition.",
+          "connection": {
+            "target": "beat_9a"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_9a"
+          }
+        ]
+      },
+      {
+        "id": "beat_9a",
+        "name": "Increment Horror - Basement",
+        "type": "setVariable",
+        "position": {
+          "x": 2800,
+          "y": 350
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "horrorExposure",
+          "value": 3,
+          "operation": "add",
+          "connection": {
+            "target": "beat_11"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_11"
+          }
+        ]
+      },
+      {
+        "id": "beat_10",
+        "name": "Garden Statuary",
+        "type": "infoText",
+        "position": {
+          "x": 2200,
+          "y": 500
+        },
+        "notes": "ASSET: Stone statues in recursive patterns. One appears to have moved.",
+        "parameters": {
+          "text": "The statues are ancient, predating the mansion by millennia. Their stone faces track your movement with eyes that are merely carved depressions, yet see. One extends a hand that wasn't outstretched yesterday. The ivy grows in recursive patterns, each leaf containing the shape of the entire estate. You realize the garden is not a garden, but a diagram.",
+          "connection": {
+            "target": "beat_10a"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_10a"
+          }
+        ]
+      },
+      {
+        "id": "beat_10a",
+        "name": "Increment Horror - Garden",
+        "type": "setVariable",
+        "position": {
+          "x": 2500,
+          "y": 500
+        },
+        "parameters": {
+          "type": "counter",
+          "name": "horrorExposure",
+          "value": 2,
+          "operation": "add",
+          "connection": {
+            "target": "beat_11"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_11"
+          }
+        ]
+      },
+      {
+        "id": "beat_11",
+        "name": "Confrontation Setup",
+        "type": "infoText",
+        "position": {
+          "x": 3100,
+          "y": 300
+        },
+        "parameters": {
+          "text": "Mr. Blackwood finds you. His shadow has too many dimensions and moves independently of the failing light. His smile reveals teeth that don't fit in his mouth—too many, angled wrong. 'You've seen enough,' he whispers. The air pressure drops, and your eardrums pop. 'The question is: what will you do with what you know?'",
+          "connection": {
+            "target": "beat_12"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_12"
+          }
+        ]
+      },
+      {
+        "id": "beat_12",
+        "name": "Final Confrontation",
+        "type": "dialogTree",
+        "position": {
+          "x": 3400,
+          "y": 300
+        },
+        "notes": "CHARACTER: Mr. Blackwood should look increasingly inhuman. REVIEW: All choices lead to ending check to ensure counter matters.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Mr. Blackwood",
+            "text": "Will you complete the assessment, investigator? Will you sign off on the 'fire damage'? Or do you require... further education?",
+            "choices": [
+              {
+                "id": "c_know",
+                "text": "I know what you are. I know what this place is.",
+                "target": "beat_14_condition"
+              },
+              {
+                "id": "c_flee",
+                "text": "I'm leaving. Now. This case is closed.",
+                "target": "beat_14_condition"
+              },
+              {
+                "id": "c_deny",
+                "text": "This is fraud. Plain and simple. I'll report it.",
+                "target": "beat_14_condition"
+              }
+            ]
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_14_condition"
+          }
+        ]
+      },
+      {
+        "id": "beat_14_condition",
+        "name": "Check High Exposure",
+        "type": "conditionBeat",
+        "position": {
+          "x": 3700,
+          "y": 200
+        },
+        "notes": "CRITICAL: Checks if horrorExposure >= 6. If true, cosmic horror ending.",
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "horrorExposure",
+            "operator": ">=",
+            "value": 6
+          },
+          "trueConnection": {
+            "target": "beat_15_ending_c",
+            "label": "Too much knowledge"
+          },
+          "falseConnection": {
+            "target": "beat_16_check_b",
+            "label": "Check exposure level"
+          }
+        }
+      },
+      {
+        "id": "beat_16_check_b",
+        "name": "Check Medium Exposure",
+        "type": "conditionBeat",
+        "position": {
+          "x": 3700,
+          "y": 400
+        },
+        "notes": "Checks if horrorExposure >= 3 for damaged survival ending.",
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "horrorExposure",
+            "operator": ">=",
+            "value": 3
+          },
+          "trueConnection": {
+            "target": "beat_17_ending_b",
+            "label": "Glimpsed the truth"
+          },
+          "falseConnection": {
+            "target": "beat_18_ending_a",
+            "label": "Remained ignorant"
+          }
+        }
+      },
+      {
+        "id": "beat_15_ending_c",
+        "name": "Ending C - The Adjusted",
+        "type": "endScreen",
+        "position": {
+          "x": 4000,
+          "y": 100
+        },
+        "notes": "Worst ending - player has seen too much (6+ exposure).",
+        "parameters": {
+          "message": "ENDING: THE ADJUSTED\n\nYou understood too much. The geometry of the mansion folds around you, welcoming you into the angles where three dimensions become suggestions. Mr. Blackwood smiles as you take your place among the stones, becoming another pillar in the foundation. You are part of the Estate now, forever correcting the angles between worlds. The insurance report will never be filed. You will never file anything again, except the slow, grinding expansion of the mansion's true footprint across reality.",
+          "showRestart": true,
+          "showCredits": true,
+          "creditsPageTitle": "Case Closed",
+          "creditsPageBody": "The Blackwood Adjustment\nA Cosmic Horror Interactive Story\n\nInvestigator consumed: 1\nInsurance claims processed: 0\nReality violations: Uncountable"
+        }
+      },
+      {
+        "id": "beat_17_ending_b",
+        "name": "Ending B - The Damned",
+        "type": "endScreen",
+        "position": {
+          "x": 4000,
+          "y": 300
+        },
+        "notes": "Medium ending - player glimpsed truth (3-5 exposure) but survived damaged.",
+        "parameters": {
+          "message": "ENDING: THE DAMNED\n\nYou flee the mansion, torching the east wing as you go. The flames catch the unnatural growths, burning green and screaming in frequencies that shatter windows three towns over. You live, but the angles never look right again—doors seem too narrow, corners too sharp. You drink to forget the spirals, but they remember you. Sometimes, in your dreams, you still hear Mr. Blackwood laughing, and you wake with the taste of copper and stars. You reported the claim as fraudulent. They never found the basement.",
+          "showRestart": true,
+          "showCredits": true,
+          "creditsPageTitle": "Case Closed",
+          "creditsPageBody": "The Blackwood Adjustment\nA Cosmic Horror Interactive Story\n\nSurvivors: 1 (damaged)\nInsurance claims denied: 1\nTherapy bills: Incalculable"
+        }
+      },
+      {
+        "id": "beat_18_ending_a",
+        "name": "Ending A - The Skeptic",
+        "type": "endScreen",
+        "position": {
+          "x": 4000,
+          "y": 500
+        },
+        "notes": "Best ending for sanity - player remained ignorant (0-2 exposure).",
+        "parameters": {
+          "message": "ENDING: THE SKEPTIC\n\nYou file the report: insurance fraud, case closed. The Blackwood Estate pays out, and you collect your fee. When you read about the disappearances six months later—the family, the servants, three census takers—you tell yourself it was just a gas leak. The nightmares fade. The angles of your apartment are normal, comforting, right. You are safe, and blind, and lucky. You never think about why the payout was so large, or why the check was printed on paper that felt like skin.",
+          "showRestart": true,
+          "showCredits": true,
+          "creditsPageTitle": "Case Closed",
+          "creditsPageBody": "The Blackwood Adjustment\nA Cosmic Horror Interactive Story\n\nSurvivors: 1 (blissfully ignorant)\nInsurance claims approved: 1\nCosmic understanding: 0\n\nSometimes, ignorance is the only salvation."
+        }
+      }
+    ],
+    "reasoning": "This 29-beat structure uses a hub-and-spoke exploration pattern with two phases of investigation. The player accumulates 'horrorExposure' through setVariable beats after each discovery, creating state-based progression. The reconvergence at beat_6 ensures content remains manageable while allowing player agency in exploration order. The basement is gated by an inventory-style variable (hasKey) found in the attic, creating a Metroidvania-style lock-and-key puzzle. The three endings are determined by a cascading conditionBeat check (horrorExposure >= 6, then >= 3, else), ensuring the counter system directly impacts narrative outcome. The gradual shift from mundane insurance fraud to cosmic horror is paced through increasing exposure values—early locations add 1-2 points while the basement adds 3, representing the major revelation. This creates a satisfying arc where player curiosity (exploring more locations) is mechanically punished with worse endings, thematically reinforcing the cosmic horror genre's 'knowledge is dangerous' trope."
+  }
+}

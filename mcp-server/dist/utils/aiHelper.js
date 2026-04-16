@@ -213,6 +213,17 @@ function autoFixEndingRestartConnections(generated) {
     for (const beat of generated.beats) {
         if (!endingBeatTypes.has(beat.type))
             continue;
+        // Force reset: true on AI-generated endings so counters / variables
+        // don't leak between replays. The schema default is false, which
+        // produces ghost-reachable endings (counter-gated endings that become
+        // reachable only on the 2nd+ playthrough). AI rarely sets this.
+        if (!beat.parameters)
+            beat.parameters = {};
+        const resetKey = beat.type === 'aiSummary' ? 'resetOnRestart' : 'reset';
+        if (beat.parameters[resetKey] !== true) {
+            beat.parameters[resetKey] = true;
+            console.error(`[aiHelper.autoFix] ✓ Forced ${resetKey}:true on ${beat.type} ${beat.id}`);
+        }
         const showRestart = beat.parameters?.showRestart ?? true;
         if (!showRestart)
             continue;
@@ -354,7 +365,20 @@ VISITED TRACKING:
 - "markVisited": boolean - Block and dim choices leading to previously visited beats
 - Per-choice visited tracking: choices are individually tracked (composite key: "beatId:choiceId")
 - Supported on dialogTree, movementChoice, pickProp
+- 🚨 DO NOT enable markVisited on hub beats the player must return to (investigation hubs, shops, menus, decision loops, rooms in a multi-location investigation). It silently makes each option one-shot and can leave the story unsolvable. Only enable on beats representing a truly one-way decision.
 - "visitedBeat" condition type for conditionBeat: check if beat was visited
+
+INVESTIGATION LOOP PATTERN (preferred for "examine a room for clues"):
+- DO NOT force the player back to a higher hub after picking up each clue — that violates real-life equivalency.
+- Instead, loop the pickProp back to itself via the item-description infoText:
+    pickProp beat_examine_study → [Letter → beat_letter_desc, Drawer → beat_drawer_desc, Leave → beat_hallway]
+    beat_letter_desc (infoText) → target: beat_examine_study  ← LOOP BACK
+- The player keeps picking until they've seen everything, then uses an explicit "Leave" prop to exit.
+
+RECOVERABLE GATES (MANDATORY):
+- Every conditionBeat or choice that gates on a flag/item/counter MUST be recoverable from wherever the player is.
+- If a beat requires hasCryptKey, provide at least one path back to a beat that sets hasCryptKey — never author a gate whose requirement is only available on a branch the player may have already skipped.
+- If an ending requires a counter value, ensure there is a late-game beat that can still raise it, OR ensure the fallback ending is still meaningful.
 
 RECURSIVE DIALOG TREES:
 - DialogTree choices can use target: "__self__" to loop back to the SAME dialogTree beat
@@ -540,8 +564,9 @@ CRITICAL ANTI-PATTERNS TO AVOID:
    ✓ CORRECT: dialogTree data ONLY inside parameters.dialogTree
 
 CORRECT PARAMETER NAMES (MUST use exactly these):
-- endScreen: { message (NOT "endText"), showRestart: true (ALWAYS), showCredits, creditsPageTitle, creditsPageBody, creditsCloseText, creditsText }
+- endScreen: { message (NOT "endText"), showRestart: true (ALWAYS), reset: true (ALWAYS), showCredits, creditsPageTitle, creditsPageBody, creditsCloseText, creditsText }
   🚨 CRITICAL: When showRestart is true, endScreen MUST have a connection back to the titleScreen (beat_0). Example: "connections": [{ "targetId": "beat_0" }]. Same rule applies to aiSummary when used as an ending.
+  🚨 CRITICAL: ALWAYS set reset:true on endScreen (resetOnRestart:true on aiSummary). Without it, counters and variables LEAK between replays and can make counter-gated endings ghost-reachable on a second playthrough.
 - keypad: { prompt, layout ("numeric"|"phone"|"pin"), maxDigits, minDigits, correctCode, failTarget, maxAttempts, maskInput, saveToType, variable, buttonText, clearButtonText }
 - inputText: { prompt, variable (NOT "variableName"), saveToType: "variable" (REQUIRED), submitButtonText }
 - setVariable: { type: "variable"|"counter"|"fictionalTime", name (variable name, NOT "variableName"), value, operation }

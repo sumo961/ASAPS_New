@@ -1145,6 +1145,18 @@ export class AIService {
     for (const beat of response.beats) {
       if (!endingBeatTypes.has(beat.type)) continue;
 
+      // Force reset: true on AI-generated endings so counters / variables
+      // don't leak between replays. The schema default is false which
+      // creates ghost-reachable endings (e.g. a counter-gated ending that
+      // becomes reachable only on the 2nd or 3rd playthrough). The AI
+      // rarely sets this explicitly, so we fix it here.
+      if (!beat.parameters) beat.parameters = {};
+      const resetKey = beat.type === 'aiSummary' ? 'resetOnRestart' : 'reset';
+      if (beat.parameters[resetKey] !== true) {
+        beat.parameters[resetKey] = true;
+        console.log(`[AIService.autoFix] ✓ Forced ${resetKey}:true on ${beat.type} ${beat.id}`);
+      }
+
       const showRestart = beat.parameters?.showRestart ?? true; // default true per schema
       if (!showRestart) continue;
 

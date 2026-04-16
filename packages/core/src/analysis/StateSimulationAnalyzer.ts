@@ -165,7 +165,12 @@ export class StateSimulationAnalyzer {
     this.story = story;
     this.config = {
       maxDepth: config.maxDepth ?? 200,
-      maxPaths: config.maxPaths ?? 1000,
+      // Bumped from 1000 → 50000. Stories with wide hub-and-spoke structures
+      // can push narrow condition-gated endings to the back of the BFS queue,
+      // and a 1000-path budget exhausts before they are dequeued. Real
+      // AI-generated stories (20–40 beats) commonly need 10k–30k paths to
+      // surface all reachable endings. See Hollow Star regression test.
+      maxPaths: config.maxPaths ?? 50000,
       maxBeatRevisits: config.maxBeatRevisits ?? 1,
     };
   }
@@ -608,15 +613,44 @@ export class StateSimulationAnalyzer {
     if (beat.type === 'pickProp') {
       return true; // Each prop adds a different inventory item
     }
+
+    const params = beat.getParameters();
+
+    // Helper: does any element in an array carry per-choice effects?
+    const anyHasEffects = (arr: any[] | undefined): boolean => {
+      if (!Array.isArray(arr)) return false;
+      return arr.some((c: any) =>
+        (Array.isArray(c?.effects) && c.effects.length > 0) ||
+        c?.counter || c?.variable
+      );
+    };
+
     if (beat.type === 'dialogTree') {
-      // Only if any choice has effects
-      const params = beat.getParameters();
-      const nodes = params.dialogNodes || params.nodes || [];
-      if (nodes.length > 0) {
-        const choices = nodes[0]?.choices || [];
-        return choices.some((c: any) => c.effects && c.effects.length > 0);
+      // Current format: choices live under params.dialogTree.choices and
+      // may recurse via dialogNode. Also support legacy dialogNodes/nodes.
+      const tree = params.dialogTree;
+      const walkTree = (node: any): boolean => {
+        if (!node || !Array.isArray(node.choices)) return false;
+        if (anyHasEffects(node.choices)) return true;
+        for (const c of node.choices) {
+          if (c?.dialogNode && walkTree(c.dialogNode)) return true;
+        }
+        return false;
+      };
+      if (tree && walkTree(tree)) return true;
+
+      // Legacy fallback
+      const legacyNodes = params.dialogNodes || params.nodes || [];
+      for (const n of legacyNodes) {
+        if (anyHasEffects(n?.choices)) return true;
       }
+      return false;
     }
+
+    if (beat.type === 'movementChoice') {
+      return anyHasEffects(params.choices);
+    }
+
     return false;
   }
 
@@ -769,8 +803,22 @@ export class StateSimulationAnalyzer {
             }
             state.inventory.get(character)!.add(itemName);
           }
-          // Apply prop-specific effects
           this.applyEffectsList(prop.effects, state);
+          this.applyInlineChoiceFields(prop, state);
+        }
+        break;
+      }
+
+      case 'movementChoice': {
+        // Per-choice counter/variable effects. MovementChoiceBeat.constructor
+        // calls migrateChoiceEffects which converts inline counter fields into
+        // the canonical effects[] array, but keep the inline-field fallback
+        // in case a story is loaded through a path that skips migration.
+        const mcChoices = params.choices || [];
+        if (choiceIndex < mcChoices.length) {
+          const choice = mcChoices[choiceIndex];
+          this.applyEffectsList(choice.effects, state);
+          this.applyInlineChoiceFields(choice, state);
         }
         break;
       }
@@ -790,14 +838,100 @@ export class StateSimulationAnalyzer {
           for (const effects of effectsAlongPath) {
             this.applyEffectsList(effects, state);
           }
+          // Also collect and apply inline counter/variable fields along the same path
+          // (fallback for unmigrated data)
+          const inlineAlongPath = this.collectDialogTreeInlineFields(
+            dialogTree,
+            connection.targetId,
+            connection.label
+          );
+          for (const fields of inlineAlongPath) {
+            this.applyInlineChoiceFields(fields, state);
+          }
         }
         break;
       }
 
-      // movementChoice, hyperText, etc. - no per-choice state effects typically
+      // hyperText etc. - no per-choice state effects typically
     }
 
     return state;
+  }
+
+  /**
+   * Apply inline per-choice counter/variable fields that AI-generated stories
+   * emit directly on the choice/prop object:
+   *   { counter, counterOperation, counterValue }
+   *   { variable, variableOperation, variableValue }
+   */
+  private applyInlineChoiceFields(fields: any, state: SimulationState): void {
+    if (!fields || typeof fields !== 'object') return;
+
+    // Counter field
+    if (fields.counter) {
+      const name = fields.counter;
+      const op = fields.counterOperation || 'add';
+      const value = Number(fields.counterValue ?? 1);
+      const current = state.counters.get(name) || 0;
+      switch (op) {
+        case 'set':
+          state.counters.set(name, value);
+          break;
+        case 'subtract':
+        case 'decrement':
+          state.counters.set(name, current - value);
+          break;
+        case 'multiply':
+          state.counters.set(name, current * value);
+          break;
+        case 'divide':
+          state.counters.set(name, value !== 0 ? current / value : current);
+          break;
+        case 'change':
+        case 'add':
+        case 'increment':
+        default:
+          state.counters.set(name, current + value);
+          break;
+      }
+    }
+
+    // Variable field
+    if (fields.variable) {
+      const name = fields.variable;
+      const op = fields.variableOperation || 'set';
+      const value = fields.variableValue;
+      if (op === 'set') {
+        state.variables.set(name, value);
+      }
+    }
+  }
+
+  /**
+   * Walk a dialogTree and collect inline-field objects (counter/variable
+   * per-choice fields, not the canonical effects[] list) along the path
+   * from the root to a choice whose target matches targetId/label.
+   */
+  private collectDialogTreeInlineFields(node: any, targetId: string, label?: string): any[] {
+    const results: any[] = [];
+    const walk = (n: any, path: any[]): boolean => {
+      if (!n || !Array.isArray(n.choices)) return false;
+      for (const choice of n.choices) {
+        const newPath = [...path, choice];
+        // Direct exit target match
+        if (choice.target === targetId && (!label || choice.text === label || choice.label === label)) {
+          for (const step of newPath) results.push(step);
+          return true;
+        }
+        // Recurse into nested dialogNode
+        if (choice.dialogNode && walk(choice.dialogNode, newPath)) {
+          return true;
+        }
+      }
+      return false;
+    };
+    walk(node, []);
+    return results;
   }
 
   /**
@@ -932,8 +1066,11 @@ export class StateSimulationAnalyzer {
   private evaluateCondition(condition: Condition, state: SimulationState): boolean {
     const { type, operator } = condition;
 
-    // Get the variable name (handle legacy and new field names)
-    const varName = condition.variableName || condition.left;
+    // Get the variable name (handle legacy, AI, and new field names)
+    // AI emits { variable: "..." }; legacy uses variableName or left.
+    const varName = condition.variableName
+      || (condition as any).variable
+      || condition.left;
     const compareValue = condition.value ?? condition.right;
 
     switch (type) {

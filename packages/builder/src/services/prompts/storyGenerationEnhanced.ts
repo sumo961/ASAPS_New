@@ -154,6 +154,7 @@ const BEAT_TYPE_GUIDE = `
   - choiceDelay: seconds before choices fade in (creates suspense)
   - presentationMode: "positioned" (default) | "chat-scroll" (scrollable chat) | "chat-bubble" (single bubble)
   - markVisited: true to block and dim choices leading to previously visited beats
+- 🚨 DO NOT enable markVisited on hub beats the player must return to (investigation hubs, shops, menus, decision loops). It makes each option one-shot and can leave the story unsolvable. Only enable markVisited on beats representing a truly one-way decision.
 - ⚠️ WRONG: { "dialogTree": { "root": { ... } } } - NO extra "root" wrapper!
 - choice: { id, text, target? | dialogNode? } - What player clicks (text IS the player's line)
 - target (string): Beat ID to exit dialog
@@ -194,6 +195,7 @@ const BEAT_TYPE_GUIDE = `
 - Optional parameters:
   - choiceDelay: seconds before choices fade in (creates suspense)
   - markVisited: true to block and dim choices leading to previously visited beats
+  - 🚨 DO NOT enable markVisited on a movementChoice hub the player must return to (rooms in an investigation, floors in a building). It silently makes the story unsolvable. Only enable on truly one-way spatial moves.
   - showTextOnHover: true to only show choice text when hovering over the hotspot
 - Connections: Multiple → one per choice
 - COUNTER EFFECTS: Choices can modify counters (same as dialogTree)
@@ -273,6 +275,35 @@ Good item descriptions should:
 - Hint at mysteries or connections to other elements
 - Give the player information they can use later
 - Create atmosphere and immersion
+
+### 🚨 Investigation Loop Pattern (PREFERRED for "examine a room with multiple clues")
+
+When the player is searching a single location for clues, DO NOT force them back to a higher hub after each pickup — that violates real-life equivalency (nobody leaves a room after finding only one clue). Instead, loop the pickProp back to itself via the item-description infoText:
+
+\`\`\`
+pickProp beat_examine_study:
+  question: "What do you examine in the study?"
+  props:
+    - "Bloodstained Letter" → beat_letter_desc
+    - "Desk Drawer" → beat_drawer_desc
+    - "Portrait on the Wall" → beat_portrait_desc
+    - "Leave the study" → beat_hallway   ← one explicit exit
+
+beat_letter_desc (infoText):
+  text: "The letter is addressed to..."
+  → target: beat_examine_study   ← LOOP BACK to the same pickProp
+\`\`\`
+
+The player keeps picking until they've seen everything, then chooses the explicit "Leave" option. Combine this with markVisited: true ONLY on the pickProp itself so already-examined items are dimmed but not blocked — OR leave markVisited off and let the player re-read.
+
+### 🚨 Recoverable Gates (MANDATORY)
+
+Every beat that gates progress on a flag, item, or counter MUST be recoverable. If a conditionBeat or choice requires \`hasCryptKey\`, at least one path reachable from the player's current location must lead to a beat that sets \`hasCryptKey\`. Never author a gate whose requirement is only available on a branch the player may already have skipped.
+
+Concrete rules:
+- If a choice is "enter the crypt (needs the key)," also offer "go back and find the key" from the same beat.
+- If an ending requires a counter value the player may have under-accumulated, include a late-game beat that can raise the counter, or make the fallback ending still meaningful.
+- Never build dead-end branches where the player must restart the whole story to try again.
 
 **hyperText** - Clickable word/phrase branching
 - Use: Subtle choices, memory/knowledge checks, exploring details in text
@@ -362,6 +393,7 @@ Good item descriptions should:
 - Parameters:
   - message: "Ending text"  ← NOT "endMessage" or "text"!
   - showRestart: boolean (ALWAYS set to true so player can replay!)
+  - reset: boolean (ALWAYS set to true — see below)
   - showCredits: boolean — show a credits button
   - creditsPageTitle: Title for the credits page (default: "Credits")
   - creditsPageBody: Body text of the credits page (supports line breaks)
@@ -369,6 +401,7 @@ Good item descriptions should:
   - creditsText: Label for the credits button (default: "Credits")
 - ⚠️ CRITICAL: Use "message", NOT "endMessage"!
 - ⚠️ CRITICAL: ALWAYS set "showRestart": true - player must be able to replay!
+- 🚨 CRITICAL: ALWAYS set "reset": true — otherwise counters and variables LEAK between replays, which can make counter-gated endings "ghost-reachable" on a second playthrough (player replays, counter adds on top of previous run, crosses threshold, surprise ending). reset:true wipes counters, variables, inventory, and visited tracking on restart, which is nearly always what you want.
 - 🚨 CRITICAL: When showRestart is true, you MUST add a connection back to the titleScreen (beat_0) so the restart button works and shows up as a graph edge. Example: "connections": [{ "targetId": "beat_0" }]
 - Pattern: Multiple endScreens for different endings
 - 🚨🚨🚨 CRITICAL: endScreen must be in the main "beats" array! 🚨🚨🚨
@@ -618,6 +651,7 @@ Fictional time condition example (CORRECT format):
 - Credits page: creditsPageTitle, creditsPageBody, creditsCloseText
 - When used as an ending: set showRestart: true AND add a connection back to the titleScreen (beat_0) so the restart button works and shows up as a graph edge. Example: "connections": [{ "targetId": "beat_0" }]
 - 🚨 CRITICAL: Same rule as endScreen — showRestart:true REQUIRES an explicit connection to beat_0.
+- 🚨 CRITICAL: ALWAYS set "resetOnRestart": true so counters, variables, and inventory don't leak between replays. Without it, counter-gated endings can become "ghost-reachable" on a second playthrough (counter adds on top of previous run, crosses threshold).
 - Advantage over endScreen: the player sees a personalized recap of what they did, not just a static message
 
 **aiCondition** - AI-driven branching that analyzes player state

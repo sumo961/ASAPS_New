@@ -1,0 +1,1254 @@
+{
+  "title": "The Policy of the Hollow Star",
+  "generatedAt": "2026-04-13T20:50:46.174Z",
+  "status": "success",
+  "beatCount": 41,
+  "beatTypes": [
+    "titleScreen",
+    "setVariable",
+    "infoText",
+    "movementChoice",
+    "dialogTree",
+    "infoText",
+    "infoText",
+    "movementChoice",
+    "pickProp",
+    "infoText",
+    "infoText",
+    "infoText",
+    "pickProp",
+    "infoText",
+    "infoText",
+    "infoText",
+    "infoText",
+    "conditionBeat",
+    "infoText",
+    "setVariable",
+    "infoText",
+    "conditionBeat",
+    "movementChoice",
+    "infoText",
+    "keypad",
+    "infoText",
+    "setVariable",
+    "infoText",
+    "movementChoice",
+    "infoText",
+    "infoText",
+    "infoText",
+    "setVariable",
+    "conditionBeat",
+    "conditionBeat",
+    "conditionBeat",
+    "infoText",
+    "endScreen",
+    "endScreen",
+    "endScreen",
+    "endScreen"
+  ],
+  "errors": [],
+  "warnings": [
+    "beats[1]: Parameter 'timeYear' not defined in schema for beat type 'setVariable'",
+    "beats[1]: Parameter 'timeMonth' not defined in schema for beat type 'setVariable'",
+    "beats[1]: Parameter 'timeDay' not defined in schema for beat type 'setVariable'",
+    "beats[1]: Parameter 'timeHour' not defined in schema for beat type 'setVariable'",
+    "beats[1]: Parameter 'timeMinute' not defined in schema for beat type 'setVariable'",
+    "beats[19]: Parameter 'timeUnit' not defined in schema for beat type 'setVariable'"
+  ],
+  "story": {
+    "metadata": {
+      "title": "The Policy of the Hollow Star",
+      "author": "AI Assistant",
+      "description": "1926, coastal New England. A private investigator arrives at a weather-beaten mansion to sniff out insurance fraud. The case doesn’t stay mundane for long: lies become rites, paperwork becomes prophecy, and the estate’s grounds reveal a geometry that should not exist.",
+      "genre": "horror"
+    },
+    "suggestedTheme": {
+      "themeId": "builtin-twine",
+      "reason": "A text-forward cosmic-horror mystery benefits from a minimal interface that emphasizes reading, clues, and dread without visual-novel framing."
+    },
+    "beats": [
+      {
+        "id": "beat_0",
+        "name": "Title Screen",
+        "type": "titleScreen",
+        "position": {
+          "x": 100,
+          "y": 300
+        },
+        "notes": "ASSET: Dark, grainy mansion exterior photo with high-contrast lighting. AUDIO: Low wind + distant surf.",
+        "parameters": {
+          "title": "The Policy of the Hollow Star",
+          "author": "AI Assistant",
+          "connection": {
+            "target": "beat_1"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_1"
+          }
+        ]
+      },
+      {
+        "id": "beat_1",
+        "name": "Set Arrival Time",
+        "type": "setVariable",
+        "position": {
+          "x": 350,
+          "y": 300
+        },
+        "notes": "Initialize fictional time for 1926 mood and pacing. Timer HUD can be enabled later; story still works without it.",
+        "parameters": {
+          "type": "fictionalTime",
+          "operation": "set",
+          "timeYear": 1926,
+          "timeMonth": 10,
+          "timeDay": 18,
+          "timeHour": 16,
+          "timeMinute": 10,
+          "connection": {
+            "target": "beat_2"
+          },
+          "name": "variable",
+          "value": ""
+        },
+        "connections": [
+          {
+            "targetId": "beat_2"
+          }
+        ]
+      },
+      {
+        "id": "beat_2",
+        "name": "Arrival at Haversham Grounds",
+        "type": "infoText",
+        "position": {
+          "x": 600,
+          "y": 300
+        },
+        "notes": "ASSET: Long driveway lined with dead oaks; mansion silhouette. INTENT: Present as a routine fraud job; hint at wrongness in architecture.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "October, 1926. You step out of your motorcar at Haversham Manor—an old New England estate with salt in its timbers and money in its stones. The insurer’s letter is plain: suspected fraud. A house fire claim. Missing valuables. A family that won’t answer questions.\n\nThe grounds are too quiet. Even the crows keep their distance.",
+          "buttonText": "Approach the manor",
+          "connection": {
+            "target": "beat_3"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3"
+          }
+        ]
+      },
+      {
+        "id": "beat_3",
+        "name": "Front Steps: First Approach",
+        "type": "movementChoice",
+        "position": {
+          "x": 850,
+          "y": 300
+        },
+        "notes": "First meaningful decision: professional/legal approach vs trespass. Counters: +clues for methodical work; +dread for intrusive/occult curiosity.",
+        "parameters": {
+          "speaker": "Narrator",
+          "question": "At the front steps, how do you begin?",
+          "choices": [
+            {
+              "id": "c1",
+              "text": "Knock and present your credentials to the caretaker",
+              "location": "Knock and present your credentials to the caretaker",
+              "target": "beat_4",
+              "counter": "cluesFound",
+              "counterOperation": "add",
+              "counterValue": 1
+            },
+            {
+              "id": "c2",
+              "text": "Circle the grounds first, looking for signs of staged damage",
+              "location": "Circle the grounds first, looking for signs of staged damage",
+              "target": "beat_5",
+              "counter": "cluesFound",
+              "counterOperation": "add",
+              "counterValue": 1
+            },
+            {
+              "id": "c3",
+              "text": "Slip in through a side service door before anyone can compose a story",
+              "location": "Slip in through a side service door before anyone can compose a story",
+              "target": "beat_6",
+              "counter": "dread",
+              "counterOperation": "add",
+              "counterValue": 1
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_4"
+          },
+          {
+            "targetId": "beat_5"
+          },
+          {
+            "targetId": "beat_6"
+          }
+        ]
+      },
+      {
+        "id": "beat_4",
+        "name": "Caretaker Interview",
+        "type": "dialogTree",
+        "position": {
+          "x": 1150,
+          "y": 150
+        },
+        "notes": "NPC establishes mundane cover story; player can press (clues) or soothe (trust variable). Keep it plausible but increasingly strained.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Mrs. Wicker",
+            "text": "A woman in black wool answers after a long delay. Her eyes flick to your briefcase as if it breathes.\n\n“Insurance man?” she asks, though your badge says otherwise. “The family is resting. You’ll find no fraud here.”",
+            "choices": [
+              {
+                "id": "c1",
+                "text": "I’m a private investigator. I only need facts—dates, receipts, a look at the fire room.",
+                "target": "beat_7",
+                "counter": "cluesFound",
+                "counterOperation": "add",
+                "counterValue": 1
+              },
+              {
+                "id": "c2",
+                "text": "I’m not here to harass you. Help me close this cleanly and you won’t see me again.",
+                "target": "beat_7"
+              },
+              {
+                "id": "c3",
+                "text": "If you’re hiding something, I’ll find it. Now move aside.",
+                "target": "beat_7",
+                "counter": "dread",
+                "counterOperation": "add",
+                "counterValue": 1
+              }
+            ]
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_5",
+        "name": "Grounds Survey",
+        "type": "infoText",
+        "position": {
+          "x": 1150,
+          "y": 300
+        },
+        "notes": "Seed cosmic geometry subtly: paths that don’t match distances; ash where there was no fire. Leads to hub.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "You walk the perimeter. The hedges are cut with an almost mathematical cruelty. Near the east wall, the grass bears a dark stain—old ash—yet no scorch marks on the stone.\n\nYou take notes. Once, you glance back at the manor and feel an unpleasant certainty: the windows are not where they were a moment ago.",
+          "buttonText": "Continue",
+          "connection": {
+            "target": "beat_7"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_6",
+        "name": "Service Door Entry",
+        "type": "infoText",
+        "position": {
+          "x": 1150,
+          "y": 450
+        },
+        "notes": "Trespass path: gives earlier horror tone (+dread from prior choice). Introduce smell of brine, odd angles.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The service door yields with a tired sigh. Inside: cold air, brine, and the faintest trace of something sweet gone rotten.\n\nYour footsteps feel muffled, as if the house is swallowing sound. The corridor’s angles are subtly wrong—like a draftsman tried to sketch a hallway from memory after a fever.",
+          "buttonText": "Get your bearings",
+          "connection": {
+            "target": "beat_7"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_7",
+        "name": "Investigation Hub: Where Next?",
+        "type": "movementChoice",
+        "position": {
+          "x": 1450,
+          "y": 300
+        },
+        "notes": "Hub-and-spoke. markVisited prevents repetitive clue farming. Ensure generic text works regardless of prior route.",
+        "parameters": {
+          "speaker": "Narrator",
+          "question": "You steady your thoughts. What do you investigate on the estate?",
+          "markVisited": true,
+          "choices": [
+            {
+              "id": "c1",
+              "text": "Inspect the burned study (the claim’s origin)",
+              "location": "Inspect the burned study (the claim’s origin)",
+              "target": "beat_8"
+            },
+            {
+              "id": "c2",
+              "text": "Search the greenhouse and the rear paths",
+              "location": "Search the greenhouse and the rear paths",
+              "target": "beat_9"
+            },
+            {
+              "id": "c3",
+              "text": "Visit the family crypt on the hill",
+              "location": "Visit the family crypt on the hill",
+              "target": "beat_10"
+            },
+            {
+              "id": "c4",
+              "text": "Enough. Return to your car and file a preliminary report",
+              "location": "Enough. Return to your car and file a preliminary report",
+              "target": "beat_18"
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_8"
+          },
+          {
+            "targetId": "beat_9"
+          },
+          {
+            "targetId": "beat_10"
+          },
+          {
+            "targetId": "beat_18"
+          }
+        ]
+      },
+      {
+        "id": "beat_8",
+        "name": "Burned Study: Evidence Shelf",
+        "type": "pickProp",
+        "position": {
+          "x": 1750,
+          "y": 150
+        },
+        "notes": "pickProp auto-adds item; each selection must go to an infoText describing it (MANDATORY). Each prop also increments clues/dread.",
+        "parameters": {
+          "speaker": "Narrator",
+          "question": "In the charred study, what do you focus on?",
+          "props": [
+            {
+              "id": "p1",
+              "name": "Insurance Ledger",
+              "description": "A half-burned ledger with stamped policy numbers and soot-black fingerprints.",
+              "target": "beat_11",
+              "counter": "cluesFound",
+              "counterOperation": "add",
+              "counterValue": 1
+            },
+            {
+              "id": "p2",
+              "name": "Melted Watch",
+              "description": "A pocket watch warped by heat, its hands fused at an impossible time.",
+              "target": "beat_12",
+              "counter": "dread",
+              "counterOperation": "add",
+              "counterValue": 1
+            },
+            {
+              "id": "p3",
+              "name": "Ashen Photograph",
+              "description": "A photograph with a corner burned away; the faces seem smudged on purpose.",
+              "target": "beat_13",
+              "counter": "cluesFound",
+              "counterOperation": "add",
+              "counterValue": 1
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_11"
+          },
+          {
+            "targetId": "beat_12"
+          },
+          {
+            "targetId": "beat_13"
+          }
+        ]
+      },
+      {
+        "id": "beat_11",
+        "name": "Item: Insurance Ledger (Described)",
+        "type": "infoText",
+        "position": {
+          "x": 2050,
+          "y": 50
+        },
+        "notes": "Clue-heavy: suggests fraud, but also an occult pattern in numbers.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The ledger lists the fire claim and—oddly—three earlier policies taken out on the same wing across decades, each followed by a “loss.”\n\nThe policy numbers repeat digits in a way that feels deliberate. One margin note, written in pencil: “The adjusters will believe arithmetic before they believe the sky.”",
+          "buttonText": "Back away from the ash",
+          "connection": {
+            "target": "beat_14"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_14"
+          }
+        ]
+      },
+      {
+        "id": "beat_12",
+        "name": "Item: Melted Watch (Described)",
+        "type": "infoText",
+        "position": {
+          "x": 2050,
+          "y": 150
+        },
+        "notes": "Horror-forward: time anomaly hint.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The watch is ruined—yet the crystal isn’t cracked. The hands are welded at 3:17.\n\nYou turn it over. Someone scratched a star-shaped hollow into the backplate, and the metal around it is cold, as if the fire avoided that shape. Your stomach tightens with a memory you don’t own: a bell tolling underwater.",
+          "buttonText": "Pocket it",
+          "connection": {
+            "target": "beat_14"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_14"
+          }
+        ]
+      },
+      {
+        "id": "beat_13",
+        "name": "Item: Ashen Photograph (Described)",
+        "type": "infoText",
+        "position": {
+          "x": 2050,
+          "y": 250
+        },
+        "notes": "Connect family to cult; reveal symbol; set up keypad code clue elsewhere (3:17).",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The photograph shows the Havershams posed stiffly on the same front steps. But in the burned corner, someone has scraped the emulsion away to erase a figure—tall, blurred, standing too close.\n\nOn the back: a penciled emblem, a five-point star drawn as a hollow outline, with the words “NOT A STAR—A WINDOW.”",
+          "buttonText": "Leave the study",
+          "connection": {
+            "target": "beat_14"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_14"
+          }
+        ]
+      },
+      {
+        "id": "beat_9",
+        "name": "Greenhouse: Strange Harvest",
+        "type": "pickProp",
+        "position": {
+          "x": 1750,
+          "y": 300
+        },
+        "notes": "Nature + cosmic biology. One prop is a practical tool (Lantern) to gate crypt interior.",
+        "parameters": {
+          "speaker": "Narrator",
+          "question": "In the greenhouse, damp heat fogs the panes. What do you examine?",
+          "props": [
+            {
+              "id": "p1",
+              "name": "Lantern",
+              "description": "A heavy oil lantern, recently used; the wick smells of salt rather than kerosene.",
+              "target": "beat_15",
+              "counter": "cluesFound",
+              "counterOperation": "add",
+              "counterValue": 1
+            },
+            {
+              "id": "p2",
+              "name": "Black Soil Sample",
+              "description": "Soil from a bench planter—dark as ink, threaded with pale fibers that twitch when touched.",
+              "target": "beat_16",
+              "counter": "dread",
+              "counterOperation": "add",
+              "counterValue": 1
+            },
+            {
+              "id": "p3",
+              "name": "Greenhouse Note",
+              "description": "A torn note pinned under a jar lid, written in a careful hand.",
+              "target": "beat_17",
+              "counter": "cluesFound",
+              "counterOperation": "add",
+              "counterValue": 1
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_15"
+          },
+          {
+            "targetId": "beat_16"
+          },
+          {
+            "targetId": "beat_17"
+          }
+        ]
+      },
+      {
+        "id": "beat_15",
+        "name": "Item: Lantern (Described)",
+        "type": "infoText",
+        "position": {
+          "x": 2050,
+          "y": 350
+        },
+        "notes": "Inventory-gate tool. Mention faint symbol, tying to hollow star.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The lantern is warm in your hand, as if it remembers flame. The glass is etched with tiny marks—somebody’s obsessive tally—until the scratches resolve into a hollow star.\n\nYou test the shutter. The light it promises feels… dependable. That alone is a relief.",
+          "buttonText": "Step back from the panes",
+          "connection": {
+            "target": "beat_14"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_14"
+          }
+        ]
+      },
+      {
+        "id": "beat_16",
+        "name": "Item: Black Soil Sample (Described)",
+        "type": "infoText",
+        "position": {
+          "x": 2050,
+          "y": 450
+        },
+        "notes": "Pure dread; implies non-Euclidean root network under grounds.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "You scrape a pinch into a paper fold. The soil is wrong—too fine, too eager to cling. Pale fibers lace it like nerves.\n\nFor an instant, the greenhouse floor seems to drop away, replaced by a web of roots that don’t follow the rules of direction. The vision snaps shut, leaving you with shaking hands and an almost-laugh.",
+          "buttonText": "Pocket the sample",
+          "connection": {
+            "target": "beat_14"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_14"
+          }
+        ]
+      },
+      {
+        "id": "beat_17",
+        "name": "Item: Greenhouse Note (Described)",
+        "type": "infoText",
+        "position": {
+          "x": 2050,
+          "y": 550
+        },
+        "notes": "Key clue: mentions time 3:17 and a 'gate under the hill'.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The note reads: “Do not burn the study again. Fire draws attention. The proper opening is at 3:17, when the angles soften. Use the lantern. The gate is under the hill, behind the false stone.”\n\nSomeone has underlined “3:17” hard enough to tear the paper.",
+          "buttonText": "Fold it away",
+          "connection": {
+            "target": "beat_14"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_14"
+          }
+        ]
+      },
+      {
+        "id": "beat_10",
+        "name": "Crypt Approach: Iron Door",
+        "type": "infoText",
+        "position": {
+          "x": 1750,
+          "y": 450
+        },
+        "notes": "Gates crypt interior with inventory check for Lantern.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The family crypt squats on the hill, a stone mouth sealed with an iron door. Wind pushes at the weeds like a cautious hand.\n\nThe lock plate bears a shallow, hollow star. The keyhole is there—but the darkness behind it looks deeper than the hill has any right to hold.",
+          "buttonText": "Try the door",
+          "connection": {
+            "target": "beat_19"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_19"
+          }
+        ]
+      },
+      {
+        "id": "beat_19",
+        "name": "Condition: Do You Have a Lantern?",
+        "type": "conditionBeat",
+        "position": {
+          "x": 2050,
+          "y": 700
+        },
+        "notes": "Inventory gate: prevents crypt interior without light/tool.",
+        "parameters": {
+          "condition": {
+            "type": "inventory",
+            "item": "Lantern",
+            "character": "player",
+            "checkType": "has"
+          },
+          "trueConnection": {
+            "target": "beat_20",
+            "label": "Light the way"
+          },
+          "falseConnection": {
+            "target": "beat_21",
+            "label": "Too dark to proceed"
+          }
+        }
+      },
+      {
+        "id": "beat_21",
+        "name": "Turn Back From the Crypt",
+        "type": "infoText",
+        "position": {
+          "x": 2350,
+          "y": 780
+        },
+        "notes": "Soft failure that reconverges to hub; no dead-end.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "You pull on the iron ring and the door gives a breath of cold air that smells of tidepools. But you can’t see two inches past the threshold.\n\nGoing in blind would be bravado, not work. Not yet.",
+          "buttonText": "Return to the manor grounds",
+          "connection": {
+            "target": "beat_7"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_14",
+        "name": "Time Passes on the Grounds",
+        "type": "setVariable",
+        "position": {
+          "x": 1750,
+          "y": 30
+        },
+        "notes": "Advance fictional time after each investigation spoke. Reinforces 3:17 relevance later.",
+        "parameters": {
+          "type": "fictionalTime",
+          "operation": "advance",
+          "value": 45,
+          "timeUnit": "minutes",
+          "connection": {
+            "target": "beat_7"
+          },
+          "name": "variable"
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_18",
+        "name": "Retreat to the Car",
+        "type": "infoText",
+        "position": {
+          "x": 1750,
+          "y": 600
+        },
+        "notes": "Player attempts to leave early; condition checks if dread is already high enough to force the supernatural escalation.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "You reach your car with the comfort of the familiar: leather seat, metal dash, a world that obeys tools.\n\nBut when you look back, the manor’s silhouette is wrong—too many corners, as if drawn by a hand that never learned perspective.",
+          "buttonText": "Try the ignition",
+          "connection": {
+            "target": "beat_22"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_22"
+          }
+        ]
+      },
+      {
+        "id": "beat_22",
+        "name": "Condition: Has the Horror Already Taken Hold?",
+        "type": "conditionBeat",
+        "position": {
+          "x": 2050,
+          "y": 600
+        },
+        "notes": "If dread >= 2, the estate 'doesn't let you go' and pushes toward finale. Otherwise player can choose to return to work or leave (still leads to finale gateway via conditionBeat later).",
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "dread",
+            "operator": ">=",
+            "value": 2
+          },
+          "trueConnection": {
+            "target": "beat_23",
+            "label": "The estate resists"
+          },
+          "falseConnection": {
+            "target": "beat_24",
+            "label": "You still have a choice"
+          }
+        }
+      },
+      {
+        "id": "beat_24",
+        "name": "A Choice to Continue or Leave",
+        "type": "movementChoice",
+        "position": {
+          "x": 2350,
+          "y": 600
+        },
+        "notes": "Meaningful choice: pursue truth vs bail. Even if leaving, story routes to finale gateway (ending based on clues/dread).",
+        "parameters": {
+          "speaker": "Narrator",
+          "question": "The engine turns over. You could go. Do you?",
+          "choices": [
+            {
+              "id": "c1",
+              "text": "Stay. A fraud case doesn’t make your hands shake—something else does",
+              "location": "Stay. A fraud case doesn’t make your hands shake—something else does",
+              "target": "beat_7",
+              "counter": "dread",
+              "counterOperation": "add",
+              "counterValue": 1
+            },
+            {
+              "id": "c2",
+              "text": "Leave now and write it up as fraud with insufficient access",
+              "location": "Leave now and write it up as fraud with insufficient access",
+              "target": "beat_27"
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          },
+          {
+            "targetId": "beat_27"
+          }
+        ]
+      },
+      {
+        "id": "beat_23",
+        "name": "The Car Will Not Leave",
+        "type": "infoText",
+        "position": {
+          "x": 2350,
+          "y": 450
+        },
+        "notes": "Forced escalation when dread is high: suggests the grounds are an organism/geometry trap.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The ignition coughs and dies. Again. Again.\n\nThe headlights flicker—and in their brief cone you see the driveway stretching wrong, too long, bending in on itself like a ribbon tied into a knot. The estate does not want you leaving with your questions intact.",
+          "buttonText": "Swallow your pride and go back",
+          "connection": {
+            "target": "beat_7"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_20",
+        "name": "Crypt Interior: The False Stone",
+        "type": "keypad",
+        "position": {
+          "x": 2350,
+          "y": 300
+        },
+        "notes": "Keypad used as ritual/time-lock. Clues point to 0317. Wrong code loops back with dread penalty via infoText -> keypad.",
+        "parameters": {
+          "prompt": "By lantern light you find a false stone with four recessed numerals. Enter the code:",
+          "layout": "numeric",
+          "maxDigits": 4,
+          "minDigits": 4,
+          "correctCode": "0317",
+          "failTarget": "beat_25",
+          "maxAttempts": 3,
+          "maskInput": false,
+          "connection": {
+            "target": "beat_26"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_26"
+          }
+        ]
+      },
+      {
+        "id": "beat_25",
+        "name": "Wrong Code: The Stone Listens",
+        "type": "infoText",
+        "position": {
+          "x": 2650,
+          "y": 360
+        },
+        "notes": "Penalty: increase dread through a setVariable beat, then back to keypad. Keeps offline; no counter-on-choice needed here.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The false stone vibrates under your fingertips—like something behind it shifts closer. Your lantern flame gutters blue.\n\nFor a moment you hear your own voice from far away, calmly describing the case as ‘mundane.’ The sound makes you nauseous.",
+          "buttonText": "Try again",
+          "connection": {
+            "target": "beat_28"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_28"
+          }
+        ]
+      },
+      {
+        "id": "beat_28",
+        "name": "Increase Dread After Wrong Attempt",
+        "type": "setVariable",
+        "position": {
+          "x": 2950,
+          "y": 360
+        },
+        "notes": "Counter updated via setVariable (not via choice). This counter is checked later by conditionBeat for endings (dread >= 3).",
+        "parameters": {
+          "type": "counter",
+          "name": "dread",
+          "value": 1,
+          "operation": "add",
+          "connection": {
+            "target": "beat_20"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_20"
+          }
+        ]
+      },
+      {
+        "id": "beat_26",
+        "name": "Beyond the False Stone",
+        "type": "infoText",
+        "position": {
+          "x": 2650,
+          "y": 250
+        },
+        "notes": "Climax setup. Player chooses approach: destroy evidence vs document vs bargain. Choices modify counters/variables and route to finale gateway conditionBeat.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The stone unlocks with a wet click. A seam opens—too wide for the hill’s thickness—and your lantern reveals a stairwell descending into an architecture that disagrees with your eyes.\n\nAt the bottom: a chamber of chalked circles and ledger pages nailed to the wall like prayers. In the center, the hollow-star symbol is cut into the floor, not as a mark but as a missing piece. Through that absence, something watches—patient as deep water.",
+          "buttonText": "Step closer",
+          "connection": {
+            "target": "beat_29"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_29"
+          }
+        ]
+      },
+      {
+        "id": "beat_29",
+        "name": "Final Decision in the Chamber",
+        "type": "movementChoice",
+        "position": {
+          "x": 2950,
+          "y": 250
+        },
+        "notes": "Last major choice. All paths reconverge to endingGateway conditionBeat. Threshold reachability: cluesFound can reach at least 5; dread can reach 4+.",
+        "parameters": {
+          "speaker": "Narrator",
+          "question": "How do you respond to the chamber’s ‘truth’?",
+          "choices": [
+            {
+              "id": "c1",
+              "text": "Photograph the pages, copy the policy numbers, and leave with proof",
+              "location": "Photograph the pages, copy the policy numbers, and leave with proof",
+              "target": "beat_30",
+              "counter": "cluesFound",
+              "counterOperation": "add",
+              "counterValue": 1
+            },
+            {
+              "id": "c2",
+              "text": "Pour lantern oil over the papers and set the chamber alight",
+              "location": "Pour lantern oil over the papers and set the chamber alight",
+              "target": "beat_31",
+              "counter": "dread",
+              "counterOperation": "add",
+              "counterValue": 1
+            },
+            {
+              "id": "c3",
+              "text": "Speak to the presence: offer silence in exchange for release",
+              "location": "Speak to the presence: offer silence in exchange for release",
+              "target": "beat_32",
+              "counter": "dread",
+              "counterOperation": "add",
+              "counterValue": 1
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_30"
+          },
+          {
+            "targetId": "beat_31"
+          },
+          {
+            "targetId": "beat_32"
+          }
+        ]
+      },
+      {
+        "id": "beat_30",
+        "name": "You Document Everything",
+        "type": "infoText",
+        "position": {
+          "x": 3250,
+          "y": 150
+        },
+        "notes": "Rational route, boosts clues. Reconverges to ending gateway.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "You work with shaking efficiency: notes, numbers, names. The ledger pages form a timeline of ‘losses’ that is also a calendar of openings.\n\nYour camera flash reflects in the hollow star like a pupil dilating. Something shifts, not angry—interested. You back away without turning your back on the absence.",
+          "buttonText": "Climb the stairs",
+          "connection": {
+            "target": "beat_33"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_33"
+          }
+        ]
+      },
+      {
+        "id": "beat_31",
+        "name": "You Burn the Evidence",
+        "type": "infoText",
+        "position": {
+          "x": 3250,
+          "y": 250
+        },
+        "notes": "Destructive route: may fail if not enough clues; increases dread. Reconverges to ending gateway.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The oil catches fast. Smoke coils along lines that aren’t drafts but decisions.\n\nFor an instant the hollow star brightens—revealing not a room beyond, but a distance. A pressure builds behind your teeth, urging you to laugh or pray. You flee up the stairs as the chamber howls without sound.",
+          "buttonText": "Run",
+          "connection": {
+            "target": "beat_33"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_33"
+          }
+        ]
+      },
+      {
+        "id": "beat_32",
+        "name": "You Bargain With the Absence",
+        "type": "infoText",
+        "position": {
+          "x": 3250,
+          "y": 350
+        },
+        "notes": "Temptation route. Sets variable acceptedBargain. Reconverges to ending gateway.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "You speak in the careful tone you use with hostile witnesses: calm, professional, controlled.\n\nThe chamber answers by making you aware of every heartbeat you have ever had. In that awareness is an offer: forget what you saw, sign your name to silence, and the driveway will untie itself.\n\nThe bargain tastes like copper and relief.",
+          "buttonText": "Make your choice",
+          "connection": {
+            "target": "beat_34"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_34"
+          }
+        ]
+      },
+      {
+        "id": "beat_34",
+        "name": "Set Variable: Accepted Bargain",
+        "type": "setVariable",
+        "position": {
+          "x": 3550,
+          "y": 350
+        },
+        "notes": "Boolean flag used at ending gateway to route to secret/complicit ending.",
+        "parameters": {
+          "type": "variable",
+          "name": "acceptedBargain",
+          "value": true,
+          "operation": "set",
+          "connection": {
+            "target": "beat_33"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_33"
+          }
+        ]
+      },
+      {
+        "id": "beat_33",
+        "name": "Ending Gateway 1: Bargain Check",
+        "type": "conditionBeat",
+        "position": {
+          "x": 3550,
+          "y": 250
+        },
+        "notes": "First ending gate. If player accepted bargain, route to complicit ending regardless of clues.",
+        "parameters": {
+          "condition": {
+            "type": "variable",
+            "variable": "acceptedBargain",
+            "operator": "==",
+            "value": true
+          },
+          "trueConnection": {
+            "target": "beat_ending_complicit",
+            "label": "You took the bargain"
+          },
+          "falseConnection": {
+            "target": "beat_35",
+            "label": "No bargain"
+          }
+        }
+      },
+      {
+        "id": "beat_35",
+        "name": "Ending Gateway 2: Enough Clues?",
+        "type": "conditionBeat",
+        "position": {
+          "x": 3850,
+          "y": 250
+        },
+        "notes": "Counter check for cluesFound. Threshold reachable: up to 1 (approach) +1 (caretaker/grounds) + up to 1 (study prop) +1 (greenhouse prop) +1 (final doc choice) = 5.",
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "cluesFound",
+            "operator": ">=",
+            "value": 4
+          },
+          "trueConnection": {
+            "target": "beat_ending_expose",
+            "label": "Proof in hand"
+          },
+          "falseConnection": {
+            "target": "beat_36",
+            "label": "Not enough proof"
+          }
+        }
+      },
+      {
+        "id": "beat_36",
+        "name": "Ending Gateway 3: Dread Overwhelms?",
+        "type": "conditionBeat",
+        "position": {
+          "x": 4150,
+          "y": 250
+        },
+        "notes": "Counter check for dread. If high, route to consumed ending; else to ambiguous escape.",
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "dread",
+            "operator": ">=",
+            "value": 3
+          },
+          "trueConnection": {
+            "target": "beat_ending_consumed",
+            "label": "Mind buckles"
+          },
+          "falseConnection": {
+            "target": "beat_ending_escape",
+            "label": "You get out—changed"
+          }
+        }
+      },
+      {
+        "id": "beat_27",
+        "name": "You Leave the Estate",
+        "type": "infoText",
+        "position": {
+          "x": 2650,
+          "y": 600
+        },
+        "notes": "Early-exit path still flows into ending gateway chain, so counters matter. This beat preserves player agency while keeping a satisfying conclusion.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "You drive away before dusk can settle into the hedges. The manor shrinks behind you, and with every mile your reasons sound more sensible.\n\nYet the policy numbers in your notebook look less like bookkeeping and more like coordinates. When you blink, you see the hollow star burned against the inside of your eyelids.",
+          "buttonText": "That night…",
+          "connection": {
+            "target": "beat_35"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_35"
+          }
+        ]
+      },
+      {
+        "id": "beat_ending_expose",
+        "name": "Ending: The Investigator’s Report (Expose)",
+        "type": "endScreen",
+        "position": {
+          "x": 4450,
+          "y": 150
+        },
+        "notes": "Good/competent ending: enough proof to expose fraud/cult activity, but cosmic horror lingers.",
+        "parameters": {
+          "message": "You submit your report with copies, dates, and the pattern that ties the Haversham losses together. The insurer’s lawyers see fraud; the papers see scandal; the police see a family of fanatics and a trail of arson.\n\nNo one sees the geometry beneath the words.\n\nWeeks later, a clerk asks why your photographs show a star-shaped hole where the floor should be. You tell him it’s a light leak. He believes you. Arithmetic before the sky.\n\nSome nights you still wake at 3:17, certain something is counting your breaths—and that you proved it exists to people who cannot understand what proof means.",
+          "showRestart": true,
+          "showCredits": true,
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Interactive narrative design & writing: AI Assistant\n\nTheme recommendation: builtin-twine\n\nHistorical note: This is fictional; any resemblance to real persons or estates is coincidental."
+        }
+      },
+      {
+        "id": "beat_ending_escape",
+        "name": "Ending: A Clean Getaway (Ambiguous)",
+        "type": "endScreen",
+        "position": {
+          "x": 4450,
+          "y": 250
+        },
+        "notes": "Neutral ending: player escapes with limited proof; suggests ongoing menace.",
+        "parameters": {
+          "message": "You leave Haversham Manor with a handful of notes and a feeling you can’t itemize. Your final report is cautious: inconsistencies, uncooperative residents, suspicious accounting.\n\nThe insurer shelves the file. The world moves on.\n\nBut you do not.\n\nWhen you pass a dark window, you sometimes see your reflection misaligned by a fraction of an inch—like a draft that never quite matches the finished house. At 3:17, you find yourself listening for a bell that might be underwater, and you cannot remember when you learned to fear a time on a clock.",
+          "showRestart": true,
+          "showCredits": true,
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Interactive narrative design & writing: AI Assistant"
+        }
+      },
+      {
+        "id": "beat_ending_consumed",
+        "name": "Ending: The Hollow Star Looks Back",
+        "type": "endScreen",
+        "position": {
+          "x": 4450,
+          "y": 350
+        },
+        "notes": "Bad ending: dread high; cosmic horror wins.",
+        "parameters": {
+          "message": "After Haversham, your case notes unravel. Dates drift. Distances lie. You discover pages in your notebook that you don’t recall writing, filled with policy numbers arranged like prayers.\n\nOne evening you wake to find your room measured in unfamiliar angles. The air tastes of brine. Your watch—any watch—insists it is 3:17.\n\nYou understand then that the mansion wasn’t a place you visited. It was a shape you were introduced to.\n\nAnd once introduced, you can’t stop seeing it.\n\nThe hollow star opens in the corner of your vision.\n\nSomething patient as deep water finally recognizes you.",
+          "showRestart": true,
+          "showCredits": true,
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Interactive narrative design & writing: AI Assistant"
+        }
+      },
+      {
+        "id": "beat_ending_complicit",
+        "name": "Ending: The Quiet Policy (Complicit)",
+        "type": "endScreen",
+        "position": {
+          "x": 4450,
+          "y": 50
+        },
+        "notes": "Secret/complicit ending: player bargains and survives by silence.",
+        "parameters": {
+          "message": "You drive away as if the driveway has always been straight. Your engine purrs. Your hands stop shaking.\n\nYou file a report that is technically true and spiritually false. A mundane fraud case. Uncooperative witnesses. No actionable discrepancies.\n\nDays later, an envelope arrives with no return address. Inside is a single page torn from an insurance ledger and a hollow-star watermark that catches the light like an eyelid.\n\nAt the bottom: your name, written in your own handwriting.\n\nYou live a long time after that, and you never wake at 3:17 again.\n\nBut you also never speak honestly about what you saw on the hill.\n\nThe policy pays out.\nThe silence holds.\nSomething remains satisfied.",
+          "showRestart": true,
+          "showCredits": true,
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Interactive narrative design & writing: AI Assistant"
+        }
+      }
+    ],
+    "variables": [
+      {
+        "name": "acceptedBargain",
+        "initialValue": false,
+        "description": "Whether the investigator accepted the chamber’s offer of silence for release."
+      }
+    ],
+    "characters": [
+      {
+        "id": "char_player",
+        "name": "Private Investigator",
+        "displayName": "Investigator",
+        "role": "player",
+        "description": "A professional snoop with a wartime steadiness and a growing dread he can’t invoice.",
+        "counters": [
+          {
+            "name": "cluesFound",
+            "displayName": "Clues",
+            "value": 0,
+            "min": 0,
+            "max": 10
+          },
+          {
+            "name": "dread",
+            "displayName": "Dread",
+            "value": 0,
+            "min": 0,
+            "max": 10
+          }
+        ]
+      },
+      {
+        "id": "char_wicker",
+        "name": "Mrs. Wicker",
+        "displayName": "Mrs. Wicker",
+        "role": "npc",
+        "description": "The manor’s caretaker—tight-lipped, precise, and afraid of saying the wrong thing in the wrong place."
+      }
+    ],
+    "reasoning": "Structure uses a hub-and-spoke investigation (beat_7) to deliver moderate branching with reconvergence, preventing exponential growth while preserving meaningful choice. Procedural elements: (1) counters cluesFound and dread modified directly by choices/props; (2) inventory via pickProp items, gating crypt access with a conditionBeat (beat_19); (3) fictionalTime advances to reinforce the 3:17 motif; (4) a variable acceptedBargain for a distinct ending. All paths route through an explicit ending gateway chain (beat_33 -> beat_35 -> beat_36) so accumulated state determines endings: Complicit ending if acceptedBargain, Expose ending if cluesFound >= 4, otherwise dread decides between Escape and Consumed. No AI-powered beats are used."
+  }
+}
