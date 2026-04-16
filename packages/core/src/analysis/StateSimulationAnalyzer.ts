@@ -197,6 +197,16 @@ export class StateSimulationAnalyzer {
   }
 
   /**
+   * Return the raw SimulatedPath[] without grouping into outcome groups.
+   * Used by PathTree builder which needs the flat path data directly.
+   */
+  public analyzeRaw(): SimulatedPath[] {
+    const firstBeatId = this.story.getFirstBeatId();
+    if (!firstBeatId) return [];
+    return this.exploreAllPaths(firstBeatId, createInitialState());
+  }
+
+  /**
    * Analyze paths backward from a target beat
    * Returns result compatible with BackwardAnalysisResult
    */

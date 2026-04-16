@@ -198,47 +198,6 @@ describe('ConstraintPathAnalyzer — counter-gated endings', () => {
    * unreachable even though they are reachable in normal play. This test
    * asserts all four authored endings are feasible paths from start.
    */
-  it('diagnostic: measure duplication in Hollow Star paths', () => {
-    const story = loadFixtureStory(hollowStarFixture);
-    const result = new StateSimulationAnalyzer(story).analyze();
-
-    process.stderr.write('\n=== PATH DEDUP DIAGNOSTIC ===\n');
-    let grandRaw = 0;
-    let grandByDec = 0;
-    let grandByDecAndFinalState = 0;
-    for (const o of result.outcomes) {
-      const raw = (o.pathVariations?.length ?? 0);
-      grandRaw += raw;
-
-      // Deduplicate by decision sequence only (ignore state differences)
-      const byDec = new Set<string>();
-      // Deduplicate by decision sequence + final state signature
-      const byDecAndFinal = new Set<string>();
-
-      for (const v of (o.pathVariations || [])) {
-        const decKey = v.decisions.map((d: any) => `${d.beatName}::${d.choice}`).join('|');
-        byDec.add(decKey);
-
-        const fs: any = (v as any).finalState;
-        const counters = fs?.counters
-          ? Array.from(fs.counters as Map<string, number>).sort().map(([k, v]) => `${k}=${v}`).join(',')
-          : '';
-        const vars = fs?.variables
-          ? Array.from(fs.variables as Map<string, any>).sort().map(([k, v]) => `${k}=${v}`).join(',')
-          : '';
-        byDecAndFinal.add(`${decKey}##${counters}##${vars}`);
-      }
-
-      grandByDec += byDec.size;
-      grandByDecAndFinalState += byDecAndFinal.size;
-
-      process.stderr.write(
-        `  ${o.endType.padEnd(7)} ${o.endingBeatId.padEnd(25)} raw=${raw.toString().padStart(4)}  uniqueByDecisionSeq=${byDec.size.toString().padStart(4)}  uniqueByDecSeq+finalState=${byDecAndFinal.size}\n`
-      );
-    }
-    process.stderr.write(`TOTAL  raw=${grandRaw}  uniqueByDecisionSeq=${grandByDec}  uniqueByDecSeq+finalState=${grandByDecAndFinalState}\n`);
-  });
-
   it('reports all four endings on the Hollow Star fixture (StateSimulationAnalyzer)', () => {
     const story = loadFixtureStory(hollowStarFixture);
     // Use defaults — test that the bumped default maxPaths is enough for a

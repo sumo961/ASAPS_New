@@ -41,6 +41,16 @@ export type {
   QueryResult,
 } from './PathQuery';
 
+// Collapsed path tree view
+export { buildPathTree } from './PathTree';
+export type {
+  PathTreeNode,
+  PathTreeBranch,
+  PathTreeResult,
+  HubOption,
+  BeatRef,
+} from './PathTree';
+
 // Reachability analysis
 export { ReachabilityAnalyzer } from './ReachabilityAnalyzer';
 export type {
