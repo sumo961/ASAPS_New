@@ -460,7 +460,9 @@ function buildHubNode(
   const exitChildren: PathTreeBranch[] = [];
 
   for (const [, child] of hubTrie.children) {
-    const label = getMajorityDecisionLabel(child) || child.beatName || child.beatId;
+    // Use the hub beat's choice text (what the player sees at the hub)
+    // by filtering the hub's decision labels to paths going to this child.
+    const label = getHubChoiceLabelForChild(hubTrie, child) || child.beatName || child.beatId;
     const effects = getStateEffectsSummary(child, paths);
     const classification = classifyHubChild(child, hubBeatId);
 
@@ -589,6 +591,28 @@ function buildExcursionSubbranches(
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Get the hub's choice label for a specific child by filtering the hub
+ * node's decision labels to paths that flow through the child.
+ */
+function getHubChoiceLabelForChild(hubTrie: TrieNode, childTrie: TrieNode): string | undefined {
+  const childPathSet = childTrie.pathIndices;
+  const counts = new Map<string, number>();
+
+  for (const [pathIdx, label] of hubTrie.decisionLabels) {
+    if (childPathSet.has(pathIdx)) {
+      counts.set(label, (counts.get(label) || 0) + 1);
+    }
+  }
+
+  let best = '';
+  let bestCount = 0;
+  for (const [label, count] of counts) {
+    if (count > bestCount) { best = label; bestCount = count; }
+  }
+  return best || undefined;
+}
 
 function getMajorityDecisionLabel(trie: TrieNode): string | undefined {
   if (trie.decisionLabels.size === 0) return undefined;

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { GitBranch, ChevronRight, Search, Clock, AlertTriangle, CheckCircle, Target, ArrowLeft, HelpCircle } from 'lucide-react';
+import { GitBranch, ChevronRight, Search, Clock, AlertTriangle, CheckCircle, Target, ArrowLeft, HelpCircle, TreePine } from 'lucide-react';
 import {
   Story,
   ConstraintPathAnalyzer,
@@ -7,6 +7,7 @@ import {
   StateSimulationAnalyzer,
   PathQueryEngine,
   constraintSetToStrings,
+  buildPathTree,
 } from '@asaps/core';
 import type {
   OutcomeGroup,
@@ -15,7 +16,9 @@ import type {
   BackwardAnalysisResult,
   PathRequirement,
   DecisionPoint,
+  PathTreeResult,
 } from '@asaps/core';
+import { PathTreeView } from './PathTreeView';
 
 interface PathVisualizationProps {
   story: Story;
@@ -28,7 +31,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
 }) => {
   const [queryInput, setQueryInput] = useState('');
   const [selectedOutcome, setSelectedOutcome] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'forward' | 'backward'>('forward');
+  const [viewMode, setViewMode] = useState<'forward' | 'backward' | 'tree'>('forward');
   const [selectedBackwardBeat, setSelectedBackwardBeat] = useState<string | null>(null);
   const [expandedBackwardPath, setExpandedBackwardPath] = useState<number | null>(null);
 
@@ -51,6 +54,17 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
       return null;
     }
   }, [simulationAnalyzer]);
+
+  // Build collapsed path tree (shares the same analyzer, runs exploration once)
+  const pathTreeResult = useMemo<PathTreeResult | null>(() => {
+    try {
+      const rawPaths = simulationAnalyzer.analyzeRaw();
+      return buildPathTree(rawPaths, story);
+    } catch (error) {
+      console.error('[PathVisualization] Path tree build error:', error);
+      return null;
+    }
+  }, [simulationAnalyzer, story]);
 
   // Get endings for backward analysis
   const endings = useMemo(() => {
@@ -289,6 +303,17 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
               Forward
             </button>
             <button
+              onClick={() => setViewMode('tree')}
+              className={`px-3 py-1 text-xs rounded-md transition-colors flex items-center gap-1 ${
+                viewMode === 'tree'
+                  ? 'bg-white text-emerald-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <TreePine className="w-3 h-3" />
+              Tree
+            </button>
+            <button
               onClick={() => setViewMode('backward')}
               className={`px-3 py-1 text-xs rounded-md transition-colors flex items-center gap-1 ${
                 viewMode === 'backward'
@@ -304,6 +329,8 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
         <p className="text-sm text-gray-600 mt-1">
           {viewMode === 'forward'
             ? 'All possible outcomes from story start'
+            : viewMode === 'tree'
+            ? 'Story structure as a collapsed decision tree'
             : 'All paths to reach a specific ending'}
         </p>
       </div>
@@ -520,6 +547,25 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
             )}
           </div>
         </>
+      )}
+
+      {/* Tree View */}
+      {viewMode === 'tree' && (
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          {pathTreeResult ? (
+            <PathTreeView
+              treeResult={pathTreeResult}
+              onHighlightPath={onHighlightPath}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-8 text-gray-400">
+              <div className="text-center">
+                <TreePine className="w-8 h-8 mx-auto mb-2" />
+                <p className="text-sm">Building path tree...</p>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Backward Analysis View */}
