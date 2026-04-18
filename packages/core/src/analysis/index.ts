@@ -49,6 +49,9 @@ export type {
   PathTreeResult,
   HubOption,
   BeatRef,
+  ConditionAnnotation,
+  StateSummary,
+  ChoiceVariant,
 } from './PathTree';
 
 // Reachability analysis
