@@ -32,6 +32,11 @@ export abstract class Beat {
   public timeDisplayMode?: 'fictionalTime' | 'manual' | 'none'; // Per-beat time display mode
   public timeDisplayText?: string; // Override Timer HUD text for this beat (manual mode)
   public overrideCountdownMeter?: boolean; // Override default countdown meter visibility on this beat
+  /**
+   * Level-2 analyzer annotation. Optional list of state requirements the path
+   * analyzer will check when simulating. Not enforced by the engine.
+   */
+  public requires?: import('../types').StateRequirement[];
   public _version: number = 0; // Version counter incremented on parameter updates (for React change detection)
 
   constructor(config: BeatConfig) {
@@ -52,6 +57,7 @@ export abstract class Beat {
     this.timeDisplayMode = (config as any).timeDisplayMode || (config.parameters as any)?.timeDisplayMode;
     this.timeDisplayText = (config as any).timeDisplayText || (config.parameters as any)?.timeDisplayText;
     this.overrideCountdownMeter = (config as any).overrideCountdownMeter || (config.parameters as any)?.overrideCountdownMeter;
+    this.requires = (config as any).requires || (config.parameters as any)?.requires;
     this.x = config.x;
     this.y = config.y;
 

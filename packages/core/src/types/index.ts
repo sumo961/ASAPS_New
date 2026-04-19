@@ -125,6 +125,25 @@ export interface Effect {
   value?: any;
 }
 
+/**
+ * Declares a state prerequisite for a beat. Level-2 authoring annotation used
+ * by the path analyzer (not enforced by the engine). When a gated beat — e.g. a
+ * keypad that expects the player to have found a code — declares a requirement,
+ * the analyzer can check that every path reaching the beat satisfies it, and
+ * warn about soft-locks if the requirement cannot be fulfilled in scope.
+ *
+ * The condition reuses the standard Condition type, so any predicate a
+ * conditionBeat can express can also be a requirement (variable, counter,
+ * inventory, counterCompare, visitedBeat, fictionalTime).
+ */
+export interface StateRequirement {
+  condition: Condition;
+  /** Human-readable explanation, e.g. "Player must have read the code.". */
+  explanation: string;
+  /** Analyzer severity when unsatisfied. Defaults to 'error'. */
+  severity?: 'warn' | 'error';
+}
+
 export interface BeatConfig {
   id: string;
   name: string;

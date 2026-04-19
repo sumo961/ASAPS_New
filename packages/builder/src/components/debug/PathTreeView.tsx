@@ -10,40 +10,44 @@ interface PathTreeViewProps {
 /**
  * User's current selections across the tree.
  * - exclusive: single-choice selections (dialog variants, main tree branches)
- * - hubVisits: hub options the user has marked as "visited" (multi-select per hub)
- * - itemPicks: items picked inside a pickProp beat that lives within a hub loop.
- *   Hub loops allow revisiting the pickProp and picking different items, so these
- *   are multi-select (checkbox). For a pickProp OUTSIDE a hub loop, use exclusive.
+ * - hubSequence: ordered list of committed visits per hub. Each visit records
+ *   which option was taken and (for options with sub-items) which item was
+ *   picked. Visits are stacked as cards in the UI, matching real gameplay:
+ *   player enters hub, picks option, returns to hub, picks again, ...
  */
+/**
+ * One visit to a hub: which option was taken (targetBeatId) and which item
+ * was picked inside it (itemLabel, optional for options without sub-items).
+ */
+export interface HubVisit {
+  optionTargetBeatId: string;
+  optionLabel: string;
+  itemLabel?: string;
+  /** Combined effects for this visit (option-level + item-level) */
+  effects: string[];
+}
+
 export interface Selections {
   exclusive: Map<string, string>;
-  hubVisits: Map<string, Set<string>>;        // hubBeatId → visited target beat IDs
-  itemPicks: Map<string, Set<string>>;        // pickPropBeatId → picked item labels
-  /**
-   * Effects recorded for each selection. Keyed by canonical identifier so we
-   * can compose state additively — this lets users build scenarios that
-   * wouldn't be realizable as a single simulated path (e.g., picking multiple
-   * items from the same pickProp inside a hub loop).
-   *   "excl:<beatId>" → effects for that exclusive selection
-   *   "hub:<hubBeatId>:<targetBeatId>" → effects for a hub visit
-   *   "pick:<pickBeatId>:<label>" → effects for an item pick
-   */
+  /** Ordered visit sequence per hub. Empty array is allowed (hub opened but
+   *  no visits committed). */
+  hubSequence: Map<string, HubVisit[]>;
+  /** Effects for exclusive selections, keyed by "excl:<beatId>". Hub visit
+   *  effects live inline on each HubVisit entry so we don't duplicate. */
   effects: Map<string, string[]>;
 }
 
 function emptySelections(): Selections {
   return {
     exclusive: new Map(),
-    hubVisits: new Map(),
-    itemPicks: new Map(),
+    hubSequence: new Map(),
     effects: new Map(),
   };
 }
 
 function totalSelectionCount(s: Selections): number {
   let n = s.exclusive.size;
-  for (const set of s.hubVisits.values()) n += set.size;
-  for (const set of s.itemPicks.values()) n += set.size;
+  for (const seq of s.hubSequence.values()) n += seq.length;
   return n;
 }
 
@@ -80,17 +84,26 @@ function composeStateFromEffects(effectsList: string[][]): StateSummary | undefi
 
 function computeSyntheticState(selections: Selections, scopeKeys?: Set<string>): StateSummary | undefined {
   const all: string[][] = [];
+  // Exclusive selection effects
   for (const [key, e] of selections.effects) {
     if (scopeKeys && !scopeKeys.has(key)) continue;
     all.push(e);
+  }
+  // Hub visit effects — each committed visit contributes its inline effects
+  for (const [hubBeatId, visits] of selections.hubSequence) {
+    for (let i = 0; i < visits.length; i++) {
+      const key = `hubvisit:${hubBeatId}:${i}`;
+      if (scopeKeys && !scopeKeys.has(key)) continue;
+      all.push(visits[i].effects);
+    }
   }
   return composeStateFromEffects(all);
 }
 
 /**
  * Filter path indices to paths matching all selections.
- * - Exclusive: path's step at beatId must have decisionMade === label
- * - Hub visits: path must contain a step at each visited target beat ID
+ * Kept for highlighting and path count display, though state is now
+ * composed additively from selection effects rather than from filtered paths.
  */
 function filterPathsBySelections(
   pathIndices: number[],
@@ -103,30 +116,17 @@ function filterPathsBySelections(
     const path = flatPaths[pi];
     if (!path) return false;
 
-    // Exclusive selections: decisionMade must match at that beat
     for (const [beatId, label] of selections.exclusive) {
       const step = path.steps.find((s: any) => s.beatId === beatId);
       if (step && step.decisionMade && step.decisionMade !== label) return false;
     }
 
-    // Hub visits: path must visit every CHECKED hub-option target (inclusive —
-    // path may also visit other unchecked options). Keeps paths viable since
-    // most stories require visiting at least one exit option too.
-    for (const [, visitedTargets] of selections.hubVisits) {
-      for (const targetBeatId of visitedTargets) {
-        if (!path.steps.some((s: any) => s.beatId === targetBeatId)) return false;
-      }
-    }
-
-    // Item picks (multi-select inside hubs): path must include a step at the
-    // pickProp beat with decisionMade === each picked label. Hub loops allow
-    // multiple visits so several items can be picked cumulatively.
-    for (const [pickBeatId, labels] of selections.itemPicks) {
-      for (const label of labels) {
-        const found = path.steps.some((s: any) =>
-          s.beatId === pickBeatId && s.decisionMade === label
-        );
-        if (!found) return false;
+    for (const [, visits] of selections.hubSequence) {
+      // For filtering, require the path to visit every committed option target
+      for (const visit of visits) {
+        if (!path.steps.some((s: any) => s.beatId === visit.optionTargetBeatId)) {
+          return false;
+        }
       }
     }
 
@@ -198,51 +198,25 @@ export const PathTreeView: React.FC<PathTreeViewProps> = ({ treeResult, onHighli
     });
   }, []);
 
-  const handleToggleHubVisit = useCallback((hubBeatId: string, targetBeatId: string, effects: string[] = []) => {
+  const handleCommitHubVisit = useCallback((hubBeatId: string, visit: HubVisit) => {
     setSelections(prev => {
-      const next = {
-        ...prev,
-        hubVisits: new Map(prev.hubVisits),
-        effects: new Map(prev.effects),
-      };
-      const visited = new Set(next.hubVisits.get(hubBeatId) ?? new Set<string>());
-      const effectsKey = `hub:${hubBeatId}:${targetBeatId}`;
-      if (visited.has(targetBeatId)) {
-        visited.delete(targetBeatId);
-        next.effects.delete(effectsKey);
-      } else {
-        visited.add(targetBeatId);
-        next.effects.set(effectsKey, effects);
-      }
-      if (visited.size === 0) {
-        next.hubVisits.delete(hubBeatId);
-      } else {
-        next.hubVisits.set(hubBeatId, visited);
-      }
+      const next = { ...prev, hubSequence: new Map(prev.hubSequence) };
+      const seq = [...(next.hubSequence.get(hubBeatId) ?? [])];
+      seq.push(visit);
+      next.hubSequence.set(hubBeatId, seq);
       return next;
     });
   }, []);
 
-  const handleToggleItemPick = useCallback((pickPropBeatId: string, label: string, effects: string[] = []) => {
+  const handleRemoveHubVisit = useCallback((hubBeatId: string, visitIndex: number) => {
     setSelections(prev => {
-      const next = {
-        ...prev,
-        itemPicks: new Map(prev.itemPicks),
-        effects: new Map(prev.effects),
-      };
-      const picks = new Set(next.itemPicks.get(pickPropBeatId) ?? new Set<string>());
-      const effectsKey = `pick:${pickPropBeatId}:${label}`;
-      if (picks.has(label)) {
-        picks.delete(label);
-        next.effects.delete(effectsKey);
+      const next = { ...prev, hubSequence: new Map(prev.hubSequence) };
+      const seq = [...(next.hubSequence.get(hubBeatId) ?? [])];
+      seq.splice(visitIndex, 1);
+      if (seq.length === 0) {
+        next.hubSequence.delete(hubBeatId);
       } else {
-        picks.add(label);
-        next.effects.set(effectsKey, effects);
-      }
-      if (picks.size === 0) {
-        next.itemPicks.delete(pickPropBeatId);
-      } else {
-        next.itemPicks.set(pickPropBeatId, picks);
+        next.hubSequence.set(hubBeatId, seq);
       }
       return next;
     });
@@ -285,8 +259,8 @@ export const PathTreeView: React.FC<PathTreeViewProps> = ({ treeResult, onHighli
         defaultExpanded={true}
         selections={selections}
         onSelectExclusive={handleSelectExclusive}
-        onToggleHubVisit={handleToggleHubVisit}
-        onToggleItemPick={handleToggleItemPick}
+        onCommitHubVisit={handleCommitHubVisit}
+        onRemoveHubVisit={handleRemoveHubVisit}
         priorKeys={new Set()}
       />
     </div>
@@ -305,15 +279,15 @@ interface TreeNodeViewProps {
   defaultExpanded?: boolean;
   selections: Selections;
   onSelectExclusive: (beatId: string, label: string, effects?: string[]) => void;
-  onToggleHubVisit: (hubBeatId: string, targetBeatId: string, effects?: string[]) => void;
-  onToggleItemPick: (pickPropBeatId: string, label: string, effects?: string[]) => void;
+  onCommitHubVisit: (hubBeatId: string, visit: HubVisit) => void;
+  onRemoveHubVisit: (hubBeatId: string, visitIndex: number) => void;
   /** Keys of selections committed at or before this render position. */
   priorKeys: Set<string>;
 }
 
 const TreeNodeView: React.FC<TreeNodeViewProps> = ({
   node, treeResult, onHighlightPath, depth, defaultExpanded = false,
-  selections, onSelectExclusive, onToggleHubVisit, onToggleItemPick, priorKeys,
+  selections, onSelectExclusive, onCommitHubVisit, onRemoveHubVisit, priorKeys,
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded || depth < 1);
 
@@ -432,8 +406,8 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
               depth={depth}
               selections={selections}
               onSelectExclusive={onSelectExclusive}
-              onToggleHubVisit={onToggleHubVisit}
-              onToggleItemPick={onToggleItemPick}
+              onCommitHubVisit={onCommitHubVisit}
+              onRemoveHubVisit={onRemoveHubVisit}
               priorKeys={localPriorKeys}
             />
           )}
@@ -462,8 +436,8 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
                     depth={depth + 1}
                     selections={selections}
                     onSelectExclusive={onSelectExclusive}
-                    onToggleHubVisit={onToggleHubVisit}
-              onToggleItemPick={onToggleItemPick}
+                    onCommitHubVisit={onCommitHubVisit}
+              onRemoveHubVisit={onRemoveHubVisit}
               priorKeys={childPriorKeys}
                   />
                 ))}
@@ -484,9 +458,6 @@ interface BranchViewProps {
   branch: PathTreeBranch;
   /** The beat the choice was made at. If set, this branch is a radio-style exclusive selection. */
   parentBeatId?: string;
-  /** The pickProp beat this branch belongs to in a multi-visit (hub) context.
-   *  When set, the branch renders as a checkbox and toggles item-pick state. */
-  multiPickBeatId?: string;
   /** True if another sibling is selected — dim this one (radio mode). */
   isDimmed?: boolean;
   treeResult: PathTreeResult;
@@ -494,41 +465,30 @@ interface BranchViewProps {
   depth: number;
   selections: Selections;
   onSelectExclusive: (beatId: string, label: string, effects?: string[]) => void;
-  onToggleHubVisit: (hubBeatId: string, targetBeatId: string, effects?: string[]) => void;
-  onToggleItemPick: (pickPropBeatId: string, label: string, effects?: string[]) => void;
+  onCommitHubVisit: (hubBeatId: string, visit: HubVisit) => void;
+  onRemoveHubVisit: (hubBeatId: string, visitIndex: number) => void;
   /** Keys of selections committed at or before this render position. */
   priorKeys: Set<string>;
 }
 
 const BranchView: React.FC<BranchViewProps> = ({
-  branch, parentBeatId, multiPickBeatId, isDimmed, treeResult, onHighlightPath, depth,
-  selections, onSelectExclusive, onToggleHubVisit, onToggleItemPick, priorKeys,
+  branch, parentBeatId, isDimmed, treeResult, onHighlightPath, depth,
+  selections, onSelectExclusive, onCommitHubVisit, onRemoveHubVisit, priorKeys,
 }) => {
   const label = branch.label.length > 60
     ? branch.label.substring(0, 57) + '...'
     : branch.label;
 
   const isConditionBranch = branch.conditionResult !== undefined;
-  const isMultiPick = !!multiPickBeatId && !isConditionBranch;
-  const selectable = (!!parentBeatId || isMultiPick) && !isConditionBranch;
-
-  // Radio-mode (exclusive) selection
+  const selectable = !!parentBeatId && !isConditionBranch;
   const isRadioSelected = !!parentBeatId && selections.exclusive.get(parentBeatId) === branch.label;
-  // Checkbox-mode (item picks inside a hub) selection
-  const isChecked = isMultiPick
-    && (selections.itemPicks.get(multiPickBeatId!)?.has(branch.label) ?? false);
-
-  const isSelected = isRadioSelected || isChecked;
+  const isSelected = isRadioSelected;
+  const isChecked = false; // no longer used — kept for minimal classname diff below
 
   const handleSelectClick = (e: React.MouseEvent) => {
     if (!selectable) return;
     e.stopPropagation();
-    const effects = branch.stateEffects ?? [];
-    if (isMultiPick) {
-      onToggleItemPick(multiPickBeatId!, branch.label, effects);
-    } else if (parentBeatId) {
-      onSelectExclusive(parentBeatId, branch.label, effects);
-    }
+    onSelectExclusive(parentBeatId!, branch.label, branch.stateEffects ?? []);
   };
 
   return (
@@ -538,14 +498,12 @@ const BranchView: React.FC<BranchViewProps> = ({
         className={`flex items-center gap-1 ml-4 pl-2 border-l border-gray-200 rounded px-1 py-0.5 transition-all ${
           selectable ? 'cursor-pointer' : ''
         } ${
-          isChecked
-            ? 'bg-blue-50 ring-1 ring-blue-200'
-            : isRadioSelected
+          isRadioSelected
             ? 'bg-purple-100 ring-1 ring-purple-300'
             : isDimmed
             ? 'opacity-40 hover:opacity-70'
             : selectable
-            ? (isMultiPick ? 'hover:bg-blue-50' : 'hover:bg-purple-50')
+            ? 'hover:bg-purple-50'
             : ''
         }`}
         onClick={handleSelectClick}
@@ -559,19 +517,7 @@ const BranchView: React.FC<BranchViewProps> = ({
           }`}>
             {branch.conditionResult ? 'TRUE' : 'FALSE'}
           </span>
-        ) : isMultiPick ? (
-          /* Checkbox indicator for multi-pick (items inside a hub) */
-          <span
-            className={`w-3.5 h-3.5 flex-shrink-0 border rounded-sm flex items-center justify-center transition-colors ${
-              isChecked
-                ? 'bg-blue-500 border-blue-500 text-white'
-                : 'border-gray-300 bg-white hover:border-blue-400'
-            }`}
-          >
-            {isChecked && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
-          </span>
         ) : selectable ? (
-          /* Radio indicator for exclusive selection */
           <span
             className={`w-3.5 h-3.5 flex-shrink-0 rounded-full border flex items-center justify-center transition-colors ${
               isRadioSelected
@@ -585,9 +531,7 @@ const BranchView: React.FC<BranchViewProps> = ({
           <GitBranch className="w-3 h-3 flex-shrink-0 text-purple-400" />
         )}
         <span className={`text-xs truncate ${
-          isChecked ? 'text-blue-900 font-medium'
-          : isRadioSelected ? 'text-purple-800 font-medium'
-          : 'text-purple-700'
+          isRadioSelected ? 'text-purple-800 font-medium' : 'text-purple-700'
         }`} title={branch.label}>
           {label}
         </span>
@@ -611,8 +555,8 @@ const BranchView: React.FC<BranchViewProps> = ({
         depth={depth}
         selections={selections}
         onSelectExclusive={onSelectExclusive}
-        onToggleHubVisit={onToggleHubVisit}
-        onToggleItemPick={onToggleItemPick}
+        onCommitHubVisit={onCommitHubVisit}
+        onRemoveHubVisit={onRemoveHubVisit}
         priorKeys={priorKeys}
       />
     </div>
@@ -630,113 +574,143 @@ interface HubNodeDetailProps {
   depth: number;
   selections: Selections;
   onSelectExclusive: (beatId: string, label: string, effects?: string[]) => void;
-  onToggleHubVisit: (hubBeatId: string, targetBeatId: string, effects?: string[]) => void;
-  onToggleItemPick: (pickPropBeatId: string, label: string, effects?: string[]) => void;
+  onCommitHubVisit: (hubBeatId: string, visit: HubVisit) => void;
+  onRemoveHubVisit: (hubBeatId: string, visitIndex: number) => void;
   /** Keys of selections committed at or before this render position. */
   priorKeys: Set<string>;
 }
 
-const HubNodeDetail: React.FC<HubNodeDetailProps> = ({ node, treeResult, onHighlightPath, depth, selections, onSelectExclusive, onToggleHubVisit, onToggleItemPick, priorKeys }) => {
-  const [expandedOption, setExpandedOption] = useState<number | null>(null);
-  const [showExit, setShowExit] = useState(true);
-
+const HubNodeDetail: React.FC<HubNodeDetailProps> = ({
+  node, treeResult, onHighlightPath, depth,
+  selections, onSelectExclusive, onCommitHubVisit, onRemoveHubVisit, priorKeys,
+}) => {
+  const hubBeatId = node.hubBeatId ?? '';
   const loopOptions = node.hubOptions.filter(o => o.returnsToHub);
   const exitOptions = node.hubOptions.filter(o => !o.returnsToHub);
-  const hubBeatId = node.hubBeatId ?? '';
-  const hubEntry = selections.hubVisits.get(hubBeatId);
-  const visitedTargets = hubEntry?.visited ?? new Set<string>();
-
-  // Accumulated state at the hub: ancestors + hub visits + inner picks.
-  // Additive composition, not path-based, so scenarios with multiple item
-  // picks (not realizable as a single simulated path) still compute.
-  const hubState = useMemo(() => {
-    const scope = new Set(priorKeys);
-    for (const target of visitedTargets) scope.add(`hub:${hubBeatId}:${target}`);
-    for (const [pickBeatId, labels] of selections.itemPicks) {
-      for (const label of labels) scope.add(`pick:${pickBeatId}:${label}`);
-    }
-    if (scope.size === 0) return undefined;
-    return computeSyntheticState(selections, scope);
-  }, [selections, priorKeys, visitedTargets, hubBeatId]);
+  const committedVisits = selections.hubSequence.get(hubBeatId) ?? [];
 
   return (
-    <div className="ml-6 pl-2 border-l border-blue-200 space-y-1">
-      {/* Hub options (excursions) */}
-      {loopOptions.length > 0 && (
-        <div>
-          <div className="text-xs text-blue-600 font-medium flex items-center gap-1 py-0.5">
-            <RotateCw className="w-3 h-3" />
-            Options (check any to visit — effects accumulate)
-          </div>
-          {loopOptions.map((option, i) => (
-            <HubOptionView
-              key={i}
-              option={option}
-              hubBeatId={hubBeatId}
-              isVisited={visitedTargets.has(option.targetBeatId)}
-              isExpanded={expandedOption === i}
-              onToggle={() => setExpandedOption(expandedOption === i ? null : i)}
-              treeResult={treeResult}
-              onHighlightPath={onHighlightPath}
-              depth={depth}
-              selections={selections}
-              onSelectExclusive={onSelectExclusive}
-              onToggleHubVisit={onToggleHubVisit}
-              onToggleItemPick={onToggleItemPick}
-              priorKeys={priorKeys}
-              onToggleItemPick={onToggleItemPick}
-            />
-          ))}
+    <HubVisitLog
+      hubBeatId={hubBeatId}
+      hubBeatName={node.beats[node.beats.length - 1]?.beatName || 'Hub'}
+      loopOptions={loopOptions}
+      exitOptions={exitOptions}
+      committedVisits={committedVisits}
+      hubExitNode={node.hubExitNode}
+      treeResult={treeResult}
+      onHighlightPath={onHighlightPath}
+      depth={depth}
+      selections={selections}
+      onSelectExclusive={onSelectExclusive}
+      onCommitHubVisit={onCommitHubVisit}
+      onRemoveHubVisit={onRemoveHubVisit}
+      priorKeys={priorKeys}
+    />
+  );
+};
 
-          {/* Cumulative state from checked options */}
-          {hubState && (
-            <div className="ml-6 mt-1">
-              <div className="text-[10px] text-blue-600 mb-0.5">
-                Accumulated state ({visitedTargets.size} option{visitedTargets.size > 1 ? 's' : ''} visited):
-              </div>
-              <StateSummaryView summary={hubState} />
+// ============================================================================
+// HubVisitLog — stacked "visit cards" showing each trip to the hub
+// ============================================================================
+
+interface HubVisitLogProps {
+  hubBeatId: string;
+  hubBeatName: string;
+  loopOptions: HubOption[];
+  exitOptions: HubOption[];
+  committedVisits: HubVisit[];
+  hubExitNode?: PathTreeNode;
+  treeResult: PathTreeResult;
+  onHighlightPath?: (beatIds: string[]) => void;
+  depth: number;
+  selections: Selections;
+  onSelectExclusive: (beatId: string, label: string, effects?: string[]) => void;
+  onCommitHubVisit: (hubBeatId: string, visit: HubVisit) => void;
+  onRemoveHubVisit: (hubBeatId: string, visitIndex: number) => void;
+  priorKeys: Set<string>;
+}
+
+const MAX_VISITS = 10;
+
+const HubVisitLog: React.FC<HubVisitLogProps> = ({
+  hubBeatId, hubBeatName, loopOptions, exitOptions, committedVisits, hubExitNode,
+  treeResult, onHighlightPath, depth, selections, onSelectExclusive,
+  onCommitHubVisit, onRemoveHubVisit, priorKeys,
+}) => {
+  const exitVisitIndex = committedVisits.findIndex(v =>
+    exitOptions.some(o => o.targetBeatId === v.optionTargetBeatId)
+  );
+  const hasExited = exitVisitIndex >= 0;
+  const visitCount = committedVisits.length;
+  const showNextSlot = !hasExited && visitCount < MAX_VISITS;
+
+  return (
+    <div className="ml-6 pl-2 border-l border-blue-200 space-y-2">
+      {/* Committed visits */}
+      {committedVisits.map((visit, idx) => (
+        <VisitCard
+          key={idx}
+          hubBeatName={hubBeatName}
+          hubBeatId={hubBeatId}
+          visitIndex={idx}
+          visit={visit}
+          loopOptions={loopOptions}
+          exitOptions={exitOptions}
+          committedVisits={committedVisits}
+          committed
+          onRemove={() => onRemoveHubVisit(hubBeatId, idx)}
+        />
+      ))}
+
+      {/* Next visit slot */}
+      {showNextSlot && (
+        <VisitCard
+          hubBeatName={hubBeatName}
+          hubBeatId={hubBeatId}
+          visitIndex={visitCount}
+          loopOptions={loopOptions}
+          exitOptions={exitOptions}
+          committedVisits={committedVisits}
+          committed={false}
+          onCommit={visit => onCommitHubVisit(hubBeatId, visit)}
+        />
+      )}
+
+      {/* Accumulated state so far */}
+      {visitCount > 0 && (() => {
+        const scope = new Set(priorKeys);
+        for (let i = 0; i < visitCount; i++) scope.add(`hubvisit:${hubBeatId}:${i}`);
+        const state = computeSyntheticState(selections, scope);
+        return state ? (
+          <div className="ml-2 mt-1">
+            <div className="text-[10px] text-blue-600 mb-0.5">
+              Accumulated state after {visitCount} visit{visitCount > 1 ? 's' : ''}:
             </div>
-          )}
-        </div>
-      )}
+            <StateSummaryView summary={state} />
+          </div>
+        ) : null;
+      })()}
 
-      {/* Exit options */}
-      {exitOptions.length > 0 && (
-        <div className="text-xs text-gray-500 py-0.5">
-          <span className="flex items-center gap-1">
-            <MapPin className="w-3 h-3" />
-            Exit options: {exitOptions.map(o => o.label).join(', ')}
-          </span>
-        </div>
-      )}
-
-      {/* Hub exit path */}
-      {node.hubExitNode && (
-        <div>
-          <div
-            className="text-xs text-green-700 font-medium flex items-center gap-1 py-0.5 cursor-pointer hover:text-green-800"
-            onClick={() => setShowExit(e => !e)}
-          >
-            {showExit ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+      {/* After-hub path (only meaningful after an exit visit is committed) */}
+      {hubExitNode && hasExited && (
+        <div className="pt-1">
+          <div className="text-xs text-green-700 font-medium flex items-center gap-1 py-0.5">
+            <ChevronDown className="w-3 h-3" />
             After hub
           </div>
-          {showExit && (() => {
-            // Augment scope: hub visits + inner picks count as "prior" for beats after the hub
+          {(() => {
             const exitPriorKeys = new Set(priorKeys);
-            for (const target of visitedTargets) exitPriorKeys.add(`hub:${hubBeatId}:${target}`);
-            for (const [pickBeatId, labels] of selections.itemPicks) {
-              for (const label of labels) exitPriorKeys.add(`pick:${pickBeatId}:${label}`);
-            }
+            for (let i = 0; i < visitCount; i++) exitPriorKeys.add(`hubvisit:${hubBeatId}:${i}`);
             return (
               <TreeNodeView
-                node={node.hubExitNode}
+                node={hubExitNode}
                 treeResult={treeResult}
                 onHighlightPath={onHighlightPath}
                 depth={depth + 1}
                 selections={selections}
                 onSelectExclusive={onSelectExclusive}
-                onToggleHubVisit={onToggleHubVisit}
-                onToggleItemPick={onToggleItemPick}
+                onCommitHubVisit={onCommitHubVisit}
+                onRemoveHubVisit={onRemoveHubVisit}
                 priorKeys={exitPriorKeys}
               />
             );
@@ -748,112 +722,244 @@ const HubNodeDetail: React.FC<HubNodeDetailProps> = ({ node, treeResult, onHighl
 };
 
 // ============================================================================
-// HubOptionView — a single hub excursion option
+// VisitCard — one visit to the hub (either committed or a fresh slot)
 // ============================================================================
 
-interface HubOptionViewProps {
-  option: HubOption;
+interface VisitCardProps {
   hubBeatId: string;
-  isVisited: boolean;
-  isExpanded: boolean;
-  onToggle: () => void;
-  treeResult: PathTreeResult;
-  onHighlightPath?: (beatIds: string[]) => void;
-  depth: number;
-  selections: Selections;
-  onSelectExclusive: (beatId: string, label: string, effects?: string[]) => void;
-  onToggleHubVisit: (hubBeatId: string, targetBeatId: string, effects?: string[]) => void;
-  onToggleItemPick: (pickPropBeatId: string, label: string, effects?: string[]) => void;
-  /** Keys of selections committed at or before this render position. */
-  priorKeys: Set<string>;
+  hubBeatName: string;
+  visitIndex: number;
+  visit?: HubVisit;                       // set if committed
+  loopOptions: HubOption[];
+  exitOptions: HubOption[];
+  committedVisits: HubVisit[];
+  committed: boolean;
+  onCommit?: (visit: HubVisit) => void;
+  onRemove?: () => void;
 }
 
-const HubOptionView: React.FC<HubOptionViewProps> = ({
-  option, hubBeatId, isVisited, isExpanded, onToggle, treeResult, onHighlightPath, depth,
-  selections, onSelectExclusive, onToggleHubVisit, onToggleItemPick, priorKeys,
+const VisitCard: React.FC<VisitCardProps> = ({
+  hubBeatId, hubBeatName, visitIndex, visit, loopOptions, exitOptions,
+  committedVisits, committed, onCommit, onRemove,
 }) => {
-  const label = option.label.length > 50
-    ? option.label.substring(0, 47) + '...'
-    : option.label;
+  // Staging state while composing an uncommitted visit
+  const [stagedOption, setStagedOption] = useState<HubOption | null>(null);
+  const [stagedItemLabel, setStagedItemLabel] = useState<string | null>(null);
 
-  const hasDetail = (option.subbranches && option.subbranches.length > 0) || option.beats.length > 2;
+  // Compute redundancy hints — which options/items are already-done per markVisited
+  const allOptions = [...loopOptions, ...exitOptions];
+  const optionRedundancy = useMemo(() => {
+    const m = new Map<string, { visitedBefore: boolean; itemsPickedBefore: Set<string> }>();
+    for (const opt of allOptions) {
+      const prior = committedVisits.slice(0, committed ? visitIndex : visitIndex)
+        .filter(v => v.optionTargetBeatId === opt.targetBeatId);
+      const itemsPickedBefore = new Set(prior.map(v => v.itemLabel).filter(Boolean) as string[]);
+      m.set(opt.targetBeatId, {
+        visitedBefore: prior.length > 0,
+        itemsPickedBefore,
+      });
+    }
+    return m;
+  }, [allOptions, committedVisits, visitIndex, committed]);
+
+  // Committed card — render as a compact summary
+  if (committed && visit) {
+    const option = allOptions.find(o => o.targetBeatId === visit.optionTargetBeatId);
+    const isExit = exitOptions.some(o => o.targetBeatId === visit.optionTargetBeatId);
+    return (
+      <div className={`rounded border px-2 py-1.5 text-xs ${
+        isExit ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50'
+      }`}>
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <Layers className={`w-3 h-3 ${isExit ? 'text-green-600' : 'text-blue-600'}`} />
+          <span className={`font-medium ${isExit ? 'text-green-800' : 'text-blue-800'}`}>
+            {isExit ? 'Exit' : `Visit ${visitIndex + 1}`}: {hubBeatName}
+          </span>
+          {onRemove && (
+            <button
+              onClick={onRemove}
+              className="ml-auto text-[10px] text-gray-500 hover:text-red-600 underline"
+              title="Remove this visit"
+            >
+              remove
+            </button>
+          )}
+        </div>
+        <div className="ml-4 space-y-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-400">→</span>
+            <span className="text-gray-800">{visit.optionLabel}</span>
+          </div>
+          {visit.itemLabel && (
+            <div className="flex items-center gap-1.5 ml-4">
+              <span className="text-gray-400">▸</span>
+              <span className="text-gray-800">{visit.itemLabel}</span>
+            </div>
+          )}
+          {visit.effects.length > 0 && (
+            <div className="ml-4 text-amber-700">
+              [{visit.effects.join(', ')}]
+            </div>
+          )}
+          {/* Beat chain for option + item follow-up */}
+          {option && (() => {
+            const beats: BeatRef[] = [];
+            if (option.beats.length > 0) beats.push(...option.beats);
+            if (visit.itemLabel) {
+              const item = option.items?.find(it => it.label === visit.itemLabel);
+              if (item?.followUpBeats) beats.push(...item.followUpBeats.slice(1));
+            }
+            if (beats.length <= 1) return null;
+            return (
+              <div className="ml-4 text-[11px] text-gray-500">
+                {beats.map(b => b.beatName || b.beatId).join(' → ')}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+    );
+  }
+
+  // Next-visit slot — staging UI
+  const canCommit = stagedOption !== null && (
+    !stagedOption.items || stagedOption.items.length === 0 || stagedItemLabel !== null
+  );
+
+  const commitVisit = () => {
+    if (!stagedOption || !canCommit || !onCommit) return;
+    const item = stagedOption.items?.find(it => it.label === stagedItemLabel);
+    const effects = [
+      ...stagedOption.stateEffects,
+      ...(item?.stateEffects ?? []),
+    ];
+    onCommit({
+      optionTargetBeatId: stagedOption.targetBeatId,
+      optionLabel: stagedOption.label,
+      itemLabel: item?.label,
+      effects,
+    });
+    setStagedOption(null);
+    setStagedItemLabel(null);
+  };
 
   return (
-    <div className="ml-2">
-      <div
-        className={`flex items-center gap-1.5 py-0.5 px-1 rounded text-xs ${
-          isVisited ? 'bg-blue-50 ring-1 ring-blue-200' : ''
-        }`}
-      >
-        {/* Visit checkbox */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleHubVisit(hubBeatId, option.targetBeatId, option.stateEffects); }}
-          className={`w-3.5 h-3.5 flex-shrink-0 border rounded-sm flex items-center justify-center transition-colors ${
-            isVisited
-              ? 'bg-blue-500 border-blue-500 text-white'
-              : 'border-gray-300 bg-white hover:border-blue-400'
-          }`}
-          title={isVisited ? 'Click to remove this visit' : 'Click to mark as visited'}
-        >
-          {isVisited && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
-        </button>
-
-        {/* Expand/collapse (for options with sub-choices) */}
-        {hasDetail && (
-          <span
-            onClick={onToggle}
-            className="cursor-pointer"
-            title="Expand sub-choices"
-          >
-            {isExpanded
-              ? <ChevronDown className="w-3 h-3 text-blue-400" />
-              : <ChevronRight className="w-3 h-3 text-blue-400" />}
-          </span>
-        )}
-
-        <span
-          className={`truncate ${isVisited ? 'text-blue-900 font-medium' : 'text-gray-700'} ${hasDetail ? 'cursor-pointer' : ''}`}
-          title={option.label}
-          onClick={hasDetail ? onToggle : undefined}
-        >
-          {label}
+    <div className="rounded border border-dashed border-blue-300 bg-white px-2 py-1.5 text-xs">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Layers className="w-3 h-3 text-blue-500" />
+        <span className="text-blue-700 font-medium">
+          Visit {visitIndex + 1}: {hubBeatName}
         </span>
-        {option.stateEffects.length > 0 && (
-          <span className="text-amber-600 flex-shrink-0">
-            [{option.stateEffects.join(', ')}]
-          </span>
-        )}
+        <span className="text-[10px] text-gray-400 ml-auto">pick an option</span>
       </div>
 
-      {/* Expanded: show sub-branches (e.g., pickProp choices within this option).
-          Because this option is INSIDE a hub loop, the player can revisit and
-          pick multiple items, so render as multi-select checkboxes. */}
-      {isExpanded && option.subbranches && (() => {
-        const pickBeatId = option.targetBeatId;
-        return (
-          <div className="ml-4 pl-2 border-l border-blue-100 space-y-0.5">
-            {option.subbranches.map((branch, i) => (
-              <BranchView
-                key={i}
-                branch={branch}
-                multiPickBeatId={pickBeatId}
-                treeResult={treeResult}
-                onHighlightPath={onHighlightPath}
-                depth={depth + 2}
-                selections={selections}
-                onSelectExclusive={onSelectExclusive}
-                onToggleHubVisit={onToggleHubVisit}
-                onToggleItemPick={onToggleItemPick}
-              />
-            ))}
-          </div>
-        );
-      })()}
+      {/* Option picker */}
+      <div className="ml-4 space-y-0.5">
+        {[...loopOptions, ...exitOptions].map((opt, i) => {
+          const isExit = exitOptions.includes(opt);
+          const redundancy = optionRedundancy.get(opt.targetBeatId);
+          const dimmed = opt.markVisitedOnHub && redundancy?.visitedBefore;
+          const allItemsExhausted = opt.markVisitedOnItems && opt.items
+            && opt.items.every(it => redundancy?.itemsPickedBefore.has(it.label));
+          const optDimmed = dimmed || allItemsExhausted;
+          const selected = stagedOption?.targetBeatId === opt.targetBeatId;
+          return (
+            <div key={i}>
+              <div
+                className={`flex items-center gap-1.5 py-0.5 px-1 rounded cursor-pointer transition-all ${
+                  selected
+                    ? (isExit ? 'bg-green-100 ring-1 ring-green-300' : 'bg-blue-100 ring-1 ring-blue-300')
+                    : optDimmed ? 'opacity-40 hover:opacity-70' : 'hover:bg-blue-50'
+                }`}
+                onClick={() => { setStagedOption(opt); setStagedItemLabel(null); }}
+              >
+                {/* Radio */}
+                <span
+                  className={`w-3.5 h-3.5 flex-shrink-0 rounded-full border flex items-center justify-center ${
+                    selected
+                      ? (isExit ? 'border-green-500 bg-green-500' : 'border-blue-500 bg-blue-500')
+                      : 'border-gray-300 bg-white'
+                  }`}
+                >
+                  {selected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </span>
+                <span className={selected ? 'text-blue-900 font-medium' : 'text-gray-800'}>
+                  {opt.label}
+                </span>
+                {optDimmed && (
+                  <span className="text-[10px] text-gray-500 italic">(already done)</span>
+                )}
+                {isExit && (
+                  <span className="text-[10px] text-green-700 ml-auto">exits hub</span>
+                )}
+              </div>
 
-      {/* Expanded: show beat chain if no sub-branches but long chain */}
-      {isExpanded && !option.subbranches && option.beats.length > 2 && (
-        <div className="ml-6 text-xs text-gray-500 py-0.5">
-          {option.beats.map(b => b.beatName || b.beatId).join(' → ')}
+              {/* Item sub-picker for the staged option */}
+              {selected && opt.items && opt.items.length > 0 && (
+                <div className="ml-6 mt-1 space-y-0.5 border-l border-blue-100 pl-2">
+                  <div className="text-[10px] text-blue-500">pick one item:</div>
+                  {opt.items.map((item, ii) => {
+                    const itemPickedBefore = opt.markVisitedOnItems
+                      && redundancy?.itemsPickedBefore.has(item.label);
+                    const itemSelected = stagedItemLabel === item.label;
+                    return (
+                      <div
+                        key={ii}
+                        className={`flex items-center gap-1.5 py-0.5 px-1 rounded cursor-pointer transition-all ${
+                          itemSelected
+                            ? 'bg-blue-100 ring-1 ring-blue-300'
+                            : itemPickedBefore ? 'opacity-40 hover:opacity-70' : 'hover:bg-blue-50'
+                        }`}
+                        onClick={() => setStagedItemLabel(item.label)}
+                      >
+                        <span
+                          className={`w-3.5 h-3.5 flex-shrink-0 rounded-full border flex items-center justify-center ${
+                            itemSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'
+                          }`}
+                        >
+                          {itemSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </span>
+                        <span className={itemSelected ? 'text-blue-900 font-medium' : 'text-gray-700'}>
+                          {item.label}
+                        </span>
+                        {item.stateEffects.length > 0 && (
+                          <span className="text-amber-600 text-[10px]">
+                            [{item.stateEffects.join(', ')}]
+                          </span>
+                        )}
+                        {itemPickedBefore && (
+                          <span className="text-[10px] text-gray-500 italic">(already picked)</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Commit button */}
+      {stagedOption && (
+        <div className="ml-4 mt-2 flex items-center gap-2">
+          <button
+            onClick={commitVisit}
+            disabled={!canCommit}
+            className={`px-2 py-0.5 text-xs rounded ${
+              canCommit
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            Commit visit
+          </button>
+          <button
+            onClick={() => { setStagedOption(null); setStagedItemLabel(null); }}
+            className="text-[10px] text-gray-500 hover:text-gray-700 underline"
+          >
+            cancel
+          </button>
         </div>
       )}
     </div>

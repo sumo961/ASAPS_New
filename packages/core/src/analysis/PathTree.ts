@@ -52,13 +52,36 @@ export interface ChoiceVariant {
   pathCount: number;
 }
 
+/**
+ * One sub-choice within a hub option (e.g., a specific prop picked from a
+ * pickProp that lives inside the hub). We store these as first-class items
+ * so the UI can render per-visit exclusive selections.
+ */
+export interface HubOptionItem {
+  label: string;
+  stateEffects: string[];
+  /** Beat chain that plays after picking this item (e.g., description → return). */
+  followUpBeats: BeatRef[];
+  pathCount: number;
+}
+
 export interface HubOption {
   label: string;
   targetBeatId: string;
   beats: BeatRef[];
   stateEffects: string[];
-  subbranches?: PathTreeBranch[];
+  /** Prop-level / sub-choice items (pickProp, inner dialogTree etc). Within a
+   *  single hub visit, exactly one item is picked — these are exclusive. */
+  items?: HubOptionItem[];
+  subbranches?: PathTreeBranch[]; // legacy — kept for back-compat with existing UI
   returnsToHub: boolean;
+  /** If true, the hub option beat has markVisited enabled in authoring — the
+   *  engine will gray out this option in runtime after the first visit. The UI
+   *  uses this to dim re-picks in the visit-sequence display. */
+  markVisitedOnHub?: boolean;
+  /** If true, the underlying pickProp (or equivalent) has markVisited enabled —
+   *  specific items can't be re-picked on subsequent visits. */
+  markVisitedOnItems?: boolean;
 }
 
 export interface PathTreeNode {
@@ -510,13 +533,27 @@ function buildHubNode(
         ? buildExcursionSubbranches(child, hubBeatId, paths)
         : undefined;
 
+      // Build first-class items (pickProp props, dialogTree choices, etc.)
+      // for the visit-sequence UI. Each item = a distinct pick within the
+      // excursion. Pulled from the first multi-child node inside the excursion.
+      const items = buildExcursionItems(child, hubBeatId, paths);
+
+      // Detect markVisited flags on the hub beat and on the option target beat
+      const hubBeat = story.getBeat(hubBeatId);
+      const optionBeat = story.getBeat(child.beatId);
+      const markVisitedOnHub = !!(hubBeat && (hubBeat.getParameters() as any).markVisited);
+      const markVisitedOnItems = !!(optionBeat && (optionBeat.getParameters() as any).markVisited);
+
       options.push({
         label,
         targetBeatId: child.beatId,
         beats: excursionBeats,
         stateEffects: effects,
+        items,
         subbranches,
         returnsToHub: !classification.hasExit,
+        markVisitedOnHub,
+        markVisitedOnItems,
       });
     }
 
@@ -635,6 +672,46 @@ function buildExcursionSubbranches(
   }
 
   return branches.length > 1 ? branches : undefined;
+}
+
+/**
+ * Build HubOptionItem[] for an excursion — the per-pick entries (pickProp
+ * props, dialog choices) inside a hub option. Each item represents one
+ * possible pick during a single visit.
+ */
+function buildExcursionItems(
+  node: TrieNode,
+  hubBeatId: string,
+  paths: SimulatedPath[],
+): HubOptionItem[] | undefined {
+  // Walk to first multi-child node in the excursion (the pickProp / dialog)
+  let cursor = node;
+  while (cursor.children.size === 1) {
+    const [key, child] = [...cursor.children.entries()][0];
+    if (key === hubBeatId) return undefined;
+    cursor = child;
+  }
+  if (cursor.children.size <= 1) return undefined;
+
+  const items: HubOptionItem[] = [];
+  for (const [key, child] of cursor.children) {
+    if (key === hubBeatId) continue;
+    const label = getParentDecisionLabelForChild(cursor, child)
+      || child.beatName || child.beatId;
+    const sampleIdx = [...child.pathIndices][0];
+    const stateEffects = sampleIdx !== undefined
+      ? computeChoiceEffectsAtParent(cursor.beatId, sampleIdx, paths)
+      : [];
+    // Collect the beats AFTER the pick, up to the loop back to the hub
+    const followUpBeats = collectExcursionBeats(child, hubBeatId);
+    items.push({
+      label,
+      stateEffects,
+      followUpBeats,
+      pathCount: child.pathIndices.size,
+    });
+  }
+  return items.length > 0 ? items : undefined;
 }
 
 // ============================================================================

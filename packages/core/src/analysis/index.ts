@@ -41,6 +41,13 @@ export type {
   QueryResult,
 } from './PathQuery';
 
+// Level-2 story warnings (soft-locks, ungated puzzles, unfulfillable requires)
+export { detectStoryWarnings } from './StoryWarnings';
+export type {
+  StoryWarning,
+  StoryWarningCode,
+} from './StoryWarnings';
+
 // Collapsed path tree view
 export { buildPathTree } from './PathTree';
 export type {
@@ -48,6 +55,7 @@ export type {
   PathTreeBranch,
   PathTreeResult,
   HubOption,
+  HubOptionItem,
   BeatRef,
   ConditionAnnotation,
   StateSummary,
