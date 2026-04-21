@@ -35,16 +35,16 @@ describe('StoryWarnings', () => {
     const paths = new StateSimulationAnalyzer(story).analyzeRaw();
     const warnings = detectStoryWarnings({ paths, story });
 
+    // The crypt keypad's failTarget loops: Wrong Code → Increase Dread → keypad.
+    // Dread accumulates but doesn't help the player escape the keypad itself
+    // (the only way out is entering correctCode), and the story has no upstream
+    // gate forcing the player to have the code. This should be flagged.
     const keypadWarning = warnings.find(w =>
       (w.code === 'keypad-softlock-loop' || w.code === 'keypad-softlock-unlimited') &&
       w.beatName.includes('False Stone')
     );
-
-    // The crypt keypad's failTarget loops: Wrong Code → Increase Dread → keypad.
-    // Dread IS inspected by a downstream condition (beat_22 dread>=2, beat_36 dread>=3),
-    // so strictly speaking this is classified as "state-degrading" — not a soft-lock
-    // by our rule set. Confirm that we don't falsely flag it as a hard soft-lock.
-    expect(keypadWarning).toBeUndefined();
+    expect(keypadWarning).toBeDefined();
+    expect(keypadWarning?.severity).toBe('error');
   });
 
   it('detects an obvious keypad with no recovery', () => {

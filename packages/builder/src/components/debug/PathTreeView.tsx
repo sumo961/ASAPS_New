@@ -1,10 +1,14 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { ChevronRight, ChevronDown, GitBranch, RotateCw, MapPin, Flag, AlertTriangle, Layers, Activity, Check } from 'lucide-react';
-import type { PathTreeNode, PathTreeBranch, PathTreeResult, HubOption, ConditionAnnotation, StateSummary, ChoiceVariant } from '@asaps/core';
+import type { PathTreeNode, PathTreeBranch, PathTreeResult, HubOption, ConditionAnnotation, StateSummary, ChoiceVariant, StoryWarning, Story, Condition, BeatRef } from '@asaps/core';
 
 interface PathTreeViewProps {
   treeResult: PathTreeResult;
   onHighlightPath?: (beatIds: string[]) => void;
+  warningsByBeatId?: Map<string, StoryWarning[]>;
+  /** Optional story reference — enables state-aware evaluation of condition
+   *  beats inside hub visit cards (shows which branch is currently active). */
+  story?: Story;
 }
 
 /**
@@ -80,6 +84,100 @@ function composeStateFromEffects(effectsList: string[][]): StateSummary | undefi
 
   if (Object.keys(counters).length === 0 && inventory.size === 0) return undefined;
   return { counters, variables: {}, inventory: [...inventory].sort() };
+}
+
+/**
+ * Apply a visit's effect strings to an incoming StateSummary and return a new
+ * summary. Used to evaluate conditions that appear within a visit's chain.
+ */
+function stateAtVisitAppliedEffects(
+  incoming: StateSummary | undefined,
+  effects: string[],
+): StateSummary | undefined {
+  const priorEffects: string[] = [];
+  if (incoming) {
+    for (const [name, r] of Object.entries(incoming.counters)) {
+      priorEffects.push(`+${r.avg} ${name}`);
+    }
+    for (const item of incoming.inventory) priorEffects.push(`+${item}`);
+  }
+  return composeStateFromEffects([priorEffects, effects]);
+}
+
+/**
+ * Walk a chain of beats forward, following condition branches resolved against
+ * the given state. Return true if the walk ever reaches the hub beat; false if
+ * it terminates elsewhere (ending, dead end, cycle, branching non-hub-returning beat).
+ */
+function chainReturnsToHub(
+  chainBeats: BeatRef[],
+  hubBeatId: string,
+  story: Story,
+  state: StateSummary | undefined,
+): boolean {
+  // First walk the pre-existing chain; when we hit a conditionBeat, follow the
+  // branch indicated by `state`. If we exhaust the chain without a condition,
+  // continue walking in the story graph from the last beat's connections.
+  let nextBeatId: string | null = null;
+
+  for (let i = 0; i < chainBeats.length; i++) {
+    const b = chainBeats[i];
+    const beat = story.getBeat(b.beatId);
+    if (!beat) return false;
+
+    if (beat.type === 'conditionBeat') {
+      const params = beat.getParameters() as any;
+      const condition: Condition | undefined = params.condition;
+      const result = condition && state
+        ? evaluateConditionAgainstSummary(condition, state)
+        : undefined;
+      const target = result === true
+        ? (params.trueConnection?.target || params.trueTarget)
+        : (params.falseConnection?.target || params.falseTarget);
+      if (!target) return false;
+      nextBeatId = target;
+      break;
+    }
+  }
+
+  // If no condition was encountered, the chain ended at the last beat — see where its connections point
+  if (nextBeatId === null) {
+    const last = chainBeats[chainBeats.length - 1];
+    const lastBeat = last ? story.getBeat(last.beatId) : null;
+    const conns = lastBeat?.getConnections() ?? [];
+    nextBeatId = conns.length > 0 ? conns[0].targetId : null;
+  }
+
+  // Walk forward from nextBeatId until we either reach the hub or terminate
+  const seen = new Set<string>();
+  let cursor = nextBeatId;
+  let steps = 0;
+  while (cursor && !seen.has(cursor) && steps++ < 40) {
+    if (cursor === hubBeatId) return true;
+    seen.add(cursor);
+    const beat = story.getBeat(cursor);
+    if (!beat) return false;
+    if (beat.type === 'endScreen' || beat.type === 'aiSummary') return false;
+    // Another conditionBeat: evaluate again
+    if (beat.type === 'conditionBeat') {
+      const params = beat.getParameters() as any;
+      const condition: Condition | undefined = params.condition;
+      const result = condition && state
+        ? evaluateConditionAgainstSummary(condition, state)
+        : undefined;
+      cursor = result === true
+        ? (params.trueConnection?.target || params.trueTarget)
+        : (params.falseConnection?.target || params.falseTarget);
+      continue;
+    }
+    // Any other branching beat (keypad, choice) — assume exit, not return-to-hub
+    if (['dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'keypad'].includes(beat.type)) {
+      return false;
+    }
+    const conns = beat.getConnections();
+    cursor = conns.length > 0 ? conns[0].targetId : null;
+  }
+  return false;
 }
 
 function computeSyntheticState(selections: Selections, scopeKeys?: Set<string>): StateSummary | undefined {
@@ -176,7 +274,7 @@ function computeFilteredStateSummary(
   return { counters, variables: {}, inventory: [...inventoryItems].sort() };
 }
 
-export const PathTreeView: React.FC<PathTreeViewProps> = ({ treeResult, onHighlightPath }) => {
+export const PathTreeView: React.FC<PathTreeViewProps> = ({ treeResult, onHighlightPath, warningsByBeatId, story }) => {
   const [selections, setSelections] = useState<Selections>(emptySelections);
 
   const handleSelectExclusive = useCallback((beatId: string, label: string, effects: string[] = []) => {
@@ -262,6 +360,8 @@ export const PathTreeView: React.FC<PathTreeViewProps> = ({ treeResult, onHighli
         onCommitHubVisit={handleCommitHubVisit}
         onRemoveHubVisit={handleRemoveHubVisit}
         priorKeys={new Set()}
+        warningsByBeatId={warningsByBeatId}
+        story={story}
       />
     </div>
   );
@@ -283,11 +383,15 @@ interface TreeNodeViewProps {
   onRemoveHubVisit: (hubBeatId: string, visitIndex: number) => void;
   /** Keys of selections committed at or before this render position. */
   priorKeys: Set<string>;
+  /** Warnings keyed by beat ID, forwarded from PathVisualization. */
+  warningsByBeatId?: Map<string, StoryWarning[]>;
+  /** Optional story — for state-aware conditionBeat evaluation in visit cards. */
+  story?: Story;
 }
 
 const TreeNodeView: React.FC<TreeNodeViewProps> = ({
   node, treeResult, onHighlightPath, depth, defaultExpanded = false,
-  selections, onSelectExclusive, onCommitHubVisit, onRemoveHubVisit, priorKeys,
+  selections, onSelectExclusive, onCommitHubVisit, onRemoveHubVisit, priorKeys, warningsByBeatId, story,
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded || depth < 1);
 
@@ -327,6 +431,19 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
       : `${node.beats[0].beatName} → ... → ${node.beats[node.beats.length - 1].beatName} (${node.beats.length} beats)`
     : '';
 
+  // Collect warnings that touch any beat in this node
+  const nodeWarnings = useMemo(() => {
+    if (!warningsByBeatId) return [];
+    const out: StoryWarning[] = [];
+    for (const b of node.beats) {
+      const ws = warningsByBeatId.get(b.beatId);
+      if (ws) out.push(...ws);
+    }
+    return out;
+  }, [warningsByBeatId, node.beats]);
+  const hasError = nodeWarnings.some(w => w.severity === 'error');
+  const hasWarning = nodeWarnings.length > 0;
+
   return (
     <div className={depth > 0 ? 'ml-4 border-l border-gray-200 pl-2' : ''}>
       {/* Node header */}
@@ -350,6 +467,16 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
         <span className="text-gray-800 truncate" title={node.beats.map(b => b.beatName).join(' → ')}>
           {beatSummary || node.type}
         </span>
+
+        {/* Warning icon (if any beat in this node has warnings) */}
+        {hasWarning && (
+          <span
+            className={`flex-shrink-0 ${hasError ? 'text-red-600' : 'text-amber-600'}`}
+            title={nodeWarnings.map(w => `[${w.code}] ${w.beatName}: ${w.message}`).join('\n\n')}
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+          </span>
+        )}
 
         {/* Path count badge */}
         <span className="ml-auto text-xs text-gray-400 flex-shrink-0">
@@ -408,6 +535,8 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
               onSelectExclusive={onSelectExclusive}
               onCommitHubVisit={onCommitHubVisit}
               onRemoveHubVisit={onRemoveHubVisit}
+              warningsByBeatId={warningsByBeatId}
+              story={story}
               priorKeys={localPriorKeys}
             />
           )}
@@ -438,6 +567,8 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
                     onSelectExclusive={onSelectExclusive}
                     onCommitHubVisit={onCommitHubVisit}
               onRemoveHubVisit={onRemoveHubVisit}
+              warningsByBeatId={warningsByBeatId}
+              story={story}
               priorKeys={childPriorKeys}
                   />
                 ))}
@@ -469,11 +600,15 @@ interface BranchViewProps {
   onRemoveHubVisit: (hubBeatId: string, visitIndex: number) => void;
   /** Keys of selections committed at or before this render position. */
   priorKeys: Set<string>;
+  /** Warnings keyed by beat ID, forwarded from PathVisualization. */
+  warningsByBeatId?: Map<string, StoryWarning[]>;
+  /** Optional story — for state-aware conditionBeat evaluation in visit cards. */
+  story?: Story;
 }
 
 const BranchView: React.FC<BranchViewProps> = ({
   branch, parentBeatId, isDimmed, treeResult, onHighlightPath, depth,
-  selections, onSelectExclusive, onCommitHubVisit, onRemoveHubVisit, priorKeys,
+  selections, onSelectExclusive, onCommitHubVisit, onRemoveHubVisit, priorKeys, warningsByBeatId, story,
 }) => {
   const label = branch.label.length > 60
     ? branch.label.substring(0, 57) + '...'
@@ -558,6 +693,8 @@ const BranchView: React.FC<BranchViewProps> = ({
         onCommitHubVisit={onCommitHubVisit}
         onRemoveHubVisit={onRemoveHubVisit}
         priorKeys={priorKeys}
+        warningsByBeatId={warningsByBeatId}
+        story={story}
       />
     </div>
   );
@@ -578,11 +715,15 @@ interface HubNodeDetailProps {
   onRemoveHubVisit: (hubBeatId: string, visitIndex: number) => void;
   /** Keys of selections committed at or before this render position. */
   priorKeys: Set<string>;
+  /** Warnings keyed by beat ID, forwarded from PathVisualization. */
+  warningsByBeatId?: Map<string, StoryWarning[]>;
+  /** Optional story — for state-aware conditionBeat evaluation in visit cards. */
+  story?: Story;
 }
 
 const HubNodeDetail: React.FC<HubNodeDetailProps> = ({
   node, treeResult, onHighlightPath, depth,
-  selections, onSelectExclusive, onCommitHubVisit, onRemoveHubVisit, priorKeys,
+  selections, onSelectExclusive, onCommitHubVisit, onRemoveHubVisit, priorKeys, warningsByBeatId, story,
 }) => {
   const hubBeatId = node.hubBeatId ?? '';
   const loopOptions = node.hubOptions.filter(o => o.returnsToHub);
@@ -605,6 +746,8 @@ const HubNodeDetail: React.FC<HubNodeDetailProps> = ({
       onCommitHubVisit={onCommitHubVisit}
       onRemoveHubVisit={onRemoveHubVisit}
       priorKeys={priorKeys}
+      story={story}
+      warningsByBeatId={warningsByBeatId}
     />
   );
 };
@@ -628,6 +771,8 @@ interface HubVisitLogProps {
   onCommitHubVisit: (hubBeatId: string, visit: HubVisit) => void;
   onRemoveHubVisit: (hubBeatId: string, visitIndex: number) => void;
   priorKeys: Set<string>;
+  story?: Story;
+  warningsByBeatId?: Map<string, StoryWarning[]>;
 }
 
 const MAX_VISITS = 10;
@@ -635,12 +780,36 @@ const MAX_VISITS = 10;
 const HubVisitLog: React.FC<HubVisitLogProps> = ({
   hubBeatId, hubBeatName, loopOptions, exitOptions, committedVisits, hubExitNode,
   treeResult, onHighlightPath, depth, selections, onSelectExclusive,
-  onCommitHubVisit, onRemoveHubVisit, priorKeys,
+  onCommitHubVisit, onRemoveHubVisit, priorKeys, story, warningsByBeatId,
 }) => {
-  const exitVisitIndex = committedVisits.findIndex(v =>
-    exitOptions.some(o => o.targetBeatId === v.optionTargetBeatId)
-  );
-  const hasExited = exitVisitIndex >= 0;
+  // Pre-compute state AT each visit index (state going in, before the visit's effects)
+  const stateAtVisit = useMemo(() => {
+    const arr: (StateSummary | undefined)[] = [];
+    for (let i = 0; i <= committedVisits.length; i++) {
+      const scope = new Set(priorKeys);
+      for (let j = 0; j < i; j++) scope.add(`hubvisit:${hubBeatId}:${j}`);
+      arr.push(scope.size === 0 ? undefined : computeSyntheticState(selections, scope));
+    }
+    return arr;
+  }, [committedVisits.length, priorKeys, hubBeatId, selections]);
+
+  // Determine whether each committed visit structurally EXITS the hub given
+  // the accumulated state at that visit. This picks up conditional branches
+  // whose TRUE target leads outside the hub (like the Lantern check → keypad).
+  const allOptions = [...loopOptions, ...exitOptions];
+  const visitExits = useMemo(() => committedVisits.map((visit, idx) => {
+    // If the option itself is an explicit exit, it's an exit
+    if (exitOptions.some(o => o.targetBeatId === visit.optionTargetBeatId)) return true;
+    if (!story) return false;
+    // Walk the option's chain; when we hit a conditionBeat, evaluate against
+    // state AT this visit + this visit's own effects, then walk the chosen branch.
+    const option = allOptions.find(o => o.targetBeatId === visit.optionTargetBeatId);
+    if (!option) return false;
+    const state = stateAtVisitAppliedEffects(stateAtVisit[idx], visit.effects);
+    return !chainReturnsToHub(option.beats, hubBeatId, story, state);
+  }), [committedVisits, exitOptions, allOptions, story, stateAtVisit, hubBeatId]);
+
+  const hasExited = visitExits.some(Boolean);
   const visitCount = committedVisits.length;
   const showNextSlot = !hasExited && visitCount < MAX_VISITS;
 
@@ -658,7 +827,11 @@ const HubVisitLog: React.FC<HubVisitLogProps> = ({
           exitOptions={exitOptions}
           committedVisits={committedVisits}
           committed
+          exitsHub={visitExits[idx]}
           onRemove={() => onRemoveHubVisit(hubBeatId, idx)}
+          stateBeforeVisit={stateAtVisit[idx]}
+          story={story}
+          warningsByBeatId={warningsByBeatId}
         />
       ))}
 
@@ -673,6 +846,9 @@ const HubVisitLog: React.FC<HubVisitLogProps> = ({
           committedVisits={committedVisits}
           committed={false}
           onCommit={visit => onCommitHubVisit(hubBeatId, visit)}
+          stateBeforeVisit={stateAtVisit[visitCount]}
+          story={story}
+          warningsByBeatId={warningsByBeatId}
         />
       )}
 
@@ -712,6 +888,8 @@ const HubVisitLog: React.FC<HubVisitLogProps> = ({
                 onCommitHubVisit={onCommitHubVisit}
                 onRemoveHubVisit={onRemoveHubVisit}
                 priorKeys={exitPriorKeys}
+                story={story}
+                warningsByBeatId={warningsByBeatId}
               />
             );
           })()}
@@ -734,13 +912,23 @@ interface VisitCardProps {
   exitOptions: HubOption[];
   committedVisits: HubVisit[];
   committed: boolean;
+  /** For committed visits: true when the active branch leads OUT of the hub
+   *  (either an explicit exit option, or a conditional TRUE branch resolved
+   *  against accumulated state). */
+  exitsHub?: boolean;
   onCommit?: (visit: HubVisit) => void;
   onRemove?: () => void;
+  /** Accumulated state ENTERING this visit — used to evaluate condition
+   *  beats inside the excursion chain. */
+  stateBeforeVisit?: StateSummary;
+  story?: Story;
+  warningsByBeatId?: Map<string, StoryWarning[]>;
 }
 
 const VisitCard: React.FC<VisitCardProps> = ({
   hubBeatId, hubBeatName, visitIndex, visit, loopOptions, exitOptions,
-  committedVisits, committed, onCommit, onRemove,
+  committedVisits, committed, exitsHub, onCommit, onRemove, stateBeforeVisit,
+  story, warningsByBeatId,
 }) => {
   // Staging state while composing an uncommitted visit
   const [stagedOption, setStagedOption] = useState<HubOption | null>(null);
@@ -765,7 +953,11 @@ const VisitCard: React.FC<VisitCardProps> = ({
   // Committed card — render as a compact summary
   if (committed && visit) {
     const option = allOptions.find(o => o.targetBeatId === visit.optionTargetBeatId);
-    const isExit = exitOptions.some(o => o.targetBeatId === visit.optionTargetBeatId);
+    const explicitExit = exitOptions.some(o => o.targetBeatId === visit.optionTargetBeatId);
+    // A visit "exits" the hub either because its option is an explicit exit
+    // option, or because its active branch (resolved via accumulated state)
+    // leads out of the hub — the latter is passed in via `exitsHub`.
+    const isExit = explicitExit || !!exitsHub;
     return (
       <div className={`rounded border px-2 py-1.5 text-xs ${
         isExit ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50'
@@ -775,6 +967,14 @@ const VisitCard: React.FC<VisitCardProps> = ({
           <span className={`font-medium ${isExit ? 'text-green-800' : 'text-blue-800'}`}>
             {isExit ? 'Exit' : `Visit ${visitIndex + 1}`}: {hubBeatName}
           </span>
+          {!explicitExit && exitsHub && (
+            <span
+              className="text-[10px] px-1.5 py-0 rounded bg-green-100 text-green-700"
+              title="This visit's active branch (resolved against accumulated state) leads out of the hub."
+            >
+              branch exits hub
+            </span>
+          )}
           {onRemove && (
             <button
               onClick={onRemove}
@@ -801,7 +1001,8 @@ const VisitCard: React.FC<VisitCardProps> = ({
               [{visit.effects.join(', ')}]
             </div>
           )}
-          {/* Beat chain for option + item follow-up */}
+          {/* Beat chain for option + item follow-up, with state-aware
+              conditionBeat evaluation */}
           {option && (() => {
             const beats: BeatRef[] = [];
             if (option.beats.length > 0) beats.push(...option.beats);
@@ -811,9 +1012,13 @@ const VisitCard: React.FC<VisitCardProps> = ({
             }
             if (beats.length <= 1) return null;
             return (
-              <div className="ml-4 text-[11px] text-gray-500">
-                {beats.map(b => b.beatName || b.beatId).join(' → ')}
-              </div>
+              <VisitBeatChain
+                beats={beats}
+                story={story}
+                stateBeforeVisit={stateBeforeVisit}
+                visitEffects={visit.effects}
+                warningsByBeatId={warningsByBeatId}
+              />
             );
           })()}
         </div>
@@ -984,6 +1189,284 @@ const NodeTypeIcon: React.FC<{ type: PathTreeNode['type'] }> = ({ type }) => {
       return <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />;
   }
 };
+
+// ============================================================================
+// VisitBeatChain — state-aware rendering of the beat chain inside a visit
+// ============================================================================
+
+const VisitBeatChain: React.FC<{
+  beats: BeatRef[];
+  story?: Story;
+  stateBeforeVisit?: StateSummary;
+  visitEffects: string[];
+  warningsByBeatId?: Map<string, StoryWarning[]>;
+}> = ({ beats, story, stateBeforeVisit, visitEffects, warningsByBeatId }) => {
+  // Compose state DURING this visit: the state entering + this visit's effects
+  const stateDuringVisit = useMemo(() => {
+    const priorEffects: string[] = [];
+    if (stateBeforeVisit) {
+      for (const [name, r] of Object.entries(stateBeforeVisit.counters)) {
+        priorEffects.push(`+${r.avg} ${name}`);
+      }
+      for (const item of stateBeforeVisit.inventory) {
+        priorEffects.push(`+${item}`);
+      }
+    }
+    return composeStateFromEffects([priorEffects, visitEffects]);
+  }, [stateBeforeVisit, visitEffects]);
+
+  const segments: React.ReactNode[] = [];
+  let i = 0;
+  while (i < beats.length) {
+    const b = beats[i];
+    const beatInStory = story?.getBeat(b.beatId);
+    const isCondition = beatInStory?.type === 'conditionBeat' || b.beatType === 'conditionBeat';
+
+    if (isCondition) {
+      // Evaluate this condition against the state during the visit.
+      // If the story reference is available we read the raw condition;
+      // otherwise we fall back to a label-only rendering.
+      const params = beatInStory ? (beatInStory.getParameters() as any) : {};
+      const condition: Condition | undefined = params.condition;
+      const result = condition && stateDuringVisit
+        ? evaluateConditionAgainstSummary(condition, stateDuringVisit)
+        : undefined;
+      const condText = condition ? formatCondition(condition) : b.beatName;
+
+      const trueTarget = params.trueConnection?.target || params.trueTarget;
+      const falseTarget = params.falseConnection?.target || params.falseTarget;
+      const trueChain = trueTarget && story ? walkChain(trueTarget, story, new Set([b.beatId])) : null;
+      const falseChain = falseTarget && story ? walkChain(falseTarget, story, new Set([b.beatId])) : null;
+
+      segments.push(
+        <div key={i} className="ml-4 text-[11px]">
+          <div className="flex items-center gap-1.5 py-0.5">
+            <Activity className="w-3 h-3 text-cyan-500 flex-shrink-0" />
+            <span className="text-cyan-800">{b.beatName || condText}:</span>
+            <span className="font-mono text-cyan-700">{condText}</span>
+          </div>
+          <div className={`ml-4 py-0.5 ${result === true ? 'font-medium text-green-700' : 'text-gray-400 line-through'}`}>
+            <span className="px-1 py-0 text-[10px] font-bold rounded bg-green-100 text-green-700 mr-1">TRUE</span>
+            {trueChain
+              ? <ChainDisplay chain={trueChain} warningsByBeatId={warningsByBeatId} active={result === true} />
+              : <span>→ {params.trueConnection?.label || trueTarget || '...'}</span>}
+          </div>
+          <div className={`ml-4 py-0.5 ${result === false ? 'font-medium text-orange-700' : 'text-gray-400 line-through'}`}>
+            <span className="px-1 py-0 text-[10px] font-bold rounded bg-orange-100 text-orange-700 mr-1">FALSE</span>
+            {falseChain
+              ? <ChainDisplay chain={falseChain} warningsByBeatId={warningsByBeatId} active={result === false} />
+              : <span>→ {params.falseConnection?.label || falseTarget || '...'}</span>}
+          </div>
+        </div>
+      );
+
+      // Once we hit a condition, stop rendering the linear chain —
+      // the condition's branches handle the rest.
+      break;
+    }
+
+    i++;
+  }
+
+  // If no condition in the chain, fall back to linear rendering
+  if (segments.length === 0) {
+    return (
+      <div className="ml-4 text-[11px] text-gray-500">
+        {beats.map(b => b.beatName || b.beatId).join(' → ')}
+      </div>
+    );
+  }
+
+  // Pre-condition beats shown linearly, then the condition block
+  const beforeCondition = beats.slice(0, i);
+  return (
+    <div className="ml-4 text-[11px]">
+      {beforeCondition.length > 0 && (
+        <div className="text-gray-500">
+          {beforeCondition.map(b => b.beatName || b.beatId).join(' → ')}
+        </div>
+      )}
+      {segments}
+    </div>
+  );
+};
+
+/**
+ * Walk the beat graph forward from startBeatId. Collect a linear chain of
+ * beats until we hit a branching beat, ending beat, or cycle. Returns the
+ * collected chain plus a flag indicating the terminator's type.
+ */
+interface WalkedChain {
+  beats: Array<{ beatId: string; beatName: string; beatType: string }>;
+  terminator?:
+    | { kind: 'branch'; beatId: string; beatName: string; beatType: string }
+    | { kind: 'ending'; beatId: string; beatName: string }
+    | { kind: 'deadEnd'; beatId: string; beatName: string }
+    | { kind: 'cycle' };
+}
+
+function walkChain(startBeatId: string, story: Story, visited: Set<string>): WalkedChain {
+  const beats: WalkedChain['beats'] = [];
+  let cursor = startBeatId;
+  const localSeen = new Set(visited);
+  for (let step = 0; step < 40; step++) {
+    if (localSeen.has(cursor)) return { beats, terminator: { kind: 'cycle' } };
+    localSeen.add(cursor);
+    const beat = story.getBeat(cursor);
+    if (!beat) return { beats, terminator: { kind: 'deadEnd', beatId: cursor, beatName: cursor } };
+
+    // Ending: done
+    if (beat.type === 'endScreen' || beat.type === 'aiSummary') {
+      beats.push({ beatId: beat.id, beatName: beat.name, beatType: beat.type });
+      return { beats, terminator: { kind: 'ending', beatId: beat.id, beatName: beat.name } };
+    }
+
+    // Branching beat (condition/choice/keypad) — stop before, surface as terminator
+    if (['conditionBeat', 'dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'keypad'].includes(beat.type)) {
+      return {
+        beats,
+        terminator: { kind: 'branch', beatId: beat.id, beatName: beat.name, beatType: beat.type },
+      };
+    }
+
+    // Linear beat: record and advance
+    beats.push({ beatId: beat.id, beatName: beat.name, beatType: beat.type });
+    const conns = beat.getConnections();
+    if (conns.length === 0) {
+      return { beats, terminator: { kind: 'deadEnd', beatId: cursor, beatName: beat.name } };
+    }
+    cursor = conns[0].targetId;
+  }
+  return { beats };
+}
+
+const ChainDisplay: React.FC<{
+  chain: WalkedChain;
+  warningsByBeatId?: Map<string, StoryWarning[]>;
+  /** Whether this branch is the one taken given current state. Warnings on
+   *  inactive branches are suppressed since they're purely hypothetical. */
+  active?: boolean;
+}> = ({ chain, warningsByBeatId, active }) => {
+  const parts: string[] = [];
+  for (const b of chain.beats) parts.push(b.beatName || b.beatId);
+  if (chain.terminator) {
+    switch (chain.terminator.kind) {
+      case 'branch':
+        parts.push(`→ ${chain.terminator.beatName} (${chain.terminator.beatType})`);
+        break;
+      case 'ending':
+        parts.push(`→ ${chain.terminator.beatName} [ending]`);
+        break;
+      case 'deadEnd':
+        parts.push(`→ ${chain.terminator.beatName} [dead end]`);
+        break;
+      case 'cycle':
+        parts.push('→ (cycle)');
+        break;
+    }
+  }
+
+  // Collect warnings that touch any beat in this chain (including the terminator)
+  const chainWarnings: StoryWarning[] = [];
+  if (warningsByBeatId && active) {
+    const ids = new Set<string>();
+    for (const b of chain.beats) ids.add(b.beatId);
+    if (chain.terminator && chain.terminator.kind !== 'cycle') {
+      ids.add(chain.terminator.beatId);
+    }
+    for (const id of ids) {
+      const ws = warningsByBeatId.get(id);
+      if (ws) chainWarnings.push(...ws);
+    }
+  }
+  const hasError = chainWarnings.some(w => w.severity === 'error');
+
+  return (
+    <span>
+      → {parts.join(' → ')}
+      {chainWarnings.length > 0 && (
+        <span
+          className={`inline-flex items-center gap-1 ml-2 px-1 py-0 rounded text-[10px] ${
+            hasError ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+          }`}
+          title={chainWarnings.map(w => `[${w.code}] ${w.beatName}: ${w.message}`).join('\n\n')}
+        >
+          <AlertTriangle className="w-3 h-3" />
+          {chainWarnings[0].code}
+          {chainWarnings.length > 1 && ` +${chainWarnings.length - 1}`}
+        </span>
+      )}
+    </span>
+  );
+};
+
+function formatCondition(c: Condition): string {
+  const type = (c as any).type;
+  const op = (c as any).operator;
+  const v = (c as any).variableName || (c as any).variable || (c as any).left;
+  const val = (c as any).value ?? (c as any).right;
+  const item = (c as any).item;
+  switch (type) {
+    case 'inventory':
+      return `has ${item || v}`;
+    case 'counter':
+    case 'variable':
+      return `${v} ${op} ${val}`;
+    case 'visitedBeat':
+      return `visited ${(c as any).beatId || v}`;
+    default:
+      return `${v ?? type} ${op ?? ''} ${val ?? ''}`.trim();
+  }
+}
+
+function evaluateConditionAgainstSummary(c: Condition, state: StateSummary): boolean | undefined {
+  const type = (c as any).type;
+  const op = (c as any).operator;
+  const val = (c as any).value ?? (c as any).right;
+  const v = (c as any).variableName || (c as any).variable || (c as any).left;
+  const item = (c as any).item;
+
+  switch (type) {
+    case 'inventory': {
+      const name = item || val || v;
+      if (!name) return undefined;
+      const has = state.inventory.includes(name);
+      return op === '!=' || op === 'not' ? !has : has;
+    }
+    case 'counter': {
+      if (!v) return undefined;
+      const r = state.counters[v];
+      if (!r) return op === '!=' || op === '<' || op === '<=' ? compare(0, op, Number(val)) : compare(0, op, Number(val));
+      return compare(r.avg, op, Number(val));
+    }
+    case 'variable': {
+      // Composed state doesn't track variable values — fall back to inventory
+      // heuristic (set-variable effects are represented as "+<name>") and
+      // otherwise return undefined (unknown).
+      if (!v) return undefined;
+      // If the variable is in the inventory set (we piggyback non-counter
+      // effects there), treat it as set/truthy.
+      if (state.inventory.includes(v)) {
+        return op === '!=' || op === 'not' ? !(val ?? true) : !!(val ?? true);
+      }
+      return undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+function compare(a: number, op: string, b: number): boolean {
+  switch (op) {
+    case '>=': return a >= b;
+    case '<=': return a <= b;
+    case '>':  return a > b;
+    case '<':  return a < b;
+    case '==': return a === b;
+    case '!=': return a !== b;
+    default:   return false;
+  }
+}
 
 // ============================================================================
 // ChoiceVariantsView — inline display for same-target multi-choice beats

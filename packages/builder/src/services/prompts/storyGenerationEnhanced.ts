@@ -365,6 +365,26 @@ Concrete rules:
   - See Pattern 8: Code/Password Puzzle for complete example
   - ⚠️ For numeric codes, prefer keypad over inputText — visual keypad is more immersive!
 
+🚨 GENERIC BEAT ANNOTATION: "requires" (use on any beat that gates progress)
+
+Any beat can declare state prerequisites via "requires" on its parameters. These are
+analyzer-facing annotations: the path analyzer uses them to flag soft-locks and
+unreachable gates. Use this whenever a beat should only be meaningfully entered after
+narrative setup. Typical pairing:
+  - code-revealing pickProp/infoText: effects = [{ type:"setVariable", target:"knowsCode", value:true }]
+  - keypad that consumes that code: requires = [{ condition: { type:"variable", variableName:"knowsCode", operator:"==", value:true }, explanation:"..." }]
+Combine with a conditionBeat that actually routes the player if the requirement is unmet.
+
+Example requires entry:
+  "requires": [
+    { "condition": { "type": "variable", "variableName": "knowsCode", "operator": "==", "value": true },
+      "explanation": "Player must have read the code from the note." }
+  ]
+
+The condition field accepts the same types as conditionBeat
+(variable, counter, inventory, visitedBeat, counterCompare, fictionalTime).
+Severity: "error" (default) means the gate is broken without this; "warn" means soft.
+
 **keypad** - Numeric keypad input (safe locks, PIN entry, phone dialers)
 - Use: Entering codes, unlocking safes, dialing phones, PIN verification
 - Parameters:
@@ -382,10 +402,46 @@ Concrete rules:
   - clearButtonText: Clear button text (default: "Clear")
 - Connections: Single → after correct code or submit
 - ⚠️ For code puzzles, prefer keypad over inputText — visual keypad is more immersive!
-- Example: Safe combination puzzle:
+
+🚨 CRITICAL KEYPAD RULES (required to avoid soft-locks):
+
+1) failTarget MUST lead to an ESCAPE, never loop back to the keypad with no state change.
+   ❌ WRONG: keypad.failTarget = "beat_wrong_code" → infoText "Try again" → back to keypad.
+      (This is an infinite loop for players who don't know the code.)
+   ✓ RIGHT: failTarget leads to either (a) an endScreen explaining the failure,
+      (b) a beat that sends the player back to find the code,
+      or (c) a counter-degrading chain where another condition eventually triggers recovery.
+
+2) If the code is narrative-earned (player must have read/been told it), declare a "requires":
+     "requires": [{
+       "condition": { "type": "variable", "variableName": "knowsCode", "operator": "==", "value": true },
+       "explanation": "Player must have read the combination from the safe deposit note."
+     }]
+   AND set that flag in the code-revealing beat's effects:
+     { "type": "setVariable", "target": "knowsCode", "value": true }
+   AND put a conditionBeat in front of the keypad checking the flag.
+   If the flag is false, the conditionBeat should send the player somewhere helpful (not into the keypad).
+
+3) maxAttempts: 0 (unlimited tries) is only valid if the failure chain mutates state
+   that some other condition reads (e.g. "+1 dread", then elsewhere a check on dread ≥ N
+   triggers an alternate branch). Otherwise use maxAttempts 3+ with a real failTarget.
+
+- Example: Safe combination puzzle (well-formed):
   {
     "type": "keypad",
-    "parameters": { "prompt": "Enter the safe code:", "layout": "numeric", "maxDigits": 4, "correctCode": "1847", "failTarget": "beat_wrong", "maxAttempts": 3, "maskInput": true }
+    "parameters": {
+      "prompt": "Enter the safe code:",
+      "layout": "numeric",
+      "maxDigits": 4,
+      "correctCode": "1847",
+      "failTarget": "beat_out_of_attempts",
+      "maxAttempts": 3,
+      "maskInput": true,
+      "requires": [{
+        "condition": { "type": "variable", "variableName": "knowsCode", "operator": "==", "value": true },
+        "explanation": "Player must have seen the code on the note."
+      }]
+    }
   }
 
 **endScreen** - Story conclusion (ACTUAL BEATS in the beats array!)

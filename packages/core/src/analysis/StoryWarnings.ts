@@ -74,51 +74,60 @@ function detectKeypadWarnings(
   const params = keypad.getParameters() as any;
   const maxAttempts: number = params.maxAttempts ?? 0;
   const failTarget: string | undefined = params.failTarget;
-  const declaredRequires: StateRequirement[] | undefined = params.requires;
-
-  // Rule 1: bounded keypad with failTarget that loops back
-  if (maxAttempts > 0 && failTarget) {
-    const loops = traceReachesSelf(failTarget, keypad.id, story, new Set(), 0);
-    if (loops.cycles && !loops.mutatesInspectedState) {
-      out.push({
-        code: 'keypad-softlock-loop',
-        severity: 'error',
-        beatId: keypad.id,
-        beatName: keypad.name,
-        message:
-          `Keypad's failure path ("failTarget") loops back to the keypad without ` +
-          `any state change that would help the player (no counter/variable/inventory ` +
-          `change is read by a downstream condition). Players who don't know the code ` +
-          `will be stuck indefinitely. Wire failTarget to a beat that either helps the ` +
-          `player obtain the code, or to an explanatory endScreen.`,
-        detail: { failTarget },
-      });
-    }
-  }
-
-  // Rule 2: unlimited-tries keypad with no state-degrading mechanic
-  if (maxAttempts === 0 && failTarget) {
-    const loops = traceReachesSelf(failTarget, keypad.id, story, new Set(), 0);
-    if (loops.cycles && !loops.mutatesInspectedState) {
-      out.push({
-        code: 'keypad-softlock-unlimited',
-        severity: 'error',
-        beatId: keypad.id,
-        beatName: keypad.name,
-        message:
-          `Keypad has maxAttempts: 0 (unlimited tries), and the failure loop makes no ` +
-          `state changes that any downstream condition reads. The player has no way ` +
-          `to progress if they don't know the code. Either add a counter that ` +
-          `eventually triggers a recovery beat, or point failTarget to an escape.`,
-        detail: { failTarget },
-      });
-    }
-  }
-
-  // Rule 3: ungated keypad (no requires, no upstream conditionBeat checking for prerequisite)
+  const declaredRequires: StateRequirement[] | undefined = keypad.requires || params.requires;
   const hasRequires = declaredRequires && declaredRequires.length > 0;
-  const hasUpstreamGate = findUpstreamPrerequisiteGate(keypad, story);
-  if (!hasRequires && !hasUpstreamGate) {
+  // For keypads, ONLY an explicit `requires` counts as proper gating. An
+  // upstream conditionBeat might gate a different concept (e.g., Lantern
+  // possession) while leaving the code ungated. Without explicit author
+  // intent via `requires`, we can't semantically verify the keypad is
+  // narratively protected.
+  const isProperlyGated = hasRequires;
+
+  // For a keypad, the ONLY way out is to enter `correctCode`. Loop-state
+  // mutations don't help the player escape the keypad itself — they only
+  // matter after the keypad is passed. So any `failTarget` that cycles
+  // back to the keypad is a soft-lock UNLESS an upstream gate prevents
+  // the player from reaching the keypad without the code (via conditionBeat
+  // or a declared `requires`).
+  if (failTarget && !isProperlyGated) {
+    const loops = traceReachesSelf(failTarget, keypad.id, story, new Set(), 0);
+    if (loops.cycles) {
+      if (maxAttempts > 0) {
+        out.push({
+          code: 'keypad-softlock-loop',
+          severity: 'error',
+          beatId: keypad.id,
+          beatName: keypad.name,
+          message:
+            `Keypad's failTarget loops back to the keypad, and nothing upstream ` +
+            `prevents the player from reaching it without the code. A player who ` +
+            `doesn't know the code will be stuck: the loop's state changes (if any) ` +
+            `don't change the keypad's correctCode, so they cannot escape. ` +
+            `Either (a) gate the keypad with a conditionBeat / 'requires' checking ` +
+            `a flag set when the code is revealed, or (b) wire failTarget to an ` +
+            `endScreen or recovery beat.`,
+          detail: { failTarget },
+        });
+      } else {
+        out.push({
+          code: 'keypad-softlock-unlimited',
+          severity: 'error',
+          beatId: keypad.id,
+          beatName: keypad.name,
+          message:
+            `Keypad has maxAttempts: 0 (unlimited tries) and failTarget loops ` +
+            `back to this keypad. A player without the code will be stuck ` +
+            `indefinitely — the keypad only exits on correct input. Add a ` +
+            `'requires' / upstream conditionBeat so the player cannot reach ` +
+            `this keypad without the code, or wire failTarget to an escape.`,
+          detail: { failTarget },
+        });
+      }
+    }
+  }
+
+  // Ungated keypad (no requires, no upstream conditionBeat) — warning
+  if (!isProperlyGated) {
     out.push({
       code: 'keypad-ungated',
       severity: 'warn',
@@ -129,8 +138,8 @@ function detectKeypadWarnings(
         `conditionBeat checking for a code-found variable or item). Any player ` +
         `reaching this keypad can enter the correct code, even if the narrative ` +
         `hasn't revealed it. If the code is meant to be earned, declare a ` +
-        `'requires' annotation or gate the keypad with a conditionBeat checking a ` +
-        `flag set by the code-revealing beat.`,
+        `'requires' annotation or gate the keypad with a conditionBeat checking ` +
+        `a flag set by the code-revealing beat.`,
     });
   }
 

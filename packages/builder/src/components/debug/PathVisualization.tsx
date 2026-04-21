@@ -8,6 +8,7 @@ import {
   PathQueryEngine,
   constraintSetToStrings,
   buildPathTree,
+  detectStoryWarnings,
 } from '@asaps/core';
 import type {
   OutcomeGroup,
@@ -17,6 +18,7 @@ import type {
   PathRequirement,
   DecisionPoint,
   PathTreeResult,
+  StoryWarning,
 } from '@asaps/core';
 import { PathTreeView } from './PathTreeView';
 
@@ -55,16 +57,28 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
     }
   }, [simulationAnalyzer]);
 
-  // Build collapsed path tree (shares the same analyzer, runs exploration once)
-  const pathTreeResult = useMemo<PathTreeResult | null>(() => {
+  // Build collapsed path tree + detect story warnings (shares the raw paths)
+  const { pathTreeResult, storyWarnings } = useMemo(() => {
     try {
       const rawPaths = simulationAnalyzer.analyzeRaw();
-      return buildPathTree(rawPaths, story);
+      const tree = buildPathTree(rawPaths, story);
+      const warnings = detectStoryWarnings({ paths: rawPaths, story });
+      return { pathTreeResult: tree, storyWarnings: warnings };
     } catch (error) {
-      console.error('[PathVisualization] Path tree build error:', error);
-      return null;
+      console.error('[PathVisualization] Path tree / warnings error:', error);
+      return { pathTreeResult: null as PathTreeResult | null, storyWarnings: [] as StoryWarning[] };
     }
   }, [simulationAnalyzer, story]);
+
+  // Group warnings by beat for fast UI lookup
+  const warningsByBeatId = useMemo(() => {
+    const m = new Map<string, StoryWarning[]>();
+    for (const w of storyWarnings) {
+      if (!m.has(w.beatId)) m.set(w.beatId, []);
+      m.get(w.beatId)!.push(w);
+    }
+    return m;
+  }, [storyWarnings]);
 
   // Get endings for backward analysis
   const endings = useMemo(() => {
@@ -552,10 +566,16 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
       {/* Tree View */}
       {viewMode === 'tree' && (
         <div className="flex-1 overflow-y-auto px-4 py-3">
+          {/* Story warnings summary */}
+          {storyWarnings.length > 0 && (
+            <StoryWarningsSummary warnings={storyWarnings} />
+          )}
           {pathTreeResult ? (
             <PathTreeView
               treeResult={pathTreeResult}
               onHighlightPath={onHighlightPath}
+              warningsByBeatId={warningsByBeatId}
+              story={story}
             />
           ) : (
             <div className="flex items-center justify-center py-8 text-gray-400">
@@ -820,6 +840,48 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// StoryWarningsSummary — collapsible banner listing all detected soft-locks
+// and authoring problems.
+// ============================================================================
+
+const StoryWarningsSummary: React.FC<{ warnings: StoryWarning[] }> = ({ warnings }) => {
+  const [expanded, setExpanded] = useState(true);
+  const errors = warnings.filter(w => w.severity === 'error');
+  const warns = warnings.filter(w => w.severity !== 'error');
+  const bg = errors.length > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200';
+  const accent = errors.length > 0 ? 'text-red-700' : 'text-amber-700';
+
+  return (
+    <div className={`mb-2 rounded border ${bg}`}>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium ${accent}`}
+      >
+        <AlertTriangle className="w-4 h-4" />
+        <span>
+          {errors.length > 0 && `${errors.length} error${errors.length > 1 ? 's' : ''}`}
+          {errors.length > 0 && warns.length > 0 && ', '}
+          {warns.length > 0 && `${warns.length} warning${warns.length > 1 ? 's' : ''}`}
+        </span>
+        <ChevronRight className={`w-3 h-3 ml-auto transition-transform ${expanded ? 'rotate-90' : ''}`} />
+      </button>
+      {expanded && (
+        <ul className="px-3 pb-2 space-y-1 text-xs">
+          {warnings.map((w, i) => (
+            <li key={i} className={`pl-2 border-l-2 ${w.severity === 'error' ? 'border-red-400' : 'border-amber-400'}`}>
+              <div className={`font-medium ${w.severity === 'error' ? 'text-red-800' : 'text-amber-800'}`}>
+                [{w.code}] {w.beatName}
+              </div>
+              <div className="text-gray-700 ml-0.5">{w.message}</div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

@@ -444,6 +444,21 @@ COUNTER OPERATIONS IN DIALOGTREE:
 - Example choice: { "text": "Be friendly", "target": "next", "counter": "trust", "counterOperation": "change", "counterValue": 1 }
 - This allows tracking relationships, skills, or any numeric game state
 
+STATE REQUIREMENTS ("requires" on any beat):
+Any beat can declare state prerequisites via a "requires" field on parameters:
+  "requires": [
+    { "condition": { "type": "variable", "variableName": "knowsCode", "operator": "==", "value": true },
+      "explanation": "Player must have read the code." }
+  ]
+The path analyzer uses these to flag soft-locks (gate reachable without the required state).
+Condition field reuses the conditionBeat schema: variable, counter, inventory, visitedBeat, counterCompare, fictionalTime.
+Use on keypads, conditionBeats that represent puzzles, or any beat that should only be meaningful after narrative setup.
+
+Typical pairing:
+  1. A beat reveals info (infoText or pickProp) with effects: [{"type":"setVariable","target":"knowsCode","value":true}]
+  2. A conditionBeat in front of the gate checks that variable — if false, routes somewhere safe.
+  3. The gate beat declares "requires" on that variable, so the analyzer can verify the contract.
+
 VISITED TRACKING:
 - "markVisited": boolean - Block and dim choices leading to previously visited beats
 - Per-choice visited tracking: choices are individually tracked (composite key: "beatId:choiceId")
@@ -650,7 +665,10 @@ CORRECT PARAMETER NAMES (MUST use exactly these):
 - endScreen: { message (NOT "endText"), showRestart: true (ALWAYS), reset: true (ALWAYS), showCredits, creditsPageTitle, creditsPageBody, creditsCloseText, creditsText }
   🚨 CRITICAL: When showRestart is true, endScreen MUST have a connection back to the titleScreen (beat_0). Example: "connections": [{ "targetId": "beat_0" }]. Same rule applies to aiSummary when used as an ending.
   🚨 CRITICAL: ALWAYS set reset:true on endScreen (resetOnRestart:true on aiSummary). Without it, counters and variables LEAK between replays and can make counter-gated endings ghost-reachable on a second playthrough.
-- keypad: { prompt, layout ("numeric"|"phone"|"pin"), maxDigits, minDigits, correctCode, failTarget, maxAttempts, maskInput, saveToType, variable, buttonText, clearButtonText }
+- keypad: { prompt, layout ("numeric"|"phone"|"pin"), maxDigits, minDigits, correctCode, failTarget, maxAttempts, maskInput, saveToType, variable, buttonText, clearButtonText, requires }
+  🚨 CRITICAL: failTarget MUST NOT loop back to this keypad with no state change — that's a soft-lock. Wire failTarget to an endScreen explaining failure, or to a beat that leads back to the code source.
+  🚨 CRITICAL: If the code is narrative-earned, declare "requires": [{condition: {type:"variable", variableName:"knowsCode", operator:"==", value:true}, explanation:"Player must have read the code."}] AND set the same flag via effects on the code-revealing beat AND gate the keypad with a conditionBeat checking the flag.
+  🚨 maxAttempts: 0 (unlimited) is only valid if the failure chain modifies a counter that some other condition reads. Otherwise use maxAttempts 3+ with a real failTarget.
 - inputText: { prompt, variable (NOT "variableName"), saveToType: "variable" (REQUIRED), submitButtonText }
 - setVariable: { type: "variable"|"counter"|"fictionalTime", name (variable name, NOT "variableName"), value, operation }
   ⚠️ Two different "name" fields: beat.name = display label, beat.parameters.name = VARIABLE name
