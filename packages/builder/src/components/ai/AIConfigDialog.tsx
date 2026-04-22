@@ -334,31 +334,31 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             <p className="mt-1 text-xs text-gray-500">{preset.modelHelp}</p>
           </div>
 
-          {/* Reasoning effort (GPT-5) */}
-          {(provider === 'openai' || provider === 'local') && (
-            <div>
-              <label htmlFor="reasoningEffort" className="block text-sm font-medium text-gray-700 mb-2">
-                Reasoning effort (GPT-5)
-              </label>
-              <select
-                id="reasoningEffort"
-                value={reasoningEffort}
-                onChange={(e) => setReasoningEffort(e.target.value as any)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">Auto (model default)</option>
-                <option value="none">None (no reasoning, fastest)</option>
-                <option value="minimal">Minimal</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="xhigh">X-High (max depth)</option>
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                GPT-5 reasoning uses max_completion_tokens and ignores temperature. Leave blank to use the model default (gpt-5.2 defaults to none).
-              </p>
-            </div>
-          )}
+          {/* Reasoning effort / extended thinking */}
+          <div>
+            <label htmlFor="reasoningEffort" className="block text-sm font-medium text-gray-700 mb-2">
+              {provider === 'claude' ? 'Extended thinking (Claude)' : 'Reasoning effort (GPT-5)'}
+            </label>
+            <select
+              id="reasoningEffort"
+              value={reasoningEffort}
+              onChange={(e) => setReasoningEffort(e.target.value as any)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">Auto (model default)</option>
+              <option value="none">None (no reasoning, fastest)</option>
+              <option value="minimal">Minimal</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="xhigh">X-High (max depth)</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              {provider === 'claude'
+                ? 'Claude 4+ extended thinking allocates a thinking budget before responding. Temperature is forced to 1.0 when enabled. Only applies to the direct Anthropic endpoint; most Claude-compatible proxies do not support this.'
+                : 'GPT-5 reasoning uses max_completion_tokens and ignores temperature. Leave blank to use the model default (gpt-5.2 defaults to none).'}
+            </p>
+          </div>
 
           {/* Base URL */}
           <div>
@@ -392,27 +392,25 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             </p>
           </div>
 
-          {/* Max Tokens (Optional) - shown when using custom baseUrl */}
-          {baseUrl && (
-            <div>
-              <label htmlFor="maxTokens" className="block text-sm font-medium text-gray-700 mb-2">
-                Max Tokens (Optional)
-              </label>
-              <input
-                id="maxTokens"
-                type="number"
-                value={maxTokens}
-                onChange={(e) => setMaxTokens(e.target.value)}
-                placeholder="32000"
-                min="1000"
-                max="256000"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Max output tokens for story generation. Default: 32000. Kimi K2 supports up to 256K.
-              </p>
-            </div>
-          )}
+          {/* Max Tokens (Optional) */}
+          <div>
+            <label htmlFor="maxTokens" className="block text-sm font-medium text-gray-700 mb-2">
+              Max Tokens (Optional)
+            </label>
+            <input
+              id="maxTokens"
+              type="number"
+              value={maxTokens}
+              onChange={(e) => setMaxTokens(e.target.value)}
+              placeholder="32000"
+              min="1000"
+              max="256000"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Max output tokens for story generation. Default: 32000. Claude supports up to 64K output; Kimi K2 supports up to 256K.
+            </p>
+          </div>
 
           {/* Error */}
           {(error || aiError) && (

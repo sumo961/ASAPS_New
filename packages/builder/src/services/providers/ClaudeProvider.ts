@@ -63,6 +63,26 @@ export class ClaudeProvider extends BaseAIProvider {
   }
 
   /**
+   * Map reasoningEffort to a Claude extended-thinking budget_tokens value.
+   * Returns undefined when thinking should NOT be enabled (unset, 'none', or
+   * when pointed at a custom baseUrl — most Claude-compatible proxies don't
+   * support the thinking parameter).
+   */
+  private getThinkingBudget(): number | undefined {
+    if (this.useProxy) return undefined;
+    const effort = this.config?.reasoningEffort;
+    if (!effort || effort === 'none') return undefined;
+    switch (effort) {
+      case 'minimal': return 1024;
+      case 'low':     return 4000;
+      case 'medium':  return 10000;
+      case 'high':    return 20000;
+      case 'xhigh':   return 32000;
+      default:        return undefined;
+    }
+  }
+
+  /**
    * Attempt to repair malformed or truncated JSON
    * Handles:
    * - Missing quotes in property names (e.g., "description: → "description":)
@@ -188,11 +208,13 @@ export class ClaudeProvider extends BaseAIProvider {
       // Kimi K2 supports 256K context, Claude supports 200K+
       const defaultMaxTokens = 32000;
       const maxTokens = this.config?.maxTokens || defaultMaxTokens;
+      const thinkingBudget = this.getThinkingBudget();
 
-      const requestBody = {
+      const requestBody: any = {
         model: this.model,
         max_tokens: maxTokens,
-        temperature: this.config?.temperature || 0.7,
+        // Extended thinking requires temperature=1.0; regular calls use the configured value.
+        temperature: thinkingBudget ? 1.0 : (this.config?.temperature || 0.7),
         system: systemPrompt,
         messages: [
           {
@@ -201,6 +223,11 @@ export class ClaudeProvider extends BaseAIProvider {
           },
         ],
       };
+
+      if (thinkingBudget) {
+        requestBody.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
+        console.log(`[ClaudeProvider] Extended thinking enabled, budget=${thinkingBudget}`);
+      }
 
       let response;
 
@@ -213,9 +240,11 @@ export class ClaudeProvider extends BaseAIProvider {
         response = { content: apiResponse.content };
       }
 
-      // Extract and parse JSON response
-      const content = response.content[0];
-      if (content.type !== 'text') {
+      // Extract and parse JSON response. With extended thinking enabled, the
+      // response may contain a leading `thinking` block before the `text` block.
+      const content = (response.content as Array<{ type: string; text?: string }>)
+        .find(c => c.type === 'text');
+      if (!content || typeof content.text !== 'string') {
         throw new Error('Unexpected response type from Claude');
       }
 
