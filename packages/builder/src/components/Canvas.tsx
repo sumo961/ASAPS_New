@@ -30,6 +30,7 @@ interface CanvasProps {
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   highlightedBeatIds?: string[];
+  pwVisitedBeatIds?: string[];
   onAutoLayout?: () => void;
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
@@ -70,6 +71,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onClusterResize,
   onAutoLayoutCluster,
   highlightedBeatIds = [],
+  pwVisitedBeatIds = [],
   onAutoLayout,
   onAddToContainer,
   onRemoveCluster,
@@ -139,6 +141,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onClusterResize={onClusterResize}
           onAutoLayoutCluster={onAutoLayoutCluster}
           highlightedBeatIds={highlightedBeatIds}
+          pwVisitedBeatIds={pwVisitedBeatIds}
           onAutoLayout={onAutoLayout}
           onAddToContainer={onAddToContainer}
           onRemoveCluster={onRemoveCluster}

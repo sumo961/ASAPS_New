@@ -11,6 +11,8 @@ interface BeatNodeData {
   selected: boolean;
   color: string;
   highlighted?: boolean;
+  /** True when the beat was visited in the current Preview Window session. */
+  pwVisited?: boolean;
 }
 
 // Beat type icons
@@ -84,20 +86,37 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
   const fullLabel = data.label || 'Unnamed Beat';
   const displayLabel = truncateTitle(fullLabel);
 
+  // Debug highlight (yellow) wins over PW trace (red), which wins over selected (cyan).
+  const borderColor = data.highlighted
+    ? '#eab308'
+    : data.pwVisited
+      ? '#dc2626'
+      : isSelected
+        ? '#06b6d4'
+        : '#d1d5db';
+  const bgColor = data.highlighted
+    ? '#fef9c3'
+    : data.pwVisited
+      ? '#fee2e2'
+      : isSelected
+        ? '#ecfeff'
+        : 'white';
+
   return (
     <div
       className={`
         px-3 py-2.5 rounded-lg border-2 shadow-lg
         transition-all duration-200 cursor-pointer
-        ${isSelected && !data.highlighted ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
+        ${isSelected && !data.highlighted && !data.pwVisited ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
         ${data.highlighted ? 'ring-4 ring-yellow-400 ring-opacity-70 border-yellow-500 bg-yellow-50' : ''}
-        ${!isSelected && !data.highlighted ? 'bg-white border-gray-300' : ''}
+        ${!data.highlighted && data.pwVisited ? 'ring-4 ring-red-400 ring-opacity-60 border-red-500 bg-red-50' : ''}
+        ${!isSelected && !data.highlighted && !data.pwVisited ? 'bg-white border-gray-300' : ''}
         hover:shadow-xl hover:scale-105
       `}
       style={{
-        borderColor: data.highlighted ? '#eab308' : (isSelected ? '#06b6d4' : '#d1d5db'),
+        borderColor,
         width: `${NODE_WIDTH}px`,
-        backgroundColor: data.highlighted ? '#fef9c3' : (isSelected ? '#ecfeff' : 'white'),
+        backgroundColor: bgColor,
       }}
       title={fullLabel}
     >

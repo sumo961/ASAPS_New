@@ -46,6 +46,8 @@ interface GraphEditorProps {
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   highlightedBeatIds?: string[];
+  /** Beats visited during the active Preview Window session — rendered as a red trace. */
+  pwVisitedBeatIds?: string[];
   onAutoLayout?: () => void;
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
@@ -107,6 +109,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onClusterResize,
   onAutoLayoutCluster,
   highlightedBeatIds = [],
+  pwVisitedBeatIds = [],
   onAutoLayout,
   onAddToContainer,
   onRemoveCluster,
@@ -151,6 +154,13 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const highlightedBeatIdsRef = useRef(highlightedBeatIdsSet);
   highlightedBeatIdsRef.current = highlightedBeatIdsSet;
 
+  // Same treatment for the live Preview Window trace (red overlay).
+  const pwVisitedBeatIdsSet = useMemo(() => {
+    return pwVisitedBeatIds.length > 0 ? new Set(pwVisitedBeatIds) : null;
+  }, [pwVisitedBeatIds]);
+  const pwVisitedBeatIdsRef = useRef(pwVisitedBeatIdsSet);
+  pwVisitedBeatIdsRef.current = pwVisitedBeatIdsSet;
+
   // DEBUG: Track initial mounting
   const mountRef = useRef(false);
 
@@ -194,6 +204,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         selected: selectedBeat?.id === beat.id,
         color: beatTypeColors[beat.type] || '#94a3b8',
         highlighted: highlightedBeatIdsRef.current?.has(beat.id) ?? false,
+        pwVisited: pwVisitedBeatIdsRef.current?.has(beat.id) ?? false,
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -817,6 +828,25 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       });
     });
   }, [highlightedBeatIdsSet, setNodes]);
+
+  // Separate effect for the PW-visited trace so red/yellow updates don't thrash
+  // each other — toggling the trace mid-play must not rebuild the whole graph.
+  useEffect(() => {
+    setNodes((currentNodes) => {
+      return currentNodes.map((node) => {
+        if (node.type !== 'beat') return node;
+        const isVisited = pwVisitedBeatIdsSet?.has(node.id) ?? false;
+        if (node.data.pwVisited === isVisited) return node;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            pwVisited: isVisited,
+          },
+        };
+      });
+    });
+  }, [pwVisitedBeatIdsSet, setNodes]);
 
   // Auto-center and zoom on selected beat for better visibility
   useEffect(() => {

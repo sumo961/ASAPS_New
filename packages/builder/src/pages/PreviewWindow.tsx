@@ -1568,17 +1568,37 @@ export const PreviewWindow: React.FC = () => {
         // Replace countersRef with current context state (ensures reset clears old values)
         countersRef.current = { ...counters };
 
+        const visitedBeats = ctx.getVisitedBeats();
+
         setDebugInfo({
-          visitedBeats: ctx.getVisitedBeats(),
+          visitedBeats,
           variables,
           counters,
           inventory: ctx.getInventoryEntries(),
           timers,
         });
 
+        // Echo visited-beats back to the builder so it can paint the flowchart
+        // (we fire on every state change — the opener dedupes).
+        try {
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage(
+              { type: 'VISITED_BEATS_UPDATE', payload: { visitedBeats } },
+              window.location.origin,
+            );
+          } else if (isElectronRef.current) {
+            (window as any).electronAPI?.preview?.sendToMain?.({
+              type: 'VISITED_BEATS_UPDATE',
+              payload: { visitedBeats },
+            });
+          }
+        } catch (err) {
+          console.warn('[PreviewWindow] Failed to post VISITED_BEATS_UPDATE:', err);
+        }
+
         // Update renderer with visited state for blocking/dimming visited choices
         if (rendererRef.current && 'setVisitedBeats' in rendererRef.current) {
-          (rendererRef.current as any).setVisitedBeats(ctx.getVisitedBeats());
+          (rendererRef.current as any).setVisitedBeats(visitedBeats);
         }
         if (rendererRef.current && 'setVisitedChoiceIds' in rendererRef.current) {
           const currentBeatId = ctx.getCurrentBeatId();

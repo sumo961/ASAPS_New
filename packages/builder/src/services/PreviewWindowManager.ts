@@ -30,7 +30,13 @@ export interface SerializedStoryData {
 
 // Message types for cross-window communication
 export interface PreviewMessage {
-  type: 'STORY_UPDATE' | 'NAVIGATE_TO_BEAT' | 'STATE_PRESET' | 'CLOSE' | 'PING';
+  type:
+    | 'STORY_UPDATE'
+    | 'NAVIGATE_TO_BEAT'
+    | 'STATE_PRESET'
+    | 'CLOSE'
+    | 'PING'
+    | 'VISITED_BEATS_UPDATE';
   payload?: {
     storyData?: SerializedStoryData;
     beatId?: string;
@@ -46,6 +52,8 @@ export interface PreviewMessage {
     textDirection?: 'ltr' | 'rtl';
     /** Active language code for AI response generation (e.g., 'es', 'de') */
     activeLanguage?: string | null;
+    /** Beat IDs visited during the current preview session */
+    visitedBeats?: string[];
   };
 }
 
@@ -55,11 +63,14 @@ export interface PreviewWindowState {
 }
 
 type StateChangeCallback = (state: PreviewWindowState) => void;
+type VisitedBeatsCallback = (visitedBeatIds: string[]) => void;
 
 class PreviewWindowManager {
   private previewWindow: Window | null = null;
   private checkInterval: ReturnType<typeof setInterval> | null = null;
   private listeners: Set<StateChangeCallback> = new Set();
+  private visitedListeners: Set<VisitedBeatsCallback> = new Set();
+  private lastVisitedBeats: string[] = [];
   private pendingData: PreviewMessage['payload'] | null = null;
   private isElectron: boolean = false;
 
@@ -89,6 +100,16 @@ class PreviewWindowManager {
     // Immediately notify of current state
     callback(this.getState());
     return () => this.listeners.delete(callback);
+  }
+
+  /**
+   * Subscribe to visited-beats updates streamed back from the preview window.
+   * Immediately notifies the subscriber with the last-known set (may be empty).
+   */
+  subscribeToVisitedBeats(callback: VisitedBeatsCallback): () => void {
+    this.visitedListeners.add(callback);
+    callback(this.lastVisitedBeats);
+    return () => this.visitedListeners.delete(callback);
   }
 
   /**
@@ -348,6 +369,12 @@ class PreviewWindowManager {
           this.notifyListeners();
         }
         break;
+      case 'VISITED_BEATS_UPDATE': {
+        const visited = message.payload?.visitedBeats ?? [];
+        this.lastVisitedBeats = visited;
+        this.visitedListeners.forEach(cb => cb(visited));
+        break;
+      }
     }
   };
 
@@ -377,6 +404,9 @@ class PreviewWindowManager {
     this.previewWindow = null;
     this.pendingData = null;
     this._electronWindowOpen = false;
+    // Clear the visited-beats trace so the flowchart stops showing stale red highlights
+    this.lastVisitedBeats = [];
+    this.visitedListeners.forEach(cb => cb([]));
     this.notifyListeners();
   }
 

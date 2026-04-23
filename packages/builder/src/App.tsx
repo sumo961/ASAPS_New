@@ -5,7 +5,9 @@ import { WorkspaceView } from './components/WorkspaceView';
 import { Inspector } from './components/Inspector';
 import { StoryPreview } from './components/preview/StoryPreview';
 import { PreviewWindow } from './pages/PreviewWindow';
+import { DebugWindow } from './pages/DebugWindow';
 import { previewWindowManager, type PreviewWindowState } from './services/PreviewWindowManager';
+import { debugWindowManager } from './services/DebugWindowManager';
 import { GlobalSettingsInspector } from './components/settings/GlobalSettingsInspector';
 import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
@@ -25,7 +27,6 @@ import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { InputModal } from './components/InputModal';
 import { getStorageAdapter } from './storage/HybridStorageAdapter';
 import { assetToStored, extractBlobFromAsset } from './storage/AssetStorageAdapter';
-import { DebugPanel } from './components/debug/DebugPanel';
 import { SearchPanel } from './components/search';
 import { HelperCommandInput } from './components/ai/HelperCommandInput';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
@@ -112,6 +113,9 @@ const isElectron = () => typeof window !== 'undefined' && !!window.electronAPI?.
 
 // Check if we're in the preview window route
 const isPreviewWindowRoute = () => typeof window !== 'undefined' && window.location.hash === '#/preview-window';
+
+// Check if we're in the debug window route (pop-out Debug Tools)
+const isDebugWindowRoute = () => typeof window !== 'undefined' && window.location.hash === '#/debug-window';
 
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
@@ -206,6 +210,11 @@ function App() {
     return <PreviewWindow />;
   }
 
+  // Pop-out debug tools window
+  if (isDebugWindowRoute()) {
+    return <DebugWindow />;
+  }
+
   const { state, actions, initializeStory } = useStoryBuilder();
 
   // Stable mutations ref for the command system — always points to current actions
@@ -242,6 +251,8 @@ function App() {
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [showHelperCommands, setShowHelperCommands] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
+  // Beats visited by the Preview Window (live trace, shown as red highlight on the flowchart).
+  const [pwVisitedBeatIds, setPwVisitedBeatIds] = useState<string[]>([]);
   const [previewWindowOpen, setPreviewWindowOpen] = useState(false);
   const [triggerNewProject, setTriggerNewProject] = useState(0);
   const [missingAssetsInfo, setMissingAssetsInfo] = useState<{ missing: import('@asaps/core').AssetManifestEntry[]; path: string } | null>(null);
@@ -383,6 +394,30 @@ function App() {
       setPreviewWindowOpen(windowState.isOpen);
     });
     return unsubscribe;
+  }, []);
+
+  // Subscribe to visited-beats updates from the preview window to paint the flowchart trace.
+  useEffect(() => {
+    const unsubscribe = previewWindowManager.subscribeToVisitedBeats(setPwVisitedBeatIds);
+    return unsubscribe;
+  }, []);
+
+  // Keep local debug-panel state in sync with the pop-out debug window state,
+  // so closing the pop-out clears the highlight trace in the flowchart.
+  useEffect(() => {
+    const unsubState = debugWindowManager.subscribe(({ isOpen }) => {
+      setShowDebugPanel(isOpen);
+      if (!isOpen) setHighlightedBeatIds([]);
+    });
+    const unsubHighlights = debugWindowManager.subscribeToHighlights(evt => {
+      if (evt.kind === 'path') setHighlightedBeatIds(evt.beatIds);
+      else if (evt.kind === 'beat') setHighlightedBeatIds([evt.beatId]);
+      else setHighlightedBeatIds([]);
+    });
+    return () => {
+      unsubState();
+      unsubHighlights();
+    };
   }, []);
 
   // Project and global settings
@@ -3871,6 +3906,19 @@ function App() {
     previewWindowManager.navigateToBeat(selectedBeat.id);
   }, [previewWindowOpen, selectedBeat]);
 
+  // Auto-reload the pop-out Debug window when the authored story changes,
+  // so Reachability / Path Analysis / Story Logic stay in sync with edits.
+  useEffect(() => {
+    if (!showDebugPanel) return;
+    const timeout = setTimeout(() => {
+      const storyData = getSerializedStoryData();
+      debugWindowManager.sendStoryUpdate(
+        storyData as unknown as import('./services/PreviewWindowManager').SerializedStoryData,
+      );
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [showDebugPanel, state.beats, state.connections, getSerializedStoryData]);
+
   // Asset and character handlers
   const handleAssetSelect = useCallback((type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => {
     // Implement asset selection modal
@@ -4794,18 +4842,23 @@ function App() {
   }, [actions, markChanged]);
 
   /**
-   * Handle opening debug panel
+   * Handle opening debug panel. Opens the pop-out Debug window and seeds it
+   * with the current serialized story. The window can then be dragged freely,
+   * including onto a second display.
    */
   const handleOpenDebugPanel = useCallback(() => {
-    setShowDebugPanel(true);
-  }, []);
+    const storyData = getSerializedStoryData() as unknown as import('./services/PreviewWindowManager').SerializedStoryData;
+    debugWindowManager.open(storyData);
+    setShowDebugPanel(true); // kept for backwards-compatible state tracking
+  }, [getSerializedStoryData]);
 
   /**
-   * Handle closing debug panel
+   * Handle closing debug panel (close the pop-out and clear any trace highlight).
    */
   const handleCloseDebugPanel = useCallback(() => {
+    debugWindowManager.close();
     setShowDebugPanel(false);
-    setHighlightedBeatIds([]); // Clear highlighting when closing
+    setHighlightedBeatIds([]);
   }, []);
 
   /**
@@ -5183,6 +5236,7 @@ function App() {
             projectSettings={projectSettings}
             globalSettings={globalSettings}
             highlightedBeatIds={highlightedBeatIds}
+            pwVisitedBeatIds={pwVisitedBeatIds}
             onAutoLayout={handleAutoLayout}
             onAutoLayoutCluster={(clusterId: string) => {
               // Auto-layout beats within a cluster using a simple grid
@@ -5484,15 +5538,8 @@ function App() {
         />
       )}
 
-      {/* Debug Panel */}
-      {showDebugPanel && (
-        <DebugPanel
-          story={getStoryForPreview()}
-          onClose={handleCloseDebugPanel}
-          onHighlightBeat={handleHighlightBeat}
-          onHighlightPath={handleHighlightPath}
-        />
-      )}
+      {/* Debug Tools now render in a separate pop-out window (see DebugWindow.tsx).
+          Nothing to render inline. The open/close button still lives in the header. */}
 
       {/* Search Panel */}
       <SearchPanel
