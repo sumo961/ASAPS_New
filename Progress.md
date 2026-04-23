@@ -1,5 +1,125 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-23: Path Tree Analyzer, Soft-Lock Detection, Pop-Out Debug Window & PW Trace (v0.9.33)
+
+### Overview
+
+This release focuses on **authorial debugging and analysis**. A new **PathTree analyzer** gives authors a collapsed, interactive tree over all simulated playthroughs with hub-visit logs and scope-aware accumulated state. A new **StoryWarnings** module detects five classes of structural defects (keypad soft-locks, ungated puzzles, unfulfillable/violated `requires`) and surfaces them inline in the visit chain — so authors can see, on the analyzer, the specific state conditions that would trap a player. The **Debug Tools panel pops out into its own window** so it can be moved to a second monitor, and the **Preview Window now paints a live red trace** on the flowchart for every beat visited during a playthrough. AI configuration gains **extended thinking support for Claude** and exposes max-tokens for all providers.
+
+### PathTree Analyzer (New)
+
+A new collapsed-tree view over the simulated path set, exposed as a new **Tree** tab in the Path Analysis panel.
+
+- `PathTree` builder constructs a trie of simulated paths, detects hubs via returns-to-hub analysis, classifies loop vs. exit options, and collects excursion sub-branches + items per option
+- Hub options carry per-item data (label, state effects, follow-up beats) and `markVisitedOnHub` / `markVisitedOnItems` flags for dimming redundant picks
+- Choice variants on same-target branches (e.g. inline dialog variants) are folded into the parent node and rendered as radio-style selections
+- Condition annotations attach TRUE/FALSE result to every conditional branch in the tree
+
+**Files modified:**
+- `packages/core/src/analysis/PathTree.ts` — New analyzer (≈1 100 lines) with `buildPathTree`, hub detection, excursion collection, choice variant folding
+- `packages/core/src/analysis/StateSimulationAnalyzer.ts` — State surface extensions for tree consumption
+- `packages/core/src/analysis/index.ts` — Exports for `PathTreeNode`, `HubOption`, `HubOptionItem`, `BeatRef`, `StateSummary`, `ChoiceVariant`
+- `packages/core/tests/analysis/PathTree.test.ts` — New tests
+
+### Interactive PathTreeView + Hub Visit Log
+
+The author-facing UI for the new tree, with selections and additive state composition.
+
+- `PathTreeView` renders each `PathTreeNode` recursively with type icons, path counts, ending/dead-end badges, and expand/collapse
+- **Selections** are additive, not filtering: each radio/checkbox choice contributes state effects to a scope-aware composite rather than filtering paths. Authors can now simulate combinations no single simulator path realises (needed for hub scenarios where one path can't pick multiple items)
+- **Hub Visit Log**: stacked "visit cards" matching actual gameplay — the player arrives at a hub, picks an option (and optionally an item within it), its effects are committed, then the next visit card opens. Visits can be removed to rewind
+- **State-aware conditional branches** inside each visit's chain: when a visit's chain contains a `conditionBeat`, the condition is evaluated against accumulated state and the TRUE/FALSE branches render with the active one highlighted and the inactive one line-through
+- `walkChain` resolves linear beat segments until it hits a branching beat, ending, dead-end, or cycle — so visit chains show real beat names all the way to the next decision point instead of just the immediate next beat
+- Accumulated state display shows counter ranges and named inventory items (not just counts)
+
+**Files modified:**
+- `packages/builder/src/components/debug/PathTreeView.tsx` — New component (≈1 500 lines)
+- `packages/builder/src/components/debug/PathVisualization.tsx` — Tree tab integration
+
+### StoryWarnings — Soft-Lock & `requires` Detection
+
+A new Level-2 analyzer that scans paths + story structure for five classes of structural defects and annotates them on the tree.
+
+- `keypad-softlock-loop` / `keypad-softlock-unlimited` — keypad whose `failTarget` loops back to the keypad (with or without a mutation) and has no narrative gate declaring the code
+- `keypad-ungated` — ungated keypad with no authored `requires` at all
+- `requires-unfulfillable` — beat declares a `requires` whose condition cannot be produced by any prior beat
+- `requires-violated-on-path` — a simulated path reaches a required beat without satisfying the requirement
+- New `StateRequirement` type on `Beat` with `{ condition, explanation, severity }` — purely analyzer metadata, not engine-enforced
+- Warnings surface in three places: a top-of-panel summary banner, an `AlertTriangle` icon on every tree node whose beats are affected, and inline pills on visit-chain terminators so the keypad appears with its warning code right in the spot the player would get stuck
+
+**Files modified:**
+- `packages/core/src/analysis/StoryWarnings.ts` — New module (5 warning codes, cycle detection with state-mutation tracking, requires reachability analysis)
+- `packages/core/src/types/index.ts` — `StateRequirement` type
+- `packages/core/src/beats/Beat.ts` — `requires?: StateRequirement[]` field
+- `packages/core/tests/analysis/StoryWarnings.test.ts` — New tests including the Hollow Star keypad regression
+- `packages/core/tests/fixtures/hollowstar.json`, `blackwood.json` — Regression fixtures
+
+### AI Generation Teaches the `requires` Convention
+
+Both internal (`AIService`) and MCP generation prompts now teach the narrative-gate pattern so AI-authored stories don't produce soft-locks.
+
+- `STATE REQUIREMENTS` section added to the system prompt with rules: keypads must declare `requires` when the code is narratively-earned, keypad `failTarget` must escape (never loop to itself without recovery), `maxAttempts:0` is banned unless there's an explicit escape
+- Worked example pairs `setVariable` on a pickProp (`codeFound = true`), a `conditionBeat` gating entry to the keypad, and a `requires` annotation explaining the gate
+
+**Files modified:**
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`
+- `mcp-server/src/utils/aiHelper.ts`
+
+### Pop-Out Debug Window
+
+Story Debug Tools (Reachability, Path Analysis, Story Logic) now live in a separate browser window that can be dragged anywhere — including onto a second display.
+
+- New `DebugWindow` page at hash route `#/debug-window` that reconstructs a live `Story` from a serialized payload (same shape as Preview Window) and renders the three existing analyzer components
+- New `DebugWindowManager` service mirroring `PreviewWindowManager`: `window.open` + `postMessage` with origin check, auto-retry on `PING`, debounced auto-push of story updates (300 ms)
+- Highlight clicks (beat or path) posted back to the opener so the flowchart paints exactly like before — the contract between analyzer and graph is unchanged, just the window is separate
+- The in-page draggable overlay is removed
+
+**Files modified:**
+- `packages/builder/src/pages/DebugWindow.tsx` — New page
+- `packages/builder/src/services/DebugWindowManager.ts` — New service
+- `packages/builder/src/App.tsx` — `#/debug-window` route, subscriptions, story-update push effect
+
+### Preview Window → Flowchart Red Trace
+
+Beats visited during the active Preview Window session are now painted red on the main builder's flowchart in real time.
+
+- PW echoes `visitedBeats` back to the opener on every state tick via a new `VISITED_BEATS_UPDATE` message
+- `PreviewWindowManager` exposes `subscribeToVisitedBeats`; cleared automatically when the PW closes so stale traces don't stick
+- `App → WorkspaceView → Canvas → GraphEditor` threads a new `pwVisitedBeatIds` prop through to `BeatNode`, which renders a red ring + red-50 background. The existing yellow debug highlight wins when both are set on the same beat
+
+**Files modified:**
+- `packages/builder/src/services/PreviewWindowManager.ts` — New message type + subscription API
+- `packages/builder/src/pages/PreviewWindow.tsx` — Echo visited-beats every update tick
+- `packages/builder/src/App.tsx` — `pwVisitedBeatIds` state + subscription
+- `packages/builder/src/components/WorkspaceView.tsx`, `Canvas.tsx`, `graph/GraphEditor.tsx`, `graph/BeatNode.tsx` — Prop threading + red highlight rendering
+
+### Claude Extended Thinking + Exposed Max-Tokens
+
+AI Config Dialog now exposes **Max Tokens** and an **Extended Thinking / Reasoning Effort** selector for the Claude provider (previously OpenAI/Local only, with max-tokens hidden behind a custom baseUrl).
+
+- Claude provider maps `reasoningEffort` → `thinking.budget_tokens` for direct Anthropic calls (`minimal`=1024 … `xhigh`=32000); forces `temperature: 1.0` when thinking is active (Anthropic requirement)
+- Response parsing walks content blocks to find the `text` block, so a leading `thinking` block no longer breaks extraction
+- Proxy / custom-baseUrl requests skip thinking since most Claude-compatible providers don't support the parameter
+- Max Tokens is now always visible and applied for all providers
+
+**Files modified:**
+- `packages/builder/src/components/ai/AIConfigDialog.tsx`
+- `packages/builder/src/services/providers/ClaudeProvider.ts`
+
+### Bug Fixes Rolled In
+
+- **EndScreen / AISummary credits page close**: closing the credits overlay no longer leaves the player stranded — returns cleanly to the End/AISummary screen
+- **Timer HUD overlay** resets properly on story restart
+- **Fictional-time display**: no longer force-enabled on every story load; honours the per-story setting
+- **Analyzer**: inline counter + budget fixes for more accurate path simulation
+
+**Files modified:**
+- `packages/core/src/beats/EndScreenBeat.ts`, `AISummaryBeat.ts`
+- `packages/player-web/src/WebPlayer.tsx`
+- `packages/core/src/analysis/StateSimulationAnalyzer.ts`
+
+---
+
 ## 2026-04-14: Kimi K2.5, AI Prompt Fixes, Undo/Redo & Input UX (v0.9.32)
 
 ### Overview

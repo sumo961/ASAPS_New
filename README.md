@@ -16,12 +16,20 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.32)
+## ⚠️ Development Status (v0.9.33)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **PathTree Analyzer** | **v0.9.33**: New Tree tab in Path Analysis — collapsed tree over simulated paths with hub detection, radio/checkbox selections, scope-aware additive state composition, and state-aware conditional branch rendering |
+| **Hub Visit Log** | **v0.9.33**: Interactive visit cards for hub nodes — pick options + items across multiple visits, see accumulated state per visit, visit counterfactual scenarios no single simulator path realises |
+| **Story Soft-Lock Detection** | **v0.9.33**: New StoryWarnings analyzer flags keypad soft-locks, ungated puzzles, unfulfillable `requires`, and paths that violate `requires` — with inline warnings on visit chains showing exactly where players get stuck |
+| **`requires` Annotations** | **v0.9.33**: New Level-2 `StateRequirement` type on beats — authors (and AI) declare narrative gates; the analyzer validates them against path reachability |
+| **Pop-Out Debug Window** | **v0.9.33**: Story Debug Tools (Reachability / Path Analysis / Story Logic) now open in a separate browser window — drag it to a second monitor while editing |
+| **Preview Window Trace** | **v0.9.33**: Beats visited during a preview session are painted live on the main flowchart with a red highlight; complements the existing yellow debug highlight |
+| **Claude Extended Thinking** | **v0.9.33**: AI Config Dialog exposes extended-thinking effort levels for Claude (minimal…xhigh), mapped to `thinking.budget_tokens`; Max Tokens now visible for all providers |
+| **AI Prompt `requires` Teaching** | **v0.9.33**: Internal + MCP generation prompts teach the `requires` convention so AI-authored stories declare narrative gates instead of producing soft-locks |
 | **Kimi K2.5 Support** | **v0.9.32**: Full end-to-end support for Kimi K2.5 as an OpenAI-compatible story generation provider (reasoning model handling, 10-minute proxy timeout, JSON repair for unescaped dialogue quotes) |
 | **AI Prompt Fixes** | **v0.9.32**: EndScreen/aiSummary now get explicit restart edges to beat_0 (prompt + auto-fix); dialogTree is the default multi-choice beat, movementChoice reserved for spatial hotspots |
 | **Undo/Redo for Characters & Global Settings** | **v0.9.32**: Character Editor and Global Settings edits now flow through the command system — Ctrl/Cmd+Z works for these too |
