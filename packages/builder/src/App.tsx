@@ -3777,6 +3777,14 @@ function App() {
       })) || [],
       locations: beat.locations ? Array.from(beat.locations.values()) : [],
       animations: beat.animations || [],
+      // State requirements — preserved so the Preview Window and pop-out Debug
+      // window honour them (runtime gate + analyzer reachability).
+      ...((beat as any).requires && (beat as any).requires.length > 0
+        ? { requires: (beat as any).requires }
+        : {}),
+      ...((beat as any).requiresMode && (beat as any).requiresMode !== 'all'
+        ? { requiresMode: (beat as any).requiresMode }
+        : {}),
     };});
 
     const storyData = {

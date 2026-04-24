@@ -255,6 +255,30 @@ export class ReachabilityAnalyzer {
           queue.push(beat.defaultTarget);
         }
       }
+
+      // Requirement redirects: if this beat declares any `requires` with a
+      // fallbackTarget, the engine may redirect there when the requirement is
+      // unmet. Those targets are genuinely reachable — without this, a beat
+      // whose ONLY incoming edge is a requires-redirect shows as unreachable.
+      const requires = (beat as any).requires as any[] | undefined;
+      if (Array.isArray(requires)) {
+        for (const req of requires) {
+          const fb = req?.fallbackTarget;
+          if (!fb || reachable.has(fb)) continue;
+          const fbBeat = this.story.getBeat(fb);
+          if (!fbBeat) {
+            this.brokenConnections.push({
+              sourceBeatId: beatId,
+              sourceBeatName: beat.name,
+              targetId: fb,
+              label: 'requires-fallback'
+            });
+            continue;
+          }
+          reachable.add(fb);
+          queue.push(fb);
+        }
+      }
     }
 
     return reachable;
@@ -780,6 +804,24 @@ export class ReachabilityAnalyzer {
             label: 'default'
           }
         });
+      }
+
+      // Check requirement fallbackTargets — requirement redirects are a real
+      // inbound edge even though they're not in the connections array.
+      const requires = (beat as any).requires as any[] | undefined;
+      if (Array.isArray(requires)) {
+        for (const req of requires) {
+          if (req?.fallbackTarget === targetBeatId) {
+            incoming.push({
+              sourceBeatId: beat.id,
+              sourceBeatName: beat.name,
+              connection: {
+                targetId: targetBeatId,
+                label: `requires: ${req.explanation ? String(req.explanation).slice(0, 40) : 'fallback'}`
+              }
+            });
+          }
+        }
       }
     }
 

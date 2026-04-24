@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Beat } from '@asaps/core';
-import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe } from 'lucide-react';
+import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
 import { HyperTextEditor } from '../editors/HyperTextEditor';
@@ -13,8 +13,10 @@ import type { BeatDefinition } from './SchemaFormGenerator';
 import type { Asset } from './assets/AssetManager';
 import type { Character } from '../types/character';
 import { useAvailableCounters, useAvailableVariables, useAvailableInventoryItems } from '../hooks/useAvailableCountersAndVariables';
+import { extractStoryStateReferences } from '../utils/storyStateExtraction';
 import { resolveTranslatedSpeakerName } from '../utils/speakerUtils';
 import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
+import { RequirementsEditor } from '../editors/RequirementsEditor';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
 import { TextFieldWithVariables } from '../editors/TextFieldWithVariables';
 import { useTranslationState, useTranslationActions } from '../contexts/TranslationContext';
@@ -168,6 +170,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [showRequirements, setShowRequirements] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'properties' | 'visual'>('properties');
 
@@ -230,10 +233,20 @@ export const Inspector: React.FC<InspectorProps> = ({
     };
   }, [isResizing, maxWidth, onWidthChange, externalWidth, internalWidth]);
 
-  // Get available counters, variables, and inventory items for dropdowns
+  // Get available counters, variables, and inventory items for dropdowns.
+  // These are the declared sets (from characters + globalSettings).
   const availableCounters = useAvailableCounters(characters);
   const availableVariables = useAvailableVariables(globalSettings || null);
   const availableInventoryItems = useAvailableInventoryItems(characters);
+
+  // Many stories (including AI-generated ones) reference items/counters/variables
+  // without declaring them up-front on a character or in global settings. Scan
+  // every beat so dropdowns show the actual working set; we union this with the
+  // declared sets below.
+  const storyStateRefs = useMemo(
+    () => extractStoryStateReferences(allBeats as any),
+    [allBeats],
+  );
 
   // Force re-render trigger for when we modify beat.locations directly
   const [locationUpdateTrigger, setLocationUpdateTrigger] = useState(0);
@@ -1068,7 +1081,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setHasChanges(true);
 
     // For fields that affect graph visualization or need immediate persistence, update immediately
-    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'speaker' || field === 'showSpeaker' || field === 'timeDisplayMode' || field === 'timeDisplayText' || field === 'overrideCountdownMeter') {
+    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'speaker' || field === 'showSpeaker' || field === 'timeDisplayMode' || field === 'timeDisplayText' || field === 'overrideCountdownMeter' || field === 'requires' || field === 'requiresMode') {
       if (onUpdate && beat) {
         onUpdate(beat.id, { [field]: value });
       }
@@ -1255,6 +1268,11 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.notes = localBeat.notes;
       beat.speaker = localBeat.speaker || '';
       beat.showSpeaker = localBeat.showSpeaker ?? undefined;
+      // State requirements (gate the beat behind prior story state)
+      beat.requires = (localBeat.requires && localBeat.requires.length > 0)
+        ? localBeat.requires
+        : undefined;
+      beat.requiresMode = localBeat.requiresMode || 'all';
 
       // Update sound: preserve existing properties, only update assetId and editable fields
       const bgSoundId = localBeat.parameters?.backgroundSound;
@@ -3495,6 +3513,90 @@ export const Inspector: React.FC<InspectorProps> = ({
                       <p className="text-xs text-gray-500">
                         These notes are for authors only and will not be displayed to players.
                       </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Requirements Section - Collapsible, universal (applies to all beat types) */}
+                <div className="border-t pt-4">
+                  <button
+                    onClick={() => setShowRequirements(!showRequirements)}
+                    className="w-full py-2 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 rounded-lg"
+                  >
+                    {showRequirements ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    <ShieldCheck className="w-4 h-4 text-amber-600" />
+                    Requirements
+                    {localBeat.requires && localBeat.requires.length > 0 && (
+                      <span className="ml-auto text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                        {localBeat.requires.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {showRequirements && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 mb-2">
+                        Conditions that must hold when the player reaches this beat. When unmet at
+                        runtime, the engine redirects to the fallback beat you choose. The path
+                        analyzer also uses these to detect soft-locks.
+                      </p>
+                      <RequirementsEditor
+                        value={localBeat.requires}
+                        onChange={next => handleChange('requires', next)}
+                        mode={localBeat.requiresMode || 'all'}
+                        onModeChange={next => handleChange('requiresMode', next)}
+                        allBeats={allBeats}
+                        availableCounters={(() => {
+                          const declared = new Set(availableCounters.map(c => c.name));
+                          const fromStory = [...storyStateRefs.counters]
+                            .filter(n => !declared.has(n))
+                            .map(name => ({
+                              name,
+                              displayName: `${name} (used in story)`,
+                            }));
+                          return [
+                            ...availableCounters.map(c => ({
+                              name: c.name,
+                              displayName: c.displayName || c.name,
+                              characterName: c.characterName,
+                            })),
+                            ...fromStory,
+                          ];
+                        })()}
+                        availableVariables={(() => {
+                          const declared = new Set(availableVariables.map(v => v.name));
+                          const fromStory = [...storyStateRefs.variables]
+                            .filter(n => !declared.has(n))
+                            .map(name => ({
+                              name,
+                              displayName: `${name} (used in story)`,
+                            }));
+                          return [
+                            ...availableVariables.map(v => ({
+                              name: v.name,
+                              displayName: v.description ? `${v.name} (${v.description})` : v.name,
+                            })),
+                            ...fromStory,
+                          ];
+                        })()}
+                        availableInventoryItems={(() => {
+                          const declared = new Set(availableInventoryItems.map(i => i.name));
+                          const fromStory = [...storyStateRefs.items]
+                            .filter(n => !declared.has(n))
+                            .map(name => ({
+                              name,
+                              displayName: `${name} (used in story)`,
+                            }));
+                          return [
+                            ...availableInventoryItems.map(i => ({
+                              name: i.name,
+                              displayName: i.displayName || i.name,
+                              characterName: i.characterName,
+                            })),
+                            ...fromStory,
+                          ];
+                        })()}
+                      />
                     </div>
                   )}
                 </div>

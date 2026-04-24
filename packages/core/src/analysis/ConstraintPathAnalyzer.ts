@@ -497,6 +497,17 @@ export class ConstraintPathAnalyzer {
       connections.push({ targetId: beat.defaultTarget });
     }
 
+    // Requirement redirects (requires[].fallbackTarget) — engine-visible edges.
+    const requires = (beat as any).requires as any[] | undefined;
+    if (Array.isArray(requires)) {
+      for (const req of requires) {
+        const fb = req?.fallbackTarget;
+        if (fb && !connections.some(c => c.targetId === fb)) {
+          connections.push({ targetId: fb, label: 'requires-fallback' });
+        }
+      }
+    }
+
     // For condition beats, ensure true/false targets are included
     if (beat.type === 'conditionBeat') {
       const params = beat.getParameters();

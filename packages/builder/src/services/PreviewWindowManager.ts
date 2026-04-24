@@ -25,6 +25,11 @@ export interface SerializedStoryData {
     connections: Array<{ targetId: string; label?: string; condition?: any }>;
     locations?: any[];
     animations?: any[];
+    /** Beat-level state prerequisites (StateRequirement[]). Preserved through
+     *  cross-window transport so the preview engine gates at runtime and the
+     *  pop-out Debug window's analyzers see the fallback edges. */
+    requires?: any[];
+    requiresMode?: 'all' | 'any';
   }>;
 }
 

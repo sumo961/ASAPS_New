@@ -37,6 +37,8 @@ export abstract class Beat {
    * analyzer will check when simulating. Not enforced by the engine.
    */
   public requires?: import('../types').StateRequirement[];
+  /** How multiple requirements combine. Default 'all' (AND); 'any' means OR. */
+  public requiresMode: 'all' | 'any' = 'all';
   public _version: number = 0; // Version counter incremented on parameter updates (for React change detection)
 
   constructor(config: BeatConfig) {
@@ -58,6 +60,9 @@ export abstract class Beat {
     this.timeDisplayText = (config as any).timeDisplayText || (config.parameters as any)?.timeDisplayText;
     this.overrideCountdownMeter = (config as any).overrideCountdownMeter || (config.parameters as any)?.overrideCountdownMeter;
     this.requires = (config as any).requires || (config.parameters as any)?.requires;
+    this.requiresMode = (config as any).requiresMode
+      || (config.parameters as any)?.requiresMode
+      || 'all';
     this.x = config.x;
     this.y = config.y;
 
@@ -78,6 +83,23 @@ export abstract class Beat {
 
   async execute(context: StoryContext, renderer: IRenderer): Promise<string | null> {
     try {
+      // Gate check: evaluate declared requirements before any side effects.
+      // If a requirement fails and declares a fallbackTarget, redirect there
+      // without rendering or marking this beat visited. Requirements with no
+      // fallbackTarget behave as pure annotations and only log a warning.
+      const gateResult = this.checkRequirementsGate(context);
+      if (gateResult.redirect) {
+        console.log(
+          `[Beat ${this.id}] Requirement unmet — redirecting to "${gateResult.redirect}" (${gateResult.reason}).`
+        );
+        return gateResult.redirect;
+      }
+      if (gateResult.warnings.length > 0) {
+        for (const w of gateResult.warnings) {
+          console.warn(`[Beat ${this.id}] Requirement unmet (no fallbackTarget declared): ${w}`);
+        }
+      }
+
       // Notify renderer of current beat info at the START of execution
       renderer.setState('currentBeatInfo', {
         id: this.id,
@@ -276,6 +298,65 @@ export abstract class Beat {
     }
   }
 
+  /**
+   * Evaluate declared `requires[]` against the current context.
+   *
+   * `requiresMode === 'all'` (default): beat is gated if ANY requirement fails
+   * — redirect to the first failing one's fallbackTarget.
+   * `requiresMode === 'any'`: beat is gated only if EVERY requirement fails
+   * — redirect to the first failing one's fallbackTarget (representative of
+   * the unsatisfied set).
+   *
+   * Requirements without a fallbackTarget behave as annotations: they surface
+   * as `warnings` so the engine logs them but don't block progression.
+   */
+  protected checkRequirementsGate(
+    context: StoryContext,
+  ): { redirect: string | null; reason: string; warnings: string[] } {
+    const warnings: string[] = [];
+    if (!this.requires || this.requires.length === 0) {
+      return { redirect: null, reason: '', warnings };
+    }
+
+    const evals = this.requires.map(req => {
+      let satisfied = false;
+      try {
+        satisfied = context.checkCondition(req.condition);
+      } catch (err) {
+        console.warn(`[Beat ${this.id}] Failed to evaluate requirement:`, err);
+        satisfied = true; // fail-open — don't trap players on evaluator bugs
+      }
+      return { req, satisfied };
+    });
+
+    if (this.requiresMode === 'any') {
+      // OR semantics: pass if any is satisfied.
+      if (evals.some(e => e.satisfied)) {
+        return { redirect: null, reason: '', warnings };
+      }
+      // All failed — pick the first failure with a fallbackTarget.
+      for (const { req } of evals) {
+        const label = req.explanation || 'declared prerequisite';
+        if (req.fallbackTarget) {
+          return { redirect: req.fallbackTarget, reason: `any-of: ${label}`, warnings };
+        }
+        warnings.push(label);
+      }
+      return { redirect: null, reason: '', warnings };
+    }
+
+    // AND semantics (default): first failure wins.
+    for (const { req, satisfied } of evals) {
+      if (satisfied) continue;
+      const label = req.explanation || 'declared prerequisite';
+      if (req.fallbackTarget) {
+        return { redirect: req.fallbackTarget, reason: label, warnings };
+      }
+      warnings.push(label);
+    }
+    return { redirect: null, reason: '', warnings };
+  }
+
   private static readonly PREFETCHABLE_TYPES = new Set([
     'aiInfoText', 'aiDurScreen', 'aiDialogTree', 'aiConversation', 'aiSummary', 'onlineContent',
   ]);
@@ -456,6 +537,11 @@ export abstract class Beat {
       timeDisplayMode: this.timeDisplayMode,
       timeDisplayText: this.timeDisplayText,
       overrideCountdownMeter: this.overrideCountdownMeter,
+      // Persist state requirements as a top-level field (the constructor also
+      // accepts them nested under parameters for backwards compatibility).
+      ...(this.requires && this.requires.length > 0 ? { requires: this.requires } : {}),
+      // Only persist requiresMode when it's non-default to keep JSON clean.
+      ...(this.requiresMode && this.requiresMode !== 'all' ? { requiresMode: this.requiresMode } : {}),
       parameters: parameters
     };
     return json;

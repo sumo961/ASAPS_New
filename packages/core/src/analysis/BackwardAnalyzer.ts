@@ -346,6 +346,19 @@ export class BackwardAnalyzer {
       results.push({ targetId: beat.defaultTarget, connection: null });
     }
 
+    // Requirement fallback redirects (the engine jumps here when a requires[]
+    // entry is unmet). Count them as outgoing so backward analysis finds them.
+    const requires = (beat as any).requires as any[] | undefined;
+    if (Array.isArray(requires)) {
+      for (const req of requires) {
+        const fb = req?.fallbackTarget;
+        if (fb && !addedTargets.has(fb)) {
+          results.push({ targetId: fb, connection: null });
+          addedTargets.add(fb);
+        }
+      }
+    }
+
     return results;
   }
 

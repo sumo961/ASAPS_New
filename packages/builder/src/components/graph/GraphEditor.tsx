@@ -712,6 +712,40 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           allEdges.push(edge);
         }
       }
+
+      // Add state-requirement fallback redirects. These are visual only — the
+      // engine resolves the redirect itself inside Beat.execute(); we draw them
+      // so authors can see where the beat escapes to when a gate fails.
+      const requires: any[] | undefined = (beat as any).requires;
+      if (Array.isArray(requires)) {
+        requires.forEach((req, i) => {
+          if (!req?.fallbackTarget) return;
+          const label = req.explanation
+            ? `requires: ${String(req.explanation).slice(0, 32)}${req.explanation.length > 32 ? '…' : ''}`
+            : 'requires';
+          const edge = createEdge(beat.id, req.fallbackTarget, {
+            id: `requires-${beat.id}-${i}`,
+            type: 'custom',
+            animated: false,
+            label,
+            style: {
+              stroke: '#d97706',
+              strokeWidth: 2,
+              strokeDasharray: '3 3',
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 20,
+              height: 20,
+              color: '#d97706',
+            },
+          });
+          if (edge && !edgeIds.has(edge.id)) {
+            edgeIds.add(edge.id);
+            allEdges.push(edge);
+          }
+        });
+      }
     });
 
     return allEdges;

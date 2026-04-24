@@ -115,6 +115,9 @@ export interface SerializedBeat {
   defaultTargetDelay?: number;
   showTimer?: boolean;
   notes?: string;
+  /** Beat-level state prerequisites. See StateRequirement in ../types. */
+  requires?: any[];
+  requiresMode?: 'all' | 'any';
   _format: string;
 }
 
@@ -152,6 +155,9 @@ export function serializeBeat(beat: Beat): SerializedBeat {
     // Skip speaker/showSpeaker for dialogTree — speaker lives in parameters.dialogTree.speaker
     ...(raw.speaker && raw.type !== 'dialogTree' ? { speaker: raw.speaker } : {}),
     ...(raw.showSpeaker != null && raw.type !== 'dialogTree' ? { showSpeaker: raw.showSpeaker } : {}),
+    // State requirements (Level-2 authoring): persist when declared.
+    ...(Array.isArray(raw.requires) && raw.requires.length > 0 ? { requires: raw.requires } : {}),
+    ...(raw.requiresMode && raw.requiresMode !== 'all' ? { requiresMode: raw.requiresMode } : {}),
     _format: FORMAT_VERSION,
   };
 
@@ -189,6 +195,9 @@ export function serializeBeatFromJSON(raw: any): SerializedBeat {
     ...(raw.notes ? { notes: raw.notes } : {}),
     ...(raw.speaker && raw.type !== 'dialogTree' ? { speaker: raw.speaker } : {}),
     ...(raw.showSpeaker != null && raw.type !== 'dialogTree' ? { showSpeaker: raw.showSpeaker } : {}),
+    // State requirements (Level-2 authoring): persist when declared.
+    ...(Array.isArray(raw.requires) && raw.requires.length > 0 ? { requires: raw.requires } : {}),
+    ...(raw.requiresMode && raw.requiresMode !== 'all' ? { requiresMode: raw.requiresMode } : {}),
     _format: FORMAT_VERSION,
   };
 

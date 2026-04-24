@@ -283,10 +283,15 @@ export class StateSimulationAnalyzer {
         continue;
       }
 
-      // Also include beats with no outgoing connections (implicit endings)
+      // Also include beats with no outgoing connections (implicit endings).
+      // A requirement redirect (requires[].fallbackTarget) is an outgoing edge
+      // too — if only that exists, the beat isn't an implicit ending.
       const connections = beat.getConnections();
       const hasDefaultTarget = beat.defaultTarget && beat.defaultTarget.trim() !== '';
-      if (connections.length === 0 && !hasDefaultTarget) {
+      const requires = (beat as any).requires as any[] | undefined;
+      const hasRequiresFallback = Array.isArray(requires)
+        && requires.some(r => typeof r?.fallbackTarget === 'string' && r.fallbackTarget.trim() !== '');
+      if (connections.length === 0 && !hasDefaultTarget && !hasRequiresFallback) {
         endings.push({ beatId: beat.id, beatName: beat.name });
       }
     }
@@ -593,6 +598,21 @@ export class StateSimulationAnalyzer {
     // Also check for defaultTarget
     if (beat.defaultTarget && !connections.some(c => c.targetId === beat.defaultTarget)) {
       connections.push({ targetId: beat.defaultTarget });
+    }
+
+    // Requirement redirects: if this beat declares `requires` with a
+    // fallbackTarget, the engine may jump there when the requirement is
+    // unmet. The simulator surfaces those as additional reachable branches
+    // so path analysis sees the redirect (and the target beat isn't
+    // reported as unreachable when requires-redirect is the only way in).
+    const requires = (beat as any).requires as any[] | undefined;
+    if (Array.isArray(requires)) {
+      for (const req of requires) {
+        const fb = req?.fallbackTarget;
+        if (fb && !connections.some(c => c.targetId === fb)) {
+          connections.push({ targetId: fb, label: 'requires-fallback' } as Connection);
+        }
+      }
     }
 
     // Skip deduplication for beats where each choice has different state effects

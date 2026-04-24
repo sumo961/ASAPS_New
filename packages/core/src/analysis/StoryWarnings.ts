@@ -307,6 +307,21 @@ function collectAncestorBeatIds(targetId: string, story: Story): Set<string> {
       if (!inbound.has(c.targetId)) inbound.set(c.targetId, new Set());
       inbound.get(c.targetId)!.add(b.id);
     }
+    // Default target and requires-fallback are also real inbound edges.
+    if (b.defaultTarget) {
+      if (!inbound.has(b.defaultTarget)) inbound.set(b.defaultTarget, new Set());
+      inbound.get(b.defaultTarget)!.add(b.id);
+    }
+    const requires = (b as any).requires as any[] | undefined;
+    if (Array.isArray(requires)) {
+      for (const req of requires) {
+        const fb = req?.fallbackTarget;
+        if (fb) {
+          if (!inbound.has(fb)) inbound.set(fb, new Set());
+          inbound.get(fb)!.add(b.id);
+        }
+      }
+    }
   }
 
   const out = new Set<string>();
@@ -337,33 +352,70 @@ function detectRequiresWarnings(
   paths: SimulatedPath[],
 ): StoryWarning[] {
   const out: StoryWarning[] = [];
+  const ancestors = collectAncestorBeatIds(beat.id, story);
 
-  // Rule 4a: requires-unfulfillable — no path simulated reaches this beat with
-  // the requirement satisfied.
+  // Rule 4a: requires-unfulfillable — no ancestor beat can produce the state
+  // this requirement checks.
+  //
+  // Structural rather than simulation-based: the BFS path simulator doesn't
+  // enumerate every hub-visit permutation, so "no simulated path satisfies"
+  // used to flag perfectly fulfillable setups. Instead we walk the beat graph
+  // backwards and ask: is there ANY ancestor that writes the state this
+  // condition reads? If yes, the requirement is plausibly fulfillable.
   for (const req of requires) {
-    const canBeSatisfied = paths.some(p => {
-      const stepIdx = p.steps.findIndex((s: SimulatedStep) => s.beatId === beat.id);
-      if (stepIdx < 0) return false;
-      const stateBefore = stepIdx > 0 ? p.steps[stepIdx - 1].stateAfter : p.steps[stepIdx].stateAfter;
-      return evaluateCondition(req.condition, stateBefore);
-    });
+    const cond = req.condition as any;
+    const refs = collectConditionReferencedNames(cond || {}).filter(Boolean);
+    const descr = req.explanation && req.explanation.trim()
+      ? req.explanation
+      : formatConditionSummary(cond);
 
-    if (!canBeSatisfied) {
+    // Incomplete condition: the author opened a requirement slot but didn't pick
+    // an item/variable/counter. Surface separately so the message is actionable.
+    if (refs.length === 0) {
+      out.push({
+        code: 'requires-unfulfillable',
+        severity: req.severity ?? 'warn',
+        beatId: beat.id,
+        beatName: beat.name,
+        message:
+          `Requirement on "${beat.name}" is incomplete — no item, variable, or ` +
+          `counter is selected in the condition. Finish configuring it or remove ` +
+          `the requirement.`,
+        detail: { requirement: req },
+      });
+      continue;
+    }
+
+    // Does any ancestor beat produce the referenced state?
+    let producedByAncestor = false;
+    for (const ancId of ancestors) {
+      const anc = story.getBeat(ancId);
+      if (!anc) continue;
+      if (beatProducesAnyOf(anc, refs)) {
+        producedByAncestor = true;
+        break;
+      }
+    }
+
+    if (!producedByAncestor) {
       out.push({
         code: 'requires-unfulfillable',
         severity: req.severity ?? 'error',
         beatId: beat.id,
         beatName: beat.name,
         message:
-          `Requirement "${req.explanation}" cannot be satisfied by any path reaching ` +
-          `this beat. No ancestor beat sets the state this requirement checks. ` +
-          `Either wire a beat that sets the prerequisite state, or remove the requirement.`,
+          `Requirement "${descr}" on "${beat.name}" cannot be satisfied: no ` +
+          `upstream beat produces ${refs.join(' / ')}. Wire a setVariable, ` +
+          `addRemoveInventory, pickProp, or choice effect upstream — or remove the ` +
+          `requirement.`,
         detail: { requirement: req },
       });
     }
   }
 
-  // Rule 4b: requires-violated-on-path — some path reaches this beat without satisfying
+  // Rule 4b: requires-violated-on-path — some simulated path reaches this beat
+  // without satisfying the requirement. Only meaningful for complete conditions
+  // and when the requirement is fulfillable at all (otherwise Rule 4a handles it).
   let totalPathsToBeat = 0;
   let violatingPaths = 0;
   for (const p of paths) {
@@ -372,6 +424,9 @@ function detectRequiresWarnings(
     totalPathsToBeat++;
     const stateBefore = stepIdx > 0 ? p.steps[stepIdx - 1].stateAfter : p.steps[stepIdx].stateAfter;
     for (const req of requires) {
+      const cond = req.condition as any;
+      const refs = collectConditionReferencedNames(cond || {}).filter(Boolean);
+      if (refs.length === 0) continue; // skip incomplete
       if (!evaluateCondition(req.condition, stateBefore)) {
         violatingPaths++;
         break;
@@ -386,13 +441,100 @@ function detectRequiresWarnings(
       beatName: beat.name,
       message:
         `${violatingPaths} of ${totalPathsToBeat} simulated paths reach this beat ` +
-        `without satisfying its declared requirement. The player may encounter this ` +
-        `beat unprepared; consider gating access with a conditionBeat.`,
+        `without satisfying its declared requirement. Players may encounter this ` +
+        `beat unprepared — the runtime gate will redirect to the fallback, but ` +
+        `consider whether that flow is what you want.`,
       detail: { violatingPaths, totalPathsToBeat },
     });
   }
 
   return out;
+}
+
+/**
+ * Does this beat write any of the given state names? Scans the beat-type-specific
+ * parameter shapes plus the canonical `effects[]` wherever they appear (prop,
+ * choice, connection, top-level).
+ */
+function beatProducesAnyOf(beat: Beat, refs: string[]): boolean {
+  const nameSet = new Set(refs.filter(Boolean));
+  if (nameSet.size === 0) return false;
+  const params = (beat.getParameters() as any) || {};
+
+  if (beat.type === 'setVariable') {
+    const n = params.name || params.variableName;
+    if (n && nameSet.has(n)) return true;
+  }
+
+  if (beat.type === 'addRemoveInventory') {
+    if (params.item && nameSet.has(params.item)) return true;
+  }
+
+  if (Array.isArray(params.props)) {
+    for (const p of params.props) {
+      const item = p?.inventoryName || p?.locationName || p?.name;
+      if (item && nameSet.has(item)) return true;
+      if (p?.counter && nameSet.has(p.counter)) return true;
+      if (Array.isArray(p?.effects)) {
+        for (const e of p.effects) if (effectTouchesName(e, nameSet)) return true;
+      }
+    }
+  }
+
+  if (Array.isArray(params.choices)) {
+    for (const c of params.choices) {
+      if (Array.isArray(c?.effects)) {
+        for (const e of c.effects) if (effectTouchesName(e, nameSet)) return true;
+      }
+    }
+  }
+
+  if (Array.isArray(params.connections)) {
+    for (const conn of params.connections) {
+      if (Array.isArray(conn?.effects)) {
+        for (const e of conn.effects) if (effectTouchesName(e, nameSet)) return true;
+      }
+    }
+  }
+
+  if (Array.isArray(params.effects)) {
+    for (const e of params.effects) if (effectTouchesName(e, nameSet)) return true;
+  }
+
+  // DialogTree nested effects
+  if (params.dialogTree) {
+    const walk = (node: any): boolean => {
+      if (!node || typeof node !== 'object') return false;
+      if (Array.isArray(node.choices)) {
+        for (const c of node.choices) {
+          if (Array.isArray(c?.effects)) {
+            for (const e of c.effects) if (effectTouchesName(e, nameSet)) return true;
+          }
+          if (c?.next && walk(c.next)) return true;
+        }
+      }
+      return false;
+    };
+    if (walk(params.dialogTree)) return true;
+  }
+
+  return false;
+}
+
+function effectTouchesName(e: any, nameSet: Set<string>): boolean {
+  if (!e || typeof e !== 'object') return false;
+  const candidates = [e.target, e.counter, e.variable, e.item, e.name];
+  return candidates.some(n => n && nameSet.has(n));
+}
+
+function formatConditionSummary(c: any): string {
+  if (!c || typeof c !== 'object') return 'condition';
+  const t = c.type;
+  if (t === 'inventory') return `has ${c.item || '?'}`;
+  if (t === 'counter') return `${c.variableName || c.variable || '?'} ${c.operator || ''} ${c.value ?? ''}`.trim();
+  if (t === 'variable') return `${c.variableName || c.variable || '?'} ${c.operator || ''} ${c.value ?? ''}`.trim();
+  if (t === 'visitedBeat') return `visited ${c.beatId || '?'}`;
+  return String(t || 'condition');
 }
 
 // Minimal condition evaluator — mirrors StateSimulationAnalyzer's evaluateCondition.

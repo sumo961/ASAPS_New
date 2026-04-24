@@ -126,11 +126,15 @@ export interface Effect {
 }
 
 /**
- * Declares a state prerequisite for a beat. Level-2 authoring annotation used
- * by the path analyzer (not enforced by the engine). When a gated beat — e.g. a
- * keypad that expects the player to have found a code — declares a requirement,
- * the analyzer can check that every path reaching the beat satisfies it, and
- * warn about soft-locks if the requirement cannot be fulfilled in scope.
+ * Declares a state prerequisite that must hold when a beat is entered.
+ *
+ * Requirements are a first-class authoring primitive: at runtime, the engine
+ * evaluates each requirement against the StoryContext when the beat is about
+ * to execute; if any fail, the engine redirects to the requirement's
+ * `fallbackTarget` instead of running the beat's action. This is the natural
+ * way to say "you need the lantern to enter the crypt — otherwise go back to
+ * the hall". It also gives the path analyzer a formal contract to verify
+ * (e.g. surfacing soft-locks when no path satisfies the requirement).
  *
  * The condition reuses the standard Condition type, so any predicate a
  * conditionBeat can express can also be a requirement (variable, counter,
@@ -140,8 +144,14 @@ export interface StateRequirement {
   condition: Condition;
   /** Human-readable explanation, e.g. "Player must have read the code.". */
   explanation: string;
-  /** Analyzer severity when unsatisfied. Defaults to 'error'. */
+  /** Analyzer severity when no reachable path satisfies the requirement. Defaults to 'error'. */
   severity?: 'warn' | 'error';
+  /**
+   * Beat to redirect to when this requirement is unmet at runtime. If omitted,
+   * the engine logs a warning and continues into the beat (backwards-compatible
+   * with pure-annotation usage).
+   */
+  fallbackTarget?: string;
 }
 
 export interface BeatConfig {
@@ -159,6 +169,14 @@ export interface BeatConfig {
   x?: number;
   y?: number;
   notes?: string; // Author notes (not shown to player)
+  /** State prerequisites — see StateRequirement for semantics. */
+  requires?: StateRequirement[];
+  /**
+   * How multiple requirements combine. 'all' (default) — every requirement
+   * must hold. 'any' — at least one must hold; the beat is gated only when
+   * *every* requirement fails.
+   */
+  requiresMode?: 'all' | 'any';
 }
 
 export interface StoryMetadata {
