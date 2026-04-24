@@ -1,5 +1,94 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-24: Requirements Primitive, Live Current-Beat Marker & Authoring UX (v0.9.34)
+
+### Overview
+
+State **requirements** are now a first-class authoring primitive with a universal Inspector section, AND/OR combination modes, and runtime enforcement — declare "this beat needs the Lantern OR the Torch to enter, otherwise redirect to Hall" and the engine honours it. The flowchart also learns to speak the new language: requirement redirects render as dashed amber edges, the **live red trace from the Preview Window now paints on beat *enter*** (not after leaving), and the **currently-executing beat** gets a brighter, thicker, pulsing border so you can see exactly where the player is. Several analyzer bugs that surfaced during the first authors' sessions are fixed (persistence of requires on project reload, hub-retry for choices whose downstream is state-dependent, accurate outcomes count breakdown). A handful of authoring UX fixes round out the release (delete buttons for characters + assets, InputText character-picker populated correctly, InputText value no longer leaks between beats).
+
+### State Requirements as First-Class Authoring
+
+The analyzer-only `requires` annotation from v0.9.33 becomes a real authoring primitive — the engine honours it at runtime.
+
+- New `StateRequirement.fallbackTarget` — when a requirement is unmet at beat-enter, the engine redirects to the fallback beat **without** running the beat's action or marking it visited. A requirement without a fallback behaves as a warning-only annotation (same as before).
+- New `requiresMode: 'all' | 'any'` on every beat. 'all' (default) = every requirement must hold; 'any' = at least one must hold. Toggle shows up in the Requirements section when 2+ requirements are declared.
+- Universal **Requirements** section in the Inspector (all beat types, collapsible) with a ShieldCheck icon, count badge, AND/OR combine toggle, and cards for each requirement: condition-type picker (inventory / counter / variable / visitedBeat), SmartNameDropdown-backed pickers, explanation textarea, fallback beat picker, severity dropdown.
+- New `storyStateExtraction.ts` utility scans every beat for referenced items / counters / variables (addRemoveInventory, pickProp props, setVariable, conditionBeat, choice + prop + connection effects, dialogTree effects) so the Inspector dropdowns show the actual working set, not just state pre-declared on a character or in globalSettings. AI-generated stories that never pre-declare now populate the picker correctly.
+- GraphEditor draws requirement redirects as **dashed amber edges** labelled `requires: <explanation>` — distinct from condition (animated amber), default-target (green dashed), and normal connections (grey solid).
+- Persistence: `requires` + `requiresMode` round-trip through `Beat.toJSON()`, `BeatSerializer.serializeBeat()`, the cross-window `SerializedStoryData` used by Preview + Debug windows, AND the project-load deserializer (`projectDeserializer.ts`) — which previously whitelisted fields and silently dropped both, so requirements disappeared on project reload. Now they stick.
+
+**Files modified:**
+- `packages/core/src/types/index.ts` — `StateRequirement.fallbackTarget`, `BeatConfig.requires` + `requiresMode`
+- `packages/core/src/beats/Beat.ts` — `requiresMode` field, `checkRequirementsGate()` with AND/OR semantics, `toJSON` persistence
+- `packages/core/src/persistence/BeatSerializer.ts` — emit both fields
+- `packages/core/tests/beats/BeatRequiresGate.test.ts` — 6 tests: AND redirect, satisfied pass-through, annotation-only warn, first-unmet precedence, OR pass-when-any-met, OR redirect-when-all-fail
+- `packages/builder/src/editors/RequirementsEditor.tsx` — new component
+- `packages/builder/src/utils/storyStateExtraction.ts` — new scanner + hook
+- `packages/builder/src/components/Inspector.tsx` — universal Requirements section, merged state lists
+- `packages/builder/src/components/graph/GraphEditor.tsx` — requires-fallback edges
+- `packages/builder/src/utils/projectDeserializer.ts` — include `requires` / `requiresMode` in reconstructed `BeatConfig`, with backwards-compat for nesting under `parameters`
+- `packages/builder/src/App.tsx` (`getSerializedStoryData`) + `services/PreviewWindowManager.ts` (`SerializedStoryData` type) — round-trip cross-window
+
+### Live Current-Beat Marker on the Flowchart
+
+The red PW trace painted beats **after** they were left (when `context.markBeatVisited` fired at the end of `Beat.execute()`). Now it paints on enter, and the current beat stands out.
+
+- New `currentBeatId` in the `VISITED_BEATS_UPDATE` message, threaded Preview → Manager → App → Workspace → Canvas → GraphEditor → BeatNode.
+- `PreviewWindow` augments the posted `visitedBeats` list with `ctx.getCurrentBeatId()` so the active beat lights up immediately.
+- **BeatNode** styles past-visited beats (red-50 bg, red-600 border, 2px) distinctly from the **active beat** (red-200 bg, red-700 border, **4px**, red-500 ring with pulse).
+- GraphEditor uses a focused effect that flips `pwCurrent` on only the two beats whose status changes per step — no full graph rebuild.
+
+**Files modified:**
+- `packages/builder/src/pages/PreviewWindow.tsx` — augment payload, post current beat ID
+- `packages/builder/src/services/PreviewWindowManager.ts` — subscribe API delivers `{ visitedBeatIds, currentBeatId }`
+- `packages/builder/src/App.tsx`, `components/WorkspaceView.tsx`, `components/Canvas.tsx` — prop pass-through
+- `packages/builder/src/components/graph/GraphEditor.tsx` — focused current-beat effect
+- `packages/builder/src/components/graph/BeatNode.tsx` — distinct styling for current vs past-visited
+
+### Analyzer Fixes
+
+- **PathTree hub retry** only re-explored hub options whose **immediate** target was a conditionBeat. Options like "Visit the crypt" that lead through an intro `infoText` to a conditionBeat (a few hops in) never got retried after state changed, so paths mis-classified as dead ends. New `branchHasStateDependence` walks up to 6 beats ahead and retries if it finds a conditionBeat or a requires-gated beat. Hollow Star goes from ~2,435 to ~7,835 simulated paths, and the "No code → Hub" dead ends disappear.
+- **`requires-unfulfillable` false-positives**: the old check asked "does any simulated path reach this beat with the requirement satisfied?" — which fails for hub-and-spoke stories where some picking-up permutation is valid but un-simulated. Replaced with a structural ancestor walk: "does any upstream beat write the state this condition reads?" (setVariable, addRemoveInventory, pickProp props, choice effects, connection effects, nested dialogTree effects). Messages also include the referenced state names and fall back to a condition summary when `explanation` is empty (no more `Requirement ""`).
+- **Forward Analysis outcomes count** was adding cycle/dead-end terminations alongside real endings, which made "7 outcomes" mean "4 endings + 3 simulator terminations" on stories like Hollow Star. The Outcomes card now shows a breakdown line ("4 endings + 3 cycles") with a tooltip explaining cycles/dead-ends aren't narrative outcomes.
+- **Reachability / BackwardAnalyzer / ConstraintPathAnalyzer** — every outgoing-edge walk now treats `requires[].fallbackTarget` as a real edge. A beat reachable only via a requirement redirect is no longer flagged as orphaned, and `collectAncestorBeatIds` in StoryWarnings includes both `defaultTarget` and requirement fallbacks.
+
+**Files modified:**
+- `packages/core/src/analysis/StateSimulationAnalyzer.ts` — `branchHasStateDependence`, fallback edges, ending detection
+- `packages/core/src/analysis/StoryWarnings.ts` — structural unfulfillable check, `beatProducesAnyOf`, enriched messages, ancestor map includes defaultTarget + fallbackTarget
+- `packages/core/src/analysis/ReachabilityAnalyzer.ts` — fallback as inbound/outbound edge
+- `packages/core/src/analysis/BackwardAnalyzer.ts` — fallback in outgoing targets
+- `packages/core/src/analysis/ConstraintPathAnalyzer.ts` — fallback in getConnections
+- `packages/builder/src/components/debug/PathVisualization.tsx` — Outcomes stat breakdown
+
+### AI Story Generation — `aiSummary.maxLength` Coercion
+
+AI models sometimes emitted `maxLength: 220` (a character count) for `aiSummary` beats, but the schema expects the enum `"short" | "medium" | "long"` — validation failed and the whole generation bounced.
+
+- Prompts tightened on both the internal and MCP paths to say `"short"|"medium"|"long" — NOT a number`.
+- New `autoFixAiSummaryMaxLength` in `AIService.ts` and MCP `aiHelper.ts` coerces numeric values (`< 150 → short`, `> 400 → long`, else `medium`) so generation succeeds even when the model still emits numbers.
+
+**Files modified:**
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`
+- `packages/builder/src/services/AIService.ts`
+- `mcp-server/src/utils/aiHelper.ts`
+
+### Authoring UX Fixes
+
+- **Delete button on character cards** now shown in both grid and list views (was hidden in `selectionMode`, which is the character manager's first screen). `confirm()` prompt still gates the destructive action.
+- **Delete button on assets** — `AssetSelectionModal` accepted `onAssetRemove` but never rendered a button. Added hover-revealed trash buttons on grid cards and list rows with confirmation. The main AssetManager already had delete.
+- **InputText character dropdown** was empty even when characters existed: the field read a `string[]` of NPC names and then indexed `.id`/`.name`/`.displayName` on bare strings. Switched to the existing `characterObjects` prop (full `Character[]`), and included player characters since InputText is the primary way to ask "What's your name?".
+- **InputText value leak across beats** — consecutive inputText beats retained the previous beat's typed text when neither had a placeholder. The reset effect keyed only on content-shape hashes, which didn't change between structurally-identical prompts. Added a `beatId` prop (plumbed from `ReactRenderer` via `currentBeatInfo`) and included it in the effect's dependency list so the field clears on every beat navigation.
+
+**Files modified:**
+- `packages/builder/src/components/characters/CharacterCard.tsx`
+- `packages/builder/src/components/characters/CharacterManager.tsx`
+- `packages/builder/src/components/assets/AssetSelectionModal.tsx`
+- `packages/builder/src/components/SchemaFormGenerator.tsx`
+- `packages/renderer/src/components/PositionedBeatView.tsx`
+- `packages/renderer/src/renderers/ReactRenderer.tsx`
+
+---
+
 ## 2026-04-23: Path Tree Analyzer, Soft-Lock Detection, Pop-Out Debug Window & PW Trace (v0.9.33)
 
 ### Overview

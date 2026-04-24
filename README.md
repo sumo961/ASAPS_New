@@ -16,12 +16,20 @@ The User Guide covers:
 - **AI Integration**: Configuring AI providers for dynamic content generation
 - **Tips & Best Practices**: Workflow recommendations for efficient story creation
 
-## ⚠️ Development Status (v0.9.33)
+## ⚠️ Development Status (v0.9.34)
 
 This is a **beta release**. Core functionality works, but some features are incomplete or untested:
 
 | Feature | Status |
 |---------|--------|
+| **State Requirements (Runtime)** | **v0.9.34**: `requires` is now a first-class authoring primitive — declare a beat's prerequisite, pick a fallback beat, and the engine redirects at runtime when the requirement is unmet. AND/OR combine modes. Universal Inspector section with condition picker + explanation + fallback + severity |
+| **Requirements on the Flowchart** | **v0.9.34**: Requirement redirects render as dashed amber edges labelled with the explanation; analyzers (Reachability, BackwardAnalyzer, PathTree) now treat fallback targets as real edges so gated-only beats aren't mis-flagged as orphaned |
+| **Live Current-Beat Marker** | **v0.9.34**: PW red trace now paints on beat *enter* (not after leaving), and the currently-executing beat stands out with a thicker, brighter, pulsing border |
+| **Inspector State Dropdowns** | **v0.9.34**: Dropdowns populate from the full working set of items/counters/variables referenced anywhere in the story — not just character/globalSettings declarations. AI-generated stories no longer produce empty pickers |
+| **Character & Asset Delete Buttons** | **v0.9.34**: Trash buttons in the character editor (both grid and list views, including selection mode) and in the asset picker. Confirmation prompts prevent accidental deletes |
+| **InputText Fixes** | **v0.9.34**: Character dropdown now populated with every project character (including the player); input value no longer leaks between consecutive inputText beats without placeholders |
+| **Analyzer Accuracy** | **v0.9.34**: Hub-option retry now scans 6 beats ahead for state-dependent targets (not just immediate conditionBeats); `requires-unfulfillable` is a structural ancestor-writes-state check, not simulation-based; Forward Analysis "Outcomes" count explains its breakdown (endings vs cycles vs dead-ends) |
+| **AI Generation Robustness** | **v0.9.34**: `aiSummary.maxLength` numeric values (220, 400, etc.) now auto-coerced to `"short"`/`"medium"`/`"long"` enum instead of bouncing validation |
 | **PathTree Analyzer** | **v0.9.33**: New Tree tab in Path Analysis — collapsed tree over simulated paths with hub detection, radio/checkbox selections, scope-aware additive state composition, and state-aware conditional branch rendering |
 | **Hub Visit Log** | **v0.9.33**: Interactive visit cards for hub nodes — pick options + items across multiple visits, see accumulated state per visit, visit counterfactual scenarios no single simulator path realises |
 | **Story Soft-Lock Detection** | **v0.9.33**: New StoryWarnings analyzer flags keypad soft-locks, ungated puzzles, unfulfillable `requires`, and paths that violate `requires` — with inline warnings on visit chains showing exactly where players get stuck |
