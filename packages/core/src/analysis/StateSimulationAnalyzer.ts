@@ -438,16 +438,16 @@ export class StateSimulationAnalyzer {
         // we need to check if any option NOW leads somewhere different
         // (e.g., a condition that was false is now true due to state changes).
         //
-        // KEY INSIGHT: Only retry options that lead to CONDITION BEATS.
-        // Options that lead to regular beats (like visiting an expert) don't
-        // need retrying - they always do the same thing. But condition-gated
-        // paths might now succeed if the required variables have been set.
+        // KEY INSIGHT: Only retry options whose downstream behaviour depends
+        // on state — any conditionBeat or requires-gated beat reachable within
+        // a few hops of the option's target. Options that lead to a purely
+        // linear chain always do the same thing and don't need retrying.
+        // Walking ~6 beats forward catches the common authoring pattern of a
+        // choice → intro text → condition / gated beat.
         if (availableOptions.length === 0) {
-          // Find options that lead to condition beats - only these might behave differently
           const conditionGatedOptions: number[] = [];
           for (let i = 0; i < connections.length; i++) {
-            const targetBeat = this.getBeat(connections[i].targetId);
-            if (targetBeat && targetBeat.type === 'conditionBeat') {
+            if (this.branchHasStateDependence(connections[i].targetId, 6)) {
               conditionGatedOptions.push(i);
             }
           }
@@ -639,6 +639,39 @@ export class StateSimulationAnalyzer {
    * Check if a beat has per-choice state effects that make each branch unique
    * even when connections share the same target.
    */
+  /**
+   * Walk forward from `startBeatId` up to `maxSteps` linear hops and report
+   * whether any beat reachable on this chain is state-dependent — a
+   * conditionBeat, or a beat declaring `requires`. Used by the hub-retry logic
+   * to decide whether revisiting a "taken" option might now behave differently
+   * because state changed elsewhere.
+   *
+   * The walk follows only the first outgoing connection per beat (linear
+   * prefix) and stops on branching beats (other than the ones we're looking
+   * for) so it stays cheap.
+   */
+  private branchHasStateDependence(startBeatId: string, maxSteps: number): boolean {
+    let cursor: string | null = startBeatId;
+    const seen = new Set<string>();
+    for (let step = 0; step < maxSteps; step++) {
+      if (!cursor || seen.has(cursor)) return false;
+      seen.add(cursor);
+      const beat = this.getBeat(cursor);
+      if (!beat) return false;
+      const hasRequires = Array.isArray((beat as any).requires)
+        && (beat as any).requires.length > 0;
+      if (beat.type === 'conditionBeat' || hasRequires) return true;
+      // Don't traverse into choice-style branching beats — those are separate
+      // decision points with their own retry behaviour.
+      if (['dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'keypad'].includes(beat.type)) {
+        return false;
+      }
+      const conns = beat.getConnections();
+      cursor = conns.length > 0 ? conns[0].targetId : beat.defaultTarget ?? null;
+    }
+    return false;
+  }
+
   private hasPerChoiceEffects(beat: Beat): boolean {
     if (beat.type === 'pickProp') {
       return true; // Each prop adds a different inventory item

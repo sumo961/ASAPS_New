@@ -353,7 +353,15 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
       {viewMode === 'forward' && (
         <>
           {/* Analysis Stats */}
-          {analysisResult && (
+          {analysisResult && (() => {
+            // Break down outcomes by type so the "Outcomes" number is honest
+            // about what it's counting. Cycles/dead-ends aren't narrative
+            // endings — they're simulator terminations.
+            const endingCount = analysisResult.outcomes.filter((o: any) => o.endType === 'ending').length;
+            const cycleCount = analysisResult.outcomes.filter((o: any) => o.endType === 'cycle').length;
+            const deadEndCount = analysisResult.outcomes.filter((o: any) => o.endType === 'deadEnd').length;
+            const hasNonEnding = cycleCount > 0 || deadEndCount > 0;
+            return (
             <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
               <div className="grid grid-cols-4 gap-3 mb-3">
                 <div className="bg-blue-50 p-2 rounded">
@@ -361,6 +369,13 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                   <div className="text-xl font-bold text-blue-700">
                     {analysisResult.outcomes.length}
                   </div>
+                  {hasNonEnding && (
+                    <div className="text-[10px] text-blue-600 mt-0.5 leading-tight" title="Cycles and dead ends are simulator terminations — the BFS gave up on loops or missing exits. Only 'endings' are narrative outcomes (endScreen/aiSummary).">
+                      {endingCount} ending{endingCount !== 1 ? 's' : ''}
+                      {cycleCount > 0 && ` + ${cycleCount} cycle${cycleCount !== 1 ? 's' : ''}`}
+                      {deadEndCount > 0 && ` + ${deadEndCount} dead end${deadEndCount !== 1 ? 's' : ''}`}
+                    </div>
+                  )}
                 </div>
                 <div className="bg-indigo-50 p-2 rounded">
                   <div className="text-xs text-indigo-700">Total Paths</div>
@@ -400,7 +415,8 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                 )}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Query Input */}
           <div className="px-4 py-3 border-b border-gray-100 space-y-2 flex-shrink-0">

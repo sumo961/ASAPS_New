@@ -10,6 +10,66 @@ describe('projectDeserializer', () => {
   });
 
   describe('deserializeBeats', () => {
+    it('preserves requires and requiresMode across deserialization', () => {
+      const beatsData = [
+        {
+          id: 'beat_gated',
+          name: 'Gated',
+          type: 'infoText',
+          parameters: { text: 'hi' },
+          connections: [{ targetId: 'next' }],
+          requires: [
+            {
+              condition: { type: 'inventory', operator: '==', item: 'Lantern', value: true },
+              explanation: 'needs lantern',
+              severity: 'error',
+              fallbackTarget: 'hall',
+            },
+          ],
+          requiresMode: 'any',
+        },
+      ];
+
+      const beats = deserializeBeats(beatsData);
+
+      expect(beats).toHaveLength(1);
+      const b: any = beats[0];
+      expect(Array.isArray(b.requires)).toBe(true);
+      expect(b.requires).toHaveLength(1);
+      expect(b.requires[0].fallbackTarget).toBe('hall');
+      expect(b.requires[0].explanation).toBe('needs lantern');
+      expect(b.requiresMode).toBe('any');
+    });
+
+    it('accepts requires nested under parameters for backwards compatibility', () => {
+      const beatsData = [
+        {
+          id: 'beat_legacy',
+          name: 'Legacy',
+          type: 'infoText',
+          parameters: {
+            text: 'hi',
+            requires: [
+              {
+                condition: { type: 'inventory', operator: '==', item: 'Key', value: true },
+                explanation: 'needs key',
+              },
+            ],
+            requiresMode: 'all',
+          },
+          connections: [],
+        },
+      ];
+
+      const beats = deserializeBeats(beatsData);
+
+      expect(beats).toHaveLength(1);
+      const b: any = beats[0];
+      expect(Array.isArray(b.requires)).toBe(true);
+      expect(b.requires[0].condition.item).toBe('Key');
+      expect(b.requiresMode).toBe('all');
+    });
+
     it('should deserialize a simple beat', () => {
       const beatsData = [
         {

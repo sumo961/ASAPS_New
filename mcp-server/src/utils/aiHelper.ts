@@ -322,6 +322,29 @@ function autoFixEndingRestartConnections(generated: any): void {
 }
 
 /**
+ * Coerce numeric aiSummary maxLength to the schema's enum
+ * "short" | "medium" | "long". AI models occasionally emit a character count
+ * (e.g. 220) which fails validation.
+ */
+function autoFixAiSummaryMaxLength(generated: any): void {
+  if (!generated?.beats || !Array.isArray(generated.beats)) return;
+  let fixCount = 0;
+  for (const beat of generated.beats) {
+    if (beat.type !== 'aiSummary') continue;
+    if (!beat.parameters) continue;
+    const value = beat.parameters.maxLength;
+    if (typeof value !== 'number') continue;
+    const bucket = value < 150 ? 'short' : value > 400 ? 'long' : 'medium';
+    beat.parameters.maxLength = bucket;
+    fixCount++;
+    console.error(`[aiHelper.autoFix] ✓ aiSummary ${beat.id}: coerced maxLength ${value} → "${bucket}"`);
+  }
+  if (fixCount > 0) {
+    console.error(`[aiHelper.autoFix] Auto-fixed ${fixCount} aiSummary maxLength values`);
+  }
+}
+
+/**
  * Generate story using Claude API
  */
 async function generateStoryWithAI(config: StoryConfig, apiKey: string): Promise<GeneratedStory> {
@@ -766,6 +789,9 @@ Generate a complete, engaging interactive story structure.`;
   // Auto-fix: ensure ending beats (endScreen, aiSummary) with showRestart:true have
   // an explicit connection back to the titleScreen so the restart edge appears in the graph.
   autoFixEndingRestartConnections(generated);
+
+  // Auto-fix: aiSummary.maxLength sometimes comes back as a number — coerce to enum.
+  autoFixAiSummaryMaxLength(generated);
 
   // Add placeholder positions to beats if not present
   // Note: The builder's TreeLayoutAlgorithm will recalculate proper tree positions

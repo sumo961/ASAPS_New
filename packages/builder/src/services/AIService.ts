@@ -1180,6 +1180,31 @@ export class AIService {
   }
 
   /**
+   * Coerce numeric `maxLength` on aiSummary beats to the schema's enum
+   * "short" | "medium" | "long". AI models occasionally emit a character
+   * count (e.g. 220) which fails validation.
+   */
+  private autoFixAiSummaryMaxLength(response: StoryGenerationResponse): void {
+    if (!response.beats) return;
+    let fixCount = 0;
+    for (const beat of response.beats) {
+      if (beat.type !== 'aiSummary') continue;
+      const params: any = beat.parameters || {};
+      const value = params.maxLength;
+      if (typeof value !== 'number') continue;
+      // Map numeric lengths to the authored enum. Thresholds match typical
+      // "short paragraph / medium recap / long essay" lengths.
+      const bucket = value < 150 ? 'short' : value > 400 ? 'long' : 'medium';
+      params.maxLength = bucket;
+      fixCount++;
+      console.log(`[AIService.autoFix] ✓ aiSummary ${beat.id}: coerced maxLength ${value} → "${bucket}"`);
+    }
+    if (fixCount > 0) {
+      console.log(`[AIService.autoFix] Auto-fixed ${fixCount} aiSummary maxLength values`);
+    }
+  }
+
+  /**
    * Helper to collect all targets from a dialogTree recursively
    */
   private collectDialogTreeTargets(node: any, targets: Set<string>): void {
@@ -1221,6 +1246,11 @@ export class AIService {
 
       // Auto-fix EndScreen beats missing restart connection back to title screen
       this.autoFixEndScreenConnections(response);
+
+      // Auto-fix aiSummary maxLength: AI models sometimes emit a character
+      // count (e.g. 220) instead of the schema's enum "short"|"medium"|"long".
+      // Coerce numeric values so validation doesn't fail on an otherwise fine story.
+      this.autoFixAiSummaryMaxLength(response);
 
       // Validate if enabled
       let validationErrors: any[] = [];

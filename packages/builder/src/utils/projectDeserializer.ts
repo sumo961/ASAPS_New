@@ -452,6 +452,10 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         timeDisplayMode: beatData.timeDisplayMode,
         timeDisplayText: beatData.timeDisplayText,
         overrideCountdownMeter: beatData.overrideCountdownMeter,
+        // State requirements (Level-2 authoring). Accept both top-level and
+        // nested-in-parameters placements for forward/backwards compatibility.
+        requires: beatData.requires ?? beatData.parameters?.requires,
+        requiresMode: beatData.requiresMode ?? beatData.parameters?.requiresMode,
         parameters: beatData.parameters || {}
       };
 

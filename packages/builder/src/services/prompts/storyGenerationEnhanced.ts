@@ -702,7 +702,7 @@ Fictional time condition example (CORRECT format):
 - Use: Personalized recap of the player's journey — ideal for endings, epilogues, or checkpoints
 - The AI generates a summary based on the player's actual choices, variables, and inventory
 - Has ALL the same ending capabilities as endScreen: showRestart, showCredits, resetOnRestart
-- Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength, includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory
+- Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength ("short"|"medium"|"long" — NOT a number), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory
 - Supports showRestart, showCredits, resetOnRestart with granular reset sub-options (resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory)
 - Credits page: creditsPageTitle, creditsPageBody, creditsCloseText
 - When used as an ending: set showRestart: true AND add a connection back to the titleScreen (beat_0) so the restart button works and shows up as a graph edge. Example: "connections": [{ "targetId": "beat_0" }]
@@ -2015,7 +2015,7 @@ You may use these advanced beat types that leverage AI at runtime:
 - **aiCondition**: AI-driven branching that analyzes player state to determine path
 - **aiDialogTree**: Generate personalized dialog trees at runtime using AI
 - **aiSummary**: AI-generated personalized summary — can REPLACE endScreen as story ending!
-  Parameters: prompt, title, summaryStyle, maxLength, includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart, showCredits, resetOnRestart (with granular sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText
+  Parameters: prompt, title, summaryStyle, maxLength ("short"|"medium"|"long" — NEVER a number), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory, showRestart, showCredits, resetOnRestart (with granular sub-options), creditsPageTitle, creditsPageBody, creditsCloseText, restartText, creditsText
   Use instead of endScreen when you want the player to see a recap of their choices and consequences
 - **aiInfoText**: Generate contextual 1-2 sentence text using AI based on player state (like infoText but dynamic)
   Parameters: prompt (context for AI), fallbackText (if AI unavailable), buttonText, includeVariables, includeInventory, includeHistory, maxSentences
