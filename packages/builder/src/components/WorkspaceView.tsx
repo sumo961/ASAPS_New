@@ -44,6 +44,8 @@ interface WorkspaceViewProps {
   highlightedBeatIds?: string[];
   /** Beats visited during the active Preview Window session — passed to the flowchart for the red trace overlay. */
   pwVisitedBeatIds?: string[];
+  /** Currently-active beat in the Preview Window — painted more prominently. */
+  pwCurrentBeatId?: string | null;
   onAutoLayout?: () => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   onAddToContainer?: (clusterId: string) => void;
@@ -95,6 +97,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   globalSettings,
   highlightedBeatIds = [],
   pwVisitedBeatIds = [],
+  pwCurrentBeatId,
   onAutoLayout,
   onAutoLayoutCluster,
   onAddToContainer,
@@ -225,6 +228,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onTogglePalette={onTogglePalette}
               highlightedBeatIds={highlightedBeatIds}
               pwVisitedBeatIds={pwVisitedBeatIds}
+              pwCurrentBeatId={pwCurrentBeatId}
               onAutoLayout={onAutoLayout}
               onAutoLayoutCluster={onAutoLayoutCluster}
               onAddToContainer={onAddToContainer}

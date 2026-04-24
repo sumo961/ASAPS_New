@@ -253,6 +253,9 @@ function App() {
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   // Beats visited by the Preview Window (live trace, shown as red highlight on the flowchart).
   const [pwVisitedBeatIds, setPwVisitedBeatIds] = useState<string[]>([]);
+  // The beat currently executing in the Preview Window — painted more
+  // prominently on the flowchart than past-visited beats.
+  const [pwCurrentBeatId, setPwCurrentBeatId] = useState<string | null>(null);
   const [previewWindowOpen, setPreviewWindowOpen] = useState(false);
   const [triggerNewProject, setTriggerNewProject] = useState(0);
   const [missingAssetsInfo, setMissingAssetsInfo] = useState<{ missing: import('@asaps/core').AssetManifestEntry[]; path: string } | null>(null);
@@ -398,7 +401,10 @@ function App() {
 
   // Subscribe to visited-beats updates from the preview window to paint the flowchart trace.
   useEffect(() => {
-    const unsubscribe = previewWindowManager.subscribeToVisitedBeats(setPwVisitedBeatIds);
+    const unsubscribe = previewWindowManager.subscribeToVisitedBeats(({ visitedBeatIds, currentBeatId }) => {
+      setPwVisitedBeatIds(visitedBeatIds);
+      setPwCurrentBeatId(currentBeatId);
+    });
     return unsubscribe;
   }, []);
 
@@ -5245,6 +5251,7 @@ function App() {
             globalSettings={globalSettings}
             highlightedBeatIds={highlightedBeatIds}
             pwVisitedBeatIds={pwVisitedBeatIds}
+            pwCurrentBeatId={pwCurrentBeatId}
             onAutoLayout={handleAutoLayout}
             onAutoLayoutCluster={(clusterId: string) => {
               // Auto-layout beats within a cluster using a simple grid

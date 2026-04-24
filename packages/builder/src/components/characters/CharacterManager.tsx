@@ -13,7 +13,8 @@ import {
   Download,
   Upload,
   Users,
-  Pencil
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { Character, CHARACTER_TEMPLATES } from '../../types/character';
 import { CharacterCard } from './CharacterCard';
@@ -361,6 +362,17 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                       <Pencil className="w-4 h-4 text-blue-500" />
                     </button>
                   )}
+                  {/* Delete button — always visible so the first screen of the editor has per-row delete */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCharacterRemove(character.id);
+                    }}
+                    className="p-2 rounded-lg hover:bg-red-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove Character"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </button>
                 </div>
               </div>
               );

@@ -59,6 +59,8 @@ export interface PreviewMessage {
     activeLanguage?: string | null;
     /** Beat IDs visited during the current preview session */
     visitedBeats?: string[];
+    /** Currently-active beat (painted more prominently than past-visited beats) */
+    currentBeatId?: string | null;
   };
 }
 
@@ -68,7 +70,15 @@ export interface PreviewWindowState {
 }
 
 type StateChangeCallback = (state: PreviewWindowState) => void;
-type VisitedBeatsCallback = (visitedBeatIds: string[]) => void;
+/**
+ * Callback signature for live trace updates. `visitedBeatIds` is the
+ * cumulative set of beats the player has passed through; `currentBeatId` is
+ * the beat currently executing (painted more prominently on the flowchart).
+ */
+type VisitedBeatsCallback = (update: {
+  visitedBeatIds: string[];
+  currentBeatId: string | null;
+}) => void;
 
 class PreviewWindowManager {
   private previewWindow: Window | null = null;
@@ -76,6 +86,7 @@ class PreviewWindowManager {
   private listeners: Set<StateChangeCallback> = new Set();
   private visitedListeners: Set<VisitedBeatsCallback> = new Set();
   private lastVisitedBeats: string[] = [];
+  private lastCurrentBeatId: string | null = null;
   private pendingData: PreviewMessage['payload'] | null = null;
   private isElectron: boolean = false;
 
@@ -108,12 +119,16 @@ class PreviewWindowManager {
   }
 
   /**
-   * Subscribe to visited-beats updates streamed back from the preview window.
+   * Subscribe to live trace updates streamed back from the preview window:
+   * the cumulative visited-beats list plus the currently-active beat.
    * Immediately notifies the subscriber with the last-known set (may be empty).
    */
   subscribeToVisitedBeats(callback: VisitedBeatsCallback): () => void {
     this.visitedListeners.add(callback);
-    callback(this.lastVisitedBeats);
+    callback({
+      visitedBeatIds: this.lastVisitedBeats,
+      currentBeatId: this.lastCurrentBeatId,
+    });
     return () => this.visitedListeners.delete(callback);
   }
 
@@ -376,8 +391,13 @@ class PreviewWindowManager {
         break;
       case 'VISITED_BEATS_UPDATE': {
         const visited = message.payload?.visitedBeats ?? [];
+        const current = message.payload?.currentBeatId ?? null;
         this.lastVisitedBeats = visited;
-        this.visitedListeners.forEach(cb => cb(visited));
+        this.lastCurrentBeatId = current;
+        this.visitedListeners.forEach(cb => cb({
+          visitedBeatIds: visited,
+          currentBeatId: current,
+        }));
         break;
       }
     }
@@ -411,7 +431,8 @@ class PreviewWindowManager {
     this._electronWindowOpen = false;
     // Clear the visited-beats trace so the flowchart stops showing stale red highlights
     this.lastVisitedBeats = [];
-    this.visitedListeners.forEach(cb => cb([]));
+    this.lastCurrentBeatId = null;
+    this.visitedListeners.forEach(cb => cb({ visitedBeatIds: [], currentBeatId: null }));
     this.notifyListeners();
   }
 

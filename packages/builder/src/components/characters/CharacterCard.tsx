@@ -69,16 +69,15 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
             <Pencil className="w-4 h-4 text-blue-500" />
           </button>
         )}
-        {/* Remove Button - hidden in selection mode */}
-        {!selectionMode && (
-          <button
-            onClick={handleRemove}
-            className="p-1.5 bg-white rounded-full hover:bg-red-100"
-            title="Remove Character"
-          >
-            <X className="w-4 h-4 text-red-500" />
-          </button>
-        )}
+        {/* Remove Button — shown in both modes so the first screen of the
+            Character Editor has per-card delete. */}
+        <button
+          onClick={handleRemove}
+          className="p-1.5 bg-white rounded-full hover:bg-red-100"
+          title="Remove Character"
+        >
+          <X className="w-4 h-4 text-red-500" />
+        </button>
       </div>
 
       {/* Character Image/Icon */}

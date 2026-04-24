@@ -686,8 +686,14 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           );
         }
 
-        // Handle character selection fields
+        // Handle character selection fields — for inputText saving to a
+        // characterName. Uses `characterObjects` (the real Character[]), NOT
+        // `characters` (which is a string[] of NPC names from
+        // getAvailableCharacters). inputText should offer ALL characters
+        // including the player, since changing the player's display name is a
+        // primary use of this feature ("What should I call you?").
         if (paramName === 'characterId') {
+          const opts = Array.isArray(characterObjects) ? characterObjects : [];
           return (
             <div key={paramName}>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -700,14 +706,15 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
                 <option value="">Select character...</option>
-                {characters && characters.length > 0 ? (
-                  characters.map((char: any) => (
+                {opts.length > 0 ? (
+                  opts.map((char) => (
                     <option key={char.id} value={char.id}>
-                      {char.name || char.displayName || char.id}
+                      {char.displayName || char.name || char.id}
+                      {char.role ? ` (${char.role})` : ''}
                     </option>
                   ))
                 ) : (
-                  <option disabled>No characters defined</option>
+                  <option disabled>No characters defined — add one in the Character Manager</option>
                 )}
               </select>
               <p className="text-xs text-gray-500 mt-1">

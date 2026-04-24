@@ -1569,6 +1569,15 @@ export const PreviewWindow: React.FC = () => {
         countersRef.current = { ...counters };
 
         const visitedBeats = ctx.getVisitedBeats();
+        const currentBeatId = ctx.getCurrentBeatId() || null;
+
+        // Include the current beat in the visited list so the flowchart paints
+        // it as soon as the player ENTERS it. The engine only records
+        // `visitedBeats` at the END of Beat.execute(), which without this
+        // augmentation would mean the red trace always lagged one beat behind.
+        const paintedBeats = currentBeatId && !visitedBeats.includes(currentBeatId)
+          ? [...visitedBeats, currentBeatId]
+          : visitedBeats;
 
         setDebugInfo({
           visitedBeats,
@@ -1578,18 +1587,21 @@ export const PreviewWindow: React.FC = () => {
           timers,
         });
 
-        // Echo visited-beats back to the builder so it can paint the flowchart
-        // (we fire on every state change — the opener dedupes).
+        // Echo visited-beats + current-beat back to the builder so it can
+        // paint the flowchart (we fire on every state change — the opener
+        // dedupes). The builder uses `currentBeatId` to draw the active beat
+        // more prominently than past-visited beats.
         try {
+          const payload = { visitedBeats: paintedBeats, currentBeatId };
           if (window.opener && !window.opener.closed) {
             window.opener.postMessage(
-              { type: 'VISITED_BEATS_UPDATE', payload: { visitedBeats } },
+              { type: 'VISITED_BEATS_UPDATE', payload },
               window.location.origin,
             );
           } else if (isElectronRef.current) {
             (window as any).electronAPI?.preview?.sendToMain?.({
               type: 'VISITED_BEATS_UPDATE',
-              payload: { visitedBeats },
+              payload,
             });
           }
         } catch (err) {

@@ -1937,6 +1937,7 @@ export class ReactRenderer extends BaseRenderer {
               timerState={this.timerState}
               onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
               beatType={beatType}
+              beatId={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id}
               timerHudConfig={this.timerHudConfig}
               timerHudOverrideText={this.timerHudOverrideText}
               timerHudState={this.timerHudState}

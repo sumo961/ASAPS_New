@@ -508,6 +508,11 @@ export interface PositionedBeatViewProps {
   onSubscribeTimerState?: (listener: (state: PositionedBeatViewProps['timerState']) => void) => () => void;
   /** Beat type for smart text box sizing (determines if there's a button) */
   beatType?: string;
+  /** Current beat ID — used as a reset key for per-beat local state (e.g. the
+   *  inputText value). Without this, consecutive inputText beats with
+   *  structurally-identical elements would retain the previous beat's typed
+   *  value because the existing content-based reset key never changes. */
+  beatId?: string;
   /** Editor mode - cosmetic differences only (hotspot borders, scroll badges) */
   editorMode?: boolean;
   /** Callback reporting computed element positions after collision detection + smart sizing */
@@ -951,6 +956,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   timerState: initialTimerState,
   onSubscribeTimerState,
   beatType,
+  beatId,
   editorMode = false,
   onLayoutComputed,
   timerHudConfig,
@@ -976,6 +982,12 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Reset inputValue when the beat changes or input element's content (prompt) changes.
   // If the content looks like a resolved variable (non-empty, not a raw ${...} reference),
   // pre-populate the input with it so users can edit an existing value.
+  //
+  // `beatId` is the authoritative reset key: two consecutive inputText beats
+  // with identical structure still differ in id, so including it guarantees the
+  // field clears between beats. Without it, typed text from the previous beat
+  // leaked into the next one whenever neither beat set a placeholder (the
+  // inputPrompt / element content key didn't change between them).
   const inputElement = elements.find(el => el.location.name.toLowerCase().includes('input'));
   const inputPrompt = inputElement?.content;
   const inputResetKey = elements.map(el => `${el.location.name}:${el.content?.substring(0, 20)}`).join('|');
@@ -988,7 +1000,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
     } else {
       setInputValue('');
     }
-  }, [inputPrompt, inputResetKey]);
+  }, [beatId, inputPrompt, inputResetKey]);
 
   // State for timer - subscribes to updates for real-time progress bar animation
   const [timerState, setTimerState] = React.useState(initialTimerState);

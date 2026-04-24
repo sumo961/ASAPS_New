@@ -13,6 +13,9 @@ interface BeatNodeData {
   highlighted?: boolean;
   /** True when the beat was visited in the current Preview Window session. */
   pwVisited?: boolean;
+  /** True for the beat currently executing in the Preview Window — painted
+   *  more prominently than past-visited beats. */
+  pwCurrent?: boolean;
 }
 
 // Beat type icons
@@ -87,30 +90,36 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
   const displayLabel = truncateTitle(fullLabel);
 
   // Debug highlight (yellow) wins over PW trace (red), which wins over selected (cyan).
+  // Within the PW trace, the CURRENT beat gets a deeper red and thicker ring than past-visited beats.
   const borderColor = data.highlighted
     ? '#eab308'
-    : data.pwVisited
-      ? '#dc2626'
-      : isSelected
-        ? '#06b6d4'
-        : '#d1d5db';
+    : data.pwCurrent
+      ? '#b91c1c'  // red-700 (deeper) for active beat
+      : data.pwVisited
+        ? '#dc2626'  // red-600 for past-visited beats
+        : isSelected
+          ? '#06b6d4'
+          : '#d1d5db';
   const bgColor = data.highlighted
     ? '#fef9c3'
-    : data.pwVisited
-      ? '#fee2e2'
-      : isSelected
-        ? '#ecfeff'
-        : 'white';
+    : data.pwCurrent
+      ? '#fecaca'  // red-200 (brighter) — stands out in the trace
+      : data.pwVisited
+        ? '#fee2e2'  // red-50/100 for past beats
+        : isSelected
+          ? '#ecfeff'
+          : 'white';
 
   return (
     <div
       className={`
-        px-3 py-2.5 rounded-lg border-2 shadow-lg
+        px-3 py-2.5 rounded-lg shadow-lg
         transition-all duration-200 cursor-pointer
-        ${isSelected && !data.highlighted && !data.pwVisited ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
+        ${data.pwCurrent ? 'border-4 ring-4 ring-red-500 ring-opacity-70 animate-pulse-slow' : 'border-2'}
+        ${isSelected && !data.highlighted && !data.pwVisited && !data.pwCurrent ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
         ${data.highlighted ? 'ring-4 ring-yellow-400 ring-opacity-70 border-yellow-500 bg-yellow-50' : ''}
-        ${!data.highlighted && data.pwVisited ? 'ring-4 ring-red-400 ring-opacity-60 border-red-500 bg-red-50' : ''}
-        ${!isSelected && !data.highlighted && !data.pwVisited ? 'bg-white border-gray-300' : ''}
+        ${!data.highlighted && !data.pwCurrent && data.pwVisited ? 'ring-4 ring-red-400 ring-opacity-60 border-red-500 bg-red-50' : ''}
+        ${!isSelected && !data.highlighted && !data.pwVisited && !data.pwCurrent ? 'bg-white border-gray-300' : ''}
         hover:shadow-xl hover:scale-105
       `}
       style={{

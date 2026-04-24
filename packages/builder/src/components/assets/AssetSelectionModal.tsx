@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Grid, List, Upload, ExternalLink, Search } from 'lucide-react';
+import { X, Grid, List, Upload, ExternalLink, Search, Trash2 } from 'lucide-react';
 import type { Asset } from './AssetManager';
 
 interface AssetSelectionModalProps {
@@ -248,6 +248,15 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
     }
   };
 
+  // Per-item delete handler. Confirms first, then removes. Click handlers on
+  // the card/row select the asset for use — stopPropagation prevents that.
+  const handleRemoveAsset = (e: React.MouseEvent, asset: Asset) => {
+    e.stopPropagation();
+    if (confirm(`Remove "${asset.name}" from the project?`)) {
+      onAssetRemove(asset.id);
+    }
+  };
+
   // Get file accept string based on subType
   const getFileAccept = () => {
     if (assetSubType === 'background') return '.jpg,.jpeg';
@@ -358,13 +367,21 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
               {filteredAssets.map(asset => (
                 <div
                   key={asset.id}
-                  className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-all cursor-pointer hover:border-blue-500 hover:bg-blue-50"
+                  className="group relative border border-gray-200 rounded-lg p-3 hover:shadow-md transition-all cursor-pointer hover:border-blue-500 hover:bg-blue-50"
                   onClick={() => {
                     console.log('[AssetSelectionModal] Asset clicked (grid view):', asset);
                     onSelect(asset);
                     onClose();
                   }}
                 >
+                  {/* Delete button — appears on hover */}
+                  <button
+                    onClick={(e) => handleRemoveAsset(e, asset)}
+                    className="absolute top-2 right-2 z-10 p-1.5 bg-white rounded-full shadow-sm hover:bg-red-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title={`Remove "${asset.name}" from project`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                  </button>
                   <div className="aspect-square bg-gray-100 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
                     {getAssetPreview(asset)}
                   </div>
@@ -389,7 +406,7 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
               {filteredAssets.map(asset => (
                 <div
                   key={asset.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-500 cursor-pointer transition-all"
+                  className="group flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-500 cursor-pointer transition-all"
                   onClick={() => {
                     console.log('[AssetSelectionModal] Asset clicked (list view):', asset);
                     onSelect(asset);
@@ -414,6 +431,13 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
                       {asset.subType && ` • ${asset.subType}`}
                     </p>
                   </div>
+                  <button
+                    onClick={(e) => handleRemoveAsset(e, asset)}
+                    className="p-2 text-red-500 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    title={`Remove "${asset.name}" from project`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
             </div>

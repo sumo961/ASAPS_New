@@ -48,6 +48,8 @@ interface GraphEditorProps {
   highlightedBeatIds?: string[];
   /** Beats visited during the active Preview Window session — rendered as a red trace. */
   pwVisitedBeatIds?: string[];
+  /** Currently-active beat in the Preview Window — highlighted more prominently than past-visited beats. */
+  pwCurrentBeatId?: string | null;
   onAutoLayout?: () => void;
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
@@ -110,6 +112,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onAutoLayoutCluster,
   highlightedBeatIds = [],
   pwVisitedBeatIds = [],
+  pwCurrentBeatId,
   onAutoLayout,
   onAddToContainer,
   onRemoveCluster,
@@ -161,6 +164,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const pwVisitedBeatIdsRef = useRef(pwVisitedBeatIdsSet);
   pwVisitedBeatIdsRef.current = pwVisitedBeatIdsSet;
 
+  // Ref mirror for the currently-active PW beat so nodes can read it without
+  // becoming a memo dependency (avoids rebuilding all nodes on each beat step).
+  const pwCurrentBeatIdRef = useRef<string | null | undefined>(pwCurrentBeatId);
+  pwCurrentBeatIdRef.current = pwCurrentBeatId;
+
   // DEBUG: Track initial mounting
   const mountRef = useRef(false);
 
@@ -205,6 +213,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         color: beatTypeColors[beat.type] || '#94a3b8',
         highlighted: highlightedBeatIdsRef.current?.has(beat.id) ?? false,
         pwVisited: pwVisitedBeatIdsRef.current?.has(beat.id) ?? false,
+        pwCurrent: pwCurrentBeatIdRef.current === beat.id,
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -881,6 +890,25 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       });
     });
   }, [pwVisitedBeatIdsSet, setNodes]);
+
+  // Move the "current beat" marker to whichever beat is executing now. Runs
+  // as a focused effect so only the two beats that flipped status re-render.
+  useEffect(() => {
+    setNodes((currentNodes) => {
+      return currentNodes.map((node) => {
+        if (node.type !== 'beat') return node;
+        const isCurrent = pwCurrentBeatId === node.id;
+        if (node.data.pwCurrent === isCurrent) return node;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            pwCurrent: isCurrent,
+          },
+        };
+      });
+    });
+  }, [pwCurrentBeatId, setNodes]);
 
   // Auto-center and zoom on selected beat for better visibility
   useEffect(() => {
