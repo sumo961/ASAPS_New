@@ -108,6 +108,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isOpen: () => ipcRenderer.invoke('preview:is-open'),
     sendMessage: (message: any) => ipcRenderer.invoke('preview:send-message', message),
     ping: () => ipcRenderer.send('preview:ping'),
+    /** Called from the preview window to push arbitrary messages back to the
+     *  main builder window (e.g. VISITED_BEATS_UPDATE for the live red trace). */
+    sendToMain: (message: any) => ipcRenderer.send('preview:send-to-main', message),
   },
   onPreviewMessage: (callback: (message: any) => void) => {
     const handler = (_: unknown, message: any) => callback(message);
@@ -122,6 +125,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPreviewClosed: (callback: () => void) => {
     ipcRenderer.on('preview:closed', callback);
     return () => ipcRenderer.removeListener('preview:closed', callback);
+  },
+  /** Subscribe (from the MAIN builder window) to messages the preview window
+   *  pushes back via preview.sendToMain. This is the counterpart to
+   *  window.addEventListener('message') in the web build. */
+  onPreviewMessageToMain: (callback: (message: any) => void) => {
+    const handler = (_: unknown, message: any) => callback(message);
+    ipcRenderer.on('preview:message-to-main', handler);
+    return () => ipcRenderer.removeListener('preview:message-to-main', handler);
+  },
+
+  // Debug window operations (pop-out Story Debug Tools). Mirrors `preview`.
+  debug: {
+    open: () => ipcRenderer.invoke('debug:open'),
+    close: () => ipcRenderer.invoke('debug:close'),
+    isOpen: () => ipcRenderer.invoke('debug:is-open'),
+    sendMessage: (message: any) => ipcRenderer.invoke('debug:send-message', message),
+    ping: () => ipcRenderer.send('debug:ping'),
+    sendToMain: (message: any) => ipcRenderer.send('debug:send-to-main', message),
+  },
+  onDebugMessage: (callback: (message: any) => void) => {
+    const handler = (_: unknown, message: any) => callback(message);
+    ipcRenderer.on('debug:message', handler);
+    return () => ipcRenderer.removeListener('debug:message', handler);
+  },
+  onDebugReady: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('debug:ready', handler);
+    return () => ipcRenderer.removeListener('debug:ready', handler);
+  },
+  onDebugClosed: (callback: () => void) => {
+    ipcRenderer.on('debug:closed', callback);
+    return () => ipcRenderer.removeListener('debug:closed', callback);
+  },
+  onDebugMessageToMain: (callback: (message: any) => void) => {
+    const handler = (_: unknown, message: any) => callback(message);
+    ipcRenderer.on('debug:message-to-main', handler);
+    return () => ipcRenderer.removeListener('debug:message-to-main', handler);
   },
 
   // Story injection from MCP server
@@ -221,10 +261,24 @@ declare global {
         isOpen: () => Promise<boolean>;
         sendMessage: (message: any) => Promise<boolean>;
         ping: () => void;
+        sendToMain: (message: any) => void;
       };
       onPreviewMessage: (callback: (message: any) => void) => () => void;
       onPreviewReady: (callback: () => void) => () => void;
       onPreviewClosed: (callback: () => void) => () => void;
+      onPreviewMessageToMain: (callback: (message: any) => void) => () => void;
+      debug: {
+        open: () => Promise<boolean>;
+        close: () => Promise<boolean>;
+        isOpen: () => Promise<boolean>;
+        sendMessage: (message: any) => Promise<boolean>;
+        ping: () => void;
+        sendToMain: (message: any) => void;
+      };
+      onDebugMessage: (callback: (message: any) => void) => () => void;
+      onDebugReady: (callback: () => void) => () => void;
+      onDebugClosed: (callback: () => void) => () => void;
+      onDebugMessageToMain: (callback: (message: any) => void) => () => void;
       onStoryInject: (callback: (data: any) => void) => () => void;
       onVCSCommit: (callback: () => void) => () => void;
       onVCSPush: (callback: () => void) => () => void;

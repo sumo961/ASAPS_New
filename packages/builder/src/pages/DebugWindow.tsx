@@ -26,16 +26,30 @@ export const DebugWindow: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('reachability');
 
   // Listen for STORY_UPDATE messages; ping the opener so it knows we're ready.
+  // In Electron the preload exposes the same transport via IPC.
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      const message = event.data as DebugMessage;
+    const isElectron = typeof window !== 'undefined'
+      && !!(window as any).electronAPI?.debug?.ping;
+
+    const handleDebugMessage = (message: DebugMessage) => {
       if (!message || typeof message.type !== 'string') return;
       if (message.type === 'STORY_UPDATE' && message.payload?.storyData) {
         setStoryData(message.payload.storyData);
       }
     };
-    window.addEventListener('message', handleMessage);
+
+    // Web path: postMessage
+    const handleWebMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      handleDebugMessage(event.data as DebugMessage);
+    };
+    window.addEventListener('message', handleWebMessage);
+
+    // Electron IPC path
+    let unsubscribeIPC: (() => void) | undefined;
+    if (isElectron) {
+      unsubscribeIPC = (window as any).electronAPI.onDebugMessage(handleDebugMessage);
+    }
 
     // Announce readiness so the manager can push the latest story.
     if (window.opener) {
@@ -45,8 +59,18 @@ export const DebugWindow: React.FC = () => {
         console.warn('[DebugWindow] Failed to PING opener:', err);
       }
     }
+    if (isElectron) {
+      try {
+        (window as any).electronAPI.debug.ping();
+      } catch (err) {
+        console.warn('[DebugWindow] Failed to PING main via IPC:', err);
+      }
+    }
 
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleWebMessage);
+      unsubscribeIPC?.();
+    };
   }, []);
 
   // Reconstruct a live Story object from the serialized payload. Mirrors the
@@ -84,9 +108,16 @@ export const DebugWindow: React.FC = () => {
   }, [storyData]);
 
   // Forward highlight events to the opener so the flowchart paints them.
+  // Uses postMessage on the web and the Electron `debug.sendToMain` IPC
+  // channel in the desktop build (there's no real `window.opener` on
+  // BrowserWindows opened via IPC).
   const postToOpener = (message: DebugMessage) => {
     try {
-      window.opener?.postMessage(message, window.location.origin);
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(message, window.location.origin);
+      } else if ((window as any).electronAPI?.debug?.sendToMain) {
+        (window as any).electronAPI.debug.sendToMain(message);
+      }
     } catch (err) {
       console.warn('[DebugWindow] Failed to post highlight to opener:', err);
     }

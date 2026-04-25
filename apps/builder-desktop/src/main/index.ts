@@ -268,6 +268,7 @@ function checkForUpdatesManually(): void {
 
 let mainWindow: BrowserWindow | null = null;
 let previewWindow: BrowserWindow | null = null;
+let debugWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
 
 function createWindow(): void {
@@ -939,6 +940,104 @@ ipcMain.on('preview:ping', () => {
   console.log('[Main] Preview window is ready (ping received)');
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('preview:ready');
+  }
+});
+
+// Relay messages from the preview window back to the main builder window
+// (e.g. VISITED_BEATS_UPDATE for the live red flowchart trace). The preview
+// window calls electronAPI.preview.sendToMain(msg); we forward it to main.
+ipcMain.on('preview:send-to-main', (_, message: any) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('preview:message-to-main', message);
+  }
+});
+
+// ============================================================================
+// Debug Window Management — pop-out Story Debug Tools (Reachability, Path
+// Analysis, Story Logic). Mirrors the Preview Window setup: a dedicated
+// BrowserWindow opened via IPC (web window.open is denied by the main
+// window's setWindowOpenHandler, so we route through Electron directly).
+// ============================================================================
+
+function createDebugWindow(): void {
+  if (debugWindow && !debugWindow.isDestroyed()) {
+    debugWindow.focus();
+    return;
+  }
+
+  const mainBounds = mainWindow?.getBounds() || { x: 100, y: 100 };
+
+  debugWindow = new BrowserWindow({
+    width: 900,
+    height: 800,
+    x: mainBounds.x + 80,
+    y: mainBounds.y + 80,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    },
+    title: 'ASAPS Debug Tools',
+    show: false,
+  });
+
+  debugWindow.once('ready-to-show', () => {
+    debugWindow?.show();
+  });
+
+  if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) {
+    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+    debugWindow.loadURL(`${devUrl}#/debug-window`);
+  } else {
+    debugWindow.loadFile(join(__dirname, '../../builder/index.html'), {
+      hash: '/debug-window',
+    });
+  }
+
+  debugWindow.on('closed', () => {
+    debugWindow = null;
+    mainWindow?.webContents.send('debug:closed');
+  });
+}
+
+ipcMain.handle('debug:open', async () => {
+  createDebugWindow();
+  return true;
+});
+
+ipcMain.handle('debug:close', async () => {
+  if (debugWindow && !debugWindow.isDestroyed()) {
+    debugWindow.close();
+  }
+  return true;
+});
+
+ipcMain.handle('debug:is-open', async () => {
+  return debugWindow !== null && !debugWindow.isDestroyed();
+});
+
+ipcMain.handle('debug:send-message', async (_, message: any) => {
+  if (debugWindow && !debugWindow.isDestroyed()) {
+    debugWindow.webContents.send('debug:message', message);
+    return true;
+  }
+  return false;
+});
+
+// Debug window announces readiness (so the manager can flush the pending story)
+ipcMain.on('debug:ping', () => {
+  console.log('[Main] Debug window is ready (ping received)');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('debug:ready');
+  }
+});
+
+// Relay messages FROM the debug window back to the main builder window
+// (e.g. HIGHLIGHT_PATH / HIGHLIGHT_BEAT / CLEAR_HIGHLIGHT for flowchart painting)
+ipcMain.on('debug:send-to-main', (_, message: any) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('debug:message-to-main', message);
   }
 });
 

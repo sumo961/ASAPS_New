@@ -326,10 +326,26 @@ export const PathTreeView: React.FC<PathTreeViewProps> = ({ treeResult, onHighli
 
   const total = totalSelectionCount(selections);
 
+  // Linearise the current selections in tree order so the side panel shows
+  // "what the player committed to, in order" — same shape as the backward
+  // analyzer's Decision Path. We walk the tree once and collect:
+  //   - exclusive selections (radio choices on branches and inline variants)
+  //   - hub visits (one entry per committed visit, in order)
+  const decisionTrail = useMemo(
+    () => buildDecisionTrail(treeResult.root, selections),
+    [treeResult.root, selections],
+  );
+
+  // Final accumulated state after every committed selection.
+  const finalState = useMemo(
+    () => computeSyntheticState(selections),
+    [selections],
+  );
+
   return (
-    <div className="space-y-1 text-sm">
+    <div className="text-sm">
       {/* Stats header */}
-      <div className="flex items-center gap-3 px-2 py-1.5 bg-gray-50 rounded text-xs text-gray-600">
+      <div className="flex items-center gap-3 px-2 py-1.5 bg-gray-50 rounded text-xs text-gray-600 mb-2">
         <span>{treeResult.totalRawPaths.toLocaleString()} total paths</span>
         <span className="text-gray-300">|</span>
         <span>{treeResult.totalTreeNodes} tree nodes</span>
@@ -348,24 +364,212 @@ export const PathTreeView: React.FC<PathTreeViewProps> = ({ treeResult, onHighli
         )}
       </div>
 
-      {/* Tree */}
-      <TreeNodeView
-        node={treeResult.root}
-        treeResult={treeResult}
-        onHighlightPath={onHighlightPath}
-        depth={0}
-        defaultExpanded={true}
-        selections={selections}
-        onSelectExclusive={handleSelectExclusive}
-        onCommitHubVisit={handleCommitHubVisit}
-        onRemoveHubVisit={handleRemoveHubVisit}
-        priorKeys={new Set()}
-        warningsByBeatId={warningsByBeatId}
-        story={story}
-      />
+      <div className="grid grid-cols-[1fr_280px] gap-3 items-start">
+        {/* Tree */}
+        <div className="space-y-1 min-w-0">
+          <TreeNodeView
+            node={treeResult.root}
+            treeResult={treeResult}
+            onHighlightPath={onHighlightPath}
+            depth={0}
+            defaultExpanded={true}
+            selections={selections}
+            onSelectExclusive={handleSelectExclusive}
+            onCommitHubVisit={handleCommitHubVisit}
+            onRemoveHubVisit={handleRemoveHubVisit}
+            priorKeys={new Set()}
+            warningsByBeatId={warningsByBeatId}
+            story={story}
+          />
+        </div>
+
+        {/* Side panel — current decision path + accumulated state */}
+        <DecisionTrailPanel
+          trail={decisionTrail}
+          finalState={finalState}
+          totalSelections={total}
+          onClear={handleClearSelections}
+        />
+      </div>
     </div>
   );
 };
+
+// ============================================================================
+// DecisionTrailPanel — sticky right-side summary of selections + final state
+// ============================================================================
+
+interface DecisionTrailEntry {
+  kind: 'choice' | 'hubVisit';
+  beatName: string;
+  label: string;
+  effects: string[];
+  index?: number; // for hub visits: ordinal within that hub
+}
+
+const DecisionTrailPanel: React.FC<{
+  trail: DecisionTrailEntry[];
+  finalState: StateSummary | undefined;
+  totalSelections: number;
+  onClear: () => void;
+}> = ({ trail, finalState, totalSelections, onClear }) => {
+  return (
+    <div className="border border-gray-200 rounded bg-white sticky top-2 self-start max-h-[80vh] overflow-y-auto">
+      <div className="px-3 py-2 border-b bg-gray-50 flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+          Decision Path
+        </span>
+        {totalSelections > 0 && (
+          <button
+            onClick={onClear}
+            className="text-[10px] text-purple-600 hover:text-purple-800 underline"
+          >
+            clear
+          </button>
+        )}
+      </div>
+
+      <div className="p-3">
+        {trail.length === 0 ? (
+          <p className="text-xs text-gray-500 italic">
+            Click a choice in the tree on the left, or commit a hub visit, to build a
+            scenario. Selections accumulate state shown below.
+          </p>
+        ) : (
+          <ol className="space-y-2">
+            {trail.map((entry, i) => {
+              const isLast = i === trail.length - 1;
+              return (
+                <li key={i} className="flex items-start gap-2">
+                  <div className="flex flex-col items-center flex-shrink-0 mt-0.5">
+                    <div
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium ${
+                        i === 0
+                          ? 'bg-blue-500 text-white'
+                          : isLast
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {i + 1}
+                    </div>
+                    {!isLast && <div className="w-px h-3 bg-gray-200 mt-0.5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-gray-900 truncate" title={entry.beatName}>
+                      {entry.kind === 'hubVisit'
+                        ? `${entry.beatName} (visit ${entry.index! + 1})`
+                        : entry.beatName}
+                    </div>
+                    <div className="text-[11px] text-gray-600 truncate" title={entry.label}>
+                      → {entry.label}
+                    </div>
+                    {entry.effects.length > 0 && (
+                      <div className="text-[10px] text-amber-700 mt-0.5">
+                        [{entry.effects.join(', ')}]
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
+
+      {finalState && (
+        <div className="px-3 py-2 border-t bg-blue-50/40">
+          <div className="text-[10px] font-semibold text-blue-700 uppercase tracking-wide mb-1">
+            Accumulated state
+          </div>
+          <StateSummaryView summary={finalState} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Walk the tree in display order and produce a flat list of the user's
+ * current selections — each as a `{kind, beatName, label, effects}` entry.
+ *
+ * Tree-order matches what the user sees, so the trail reads top-to-bottom
+ * exactly as their selections appear on the left.
+ */
+function buildDecisionTrail(
+  root: PathTreeNode,
+  selections: Selections,
+): DecisionTrailEntry[] {
+  const out: DecisionTrailEntry[] = [];
+
+  const visit = (node: PathTreeNode): void => {
+    // Inline choice variants on linear beats
+    for (const beat of node.beats) {
+      if (beat.choiceVariants && beat.choiceVariants.length > 0) {
+        const picked = selections.exclusive.get(beat.beatId);
+        if (picked) {
+          const variant = beat.choiceVariants.find(v => v.label === picked);
+          out.push({
+            kind: 'choice',
+            beatName: beat.beatName || beat.beatId,
+            label: picked,
+            effects: variant?.stateEffects ?? [],
+          });
+        }
+      }
+    }
+
+    // Hub visits — one trail entry per committed visit
+    if (node.type === 'hub' && node.hubBeatId) {
+      const visits = selections.hubSequence.get(node.hubBeatId) ?? [];
+      const hubName = node.beats[node.beats.length - 1]?.beatName || 'Hub';
+      visits.forEach((v, idx) => {
+        const itemSuffix = v.itemLabel ? ` ▸ ${v.itemLabel}` : '';
+        out.push({
+          kind: 'hubVisit',
+          beatName: hubName,
+          label: `${v.optionLabel}${itemSuffix}`,
+          effects: v.effects,
+          index: idx,
+        });
+      });
+      // Continue into the hub's exit subtree
+      if (node.hubExitNode) visit(node.hubExitNode);
+      return; // hub options aren't TreeNode children; we've covered them via visits
+    }
+
+    // Branch children — pick the selected branch (radio) and recurse
+    if (node.children.length > 0) {
+      const parentBeatId = node.type === 'branch' && node.branchBeatType !== 'conditionBeat'
+        ? node.branchBeatId
+        : undefined;
+      const selectedLabel = parentBeatId ? selections.exclusive.get(parentBeatId) : undefined;
+      for (const branch of node.children) {
+        // For branch (radio) selections, only follow the selected sibling.
+        // For condition branches, both are exploration siblings — descend into all.
+        if (parentBeatId && selectedLabel) {
+          if (branch.label !== selectedLabel) continue;
+          // Record the radio selection itself
+          out.push({
+            kind: 'choice',
+            beatName: branch.child.beats[0]?.beatName || branch.label,
+            label: branch.label,
+            effects: branch.stateEffects ?? [],
+          });
+          visit(branch.child);
+          break;
+        }
+        // No selection at this branch yet — don't descend speculatively.
+        if (parentBeatId) continue;
+        // Condition branches: descend through both (no committed pick)
+        visit(branch.child);
+      }
+    }
+  };
+
+  visit(root);
+  return out;
+}
 
 // ============================================================================
 // TreeNodeView — recursive renderer for each PathTreeNode

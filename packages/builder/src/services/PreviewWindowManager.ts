@@ -105,6 +105,18 @@ class PreviewWindowManager {
       (window as any).electronAPI?.onPreviewClosed?.(() => {
         this.cleanup();
       });
+      // Forward messages the preview window sends back via IPC through the
+      // same `handleMessage` path as the web build. Without this, the live
+      // red trace (VISITED_BEATS_UPDATE) never reaches the main builder in
+      // Electron even though the preview window posts it.
+      (window as any).electronAPI?.onPreviewMessageToMain?.((message: any) => {
+        // Shim a synthetic MessageEvent so handleMessage's origin check and
+        // data extraction work identically for web and Electron.
+        this.handleMessage({
+          origin: typeof window !== 'undefined' ? window.location.origin : '',
+          data: message,
+        } as MessageEvent);
+      });
     }
   }
 
