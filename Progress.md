@@ -1,5 +1,78 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-27: Persistence + Authoring UX Fixes Across Git, Assets, Dialog & Cluster Flows (v0.9.36)
+
+### Overview
+
+A grab-bag bugfix release driven entirely by author feedback against v0.9.35, focused on long-running paper-cuts in the Git/asset workflow plus three smaller authoring fixes. The biggest of these: assets now actually delete from disk in directory-format projects (so they stop being re-pushed to GitHub after the author "removes" them), and Git LFS is no longer auto-configured for asset binaries (the source of clone/pull losing assets entirely on systems where git-lfs was installed). Plus: HistoryTab no longer leaks the previous project's commits when switching projects, the Missing Assets dialog actually persists its actions instead of silently no-op'ing, NPC responses in DialogTree gain a delete button, and several smaller cleanup items.
+
+### Asset Deletion Round-Trip — IndexedDB ↔ Filesystem ↔ Git
+
+Removing an asset in the UI was clearing IndexedDB metadata only; the binary on disk lingered in the directory project's `assets/` folder, and the manifest entry stayed. So next git commit re-pushed the binary, and the missing-assets validator kept flagging the entry on every reload.
+
+- New `DirectoryAdapter.deleteAsset(assetId)` removes the binary on disk **and** prunes the corresponding entry from `assets/_manifest.json`. Also drops the entry from the in-memory `lastManifest` cache so subsequent merge-style saves don't resurrect it.
+- `PersistenceContext.deleteAssetFromDirectory(assetId)` exposes that adapter method and is wired through the `useProject` hook. App's `handleAssetRemove` now invokes it after the IndexedDB delete.
+
+**Files modified:**
+- `packages/builder/src/storage/adapters/DirectoryAdapter.ts`
+- `packages/builder/src/contexts/PersistenceContext.tsx`
+- `packages/builder/src/App.tsx`
+
+### Git LFS Removed from Auto-Generated `.gitattributes`
+
+The directory format's bootstrap `.gitattributes` declared `assets/**/* filter=lfs`. On any author with `git-lfs` installed, push uploaded LFS pointers to GitHub LFS storage (often without LFS being enabled on the remote), and the in-app clone/pull then ended up with pointer files instead of the actual binaries — so assets visible on github.com simply never came back to a fresh clone.
+
+- New template uses explicit `*.png binary`, `*.mp3 binary`, etc. instead of an LFS filter — git treats them as plain blobs which is what ASAPS actually wants.
+- `DirectoryAdapter.saveProject` now auto-migrates existing projects whose `.gitattributes` still contains `filter=lfs` — the next save rewrites the file with the new template. Other VCS helper files (`.gitignore`, `.p4ignore`) keep their preserve-on-exist behaviour.
+
+For existing repos that already pushed LFS pointers, authors need a one-time `git lfs migrate import --everything` + `git push --force` to convert past pointers back to blobs. The new behaviour is in effect automatically going forward.
+
+**Files modified:**
+- `packages/core/src/persistence/DirectoryFormat.ts`
+- `packages/builder/src/storage/adapters/DirectoryAdapter.ts`
+
+### History Tab — No More Cross-Project Commit Leak
+
+Switching/cloning into a new repo briefly showed the previous project's commit log because `HistoryTab` kept its prior commits in component state during the async window between `vcs.projectPath` changing and the new `loadCommits` resolving. The effect now clears `commits`/`expandedHash`/`hasMore` synchronously before the fetch.
+
+**Files modified:**
+- `packages/builder/src/components/vcs/HistoryTab.tsx`
+
+### Missing Assets Dialog — Path Bug Fixed; Remove Missing Now Sticks
+
+Locate, Relocate All, and Remove Missing all targeted `<root>/_manifest.json` while the manifest actually lives at `<root>/assets/_manifest.json`. The validator joins `assets` correctly, but the dialog handlers hadn't — so all three actions silently failed, and the popup re-appeared on every launch with the same stale entries. The dialog now normalises the assets-dir path once at the boundary and uses it consistently. Remove Missing also fires `onRepaired()` + `onClose()` on success so the dialog actually goes away.
+
+**Files modified:**
+- `packages/builder/src/components/settings/MissingAssetsDialog.tsx`
+
+### DialogTree — Delete Button on NPC Responses
+
+Player choices have an X to remove them; NPC responses didn't, so authors couldn't undo "Add NPC response..." without nuking the whole player choice. New `removeNestedDialogAtPath` removes just the NPC response from a parent player choice — the player choice stays (with its onward target reset to "Select action…"), and any nested player choices that were inside the removed NPC response disappear with it. For the collapsible `[Continue] → NPC → exit` pattern, the exit target is preserved on the parent choice so the conversation still flows somewhere obvious. Tooltip + code comment spell out exactly what disappears (preceding player choice stays, subsequent choices inside the response go).
+
+**Files modified:**
+- `packages/builder/src/editors/DialogTreeEditor.tsx`
+
+### Background Sound — Asset Picker No Longer Errors on Import
+
+Selecting an MP3 in an empty project's Background Sound picker raised "r is not a function". Root cause: a separate `<Inspector>` mount in `App.tsx` (distinct from the WorkspaceView path) was rendered without `onAssetAdd / onAssetRemove / onAssetUpdate`, while the modal internally non-null-asserts those props (`onAssetAdd!`). When the asset upload tried to invoke them, `undefined()` minified to "r is not a function". Wired the three handlers in. Also dropped the misleading `subType: sfx` filter for the 'sound' picker (background music isn't a sound effect — the previous tagging was filtering correctly but mislabelling the modal).
+
+**Files modified:**
+- `packages/builder/src/App.tsx`
+- `packages/builder/src/components/Inspector.tsx`
+
+### Cluster — `+ Beat` Buttons Removed; Drag-into-Cluster Works
+
+The `+ Beat` button on cluster headers (both collapsed and expanded views) only ever produced a fixed beat type, which wasn't useful — beat creation lives in the sidebar palette. Buttons removed; the App-level handler is now a no-op.
+
+In return, beats can now be **dragged directly onto an expanded cluster from the flowchart**, mirroring the sidebar→cluster drop flow. `GraphEditor.onNodeDragStop` checks the drop position against each cluster's bounds and fires `onDropBeatToCluster` for a hit (and skips the redundant case where the beat is already in that cluster).
+
+**Files modified:**
+- `packages/builder/src/components/graph/ClusterContainerNode.tsx`
+- `packages/builder/src/components/graph/GraphEditor.tsx`
+- `packages/builder/src/App.tsx`
+
+---
+
 ## 2026-04-27: Electron Parity Fixes & Path Tree Decision Panel (v0.9.35)
 
 ### Overview

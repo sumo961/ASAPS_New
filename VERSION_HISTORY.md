@@ -5,13 +5,20 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.35**. This is a **beta**: core functionality works,
+Current release: **v0.9.36**. This is a **beta**: core functionality works,
 features below reflect what has been shipped since active development began.
 
 ## Feature Matrix
 
 | Feature | Status |
 |---------|--------|
+| **Asset Deletion Round-Trip** | **v0.9.36**: Removing an asset in the UI now removes the binary on disk and prunes the manifest entry for directory-format projects, so deleted assets stop being re-pushed to GitHub |
+| **Git LFS Off for Assets** | **v0.9.36**: Auto-generated `.gitattributes` no longer routes assets through LFS — fixes clone/pull losing assets entirely on systems with `git-lfs` installed. Existing projects auto-migrate on next save |
+| **History Tab Project Switch** | **v0.9.36**: Switching/cloning into a new repo no longer briefly shows the previous project's commit log — HistoryTab clears state synchronously on `projectPath` change |
+| **Missing Assets Dialog Fix** | **v0.9.36**: Locate / Relocate All / Remove Missing now actually persist (manifest path was wrong); Remove Missing also closes the dialog on success so the popup stops re-appearing on every launch |
+| **DialogTree NPC Delete** | **v0.9.36**: NPC responses now have an X button — removes the NPC line plus any nested player choices below it; preserves the preceding player choice with its target reset |
+| **Background Sound Picker** | **v0.9.36**: Standalone Inspector mount now receives asset handlers, so uploading an MP3 from the Background Sound picker no longer fails with "r is not a function". Also dropped the misleading `sfx` subtype filter |
+| **Cluster Drag-Into-Flowchart** | **v0.9.36**: Beats can be dragged directly onto an expanded cluster in the flowchart (not just from the sidebar). Cluster `+ Beat` buttons removed — beat creation is via the sidebar palette |
 | **Electron Parity: PW Trace** | **v0.9.35**: Live red flowchart trace now works in the desktop app — added bidirectional IPC channel (`preview:send-to-main`) so the PW's VISITED_BEATS_UPDATE messages reach the main builder window in Electron, not just the web build |
 | **Electron Parity: Debug Window** | **v0.9.35**: Pop-out Debug window now opens correctly in the desktop app — full Electron IPC plumbing (`createDebugWindow`, `debug:*` channels, preload `debug` object, `electronWindowOpen` ready-gate) mirroring the Preview Window setup. Was previously rejected by the main window's `setWindowOpenHandler` |
 | **Path Tree: Decision Path Panel** | **v0.9.35**: Sticky right-side panel summarises committed selections from the tree as a numbered linear list (same shape as the backward analyzer's decision path), with effects pills per entry and final accumulated state |
