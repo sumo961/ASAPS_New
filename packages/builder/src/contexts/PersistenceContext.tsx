@@ -72,6 +72,8 @@ export interface PersistenceContextValue {
   projectPath: string | null;
   openDirectoryProject: (dirPath: string) => Promise<boolean>;
   saveAsDirectory: (dirPath: string) => Promise<boolean>;
+  /** Remove an asset from the active directory project (file + manifest entry). No-op for non-directory projects. */
+  deleteAssetFromDirectory: (assetId: string) => Promise<void>;
 
   // Initialization
   initialized: boolean;
@@ -1050,6 +1052,22 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     setSyncCallback(null);
   }, [debug]);
 
+  // Asset deletion for directory projects: removes the binary on disk +
+  // prunes the manifest entry. Wired through here (not directly from the
+  // asset UI) so we can route through the active DirectoryAdapter.
+  const deleteAssetFromDirectory = useCallback(async (assetId: string): Promise<void> => {
+    const adapter = directoryAdapterRef.current;
+    if (!adapter || !adapter.getProjectPath()) return;
+    try {
+      await adapter.deleteAsset(assetId);
+      // The asset id is no longer "saved" — drop from the optimisation set
+      // so a future re-add of the same id (re-imported) actually writes again.
+      savedAssetIdsRef.current.delete(assetId);
+    } catch (err) {
+      console.warn('[PersistenceContext] deleteAssetFromDirectory failed:', err);
+    }
+  }, []);
+
   // Context value
   const value: PersistenceContextValue = {
     currentProject,
@@ -1087,6 +1105,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     projectPath,
     openDirectoryProject,
     saveAsDirectory,
+    deleteAssetFromDirectory,
     initialized,
     initError,
   };
@@ -1161,6 +1180,7 @@ export function useProject() {
     updateProjectGlobalSettings,
     saveCurrentProject,
     discardUntitledProject,
+    deleteAssetFromDirectory,
   } = usePersistence();
 
   return {
@@ -1174,5 +1194,6 @@ export function useProject() {
     updateGlobalSettings: updateProjectGlobalSettings,
     saveCurrent: saveCurrentProject,
     discardUntitled: discardUntitledProject,
+    deleteAssetFromDirectory,
   };
 }

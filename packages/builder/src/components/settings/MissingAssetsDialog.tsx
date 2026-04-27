@@ -28,6 +28,17 @@ export const MissingAssetsDialog: React.FC<MissingAssetsDialogProps> = ({
   const [missing, setMissing] = useState(initialMissing);
   const [resolving, setResolving] = useState<string | null>(null);
 
+  // The caller passes `assetsPath` as the *project root* (so that the
+  // validator can locate the manifest at `<root>/assets/_manifest.json`).
+  // For our writes, we need the actual assets directory. Detect both
+  // shapes by checking whether the leaf is already named `assets`.
+  const sepHint = (() => {
+    try { return (window as any).electronAPI?.path?.sep || '/'; } catch { return '/'; }
+  })();
+  const assetsDir = assetsPath.endsWith(`${sepHint}assets`) || assetsPath.endsWith('/assets')
+    ? assetsPath
+    : [assetsPath, 'assets'].join(sepHint);
+
   const handleLocateFile = useCallback(async (entry: AssetManifestEntry) => {
     const api = (window as any).electronAPI;
     if (!api?.dialog?.open) return;
@@ -45,7 +56,7 @@ export const MissingAssetsDialog: React.FC<MissingAssetsDialogProps> = ({
       if (!result?.canceled && result?.filePaths?.[0]) {
         const sourcePath = result.filePaths[0];
         const sep = api.path?.sep || '/';
-        const targetDir = [assetsPath, entry.folder].join(sep);
+        const targetDir = [assetsDir, entry.folder].join(sep);
         const targetPath = [targetDir, entry.filename].join(sep);
 
         // Ensure target directory exists
@@ -63,7 +74,7 @@ export const MissingAssetsDialog: React.FC<MissingAssetsDialogProps> = ({
     } finally {
       setResolving(null);
     }
-  }, [assetsPath]);
+  }, [assetsDir]);
 
   const handleRelocateAll = useCallback(async () => {
     const api = (window as any).electronAPI;
@@ -91,7 +102,7 @@ export const MissingAssetsDialog: React.FC<MissingAssetsDialogProps> = ({
         try {
           const exists = await api.fs.exists(candidatePath);
           if (exists) {
-            const targetDir = [assetsPath, entry.folder].join(sep);
+            const targetDir = [assetsDir, entry.folder].join(sep);
             const targetPath = [targetDir, entry.filename].join(sep);
             await api.fs.mkdir(targetDir, { recursive: true });
             const data = await api.fs.readFile(candidatePath);
@@ -108,18 +119,19 @@ export const MissingAssetsDialog: React.FC<MissingAssetsDialogProps> = ({
     if (found.length > 0) {
       setMissing(prev => prev.filter(e => !found.includes(e.id)));
     }
-  }, [missing, assetsPath]);
+  }, [missing, assetsDir]);
 
   const handleRemoveMissing = useCallback(async () => {
     const api = (window as any).electronAPI;
     if (!api?.fs) return;
 
     const sep = api.path?.sep || '/';
-    const manifestPath = [assetsPath, '_manifest.json'].join(sep);
+    const manifestPath = [assetsDir, '_manifest.json'].join(sep);
 
     try {
       const raw = await api.fs.readFile(manifestPath, 'utf-8');
-      const manifest = JSON.parse(raw);
+      const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+      const manifest = JSON.parse(text);
       const missingIds = new Set(missing.map(e => e.id));
       // manifest.assets is a Record<id, entry>, not an array
       for (const id of missingIds) {
@@ -127,10 +139,15 @@ export const MissingAssetsDialog: React.FC<MissingAssetsDialogProps> = ({
       }
       await api.fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
       setMissing([]);
+      // Close + signal the parent to re-validate so the dialog actually goes
+      // away. Without this the parent still has the stale `missingAssetsInfo`
+      // and the popup re-appears on next launch from the same persisted entries.
+      onRepaired();
+      onClose();
     } catch (err) {
       console.error('[MissingAssetsDialog] Failed to update manifest:', err);
     }
-  }, [missing, assetsPath]);
+  }, [missing, assetsDir, onRepaired, onClose]);
 
   const handleClose = useCallback(() => {
     if (missing.length < initialMissing.length) {

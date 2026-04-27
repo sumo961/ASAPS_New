@@ -240,6 +240,57 @@ export class DirectoryAdapter implements PersistenceAdapter {
   }
 
   /**
+   * Delete an asset from a directory project: removes the binary on disk
+   * AND prunes the entry from `assets/_manifest.json`. Without this, the
+   * IndexedDB-only delete leaves the file in the working tree where git
+   * happily commits it back, and the manifest keeps a stale reference that
+   * triggers the Missing Assets popup on every load.
+   */
+  async deleteAsset(assetId: string): Promise<void> {
+    if (!this.projectPath) throw new Error('No project path set');
+    const api = window.electronAPI;
+    if (!api?.fs) throw new Error('Requires Electron filesystem API');
+
+    const reader = this.createReader();
+    const manifestPath = joinPath(this.projectPath, 'assets', '_manifest.json');
+
+    if (!(await reader.exists(manifestPath))) return;
+
+    let manifest;
+    try {
+      const raw = await reader.readText(manifestPath);
+      manifest = parseManifest(raw);
+    } catch (err) {
+      console.warn('[DirectoryAdapter] deleteAsset: failed to read manifest:', err);
+      return;
+    }
+
+    const entry = manifest.assets[assetId];
+    if (!entry) return; // nothing to do
+
+    // Remove binary on disk first; ignore "doesn't exist" — we still want the
+    // manifest entry gone either way.
+    const filePath = joinPath(this.projectPath, 'assets', entry.folder, entry.filename);
+    try {
+      if (await reader.exists(filePath) && api.fs.unlink) {
+        await api.fs.unlink(filePath);
+      }
+    } catch (err) {
+      console.warn('[DirectoryAdapter] deleteAsset: unlink failed for', filePath, err);
+    }
+
+    // Update manifest
+    delete manifest.assets[assetId];
+    await api.fs.writeFile(manifestPath, serializeManifest(manifest));
+
+    // Drop from the in-memory cached manifest so subsequent saves don't
+    // resurrect the entry via the merge-into-existing logic.
+    if (this.lastManifest && this.lastManifest.assets[assetId]) {
+      delete this.lastManifest.assets[assetId];
+    }
+  }
+
+  /**
    * Save a single beat file (granular save)
    */
   async saveBeat(beat: Beat, clusterId?: string): Promise<void> {

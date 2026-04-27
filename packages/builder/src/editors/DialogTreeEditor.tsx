@@ -284,10 +284,36 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   const removeChoiceAtPath = (path: string[], choiceIndex: number) => {
     const node = getNodeAtPath(dialogTree, path);
     if (!node || !node.choices) return;
-    
+
     const newChoices = node.choices.filter((_, i) => i !== choiceIndex);
     const updated = updateNodeAtPath(dialogTree, path, { choices: newChoices });
     onChange(updated);
+  };
+
+  // Remove just the NPC response that hangs off a player choice. The
+  // *parent* player choice (the one this X button visually attaches to)
+  // stays — its onward target is cleared so the user can pick a new
+  // destination from the dropdown. Any player choices that were *nested
+  // inside* the NPC response disappear along with it (they're children of
+  // the dialogNode being deleted, so the data structure can't orphan them).
+  // For the collapsible "[Continue] → NPC → exit" pattern we preserve that
+  // exit target on the parent choice so the conversation still flows
+  // somewhere obvious.
+  const removeNestedDialogAtPath = (path: string[], choiceIndex: number) => {
+    const node = getNodeAtPath(dialogTree, path);
+    if (!node || !node.choices) return;
+    const choice = node.choices[choiceIndex];
+    if (!choice?.dialogNode) return;
+
+    // Preserve a sensible target if one was buried in a collapsible pattern
+    const collapsedTarget = choice.dialogNode.choices?.length === 1
+      ? choice.dialogNode.choices[0].target
+      : undefined;
+
+    updateChoiceAtPath(path, choiceIndex, {
+      dialogNode: undefined,
+      target: choice.target ?? collapsedTarget ?? undefined,
+    });
   };
 
   // Toggle node expansion (for nodes with choices)
@@ -497,13 +523,20 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                 <div key={choice.id} className="mb-2">
                   {/* For collapsible patterns, show the NPC response above the player's exit choice */}
                   {isCollapsible && choice.dialogNode && nestedSpeakerColor && (
-                    <div className={`mb-1 p-2 ${nestedSpeakerColor.bg} border ${nestedSpeakerColor.border} rounded-lg overflow-hidden`}>
+                    <div className={`mb-1 p-2 ${nestedSpeakerColor.bg} border ${nestedSpeakerColor.border} rounded-lg overflow-hidden relative`}>
                       <div className="flex items-center gap-2 mb-1">
                         <div className={`w-1 h-3 rounded-full ${nestedSpeakerColor.accent}`} />
                         <Users className={`w-3 h-3 ${nestedSpeakerColor.text} flex-shrink-0`} />
                         <span className={`text-xs font-medium ${nestedSpeakerColor.text} truncate`}>
                           {choice.dialogNode.speaker || 'NPC'} responds:
                         </span>
+                        <button
+                          onClick={() => removeNestedDialogAtPath(path, index)}
+                          className="ml-auto p-0.5 text-red-500 hover:bg-red-50 rounded flex-shrink-0"
+                          title="Remove NPC response and any nested player choices below it. The parent player choice stays — pick a new onward target for it from its dropdown."
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
                       <p className="text-sm text-gray-700 break-words whitespace-pre-wrap">{choice.dialogNode.text}</p>
                     </div>
@@ -658,7 +691,17 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
 
                   {/* Nested dialog (rendered recursively) */}
                   {isChoiceExpanded && hasNestedDialog && choice.dialogNode && (
-                    <div className="mt-1">
+                    <div className="mt-1 relative">
+                      {/* Remove-NPC-response control overlaid on the nested
+                          subtree. Keeps the player choice intact and (for
+                          collapsible patterns) preserves any onward target. */}
+                      <button
+                        onClick={() => removeNestedDialogAtPath(path, index)}
+                        className="absolute top-1 right-1 z-10 p-1 bg-white/90 text-red-500 hover:bg-red-50 rounded shadow-sm border border-red-200"
+                        title="Remove NPC response and any nested player choices below it. The parent player choice stays — pick a new onward target for it from its dropdown."
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                       {/* Increment depth by 2 to account for player choice layer */}
                       {renderDialogNode(choice.dialogNode, [...path, `choice_${index}`], depth + 2)}
                     </div>

@@ -589,7 +589,7 @@ function App() {
 
   // Persistence hooks
   const { markChanged, saveNow } = useSave();
-  const { updateStory, updateGlobalSettings, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled } = useProject();
+  const { updateStory, updateGlobalSettings, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled, deleteAssetFromDirectory } = useProject();
   const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback, pauseAutoSave, resumeAutoSave, initialized: storageInitialized, openDirectoryProject, saveAsDirectory, projectFormat, projectPath } = usePersistence();
   const vcs = useVCSStatus();
   const vcsRef = useRef(vcs);
@@ -4035,7 +4035,7 @@ function App() {
 
   const handleAssetRemove = useCallback(async (assetId: string) => {
     try {
-      // Delete from storage using HybridStorageAdapter
+      // Delete from storage using HybridStorageAdapter (clears IndexedDB metadata)
       const storage = getStorageAdapter();
       await storage.initialize();
       await storage.deleteAsset(assetId);
@@ -4044,10 +4044,19 @@ function App() {
       console.error('[App] handleAssetRemove - Error deleting asset:', err);
     }
 
+    // For directory projects, also remove the binary on disk + manifest entry.
+    // Without this, the file lingers in the working tree and gets re-pushed
+    // to git on the next commit even though the user deleted it from the UI.
+    try {
+      await deleteAssetFromDirectory(assetId);
+    } catch (err) {
+      console.warn('[App] handleAssetRemove - directory cleanup failed:', err);
+    }
+
     // Always update local state
     setAssets(prev => prev.filter(a => a.id !== assetId));
     markChanged();
-  }, [markChanged]);
+  }, [markChanged, deleteAssetFromDirectory]);
 
   const handleAssetUpdate = useCallback((assetId: string, updates: Partial<Asset>) => {
     setAssets(prev => prev.map(a => a.id === assetId ? { ...a, ...updates } : a));
@@ -5284,15 +5293,11 @@ function App() {
               markChanged();
               console.log(`[App] Auto-arranged ${clusterBeats.length} beats in cluster ${cluster.name}`);
             }}
-            onAddToContainer={(clusterId: string) => {
-              // For now, show a helpful message - full implementation would show a beat selection dialog
-              console.log(`[App] Add beat to cluster ${clusterId} - drag beats from sidebar to add them`);
-              // Select the cluster to highlight it as a drop target
-              const cluster = state.clusters?.find(c => c.id === clusterId);
-              if (cluster) {
-                handleClusterSelect(cluster);
-              }
-            }}
+            // The "+ Beat" affordance lives in the sidebar palette — letting
+            // a cluster-header button only spawn one fixed beat type made
+            // little sense. The button is removed; this prop stays as an
+            // unused no-op for cluster nodes still wiring it.
+            onAddToContainer={() => {}}
             onRemoveCluster={(clusterId: string) => {
               if (actions.removeCluster) {
                 actions.removeCluster(clusterId);
@@ -5346,6 +5351,9 @@ function App() {
               onBeatAdd={actions.addBeat}
               assets={assets}
               onAssetSelect={handleAssetSelect}
+              onAssetAdd={handleAssetAdd}
+              onAssetRemove={handleAssetRemove}
+              onAssetUpdate={handleAssetUpdate}
               onOpenCharacterManager={handleOpenCharacterManager}
               onCharacterSync={(npcName, updates) => {
                 const existing = characters.find(c =>

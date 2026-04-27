@@ -398,10 +398,10 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     onRemoveContainer(cluster.id);
   }, [cluster.id, onRemoveContainer]);
 
-  const handleAddBeat = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onAddToContainer(cluster.id);
-  }, [cluster.id, onAddToContainer]);
+  // handleAddBeat removed alongside the "+ Beat" cluster-header button.
+  // (Beat creation lives in the sidebar palette; the button only ever
+  // produced one fixed type, which wasn't useful.)
+  void onAddToContainer;
 
   // Beat drag within container
   const handleBeatMouseDown = useCallback((e: React.MouseEvent, beatId: string, beatX: number, beatY: number) => {
@@ -494,13 +494,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={handleAddBeat}
-              className="w-7 h-7 bg-green-500 text-white rounded-md shadow hover:bg-green-600 transition-colors flex items-center justify-center text-sm"
-              title="Add beat to cluster"
-            >
-              +
-            </button>
+            {/* "+ Beat" button removed — beat creation happens via the sidebar palette. */}
             <button
               onClick={handleRemove}
               className="w-7 h-7 bg-red-500 text-white rounded-md shadow hover:bg-red-600 transition-colors flex items-center justify-center text-sm"
@@ -874,13 +868,11 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
 
             <div className="w-px h-4 bg-gray-300 mx-1" />
 
-            <button
-              onClick={handleAddBeat}
-              className="px-2 py-1 bg-green-500 text-white rounded shadow hover:bg-green-600 transition-colors text-xs font-medium"
-              title="Add beat to cluster"
-            >
-              + Beat
-            </button>
+            {/* "+ Beat" button removed — single-type beat creation didn't
+                make sense in practice. Authors add beats via the sidebar
+                palette and either drop them onto a cluster from the
+                flowchart or assign them via the cluster folder in the
+                sidebar. */}
             <button
               onClick={handleRemove}
               className="w-6 h-6 bg-red-500 text-white rounded shadow hover:bg-red-600 transition-colors flex items-center justify-center text-sm"

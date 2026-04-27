@@ -3679,12 +3679,15 @@ export const Inspector: React.FC<InspectorProps> = ({
         onAssetAdd={onAssetAdd!}
         onAssetRemove={onAssetRemove!}
         onAssetUpdate={onAssetUpdate!}
-        assetType={assetSelectionModal.type === 'sound' ? 'audio' : 
+        assetType={assetSelectionModal.type === 'sound' ? 'audio' :
                   (assetSelectionModal.type as 'image' | 'audio' | 'video' | 'font' | undefined)}
-        assetSubType={assetSelectionModal.type === 'background' ? 'background' : 
+        // For 'sound' (Background Sound) we deliberately leave subType blank
+        // so every audio file qualifies — background music is not a sound
+        // effect, and tagging it as `sfx` was misleading the asset filter.
+        assetSubType={assetSelectionModal.type === 'background' ? 'background' :
                      assetSelectionModal.type === 'character' ? 'character' :
-                     assetSelectionModal.type === 'prop' ? 'prop' : 
-                     assetSelectionModal.type === 'sound' ? 'sfx' : undefined}
+                     assetSelectionModal.type === 'prop' ? 'prop' :
+                     undefined}
         title={`Select ${assetSelectionModal.type || 'Asset'}`}
       />
     </>

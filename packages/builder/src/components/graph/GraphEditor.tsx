@@ -1084,11 +1084,34 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     (event: React.MouseEvent, node: Node) => {
       if (node.type === 'cluster') {
         onClusterMove(node.id, node.position.x, node.position.y);
-      } else {
-        onBeatMove(node.id, node.position.x, node.position.y);
+        return;
+      }
+
+      // Beat node — first record the move, then check whether the beat was
+      // dropped INSIDE any cluster's bounds. If yes, reassign the beat to
+      // that cluster (mirrors the sidebar→cluster drag flow).
+      onBeatMove(node.id, node.position.x, node.position.y);
+
+      if (!onDropBeatToCluster) return;
+      const dropX = node.position.x;
+      const dropY = node.position.y;
+      for (const cluster of clusters) {
+        if (!cluster.isExpanded) continue; // collapsed clusters: no drop zone
+        const cx = cluster.containerPosition?.x ?? 0;
+        const cy = cluster.containerPosition?.y ?? 0;
+        const cw = cluster.containerBounds?.width ?? 0;
+        const ch = cluster.containerBounds?.height ?? 0;
+        if (cw <= 0 || ch <= 0) continue;
+        if (dropX >= cx && dropX <= cx + cw && dropY >= cy && dropY <= cy + ch) {
+          // Don't redundantly fire when the beat is already in this cluster
+          const beatObj = beats.find(b => b.id === node.id);
+          if (beatObj?.cluster === cluster.id) return;
+          onDropBeatToCluster(node.id, cluster.id);
+          return;
+        }
       }
     },
-    [onBeatMove, onClusterMove]
+    [onBeatMove, onClusterMove, onDropBeatToCluster, clusters, beats]
   );
 
 // Handle drop to add new beats
