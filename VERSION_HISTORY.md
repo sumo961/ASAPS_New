@@ -5,13 +5,16 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.34**. This is a **beta**: core functionality works,
+Current release: **v0.9.35**. This is a **beta**: core functionality works,
 features below reflect what has been shipped since active development began.
 
 ## Feature Matrix
 
 | Feature | Status |
 |---------|--------|
+| **Electron Parity: PW Trace** | **v0.9.35**: Live red flowchart trace now works in the desktop app — added bidirectional IPC channel (`preview:send-to-main`) so the PW's VISITED_BEATS_UPDATE messages reach the main builder window in Electron, not just the web build |
+| **Electron Parity: Debug Window** | **v0.9.35**: Pop-out Debug window now opens correctly in the desktop app — full Electron IPC plumbing (`createDebugWindow`, `debug:*` channels, preload `debug` object, `electronWindowOpen` ready-gate) mirroring the Preview Window setup. Was previously rejected by the main window's `setWindowOpenHandler` |
+| **Path Tree: Decision Path Panel** | **v0.9.35**: Sticky right-side panel summarises committed selections from the tree as a numbered linear list (same shape as the backward analyzer's decision path), with effects pills per entry and final accumulated state |
 | **State Requirements (Runtime)** | **v0.9.34**: `requires` is now a first-class authoring primitive — declare a beat's prerequisite, pick a fallback beat, and the engine redirects at runtime when the requirement is unmet. AND/OR combine modes. Universal Inspector section with condition picker + explanation + fallback + severity |
 | **Requirements on the Flowchart** | **v0.9.34**: Requirement redirects render as dashed amber edges labelled with the explanation; analyzers (Reachability, BackwardAnalyzer, PathTree) now treat fallback targets as real edges so gated-only beats aren't mis-flagged as orphaned |
 | **Live Current-Beat Marker** | **v0.9.34**: PW red trace now paints on beat *enter* (not after leaving), and the currently-executing beat stands out with a thicker, brighter, pulsing border |

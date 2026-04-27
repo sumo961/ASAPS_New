@@ -1,5 +1,58 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-27: Electron Parity Fixes & Path Tree Decision Panel (v0.9.35)
+
+### Overview
+
+A focused follow-up to v0.9.34 that closes two regressions affecting the desktop (Electron) build only — the live red flowchart trace and the pop-out Debug window — both of which worked in the web build but were broken in Electron because the necessary IPC channels didn't exist. Also adds a long-requested **Decision Path side panel** to the Path Tree analyzer so authors can read their current scenario as a linear list while exploring the tree on the left.
+
+### Electron IPC: Preview Window → Main Builder (live red trace)
+
+The PW posts `VISITED_BEATS_UPDATE` messages so the main builder can paint the red flowchart trace. In the web build that goes through `window.opener.postMessage`. In Electron there was no equivalent path: the preload exposed only main→preview messaging (`preview.sendMessage`), with no preview→main return channel. The PW called `electronAPI.preview.sendToMain(…)` but that method didn't exist.
+
+- Preload: new `preview.sendToMain(message)` that fires `ipcRenderer.send('preview:send-to-main', …)`
+- Preload: new top-level `onPreviewMessageToMain(callback)` for the main builder window to subscribe
+- Main process: new `ipcMain.on('preview:send-to-main', …)` that forwards to `mainWindow.webContents.send('preview:message-to-main', …)`
+- `PreviewWindowManager` constructor now subscribes to `onPreviewMessageToMain` in Electron and synthesises a `MessageEvent` so the existing `handleMessage` handler runs identically for web and desktop
+
+**Files modified:**
+- `apps/builder-desktop/src/preload/index.ts`
+- `apps/builder-desktop/src/main/index.ts`
+- `packages/builder/src/services/PreviewWindowManager.ts`
+
+### Electron IPC: Debug Window pop-out
+
+The pop-out Debug window opens via `window.open('#/debug-window')` on the web. In Electron, the main window's `setWindowOpenHandler` rejects every `window.open` and routes URLs to the OS browser instead — so the Debug window never opened. There was also no Electron plumbing for it.
+
+- Main process: new `createDebugWindow()` using the same preload as the preview window, plus IPC handlers `debug:open / close / is-open / send-message / ping / send-to-main`. Window emits `debug:closed` and `debug:ready` to the main builder.
+- Preload: new `debug` object (`open / close / isOpen / sendMessage / ping / sendToMain`) and top-level `onDebugMessage / onDebugReady / onDebugClosed / onDebugMessageToMain`
+- `DebugWindowManager` detects Electron via `electronAPI.debug?.open`. In Electron, `open()` invokes IPC, `close()` invokes IPC, `sendStoryUpdate()` routes through `debug.sendMessage`, and a new `electronWindowOpen` flag gates sends until `debug:ready` fires (so the first story-update push isn't lost). `cleanup()` resets the flag.
+- `DebugWindow.tsx`: subscribes to `onDebugMessage` in Electron and pings via `debug.ping()`. Outgoing highlight events (`HIGHLIGHT_BEAT` / `HIGHLIGHT_PATH` / `CLEAR_HIGHLIGHT`) go via `debug.sendToMain` when `window.opener` is unavailable.
+
+**Files modified:**
+- `apps/builder-desktop/src/main/index.ts`
+- `apps/builder-desktop/src/preload/index.ts`
+- `packages/builder/src/services/DebugWindowManager.ts`
+- `packages/builder/src/pages/DebugWindow.tsx`
+
+### Decision Path Side Panel for the Path Tree
+
+The Path Tree left-pane gives a great hub-and-spoke view of selections, but until now there was no linear summary of "what the player committed to". Adds a sticky right-side panel showing each committed selection in tree order (numbered steps with effects pills), plus the final accumulated state — same shape as the backward analyzer's decision-path visualisation.
+
+- New `DecisionTrailPanel` component within `PathTreeView.tsx` rendered in a 1fr/280px grid alongside the tree
+- New `buildDecisionTrail(root, selections)` walks the tree once and collects exclusive selections + hub visits in display order. For radio branches, only the selected sibling is descended into so the trail stays linear; for condition branches (no committed pick) both sides are walked.
+- Each entry shows beat name, the chosen label, any state effects, and a step circle (blue first, green last, grey in between). Empty state explains the panel; non-empty state has a "clear" link that drops all selections.
+- Final accumulated state appears below the trail, computed from the same `computeSyntheticState` used inside the tree.
+
+**Files modified:**
+- `packages/builder/src/components/debug/PathTreeView.tsx`
+
+### Status of #5a (Backward analyzer step-ordering bug)
+
+Investigated against the user-reported scenario and dumped both the backward analyzer's `decisionPoints` + `pathBeats` and the forward simulator's `representativePath` for several path classes against the Hollow Star fixture. All three structures produced strictly correct execution-order data (`beat_19` consistently before `beat_20`, etc.). No reordering step exists between the analyzer and the renderer. Conclusion: not reproducible at this point — likely fixed implicitly by the v0.9.34 simulator-retry rework. Closing the item without code changes.
+
+---
+
 ## 2026-04-24: Requirements Primitive, Live Current-Beat Marker & Authoring UX (v0.9.34)
 
 ### Overview
