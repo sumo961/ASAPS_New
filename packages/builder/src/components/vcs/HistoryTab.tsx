@@ -77,6 +77,13 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onViewDiff, filterFile }
   }, [vcs, loadCommits]);
 
   useEffect(() => {
+    // Clear stale commits from the previous project FIRST so the user never
+    // sees another project's history during the brief window before
+    // loadCommits resolves. Without this the History tab continues to show
+    // the prior project's log when switching/cloning into a new repo.
+    setCommits([]);
+    setExpandedHash(null);
+    setHasMore(true);
     loadCommits();
   }, [vcs?.projectPath, filterFile]); // eslint-disable-line react-hooks/exhaustive-deps
 

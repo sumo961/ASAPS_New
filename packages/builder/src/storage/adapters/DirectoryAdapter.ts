@@ -162,23 +162,42 @@ export class DirectoryAdapter implements PersistenceAdapter {
     const input = this.projectToSerializeInput(project, assets);
     const { files, assetFiles } = serializeToDirectory(input);
 
-    // VCS helper files that should only be created, never overwritten
+    // VCS helper files that should only be created, never overwritten — except
+    // when the existing file contains a known-problematic directive we need to
+    // migrate away from. The original `.gitattributes` shipped with an
+    // `assets/**/* filter=lfs` line that broke clone/pull on systems with
+    // git-lfs configured; we replace any such file with the current template.
     const VCS_HELPER_FILES = new Set(['.gitignore', '.p4ignore', '.gitattributes']);
+    const reader = this.createReader();
 
     // Write all JSON files (includes the manifest with asset entries)
     for (const file of files) {
       const fullPath = joinPath(this.projectPath, ...file.path.split('/'));
 
-      // Don't overwrite VCS helper files — they may have user customizations
+      // Don't overwrite VCS helper files — they may have user customizations.
+      // Exception: migrate away from the legacy LFS-tracked-assets directive.
       if (VCS_HELPER_FILES.has(file.path) && await api.fs.exists(fullPath)) {
-        continue;
+        if (file.path === '.gitattributes') {
+          try {
+            const existing = await reader.readText(fullPath);
+            if (existing.includes('filter=lfs')) {
+              console.log('[DirectoryAdapter] Migrating .gitattributes off legacy LFS filter');
+              // fall through to overwrite below
+            } else {
+              continue;
+            }
+          } catch {
+            continue;
+          }
+        } else {
+          continue;
+        }
       }
 
       // Asset manifest: MERGE new entries into existing manifest instead of replacing.
       // serializeToDirectory only includes newly-added assets, so a naive overwrite
       // would delete all previously-saved assets from the manifest.
       if (file.path === 'assets/_manifest.json' && assets && assets.length > 0) {
-        const reader = this.createReader();
         if (await reader.exists(fullPath)) {
           const existingManifest = parseManifest(await reader.readText(fullPath));
           const newManifest = parseManifest(file.content);
