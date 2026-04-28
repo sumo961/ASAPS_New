@@ -1,5 +1,41 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-28: Cross-Project Contamination + Git Fetch Reload (v0.9.37)
+
+### Overview
+
+A small but high-impact bugfix release targeting two follow-ups to v0.9.36's persistence work, plus a desktop-build fix that authors don't see directly but matters for everyone shipping releases. Loading project B right after project A no longer leaves traces of A on screen — the previously-open overlay panels (Character Manager, Asset Manager, Settings, Debug, Search) now close on switch and stale asset blob URLs are cleared immediately. The Git "Fetch" button now actually refreshes the project on disk so newly-pulled beat/asset files appear in the UI without restarting the project. And the Electron packaged build no longer crashes on launch with `Cannot find module 'chokidar'`.
+
+### Project Switch — Overlay Panels & Asset URLs No Longer Leak Across Projects
+
+When opening a different directory project (File → Open Project Folder, or Clone Repo) right after another, both flows pre-cleared `loadedProjectIdRef.current = null` before calling `openDirectoryProject`. That clear forced the project-load effect into the lighter "REPLACING" branch, which only resets `selectedBeat`/`selectedCluster`. The more thorough "switching" branch — the one that closes the open overlay panels and resets project-specific UI — never ran, so any panel that was open when the user opened a new project kept rendering project A's content even though state.beats and the rest had moved to project B.
+
+- `App.tsx` menu/clone handlers no longer clear `loadedProjectIdRef.current` before `openDirectoryProject` — the ref keeps the previous project's ID so the load effect detects an actual switch and runs the full cleanup.
+- `setAssets([])` now fires immediately at the start of both the switching and REPLACING branches so previous project blob URLs vanish before the async asset reload finishes.
+- The REPLACING branch also got the panel closures (`setShowCharacterManager(false)`, etc.) as defense-in-depth for the first-load case.
+
+**Files modified:**
+- `packages/builder/src/App.tsx`
+
+### Git Fetch — Project Reloads From Disk Automatically
+
+The Fetch button updated remote refs but the in-memory project wasn't reloaded, so authors had to switch projects and back to see newly-pulled beat files / asset changes / settings appear. `IncomingChangesTab.handleFetch` now dispatches `asaps:git-reset` after a successful fetch, the same event Pull already used. If nothing changed on disk it's a quick no-op; if something did, the project reloads visibly.
+
+**Files modified:**
+- `packages/builder/src/components/vcs/IncomingChangesTab.tsx`
+
+### Desktop Packaging — Bundle `chokidar` and `electron-updater` Inline
+
+The packaged macOS / Windows desktop app crashed on launch with `Cannot find module 'chokidar'` (and after that's resolved, `'electron-updater'`). Root cause: both packages are runtime dependencies of `apps/builder-desktop` but live in the workspace-hoisted root `node_modules`. electron-builder's "no node modules found in collection" warning is real — it doesn't follow workspace hoisting, so neither module ended up in `app.asar`. The vite-bundled main process tried to `require()` them at runtime and failed.
+
+- `apps/builder-desktop/vite.config.ts` no longer marks `chokidar` or `electron-updater` as `external`. Rollup now bundles both inline into `dist-electron/main/index.js` (≈ 535 KB), so the packaged app doesn't need them resolvable from `node_modules` at runtime.
+- `fsevents` stays external — it's a native module that chokidar requires dynamically and falls back gracefully if missing.
+
+**Files modified:**
+- `apps/builder-desktop/vite.config.ts`
+
+---
+
 ## 2026-04-27: Persistence + Authoring UX Fixes Across Git, Assets, Dialog & Cluster Flows (v0.9.36)
 
 ### Overview
