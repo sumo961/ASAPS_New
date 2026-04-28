@@ -718,7 +718,11 @@ function App() {
         // before the load effect updates refs from the new project
         pauseAutoSave();
         resumeAutoSaveAfterLoadRef.current = true;
-        loadedProjectIdRef.current = null;
+        // Do NOT clear loadedProjectIdRef here — leaving the previous project ID
+        // intact lets the load effect detect a project switch and take the
+        // "switching" branch, which closes overlay panels and clears assets.
+        // Clearing it would force the lighter "REPLACING" branch and cause
+        // panels/assets from the previous project to bleed into the new one.
         const success = await openDirectoryProject(folderPath);
         if (success) {
           console.log('[Electron] Directory project opened successfully');
@@ -1841,6 +1845,10 @@ function App() {
         setShowSettings(false);
         setShowDebugPanel(false);
         setShowSearchPanel(false);
+        // Clear assets immediately — async loadAssets() below replaces them
+        // for the new project, but the gap was long enough for the previous
+        // project's blob URLs to flash in panels that opened during the switch.
+        setAssets([]);
         const projectData = loadProjectData(currentProject);
         console.log('[App] >>> Loaded data:', {
           title: projectData.title,
@@ -2119,6 +2127,14 @@ function App() {
         console.log('[App] >>> REPLACING state with loaded project data');
         setSelectedBeat(null);
         setSelectedCluster(null);
+        // Mirror the "switching" branch: close overlay panels and clear assets
+        // so a previously-open project's UI doesn't bleed into the new one.
+        setShowCharacterManager(false);
+        setShowAssetManager(false);
+        setShowSettings(false);
+        setShowDebugPanel(false);
+        setShowSearchPanel(false);
+        setAssets([]);
         const projectData = loadProjectData(currentProject);
         console.log('[App] >>> Loaded data:', {
           title: projectData.title,
@@ -5680,7 +5696,8 @@ function App() {
               console.log('[App] Opening cloned project as directory...');
               pauseAutoSave();
               resumeAutoSaveAfterLoadRef.current = true;
-              loadedProjectIdRef.current = null;
+              // Do NOT clear loadedProjectIdRef — see Open Project Folder handler
+              // for rationale (switching-branch panel/asset cleanup).
               const success = await openDirectoryProject(clonedPath);
               if (success) {
                 console.log('[App] Cloned project opened successfully');

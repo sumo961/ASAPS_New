@@ -23,6 +23,11 @@ export const IncomingChangesTab: React.FC = () => {
       const commits = await gitLog(vcs.projectPath, 20, undefined);
       setIncomingCommits(commits);
       setHasFetched(true);
+      // A pure fetch only updates refs — but in practice ASAPS treats this
+      // button as the "bring me current" action and authors expect file
+      // changes to appear in the UI. Dispatch the reload event so the
+      // project is re-read from disk; if nothing changed it's a quick no-op.
+      window.dispatchEvent(new CustomEvent('asaps:git-reset'));
     } finally {
       setIsFetching(false);
     }
@@ -32,7 +37,13 @@ export const IncomingChangesTab: React.FC = () => {
     if (!vcs) return;
     setIsPulling(true);
     try {
-      await vcs.pull(rebase);
+      const result = await vcs.pull(rebase);
+      // Reload in-memory project state from disk so newly-pulled beat
+      // files / asset changes / settings show up immediately. Without
+      // this, authors had to switch projects and back to see the result.
+      if (result?.success !== false) {
+        window.dispatchEvent(new CustomEvent('asaps:git-reset'));
+      }
     } finally {
       setIsPulling(false);
     }
