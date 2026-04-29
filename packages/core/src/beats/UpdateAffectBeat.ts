@@ -29,6 +29,12 @@ export interface UpdateAffectParameters {
   sentimentTarget?: string;
   sentimentEmotion?: string;
   sentimentDelta?: number;
+  // Step 5 — fire an emotion at the character. When the emotion is in the
+  // story's EmotionPalette, the runtime auto-nudges mood by the palette
+  // weights — so authors don't have to specify mood deltas separately for
+  // emotions that already have a default profile.
+  emotion?: string;
+  emotionDelta?: number;
 }
 
 export class UpdateAffectBeat extends Beat {
@@ -38,6 +44,8 @@ export class UpdateAffectBeat extends Beat {
   private sentimentTarget?: string;
   private sentimentEmotion?: string;
   private sentimentDelta?: number;
+  private emotion?: string;
+  private emotionDelta?: number;
 
   constructor(config: BeatConfig & {
     parameters?: Partial<UpdateAffectParameters>;
@@ -50,6 +58,8 @@ export class UpdateAffectBeat extends Beat {
     this.sentimentTarget = (config as any).sentimentTarget ?? p.sentimentTarget;
     this.sentimentEmotion = (config as any).sentimentEmotion ?? p.sentimentEmotion;
     this.sentimentDelta = (config as any).sentimentDelta ?? p.sentimentDelta;
+    this.emotion = (config as any).emotion ?? p.emotion;
+    this.emotionDelta = (config as any).emotionDelta ?? p.emotionDelta;
   }
 
   getParameters(): Record<string, any> {
@@ -60,6 +70,8 @@ export class UpdateAffectBeat extends Beat {
       ...(this.sentimentTarget !== undefined ? { sentimentTarget: this.sentimentTarget } : {}),
       ...(this.sentimentEmotion !== undefined ? { sentimentEmotion: this.sentimentEmotion } : {}),
       ...(this.sentimentDelta !== undefined ? { sentimentDelta: this.sentimentDelta } : {}),
+      ...(this.emotion !== undefined ? { emotion: this.emotion } : {}),
+      ...(this.emotionDelta !== undefined ? { emotionDelta: this.emotionDelta } : {}),
     };
   }
 
@@ -70,6 +82,8 @@ export class UpdateAffectBeat extends Beat {
     if (params.sentimentTarget !== undefined) this.sentimentTarget = params.sentimentTarget;
     if (params.sentimentEmotion !== undefined) this.sentimentEmotion = params.sentimentEmotion;
     if (params.sentimentDelta !== undefined) this.sentimentDelta = params.sentimentDelta;
+    if (params.emotion !== undefined) this.emotion = params.emotion;
+    if (params.emotionDelta !== undefined) this.emotionDelta = params.emotionDelta;
   }
 
   protected async performAction(
@@ -105,6 +119,21 @@ export class UpdateAffectBeat extends Beat {
     } else if (this.sentimentTarget || this.sentimentEmotion || this.sentimentDelta !== undefined) {
       console.warn(
         `UpdateAffectBeat ${this.id}: partial sentiment fields — need all of target+emotion+delta to record a sentiment`,
+      );
+    }
+
+    // Step 5 — fire an emotion. The runtime auto-nudges mood via the
+    // palette weights when the emotion is recognised; unknown emotion
+    // names update the level but skip the side-effect (so authors notice
+    // typos without cascading bad math).
+    if (this.emotion && this.emotionDelta !== undefined && this.emotionDelta !== 0) {
+      const next = context.fireCharacterEmotion(this.character, this.emotion, this.emotionDelta);
+      console.log(
+        `UpdateAffectBeat ${this.id}: ${this.character}.emotion[${this.emotion}] now ${next.toFixed(2)}`,
+      );
+    } else if (this.emotion || this.emotionDelta !== undefined) {
+      console.warn(
+        `UpdateAffectBeat ${this.id}: partial emotion fields — need both emotion + emotionDelta to fire`,
       );
     }
 

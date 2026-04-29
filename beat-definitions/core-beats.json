@@ -1169,6 +1169,29 @@
             "group": "Sentiment"
           }
         },
+        "emotion": {
+          "type": "string",
+          "required": false,
+          "description": "Emotion name to fire (e.g. joy, anger, fear). When the emotion is in the project's emotion palette, mood is auto-nudged by its weights — no need to also set mood deltas above. Unknown names still update the level but skip the mood side-effect so typos are surfaced.",
+          "ui": {
+            "label": "Emotion",
+            "group": "Emotion"
+          }
+        },
+        "emotionDelta": {
+          "type": "number",
+          "required": false,
+          "description": "Intensity delta for the named emotion. Positive bumps the emotion; negative reduces it. Clamped to [0, 1] post-add.",
+          "ui": {
+            "control": "affect-slider",
+            "label": "Intensity delta",
+            "min": -1,
+            "max": 1,
+            "step": 0.1,
+            "axisLabels": ["← weaker", "stronger →"],
+            "group": "Emotion"
+          }
+        },
         "connection": {
           "type": "connection",
           "required": true,

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UpdateAffectBeat } from '../../src/beats/UpdateAffectBeat';
 import { StoryContext } from '../../src/engine/StoryContext';
+import { Story } from '../../src/engine/Story';
 
 function makeStoryStub(characters: Array<{ id: string; name?: string; displayName?: string }>) {
   return {
@@ -106,5 +107,63 @@ describe('UpdateAffectBeat', () => {
     const beat = new UpdateAffectBeat({ id: 'b1', name: 't', type: 'updateAffect' } as any);
     beat.updateParameters({ character: 'char_2', moodValenceDelta: 0.3 });
     expect(beat.getParameters()).toMatchObject({ character: 'char_2', moodValenceDelta: 0.3 });
+  });
+
+  it('fires an emotion when emotion + emotionDelta are set, auto-nudging mood', async () => {
+    // Use a real Story so the EmotionPalette is in scope for the side-effect.
+    const story = new Story();
+    story.setCharacters([granny, wolf]);
+    const ctxWithStory = new StoryContext(undefined, story);
+
+    const beat = new UpdateAffectBeat({
+      id: 'b1', name: 't', type: 'updateAffect',
+      parameters: { character: 'char_1', emotion: 'joy', emotionDelta: 0.5 },
+    } as any);
+    await (beat as any).performAction(ctxWithStory, renderer);
+    expect(ctxWithStory.getCharacterEmotion('char_1', 'joy')).toBe(0.5);
+    // joy weights: valence +0.7, arousal +0.4 → mood = (0.35, 0.20)
+    expect(ctxWithStory.getCharacterMood('char_1').valence).toBeCloseTo(0.35);
+    expect(ctxWithStory.getCharacterMood('char_1').arousal).toBeCloseTo(0.20);
+  });
+
+  it('skips emotion firing when only one of emotion / emotionDelta is set', async () => {
+    const story = new Story();
+    story.setCharacters([granny]);
+    const ctxWithStory = new StoryContext(undefined, story);
+
+    const beatA = new UpdateAffectBeat({
+      id: 'b1', name: 't', type: 'updateAffect',
+      parameters: { character: 'char_1', emotion: 'joy' /* no delta */ },
+    } as any);
+    const beatB = new UpdateAffectBeat({
+      id: 'b2', name: 't', type: 'updateAffect',
+      parameters: { character: 'char_1', emotionDelta: 0.5 /* no name */ },
+    } as any);
+    await (beatA as any).performAction(ctxWithStory, renderer);
+    await (beatB as any).performAction(ctxWithStory, renderer);
+    expect(ctxWithStory.getCharacterEmotions('char_1')).toEqual({});
+  });
+
+  it('combines mood / sentiment / emotion in a single beat', async () => {
+    const story = new Story();
+    story.setCharacters([granny, wolf]);
+    const ctxWithStory = new StoryContext(undefined, story);
+
+    const beat = new UpdateAffectBeat({
+      id: 'b1', name: 't', type: 'updateAffect',
+      parameters: {
+        character: 'char_1',
+        moodValenceDelta: -0.2,
+        sentimentTarget: 'wolf', sentimentEmotion: 'fear', sentimentDelta: 0.5,
+        emotion: 'pride', emotionDelta: 0.4,
+      },
+    } as any);
+    await (beat as any).performAction(ctxWithStory, renderer);
+    expect(ctxWithStory.getSentimentTo('char_1', 'wolf', 'fear')).toBeCloseTo(0.5);
+    expect(ctxWithStory.getCharacterEmotion('char_1', 'pride')).toBeCloseTo(0.4);
+    // Mood: explicit -0.2 valence + pride's auto +0.5 × 0.4 = +0.2 → net 0
+    expect(ctxWithStory.getCharacterMood('char_1').valence).toBeCloseTo(0);
+    // pride's arousal weight 0.2 × 0.4 = +0.08
+    expect(ctxWithStory.getCharacterMood('char_1').arousal).toBeCloseTo(0.08);
   });
 });
