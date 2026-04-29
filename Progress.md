@@ -1,5 +1,64 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-29: Character System — Step 1 Complete + Dialog Edit-Button Fix (v0.9.41)
+
+### Overview
+
+Closes Step 1 of the rich-character roadmap (`docs/Character-State-Design.md`). Character finally graduates from "inspector metadata" to a real runtime identity: a stable Character.id ref now flows through every place an author types a character name, the runtime resolves any of (id / name / displayName) to one canonical key, and the inspector exposes a single hybrid combobox component used for **all** character inputs across the app — per-beat speaker, dialog-tree per-node speaker, AddRemoveInventory's three character fields, and AI beats' NPC name. Free-text speakers still work; "Define as Character" promotes them with a one-click bulk re-link of every other beat referencing that name. Plus a small but visible fix: nested NPC responses in the dialog editor regained their edit-pencil button (was being covered by the remove-X overlay shipped earlier).
+
+### Character System — Step 1 Complete (Layer 2 of the rich-character roadmap)
+
+The full vertical slice from runtime → schema → editor UX → consolidation flow.
+
+**Runtime (`@asaps/core`)** — `resolveCharacter` / `resolveCharacterKey` / `isKnownCharacter` utilities map any string ref (id, name, displayName, case-insensitive) to one canonical bucket key. Three new namespaced state slots on `StoryContext` — `characterCounters`, `characterVariables`, `characterFlags` — sit alongside the existing flat globals, with full accessor methods and serialization round-trip. The four character-inventory methods now route to id-keyed buckets and lazy-merge legacy alias buckets on first touch. Each beat and dialog node persists an optional `characterRef` field; `Beat.getResolvedSpeaker(characters)` returns the canonical id + display name + full character record for renderers and TTS routing.
+
+**Inspector UX (`@asaps/builder`)** — single new component `<CharacterRefField>` is the chokepoint for every character-input site. The dropdown shows pinned options, defined Characters with color dots, "Used names" with usage counts gathered from across the project, and a "+ Define '<typed>' as a Character" link when the typed text isn't already defined. Picking a defined Character writes the canonical id; typing a new name keeps it as free text — no auto-creation, no character bloat. The same component drives:
+- Per-beat speaker section (every beat type)
+- DialogTree per-node speaker (each node independently links or stays inline; multi-character conversations work naturally)
+- AddRemoveInventory's `character` / `fromChar` / `toChar` (with "Player" pinned at the top, preserving the special routing semantics)
+- AIDialogTree / AIConversation NPC field (with linked-personality auto-fill from the Character's description into `npcPersonality` when the slot is empty)
+
+**Bulk re-link consolidation** — when the user clicks "Define '<name>' as a Character", the Character Manager prefills with that name, the user fills in details and saves, and a confirmation dialog then offers to link every other beat field currently referencing that name as free text. One click, all matching speakers / inventory characters / NPC names switch to the canonical id and start following renames automatically. Refs already linked to other Characters are skipped — explicit links are never silently overwritten.
+
+**Storage contract** — every `<CharacterRefField>` site stores either a Character.id or a free-text string in the existing parameter, plus (where the schema supports it) a sibling `characterRef`. The runtime resolver accepts both forms equally, so existing data works unchanged from before Step 1 and new linked references gain id-stability incrementally as authors choose.
+
+**Tests** — 92 new tests across the slice (52 in core covering resolver, namespaced state, inventory aliasing, characterRef on Beat + DialogNode; 40 in the builder covering the combobox, the used-names hook, and the bulk re-link utilities). Zero regressions in either package — the only failing tests in the suite reproduce on main and are unrelated.
+
+**Files modified:**
+- `packages/core/src/utils/characterRef.ts` (new)
+- `packages/core/src/utils/index.ts`
+- `packages/core/src/engine/StoryContext.ts`
+- `packages/core/src/beats/Beat.ts`
+- `packages/core/src/beats/DialogTreeBeat.ts`
+- `packages/core/src/generated/beat-types.ts`
+- `packages/core/tests/utils/characterRef.test.ts` (new)
+- `packages/core/tests/engine/CharacterScopedState.test.ts` (new)
+- `packages/core/tests/engine/CharacterInventoryAliasing.test.ts` (new)
+- `packages/core/tests/beats/BeatCharacterRef.test.ts` (new)
+- `packages/builder/src/components/characters/CharacterRefField.tsx` (new)
+- `packages/builder/src/components/characters/useUsedNames.ts` (new)
+- `packages/builder/src/components/characters/relinkReferences.ts` (new)
+- `packages/builder/src/components/characters/BulkRelinkDialog.tsx` (new)
+- `packages/builder/src/components/characters/CharacterManager.tsx`
+- `packages/builder/src/components/characters/__tests__/CharacterRefField.test.tsx` (new)
+- `packages/builder/src/components/characters/__tests__/useUsedNames.test.ts` (new)
+- `packages/builder/src/components/characters/__tests__/relinkReferences.test.ts` (new)
+- `packages/builder/src/components/SchemaFormGenerator.tsx`
+- `packages/builder/src/components/Inspector.tsx`
+- `packages/builder/src/editors/DialogTreeEditor.tsx`
+- `packages/builder/src/App.tsx`
+- `beat-definitions/core-beats.json`
+- `docs/Character-and-KG-Sequencing.md` (new — sequencing plan with the proposed knowledge-graph track)
+
+### DialogTree Editor — Edit Button Restored on Nested NPC Responses
+
+The remove-NPC-response button shipped in v0.9.36 was absolute-positioned at the top-right of the nested bubble — directly on top of the recursively-rendered NPC node's existing edit pencil at the same corner. The X overlay covered the pencil, leaving authors able to remove a nested NPC response but not edit it. Fix threads an `onRemoveSelf?: () => void` callback into `renderDialogNode`; when present, the inner NPC bubble renders BOTH the edit pencil and the remove X inline next to each other. Removal behaviour is unchanged — same parent-choice preservation, same collapsible-pattern target keep.
+
+**Files modified:**
+- `packages/builder/src/editors/DialogTreeEditor.tsx`
+
+---
+
 ## 2026-04-29: GitHub Onboarding — Fixed `git init` Skipped When Ancestor Is a Repo (v0.9.40)
 
 ### Overview
