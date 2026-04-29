@@ -416,7 +416,15 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   };
 
   // Render dialog node recursively with unlimited depth
-  const renderDialogNode = (node: DialogNode, path: string[] = ['root'], depth: number = 0): JSX.Element => {
+  const renderDialogNode = (
+    node: DialogNode,
+    path: string[] = ['root'],
+    depth: number = 0,
+    /** When provided, the NPC bubble shows a remove button next to the edit
+     * pencil. Used by nested NPC responses to delete themselves from the
+     * parent player choice without losing their edit affordance. */
+    onRemoveSelf?: () => void,
+  ): JSX.Element => {
     const nodeId = path.join('.');
     const isExpanded = expandedNodes.has(nodeId);
     const isNPC = depth % 2 === 0; // Even depths are NPC, odd are player
@@ -492,6 +500,17 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               title="Edit dialog"
             >
               <Edit3 className="w-3 h-3" />
+            </button>
+          )}
+          {/* Remove-self button — only present for nested NPC responses
+              (passed in via onRemoveSelf by the parent player choice). */}
+          {isNPC && onRemoveSelf && (
+            <button
+              onClick={onRemoveSelf}
+              className="p-1 text-red-500 hover:bg-red-50 rounded"
+              title="Remove NPC response and any nested player choices below it. The parent player choice stays — pick a new onward target for it from its dropdown."
+            >
+              <X className="w-3 h-3" />
             </button>
           )}
         </div>
@@ -702,21 +721,20 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                     </button>
                   </div>
 
-                  {/* Nested dialog (rendered recursively) */}
+                  {/* Nested dialog (rendered recursively). The remove-NPC-
+                      response control rides INSIDE the nested bubble (next to
+                      its edit pencil) so both affordances stay accessible —
+                      previously the absolute-positioned overlay X covered the
+                      edit button. */}
                   {isChoiceExpanded && hasNestedDialog && choice.dialogNode && (
-                    <div className="mt-1 relative">
-                      {/* Remove-NPC-response control overlaid on the nested
-                          subtree. Keeps the player choice intact and (for
-                          collapsible patterns) preserves any onward target. */}
-                      <button
-                        onClick={() => removeNestedDialogAtPath(path, index)}
-                        className="absolute top-1 right-1 z-10 p-1 bg-white/90 text-red-500 hover:bg-red-50 rounded shadow-sm border border-red-200"
-                        title="Remove NPC response and any nested player choices below it. The parent player choice stays — pick a new onward target for it from its dropdown."
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                    <div className="mt-1">
                       {/* Increment depth by 2 to account for player choice layer */}
-                      {renderDialogNode(choice.dialogNode, [...path, `choice_${index}`], depth + 2)}
+                      {renderDialogNode(
+                        choice.dialogNode,
+                        [...path, `choice_${index}`],
+                        depth + 2,
+                        () => removeNestedDialogAtPath(path, index),
+                      )}
                     </div>
                   )}
                 </div>
