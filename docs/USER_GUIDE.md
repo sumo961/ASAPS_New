@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Version 0.9.30*
+*Version 0.9.41*
 
 ---
 
@@ -151,7 +151,7 @@ Let's take a tour of your system-building workspace. Don't worry about memorizin
 The header spans the top of the screen in three rows:
 
 **Row 1 -- Branding and Title:**
-The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.30.79), and a large text field where you can type or edit your project's title directly.
+The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.41.92), and a large text field where you can type or edit your project's title directly.
 
 **Row 2 -- Main Controls:**
 
@@ -226,6 +226,7 @@ When a **translation language** is active, the Visual Editor overlays translated
 When you select a beat, the Inspector shows everything about it:
 
 - **Name & Type** - What this beat is called and what kind it is
+- **Speaker** - For beats with dialog or narration, the [Character combobox](#character-combobox) lets you pick a defined Character, type a free-text name, or leave it blank for the narrator
 - **Content** - The beat's main content (text, choices, etc.)
 - **Connections** - Where the experience can go next
 - **Advanced Settings** - Sounds, conditions, special behaviors
@@ -233,7 +234,7 @@ When you select a beat, the Inspector shows everything about it:
 The Inspector changes based on what you've selected. Select a Dialog Tree and you'll see choice options. Select a Video Beat and you'll see playback settings.
 
 ![Inspector Panel](images/05-inspector-panel.png)
-*The Inspector panel shows properties of the selected beat*
+*The Inspector panel shows properties of the selected beat. (Note: this screenshot pre-dates v0.9.41 — the Speaker control is now a unified [Character combobox](#character-combobox) instead of a plain text dropdown.)*
 
 ## The Beat Palette (Right Side)
 
@@ -316,6 +317,8 @@ This is where interactivity shines. Present text and multiple choices, each pote
 **When to Use:** Conversations, decision points, anywhere the interactor needs options.
 
 **Pro Tip:** Use conditions to hide choices the player hasn't unlocked. Found a secret note? Show the "Ask about the mysterious symbol" option.
+
+**Per-Node Speakers (Multi-Character Conversations):** Every NPC node in a Dialog Tree has its own **NPC Speaker** field — a [Character combobox](#character-combobox) that lets each line of dialog come from a different character. A wolf-and-grandmother scene can flow Granny → Wolf → Granny just by setting different linked characters per node. When a node's speaker is linked to a defined Character, the speaker label and portrait update everywhere automatically — no need to keep the names in sync by hand.
 
 **NPC Auto-Exit:** Dialog nodes can have an **NPC Auto-Exit** target set. When a node has an auto-exit target, the NPC delivers their line and then automatically advances to the target beat without showing any choices. In the Dialog Tree Editor, nodes with an auto-exit show a green badge with the target beat name, and the choices list is hidden (since they are unreachable). Use this for NPC-initiated dismissals, forced exits, or transitions where the player has no say.
 
@@ -622,6 +625,8 @@ Give characters items or take them away. Items can be transferred between charac
 - Remove item from character
 - Transfer item from one character to another
 
+**Character fields:** All three character slots (`Character`, `From character`, `To character`) use the [Character combobox](#character-combobox). **Player** is pinned at the top of the dropdown — picking it routes to the player's inventory and preserves the global single-inventory shortcut some authors rely on. Picking any defined Character stores a stable id link, so renaming a character later updates these references automatically.
+
 **When to Use:** Finding loot, using consumables, trading, losing items.
 
 ---
@@ -649,7 +654,7 @@ Instead of scripting every possible response, let AI generate a contextually app
 
 **Key Settings:**
 - **Scenario** - Scene description providing context
-- **NPC Name** - Who the player is talking to
+- **NPC Name** - Who the player is talking to. Uses the [Character combobox](#character-combobox) — pick a defined Character to link this beat to that character's identity. When you link a Character that has a description set, the description is auto-filled into **NPC Personality** below (only if that field is empty), so you don't have to rewrite the persona on every AI beat that uses the same NPC. Free-text names still work.
 - **NPC Personality** - How the AI should "act"
 - **Exit Targets** - Named exits with descriptions telling the AI when to use each one
 - **Max Turns** - Limit conversation length
@@ -675,7 +680,8 @@ Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation ge
 
 **Key Settings:**
 - **Scenario** - Scene description
-- **NPC Name** and **NPC Personality** - Character definition
+- **NPC Name** - The NPC the player is conversing with. Same [Character combobox](#character-combobox) as AI Dialog Tree — link to a defined Character to keep the identity stable, or type a free-text name. Linking a Character with a description auto-fills **NPC Personality** when that field is empty.
+- **NPC Personality** - Character traits and behaviour the AI should embody
 - **Opening Line** - Fixed first line (if empty, the AI generates one)
 - **Max Turns** - Conversation length before fallback exit
 - **Fallback Exit Target** - Where to go when max turns are reached
@@ -829,6 +835,43 @@ When your project has translation languages configured, the Character Editor gai
 4. Enter the translated display name for each language
 
 When AI translation runs on your project, character name translations are auto-populated and kept in sync with translation resource files. During playback with a translation active, the translated name appears as the speaker label in text boxes.
+
+<a id="character-combobox"></a>
+### The Character Combobox — One Field for Every Character Reference
+
+Anywhere in the Inspector that asks for a character — a beat's speaker, an inventory recipient, an AI NPC name, a per-node speaker inside a Dialog Tree — you'll see the same control: a **Character combobox**. Click into it (or start typing) and a dropdown opens with everything you might want to pick:
+
+- **Pinned options** at the top — context-specific shortcuts. For a beat speaker the pins are *(Default — Narrator)*, *Narrator*, and your Player character (shown as e.g. *"Red (Player)"*). For inventory beats and the player-side fields the pin is *Player*.
+- **Characters** — every Character you've defined in the Character Manager, each with its color dot and display name.
+- **Used names** — every free-text speaker / character name used elsewhere in your project, with a usage count next to each (e.g. *"Mysterious Stranger 3×"*). Picking one stores it as free text — handy for keeping ad-hoc names consistent without committing to a full Character record.
+- **+ Define "<typed name>" as a Character** — appears at the bottom of the dropdown when whatever you've typed isn't yet a defined Character. Click it to open the Character Manager pre-filled with that name, ready for you to add details.
+
+**Where you'll see it.** The same combobox appears everywhere a character is referenced — five distinct sites in total:
+
+1. The **Speaker** field on every beat type (used for TTS voice routing and speaker labels).
+2. The **NPC Speaker** field on each individual node inside a **Dialog Tree** — so a single Dialog Tree can naturally flow Granny → Wolf → Granny by giving each node a different linked speaker.
+3. The **Character**, **From character**, and **To character** fields on **AddRemoveInventory** beats. *Player* is pinned at the top of these dropdowns and preserves the global single-inventory routing some authors rely on.
+4. The **NPC Name** field on **AI Dialog Tree** beats.
+5. The **NPC Name** field on **AI Conversation** beats.
+
+In the two AI cases the dropdown is filtered to non-player Characters — the player is never the NPC.
+
+**What "linking" means.** When you pick a defined Character, the field shows a colored chip with the character's name and a small **✕** unlink button. The chip is a stable link to that character's identity — not just a string copy — so:
+
+- Renaming the Character in the Character Manager updates **every** linked field across your project automatically.
+- TTS voice routing, speaker portraits, and other character-aware features look up the linked record once and stay in sync.
+- For AI Dialog Tree and AI Conversation, linking the NPC field to a Character that has a **description** auto-fills the **NPC Personality** slot from that description (only if the slot is currently empty). This means you can write the persona once on the Character record and have it reused on every AI beat that uses the same NPC.
+- If you ever delete a Character that's still linked somewhere, those fields show a small *(deleted)* indicator so you can see what needs cleanup.
+
+To go back to plain text, click the **✕** on the chip and type whatever you like.
+
+**Define-as-Character with one-click bulk re-link.** Authoring stories often starts with free-text names — you scribble *"Town Crier"* into a few beats while drafting, then later decide the Town Crier deserves a real Character with a portrait and a personality. Clicking **+ Define "Town Crier" as a Character** opens the Character Manager pre-filled with that name. Once you fill in details and save, ASAPS asks:
+
+> *"Link N references to Town Crier?"*
+
+…and lists every beat field across your project that uses *"Town Crier"* as free text — speaker fields, dialog node speakers, AI NPC fields, inventory characters. One click links them all to the new Character and they start following renames automatically. References already linked to **other** Characters are never silently overwritten — the dialog skips them. If you'd rather leave the old refs as free text, click **Keep as free text** instead.
+
+**Why this matters.** ASAPS is moving from treating characters as strings to treating them as identities. When you link a field to a defined Character, the runtime resolves that link to a single canonical record — no matter how the character is referenced (id, name, or display name). That stable identity is what feeds upcoming character-aware features such as per-character mood, sentiment-over-time, and dossier building. Everything still works if you stick with free-text names; linking just unlocks more.
 
 ### The Player Character as Speaker
 
@@ -1727,92 +1770,188 @@ Merchant gives "Magic Sword" to Player
 
 # Part 9: Version Control & Collaboration
 
-ASAPS Modern includes built-in Git version control for team collaboration. This works with the **Desktop app** on directory-format projects.
+Once your story grows past a certain size you'll want history, backups, and (eventually) co-authors. ASAPS has built-in Git support that talks directly to GitHub, so the trip from "I want to back this up" to "my collaborator just pushed an edit" doesn't require leaving the app.
 
-## Why Version Control?
+This part of the guide is for the **Desktop app** working on **directory-format projects** (saved as a folder, not a single `.zip`). Web-builder projects don't currently support version control.
 
-When building a complex narrative system, you need:
-- **History** - See what changed and when, roll back mistakes
-- **Collaboration** - Multiple people working on the same story
-- **Backup** - Your work is safely stored in a remote repository
+## Why Bother With Version Control?
 
-## Setting Up Git
+Three good reasons:
 
-### New Project
-1. Open or save your story as a **directory project** (File → Save As Folder)
-2. Open the **VCS Panel** (sidebar icon or Ctrl/Cmd+Shift+G)
-3. Click **Initialize Repository**
-4. Optionally add a remote URL (GitHub, GitLab, etc.)
+- **History** — see what changed and when, and roll back mistakes without ceremony.
+- **Backup** — your work lives on GitHub as well as your laptop. Spilled coffee, missing laptop, doesn't matter.
+- **Collaboration** — co-authors edit the same project, and ASAPS handles the merging.
 
-### Existing Repository
-1. **Clone** an existing repo: File → Clone Repository
-2. Enter the remote URL and choose a local folder
-3. The project opens automatically
+If you've never used Git before, that's fine — the on-screen prompts walk you through setup the first time. You don't need to learn the command line.
+
+## Quick Start: Three Paths In
+
+The **File menu** has the three entry points:
+
+| Menu item | What it does |
+|-----------|--------------|
+| **File → New Project on GitHub…** | Creates a fresh project folder on disk, sets up Git, and publishes a brand-new repository to GitHub — all in one dialog. Best for "I'm starting something new and I want it backed up from day one." |
+| **File → Open Project from GitHub…** | Clones an existing GitHub repository into a local folder and opens it. This is the path collaborators take when joining a project someone else created. |
+| **File → Open Project Folder (VCS)…** | Opens an existing folder on your disk that's already a directory-format project (and usually already a Git repo). ASAPS auto-detects the repo and turns on the VCS panel. |
+
+Whichever path you pick, if it's your first time using GitHub from ASAPS the app will hand you off to a guided onboarding flow before doing the actual work.
+
+## First-Time Setup: The Onboarding Flow
+
+ASAPS uses two command-line tools under the hood: **`git`** (the version control system itself) and **`gh`** (the official GitHub CLI, which handles authentication and creating repos). Both are free, well-maintained, and probably already installed if you've done any developer work — but if not, ASAPS will detect that and show install instructions.
+
+### Step 1: Install the tools (if needed)
+
+If `git` or `gh` is missing, you'll see a panel listing the status of each (✓ or ✗) and a copy-paste command appropriate for your operating system:
+
+| OS | Suggested install command |
+|----|---------------------------|
+| **macOS** | `brew install git gh` |
+| **Windows** | `winget install --id Git.Git -e ; winget install --id GitHub.cli -e` |
+| **Linux** | `sudo apt install git gh` |
+
+Each command has a **Copy** button so you can paste straight into a terminal. There are also direct links to the official installers if you'd rather download them by hand. After installing, click **Re-check** in ASAPS to refresh the detection.
+
+### Step 2: Sign in to GitHub
+
+Once `gh` is installed, click **Sign in with GitHub**. ASAPS runs `gh auth login --web` for you, which opens a browser window with a one-time code. Paste the code into the browser, authorise ASAPS, and come back. The signing-in process streams its output into a log box on screen so you can see exactly where it's at; if anything goes sideways, hit **Cancel sign-in** to abort and try again.
+
+The credentials live in `gh`'s system-wide credential store — ASAPS doesn't keep a copy.
+
+### Step 3: Connect to a remote (or skip)
+
+If you're using **New Project on GitHub** or **Open Project from GitHub**, ASAPS handles this step automatically. If you've opened an existing project folder that isn't yet on GitHub, you can either:
+
+- **Create a new GitHub repo** — pick a name and visibility (private by default — going public→private *after* pushing is a bad time), and ASAPS runs `gh repo create … --source=. --remote=origin --push`.
+- **Connect to an existing empty repo** — paste a GitHub URL you've already created at `github.com/new` and ASAPS sets it as the remote and pushes.
+
+ASAPS automatically handles a footgun that catches first-time users: if `git` doesn't have your name and email configured locally, the first commit fails with a cryptic error. Before committing, ASAPS reads your GitHub identity via `gh api user` and writes `user.name` / `user.email` into **the project's local repo** only — never into your global git config. If you've already configured git globally, that takes precedence.
+
+## Creating a Brand-New Project on GitHub
+
+**File → New Project on GitHub…** is the most direct route from "I have an idea" to "my project is on GitHub":
+
+1. Pick a **parent folder** on disk — somewhere ASAPS can create a new sub-folder for the project.
+2. Type a **project name**. This is also the GitHub repository name and the local folder name. ASAPS sanitises it (spaces become hyphens, special characters drop out) so it's a valid GitHub repo name.
+3. Choose **Private** (recommended — only you and people you invite can see it) or **Public** (visible to the world). You can change this on GitHub.com later, but only with caveats — keep it private unless you're sure.
+4. Click **Create and push**. ASAPS:
+   - Creates the folder
+   - Writes an empty ASAPS directory-format scaffold into it
+   - Runs `git init` and makes the initial commit
+   - Runs `gh repo create <username>/<name> --source=. --push` so the repo exists on GitHub with your initial commit already pushed
+
+When that's done, ASAPS opens the project and you can start authoring. Every save is automatically tracked by Git, ready to be committed and pushed.
+
+## Joining a Project Someone Else Created (Collaboration)
+
+The everyday team workflow looks like this:
+
+1. **Author A** creates the project via *File → New Project on GitHub…* and invites collaborators on **github.com** (Settings → Collaborators on the repo page).
+2. **Author B** accepts the invite by email, copies the repository URL from GitHub, and uses *File → Open Project from GitHub…* in ASAPS. After cloning, the project opens and the VCS panel becomes available.
+3. From here, both authors edit, commit, and push. The VCS panel's **Incoming** tab shows when one author has pushed work the other hasn't pulled yet.
+
+The first time a collaborator joins, they go through the same install + auth onboarding as the project's creator did — install `git`/`gh`, sign in with GitHub, then clone.
 
 ## The VCS Panel
 
-The VCS panel (accessible from the sidebar) has several tabs:
+Once a project is under version control, the **VCS panel** lives at the bottom of the window. Toggle it with **Ctrl/Cmd+Shift+G** or via *Version Control → Toggle VCS Panel*. It has four tabs:
 
 ### Pending Changes
-Shows all modified, added, or deleted files since last commit:
-- **Stage** individual files or all at once
-- **Unstage** files you don't want to commit
-- **Revert** files to discard local changes
-- Click any file to see a **diff** of what changed
 
-### Commit & Push
-1. Stage your changes
-2. Write a commit message describing what you did
-3. Click **Commit**
-4. Click **Push** to send to the remote
+Everything you've changed since your last commit. Each modified file appears with a coloured indicator (added / modified / deleted) and you can:
 
-### Pull & Sync
-- **Pull** downloads changes from the remote
-- **Pull with Rebase** replays your local commits on top of remote changes
-- The header shows **↑ ahead** and **↓ behind** counts
+- **Stage** an individual file (the green check) or **Stage All** at once.
+- **Unstage** anything you don't want to commit yet.
+- **Revert** to discard local changes (with a confirmation — this can't be undone).
+- Click a file to open a diff in the right pane and see exactly what changed.
 
-### Branches
-- View and switch between branches
-- Create new branches for features or experiments
-- Merge branches back together
+Below the file list, type a **commit message** and click **Commit** (or **Commit and Push** to send to GitHub in one step). If nothing's staged when you click Commit, ASAPS auto-stages everything currently changed for you — saves a click for the common "I want to commit everything" case.
+
+### Incoming
+
+This tab is where you fetch and push:
+
+| Button | What it does |
+|--------|--------------|
+| **Fetch** | Checks GitHub for changes other collaborators have pushed. Doesn't apply them yet — just tells you what's there. |
+| **Pull** | Fetches and applies remote changes, creating a merge commit if your local work and the remote work both moved on. |
+| **Pull (Rebase)** | Fetches and replays your local commits on top of the remote ones — a tidier history with no merge commits. |
+| **Push** | Sends your local commits up to GitHub. The button label shows how many commits are queued (e.g., "Push (3)"). |
+
+The header shows **↑ ahead** (your local commits not yet pushed) and **↓ behind** (remote commits you haven't pulled) so you can see at a glance who's where.
 
 ### History
-- Browse the full commit log
-- See which files changed in each commit
-- View diffs for any historical commit
+
+The full commit log for the project. Click any commit to see which files it touched and the diff for each. Useful for "who changed this and why?" investigations.
+
+### Branches
+
+View the current branch and switch between any branches that already exist. Note: ASAPS doesn't currently let you **create** new branches from inside the app — see [What's not (yet) supported](#vcs-not-supported) below.
 
 ## Beat-Level Status Indicators
 
-Each beat on the canvas shows a colored dot indicating its VCS status:
+Each beat on the canvas shows a small coloured dot in the top corner that mirrors its Git status:
 
-| Color | Meaning |
-|-------|---------|
-| Green | New (added/untracked) |
+| Colour | Meaning |
+|--------|---------|
+| Green | New (added since last commit, untracked) |
 | Orange | Modified since last commit |
-| Red | Merge conflict |
-| Purple | Being edited by another user |
+| Red | Has a merge conflict |
+| Purple | Being edited by another collaborator (advisory) |
+
+So you can see at a glance which parts of your story have unsaved-to-Git changes without opening the VCS panel.
 
 ## Merge Conflicts
 
-When two people edit the same beat and their changes conflict:
+When you and a collaborator edit the same beat in incompatible ways, pulling produces a **merge conflict**. ASAPS handles this gracefully:
 
-1. The beat shows a **red dot** on the canvas
-2. The VCS panel highlights conflicting files
-3. Choose resolution: **Keep Mine** or **Accept Theirs**
-4. For rebases with multiple conflicts, ASAPS resolves them step by step
+1. The conflicting beat shows a **red dot** on the canvas.
+2. The VCS panel highlights the conflicting file and offers two buttons: **Keep Mine** or **Accept Theirs**.
+3. If a rebase is mid-flight with multiple conflicts, ASAPS walks you through them one at a time.
+
+Merge conflicts in beats happen less often than you'd think because each beat is its own JSON file in the directory format — two collaborators can edit different beats freely without ever conflicting.
 
 ## Advisory Editing Locks
 
-When collaborating via Git, ASAPS tracks which beats each team member is currently editing. This is **advisory only**—it warns you but doesn't prevent editing.
+Even with per-beat files, two people editing the *same* beat at the same time will eventually conflict. ASAPS helps you avoid that by tracking who's currently editing what — **advisorily**, no actual locking:
 
-**How it works:**
-- When you select a beat in the Inspector, a lock entry is written to `.asaps-editing.json`
-- This file propagates through normal git commit/push/pull
-- Other team members see a **purple dot** on beats you're editing
-- The Inspector shows a warning banner: "*Alice is currently editing this beat*"
-- Locks automatically expire after 2 hours (handles crashes and forgotten sessions)
+- When you select a beat in the Inspector, ASAPS writes a small entry into `.asaps-editing.json` in the project root.
+- That file rides along with normal commits/pushes/pulls.
+- Collaborators see a **purple dot** on beats you're currently editing, and the Inspector banner says something like *"Alice is currently editing this beat"*.
+- Locks expire automatically after **2 hours**, so a crashed app or forgotten session doesn't leave a permanent ghost lock.
 
-**What to do:** If you see a purple indicator, consider working on a different beat to avoid merge conflicts later.
+Treat purple dots as a friendly "consider working on something else" hint rather than a hard barrier.
+
+## Common Hiccups & How to Fix Them
+
+### "I made changes but the VCS panel doesn't show anything to commit"
+
+Open the **Pending Changes** tab. If your changes are there but unstaged, click **Stage All** (or the green check next to individual files), write a commit message, and click **Commit**. If they're already staged, just commit. If the panel really shows nothing, double-check you saved (Cmd/Ctrl+S) — Git only sees what's been written to disk.
+
+### "Push rejected — the remote has commits I don't"
+
+This means a collaborator pushed something while you were working. Switch to the **Incoming** tab, click **Pull** (or **Pull (Rebase)** if you prefer cleaner history), resolve any merge conflicts that pop up, and then come back and **Push** again.
+
+### "My project is in iCloud / Dropbox / OneDrive — is that OK?"
+
+It works, but synced folders sometimes interfere with Git in subtle ways (lock files, partial writes, two clients trying to apply the same changes). If you hit weird errors that don't make sense, try moving the project somewhere outside the synced folder — `~/Documents/GitHub/` is a popular choice. The version control history stays intact through GitHub, so moving the local copy is safe.
+
+### "I cloned a repo but the assets are missing"
+
+If the repo was created on a system with **Git LFS** enabled, the asset binaries may be stored as LFS pointers rather than real files. ASAPS explicitly disables LFS, so cloning an LFS-tracked repo will give you placeholder pointer files instead of the actual images/audio. Workaround: have the original author do a one-time `git lfs migrate import --everything` + `git push --force` to convert the binaries back to plain blobs. This is rare in practice — newer ASAPS projects don't use LFS at all.
+
+<a id="vcs-not-supported"></a>
+## What's Not (Yet) Supported
+
+A few Git features that authors sometimes look for and don't find:
+
+- **SSH-based remotes** — ASAPS uses HTTPS through `gh`'s credential helper. Repos with `git@github.com:...` URLs aren't directly supported; convert to the `https://github.com/...` form.
+- **Creating branches inside ASAPS** — you can switch between existing branches, but creating new ones currently requires using `git` or `gh` in a terminal. (Branch authoring inside the app is on the roadmap.)
+- **Multi-remote setups** — ASAPS assumes a single `origin`. If you've added other remotes manually, they won't appear in the UI but they won't break anything either.
+- **Git LFS** — explicitly disabled. Asset binaries are committed as plain Git blobs.
+- **GitLab, Bitbucket, self-hosted Git** — only GitHub is wired into the onboarding flow. You can manually `git init` and add a non-GitHub remote in a terminal, but the in-app authentication and "create repo" flows are GitHub-specific.
+
+If any of these are blocking you, file an issue on the ASAPS repo — these are the features most likely to land first as the version-control story matures.
 
 ---
 
@@ -2049,7 +2188,7 @@ Yes! Configure TTS for voice output and STT for voice input. In AI Conversation 
 Use **Export → Export as HTML** to create a standalone playable file. Recipients just open it in any browser—no ASAPS installation needed.
 
 ### How do I collaborate with a team?
-Save your project as a directory format, initialize a Git repository, and push to a shared remote (GitHub, GitLab, etc.). Team members clone the repo and use the built-in VCS panel for commit/push/pull. Advisory editing locks help avoid conflicts.
+The fastest path: one author uses **File → New Project on GitHub…** to create the project and publish it to GitHub in one step, then invites collaborators on github.com. Each collaborator uses **File → Open Project from GitHub…** to clone the repo and start working. Commit, push, and pull all happen from the **VCS panel** at the bottom of the app. Advisory editing locks (purple dots on beats someone else is editing) help you avoid stepping on each other's toes. See [Part 9: Version Control & Collaboration](#part-9-version-control--collaboration) for the full walkthrough.
 
 ### Can I translate my story to other languages?
 Yes! Use the language selector (top right) to add target languages. You can translate manually or use AI-assisted translation. Translations are saved with the project.
