@@ -4,6 +4,7 @@ import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { PlayerContextBuilder } from '../utils/PlayerContextBuilder';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
+import { buildDossierForRef } from '../utils/dossier';
 import type { DialogNode, DialogChoice } from '../generated/beat-types';
 
 export interface AIDialogExitTarget {
@@ -366,9 +367,17 @@ export class AIDialogTreeBeat extends Beat {
       })
       .join('\n');
 
+    // Re-anchor dossier (Step 2 / Layer 5). When npcName resolves to a defined
+    // Character.id, the dossier is built from the authored description + tags +
+    // current character-scoped state and prepended to the prompt. The LLM
+    // generates dialog grounded in the canonical character data instead of
+    // re-imagining the NPC from scratch each beat.
+    const characters = (story as any)?.getCharacters?.() || [];
+    const characterDossier = buildDossierForRef(this.npcName, characters, context);
+
     // Build the generation prompt
     const prompt = `Generate a dialog tree for the following scenario:
-
+${characterDossier ? `\n${characterDossier}\n` : ''}
 SCENARIO: ${this.scenario}
 
 NPC: ${this.npcName}

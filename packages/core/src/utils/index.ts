@@ -1,6 +1,7 @@
 export { PlayerContextBuilder, type PlayerContextOptions, type PlayerContextData } from './PlayerContextBuilder';
 export { waitForTTS, waitForReadingTime } from './ttsWait';
 export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
+export { buildDossier, buildDossierForRef, type BuildDossierOptions } from './dossier';
 export {
   // Types
   type AIProxyRequest,

@@ -19,6 +19,15 @@ export interface ConversationPromptContext {
   npcName: string;
   /** NPC personality description */
   npcPersonality?: string;
+  /**
+   * Pre-built character dossier (Step 2 of the rich-character roadmap).
+   * When the AI beat's NPC has a characterRef linked to a defined Character,
+   * the beat builds the dossier via buildDossier() and passes it here.
+   * Rendered as a re-anchor block at the top of the system prompt — the LLM
+   * always sees the canonical character data, preventing personality drift
+   * across long conversations or beat-to-beat state changes.
+   */
+  characterDossier?: string;
   /** Scene/scenario description */
   scenario: string;
   /** Player context string (from PlayerContextBuilder) */
@@ -44,6 +53,15 @@ export function buildConversationSystemPrompt(ctx: ConversationPromptContext): s
   const parts: string[] = [];
 
   parts.push(`You are ${ctx.npcName}, a character in an interactive narrative.`);
+
+  // Re-anchor block (Mode A policy): when the NPC is linked to a defined
+  // Character, the dossier is rebuilt fresh on every turn from structured
+  // state and prepended here. The LLM always sees the canonical identity,
+  // so it can't drift away from who the character is — directly addresses
+  // the personality-drift problem flagged in the rich-character design.
+  if (ctx.characterDossier && ctx.characterDossier.trim()) {
+    parts.push(`\n${ctx.characterDossier}`);
+  }
   if (ctx.npcPersonality) {
     parts.push(`\nPERSONALITY: ${ctx.npcPersonality}`);
   }

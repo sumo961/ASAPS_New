@@ -32,6 +32,7 @@ import {
   type ConversationTurn,
 } from '../utils/ConversationPromptBuilder';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
+import { buildDossierForRef } from '../utils/dossier';
 
 export interface AIConversationBeatParams {
   /** Scene description */
@@ -399,6 +400,14 @@ export class AIConversationBeat extends Beat {
       includeChoiceHistory: this.includeChoiceHistory,
     });
 
+    // Re-anchor dossier (Step 2 / Layer 5). When the NPC field stores a
+    // canonical Character.id, build a dossier from authored description +
+    // character-scoped state (counters, variables, flags) and pass it into
+    // the system prompt. Mode A "rebuild every turn" — the LLM never drifts.
+    // No-op when the npcName field stores a free-text name.
+    const characters = (story as any)?.getCharacters?.() || [];
+    const characterDossier = buildDossierForRef(this.npcName, characters, context);
+
     const conversationHistory: ConversationTurn[] = [];
     const firedOnceDirections = new Set<string>();
     let turnNumber = 0;
@@ -419,6 +428,7 @@ export class AIConversationBeat extends Beat {
         const systemPrompt = buildConversationSystemPrompt({
           npcName: this.npcName,
           npcPersonality: this.npcPersonality,
+          characterDossier,
           scenario: this.scenario,
           playerContext,
           directions: this.directions,
@@ -663,10 +673,15 @@ export class AIConversationBeat extends Beat {
           return exitTarget;
         }
 
-        // Generate NPC response with active steering
+        // Generate NPC response with active steering. Re-anchor dossier is
+        // rebuilt on every turn (Mode A) so character-scoped state changes
+        // (e.g. counters set by a previous direction firing) feed back into
+        // the LLM's understanding of who the NPC currently is.
+        const turnDossier = buildDossierForRef(this.npcName, characters, context);
         const systemPrompt = buildConversationSystemPrompt({
           npcName: this.npcName,
           npcPersonality: this.npcPersonality,
+          characterDossier: turnDossier,
           scenario: this.scenario,
           playerContext,
           directions: this.directions,
