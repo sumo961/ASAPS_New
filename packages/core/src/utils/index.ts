@@ -1,7 +1,7 @@
 export { PlayerContextBuilder, type PlayerContextOptions, type PlayerContextData } from './PlayerContextBuilder';
 export { waitForTTS, waitForReadingTime } from './ttsWait';
 export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
-export { buildDossier, buildDossierForRef, type BuildDossierOptions, type DossierInteraction } from './dossier';
+export { buildDossier, buildDossierForRef, describeMoodAxis, type BuildDossierOptions, type DossierInteraction } from './dossier';
 export {
   beatsForCharacter,
   choicesForCharacter,

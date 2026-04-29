@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Variable, Box, Timer, User, ChevronDown, ChevronRight, Plus, Trash2, Shuffle } from 'lucide-react';
 import type { Beat } from '@asaps/core';
+import { describeMoodAxis } from '@asaps/core';
 import type { AvailableCounter, AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
 import { CharacterRefField, type UsedName } from './characters/CharacterRefField';
 
@@ -16,7 +17,13 @@ interface ParameterDefinition {
   // For fields that reference beats (target selectors)
   targetField?: boolean;
   ui?: {
-    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref';
+    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref' | 'affect-slider';
+    /** For 'affect-slider' control: end-cap labels — [low, high]. */
+    axisLabels?: [string, string];
+    /** For 'affect-slider' control: optional axis hint passed through to the
+     * qualitative summary helper ('valence' / 'arousal'); when set, the live
+     * preview shows what the resulting nudge "feels like" using describeMoodAxis. */
+    affectAxis?: 'valence' | 'arousal';
     options?: (string | { value: string; label: string })[];
     label?: string;
     min?: number;
@@ -494,6 +501,58 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 pinnedOptions={[{ value: 'player', label: 'Player' }]}
                 placeholder="Player, a defined character, or type a name…"
               />
+              {paramDef.description && (
+                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+              )}
+            </div>
+          );
+        }
+
+        // Affect slider — range input with end-cap labels. Used by the
+        // UpdateAffect beat for mood-axis deltas and sentiment strength
+        // delta. The qualitative preview ("Will feel: happier") leans on
+        // describeMoodAxis from @asaps/core so the LLM dossier and the
+        // Inspector show the same words for the same numbers.
+        if (paramDef.ui?.control === 'affect-slider') {
+          const min = paramDef.ui.min ?? -1;
+          const max = paramDef.ui.max ?? 1;
+          const step = paramDef.ui.step ?? 0.1;
+          const numericValue = typeof value === 'number'
+            ? value
+            : (typeof value === 'string' && value !== '' ? parseFloat(value) : 0);
+          const labels = paramDef.ui.axisLabels;
+          const axis = paramDef.ui.affectAxis;
+          // Resulting-feel preview applies the *delta* to a hypothetical
+          // neutral mood, so authors see the direction of effect, not a
+          // committed mood (which depends on the character's current state).
+          const previewWord = axis ? describeMoodAxis(numericValue, axis) : null;
+
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {paramDef.ui.label || label}
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {labels && <span style={{ fontSize: 11, color: '#6b7280', flexShrink: 0 }}>{labels[0]}</span>}
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={numericValue}
+                  onChange={(e) => handleChange(parseFloat(e.target.value))}
+                  style={{ flex: 1 }}
+                />
+                {labels && <span style={{ fontSize: 11, color: '#6b7280', flexShrink: 0 }}>{labels[1]}</span>}
+                <span style={{ fontFamily: 'monospace', fontSize: 12, minWidth: 44, textAlign: 'right', color: '#374151' }}>
+                  {numericValue >= 0 ? '+' : ''}{numericValue.toFixed(2)}
+                </span>
+              </div>
+              {previewWord && Math.abs(numericValue) > 0.05 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Direction: <span className="font-medium">{previewWord}</span>
+                </p>
+              )}
               {paramDef.description && (
                 <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
               )}

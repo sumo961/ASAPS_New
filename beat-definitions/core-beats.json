@@ -1109,24 +1109,30 @@
         "moodValenceDelta": {
           "type": "number",
           "required": false,
-          "description": "Delta added to mood.valence (pleasant↔unpleasant). Range -2 to 2; the runtime clamps the resulting mood to [-1, 1].",
+          "description": "Pushes the character's mood pleasanter (positive) or unpleasanter (negative). Runtime clamps the resulting mood to [-1, 1].",
           "ui": {
+            "control": "affect-slider",
             "label": "Valence delta",
             "min": -2,
             "max": 2,
             "step": 0.1,
+            "axisLabels": ["← sadder", "happier →"],
+            "affectAxis": "valence",
             "group": "Mood"
           }
         },
         "moodArousalDelta": {
           "type": "number",
           "required": false,
-          "description": "Delta added to mood.arousal (calm↔excited). Range -2 to 2; clamped to [-1, 1].",
+          "description": "Pushes the character calmer (negative) or more excited (positive). Clamped to [-1, 1].",
           "ui": {
+            "control": "affect-slider",
             "label": "Arousal delta",
             "min": -2,
             "max": 2,
             "step": 0.1,
+            "axisLabels": ["← calmer", "more excited →"],
+            "affectAxis": "arousal",
             "group": "Mood"
           }
         },
@@ -1152,12 +1158,14 @@
         "sentimentDelta": {
           "type": "number",
           "required": false,
-          "description": "Delta added to the existing (target, emotion) sentiment strength, or the strength of a newly-created one. Clamped to [-1, 1] post-add.",
+          "description": "Adds to (or subtracts from) the existing (target, emotion) sentiment strength. Negative values weaken or invert the feeling. Clamped to [-1, 1].",
           "ui": {
+            "control": "affect-slider",
             "label": "Strength delta",
             "min": -2,
             "max": 2,
             "step": 0.1,
+            "axisLabels": ["← weaker / opposite", "stronger →"],
             "group": "Sentiment"
           }
         },

@@ -184,26 +184,34 @@ export function buildDossier(
 }
 
 /**
+ * Describe a single mood axis qualitatively. Used by builder UIs so the
+ * Inspector can show authors what their numeric delta means in words.
+ *
+ * @param value Axis value, expected in [-1, 1]; rounded to nearest band.
+ * @param axis  'valence' (pleasant↔unpleasant) or 'arousal' (calm↔excited).
+ */
+export function describeMoodAxis(value: number, axis: 'valence' | 'arousal'): string {
+  if (axis === 'valence') {
+    if (value >= 0.6) return 'happy';
+    if (value >= 0.2) return 'pleased';
+    if (value <= -0.6) return 'sad';
+    if (value <= -0.2) return 'displeased';
+    return 'even-keeled';
+  }
+  if (value >= 0.6) return 'energetic';
+  if (value >= 0.2) return 'alert';
+  if (value <= -0.6) return 'lethargic';
+  if (value <= -0.2) return 'subdued';
+  return 'steady';
+}
+
+/**
  * Describe a 2D mood in natural language. Pairs a valence word (pleasant /
  * unpleasant) with an arousal word (calm / energetic). The LLM gets a
  * compact sentence rather than two opaque numbers.
  */
 function describeMood(mood: MoodLike): string {
-  const v = mood.valence;
-  const a = mood.arousal;
-  const valenceWord =
-    v >= 0.6 ? 'happy' :
-    v >= 0.2 ? 'pleased' :
-    v <= -0.6 ? 'sad' :
-    v <= -0.2 ? 'displeased' :
-    'even-keeled';
-  const arousalWord =
-    a >= 0.6 ? 'energetic' :
-    a >= 0.2 ? 'alert' :
-    a <= -0.6 ? 'lethargic' :
-    a <= -0.2 ? 'subdued' :
-    'steady';
-  return `${valenceWord}, ${arousalWord} (valence ${v.toFixed(2)}, arousal ${a.toFixed(2)})`;
+  return `${describeMoodAxis(mood.valence, 'valence')}, ${describeMoodAxis(mood.arousal, 'arousal')} (valence ${mood.valence.toFixed(2)}, arousal ${mood.arousal.toFixed(2)})`;
 }
 
 /** Translate sentiment strength into a qualitative adjective. */
