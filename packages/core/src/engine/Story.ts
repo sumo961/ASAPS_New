@@ -1,6 +1,7 @@
 import { Beat } from '../beats/Beat';
 import type { Cluster, ContainerBeatPosition } from '../types'; // Import cluster types
 import type { StoryMetadata } from '../types';
+import { DEFAULT_EMOTION_PALETTE, type EmotionDefinition } from './EmotionPalette';
 
 export class Story {
   private beats: Map<string, Beat> = new Map();
@@ -11,6 +12,9 @@ export class Story {
   private clusters: Cluster[] = [];
   private containerBeatPositions: ContainerBeatPosition[] = [];
   private assets: any[] = [];
+  // Step 5 — author-editable emotion palette. Defaults to Ekman 6 + pride /
+  // shame / interest until the project explicitly sets something else.
+  private emotionPalette: EmotionDefinition[] = DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e }));
 
   constructor(metadata?: Partial<StoryMetadata>) {
     this.metadata = {
@@ -92,6 +96,15 @@ export class Story {
 
   getCharacters(): any[] {
     return this.characters;
+  }
+
+  // Step 5 — emotion palette accessors.
+  getEmotionPalette(): EmotionDefinition[] {
+    return this.emotionPalette;
+  }
+
+  setEmotionPalette(palette: EmotionDefinition[]): void {
+    this.emotionPalette = palette.map((e) => ({ ...e }));
   }
 
   setClusters(clusters: Cluster[]): void {

@@ -90,6 +90,11 @@ export interface BuildDossierOptions {
   sentiments?: ReadonlyArray<SentimentLike>;
   /** Maximum sentiments to render (default 5). */
   maxSentiments?: number;
+  /** Current emotion levels keyed by emotion name (Step 5). Top-N rendered
+   * (default 4) by intensity descending. Sub-threshold values are filtered. */
+  emotions?: Record<string, number>;
+  /** Maximum emotions to render (default 4). */
+  maxEmotions?: number;
 }
 
 /**
@@ -139,6 +144,24 @@ export function buildDossier(
   // signal. Threshold 0.05 keeps tiny rounding artefacts out.
   if (options.mood && (Math.abs(options.mood.valence) > 0.05 || Math.abs(options.mood.arousal) > 0.05)) {
     lines.push(`Mood: ${describeMood(options.mood)}`);
+  }
+
+  // Current emotions (Step 5). Top-N by intensity, descending. Sub-threshold
+  // values dropped — emotions decay toward zero each tick so the floor is
+  // already noisy.
+  if (options.emotions) {
+    const cap = options.maxEmotions ?? 4;
+    const top = Object.entries(options.emotions)
+      .filter(([, v]) => v > 0.05)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, cap);
+    if (top.length > 0) {
+      lines.push('Currently feeling:');
+      for (const [name, value] of top) {
+        const intensity = describeEmotionIntensity(value);
+        lines.push(`  - ${intensity} ${name}`);
+      }
+    }
   }
 
   // Sentiments (Step 4). Top-N by absolute strength, descending.
@@ -224,6 +247,14 @@ function describeSentimentIntensity(strength: number): string {
   return `slight ${polarity}`.trim();
 }
 
+/** Translate an emotion intensity (∈ [0, 1]) into a qualitative adjective. */
+function describeEmotionIntensity(value: number): string {
+  if (value >= 0.75) return 'overwhelming';
+  if (value >= 0.5) return 'strong';
+  if (value >= 0.25) return 'moderate';
+  return 'mild';
+}
+
 /**
  * Format counters / variables / flags into a list of "key: value" lines.
  * Skips empty maps so the dossier stays tight.
@@ -272,6 +303,7 @@ export function buildDossierForRef(
     getCharacterInteractions?: (ref: string) => ReadonlyArray<DossierInteraction>;
     getCharacterMood?: (ref: string) => MoodLike;
     getCharacterSentiments?: (ref: string) => ReadonlyArray<SentimentLike>;
+    getCharacterEmotions?: (ref: string) => Record<string, number>;
     getStory?: () => any;
     getHistory?: () => ReadonlyArray<string>;
     getChoiceHistory?: () => ReadonlyArray<ChoiceRecordLike>;
@@ -284,6 +316,7 @@ export function buildDossierForRef(
   const state = contextLike?.getCharacterState?.(characterRef);
   const mood = contextLike?.getCharacterMood?.(characterRef);
   const sentiments = contextLike?.getCharacterSentiments?.(characterRef);
+  const emotions = contextLike?.getCharacterEmotions?.(characterRef);
 
   // Resolve interactions from whichever path the caller wired up. Prefer the
   // explicit accessor; fall back to deriving from story + history.
@@ -304,5 +337,5 @@ export function buildDossierForRef(
     }
   }
 
-  return buildDossier(character, { ...options, state, interactions, mood, sentiments });
+  return buildDossier(character, { ...options, state, interactions, mood, sentiments, emotions });
 }

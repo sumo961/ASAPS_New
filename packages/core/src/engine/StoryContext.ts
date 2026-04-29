@@ -91,6 +91,11 @@ interface StoryState {
   // Both keyed by canonical Character.id (or fallback ref string).
   characterMoods: Record<string, CharacterMood>;
   characterSentiments: Record<string, Sentiment[]>;
+  // Emotion levels per character (Step 5). Outer key = canonical Character.id,
+  // inner key = emotion name (matched case-insensitively against the story's
+  // EmotionPalette). Each value ∈ [0, 1] — emotion intensity decays toward 0
+  // each tick (typically per beat-entry) at the rate the palette declares.
+  characterEmotionLevels: Record<string, Record<string, number>>;
   visitedBeats: Set<string>;
   visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
@@ -113,6 +118,7 @@ export interface SerializedStoryState {
   characterCounters?: Record<string, Record<string, number>>;
   characterMoods?: Record<string, CharacterMood>;
   characterSentiments?: Record<string, Sentiment[]>;
+  characterEmotionLevels?: Record<string, Record<string, number>>;
   characterVariables?: Record<string, Record<string, any>>;
   characterFlags?: Record<string, Record<string, boolean>>;
   visitedBeats: string[]; // Array instead of Set for JSON serialization
@@ -218,6 +224,7 @@ export class StoryContext extends EventEmitter {
       characterFlags: {},
       characterMoods: {},
       characterSentiments: {},
+      characterEmotionLevels: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {},
@@ -610,6 +617,96 @@ export class StoryContext extends EventEmitter {
     return next;
   }
 
+  // ======== Character emotions (Step 5 — emotion nodes) ========
+
+  /** Current intensity of a single emotion for the character (∈ [0, 1]). */
+  getCharacterEmotion(charRef: string, emotion: string): number {
+    const key = this.resolveCharRef(charRef);
+    if (!key || !emotion) return 0;
+    const lower = emotion.toLowerCase();
+    return this.state.characterEmotionLevels[key]?.[lower] ?? 0;
+  }
+
+  /** All non-zero emotions for the character — keyed by emotion name (lowercase). */
+  getCharacterEmotions(charRef: string): Record<string, number> {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return {};
+    return { ...(this.state.characterEmotionLevels[key] || {}) };
+  }
+
+  /** Replace one emotion's intensity directly. Clamped to [0, 1]. */
+  setCharacterEmotion(charRef: string, emotion: string, value: number): void {
+    const key = this.resolveCharRef(charRef);
+    if (!key || !emotion) return;
+    const lower = emotion.toLowerCase();
+    if (!this.state.characterEmotionLevels[key]) this.state.characterEmotionLevels[key] = {};
+    const previous = this.state.characterEmotionLevels[key][lower] ?? 0;
+    const next = Math.max(0, Math.min(1, value));
+    this.state.characterEmotionLevels[key][lower] = next;
+    this.emit('characterEmotionChanged', { characterRef: key, emotion: lower, value: next, previous });
+  }
+
+  /**
+   * Fire an emotion at the character: bumps the emotion's level by `delta`
+   * (clamped to [0, 1]) AND nudges the character's mood by delta × the
+   * emotion's weights from the story's EmotionPalette. This is the primary
+   * authoring path — `setCharacterEmotion` is the lower-level escape hatch
+   * for cases where mood shouldn't be auto-nudged.
+   */
+  fireCharacterEmotion(charRef: string, emotion: string, delta: number): number {
+    const key = this.resolveCharRef(charRef);
+    if (!key || !emotion) return 0;
+    const lower = emotion.toLowerCase();
+    if (!this.state.characterEmotionLevels[key]) this.state.characterEmotionLevels[key] = {};
+    const previous = this.state.characterEmotionLevels[key][lower] ?? 0;
+    const next = Math.max(0, Math.min(1, previous + delta));
+    this.state.characterEmotionLevels[key][lower] = next;
+    this.emit('characterEmotionChanged', { characterRef: key, emotion: lower, value: next, previous, delta });
+
+    // Auto-nudge mood via the palette weights when the emotion is recognised.
+    const palette: any[] | undefined = (this.story as any)?.getEmotionPalette?.();
+    const def = palette?.find((e) => (e.name || '').toLowerCase() === lower);
+    if (def) {
+      const dV = Number(def.weightToValence ?? 0) * delta;
+      const dA = Number(def.weightToArousal ?? 0) * delta;
+      if (dV !== 0 || dA !== 0) this.nudgeCharacterMood(charRef, dV, dA);
+    }
+    return next;
+  }
+
+  /**
+   * Decay every emotion's intensity for the character (or all characters
+   * when charRef is omitted). Each emotion is reduced by its declared
+   * decayRate × current value; emotions that drop below 0.005 are removed
+   * from the map to keep state sparse. Typically called once per beat-entry
+   * by markBeatVisited.
+   */
+  decayCharacterEmotions(charRef?: string): void {
+    const palette: any[] | undefined = (this.story as any)?.getEmotionPalette?.();
+    if (!palette || palette.length === 0) return;
+    const rateByEmotion = new Map<string, number>();
+    for (const e of palette) {
+      rateByEmotion.set((e.name || '').toLowerCase(), Number(e.decayRate ?? 0));
+    }
+    const targetKeys = charRef
+      ? [this.resolveCharRef(charRef)].filter(Boolean) as string[]
+      : Object.keys(this.state.characterEmotionLevels);
+    for (const key of targetKeys) {
+      const levels = this.state.characterEmotionLevels[key];
+      if (!levels) continue;
+      for (const [emotion, value] of Object.entries(levels)) {
+        const rate = rateByEmotion.get(emotion) ?? 0;
+        if (rate <= 0) continue;
+        const next = value * (1 - rate);
+        if (next < 0.005) {
+          delete levels[emotion];
+        } else {
+          levels[emotion] = next;
+        }
+      }
+    }
+  }
+
   // Timer methods
   setTimer(name: string, value: number, target?: string): void {
     this.state.timers[name] = { value, target };
@@ -1000,6 +1097,10 @@ export class StoryContext extends EventEmitter {
   }
 
   markBeatVisited(beatId: string): void {
+    // Step 5 — emotion decay tick on every beat-enter. Emotions decay before
+    // the new beat's effects fire, so `fireCharacterEmotion` adds against a
+    // freshly-decayed level and the resulting mood nudge reflects recovery.
+    this.decayCharacterEmotions();
     this.state.visitedBeats.add(beatId);
     this.history.push(beatId);
     // Also record in timeline with beat metadata
@@ -1165,6 +1266,7 @@ export class StoryContext extends EventEmitter {
       characterFlags: {},
       characterMoods: {},
       characterSentiments: {},
+      characterEmotionLevels: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {}
@@ -1532,6 +1634,9 @@ export class StoryContext extends EventEmitter {
       characterSentiments: Object.fromEntries(
         Object.entries(this.state.characterSentiments).map(([k, v]) => [k, v.map((s) => ({ ...s }))])
       ),
+      characterEmotionLevels: Object.fromEntries(
+        Object.entries(this.state.characterEmotionLevels).map(([k, v]) => [k, { ...v }])
+      ),
       visitedBeats: Array.from(this.state.visitedBeats),
       visitedChoices: Array.from(this.state.visitedChoices),
       timers: { ...this.state.timers },
@@ -1584,6 +1689,9 @@ export class StoryContext extends EventEmitter {
         : {},
       characterSentiments: serialized.characterSentiments
         ? Object.fromEntries(Object.entries(serialized.characterSentiments).map(([k, v]) => [k, v.map((s: any) => ({ ...s }))]))
+        : {},
+      characterEmotionLevels: serialized.characterEmotionLevels
+        ? Object.fromEntries(Object.entries(serialized.characterEmotionLevels).map(([k, v]) => [k, { ...v }]))
         : {},
       visitedBeats: new Set(serialized.visitedBeats),
       visitedChoices: new Set((serialized as any).visitedChoices || []),

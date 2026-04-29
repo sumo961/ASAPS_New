@@ -149,6 +149,35 @@ describe('buildDossier', () => {
     });
     expect(out).not.toContain('Feels toward others');
   });
+
+  it('renders top-N current emotions sorted by intensity', () => {
+    const out = buildDossier(granny, {
+      emotions: { joy: 0.6, fear: 0.8, pride: 0.3, sadness: 0.02 },
+      maxEmotions: 3,
+    });
+    expect(out).toContain('Currently feeling');
+    // Top three by intensity: fear 0.8 (overwhelming), joy 0.6 (strong),
+    // pride 0.3 (moderate); sadness dropped at sub-threshold.
+    expect(out).toContain('overwhelming fear');
+    expect(out).toContain('strong joy');
+    expect(out).toContain('moderate pride');
+    expect(out).not.toContain('sadness');
+  });
+
+  it('omits the emotions block when no emotions are above threshold', () => {
+    const out = buildDossier(granny, { emotions: { joy: 0.02, fear: 0.01 } });
+    expect(out).not.toContain('Currently feeling');
+  });
+
+  it('caps emotions at maxEmotions (default 4)', () => {
+    const out = buildDossier(granny, {
+      emotions: { joy: 0.9, fear: 0.8, anger: 0.7, sadness: 0.6, pride: 0.5, shame: 0.4 },
+    });
+    expect(out).toContain('joy');
+    expect(out).toContain('sadness');
+    expect(out).not.toContain('pride');
+    expect(out).not.toContain('shame');
+  });
 });
 
 describe('buildDossierForRef', () => {
