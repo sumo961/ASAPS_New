@@ -18,6 +18,14 @@ import type { Connection, Condition, Effect } from '../types';
 export interface DialogNode {
   id: string;
   speaker: string;
+  /**
+   * Optional Character.id for the speaker (Layer 2 of the rich-character roadmap).
+   * When set and resolvable, takes precedence over the free-text `speaker` for
+   * stable identity (TTS voice routing, character-scoped state lookups, dossier
+   * building). The `speaker` string remains for legacy / inline cases and as the
+   * display fallback when no Character record is found.
+   */
+  characterRef?: string;
   text: string;
   emotion?: string;
   conditions?: Condition[];

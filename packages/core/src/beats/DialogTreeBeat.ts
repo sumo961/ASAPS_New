@@ -83,6 +83,9 @@ export class DialogTreeBeat extends Beat {
     const migrated: DialogNode = {
       id: node.id || 'root',
       speaker: node.speaker || '',
+      // Preserve characterRef across migrations and nested-node deep walks so
+      // pre-promoted dialog trees keep their canonical speaker identity.
+      ...(node.characterRef ? { characterRef: node.characterRef } : {}),
       text: node.text || '',
       emotion: node.emotion,
       conditions: node.conditions,

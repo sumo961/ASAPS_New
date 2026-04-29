@@ -9,6 +9,7 @@ import type {
 import type { IRenderer } from '../types';
 
 import { StoryContext } from '../engine/StoryContext';
+import { resolveCharacter } from '../utils/characterRef';
 
 export abstract class Beat {
   public id: string;
@@ -28,6 +29,14 @@ export abstract class Beat {
   public animations?: AnimationPath[]; // Path animations for elements
   public notes?: string; // Author notes (not shown to player)
   public speaker: string; // Who speaks this beat's text (for TTS voice routing and optional display)
+  /**
+   * Optional Character.id reference for the speaker (Layer 2 of the rich-character roadmap).
+   * When set and resolvable, takes precedence over `speaker` for everything that needs a
+   * stable identity (TTS voice routing, dialog history per character, dossier building).
+   * The free-text `speaker` remains for legacy / inline cases and as the display fallback
+   * when no Character record is found.
+   */
+  public characterRef?: string;
   public showSpeaker: boolean | undefined; // undefined = inherit global, true = force show, false = force hide
   public timeDisplayMode?: 'fictionalTime' | 'manual' | 'none'; // Per-beat time display mode
   public timeDisplayText?: string; // Override Timer HUD text for this beat (manual mode)
@@ -55,6 +64,7 @@ export abstract class Beat {
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
     this.notes = config.notes || (config.parameters as any)?.notes;
     this.speaker = (config as any).speaker || (config.parameters as any)?.speaker || '';
+    this.characterRef = (config as any).characterRef || (config.parameters as any)?.characterRef || undefined;
     this.showSpeaker = (config as any).showSpeaker ?? (config.parameters as any)?.showSpeaker ?? undefined;
     this.timeDisplayMode = (config as any).timeDisplayMode || (config.parameters as any)?.timeDisplayMode;
     this.timeDisplayText = (config as any).timeDisplayText || (config.parameters as any)?.timeDisplayText;
@@ -500,6 +510,41 @@ export abstract class Beat {
     return text;
   }
 
+  /**
+   * Resolve this beat's speaker against a list of defined characters.
+   *
+   * Priority: `characterRef` (when set and resolvable) → matches a Character by name
+   * (case-insensitive) on the free-text `speaker` → free-text fallback. Returns:
+   *   - `id`:         canonical Character.id, or null if no match
+   *   - `name`:       display name to show (the resolved Character.displayName/name,
+   *                   or the free-text speaker if there's no match)
+   *   - `character`:  the full Character record when matched, else null
+   *
+   * Renderers and TTS routing should call this rather than reading `this.speaker`
+   * directly, so dialog beats that point at a defined Character get a stable
+   * identity even when the free-text speaker drifts.
+   */
+  getResolvedSpeaker<C extends { id: string; name?: string; displayName?: string }>(
+    characters: ReadonlyArray<C> | null | undefined,
+  ): { id: string | null; name: string; character: C | null } {
+    // Prefer the explicit ref, fall back to matching the free-text speaker.
+    const resolved = this.characterRef
+      ? resolveCharacter(this.characterRef, characters)
+      : resolveCharacter(this.speaker, characters);
+    if (resolved) {
+      return {
+        id: resolved.id,
+        name: resolved.displayName || resolved.name || resolved.id,
+        character: resolved,
+      };
+    }
+    return {
+      id: null,
+      name: this.speaker || '',
+      character: null,
+    };
+  }
+
   toJSON(): any {
     // IMPORTANT: Use this.connections directly, NOT getConnections()
     // getConnections() may include derived connections (e.g., from dialogTree choices)
@@ -533,6 +578,7 @@ export abstract class Beat {
       node: this.node,
       notes: this.notes,
       speaker: this.speaker || undefined,
+      characterRef: this.characterRef || undefined,
       showSpeaker: this.showSpeaker != null ? this.showSpeaker : undefined,
       timeDisplayMode: this.timeDisplayMode,
       timeDisplayText: this.timeDisplayText,
