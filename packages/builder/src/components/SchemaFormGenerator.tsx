@@ -501,29 +501,56 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           );
         }
 
-        // NPC Character control - dropdown from characters with freeform entry and sync-back
+        // NPC Character control — combobox for AIDialogTree / AIConversation's
+        // npcName field. Filters defined characters to non-player roles (the
+        // NPC is whom the player talks *to*). When a defined Character is
+        // linked, the linked character's description is auto-loaded into
+        // npcPersonality (preserves the prior behaviour and is the small win
+        // that drove this Step). Free-text names work unchanged — typing a
+        // new NPC name and clicking "Define as Character" opens the Manager.
         if (paramDef.ui?.control === 'npc-character') {
-          const npcOptions: { value: string; label: string }[] = [];
+          // Non-player Characters only — the player is never the NPC.
+          const npcCharacters = characterObjects
+            .filter((c) => c.role !== 'player')
+            .map((c) => ({
+              ...c,
+              // Default minimums so the combobox has the shape it expects.
+              displayName: c.displayName || c.name || c.id,
+              visual: (c as any).visual || { type: 'static' },
+              states: (c as any).states || [],
+              defaultState: (c as any).defaultState || '',
+              counters: (c as any).counters || [],
+              inventory: (c as any).inventory || [],
+              createdAt: (c as any).createdAt || '',
+              updatedAt: (c as any).updatedAt || '',
+            })) as any[];
 
-          // Populate from character objects (NPCs and companions)
-          for (const char of characterObjects) {
-            if (char.role === 'player') continue;
-            const name = char.displayName || char.name;
-            if (name && !npcOptions.some(o => o.value === name)) {
-              npcOptions.push({ value: name, label: name });
-            }
-          }
-          // Also include string-based characters if characterObjects is empty
-          if (npcOptions.length === 0 && characters) {
-            for (const char of characters) {
-              const name = typeof char === 'string' ? char : (char.displayName || char.name);
-              if (name && name !== 'Narrator' && !npcOptions.some(o => o.value === name)) {
-                npcOptions.push({ value: name, label: name });
+          // Reconstruct combobox tuple from the single stored string.
+          const stringValue = typeof value === 'string' ? value : (value || '');
+          const matchedChar = npcCharacters.find((c: any) =>
+            c.id === stringValue
+            || (c.name || '').toLowerCase() === stringValue.toLowerCase()
+            || (c.displayName || '').toLowerCase() === stringValue.toLowerCase()
+          );
+          const matched = !!matchedChar;
+
+          const setNpc = (next: { characterRef?: string; freeText?: string }) => {
+            const newValue = next.characterRef || next.freeText || '';
+            handleChange(newValue);
+
+            // When the user links to a defined Character (newValue is the
+            // canonical id), auto-fill npcPersonality from that Character's
+            // description IF the personality slot is currently empty. This
+            // is the dossier-prefill that justifies promoting NPCs to real
+            // Characters in the first place — the LLM context now reuses
+            // the same description across every beat that links to this NPC.
+            if (next.characterRef) {
+              const linked = npcCharacters.find((c: any) => c.id === next.characterRef);
+              if (linked?.description && !parameters.npcPersonality) {
+                onParameterChange('npcPersonality', linked.description);
               }
             }
-          }
-
-          const isCustom = value && !npcOptions.some(o => o.value === value);
+          };
 
           return (
             <div key={paramName}>
@@ -531,53 +558,18 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 {paramDef.ui.label || label}
                 {paramDef.required && <span className="text-red-500 ml-1">*</span>}
               </label>
-              <select
-                value={isCustom ? '__custom__' : (value || '')}
-                onChange={(e) => {
-                  if (e.target.value === '__custom__') {
-                    handleChange(value || '');
-                  } else {
-                    handleChange(e.target.value);
-                    // When selecting an existing character, load their description into personality if it's empty
-                    if (onCharacterSync && e.target.value) {
-                      const char = characterObjects.find(c =>
-                        (c.displayName || c.name) === e.target.value
-                      );
-                      if (char?.description && !parameters.npcPersonality) {
-                        onParameterChange('npcPersonality', char.description);
-                      }
-                    }
-                  }
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              >
-                <option value="">Select character...</option>
-                {npcOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-                <option value="__custom__">New character...</option>
-              </select>
-              {(isCustom || value === '__custom__') && (
-                <input
-                  type="text"
-                  value={isCustom ? value : ''}
-                  onChange={(e) => handleChange(e.target.value)}
-                  onBlur={(e) => {
-                    // Sync new character name back to character definitions
-                    // Skip default values like "Character" — only sync intentional names
-                    const name = e.target.value.trim();
-                    const isDefault = name === (paramDef.default || 'Character');
-                    if (name && !isDefault && onCharacterSync) {
-                      onCharacterSync(name, {
-                        description: parameters.npcPersonality || undefined,
-                      });
-                    }
-                  }}
-                  placeholder="Enter new NPC name..."
-                  className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
-                  autoFocus
-                />
-              )}
+              <CharacterRefField
+                value={
+                  matched
+                    ? { characterRef: matchedChar.id, freeText: matchedChar.displayName || matchedChar.name }
+                    : { characterRef: undefined, freeText: stringValue }
+                }
+                onChange={setNpc}
+                characters={npcCharacters}
+                usedNames={usedNames}
+                onDefineAsCharacter={onDefineAsCharacter}
+                placeholder="Pick or name an NPC…"
+              />
               {paramDef.description && (
                 <p className="mt-1 text-xs text-gray-500">{paramDef.description}</p>
               )}
