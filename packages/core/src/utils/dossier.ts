@@ -1,3 +1,5 @@
+import { interactionsForCharacter } from './narrativeMemory';
+
 /**
  * Character dossier — natural-language synthesis of a Character record + its
  * runtime state (counters / variables / flags) into a string the LLM can
@@ -30,6 +32,31 @@ interface CharacterScopedState {
   flags: Record<string, boolean>;
 }
 
+interface BeatLike {
+  id: string;
+  type?: string;
+  name?: string;
+  speaker?: string;
+  characterRef?: string;
+  parameters?: Record<string, any>;
+}
+
+interface ChoiceRecordLike {
+  beatId: string;
+  beatName?: string;
+  beatType?: string;
+  choiceText: string;
+  choiceContext?: string;
+  timestamp: number;
+}
+
+export interface DossierInteraction {
+  /** Beat name (or id) where the interaction happened. */
+  beatName: string;
+  /** Optional one-line summary; when omitted, only the beat name is shown. */
+  summary?: string;
+}
+
 export interface BuildDossierOptions {
   /** Optional character-scoped state from StoryContext.getCharacterState(charId).
    * When omitted, the dossier reflects only authored data. */
@@ -38,6 +65,13 @@ export interface BuildDossierOptions {
   includeAnchorReminder?: boolean;
   /** Override the heading text. Default "CHARACTER DOSSIER". */
   heading?: string;
+  /** Recent interactions to include in a "Recent interactions" block.
+   * Caller (typically buildDossierForRef) builds these from
+   * narrativeMemory.interactionsForCharacter(). Cap to ~5–10 to keep tokens
+   * bounded; the dossier truncates if more than `maxInteractions` are passed. */
+  interactions?: ReadonlyArray<DossierInteraction>;
+  /** Maximum interactions to render (default 8). */
+  maxInteractions?: number;
 }
 
 /**
@@ -79,6 +113,18 @@ export function buildDossier(
       for (const line of stateLines) {
         lines.push(`  ${line}`);
       }
+    }
+  }
+
+  // Recent interactions (Layer 4 / Step 3 narrative memory). Tail-truncated
+  // to maxInteractions so the dossier stays bounded.
+  if (options.interactions && options.interactions.length > 0) {
+    const cap = options.maxInteractions ?? 8;
+    const tail = options.interactions.slice(-cap);
+    lines.push('Recent interactions:');
+    for (const i of tail) {
+      const summary = i.summary ? ` — ${i.summary}` : '';
+      lines.push(`  - ${i.beatName}${summary}`);
     }
   }
 
@@ -127,16 +173,50 @@ function formatStateBlock(state: CharacterScopedState): string[] {
  * Convenience: resolve a characterRef against a story's characters and a
  * StoryContext, then build the dossier. Returns empty string when the ref
  * doesn't resolve so callers can fall back to authored npcPersonality alone.
+ *
+ * If `contextLike` exposes story / history-shaped accessors, the recent
+ * interactions section is built automatically via narrativeMemory:
+ *   - getStory() returning a story with getCharacters() / getBeats()
+ *   - getHistory() returning the visited beat-id list
+ *   - getChoiceHistory() returning the choice records
+ * The AI beats pass `context` directly because StoryContext implements all
+ * three methods.
  */
 export function buildDossierForRef(
   characterRef: string | null | undefined,
   characters: ReadonlyArray<CharacterLike> | null | undefined,
-  contextLike: { getCharacterState?: (ref: string) => CharacterScopedState } | null | undefined,
+  contextLike: {
+    getCharacterState?: (ref: string) => CharacterScopedState;
+    getCharacterInteractions?: (ref: string) => ReadonlyArray<DossierInteraction>;
+    getStory?: () => any;
+    getHistory?: () => ReadonlyArray<string>;
+    getChoiceHistory?: () => ReadonlyArray<ChoiceRecordLike>;
+  } | null | undefined,
   options: BuildDossierOptions = {},
 ): string {
   if (!characterRef || !characters) return '';
   const character = characters.find((c) => c.id === characterRef) || null;
   if (!character) return '';
   const state = contextLike?.getCharacterState?.(characterRef);
-  return buildDossier(character, { ...options, state });
+
+  // Resolve interactions from whichever path the caller wired up. Prefer the
+  // explicit accessor; fall back to deriving from story + history.
+  let interactions = contextLike?.getCharacterInteractions?.(characterRef);
+  if (!interactions && contextLike?.getStory && contextLike?.getHistory) {
+    const story = contextLike.getStory();
+    const beats: BeatLike[] = (story?.getBeats?.() || story?.beats || []);
+    const history = contextLike.getHistory() || [];
+    const choiceHistory = contextLike.getChoiceHistory?.() || [];
+    if (beats.length && history.length) {
+      const trail = interactionsForCharacter(history, choiceHistory, beats, character, characters);
+      interactions = trail.map<DossierInteraction>((entry) => ({
+        beatName: entry.beatName || entry.beatId,
+        summary: entry.kind === 'choice' && entry.choiceText
+          ? `chose "${entry.choiceText}"`
+          : undefined,
+      }));
+    }
+  }
+
+  return buildDossier(character, { ...options, state, interactions });
 }

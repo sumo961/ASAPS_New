@@ -1,7 +1,16 @@
 export { PlayerContextBuilder, type PlayerContextOptions, type PlayerContextData } from './PlayerContextBuilder';
 export { waitForTTS, waitForReadingTime } from './ttsWait';
 export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
-export { buildDossier, buildDossierForRef, type BuildDossierOptions } from './dossier';
+export { buildDossier, buildDossierForRef, type BuildDossierOptions, type DossierInteraction } from './dossier';
+export {
+  beatsForCharacter,
+  choicesForCharacter,
+  interactionsForCharacter,
+  relationshipBetween,
+  type CharacterBeatEntry,
+  type CharacterChoiceEntry,
+  type CharacterInteraction,
+} from './narrativeMemory';
 export {
   // Types
   type AIProxyRequest,

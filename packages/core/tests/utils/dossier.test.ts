@@ -94,6 +94,27 @@ describe('buildDossier', () => {
     expect(out).toContain('NPC PROFILE');
     expect(out).not.toContain('CHARACTER DOSSIER');
   });
+
+  it('renders a Recent interactions block when interactions are provided', () => {
+    const out = buildDossier(granny, {
+      interactions: [
+        { beatName: 'Greeting', summary: 'said hello' },
+        { beatName: 'Cookies' },
+      ],
+    });
+    expect(out).toContain('Recent interactions');
+    expect(out).toContain('- Greeting — said hello');
+    expect(out).toContain('- Cookies');
+  });
+
+  it('caps interactions to maxInteractions (most recent kept)', () => {
+    const interactions = Array.from({ length: 12 }, (_, i) => ({ beatName: `b${i}` }));
+    const out = buildDossier(granny, { interactions, maxInteractions: 3 });
+    expect(out).toContain('- b9');
+    expect(out).toContain('- b10');
+    expect(out).toContain('- b11');
+    expect(out).not.toContain('- b8');
+  });
 });
 
 describe('buildDossierForRef', () => {
@@ -119,5 +140,22 @@ describe('buildDossierForRef', () => {
     };
     const out = buildDossierForRef('char_1', characters, ctx);
     expect(out).toContain('trust: 7');
+  });
+
+  it('auto-derives interactions from story + history when accessors are present', () => {
+    const beats = [
+      { id: 'b1', type: 'infoText', name: 'Greeting', speaker: 'Granny' },
+      { id: 'b2', type: 'dialogTree', name: 'Cookies', speaker: 'Granny' },
+    ];
+    const ctx = {
+      getStory: () => ({ getBeats: () => beats, getCharacters: () => characters }),
+      getHistory: () => ['b1', 'b2'],
+      getChoiceHistory: () => [{ beatId: 'b2', choiceText: 'Yes please', timestamp: 1 }],
+    };
+    const out = buildDossierForRef('char_1', characters, ctx);
+    expect(out).toContain('Recent interactions');
+    expect(out).toContain('- Greeting');
+    expect(out).toContain('- Cookies');
+    expect(out).toContain('chose "Yes please"');
   });
 });
