@@ -974,6 +974,28 @@ export class StoryContext extends EventEmitter {
       case 'setCounter':
         this.setCounter(effect.target, effect.value ?? 0);
         break;
+      // Step 4 / Phase A: character affect effects. The deltas live on the
+      // effect record itself (`valenceDelta` / `arousalDelta` / `strengthDelta`)
+      // so the existing effect-editor UI can treat them as any other field.
+      // `target` is the character ref (id, name, or displayName) — resolved
+      // by the underlying nudgeCharacterMood / addCharacterSentiment.
+      case 'nudgeMood': {
+        const dV = Number(effect.valenceDelta ?? 0);
+        const dA = Number(effect.arousalDelta ?? 0);
+        if (dV !== 0 || dA !== 0) {
+          this.nudgeCharacterMood(effect.target, dV, dA);
+        }
+        break;
+      }
+      case 'addSentiment': {
+        const t = effect.sentimentTarget;
+        const e = effect.sentimentEmotion;
+        const d = Number(effect.strengthDelta ?? 0);
+        if (t && e && d !== 0) {
+          this.addCharacterSentiment(effect.target, t, e, d);
+        }
+        break;
+      }
     }
   }
 

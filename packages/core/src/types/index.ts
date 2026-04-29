@@ -130,9 +130,27 @@ export interface Condition {
 }
 
 export interface Effect {
-  type: 'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter';
+  type:
+    | 'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter'
+    // Step 4 / Phase A: character affect effects so dialog choices, dialog
+    // nodes, and other effect hosts can update mood and sentiments inline
+    // without needing a separate UpdateAffect beat in the graph.
+    | 'nudgeMood' | 'addSentiment';
   target: string;
   value?: any;
+  // Sentiment-effect parameters (used when type === 'addSentiment'). Kept
+  // top-level rather than nested under `value` so the existing effect-editor
+  // UI can wire them up like any other effect property.
+  sentimentTarget?: string;
+  sentimentEmotion?: string;
+  /**
+   * Mood-effect parameters (used when type === 'nudgeMood'). Each axis is
+   * an optional delta — runtime clamps the resulting mood to [-1, 1].
+   */
+  valenceDelta?: number;
+  arousalDelta?: number;
+  /** Strength delta for addSentiment effects (clamped post-add). */
+  strengthDelta?: number;
 }
 
 /**
