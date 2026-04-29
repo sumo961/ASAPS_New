@@ -1893,6 +1893,20 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
       });
     };
 
+    // Step 7 — dossier policy fork. Default `'reAnchor'` (Mode A) means the
+    // dossier rebuilds from structured state every turn — no drift, no
+    // accumulated reflections. `'reflection'` (Mode B) accumulates per-turn
+    // reflections so the LLM sees recent felt-experience.
+    const dossierPolicy = editedCharacter.dossierPolicy || 'reAnchor';
+    const setDossierPolicy = (value: 'reAnchor' | 'reflection') => {
+      if (value === 'reAnchor') {
+        const { dossierPolicy: _drop, ...rest } = editedCharacter;
+        setEditedCharacter(rest as Character);
+      } else {
+        setEditedCharacter({ ...editedCharacter, dossierPolicy: value });
+      }
+    };
+
     return (
       <div className="space-y-6">
         {/* Personality — Big Five + author-defined traits */}
@@ -2128,6 +2142,47 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
               ))}
             </div>
           )}
+        </div>
+
+        {/* Dossier policy — Mode A re-anchor vs Mode B reflection memory */}
+        <div className="bg-white border rounded-lg p-4">
+          <h3 className="text-sm font-medium flex items-center gap-2">
+            <Heart className="w-4 h-4" />
+            Dossier policy
+          </h3>
+          <p className="text-xs text-gray-500 mt-1 mb-3">
+            Controls how the LLM sees this character when they speak in an AI beat.
+          </p>
+          <div className="space-y-2">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={dossierPolicy === 'reAnchor'}
+                onChange={() => setDossierPolicy('reAnchor')}
+                className="mt-1"
+              />
+              <div>
+                <div className="text-sm font-medium">Re-anchor every turn (default)</div>
+                <div className="text-xs text-gray-500">
+                  Rebuilds the dossier from structured state on every AI turn. The character cannot drift away from who they are. Recommended for most stories.
+                </div>
+              </div>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={dossierPolicy === 'reflection'}
+                onChange={() => setDossierPolicy('reflection')}
+                className="mt-1"
+              />
+              <div>
+                <div className="text-sm font-medium">Accumulate reflections (Mode B)</div>
+                <div className="text-xs text-gray-500">
+                  Appends reflection memory across turns. The character is allowed to grow and remember subjectively. Use the <span className="font-mono">addReflection</span> effect on choices/nodes to seed reflections, or call <span className="font-mono">appendCharacterReflection</span> at runtime.
+                </div>
+              </div>
+            </label>
+          </div>
         </div>
       </div>
     );

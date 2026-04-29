@@ -48,6 +48,30 @@ export interface Sentiment {
 }
 
 /**
+ * Reflection memory entry (Step 7 — Mode B). A short narrative note about
+ * something that happened to / through this character, accumulated as play
+ * progresses. Used in dossier rendering when the character's policy is
+ * `'reflection'` so the LLM sees recent felt-experience rather than only
+ * structured state. Reflections are append-only at the runtime level —
+ * `appendCharacterReflection` evicts the oldest when the per-character cap
+ * is exceeded so token cost stays bounded.
+ */
+export interface Reflection {
+  /** When the reflection was recorded. */
+  timestamp: number;
+  /** One- or two-sentence narrative note in the character's voice. */
+  text: string;
+  /** Beat the reflection originated from, when known — useful for debug. */
+  beatId?: string;
+  /**
+   * Salience ∈ [0, 1] — author's hint at how important this reflection is.
+   * Reflections with higher salience are kept longer when the cap evicts.
+   * Defaults to 0.5 when omitted by the caller.
+   */
+  salience?: number;
+}
+
+/**
  * Rich choice record for AI context
  * Captures what choice was made, not just which beat was visited
  */
@@ -97,6 +121,12 @@ interface StoryState {
   // EmotionPalette). Each value ∈ [0, 1] — emotion intensity decays toward 0
   // each tick (typically per beat-entry) at the rate the palette declares.
   characterEmotionLevels: Record<string, Record<string, number>>;
+  // Reflection memory per character (Step 7 — Mode B). Append-only narrative
+  // notes accumulated during play, used by characters whose `dossierPolicy`
+  // is `'reflection'`. The newest reflections are appended to the tail; the
+  // dossier reads the tail. Capped per character to keep token usage bounded
+  // — the FIFO eviction is in appendCharacterReflection().
+  characterReflections: Record<string, Reflection[]>;
   visitedBeats: Set<string>;
   visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
@@ -120,6 +150,7 @@ export interface SerializedStoryState {
   characterMoods?: Record<string, CharacterMood>;
   characterSentiments?: Record<string, Sentiment[]>;
   characterEmotionLevels?: Record<string, Record<string, number>>;
+  characterReflections?: Record<string, Reflection[]>;
   characterVariables?: Record<string, Record<string, any>>;
   characterFlags?: Record<string, Record<string, boolean>>;
   visitedBeats: string[]; // Array instead of Set for JSON serialization
@@ -226,6 +257,7 @@ export class StoryContext extends EventEmitter {
       characterMoods: {},
       characterSentiments: {},
       characterEmotionLevels: {},
+      characterReflections: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {},
@@ -720,6 +752,81 @@ export class StoryContext extends EventEmitter {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Reflection memory (Step 7 — Mode B)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Per-character cap on stored reflections. The runtime keeps the most recent
+   * `REFLECTION_CAP` entries; older entries are evicted in FIFO order. This is
+   * a token-budget guardrail for the dossier — a few dozen entries is plenty
+   * for a session-length conversation. Authors who need a larger window can
+   * raise this on a per-project basis later (Step 8 territory).
+   */
+  private static readonly REFLECTION_CAP = 32;
+
+  /**
+   * Return a shallow copy of the character's reflections in append order
+   * (oldest → newest). Empty array when none have been recorded.
+   */
+  getCharacterReflections(charRef: string): Reflection[] {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return [];
+    return (this.state.characterReflections[key] || []).map((r) => ({ ...r }));
+  }
+
+  /**
+   * Append a reflection to a character's memory. Returns the appended entry
+   * (with timestamp filled in) for callers that want to chain or echo it.
+   * Empty / whitespace-only text is rejected silently — there's no value in
+   * storing an empty reflection and downstream dossier rendering would skip
+   * it anyway.
+   *
+   * Eviction policy when the per-character cap is reached: drop the oldest
+   * entry whose salience is below the new entry's salience; if all stored
+   * entries are at-or-above the new entry's salience, drop the literal-oldest.
+   * This keeps highly salient reflections in the window even when the
+   * character is generating churn.
+   */
+  appendCharacterReflection(
+    charRef: string,
+    text: string,
+    options?: { beatId?: string; salience?: number; timestamp?: number },
+  ): Reflection | null {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return null;
+    const trimmed = (text || '').trim();
+    if (!trimmed) return null;
+
+    const entry: Reflection = {
+      timestamp: options?.timestamp ?? Date.now(),
+      text: trimmed,
+      ...(options?.beatId ? { beatId: options.beatId } : {}),
+      ...(options?.salience !== undefined
+        ? { salience: Math.max(0, Math.min(1, options.salience)) }
+        : {}),
+    };
+
+    if (!this.state.characterReflections[key]) this.state.characterReflections[key] = [];
+    const list = this.state.characterReflections[key];
+    list.push(entry);
+
+    if (list.length > StoryContext.REFLECTION_CAP) {
+      const incomingSalience = entry.salience ?? 0.5;
+      // Find an evictable entry: oldest with strictly lower salience.
+      let evictIdx = -1;
+      for (let i = 0; i < list.length - 1; i += 1) {
+        const s = list[i].salience ?? 0.5;
+        if (s < incomingSalience) { evictIdx = i; break; }
+      }
+      if (evictIdx === -1) evictIdx = 0;  // all entries ≥ new — drop oldest.
+      list.splice(evictIdx, 1);
+    }
+
+    this.emit('characterReflectionAdded', { characterRef: key, reflection: { ...entry } });
+    return { ...entry };
+  }
+
   // Timer methods
   setTimer(name: string, value: number, target?: string): void {
     this.state.timers[name] = { value, target };
@@ -1168,6 +1275,20 @@ export class StoryContext extends EventEmitter {
         }
         break;
       }
+      // Step 7 / Mode B — record a reflection on the character's memory.
+      // Effects fire from a beat or choice, so they're a natural place to
+      // author "this character now feels X about what just happened".
+      case 'addReflection': {
+        const text = (effect.reflectionText || '').trim();
+        if (text) {
+          this.appendCharacterReflection(effect.target, text, {
+            salience: typeof effect.reflectionSalience === 'number'
+              ? effect.reflectionSalience
+              : undefined,
+          });
+        }
+        break;
+      }
     }
   }
 
@@ -1342,6 +1463,7 @@ export class StoryContext extends EventEmitter {
       characterMoods: {},
       characterSentiments: {},
       characterEmotionLevels: {},
+      characterReflections: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {}
@@ -1712,6 +1834,9 @@ export class StoryContext extends EventEmitter {
       characterEmotionLevels: Object.fromEntries(
         Object.entries(this.state.characterEmotionLevels).map(([k, v]) => [k, { ...v }])
       ),
+      characterReflections: Object.fromEntries(
+        Object.entries(this.state.characterReflections).map(([k, v]) => [k, v.map((r) => ({ ...r }))])
+      ),
       visitedBeats: Array.from(this.state.visitedBeats),
       visitedChoices: Array.from(this.state.visitedChoices),
       timers: { ...this.state.timers },
@@ -1767,6 +1892,9 @@ export class StoryContext extends EventEmitter {
         : {},
       characterEmotionLevels: serialized.characterEmotionLevels
         ? Object.fromEntries(Object.entries(serialized.characterEmotionLevels).map(([k, v]) => [k, { ...v }]))
+        : {},
+      characterReflections: serialized.characterReflections
+        ? Object.fromEntries(Object.entries(serialized.characterReflections).map(([k, v]) => [k, v.map((r: any) => ({ ...r }))]))
         : {},
       visitedBeats: new Set(serialized.visitedBeats),
       visitedChoices: new Set((serialized as any).visitedChoices || []),

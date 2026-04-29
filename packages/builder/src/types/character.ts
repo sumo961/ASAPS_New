@@ -63,6 +63,19 @@ export interface Character {
    */
   traits?: Record<string, number>;
 
+  /**
+   * Step 7 — dossier policy. Controls how the character's LLM dossier is
+   * assembled at runtime:
+   *   'reAnchor'   — Mode A (default). Rebuild dossier from structured
+   *                  state every turn. The NPC cannot drift away from
+   *                  who they are; reflections are not surfaced.
+   *   'reflection' — Mode B. Append accumulated reflection memory to the
+   *                  dossier so the LLM sees recent felt-experience.
+   *                  The character is allowed to grow over the session.
+   * Optional — characters that omit this field default to 'reAnchor'.
+   */
+  dossierPolicy?: 'reAnchor' | 'reflection';
+
   // Metadata
   description?: string;
   tags?: string[];

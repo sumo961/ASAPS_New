@@ -148,7 +148,11 @@ export interface Effect {
     // Step 5: fire an emotion at a character (auto-nudges mood per palette
     // weights). The same authoring shortcut as nudgeMood/addSentiment, but
     // routed through the emotion model so palette changes take effect.
-    | 'fireEmotion';
+    | 'fireEmotion'
+    // Step 7 / Mode B: append a reflection to a character's memory. Used by
+    // characters whose dossierPolicy is 'reflection' so the LLM sees recent
+    // felt-experience alongside (or instead of) the structured dossier.
+    | 'addReflection';
   target: string;
   value?: any;
   // Sentiment-effect parameters (used when type === 'addSentiment'). Kept
@@ -170,6 +174,15 @@ export interface Effect {
   emotion?: string;
   /** Intensity delta for fireEmotion effects (clamped to [0, 1] post-add). */
   emotionDelta?: number;
+  /**
+   * Reflection text for addReflection effects (Step 7). Stored on the
+   * character's reflection memory at the moment the effect fires. Authors
+   * can use this to seed feelings the dossier renders to the LLM.
+   */
+  reflectionText?: string;
+  /** Optional salience hint ∈ [0, 1] for the reflection — higher = harder
+   * to evict when the per-character cap fills up. Defaults to 0.5. */
+  reflectionSalience?: number;
 }
 
 /**

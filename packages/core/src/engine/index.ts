@@ -1,7 +1,7 @@
 export { StoryEngine } from './StoryEngine';
 export { StoryContext } from './StoryContext';
 export { Story } from './Story';
-export type { SerializedStoryState, InventoryEntry, ChoiceRecord, ResetOptions, CharacterMood, Sentiment } from './StoryContext';
+export type { SerializedStoryState, InventoryEntry, ChoiceRecord, ResetOptions, CharacterMood, Sentiment, Reflection } from './StoryContext';
 export { DEFAULT_EMOTION_PALETTE, findEmotionDefinition, type EmotionDefinition } from './EmotionPalette';
 export {
   DEFAULT_TRAIT_NAMES,

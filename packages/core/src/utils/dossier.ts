@@ -26,6 +26,13 @@ interface CharacterLike {
   role?: string;
   /** Optional Big Five (or author-defined) traits, each in [0, 1]. Step 6. */
   traits?: Record<string, number>;
+  /**
+   * Step 7 — dossier policy. `'reAnchor'` (default, Mode A) rebuilds the
+   * dossier from structured state every turn; reflections are not rendered.
+   * `'reflection'` (Mode B) adds the character's accumulated reflection
+   * memory to the dossier so the LLM sees recent felt-experience.
+   */
+  dossierPolicy?: 'reAnchor' | 'reflection';
 }
 
 interface CharacterScopedState {
@@ -97,6 +104,14 @@ export interface BuildDossierOptions {
   emotions?: Record<string, number>;
   /** Maximum emotions to render (default 4). */
   maxEmotions?: number;
+  /**
+   * Reflection memory entries (Step 7 — Mode B). Rendered only when the
+   * character's dossierPolicy resolves to 'reflection'. Caller normally
+   * passes the most recent N from StoryContext.getCharacterReflections().
+   */
+  reflections?: ReadonlyArray<{ timestamp: number; text: string; salience?: number; beatId?: string }>;
+  /** Maximum reflections to render (default 6). */
+  maxReflections?: number;
 }
 
 /**
@@ -199,6 +214,22 @@ export function buildDossier(
     for (const i of tail) {
       const summary = i.summary ? ` — ${i.summary}` : '';
       lines.push(`  - ${i.beatName}${summary}`);
+    }
+  }
+
+  // Reflection memory (Step 7 — Mode B). Only rendered when the character
+  // has opted into the reflection policy; in Mode A re-anchor characters
+  // the dossier is rebuilt from structured state every turn so reflections
+  // are intentionally suppressed (drift resistance is the whole point).
+  // Tail-truncated to maxReflections; salience is currently used by the
+  // runtime's eviction algorithm — the dossier just renders most-recent.
+  const policy = character.dossierPolicy || 'reAnchor';
+  if (policy === 'reflection' && options.reflections && options.reflections.length > 0) {
+    const cap = options.maxReflections ?? 6;
+    const tail = options.reflections.slice(-cap);
+    lines.push('Recent reflections:');
+    for (const r of tail) {
+      lines.push(`  - ${r.text}`);
     }
   }
 
@@ -334,6 +365,7 @@ export function buildDossierForRef(
     getCharacterMood?: (ref: string) => MoodLike;
     getCharacterSentiments?: (ref: string) => ReadonlyArray<SentimentLike>;
     getCharacterEmotions?: (ref: string) => Record<string, number>;
+    getCharacterReflections?: (ref: string) => ReadonlyArray<{ timestamp: number; text: string; salience?: number; beatId?: string }>;
     getStory?: () => any;
     getHistory?: () => ReadonlyArray<string>;
     getChoiceHistory?: () => ReadonlyArray<ChoiceRecordLike>;
@@ -347,6 +379,13 @@ export function buildDossierForRef(
   const mood = contextLike?.getCharacterMood?.(characterRef);
   const sentiments = contextLike?.getCharacterSentiments?.(characterRef);
   const emotions = contextLike?.getCharacterEmotions?.(characterRef);
+  // Step 7 — only fetch reflections when the character is in reflection
+  // policy. For re-anchor characters, the dossier rebuilds from structured
+  // state every turn, so reading reflections is wasted work.
+  const policy = (character as CharacterLike).dossierPolicy || 'reAnchor';
+  const reflections = policy === 'reflection'
+    ? contextLike?.getCharacterReflections?.(characterRef)
+    : undefined;
 
   // Resolve interactions from whichever path the caller wired up. Prefer the
   // explicit accessor; fall back to deriving from story + history.
@@ -367,5 +406,5 @@ export function buildDossierForRef(
     }
   }
 
-  return buildDossier(character, { ...options, state, interactions, mood, sentiments, emotions });
+  return buildDossier(character, { ...options, state, interactions, mood, sentiments, emotions, reflections });
 }

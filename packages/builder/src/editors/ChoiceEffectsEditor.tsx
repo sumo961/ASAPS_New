@@ -19,6 +19,8 @@ const EFFECT_TYPE_LABELS: Record<EffectType, string> = {
   addSentiment: 'Add Sentiment',
   // Step 5 — fire an emotion at a character (auto-nudges mood per palette).
   fireEmotion: 'Fire Emotion',
+  // Step 7 — append a reflection to a character's memory (Mode B only).
+  addReflection: 'Add Reflection',
 };
 
 interface ChoiceEffectsEditorProps {
@@ -115,7 +117,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
   return (
     <div className={`space-y-1.5 ${compact ? '' : 'p-2 bg-gray-50 rounded'}`}>
       {effects.map((effect, index) => {
-        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment' || effect.type === 'fireEmotion';
+        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment' || effect.type === 'fireEmotion' || effect.type === 'addReflection';
         return (
         <div key={index} className="flex flex-wrap gap-1 items-center">
           {/* Type dropdown */}
@@ -145,6 +147,10 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 updates.value = undefined;
                 updates.emotion = effect.emotion ?? '';
                 updates.emotionDelta = effect.emotionDelta ?? 0.3;
+              } else if (newType === 'addReflection') {
+                updates.value = undefined;
+                updates.reflectionText = effect.reflectionText ?? '';
+                updates.reflectionSalience = effect.reflectionSalience ?? 0.5;
               }
               updateEffect(index, updates);
             }}
@@ -220,6 +226,29 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
                 placeholder="±intensity"
                 title="Intensity delta (0–1 typical). Positive bumps the emotion; mood is auto-nudged via palette weights."
+              />
+            </>
+          )}
+          {effect.type === 'addReflection' && (
+            <>
+              <input
+                type="text"
+                value={effect.reflectionText || ''}
+                onChange={(e) => updateEffect(index, { reflectionText: e.target.value })}
+                placeholder="reflection text"
+                className="flex-1 min-w-[140px] px-1.5 py-1 text-xs border rounded"
+                title="Short narrative note in the character's voice. Mode B only — characters with the default 'reAnchor' policy ignore reflections in their dossier."
+              />
+              <input
+                type="number"
+                step={0.1}
+                min={0}
+                max={1}
+                value={effect.reflectionSalience ?? 0.5}
+                onChange={(e) => updateEffect(index, { reflectionSalience: parseFloat(e.target.value) || 0 })}
+                className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
+                placeholder="salience"
+                title="0–1. Higher salience entries survive eviction longer when the per-character cap fills up."
               />
             </>
           )}
