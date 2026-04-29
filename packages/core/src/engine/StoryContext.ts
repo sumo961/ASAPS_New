@@ -248,46 +248,95 @@ export class StoryContext extends EventEmitter {
     return existing?.quantity ?? 0;
   }
 
-  // Character-specific inventory methods
+  // Character-specific inventory methods.
+  //
+  // The `character` arg accepts a Character.id (canonical), a name, or a
+  // displayName — we resolve to the canonical id-keyed bucket via
+  // resolveCharacterKey. If a legacy bucket exists under one of the alias
+  // strings (because an older story wrote to "Granny" before promotion),
+  // ensureCanonicalCharacterBucket merges it into the canonical bucket the
+  // first time the character is touched. After that, all aliases route to
+  // the same storage and stay in sync.
+
+  /**
+   * Ensure the canonical-id bucket exists and absorb any legacy alias buckets.
+   * Returns the canonical key to use, or null if the ref should route to the
+   * global player inventory ('player' / empty).
+   */
+  private ensureCanonicalCharacterBucket(ref: string): string | null {
+    if (ref === 'player' || !ref) return null;
+    const canonical = this.resolveCharRef(ref);
+    if (!canonical) return null;
+
+    // Find aliases (name, displayName, original ref) that have separate buckets
+    // and merge them into the canonical bucket.
+    const characters = (this.story as any)?.getCharacters?.() as
+      | { id: string; name?: string; displayName?: string }[]
+      | undefined;
+    const character = characters?.find((c) => c.id === canonical);
+    const aliasKeys = new Set<string>();
+    if (character) {
+      if (character.name && character.name !== canonical) aliasKeys.add(character.name);
+      if (character.displayName && character.displayName !== canonical) aliasKeys.add(character.displayName);
+    }
+    if (ref !== canonical) aliasKeys.add(ref);
+
+    if (!this.state.characterInventories[canonical]) {
+      this.state.characterInventories[canonical] = [];
+    }
+    const target = this.state.characterInventories[canonical];
+
+    for (const alias of aliasKeys) {
+      const aliasBucket = this.state.characterInventories[alias];
+      if (!aliasBucket || aliasBucket === target) continue;
+      // Merge alias entries into target (sum quantities for matching items).
+      for (const entry of aliasBucket) {
+        const existing = target.find((e) => e.name === entry.name);
+        if (existing) existing.quantity += entry.quantity;
+        else target.push({ ...entry });
+      }
+      delete this.state.characterInventories[alias];
+    }
+    return canonical;
+  }
+
   addInventoryItem(character: string, item: string, quantity: number = 1): void {
-    // Use main inventory for 'player' or initialize character inventory
     if (character === 'player' || !character) {
       this.addToInventory(item, quantity);
+      return;
+    }
+    const key = this.ensureCanonicalCharacterBucket(character) ?? character;
+    if (!this.state.characterInventories[key]) {
+      this.state.characterInventories[key] = [];
+    }
+    const charInventory = this.state.characterInventories[key];
+    const existing = charInventory.find(entry => entry.name === item);
+    if (existing) {
+      existing.quantity += quantity;
+      this.emit('inventoryChanged', { action: 'add', character: key, item, quantity, newTotal: existing.quantity });
     } else {
-      if (!this.state.characterInventories[character]) {
-        this.state.characterInventories[character] = [];
-      }
-      const charInventory = this.state.characterInventories[character];
-      const existing = charInventory.find(entry => entry.name === item);
-      if (existing) {
-        existing.quantity += quantity;
-        this.emit('inventoryChanged', { action: 'add', character, item, quantity, newTotal: existing.quantity });
-      } else {
-        charInventory.push({ name: item, quantity });
-        this.emit('inventoryChanged', { action: 'add', character, item, quantity, newTotal: quantity });
-      }
+      charInventory.push({ name: item, quantity });
+      this.emit('inventoryChanged', { action: 'add', character: key, item, quantity, newTotal: quantity });
     }
   }
 
   removeInventoryItem(character: string, item: string, quantity: number = 1): void {
-    // Use main inventory for 'player' or character-specific inventory
     if (character === 'player' || !character) {
       this.removeFromInventory(item, quantity);
+      return;
+    }
+    const key = this.ensureCanonicalCharacterBucket(character) ?? character;
+    const charInventory = this.state.characterInventories[key];
+    if (!charInventory) return;
+    const existing = charInventory.find(entry => entry.name === item);
+    if (!existing) return;
+    existing.quantity -= quantity;
+    if (existing.quantity <= 0) {
+      const index = charInventory.findIndex(entry => entry.name === item);
+      charInventory.splice(index, 1);
+      this.emit('inventoryChanged', { action: 'remove', character: key, item, quantity, newTotal: 0 });
     } else {
-      const charInventory = this.state.characterInventories[character];
-      if (charInventory) {
-        const existing = charInventory.find(entry => entry.name === item);
-        if (existing) {
-          existing.quantity -= quantity;
-          if (existing.quantity <= 0) {
-            const index = charInventory.findIndex(entry => entry.name === item);
-            charInventory.splice(index, 1);
-            this.emit('inventoryChanged', { action: 'remove', character, item, quantity, newTotal: 0 });
-          } else {
-            this.emit('inventoryChanged', { action: 'remove', character, item, quantity, newTotal: existing.quantity });
-          }
-        }
-      }
+      this.emit('inventoryChanged', { action: 'remove', character: key, item, quantity, newTotal: existing.quantity });
     }
   }
 
@@ -295,7 +344,8 @@ export class StoryContext extends EventEmitter {
     if (character === 'player' || !character) {
       return this.hasInInventory(item);
     }
-    const charInventory = this.state.characterInventories[character];
+    const key = this.ensureCanonicalCharacterBucket(character) ?? character;
+    const charInventory = this.state.characterInventories[key];
     if (!charInventory) return false;
     const existing = charInventory.find(entry => entry.name === item);
     return existing !== undefined && existing.quantity > 0;
@@ -305,7 +355,8 @@ export class StoryContext extends EventEmitter {
     if (character === 'player' || !character) {
       return this.getInventoryQuantity(item);
     }
-    const charInventory = this.state.characterInventories[character];
+    const key = this.ensureCanonicalCharacterBucket(character) ?? character;
+    const charInventory = this.state.characterInventories[key];
     if (!charInventory) return 0;
     const existing = charInventory.find(entry => entry.name === item);
     return existing?.quantity ?? 0;
