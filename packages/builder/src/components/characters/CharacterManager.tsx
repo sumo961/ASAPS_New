@@ -78,6 +78,50 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   const [showEditor, setShowEditor] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
+  // Consume the prefill name set by Inspector → CharacterRefField's "Define
+  // '<name>' as a Character" link. When present we skip the template picker
+  // and create a minimal NPC with that name, then open the editor so the
+  // author can fill in the rest. The prefill is cleared after consumption.
+  useEffect(() => {
+    const prefillName = (window as any).__asapsPrefillCharacterName;
+    if (typeof prefillName !== 'string' || !prefillName.trim()) return;
+    (window as any).__asapsPrefillCharacterName = undefined;
+    const trimmed = prefillName.trim();
+
+    // Don't double-create if a character with this exact name already exists —
+    // just select it instead so the user lands somewhere predictable.
+    const existing = characters.find((c) =>
+      (c.name || '').toLowerCase() === trimmed.toLowerCase()
+      || (c.displayName || '').toLowerCase() === trimmed.toLowerCase()
+    );
+    if (existing) {
+      selectCharacter(existing.id);
+      setShowEditor(true);
+      return;
+    }
+
+    const sanitisedName = trimmed.replace(/\s+/g, '_').toLowerCase().slice(0, 64) || 'new_character';
+    const newCharacter: Character = {
+      id: `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: sanitisedName,
+      displayName: trimmed,
+      role: 'npc',
+      visual: { type: 'static' },
+      states: [{ id: 'default', name: 'default', displayName: 'Default', visual: {} }],
+      defaultState: 'default',
+      counters: [],
+      inventory: [],
+      description: '',
+      tags: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    onCharactersChange([...characters, newCharacter]);
+    selectCharacter(newCharacter.id);
+    setShowEditor(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
 
   // Filter characters based on search and role
