@@ -1,5 +1,94 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-29: Character System — Steps 2–4 Complete (Affect, Memory, Dossier) (v0.9.42)
+
+### Overview
+
+Three more layers of the rich-character roadmap shipped in this release. Step 2 (LLM dossier with Mode A re-anchoring) wires character data into AI Dialog Tree and AI Conversation prompts so the LLM stays anchored to the canonical Character record across long conversations. Step 3 (per-character narrative memory) is a pure derived view over existing beat / choice history sliced per character — automatically included in the dossier as a "Recent interactions" block. Step 4 (mood + sentiments MVP) introduces a typed runtime model for character emotional state, the new UpdateAffect beat for in-graph mood / sentiment changes, ConditionBeat operators on mood / sentiment for branching logic, an Affect tab in the Character Editor for authored initial state, an affect-slider Inspector control with qualitative live previews, a Character Affect panel in the Preview Window's debug sidebar, and (this release's most important design refinement) **affect-as-effects on dialog choices and nodes** so authors don't need a separate UpdateAffect beat for every choice that touches emotion.
+
+The User Guide was also rewritten in this window: Part 9 (Version Control & Collaboration) is fresh, the character-combobox section reflects the v0.9.41 Inspector changes, and the FAQ collaboration entry points at the v0.9.38+ menu items.
+
+### Step 2 — Character Dossier with Mode A Re-anchoring
+
+When an AI beat's NPC field links to a defined Character, the runtime now synthesises a natural-language dossier from the Character's authored data plus current character-scoped state (counters / variables / flags) and prepends it to the LLM prompt as a "stay in character; the facts below are canonical" block. Built fresh on every turn so personality drift across long conversations is structurally prevented — the design doc's central concern about LLM character coherence.
+
+The `buildDossier(character, options)` utility produces a compact text block with the Character's identity (name, role suffix when not 'npc'), description, tags, and an optional "Current state" section. `buildDossierForRef(ref, characters, contextLike)` wraps it with auto-resolution of the ref + auto-pull of state from the StoryContext. Both AIDialogTreeBeat and AIConversationBeat now build the dossier once after the StoryContext is in scope and pass it into every prompt construction (re-anchoring policy, Mode A from the design doc).
+
+**Files modified:**
+- `packages/core/src/utils/dossier.ts` (new)
+- `packages/core/src/utils/index.ts`
+- `packages/core/src/utils/ConversationPromptBuilder.ts`
+- `packages/core/src/beats/AIConversationBeat.ts`
+- `packages/core/src/beats/AIDialogTreeBeat.ts`
+- `packages/core/tests/utils/dossier.test.ts` (new)
+
+### Step 3 — Per-Character Narrative Memory
+
+Pure derived view over existing data — no new state, no runtime cost beyond a single linear walk per query. Powers the dossier's "Recent interactions" block and unblocks future per-character UI features.
+
+`narrativeMemory.ts` exports four query functions: `beatsForCharacter` (visit history sliced per character with role tags: speaker, dialog-speaker, inventory-holder/source/target, npc), `choicesForCharacter` (choice records made in beats involving the character), `interactionsForCharacter` (combined timeline tagged kind=beat/choice), and `relationshipBetween(a, b)` (shared beats + shared choices, symmetric). Match logic mirrors `findReferencesByName` from Step 1.d.5 — characterRef-id wins, then case-insensitive name/displayName via `resolveCharacter`.
+
+`buildDossierForRef` now auto-derives interactions when the contextLike exposes `getStory()` / `getHistory()` / `getChoiceHistory()` — which StoryContext implements — so AI beats picked up the new dossier section without any call-site changes. Choice entries summarise as `chose "<text>"` to keep token budget bounded; default cap is 8 most-recent.
+
+**Files modified:**
+- `packages/core/src/utils/narrativeMemory.ts` (new)
+- `packages/core/src/utils/dossier.ts`
+- `packages/core/src/utils/index.ts`
+- `packages/core/tests/utils/narrativeMemory.test.ts` (new)
+
+### Step 4 — Mood + Sentiments MVP, End-to-End
+
+The first real new authoring feature. Five sub-pieces shipped over multiple commits:
+
+**Runtime (Step 4 part 1).** Two new typed state slots on StoryContext: `characterMoods: Record<charId, CharacterMood>` (2D continuous, valence × arousal, each clamped to [-1, 1]) and `characterSentiments: Record<charId, Sentiment[]>` (directed emotional memory — `{toEntityRef, emotion, strength, createdAt}`). Accessors: `getCharacterMood / setCharacterMood / nudgeCharacterMood`, `getCharacterSentiments / getSentimentTo / addCharacterSentiment` (strengthens an existing `(target, emotion)` row in place rather than duplicating). Events fire on change so future debug panels can subscribe without polling. Forward-compatible serialization — older saves load with empty defaults. The dossier auto-renders mood as natural language ("happy, alert (valence 0.62, arousal 0.30)") and top-N sentiments by absolute strength ("intense trust toward player").
+
+**Beat (Step 4 part 2).** `UpdateAffectBeat` invisible beat with one combined surface that handles mood deltas (`moodValenceDelta` / `moodArousalDelta`) AND sentiment recording (`sentimentTarget` + `sentimentEmotion` + `sentimentDelta`) in a single beat. Combined-beat decision documented in the commit log: splitting into UpdateMood + UpdateSentiment was considered and rejected — the cognitive overhead of a second invisible beat doesn't pay for itself.
+
+**Conditions (Step 4 part 3).** `ConditionBeat` gained two new types: 'mood' (with `moodAxis: 'valence' | 'arousal'`) and 'sentiment' (with `sentimentTarget`, optional `sentimentEmotion` — when emotion is omitted, the runtime sums strengths across all emotions toward the target as an "overall feeling toward X" scalar). All six standard operators (`==`, `!=`, `>`, `<`, `>=`, `<=`) supported.
+
+**Inspector affect-slider control.** New `'affect-slider'` schema control type renders range inputs with end-cap labels ("← sadder / happier →") and a live qualitative preview ("Direction: happier") for non-trivial deltas. Used by UpdateAffect's three delta fields. Vocabulary comes from the same `describeMoodAxis` helper the LLM dossier uses, so authors and the AI see the same words for the same numbers.
+
+**Authored initial mood + sentiments on the Character record.** New Affect tab in the Character Editor with two clamped sliders (valence + arousal) and a row-based sentiment editor. Authored values seed into runtime state on context creation, on `setStory()`, and on `reset()` — so a story restart begins from the same emotional starting point each time. Seeding never overwrites in-flight runtime values; reset clears first then re-seeds. Out-of-range authored values are clamped on seed.
+
+**Runtime affect display in Preview Window.** New `<CharacterAffectPanel>` component mounted in the Debug Info sidebar shows, for each defined Character: name + colour dot, two horizontal mood bars with centre-pivot fills, the qualitative summary, and top-N sentiments with intensity word + emotion + resolved target name. Re-renders live on `characterMoodChanged` / `characterSentimentChanged` events. "Neutral" badge when there's nothing emotionally interesting to show.
+
+**Affect as Effects on choices and nodes (this release's most important design refinement).** The `Effect` type gained `'nudgeMood'` and `'addSentiment'` variants so `DialogChoice.effects` and `DialogNode.effects` (and any other beat that hosts effect arrays) can update character affect inline. The DialogTree effect editor exposes both as new options with appropriate per-type fields. The UpdateAffect beat is kept (logic beats can't host effects, and the beat is still useful as a discrete graph-level marker), but the common choice-driven case now lives where it belongs — alongside counter, variable, and inventory effects on the choice itself. Without this, every emotionally-loaded choice would have required a separate UpdateAffect beat after it, which would have made graphs unreadable.
+
+**Files modified:**
+- `packages/core/src/engine/StoryContext.ts`
+- `packages/core/src/types/index.ts`
+- `packages/core/src/beats/UpdateAffectBeat.ts` (new)
+- `packages/core/src/beats/BeatRegistry.ts`
+- `packages/core/src/beats/ConditionBeat.ts`
+- `packages/core/src/utils/dossier.ts`
+- `packages/core/src/utils/index.ts`
+- `packages/core/tests/engine/CharacterMoodAndSentiments.test.ts` (new)
+- `packages/core/tests/engine/MoodSentimentConditions.test.ts` (new)
+- `packages/core/tests/engine/CharacterAffectSeeding.test.ts` (new)
+- `packages/core/tests/engine/AffectEffects.test.ts` (new)
+- `packages/core/tests/beats/UpdateAffectBeat.test.ts` (new)
+- `packages/builder/src/types/character.ts`
+- `packages/builder/src/components/SchemaFormGenerator.tsx`
+- `packages/builder/src/components/characters/CharacterEditor.tsx`
+- `packages/builder/src/components/characters/CharacterAffectPanel.tsx` (new)
+- `packages/builder/src/components/characters/__tests__/CharacterAffectPanel.test.tsx` (new)
+- `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
+- `packages/builder/src/pages/PreviewWindow.tsx`
+- `beat-definitions/core-beats.json`
+
+### Test Coverage
+
+Total character-feature test count is now **194 tests across 15 files** (143 core + 51 builder), all passing. Pre-existing unrelated failures (ConditionBeat counter tests, EndScreen reset, ConversationPromptBuilder "CONVERSATION RULES" stale assertion, ttsWait timing flake) reproduce on main and are untouched.
+
+### Documentation
+
+User Guide pass during the release window — Part 9 (Version Control & Collaboration) was a full rewrite, the character-combobox section was lightly polished, and the FAQ collaboration entry was rewritten to point at v0.9.38+ menu items.
+
+**Files modified:**
+- `docs/USER_GUIDE.md`
+
+---
+
 ## 2026-04-29: Character System — Step 1 Complete + Dialog Edit-Button Fix (v0.9.41)
 
 ### Overview
