@@ -15,10 +15,12 @@ const wolf: Character = { ...granny, id: 'char_2', name: 'Wolf', displayName: 'W
 function makeContext(opts: {
   moods?: Record<string, { valence: number; arousal: number }>;
   sentiments?: Record<string, Array<{ toEntityRef: string; emotion: string; strength: number }>>;
+  emotions?: Record<string, Record<string, number>>;
 }) {
   return {
     getCharacterMood: (id: string) => opts.moods?.[id] || { valence: 0, arousal: 0 },
     getCharacterSentiments: (id: string) => opts.sentiments?.[id] || [],
+    ...(opts.emotions ? { getCharacterEmotions: (id: string) => opts.emotions?.[id] || {} } : {}),
   };
 }
 
@@ -141,5 +143,42 @@ describe('CharacterAffectPanel', () => {
     render(<CharacterAffectPanel characters={[]} context={makeContext({})} onClose={onClose} />);
     fireEvent.click(screen.getByLabelText(/close/i));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('renders top-N emotions as inline bars when getCharacterEmotions is provided', () => {
+    render(
+      <CharacterAffectPanel
+        characters={[granny]}
+        context={makeContext({ emotions: { char_1: { fear: 0.7, joy: 0.2, anger: 0.45 } } })}
+      />
+    );
+    expect(screen.getByText('fear')).toBeTruthy();
+    expect(screen.getByText('anger')).toBeTruthy();
+    expect(screen.getByText('joy')).toBeTruthy();
+    expect(screen.getByText('0.70')).toBeTruthy();
+  });
+
+  it('omits sub-threshold emotions and the neutral badge accounts for them', () => {
+    render(
+      <CharacterAffectPanel
+        characters={[granny]}
+        context={makeContext({ emotions: { char_1: { joy: 0.02 } } })}
+      />
+    );
+    expect(screen.queryByText('joy')).toBeNull();
+    expect(screen.getByText('neutral')).toBeTruthy();
+  });
+
+  it('shows mood/sentiment but no emotions block when getCharacterEmotions is omitted', () => {
+    render(
+      <CharacterAffectPanel
+        characters={[granny]}
+        context={makeContext({ moods: { char_1: { valence: 0.5, arousal: 0 } } })}
+      />
+    );
+    // Mood is present, but no emotion-specific markers — confirm by absence
+    // of any of the default Ekman names rendered as text.
+    expect(screen.queryByText(/^joy$/)).toBeNull();
+    expect(screen.queryByText(/^fear$/)).toBeNull();
   });
 });

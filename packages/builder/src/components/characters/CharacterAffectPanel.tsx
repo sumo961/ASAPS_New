@@ -29,6 +29,9 @@ export interface AffectSentiment {
 export interface CharacterAffectLookup {
   getCharacterMood: (charId: string) => AffectMood;
   getCharacterSentiments: (charId: string) => ReadonlyArray<AffectSentiment>;
+  /** Step 5 — current emotion intensities, keyed by emotion name. Optional;
+   * the panel renders an emotions block only when this lookup is provided. */
+  getCharacterEmotions?: (charId: string) => Record<string, number>;
 }
 
 export interface CharacterAffectPanelProps {
@@ -83,6 +86,11 @@ export const CharacterAffectPanel: React.FC<CharacterAffectPanelProps> = ({
               .filter((s) => Math.abs(s.strength) > 0.05)
               .sort((a, b) => Math.abs(b.strength) - Math.abs(a.strength))
               .slice(0, topNSentiments);
+            const emotions = context.getCharacterEmotions?.(char.id) || {};
+            const topEmotions = Object.entries(emotions)
+              .filter(([, v]) => v > 0.05)
+              .sort(([, a], [, b]) => b - a)
+              .slice(0, 4);
             const moodIsNeutral = Math.abs(mood.valence) < 0.05 && Math.abs(mood.arousal) < 0.05;
 
             return (
@@ -90,7 +98,7 @@ export const CharacterAffectPanel: React.FC<CharacterAffectPanelProps> = ({
                 <div style={charHeaderStyle}>
                   <span style={{ ...colorDotStyle, backgroundColor: char.color || '#94a3b8' }} />
                   <span style={charNameStyle}>{char.displayName || char.name}</span>
-                  {moodIsNeutral && top.length === 0 && (
+                  {moodIsNeutral && top.length === 0 && topEmotions.length === 0 && (
                     <span style={neutralBadgeStyle}>neutral</span>
                   )}
                 </div>
@@ -100,6 +108,23 @@ export const CharacterAffectPanel: React.FC<CharacterAffectPanelProps> = ({
                 {!moodIsNeutral && (
                   <div style={moodSummaryStyle}>
                     {describeMoodAxis(mood.valence, 'valence')}, {describeMoodAxis(mood.arousal, 'arousal')}
+                  </div>
+                )}
+
+                {/* Current emotions (Step 5) — small inline bars showing
+                    intensity. Decay each beat-entry, so authors watch them
+                    fade in real time. */}
+                {topEmotions.length > 0 && (
+                  <div style={emotionsBlockStyle}>
+                    {topEmotions.map(([name, value]) => (
+                      <div key={name} style={emotionRowStyle}>
+                        <span style={emotionNameStyle}>{name}</span>
+                        <div style={emotionTrackStyle}>
+                          <div style={{ ...emotionFillStyle, width: `${Math.min(100, value * 100)}%` }} />
+                        </div>
+                        <span style={emotionValueStyle}>{value.toFixed(2)}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -213,3 +238,12 @@ const sentimentDotStyle = (strength: number): React.CSSProperties => ({
   backgroundColor: strength < 0 ? '#ef4444' : '#10b981',
   flexShrink: 0,
 });
+
+// Emotion-row mini-bars for Step 5. Compact horizontal fills so multiple
+// emotions can sit in a small panel without dominating the layout.
+const emotionsBlockStyle: React.CSSProperties = { marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 };
+const emotionRowStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: '60px 1fr 32px', alignItems: 'center', gap: 6, fontSize: 10 };
+const emotionNameStyle: React.CSSProperties = { color: '#4b5563' };
+const emotionTrackStyle: React.CSSProperties = { position: 'relative', height: 5, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden' };
+const emotionFillStyle: React.CSSProperties = { position: 'absolute', left: 0, top: 0, bottom: 0, background: '#a78bfa', borderRadius: 3 };
+const emotionValueStyle: React.CSSProperties = { fontFamily: 'monospace', fontSize: 10, color: '#374151', textAlign: 'right' };

@@ -1689,6 +1689,8 @@ export const PreviewWindow: React.FC = () => {
       // changes via UpdateAffect beats or future emotion firings.
       context.on('characterMoodChanged', updateDebugInfo);
       context.on('characterSentimentChanged', updateDebugInfo);
+      // Step 5: emotion firings + per-beat decay also re-render the panel.
+      context.on('characterEmotionChanged', updateDebugInfo);
 
       // On in-story restart (EndScreen/AISummary → context.reset / selectiveReset),
       // the renderer's HUD state is not cleared automatically. Clear stale timer
@@ -2740,6 +2742,7 @@ export const PreviewWindow: React.FC = () => {
                       context={{
                         getCharacterMood: (id: string) => ctx.getCharacterMood(id),
                         getCharacterSentiments: (id: string) => ctx.getCharacterSentiments(id),
+                        getCharacterEmotions: (id: string) => ctx.getCharacterEmotions(id),
                       }}
                     />
                   );
