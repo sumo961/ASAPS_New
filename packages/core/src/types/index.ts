@@ -92,7 +92,7 @@ export interface FictionalTime {
 }
 
 export interface Condition {
-  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime';
+  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment';
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
   // New canonical field names
   variableName?: string;
@@ -117,6 +117,16 @@ export interface Condition {
   compareVariable?: string;        // Variable name when compareSource is 'variable'
   // For fictionalTime conditions
   compareTime?: FictionalTime;     // Time to compare against
+  // For mood conditions (Step 4): which axis to test on `character`'s mood.
+  moodAxis?: 'valence' | 'arousal';
+  // For sentiment conditions (Step 4): direction & emotion of the test.
+  // `character` is the holder of the sentiment; `sentimentTarget` is whom the
+  // sentiment is directed at; `sentimentEmotion` is the emotion label.
+  // The compared scalar is the strength stored at (target, emotion). When
+  // sentimentEmotion is omitted, the strength is summed across all emotions
+  // toward the target — useful for "does Granny like the player overall?".
+  sentimentTarget?: string;
+  sentimentEmotion?: string;
 }
 
 export interface Effect {

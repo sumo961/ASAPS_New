@@ -852,6 +852,52 @@ export class StoryContext extends EventEmitter {
     }
 
     // Get variable name - support both new (variableName) and old (left) field names
+    // Mood conditions (Step 4). `character` is the mood holder; `moodAxis`
+    // is 'valence' or 'arousal'; `value` is the threshold to compare against.
+    if (condition.type === 'mood') {
+      const character = condition.character;
+      const axis = condition.moodAxis || 'valence';
+      if (!character) {
+        console.warn('mood condition missing required character field');
+        return false;
+      }
+      const mood = this.getCharacterMood(character);
+      const left = axis === 'arousal' ? mood.arousal : mood.valence;
+      const right = Number(condition.value ?? condition.right ?? 0);
+      switch (condition.operator) {
+        case '==': return left === right;
+        case '!=': return left !== right;
+        case '>': return left > right;
+        case '<': return left < right;
+        case '>=': return left >= right;
+        case '<=': return left <= right;
+        default: return false;
+      }
+    }
+
+    // Sentiment conditions (Step 4). Compares the strength of
+    // `character`'s sentiment toward `sentimentTarget` (optionally filtered
+    // by `sentimentEmotion`) against `value`.
+    if (condition.type === 'sentiment') {
+      const character = condition.character;
+      const target = condition.sentimentTarget;
+      if (!character || !target) {
+        console.warn('sentiment condition missing character or sentimentTarget');
+        return false;
+      }
+      const left = this.getSentimentTo(character, target, condition.sentimentEmotion);
+      const right = Number(condition.value ?? condition.right ?? 0);
+      switch (condition.operator) {
+        case '==': return left === right;
+        case '!=': return left !== right;
+        case '>': return left > right;
+        case '<': return left < right;
+        case '>=': return left >= right;
+        case '<=': return left <= right;
+        default: return false;
+      }
+    }
+
     // Trim to handle ASML imports that may have leading/trailing whitespace in names
     const varName = (condition.variableName || condition.left)?.trim();
 

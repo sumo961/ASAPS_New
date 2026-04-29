@@ -38,6 +38,11 @@ export class ConditionBeat extends Beat {
   public timeDay?: number;
   public timeHour?: number;
   public timeMinute?: number;
+  // Mood-specific parameter (Step 4)
+  public moodAxis?: 'valence' | 'arousal';
+  // Sentiment-specific parameters (Step 4)
+  public sentimentTarget?: string;
+  public sentimentEmotion?: string;
 
   constructor(config: BeatConfig & {
     conditionType?: string;
@@ -97,6 +102,10 @@ export class ConditionBeat extends Beat {
     this.timeDay = conditionObj.timeDay ?? params.timeDay ?? (config as any).timeDay;
     this.timeHour = conditionObj.timeHour ?? params.timeHour ?? (config as any).timeHour;
     this.timeMinute = conditionObj.timeMinute ?? params.timeMinute ?? (config as any).timeMinute;
+    // Mood / sentiment parameters (Step 4)
+    this.moodAxis = (conditionObj.moodAxis || (params as any).moodAxis || (config as any).moodAxis || 'valence') as 'valence' | 'arousal';
+    this.sentimentTarget = conditionObj.sentimentTarget || (params as any).sentimentTarget || (config as any).sentimentTarget;
+    this.sentimentEmotion = conditionObj.sentimentEmotion || (params as any).sentimentEmotion || (config as any).sentimentEmotion;
 
     // Build condition object based on type
     this.condition = this.buildCondition();
@@ -150,6 +159,17 @@ export class ConditionBeat extends Beat {
           minute: this.timeMinute ?? 0,
         };
         break;
+      case 'mood':
+        condition.character = this.character;
+        condition.moodAxis = this.moodAxis || 'valence';
+        condition.value = this.value ?? this.val ?? 0;
+        break;
+      case 'sentiment':
+        condition.character = this.character;
+        condition.sentimentTarget = this.sentimentTarget;
+        condition.sentimentEmotion = this.sentimentEmotion;
+        condition.value = this.value ?? this.val ?? 0;
+        break;
       default:
         condition.variableName = this.variableName || this.variable;
         condition.value = this.value ?? this.val;
@@ -189,6 +209,9 @@ export class ConditionBeat extends Beat {
       timeDay: this.timeDay,
       timeHour: this.timeHour,
       timeMinute: this.timeMinute,
+      moodAxis: this.moodAxis,
+      sentimentTarget: this.sentimentTarget,
+      sentimentEmotion: this.sentimentEmotion,
     };
   }
 
@@ -415,6 +438,12 @@ export class ConditionBeat extends Beat {
       case 'fictionalTime':
         isValidCondition = true; // Always valid - compares against current fictional time
         break;
+      case 'mood':
+        isValidCondition = !!this.character;
+        break;
+      case 'sentiment':
+        isValidCondition = !!(this.character && this.sentimentTarget);
+        break;
       case 'counter':
       default:
         isValidCondition = !!(this.variableName || this.variable);
@@ -440,6 +469,14 @@ export class ConditionBeat extends Beat {
         reason = `visitedBeat ${this.beatId || varName} = ${conditionResult}`;
       } else if (this.conditionType === 'fictionalTime') {
         reason = `fictionalTime ${this.operator} ${this.timeDay}/${this.timeMonth}/${this.timeYear} ${this.timeHour}:${this.timeMinute} = ${conditionResult}`;
+      } else if (this.conditionType === 'mood') {
+        const m = context.getCharacterMood(this.character || '');
+        const v = (this.moodAxis || 'valence') === 'arousal' ? m.arousal : m.valence;
+        reason = `${this.character}.mood.${this.moodAxis || 'valence'} (${v.toFixed(2)}) ${this.operator} ${compareValue} = ${conditionResult}`;
+      } else if (this.conditionType === 'sentiment') {
+        const s = context.getSentimentTo(this.character || '', this.sentimentTarget || '', this.sentimentEmotion);
+        const emotionLabel = this.sentimentEmotion ? `.${this.sentimentEmotion}` : '';
+        reason = `${this.character}.sentiment[→${this.sentimentTarget}${emotionLabel}] (${s.toFixed(2)}) ${this.operator} ${compareValue} = ${conditionResult}`;
       } else {
         const currentValue = this.conditionType === 'counter'
           ? context.getCounter(varName || '')
