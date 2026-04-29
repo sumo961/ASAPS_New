@@ -1089,6 +1089,89 @@
       "renderer": "none"
     },
 
+    "updateAffect": {
+      "category": "invisible",
+      "displayName": "Update Affect",
+      "icon": "🎭",
+      "description": "Nudge a character's mood and/or strengthen a sentiment toward another entity. The runtime clamps each axis and sentiment strength to [-1, 1].",
+      "connectionType": "single",
+      "parameters": {
+        "character": {
+          "type": "string",
+          "required": true,
+          "default": "player",
+          "description": "Character whose affect changes",
+          "ui": {
+            "control": "character-ref",
+            "label": "Character"
+          }
+        },
+        "moodValenceDelta": {
+          "type": "number",
+          "required": false,
+          "description": "Delta added to mood.valence (pleasant↔unpleasant). Range -2 to 2; the runtime clamps the resulting mood to [-1, 1].",
+          "ui": {
+            "label": "Valence delta",
+            "min": -2,
+            "max": 2,
+            "step": 0.1,
+            "group": "Mood"
+          }
+        },
+        "moodArousalDelta": {
+          "type": "number",
+          "required": false,
+          "description": "Delta added to mood.arousal (calm↔excited). Range -2 to 2; clamped to [-1, 1].",
+          "ui": {
+            "label": "Arousal delta",
+            "min": -2,
+            "max": 2,
+            "step": 0.1,
+            "group": "Mood"
+          }
+        },
+        "sentimentTarget": {
+          "type": "string",
+          "required": false,
+          "description": "Entity the sentiment is directed at (Character.id, item name, beat id, or any author tag).",
+          "ui": {
+            "control": "character-ref",
+            "label": "Sentiment target",
+            "group": "Sentiment"
+          }
+        },
+        "sentimentEmotion": {
+          "type": "string",
+          "required": false,
+          "description": "Emotion label (e.g. trust, fear, anger, joy, pride, shame). Free-text — no enforced palette.",
+          "ui": {
+            "label": "Emotion",
+            "group": "Sentiment"
+          }
+        },
+        "sentimentDelta": {
+          "type": "number",
+          "required": false,
+          "description": "Delta added to the existing (target, emotion) sentiment strength, or the strength of a newly-created one. Clamped to [-1, 1] post-add.",
+          "ui": {
+            "label": "Strength delta",
+            "min": -2,
+            "max": 2,
+            "step": 0.1,
+            "group": "Sentiment"
+          }
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Next beat after the affect update"
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "none"
+    },
+
     "inputText": {
       "category": "visible",
       "displayName": "Input Text",

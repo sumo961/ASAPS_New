@@ -14,6 +14,7 @@ import { SWFBeat } from './SWFBeat';
 import { RandomTargetBeat } from './RandomTargetBeat';
 import { SetTimerBeat } from './SetTimerBeat';
 import { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
+import { UpdateAffectBeat } from './UpdateAffectBeat';
 import { InputTextBeat } from './InputTextBeat';
 import { HyperTextBeat } from './HyperTextBeat';
 import { KeypadBeat } from './KeypadBeat';
@@ -88,6 +89,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('randomTarget', RandomTargetBeat);
     this.registerBeatType('setTimer', SetTimerBeat);
     this.registerBeatType('addRemoveInventory', AddRemoveInventoryBeat);
+    this.registerBeatType('updateAffect', UpdateAffectBeat);
     this.registerBeatType('addInventory', AddRemoveInventoryBeat); // Common AI variation
     this.registerBeatType('removeInventory', AddRemoveInventoryBeat); // Common AI variation
 
