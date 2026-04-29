@@ -23,6 +23,7 @@ import { getSavedTTSConfig } from '../hooks/useTTS';
 import { getSTTService, WebSpeechSTTProvider, WhisperSTTProvider, LocalSTTProvider, VoskSTTProvider, WhisperCppSTTProvider } from '../services/stt';
 import { getSavedSTTConfig } from '../hooks/useSTT';
 import { resolvePortraitUrl } from '../utils/speakerUtils';
+import { CharacterAffectPanel } from '../components/characters/CharacterAffectPanel';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { buildChatRequestBody } from '../services/providers/openai-utils';
@@ -1684,6 +1685,10 @@ export const PreviewWindow: React.FC = () => {
       context.on('inventoryChanged', updateDebugInfo);
       context.on('reset', updateDebugInfo);
       context.on('selectiveReset', updateDebugInfo);
+      // Step 4 / Phase 2: re-render the affect panel when mood / sentiment
+      // changes via UpdateAffect beats or future emotion firings.
+      context.on('characterMoodChanged', updateDebugInfo);
+      context.on('characterSentimentChanged', updateDebugInfo);
 
       // On in-story restart (EndScreen/AISummary → context.reset / selectiveReset),
       // the renderer's HUD state is not cleared automatically. Clear stale timer
@@ -2720,6 +2725,25 @@ export const PreviewWindow: React.FC = () => {
                   <div className="font-semibold">{currentBeat.name}</div>
                   <div className="text-xs text-gray-500">{currentBeat.type} • {currentBeat.id}</div>
                 </div>
+
+                {/* Character Affect (Step 4 Phase 2) — current mood + top
+                    sentiments per defined character. Updates live as the
+                    story plays, driven by characterMoodChanged /
+                    characterSentimentChanged events on the StoryContext. */}
+                {(() => {
+                  const ctx = engineRef.current?.getContext();
+                  const chars = previewDataRef.current?.characters;
+                  if (!ctx || !chars || chars.length === 0) return null;
+                  return (
+                    <CharacterAffectPanel
+                      characters={chars}
+                      context={{
+                        getCharacterMood: (id: string) => ctx.getCharacterMood(id),
+                        getCharacterSentiments: (id: string) => ctx.getCharacterSentiments(id),
+                      }}
+                    />
+                  );
+                })()}
 
                 {/* Visited Beats */}
                 {debugInfo.visitedBeats && debugInfo.visitedBeats.length > 0 && (
