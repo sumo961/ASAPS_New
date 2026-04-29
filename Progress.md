@@ -1,5 +1,29 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-29: GitHub Onboarding — Fixed `git init` Skipped When Ancestor Is a Repo (v0.9.40)
+
+### Overview
+
+Hot-fix for a v0.9.39 bug report. New-Project-on-GitHub jumped straight from "Wrote project scaffold" to `gh repo create --source=.`, which then failed with "current directory is not a git repository". The new project folder never got a `.git` because the init was being silently skipped.
+
+### Root Cause
+
+`git rev-parse --is-inside-work-tree` and `git log -1` both walk upward through the directory tree looking for a containing repo. If any ancestor of the new project folder is itself a git repo — and this is the common case for users who keep projects under `~/Documents/GitHub/`, or anywhere under another checkout — those commands returned success and `ensureGitRepo` / `makeInitialCommit` returned early without creating `.git` in the new folder.
+
+### Fix
+
+Both helpers now use `git rev-parse --show-toplevel` and compare the resolved root against `projectPath`:
+- **Skip init** only when the project folder *is* the repo root.
+- **Skip the initial commit's "already has commits" check** likewise — only consult `git log -1` when `--show-toplevel` matches our folder.
+- When an ancestor is a repo, the log shows a "Note: ancestor folder is a git repo (…); initialising a fresh repo in (…)." line and proceeds with init in the new folder regardless.
+
+The same fix applies transitively to all three GitHub-onboarding entry points (New-Project-on-GitHub, VCS panel's Create-new-repo form, VCS panel's Connect-existing-repo form) since they share `GitInitHelper.ts`.
+
+**Files modified:**
+- `packages/builder/src/vcs/GitInitHelper.ts`
+
+---
+
 ## 2026-04-29: GitHub Onboarding Fixes + Character System Step 1 (v0.9.39)
 
 ### Overview
