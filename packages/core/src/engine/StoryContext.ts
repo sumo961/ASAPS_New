@@ -225,6 +225,9 @@ export class StoryContext extends EventEmitter {
     };
     this.story = story;
     this.timerManager = new TimerManager();
+    // Seed authored initial affect (mood + sentiments) into the runtime
+    // state. No-op when no story or no characters declare initial affect.
+    if (story) this.seedCharacterAffectFromStory();
 
     // Forward timer events
     this.timerManager.on('timerExpired', (data) => this.emit('timerExpired', data));
@@ -1148,6 +1151,9 @@ export class StoryContext extends EventEmitter {
     this.choiceHistory = [];
     this.aiOutputHistory = [];
     this.timeline = [];
+    // Re-seed authored initial affect after the wipe so a story restart
+    // begins from the same emotional starting point each time.
+    this.seedCharacterAffectFromStory();
     this.emit('reset');
 
     // Emit change events so UI listeners (countdown meter, debug panel) update
@@ -1212,6 +1218,59 @@ export class StoryContext extends EventEmitter {
 
   setStory(story: Story): void {
     this.story = story;
+    this.seedCharacterAffectFromStory();
+  }
+
+  /**
+   * Seed character mood + sentiments from authored Character.initialMood /
+   * initialSentiments values. Only fills slots that are currently empty —
+   * runtime changes already in flight (e.g. from UpdateAffect beats) are
+   * never overwritten. Called automatically from setStory and reset; safe
+   * to call manually if the story is mutated and the new characters need
+   * their starting affect propagated.
+   */
+  seedCharacterAffectFromStory(): void {
+    const story = this.story;
+    if (!story) return;
+    const characters = (story as any).getCharacters?.() as
+      | Array<{
+          id: string;
+          initialMood?: { valence: number; arousal: number };
+          initialSentiments?: Array<{ toEntityRef: string; emotion: string; strength: number }>;
+        }>
+      | undefined;
+    if (!characters) return;
+
+    for (const char of characters) {
+      if (!char?.id) continue;
+      // Mood: seed only when no runtime mood is set for this character.
+      if (char.initialMood && !this.state.characterMoods[char.id]) {
+        this.state.characterMoods[char.id] = {
+          valence: StoryContext.clampUnit(char.initialMood.valence ?? 0),
+          arousal: StoryContext.clampUnit(char.initialMood.arousal ?? 0),
+        };
+      }
+      // Sentiments: seed each authored entry only if no matching
+      // (target, emotion) row already exists in runtime state.
+      if (char.initialSentiments && char.initialSentiments.length > 0) {
+        if (!this.state.characterSentiments[char.id]) this.state.characterSentiments[char.id] = [];
+        const existing = this.state.characterSentiments[char.id];
+        for (const seed of char.initialSentiments) {
+          if (!seed?.toEntityRef || !seed?.emotion) continue;
+          const present = existing.some(
+            (s) => s.toEntityRef === seed.toEntityRef && s.emotion === seed.emotion,
+          );
+          if (!present) {
+            existing.push({
+              toEntityRef: seed.toEntityRef,
+              emotion: seed.emotion,
+              strength: StoryContext.clampUnit(seed.strength ?? 0),
+              createdAt: Date.now(),
+            });
+          }
+        }
+      }
+    }
   }
 
   /**

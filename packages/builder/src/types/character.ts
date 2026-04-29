@@ -38,7 +38,22 @@ export interface Character {
   // Game Variables
   counters: CharacterCounter[];
   inventory: InventoryItem[];
-  
+
+  // Authored initial affect — seeded into the runtime when the story starts.
+  // Both fields are optional; characters without affect spec start at neutral
+  // mood and zero sentiments. Step 4 of the rich-character roadmap.
+  /** Initial 2D mood at story start (each axis ∈ [-1, 1], runtime clamps). */
+  initialMood?: { valence: number; arousal: number };
+  /** Initial directed sentiments at story start. */
+  initialSentiments?: Array<{
+    /** Entity the sentiment is directed at — Character.id, item name, beat id, or any author tag. */
+    toEntityRef: string;
+    /** Emotion label — free text (e.g. trust, fear, anger, joy, pride, shame). */
+    emotion: string;
+    /** Strength ∈ [-1, 1]. Negative = opposite of the named emotion. */
+    strength: number;
+  }>;
+
   // Metadata
   description?: string;
   tags?: string[];

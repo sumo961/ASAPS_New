@@ -26,9 +26,11 @@ import {
   ArrowLeftRight,
   ArrowUpDown,
   Hash,
-  Globe
+  Globe,
+  Heart
 } from 'lucide-react';
 import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG, InventoryFrameConfig, DEFAULT_INVENTORY_FRAME_CONFIG } from '../../types/character';
+import { describeMoodAxis } from '@asaps/core';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
@@ -68,7 +70,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   assets = [],
   onAssetAdd
 }) => {
-  const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'translations'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>('basic');
   const [editedCharacter, setEditedCharacter] = useState<Character>(character);
   const [hasChanges, setHasChanges] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState<string | null>(null);
@@ -1810,6 +1812,194 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
     );
   };
 
+  // Affect tab — authored initial mood + sentiments seeded into runtime
+  // state on story start. The runtime owns these values once play begins;
+  // UpdateAffect beats and emotion firings drift them away from these
+  // starting points. Resetting the story re-seeds from here.
+  const renderAffectTab = () => {
+    const mood = editedCharacter.initialMood || { valence: 0, arousal: 0 };
+    const sentiments = editedCharacter.initialSentiments || [];
+
+    const updateMood = (axis: 'valence' | 'arousal', v: number) => {
+      const clamped = Math.max(-1, Math.min(1, v));
+      setEditedCharacter({
+        ...editedCharacter,
+        initialMood: { ...mood, [axis]: clamped },
+      });
+    };
+
+    const clearMood = () => {
+      const { initialMood: _drop, ...rest } = editedCharacter;
+      setEditedCharacter(rest as Character);
+    };
+
+    const updateSentiment = (index: number, patch: Partial<{ toEntityRef: string; emotion: string; strength: number }>) => {
+      const next = [...sentiments];
+      next[index] = { ...next[index], ...patch };
+      setEditedCharacter({ ...editedCharacter, initialSentiments: next });
+    };
+
+    const addSentiment = () => {
+      setEditedCharacter({
+        ...editedCharacter,
+        initialSentiments: [...sentiments, { toEntityRef: '', emotion: '', strength: 0 }],
+      });
+    };
+
+    const removeSentiment = (index: number) => {
+      const next = sentiments.filter((_, i) => i !== index);
+      setEditedCharacter({
+        ...editedCharacter,
+        initialSentiments: next.length > 0 ? next : undefined,
+      });
+    };
+
+    const moodIsNeutral = !editedCharacter.initialMood
+      || (Math.abs(mood.valence) < 0.05 && Math.abs(mood.arousal) < 0.05);
+
+    return (
+      <div className="space-y-6">
+        {/* Mood — 2D affect at story start */}
+        <div className="bg-white border rounded-lg p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                Initial mood
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Where this character's mood starts at story open. The runtime can drift it from here via Update Affect beats.
+              </p>
+            </div>
+            {!moodIsNeutral && (
+              <button
+                onClick={clearMood}
+                className="text-xs text-gray-500 hover:text-red-600"
+                title="Reset to neutral (and remove from saved character data)"
+              >
+                Reset to neutral
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                <span>← sad</span>
+                <span className="font-medium">Valence</span>
+                <span>happy →</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={-1} max={1} step={0.05}
+                  value={mood.valence}
+                  onChange={(e) => updateMood('valence', parseFloat(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="font-mono text-xs w-12 text-right text-gray-700">
+                  {mood.valence >= 0 ? '+' : ''}{mood.valence.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                <span>← calm</span>
+                <span className="font-medium">Arousal</span>
+                <span>excited →</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={-1} max={1} step={0.05}
+                  value={mood.arousal}
+                  onChange={(e) => updateMood('arousal', parseFloat(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="font-mono text-xs w-12 text-right text-gray-700">
+                  {mood.arousal >= 0 ? '+' : ''}{mood.arousal.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {!moodIsNeutral && (
+              <div className="text-xs text-gray-600 bg-gray-50 rounded px-3 py-2">
+                Starts as <span className="font-medium">{describeMoodAxis(mood.valence, 'valence')}, {describeMoodAxis(mood.arousal, 'arousal')}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Initial sentiments — directed feelings at story start */}
+        <div className="bg-white border rounded-lg p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                Initial sentiments
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Directed feelings this character starts with. <em>Trust toward player +0.5</em>, <em>fear toward wolf +0.7</em>, etc. Each row is one (target, emotion) pair.
+              </p>
+            </div>
+            <button
+              onClick={addSentiment}
+              className="flex items-center gap-1 text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+            >
+              <Plus className="w-3 h-3" />
+              Add sentiment
+            </button>
+          </div>
+
+          {sentiments.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">No initial sentiments. Click "Add sentiment" to define one.</p>
+          ) : (
+            <div className="space-y-2">
+              {sentiments.map((s, i) => (
+                <div key={i} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                  <input
+                    type="text"
+                    value={s.toEntityRef}
+                    onChange={(e) => updateSentiment(i, { toEntityRef: e.target.value })}
+                    placeholder="toward (id, name, item, …)"
+                    className="flex-1 text-sm px-2 py-1 border rounded"
+                  />
+                  <input
+                    type="text"
+                    value={s.emotion}
+                    onChange={(e) => updateSentiment(i, { emotion: e.target.value })}
+                    placeholder="emotion"
+                    className="w-32 text-sm px-2 py-1 border rounded"
+                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="range"
+                      min={-1} max={1} step={0.05}
+                      value={s.strength}
+                      onChange={(e) => updateSentiment(i, { strength: parseFloat(e.target.value) })}
+                      className="w-24"
+                    />
+                    <span className="font-mono text-xs w-10 text-right text-gray-700">
+                      {s.strength >= 0 ? '+' : ''}{s.strength.toFixed(2)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => removeSentiment(i)}
+                    className="text-gray-400 hover:text-red-600 p-1"
+                    title="Remove this sentiment"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderTranslationsTab = () => {
     const projectLanguages = translationState.translations;
     if (projectLanguages.length === 0) {
@@ -1908,6 +2098,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             { id: 'states' as const, label: 'States', icon: Layers },
             { id: 'counters' as const, label: 'Counters', icon: Calculator },
             { id: 'inventory' as const, label: 'Inventory', icon: Package },
+            { id: 'affect' as const, label: 'Affect', icon: Heart },
             ...(translationState.translations.length > 0
               ? [{ id: 'translations' as const, label: 'Translations', icon: Globe }]
               : []),
@@ -1934,6 +2125,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
           {activeTab === 'states' && renderStatesTab()}
           {activeTab === 'counters' && renderCountersTab()}
           {activeTab === 'inventory' && renderInventoryTab()}
+          {activeTab === 'affect' && renderAffectTab()}
           {activeTab === 'translations' && renderTranslationsTab()}
         </div>
 
