@@ -29,6 +29,15 @@ export type RunCmd = (
 /**
  * Run `git init` portably (handles pre-2.28 Git) and ensure HEAD → refs/heads/main.
  * Throws on failure with a user-actionable message.
+ *
+ * Skip detection: we ONLY skip init when `projectPath` is itself the root of a
+ * git repo. We must not skip when a parent / ancestor is a repo (a common case
+ * if the user keeps projects under a synced folder that happens to be a repo,
+ * or anywhere under another checkout) — otherwise `gh repo create --source=.`
+ * later fails with "current directory is not a git repository". Checking
+ * `git rev-parse --is-inside-work-tree` here was the bug — that command walks
+ * upward and returns true for any descendant of a repo. Compare
+ * `--show-toplevel` against `projectPath` instead.
  */
 export async function ensureGitRepo(
   runCmd: RunCmd,
@@ -44,8 +53,19 @@ export async function ensureGitRepo(
     return r;
   };
 
-  const inRepo = await runCmd('git', ['rev-parse', '--is-inside-work-tree'], projectPath, 5000);
-  if (inRepo.exitCode === 0) return;
+  // `--show-toplevel` returns the absolute path of the working tree's root,
+  // or non-zero if not inside any repo. Skip init only when that root matches
+  // our project folder.
+  const top = await runCmd('git', ['rev-parse', '--show-toplevel'], projectPath, 5000);
+  if (top.exitCode === 0) {
+    // git resolves symlinks and uses platform-native separators — compare via
+    // resolved trailing-slash trimmed strings.
+    const resolvedTop = (top.stdout || '').trim().replace(/[/\\]+$/, '');
+    const resolvedProject = projectPath.replace(/[/\\]+$/, '');
+    if (resolvedTop === resolvedProject) return;
+    // Else: an ancestor is a repo — we still need to init this folder.
+    append(`Note: ancestor folder is a git repo (${resolvedTop}); initialising a fresh repo in ${resolvedProject}.\n`);
+  }
 
   const init = await exec('git', ['-c', 'init.defaultBranch=main', 'init']);
   if (init.exitCode !== 0) {
@@ -127,9 +147,17 @@ export async function makeInitialCommit(
     return r;
   };
 
-  // Skip if HEAD already exists.
-  const log1 = await runCmd('git', ['log', '-1', '--oneline'], projectPath, 5000);
-  if (log1.exitCode === 0) return;
+  // Skip only if HEAD already exists IN THIS REPO. `git log -1` walks up the
+  // tree the same way `--is-inside-work-tree` does, so we'd skip the initial
+  // commit if any ancestor folder happens to be a repo — wrong. Compare
+  // --show-toplevel to projectPath first; only then check for an existing HEAD.
+  const top = await runCmd('git', ['rev-parse', '--show-toplevel'], projectPath, 5000);
+  const resolvedTop = (top.stdout || '').trim().replace(/[/\\]+$/, '');
+  const resolvedProject = projectPath.replace(/[/\\]+$/, '');
+  if (top.exitCode === 0 && resolvedTop === resolvedProject) {
+    const log1 = await runCmd('git', ['log', '-1', '--oneline'], projectPath, 5000);
+    if (log1.exitCode === 0) return;
+  }
 
   await exec('git', ['add', '-A']);
   const c = await exec('git', ['commit', '-m', message]);
