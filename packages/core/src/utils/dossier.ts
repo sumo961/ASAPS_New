@@ -33,6 +33,19 @@ interface CharacterLike {
    * memory to the dossier so the LLM sees recent felt-experience.
    */
   dossierPolicy?: 'reAnchor' | 'reflection';
+  /**
+   * Authored goals on this character (Step 8 — Phase A). Each goal has an
+   * id, name, optional description and priority, and an optional Condition
+   * the runtime evaluates each beat to flip status to 'met'. Goal *status*
+   * is runtime state — passed into the dossier separately as
+   * `goalStatuses` on BuildDossierOptions.
+   */
+  goals?: ReadonlyArray<{
+    id: string;
+    name: string;
+    description?: string;
+    priority?: number;
+  }>;
 }
 
 interface CharacterScopedState {
@@ -112,6 +125,14 @@ export interface BuildDossierOptions {
   reflections?: ReadonlyArray<{ timestamp: number; text: string; salience?: number; beatId?: string }>;
   /** Maximum reflections to render (default 6). */
   maxReflections?: number;
+  /**
+   * Runtime goal statuses keyed by goal id (Step 8). Joined against
+   * `character.goals[]` so the dossier renders authored goals annotated
+   * with their current state. Missing entries default to 'open'.
+   */
+  goalStatuses?: Record<string, 'open' | 'met' | 'failed' | 'abandoned'>;
+  /** Maximum goals to render (default 5). */
+  maxGoals?: number;
 }
 
 /**
@@ -185,6 +206,41 @@ export function buildDossier(
       for (const [name, value] of top) {
         const intensity = describeEmotionIntensity(value);
         lines.push(`  - ${intensity} ${name}`);
+      }
+    }
+  }
+
+  // Goals (Step 8). Render open goals first (highest priority), then a
+  // short note about goals that have just been met / failed so the LLM
+  // sees both what the character is pursuing and what they've recently
+  // resolved. Skipped entirely when the character has no authored goals.
+  if (character.goals && character.goals.length > 0) {
+    const cap = options.maxGoals ?? 5;
+    const statuses = options.goalStatuses || {};
+    const annotated = character.goals.map((g) => ({
+      goal: g,
+      status: (statuses[g.id] || 'open') as 'open' | 'met' | 'failed' | 'abandoned',
+      priority: typeof g.priority === 'number' ? g.priority : 0.5,
+    }));
+    const open = annotated
+      .filter((a) => a.status === 'open')
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, cap);
+    const closed = annotated
+      .filter((a) => a.status === 'met' || a.status === 'failed')
+      .slice(0, cap);
+    if (open.length > 0) {
+      lines.push('Pursuing:');
+      for (const a of open) {
+        const desc = a.goal.description ? ` — ${a.goal.description}` : '';
+        lines.push(`  - ${a.goal.name}${desc}`);
+      }
+    }
+    if (closed.length > 0) {
+      lines.push('Recent outcomes:');
+      for (const a of closed) {
+        const verb = a.status === 'met' ? 'achieved' : 'failed';
+        lines.push(`  - ${verb} ${a.goal.name}`);
       }
     }
   }
@@ -366,6 +422,7 @@ export function buildDossierForRef(
     getCharacterSentiments?: (ref: string) => ReadonlyArray<SentimentLike>;
     getCharacterEmotions?: (ref: string) => Record<string, number>;
     getCharacterReflections?: (ref: string) => ReadonlyArray<{ timestamp: number; text: string; salience?: number; beatId?: string }>;
+    getCharacterGoalStatuses?: (ref: string) => Record<string, 'open' | 'met' | 'failed' | 'abandoned'>;
     getStory?: () => any;
     getHistory?: () => ReadonlyArray<string>;
     getChoiceHistory?: () => ReadonlyArray<ChoiceRecordLike>;
@@ -406,5 +463,11 @@ export function buildDossierForRef(
     }
   }
 
-  return buildDossier(character, { ...options, state, interactions, mood, sentiments, emotions, reflections });
+  // Step 8 — pull goal statuses if the character has authored goals; skip
+  // the lookup otherwise so the cost is zero for goal-less characters.
+  const goalStatuses = (character as CharacterLike).goals && (character as CharacterLike).goals!.length > 0
+    ? contextLike?.getCharacterGoalStatuses?.(characterRef)
+    : undefined;
+
+  return buildDossier(character, { ...options, state, interactions, mood, sentiments, emotions, reflections, goalStatuses });
 }

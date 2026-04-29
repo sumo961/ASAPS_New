@@ -76,6 +76,22 @@ export interface Character {
    */
   dossierPolicy?: 'reAnchor' | 'reflection';
 
+  /**
+   * Step 8 — authored goals. Each entry is static authoring data; the
+   * runtime tracks status (open / met / failed / abandoned) separately on
+   * StoryContext. Optional satisfaction predicate is a Condition the
+   * runtime re-evaluates each beat-enter and uses to flip status to 'met'.
+   * Drives the GAMYGDALA-style emotion firings and the dossier "Pursuing:"
+   * block.
+   */
+  goals?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    priority?: number;
+    satisfaction?: import('@asaps/core').Condition;
+  }>;
+
   // Metadata
   description?: string;
   tags?: string[];

@@ -1907,6 +1907,29 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
       }
     };
 
+    // Step 8 — goals. Static authoring data; runtime tracks status separately.
+    const goals = editedCharacter.goals || [];
+    const updateGoal = (index: number, patch: Partial<typeof goals[number]>) => {
+      const next = [...goals];
+      next[index] = { ...next[index], ...patch };
+      setEditedCharacter({ ...editedCharacter, goals: next });
+    };
+    const removeGoal = (index: number) => {
+      const next = goals.filter((_, i) => i !== index);
+      setEditedCharacter({
+        ...editedCharacter,
+        goals: next.length > 0 ? next : undefined,
+      });
+    };
+    const addGoal = () => {
+      let suffix = goals.length + 1;
+      while (goals.find((g) => g.id === `goal${suffix}`)) suffix += 1;
+      setEditedCharacter({
+        ...editedCharacter,
+        goals: [...goals, { id: `goal${suffix}`, name: '', priority: 0.5 }],
+      });
+    };
+
     return (
       <div className="space-y-6">
         {/* Personality — Big Five + author-defined traits */}
@@ -2183,6 +2206,91 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
               </div>
             </label>
           </div>
+        </div>
+
+        {/* Goals — authored, status flips at runtime, fires GAMYGDALA-style emotions */}
+        <div className="bg-white border rounded-lg p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                Goals
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Authored objectives this character is pursuing. The runtime tracks status; goals that become 'met' or 'failed' auto-fire pride/joy or shame/sadness scaled by priority. Use the <span className="font-mono">setGoalStatus</span> effect or the <span className="font-mono">goal</span> condition to react to status.
+              </p>
+            </div>
+            <button
+              onClick={addGoal}
+              className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+            >
+              + Add goal
+            </button>
+          </div>
+          {goals.length === 0 ? (
+            <div className="text-xs text-gray-400 italic py-3">
+              No goals authored. Mode A characters can leave this empty; Mode B / agentic stories need goals to drive emergent behavior.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {goals.map((goal, i) => (
+                <div key={i} className="border rounded p-3 bg-gray-50">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={goal.id}
+                          onChange={(e) => updateGoal(i, { id: e.target.value })}
+                          className="px-2 py-1 text-xs font-mono border rounded"
+                          placeholder="goal-id"
+                          style={{ width: 120 }}
+                          title="Stable identifier — used by setGoalStatus effect and goal condition"
+                        />
+                        <input
+                          type="text"
+                          value={goal.name}
+                          onChange={(e) => updateGoal(i, { name: e.target.value })}
+                          className="flex-1 px-2 py-1 text-sm border rounded"
+                          placeholder="Short label (e.g. Find the Grail)"
+                        />
+                      </div>
+                      <textarea
+                        value={goal.description || ''}
+                        onChange={(e) => updateGoal(i, { description: e.target.value || undefined })}
+                        className="w-full px-2 py-1 text-xs border rounded resize-none"
+                        rows={2}
+                        placeholder="Optional description — surfaced in the dossier for the LLM"
+                      />
+                      <div className="flex items-center gap-2 text-xs text-gray-700">
+                        <span className="w-16 flex-shrink-0">Priority:</span>
+                        <input
+                          type="range"
+                          min={0} max={1} step={0.05}
+                          value={typeof goal.priority === 'number' ? goal.priority : 0.5}
+                          onChange={(e) => updateGoal(i, { priority: parseFloat(e.target.value) })}
+                          className="flex-1"
+                        />
+                        <span className="font-mono w-10 text-right">
+                          {(typeof goal.priority === 'number' ? goal.priority : 0.5).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        Optional satisfaction predicate is wired through <span className="font-mono">goal.satisfaction</span>. Edit via the project condition editor in a follow-up — for now you can drive status with the <span className="font-mono">setGoalStatus</span> effect.
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeGoal(i)}
+                      className="text-gray-400 hover:text-red-600"
+                      title="Remove goal"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );

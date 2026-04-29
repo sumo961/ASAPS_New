@@ -72,6 +72,14 @@ export interface Reflection {
 }
 
 /**
+ * Goal status — runtime state for an authored CharacterGoal. `'open'` is the
+ * starting state; the runtime flips it to `'met'` when the goal's
+ * satisfaction predicate evaluates true, or to `'failed'` / `'abandoned'`
+ * via the `setGoalStatus` effect or direct API call.
+ */
+export type GoalStatus = 'open' | 'met' | 'failed' | 'abandoned';
+
+/**
  * Rich choice record for AI context
  * Captures what choice was made, not just which beat was visited
  */
@@ -127,6 +135,14 @@ interface StoryState {
   // dossier reads the tail. Capped per character to keep token usage bounded
   // — the FIFO eviction is in appendCharacterReflection().
   characterReflections: Record<string, Reflection[]>;
+  // Goal status per character (Step 8 — Phase A). Outer key = canonical
+  // Character.id; inner key = CharacterGoal.id; value = current status.
+  // Goals themselves are authored on Character.goals[]; the runtime tracks
+  // only their progress so authoring can stay declarative. Empty by default
+  // — characters whose authored goals haven't moved off 'open' have no
+  // entries here. The dossier renders status by joining authored goals
+  // with these statuses.
+  characterGoalStatus: Record<string, Record<string, GoalStatus>>;
   visitedBeats: Set<string>;
   visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
@@ -151,6 +167,7 @@ export interface SerializedStoryState {
   characterSentiments?: Record<string, Sentiment[]>;
   characterEmotionLevels?: Record<string, Record<string, number>>;
   characterReflections?: Record<string, Reflection[]>;
+  characterGoalStatus?: Record<string, Record<string, GoalStatus>>;
   characterVariables?: Record<string, Record<string, any>>;
   characterFlags?: Record<string, Record<string, boolean>>;
   visitedBeats: string[]; // Array instead of Set for JSON serialization
@@ -258,6 +275,7 @@ export class StoryContext extends EventEmitter {
       characterSentiments: {},
       characterEmotionLevels: {},
       characterReflections: {},
+      characterGoalStatus: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {},
@@ -827,6 +845,125 @@ export class StoryContext extends EventEmitter {
     return { ...entry };
   }
 
+  // ---------------------------------------------------------------------------
+  // Goals (Step 8 — Phase A)
+  //
+  // Goals are authored on Character.goals[]; this block tracks their runtime
+  // status and re-evaluates satisfaction predicates on every beat-enter (via
+  // `evaluateCharacterGoals`, called from markBeatVisited). When a goal flips
+  // from `open` to `met` / `failed`, the runtime fires GAMYGDALA-style
+  // emotions (pride/joy on success, shame/sadness on failure) scaled by the
+  // goal's authored priority. Authors can opt out via `suppressEmotion` on
+  // the setGoalStatus effect for goals that should change quietly.
+  // ---------------------------------------------------------------------------
+
+  /** Default emotion firings on goal status transitions. The lookup is
+   *  case-insensitive against the project's EmotionPalette so renaming
+   *  emotions doesn't break the auto-fire path — unknown names just no-op. */
+  private static readonly GOAL_EMOTIONS: Record<GoalStatus, ReadonlyArray<{ emotion: string; weight: number }>> = {
+    open:      [],
+    met:       [{ emotion: 'pride', weight: 0.7 }, { emotion: 'joy', weight: 0.4 }],
+    failed:    [{ emotion: 'shame', weight: 0.6 }, { emotion: 'sadness', weight: 0.4 }],
+    abandoned: [],
+  };
+
+  /**
+   * Read the runtime status of a single goal on a character. Defaults to
+   * 'open' for goals the runtime hasn't touched (and for goals it doesn't
+   * know about — the runtime has no opinion until something happens).
+   */
+  getGoalStatus(charRef: string, goalId: string): GoalStatus {
+    const key = this.resolveCharRef(charRef);
+    if (!key || !goalId) return 'open';
+    return this.state.characterGoalStatus[key]?.[goalId] || 'open';
+  }
+
+  /** All known goal statuses for a character (defensive copy). */
+  getCharacterGoalStatuses(charRef: string): Record<string, GoalStatus> {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return {};
+    return { ...(this.state.characterGoalStatus[key] || {}) };
+  }
+
+  /**
+   * Set the runtime status of a goal. Returns the previous status so callers
+   * can distinguish a real transition from a no-op. When the status actually
+   * changes, fires GAMYGDALA-style emotions per `GOAL_EMOTIONS` (scaled by
+   * the authored goal priority) unless `options.suppressEmotion` is set.
+   */
+  setGoalStatus(charRef: string, goalId: string, status: GoalStatus, options?: { suppressEmotion?: boolean }): GoalStatus | null {
+    const key = this.resolveCharRef(charRef);
+    if (!key || !goalId) return null;
+
+    const previous: GoalStatus = this.state.characterGoalStatus[key]?.[goalId] || 'open';
+    if (previous === status) return previous;
+
+    if (!this.state.characterGoalStatus[key]) this.state.characterGoalStatus[key] = {};
+    this.state.characterGoalStatus[key][goalId] = status;
+    this.emit('characterGoalStatusChanged', { characterRef: key, goalId, status, previous });
+
+    if (!options?.suppressEmotion) {
+      // Look the goal up so we can scale emotion firings by its authored
+      // priority. Unknown / fully-defaulted goals fire at priority 0.5 so
+      // status changes still register emotionally.
+      const characters = (this.story as any)?.getCharacters?.() as
+        Array<{ id?: string; goals?: Array<{ id: string; priority?: number }> }> | undefined;
+      const character = characters?.find((c) => c?.id === key);
+      const goal = character?.goals?.find((g) => g.id === goalId);
+      const priority = typeof goal?.priority === 'number'
+        ? Math.max(0, Math.min(1, goal.priority))
+        : 0.5;
+
+      for (const fire of StoryContext.GOAL_EMOTIONS[status]) {
+        const delta = fire.weight * priority;
+        if (delta !== 0) this.fireCharacterEmotion(key, fire.emotion, delta);
+      }
+    }
+
+    return previous;
+  }
+
+  /**
+   * Re-evaluate every goal with a satisfaction predicate for `charRef`.
+   * Goals already in a terminal state ('met' / 'failed' / 'abandoned') are
+   * skipped — once a goal closes, only an explicit setGoalStatus reopens it.
+   * Open goals whose predicate evaluates true flip to 'met' and trigger the
+   * goal-emotion side-effects. Returns the number of goals that flipped so
+   * tests / callers can detect motion.
+   */
+  evaluateCharacterGoals(charRef: string): number {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return 0;
+    const characters = (this.story as any)?.getCharacters?.() as
+      Array<{ id?: string; goals?: Array<{ id: string; satisfaction?: Condition }> }> | undefined;
+    const character = characters?.find((c) => c?.id === key);
+    const goals = character?.goals || [];
+    let flipped = 0;
+    for (const g of goals) {
+      if (!g.satisfaction) continue;
+      const status = this.getGoalStatus(key, g.id);
+      if (status !== 'open') continue;
+      if (this.checkCondition(g.satisfaction)) {
+        this.setGoalStatus(key, g.id, 'met');
+        flipped += 1;
+      }
+    }
+    return flipped;
+  }
+
+  /** Re-evaluate goals across every character that has authored goals. */
+  evaluateAllCharacterGoals(): number {
+    const characters = (this.story as any)?.getCharacters?.() as
+      Array<{ id?: string; goals?: unknown[] }> | undefined;
+    if (!characters) return 0;
+    let total = 0;
+    for (const c of characters) {
+      if (!c?.id || !Array.isArray(c.goals) || c.goals.length === 0) continue;
+      total += this.evaluateCharacterGoals(c.id);
+    }
+    return total;
+  }
+
   // Timer methods
   setTimer(name: string, value: number, target?: string): void {
     this.state.timers[name] = { value, target };
@@ -1118,6 +1255,26 @@ export class StoryContext extends EventEmitter {
       }
     }
 
+    // Goal conditions (Step 8). Compares a character's runtime goal status
+    // against an authored target string. When `goalStatus` is set on the
+    // condition, the operator compares against it; otherwise falls back to
+    // `value`. Status read defaults to 'open' for unset goals.
+    if (condition.type === 'goal') {
+      const character = condition.character;
+      const goalId = (condition as any).goalId;
+      if (!character || !goalId) {
+        console.warn('goal condition missing character or goalId');
+        return false;
+      }
+      const left = this.getGoalStatus(character, goalId);
+      const right = String((condition as any).goalStatus ?? condition.value ?? 'met');
+      switch (condition.operator) {
+        case '==': return left === right;
+        case '!=': return left !== right;
+        default: return false;
+      }
+    }
+
     // Trait conditions (Step 6). Compares a character's static trait value
     // (e.g. neuroticism, openness, or any author-defined trait) against
     // `value`. Traits are stored on the Character record as a Record<string,
@@ -1289,6 +1446,18 @@ export class StoryContext extends EventEmitter {
         }
         break;
       }
+      // Step 8 — change a character's runtime goal status. Auto-fires
+      // GAMYGDALA-style emotions for the new status unless suppressed.
+      case 'setGoalStatus': {
+        const goalId = (effect as any).goalId;
+        const status = (effect as any).goalStatus as GoalStatus | undefined;
+        if (goalId && status) {
+          this.setGoalStatus(effect.target, goalId, status, {
+            suppressEmotion: !!(effect as any).suppressEmotion,
+          });
+        }
+        break;
+      }
     }
   }
 
@@ -1297,6 +1466,12 @@ export class StoryContext extends EventEmitter {
     // the new beat's effects fire, so `fireCharacterEmotion` adds against a
     // freshly-decayed level and the resulting mood nudge reflects recovery.
     this.decayCharacterEmotions();
+    // Step 8 — re-evaluate authored goal satisfaction predicates each beat.
+    // A goal that just became true (the player picked up the lantern, the
+    // counter crossed a threshold, etc.) flips to 'met' and fires the
+    // GAMYGDALA-style emotion stack here so subsequent beats see the
+    // character's reaction.
+    this.evaluateAllCharacterGoals();
     this.state.visitedBeats.add(beatId);
     this.history.push(beatId);
     // Also record in timeline with beat metadata
@@ -1464,6 +1639,7 @@ export class StoryContext extends EventEmitter {
       characterSentiments: {},
       characterEmotionLevels: {},
       characterReflections: {},
+      characterGoalStatus: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {}
@@ -1837,6 +2013,9 @@ export class StoryContext extends EventEmitter {
       characterReflections: Object.fromEntries(
         Object.entries(this.state.characterReflections).map(([k, v]) => [k, v.map((r) => ({ ...r }))])
       ),
+      characterGoalStatus: Object.fromEntries(
+        Object.entries(this.state.characterGoalStatus).map(([k, v]) => [k, { ...v }])
+      ),
       visitedBeats: Array.from(this.state.visitedBeats),
       visitedChoices: Array.from(this.state.visitedChoices),
       timers: { ...this.state.timers },
@@ -1895,6 +2074,9 @@ export class StoryContext extends EventEmitter {
         : {},
       characterReflections: serialized.characterReflections
         ? Object.fromEntries(Object.entries(serialized.characterReflections).map(([k, v]) => [k, v.map((r: any) => ({ ...r }))]))
+        : {},
+      characterGoalStatus: serialized.characterGoalStatus
+        ? Object.fromEntries(Object.entries(serialized.characterGoalStatus).map(([k, v]) => [k, { ...v }]))
         : {},
       visitedBeats: new Set(serialized.visitedBeats),
       visitedChoices: new Set((serialized as any).visitedChoices || []),

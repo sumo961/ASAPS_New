@@ -21,6 +21,9 @@ const EFFECT_TYPE_LABELS: Record<EffectType, string> = {
   fireEmotion: 'Fire Emotion',
   // Step 7 — append a reflection to a character's memory (Mode B only).
   addReflection: 'Add Reflection',
+  // Step 8 — change a character's runtime goal status; auto-fires
+  // pride/joy/shame/sadness unless suppressEmotion is set.
+  setGoalStatus: 'Set Goal Status',
 };
 
 interface ChoiceEffectsEditorProps {
@@ -117,7 +120,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
   return (
     <div className={`space-y-1.5 ${compact ? '' : 'p-2 bg-gray-50 rounded'}`}>
       {effects.map((effect, index) => {
-        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment' || effect.type === 'fireEmotion' || effect.type === 'addReflection';
+        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment' || effect.type === 'fireEmotion' || effect.type === 'addReflection' || effect.type === 'setGoalStatus';
         return (
         <div key={index} className="flex flex-wrap gap-1 items-center">
           {/* Type dropdown */}
@@ -151,6 +154,10 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 updates.value = undefined;
                 updates.reflectionText = effect.reflectionText ?? '';
                 updates.reflectionSalience = effect.reflectionSalience ?? 0.5;
+              } else if (newType === 'setGoalStatus') {
+                updates.value = undefined;
+                (updates as any).goalId = (effect as any).goalId ?? '';
+                (updates as any).goalStatus = (effect as any).goalStatus ?? 'met';
               }
               updateEffect(index, updates);
             }}
@@ -227,6 +234,29 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 placeholder="±intensity"
                 title="Intensity delta (0–1 typical). Positive bumps the emotion; mood is auto-nudged via palette weights."
               />
+            </>
+          )}
+          {effect.type === 'setGoalStatus' && (
+            <>
+              <input
+                type="text"
+                value={(effect as any).goalId || ''}
+                onChange={(e) => updateEffect(index, { goalId: e.target.value } as any)}
+                placeholder="goal-id"
+                className="w-28 px-1.5 py-1 text-xs border rounded font-mono flex-shrink-0"
+                title="Authored goal id (must match Character.goals[].id)"
+              />
+              <select
+                value={(effect as any).goalStatus || 'met'}
+                onChange={(e) => updateEffect(index, { goalStatus: e.target.value } as any)}
+                className="px-1.5 py-1 text-xs border rounded bg-white flex-shrink-0"
+                title="Status to flip the goal to. 'met' fires pride/joy; 'failed' fires shame/sadness; 'abandoned' is silent."
+              >
+                <option value="met">met</option>
+                <option value="failed">failed</option>
+                <option value="abandoned">abandoned</option>
+                <option value="open">open</option>
+              </select>
             </>
           )}
           {effect.type === 'addReflection' && (

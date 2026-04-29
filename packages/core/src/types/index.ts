@@ -92,7 +92,7 @@ export interface FictionalTime {
 }
 
 export interface Condition {
-  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion' | 'trait';
+  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion' | 'trait' | 'goal';
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
   // New canonical field names
   variableName?: string;
@@ -136,6 +136,35 @@ export interface Condition {
   // [0, 1] (default Big Five: openness / conscientiousness / extraversion /
   // agreeableness / neuroticism — but the bag is open).
   traitName?: string;
+  // For goal conditions (Step 8): tests the runtime status of a named goal
+  // on `character`. Compare with `==` / `!=` / etc. against a status string
+  // ('open' | 'met' | 'failed' | 'abandoned'). The compared value is read
+  // from `value` (preferred) or `goalStatus` for explicit clarity.
+  goalId?: string;
+  goalStatus?: 'open' | 'met' | 'failed' | 'abandoned';
+}
+
+/**
+ * An authored goal on a Character (Step 8 — Phase A). Goals are static
+ * authoring data; their *status* is runtime state managed by StoryContext.
+ *
+ * Authors give each goal:
+ *   id           — stable identifier; used by status lookups and effects.
+ *   name         — short label for editor UIs and dossier rendering.
+ *   description? — fuller author note, included in the dossier.
+ *   priority?    — relative weight ∈ [0, 1]. Default 0.5. Used to scale
+ *                  GAMYGDALA-style emotion deltas when the goal advances.
+ *   satisfaction?— optional Condition the runtime evaluates each beat-
+ *                  enter; flips `status` to 'met' when it returns true.
+ *                  Goals without a satisfaction predicate stay open
+ *                  until something explicitly sets their status.
+ */
+export interface CharacterGoal {
+  id: string;
+  name: string;
+  description?: string;
+  priority?: number;
+  satisfaction?: Condition;
 }
 
 export interface Effect {
@@ -152,7 +181,11 @@ export interface Effect {
     // Step 7 / Mode B: append a reflection to a character's memory. Used by
     // characters whose dossierPolicy is 'reflection' so the LLM sees recent
     // felt-experience alongside (or instead of) the structured dossier.
-    | 'addReflection';
+    | 'addReflection'
+    // Step 8 — change the runtime status of a named goal on a character.
+    // Triggers GAMYGDALA-style emotion firing (pride/joy on 'met',
+    // shame/sadness on 'failed') unless `suppressEmotion` is set.
+    | 'setGoalStatus';
   target: string;
   value?: any;
   // Sentiment-effect parameters (used when type === 'addSentiment'). Kept
@@ -183,6 +216,19 @@ export interface Effect {
   /** Optional salience hint ∈ [0, 1] for the reflection — higher = harder
    * to evict when the per-character cap fills up. Defaults to 0.5. */
   reflectionSalience?: number;
+  /**
+   * Goal id for setGoalStatus effects (Step 8). Identifies which authored
+   * `Character.goals[]` entry to flip. The character is `effect.target`.
+   */
+  goalId?: string;
+  /** New status for setGoalStatus effects. */
+  goalStatus?: 'open' | 'met' | 'failed' | 'abandoned';
+  /**
+   * When true, the goal status change does not auto-fire pride / shame /
+   * joy / sadness emotions. Default false. Use for status changes that
+   * should not register as emotional events (e.g. quiet abandonment).
+   */
+  suppressEmotion?: boolean;
 }
 
 /**
