@@ -1054,17 +1054,29 @@
           "type": "string",
           "required": true,
           "default": "player",
-          "description": "Character name (for add/remove)"
+          "description": "Character name (for add/remove)",
+          "ui": {
+            "control": "character-ref",
+            "label": "Character"
+          }
         },
         "fromChar": {
           "type": "string",
           "required": false,
-          "description": "Source character (for transfer)"
+          "description": "Source character (for transfer)",
+          "ui": {
+            "control": "character-ref",
+            "label": "From character"
+          }
         },
         "toChar": {
           "type": "string",
           "required": false,
-          "description": "Target character (for transfer)"
+          "description": "Target character (for transfer)",
+          "ui": {
+            "control": "character-ref",
+            "label": "To character"
+          }
         },
         "connection": {
           "type": "connection",

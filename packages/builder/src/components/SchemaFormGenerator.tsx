@@ -16,7 +16,7 @@ interface ParameterDefinition {
   // For fields that reference beats (target selectors)
   targetField?: boolean;
   ui?: {
-    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character';
+    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref';
     options?: (string | { value: string; label: string })[];
     label?: string;
     min?: number;
@@ -437,6 +437,62 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   { value: playerSpeakerValue, label: playerSpeakerLabel },
                 ]}
                 placeholder="Type or pick a speaker…"
+              />
+              {paramDef.description && (
+                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+              )}
+            </div>
+          );
+        }
+
+        // Generic character-ref control — used wherever a beat parameter
+        // points at a character (AddRemoveInventory.character / fromChar /
+        // toChar, future PickProp interactor, etc.). Stores plain strings:
+        // either the canonical Character.id (when linked) or a free-text
+        // name. The "Player" pinned option preserves the special routing
+        // semantics of the AddRemoveInventory runtime ('player' / empty
+        // routes to the global single inventory).
+        if (paramDef.ui?.control === 'character-ref') {
+          const definedCharacters = (characters || [])
+            .map((c: any) => {
+              if (typeof c === 'string') {
+                return { id: c, name: c, displayName: c, role: 'npc', visual: { type: 'static' }, states: [], defaultState: '', counters: [], inventory: [], createdAt: '', updatedAt: '' } as any;
+              }
+              return c;
+            })
+            .filter((c: any) => c && c.id);
+
+          // The character-ref control writes a single string into the
+          // beat's parameter (no companion field). When a defined Character
+          // is picked, we store the canonical Character.id; otherwise we
+          // store the free-text name. The runtime resolver (Step 1.b)
+          // accepts both.
+          const setRef = (next: { characterRef?: string; freeText?: string }) => {
+            handleChange(next.characterRef || next.freeText || '');
+          };
+          // Reconstruct the combobox's tuple from the single stored string:
+          // if the string matches a defined character's id, treat it as
+          // characterRef; otherwise it's free text.
+          const stringValue = typeof value === 'string' ? value : (value || '');
+          const matchesId = definedCharacters.some((c: any) => c.id === stringValue);
+
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {paramDef.ui.label || label}
+              </label>
+              <CharacterRefField
+                value={
+                  matchesId
+                    ? { characterRef: stringValue, freeText: stringValue }
+                    : { characterRef: undefined, freeText: stringValue }
+                }
+                onChange={setRef}
+                characters={definedCharacters}
+                usedNames={usedNames}
+                onDefineAsCharacter={onDefineAsCharacter}
+                pinnedOptions={[{ value: 'player', label: 'Player' }]}
+                placeholder="Player, a defined character, or type a name…"
               />
               {paramDef.description && (
                 <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
