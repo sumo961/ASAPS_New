@@ -15,6 +15,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { VCSOnboardingPanel } from './VCSOnboardingPanel';
+import { ensureGitRepoAndCommit } from '../../vcs/GitInitHelper';
 
 interface Props {
   onClose: () => void;
@@ -111,12 +112,9 @@ export const NewGitHubProjectDialog: React.FC<Props> = ({ onClose, onCreated }) 
       await fs.writeFile(`${projectPath}${sep}.gitignore`, '.DS_Store\nThumbs.db\nnode_modules/\n');
       append('Wrote project scaffold.\n');
 
-      // 3. git init + commit
-      const init = await exec('git', ['init', '-b', 'main'], projectPath);
-      if (init.exitCode !== 0) throw new Error('git init failed');
-      await exec('git', ['add', '-A'], projectPath);
-      const c = await exec('git', ['commit', '-m', 'Initial commit from ASAPS Builder'], projectPath);
-      if (c.exitCode !== 0) throw new Error('Initial commit failed. Make sure git user.name and user.email are set in your global git config.');
+      // 3. git init + ensure user identity + commit (handles pre-2.28 Git
+      //    and missing user.name / user.email by querying gh api user).
+      await ensureGitRepoAndCommit(fs.runCommand, projectPath, append);
 
       // 4. gh repo create + push
       const username = vcs?.tools?.ghAuth?.username || '';

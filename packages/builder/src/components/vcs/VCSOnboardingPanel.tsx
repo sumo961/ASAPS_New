@@ -13,6 +13,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { getInstallHints, type VCSToolsState } from '../../vcs/ToolsDetector';
+import { ensureGitRepoAndCommit } from '../../vcs/GitInitHelper';
 
 interface Props {
   /** Project remote URL (already on origin). If null, we offer to create/connect a repo. */
@@ -266,18 +267,7 @@ const CreateRepoForm: React.FC<{
 
     try {
       // 1. Ensure git repo + at least one commit (gh repo create --push needs HEAD).
-      const inRepo = await runCmd('git', ['rev-parse', '--is-inside-work-tree'], projectPath, 5000);
-      if (inRepo.exitCode !== 0) {
-        const init = await exec('git', ['init', '-b', 'main']);
-        if (init.exitCode !== 0) throw new Error('git init failed');
-      }
-      const log1 = await runCmd('git', ['log', '-1', '--oneline'], projectPath, 5000);
-      if (log1.exitCode !== 0) {
-        // No commits yet — make one. Stage everything tracked-or-not.
-        await exec('git', ['add', '-A']);
-        const c = await exec('git', ['commit', '-m', 'Initial commit from ASAPS Builder']);
-        if (c.exitCode !== 0) throw new Error('Could not create initial commit. Make sure git user.name and user.email are set.');
-      }
+      await ensureGitRepoAndCommit(runCmd, projectPath, append);
       // 2. Create repo on GitHub and push.
       const repoSpec = username ? `${username}/${repoName}` : repoName;
       const visFlag = visibility === 'private' ? '--private' : '--public';
@@ -363,18 +353,8 @@ const ConnectRepoForm: React.FC<{
       return r;
     };
     try {
-      // Ensure repo exists locally with at least one commit
-      const inRepo = await runCmd('git', ['rev-parse', '--is-inside-work-tree'], projectPath, 5000);
-      if (inRepo.exitCode !== 0) {
-        const init = await exec('git', ['init', '-b', 'main']);
-        if (init.exitCode !== 0) throw new Error('git init failed');
-      }
-      const log1 = await runCmd('git', ['log', '-1', '--oneline'], projectPath, 5000);
-      if (log1.exitCode !== 0) {
-        await exec('git', ['add', '-A']);
-        const c = await exec('git', ['commit', '-m', 'Initial commit from ASAPS Builder']);
-        if (c.exitCode !== 0) throw new Error('Initial commit failed.');
-      }
+      // Ensure repo exists locally with at least one commit.
+      await ensureGitRepoAndCommit(runCmd, projectPath, append);
       // Add remote (replace if exists)
       const exists = await runCmd('git', ['remote', 'get-url', 'origin'], projectPath, 5000);
       if (exists.exitCode === 0) {
