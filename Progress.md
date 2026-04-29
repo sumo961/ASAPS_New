@@ -1,5 +1,66 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-29: GitHub Onboarding for First-Time Users + GH↔GH Switch Fix (v0.9.38)
+
+### Overview
+
+A focused release on the version-control entry experience. Authors who have never used Git or GitHub now have a guided path from "I want to back up my project" to "my project is on GitHub" without leaving ASAPS — the app detects whether `git` and `gh` are installed, helps install them with platform-aware copy-paste commands, runs `gh auth login` interactively (streaming output back to the renderer so the device-code prompt is visible), and finally creates an empty GitHub repo and publishes the project to it. The same onboarding kicks in when an author tries to **open** a GitHub project (e.g. clicking through a collaboration invite) but isn't tooled-up yet. Plus a sneaky cross-project bug where switching between two GitHub-based projects left the previous project's origin URL on screen.
+
+### File Menu — "New Project on GitHub..." + Renamed "Open Project from GitHub..."
+
+Two entries in the File menu now anchor the GitHub flows:
+
+- **New Project on GitHub...** — creates a directory-format project on disk, runs `git init -b main`, makes an initial commit, then `gh repo create <user>/<name> --source=. --remote=origin --push --private` in one shot. The author picks a parent folder, project name, and visibility (private by default — going public→private after pushing is too late).
+- **Open Project from GitHub...** (formerly "Clone Repository...") — same dialog as before for the URL, just relabelled because authors weren't sure what "clone" meant. Same code path under the hood.
+
+Both menu items are gated behind the same onboarding component, so a first-time user gets the install-tools experience whether they're creating or joining a project.
+
+**Files modified:**
+- `apps/builder-desktop/src/main/index.ts`
+- `apps/builder-desktop/src/preload/index.ts`
+- `packages/builder/src/components/vcs/NewGitHubProjectDialog.tsx` (new)
+- `packages/builder/src/components/vcs/CloneRepoDialog.tsx`
+- `packages/builder/src/App.tsx`
+
+### Tools Detection — `git` / `gh` / `gh auth status`
+
+New `ToolsDetector` runs on session start and exposes `tools`, `toolsChecking`, `recheckTools()` on the VCS context. Detection is cached for the session — tools rarely appear/disappear mid-run, and re-running `gh auth status` after an explicit auth completion keeps the UI honest. A "Re-check" button is offered everywhere onboarding is shown.
+
+**Files modified:**
+- `packages/builder/src/vcs/ToolsDetector.ts` (new)
+- `packages/builder/src/vcs/VCSStatusProvider.tsx`
+
+### Onboarding Panel — Install → Auth → Repo Wiring
+
+`VCSOnboardingPanel` is the shared UI that both menu flows fall through to when something is missing:
+
+1. **Tools missing** — a status table (Git ✓/✗, GitHub CLI ✓/✗) plus platform-aware install commands. macOS gets `brew install git gh`, Windows gets the matching `winget install --id` pair, Linux falls back to `sudo apt install git gh`. Each command has a Copy button and direct installer links via `shell.openExternal` for users who'd rather double-click an installer.
+2. **Not authenticated** — a "Sign in with GitHub" button runs `gh auth login --web --git-protocol https --hostname github.com` through a brand-new streaming IPC channel. The renderer listens to `vcs:stream-data` chunks and shows the device-code prompt + URL in a log box, so the user sees exactly what to paste in the browser. Cancel button kills the spawned process via `vcs:stream-cancel`.
+3. **Authed but no remote** — two paths: "Create new GitHub repo" (project name + visibility) or "Connect to existing empty repo" (paste URL). Both ensure a local git repo + initial commit exist before touching the remote.
+
+**Files modified:**
+- `packages/builder/src/components/vcs/VCSOnboardingPanel.tsx` (new)
+- `apps/builder-desktop/src/main/index.ts` — new `vcs:run-streaming` and `vcs:stream-cancel` handlers backed by `child_process.spawn`
+- `apps/builder-desktop/src/preload/index.ts` — exposes `electronAPI.vcs.runStreaming`, `cancelStream`, `onStreamData`, `onStreamEnd`
+
+### VCS Cross-Project Contamination — Origin URL Stuck on Project A
+
+Switching from one GitHub-based directory project to another left the VCS state (origin URL, branch, ahead/behind, history) pointing at the **previous** project. Only switching to a non-VCS project triggered a clear, because the auto-init effect's `else if` branch fired only on `projectFormat !== 'directory'`.
+
+The auto-init effect now compares `vcs.projectPath` against the new `projectPath` and re-initialises (with a clean `vcs.clear()` first) whenever they diverge. The `!vcsInitialized` short-circuit was the culprit: after project A initialised, `vcsInitialized` stayed `true`, so the effect never re-ran for project B even though the path changed.
+
+**Files modified:**
+- `packages/builder/src/App.tsx`
+
+### Asset Manifest Scaffold — `_format` Required Key
+
+The empty manifest written for newly-created GitHub projects was missing the `_format` field that `parseManifest` requires; opening the freshly-created project crashed with "Invalid asset manifest". Scaffold now writes `{ _format: '1.0', assets: {} }`.
+
+**Files modified:**
+- `packages/builder/src/components/vcs/NewGitHubProjectDialog.tsx`
+
+---
+
 ## 2026-04-28: Cross-Project Contamination + Git Fetch Reload (v0.9.37)
 
 ### Overview
