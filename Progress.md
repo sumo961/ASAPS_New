@@ -1,5 +1,61 @@
 # ASAPS Modern - Progress Log
 
+## 2026-04-29: GitHub Onboarding Fixes + Character System Step 1 (v0.9.39)
+
+### Overview
+
+Bugfix release for the GitHub onboarding flow shipped in v0.9.38, plus the foundational refactor (Step 1 of the character roadmap) that turns Character from inspector metadata into a real runtime identity. Two separate issues blocked first-time GitHub users — `git init -b main` failing on Git versions older than 2.28, and the initial commit failing with "unable to auto-detect email address" because `gh auth login` doesn't set git's commit identity. Both are fixed and the duplicated init+commit logic is consolidated. Internally, Character refs now resolve through a single chokepoint with id-keyed state, and inventory aliases collapse into the canonical bucket on first touch.
+
+### GitHub Onboarding — Fixed "git init failed" on Older Git Versions
+
+`git init -b main` (the default-branch flag) only landed in Git 2.28 (Aug 2020). Anyone on an older Git binary — common on locked-down corporate macOS, some Linux distros, and any Git installation predating that release — got `error: unknown switch 'b'` and the New-Project-on-GitHub flow stopped at step 1 with no useful diagnostic. Replaced the `-b main` flag with the older-Git-compatible idiom `-c init.defaultBranch=main` plus an explicit `git symbolic-ref HEAD refs/heads/main` after init. The combination behaves identically on modern Git and lands on `main` (rather than `master`) on every legacy Git the app might encounter.
+
+**Files modified:**
+- `packages/builder/src/vcs/GitInitHelper.ts` (new)
+
+### GitHub Onboarding — Auto-Set Local user.name / user.email from `gh api user`
+
+A subtle confusion in the v0.9.38 flow: `gh auth login` provisions a *GitHub* token for HTTPS pushes, but `git commit` requires the *git* `user.name` / `user.email` config — a totally separate identity that's empty on a fresh machine. Users hitting "Create and publish" with gh authenticated but no git identity were getting `fatal: unable to auto-detect email address` and a hard stop. Fix: before the initial commit, query the authenticated GitHub user via `gh api user` and write the values into the **local repo's** git config (never `--global` — the app must not silently mutate machine-wide identity). Falls back to GitHub's noreply form (`<id>+<login>@users.noreply.github.com`) when the user has set their email private. The first commit now succeeds without any manual config.
+
+**Files modified:**
+- `packages/builder/src/vcs/GitInitHelper.ts` (new)
+- `packages/builder/src/components/vcs/NewGitHubProjectDialog.tsx`
+- `packages/builder/src/components/vcs/VCSOnboardingPanel.tsx`
+
+The same logic is reused by all three GitHub-onboarding entry points (New Project on GitHub, VCS panel's Create-new-repo form, VCS panel's Connect-existing-repo form), removing three near-duplicate copies of the init+commit code in the process.
+
+### Character System — Step 1 Foundation (Layer 2 prerequisite)
+
+First slice of the rich-character roadmap (`docs/Character-State-Design.md`). The piecemeal feeling of having a real `Character` class but a runtime that treats characters as name strings is being addressed in stages; this release ships the foundation that unblocks every subsequent layer.
+
+**Resolver utility** — new `packages/core/src/utils/characterRef.ts` exports `resolveCharacter`, `resolveCharacterKey`, and `isKnownCharacter`. Any string ref (Character.id, name, or displayName) resolves to a single canonical bucket key, falling through to the original ref unchanged for inline / legacy personas so they still get coherent storage.
+
+**Character-scoped state slots on StoryContext** — three new namespaced maps alongside the existing flat globals:
+- `characterCounters: Record<charId, Record<name, number>>`
+- `characterVariables: Record<charId, Record<name, any>>`
+- `characterFlags: Record<charId, Record<name, boolean>>`
+
+Each gets a getter / setter pair (and an `incrementCharacterCounter`) that accept any ref form, route through the resolver, and emit per-namespace events. Existing un-namespaced `variables` / `counters` continue to work for story-global state — character scope is opt-in. State survives `serialize` / `loadFromSerialized` round-trips and is forward-compatible with older save files (missing fields default to empty objects).
+
+**Inventory alias unification** — the four character-inventory methods (`addInventoryItem`, `removeInventoryItem`, `hasInventoryItem`, `getCharacterInventoryQuantity`) now resolve their character arg to canonical id and route to the id-keyed bucket. On first touch of a known character, `ensureCanonicalCharacterBucket()` walks the in-memory `characterInventories` map and merges any buckets keyed by alias strings (name, displayName, or arbitrary legacy refs) into the canonical bucket, summing item quantities. Alias buckets are then deleted — serialized state ends up canonical, not fragmented. `'player'` and empty refs continue to route to the global single inventory unchanged. `inventoryChanged` events now fire with the canonical character id.
+
+**Tests** — 39 new tests covering the resolver, namespaced state, and inventory alias migration. All pass; no regressions in core (the 28 pre-existing failures in `ConditionBeat` / `EndScreenBeat` / `ConversationPromptBuilder` / `ttsWait` reproduce on main and are unrelated).
+
+**Documentation** — new `docs/Character-and-KG-Sequencing.md` captures the agreed sequencing between the rich-character roadmap and the proposed knowledge-graph track (cultural-adaptation experiment), including four intersection points to decide before the parallel-track phase begins (Sentiment ↔ KG edge unification, goals as outgoing semantics, versioning model, beat content vs. KG references).
+
+**Files modified:**
+- `packages/core/src/utils/characterRef.ts` (new)
+- `packages/core/src/utils/index.ts`
+- `packages/core/src/engine/StoryContext.ts`
+- `packages/core/tests/utils/characterRef.test.ts` (new)
+- `packages/core/tests/engine/CharacterScopedState.test.ts` (new)
+- `packages/core/tests/engine/CharacterInventoryAliasing.test.ts` (new)
+- `docs/Character-and-KG-Sequencing.md` (new)
+
+This is foundation only — the user-facing character experience is unchanged. Step 1.c (`characterRef` field on dialog speakers), Step 2 (NPC-persona promotion + LLM dossier), and Step 3 (per-character narrative-memory query view) build on top in following releases.
+
+---
+
 ## 2026-04-29: GitHub Onboarding for First-Time Users + GH↔GH Switch Fix (v0.9.38)
 
 ### Overview
