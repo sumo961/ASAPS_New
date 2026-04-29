@@ -2,6 +2,7 @@ import  { EventEmitter } from 'eventemitter3';
 import type { Condition, Effect, FictionalTime } from '../types';
 import type { Story } from './Story';
 import { TimerManager } from './TimerManager';
+import { resolveCharacterKey } from '../utils/characterRef';
 
 /**
  * Inventory entry with quantity support
@@ -44,6 +45,14 @@ interface StoryState {
   counters: Record<string, number>;
   inventory: InventoryEntry[];
   characterInventories: Record<string, InventoryEntry[]>; // Character-specific inventories
+  // Character-scoped state (Layer 2 of the rich-character roadmap).
+  // Outer key is the canonical Character.id (or a fallback string for inline /
+  // legacy refs). Inner key is the variable / counter / flag name.
+  // Existing un-namespaced `variables` and `counters` continue to work for
+  // story-global state — character-scoped storage is opt-in.
+  characterCounters: Record<string, Record<string, number>>;
+  characterVariables: Record<string, Record<string, any>>;
+  characterFlags: Record<string, Record<string, boolean>>;
   visitedBeats: Set<string>;
   visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
@@ -60,6 +69,12 @@ export interface SerializedStoryState {
   counters: Record<string, number>;
   inventory: InventoryEntry[];  // Now stores entries with quantities
   characterInventories: Record<string, InventoryEntry[]>;
+  // Character-scoped state (Layer 2). Optional in serialized form so older
+  // save files / committed contexts still load — the loader fills missing
+  // slots with empty objects.
+  characterCounters?: Record<string, Record<string, number>>;
+  characterVariables?: Record<string, Record<string, any>>;
+  characterFlags?: Record<string, Record<string, boolean>>;
   visitedBeats: string[]; // Array instead of Set for JSON serialization
   visitedChoices?: string[]; // Per-choice visited tracking (composite keys: "beatId:choiceId")
   timers: Record<string, { value: number; target?: string }>;
@@ -158,6 +173,9 @@ export class StoryContext extends EventEmitter {
       counters: {},
       inventory: [],
       characterInventories: {},
+      characterCounters: {},
+      characterVariables: {},
+      characterFlags: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {},
@@ -291,6 +309,98 @@ export class StoryContext extends EventEmitter {
     if (!charInventory) return 0;
     const existing = charInventory.find(entry => entry.name === item);
     return existing?.quantity ?? 0;
+  }
+
+  // ======== Character-scoped state (Layer 2) ========
+  //
+  // Counters / variables / flags namespaced under a Character ref. The ref
+  // can be a Character.id (canonical), a Character.name, or a Character
+  // displayName — the resolver normalises all three to the same id-keyed
+  // bucket. If the ref doesn't match any defined Character, the original
+  // string is used as the bucket key, so inline-only personas and legacy
+  // free-text speakers still get coherent storage.
+  //
+  // These coexist with the un-namespaced `variables` and `counters` for
+  // story-global state. Beats opt in to character-scoped storage explicitly.
+
+  /** Resolve a character ref to its canonical storage key, using this story's character list. */
+  private resolveCharRef(ref: string | null | undefined): string | null {
+    if (!ref) return null;
+    const characters = (this.story as any)?.getCharacters?.() as
+      | { id: string; name?: string; displayName?: string }[]
+      | undefined;
+    return resolveCharacterKey(ref, characters);
+  }
+
+  // -- Counters --
+  getCharacterCounter(charRef: string, name: string): number {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return 0;
+    return this.state.characterCounters[key]?.[name] ?? 0;
+  }
+
+  setCharacterCounter(charRef: string, name: string, value: number): void {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return;
+    if (!this.state.characterCounters[key]) this.state.characterCounters[key] = {};
+    const previous = this.state.characterCounters[key][name] ?? 0;
+    this.state.characterCounters[key][name] = value;
+    this.emit('characterCounterChanged', { characterRef: key, name, value, previous });
+  }
+
+  incrementCharacterCounter(charRef: string, name: string, delta: number = 1): number {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return 0;
+    const next = (this.state.characterCounters[key]?.[name] ?? 0) + delta;
+    this.setCharacterCounter(charRef, name, next);
+    return next;
+  }
+
+  // -- Variables --
+  getCharacterVariable(charRef: string, name: string): any {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return undefined;
+    return this.state.characterVariables[key]?.[name];
+  }
+
+  setCharacterVariable(charRef: string, name: string, value: any): void {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return;
+    if (!this.state.characterVariables[key]) this.state.characterVariables[key] = {};
+    const previous = this.state.characterVariables[key][name];
+    this.state.characterVariables[key][name] = value;
+    this.emit('characterVariableChanged', { characterRef: key, name, value, previous });
+  }
+
+  // -- Flags --
+  getCharacterFlag(charRef: string, name: string): boolean {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return false;
+    return this.state.characterFlags[key]?.[name] ?? false;
+  }
+
+  setCharacterFlag(charRef: string, name: string, value: boolean): void {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return;
+    if (!this.state.characterFlags[key]) this.state.characterFlags[key] = {};
+    const previous = this.state.characterFlags[key][name] ?? false;
+    this.state.characterFlags[key][name] = value;
+    this.emit('characterFlagChanged', { characterRef: key, name, value, previous });
+  }
+
+  /** All character-scoped state (counters, variables, flags) for one character — handy for dossier building / debug panels. */
+  getCharacterState(charRef: string): {
+    counters: Record<string, number>;
+    variables: Record<string, any>;
+    flags: Record<string, boolean>;
+  } {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return { counters: {}, variables: {}, flags: {} };
+    return {
+      counters: { ...(this.state.characterCounters[key] || {}) },
+      variables: { ...(this.state.characterVariables[key] || {}) },
+      flags: { ...(this.state.characterFlags[key] || {}) },
+    };
   }
 
   // Timer methods
@@ -775,6 +885,9 @@ export class StoryContext extends EventEmitter {
       counters: {},
       inventory: [],
       characterInventories: {},
+      characterCounters: {},
+      characterVariables: {},
+      characterFlags: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {}
@@ -1062,6 +1175,13 @@ export class StoryContext extends EventEmitter {
    * Converts Sets to Arrays for JSON compatibility
    */
   serialize(): SerializedStoryState {
+    // Deep-clone the per-character maps so saved snapshots don't alias live state.
+    const cloneNamespacedNumbers = (m: Record<string, Record<string, number>>) =>
+      Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { ...v }]));
+    const cloneNamespacedAny = (m: Record<string, Record<string, any>>) =>
+      Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { ...v }]));
+    const cloneNamespacedBools = (m: Record<string, Record<string, boolean>>) =>
+      Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { ...v }]));
     return {
       currentBeatId: this.state.currentBeatId,
       variables: { ...this.state.variables },
@@ -1070,6 +1190,9 @@ export class StoryContext extends EventEmitter {
       characterInventories: Object.fromEntries(
         Object.entries(this.state.characterInventories).map(([k, v]) => [k, v.map(entry => ({ ...entry }))])
       ),
+      characterCounters: cloneNamespacedNumbers(this.state.characterCounters),
+      characterVariables: cloneNamespacedAny(this.state.characterVariables),
+      characterFlags: cloneNamespacedBools(this.state.characterFlags),
       visitedBeats: Array.from(this.state.visitedBeats),
       visitedChoices: Array.from(this.state.visitedChoices),
       timers: { ...this.state.timers },
@@ -1100,6 +1223,11 @@ export class StoryContext extends EventEmitter {
       return inv.map((entry: InventoryEntry) => ({ ...entry }));
     };
 
+    // Helper: clone a Record<string, Record<string, V>> from a possibly-undefined
+    // serialized field, defaulting to {} for forward-compat with older saves.
+    const cloneNs = <V>(m: Record<string, Record<string, V>> | undefined) =>
+      m ? Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { ...v }])) : {};
+
     // Restore state
     this.state = {
       currentBeatId: serialized.currentBeatId,
@@ -1109,6 +1237,9 @@ export class StoryContext extends EventEmitter {
       characterInventories: Object.fromEntries(
         Object.entries(serialized.characterInventories || {}).map(([k, v]) => [k, migrateInventory(v)])
       ),
+      characterCounters: cloneNs<number>(serialized.characterCounters),
+      characterVariables: cloneNs<any>(serialized.characterVariables),
+      characterFlags: cloneNs<boolean>(serialized.characterFlags),
       visitedBeats: new Set(serialized.visitedBeats),
       visitedChoices: new Set((serialized as any).visitedChoices || []),
       timers: { ...serialized.timers },
