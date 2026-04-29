@@ -24,6 +24,8 @@ interface CharacterLike {
   description?: string;
   tags?: string[];
   role?: string;
+  /** Optional Big Five (or author-defined) traits, each in [0, 1]. Step 6. */
+  traits?: Record<string, number>;
 }
 
 interface CharacterScopedState {
@@ -125,6 +127,14 @@ export function buildDossier(
   // Tags — short hints. Useful for the LLM but only when meaningful.
   if (character.tags && character.tags.length > 0) {
     lines.push(`Tags: ${character.tags.join(', ')}`);
+  }
+
+  // Personality traits (Step 6). Render as a one-line phrase listing only
+  // traits that meaningfully diverge from the neutral midpoint (0.5). A
+  // trait at 0.5 carries no signal and would just dilute the prompt.
+  if (character.traits) {
+    const phrase = describePersonality(character.traits);
+    if (phrase) lines.push(`Personality: ${phrase}`);
   }
 
   // Character-scoped state — only emit sections that have content. Counters,
@@ -253,6 +263,26 @@ function describeEmotionIntensity(value: number): string {
   if (value >= 0.5) return 'strong';
   if (value >= 0.25) return 'moderate';
   return 'mild';
+}
+
+/**
+ * Describe a Big Five (or any) trait bag as a comma-separated phrase.
+ * Filters traits within ±0.15 of the neutral midpoint so a default-tuned
+ * character contributes nothing to the prompt; "high" / "low" qualifiers
+ * give the LLM directional signal without exposing the underlying numbers.
+ */
+function describePersonality(traits: Record<string, number>): string {
+  const phrases: string[] = [];
+  for (const [name, raw] of Object.entries(traits)) {
+    const v = Number(raw);
+    if (!Number.isFinite(v)) continue;
+    const delta = v - 0.5;
+    const abs = Math.abs(delta);
+    if (abs < 0.15) continue;
+    const qualifier = abs >= 0.35 ? (delta > 0 ? 'very high' : 'very low') : (delta > 0 ? 'high' : 'low');
+    phrases.push(`${qualifier} ${name}`);
+  }
+  return phrases.join(', ');
 }
 
 /**

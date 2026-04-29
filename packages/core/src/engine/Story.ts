@@ -2,6 +2,7 @@ import { Beat } from '../beats/Beat';
 import type { Cluster, ContainerBeatPosition } from '../types'; // Import cluster types
 import type { StoryMetadata } from '../types';
 import { DEFAULT_EMOTION_PALETTE, type EmotionDefinition } from './EmotionPalette';
+import { DEFAULT_TRAIT_MODULATIONS, type TraitEmotionWeight } from './PersonalityTraits';
 
 export class Story {
   private beats: Map<string, Beat> = new Map();
@@ -15,6 +16,10 @@ export class Story {
   // Step 5 — author-editable emotion palette. Defaults to Ekman 6 + pride /
   // shame / interest until the project explicitly sets something else.
   private emotionPalette: EmotionDefinition[] = DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e }));
+  // Step 6 — author-editable trait → emotion modulation table. Defaults
+  // to a Big-Five wiring (neuroticism amplifies negative emotions, etc.)
+  // that is safe to ship even when the character has no traits set.
+  private traitModulations: TraitEmotionWeight[] = DEFAULT_TRAIT_MODULATIONS.map((m) => ({ ...m }));
 
   constructor(metadata?: Partial<StoryMetadata>) {
     this.metadata = {
@@ -105,6 +110,15 @@ export class Story {
 
   setEmotionPalette(palette: EmotionDefinition[]): void {
     this.emotionPalette = palette.map((e) => ({ ...e }));
+  }
+
+  // Step 6 — trait modulation accessors.
+  getTraitModulations(): TraitEmotionWeight[] {
+    return this.traitModulations;
+  }
+
+  setTraitModulations(modulations: TraitEmotionWeight[]): void {
+    this.traitModulations = modulations.map((m) => ({ ...m }));
   }
 
   setClusters(clusters: Cluster[]): void {

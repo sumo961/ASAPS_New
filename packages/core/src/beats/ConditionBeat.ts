@@ -45,6 +45,8 @@ export class ConditionBeat extends Beat {
   public sentimentEmotion?: string;
   // Emotion-specific parameter (Step 5)
   public emotionName?: string;
+  // Trait-specific parameter (Step 6) — branches on a character's static trait value.
+  public traitName?: string;
 
   constructor(config: BeatConfig & {
     conditionType?: string;
@@ -109,6 +111,7 @@ export class ConditionBeat extends Beat {
     this.sentimentTarget = conditionObj.sentimentTarget || (params as any).sentimentTarget || (config as any).sentimentTarget;
     this.sentimentEmotion = conditionObj.sentimentEmotion || (params as any).sentimentEmotion || (config as any).sentimentEmotion;
     this.emotionName = conditionObj.emotionName || (params as any).emotionName || (config as any).emotionName;
+    this.traitName = conditionObj.traitName || (params as any).traitName || (config as any).traitName;
 
     // Build condition object based on type
     this.condition = this.buildCondition();
@@ -178,6 +181,12 @@ export class ConditionBeat extends Beat {
         condition.emotionName = this.emotionName;
         condition.value = this.value ?? this.val ?? 0;
         break;
+      case 'trait':
+        // Step 6 — branch on a character's static trait value.
+        condition.character = this.character;
+        condition.traitName = this.traitName;
+        condition.value = this.value ?? this.val ?? 0;
+        break;
       default:
         condition.variableName = this.variableName || this.variable;
         condition.value = this.value ?? this.val;
@@ -221,6 +230,7 @@ export class ConditionBeat extends Beat {
       sentimentTarget: this.sentimentTarget,
       sentimentEmotion: this.sentimentEmotion,
       emotionName: this.emotionName,
+      traitName: this.traitName,
     };
   }
 
@@ -416,6 +426,13 @@ export class ConditionBeat extends Beat {
       this.timeMinute = conditionObj.timeMinute;
     }
 
+    // Trait parameter (Step 6)
+    if (params.traitName !== undefined) {
+      this.traitName = params.traitName;
+    } else if (conditionObj.traitName !== undefined) {
+      this.traitName = conditionObj.traitName;
+    }
+
     // Rebuild condition object from extracted canonical values
     // This ensures the condition object always reflects the extracted fields
     this.condition = this.buildCondition();
@@ -456,6 +473,9 @@ export class ConditionBeat extends Beat {
       case 'emotion':
         isValidCondition = !!(this.character && this.emotionName);
         break;
+      case 'trait':
+        isValidCondition = !!(this.character && this.traitName);
+        break;
       case 'counter':
       default:
         isValidCondition = !!(this.variableName || this.variable);
@@ -492,6 +512,12 @@ export class ConditionBeat extends Beat {
       } else if (this.conditionType === 'emotion') {
         const v = context.getCharacterEmotion(this.character || '', this.emotionName || '');
         reason = `${this.character}.emotion.${this.emotionName} (${v.toFixed(2)}) ${this.operator} ${compareValue} = ${conditionResult}`;
+      } else if (this.conditionType === 'trait') {
+        const characters = (context.getStory() as any)?.getCharacters?.() as
+          Array<{ id?: string; traits?: Record<string, number> }> | undefined;
+        const charRecord = characters?.find((c) => c?.id === this.character);
+        const v = Number(charRecord?.traits?.[this.traitName || ''] ?? 0);
+        reason = `${this.character}.trait.${this.traitName} (${v.toFixed(2)}) ${this.operator} ${compareValue} = ${conditionResult}`;
       } else {
         const currentValue = this.conditionType === 'counter'
           ? context.getCounter(varName || '')

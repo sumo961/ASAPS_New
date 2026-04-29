@@ -400,6 +400,7 @@ interface PreviewData {
   assets?: Asset[];
   characters?: Character[];
   emotionPalette?: import('@asaps/core').EmotionDefinition[];
+  traitModulations?: import('@asaps/core').TraitEmotionWeight[];
   themeAssets?: any;
   activeLanguage?: string | null;
 }
@@ -765,6 +766,11 @@ export const PreviewWindow: React.FC = () => {
       // author's weights / decay rates rather than core defaults.
       if (previewData.emotionPalette && previewData.emotionPalette.length > 0) {
         newStory.setEmotionPalette(previewData.emotionPalette);
+      }
+      // Apply trait → emotion modulations so per-character traits scale
+      // incoming deltas (Step 6).
+      if (previewData.traitModulations) {
+        newStory.setTraitModulations(previewData.traitModulations);
       }
 
       // Reconstruct beats from serialized data

@@ -30,7 +30,7 @@ import {
   Heart
 } from 'lucide-react';
 import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG, InventoryFrameConfig, DEFAULT_INVENTORY_FRAME_CONFIG } from '../../types/character';
-import { describeMoodAxis } from '@asaps/core';
+import { describeMoodAxis, DEFAULT_TRAIT_NAMES, DEFAULT_TRAIT_VALUES, TRAIT_DESCRIPTIONS } from '@asaps/core';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
@@ -1857,8 +1857,141 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
     const moodIsNeutral = !editedCharacter.initialMood
       || (Math.abs(mood.valence) < 0.05 && Math.abs(mood.arousal) < 0.05);
 
+    // Step 6 — Personality traits. Authored on the Character; modulate
+    // emotion deltas at runtime via the project's TraitModulationProfile.
+    const traits = editedCharacter.traits || {};
+    const traitsNeutral = Object.values(traits).every(
+      (v) => typeof v !== 'number' || Math.abs(v - 0.5) < 0.05,
+    );
+    const updateTrait = (name: string, v: number) => {
+      const clamped = Math.max(0, Math.min(1, v));
+      setEditedCharacter({
+        ...editedCharacter,
+        traits: { ...traits, [name]: clamped },
+      });
+    };
+    const removeTrait = (name: string) => {
+      const next = { ...traits };
+      delete next[name];
+      setEditedCharacter({
+        ...editedCharacter,
+        traits: Object.keys(next).length > 0 ? next : undefined,
+      });
+    };
+    const seedDefaultTraits = () => {
+      setEditedCharacter({
+        ...editedCharacter,
+        traits: { ...DEFAULT_TRAIT_VALUES },
+      });
+    };
+    const addCustomTrait = () => {
+      let suffix = 1;
+      while (traits[`trait${suffix}`] !== undefined) suffix += 1;
+      setEditedCharacter({
+        ...editedCharacter,
+        traits: { ...traits, [`trait${suffix}`]: 0.5 },
+      });
+    };
+
     return (
       <div className="space-y-6">
+        {/* Personality — Big Five + author-defined traits */}
+        <div className="bg-white border rounded-lg p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                Personality
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Static traits in <span className="font-mono">[0, 1]</span>. Modulate emotion deltas at runtime — never gate choices on their own.
+              </p>
+            </div>
+            {Object.keys(traits).length === 0 ? (
+              <button
+                onClick={seedDefaultTraits}
+                className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+                title="Seed Big Five traits at neutral 0.5"
+              >
+                + Add Big Five
+              </button>
+            ) : (
+              <button
+                onClick={addCustomTrait}
+                className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+              >
+                + Add custom trait
+              </button>
+            )}
+          </div>
+
+          {Object.keys(traits).length === 0 ? (
+            <div className="text-xs text-gray-400 italic py-3">
+              No traits set. This character behaves like a neutral one — emotion deltas pass through unchanged.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {Object.entries(traits).map(([name, value]) => {
+                const isDefault = (DEFAULT_TRAIT_NAMES as readonly string[]).includes(name);
+                const description = isDefault
+                  ? TRAIT_DESCRIPTIONS[name as keyof typeof TRAIT_DESCRIPTIONS]
+                  : undefined;
+                return (
+                  <div key={name}>
+                    <div className="flex items-center justify-between text-xs text-gray-700 mb-1">
+                      {isDefault ? (
+                        <span className="font-medium capitalize">{name}</span>
+                      ) : (
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => {
+                            const newName = e.target.value.trim();
+                            if (!newName || newName === name) return;
+                            const next = { ...traits };
+                            delete next[name];
+                            next[newName] = value;
+                            setEditedCharacter({ ...editedCharacter, traits: next });
+                          }}
+                          className="font-medium px-1 py-0.5 border rounded text-xs"
+                          style={{ width: 140 }}
+                        />
+                      )}
+                      <button
+                        onClick={() => removeTrait(name)}
+                        className="text-gray-400 hover:text-red-600 text-sm"
+                        title={`Remove ${name}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    {description && (
+                      <p className="text-[10px] text-gray-500 mb-1">{description}</p>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={0} max={1} step={0.05}
+                        value={typeof value === 'number' ? value : 0.5}
+                        onChange={(e) => updateTrait(name, parseFloat(e.target.value))}
+                        className="flex-1"
+                      />
+                      <span className="font-mono text-xs w-12 text-right text-gray-700">
+                        {(typeof value === 'number' ? value : 0.5).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              {!traitsNeutral && (
+                <div className="text-xs text-gray-600 bg-gray-50 rounded px-3 py-2">
+                  Non-neutral traits will scale emotion deltas at runtime. Authors can branch on traits via the <span className="font-mono">trait</span> condition operator.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Mood — 2D affect at story start */}
         <div className="bg-white border rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">

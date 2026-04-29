@@ -16,7 +16,7 @@ import { findReferencesByName, relinkReferences } from './components/characters/
 import { AssetManager } from './components/assets/AssetManager';
 import { ImportAsmlDialog } from './components/ImportAsmlDialog';
 import { ImportTwineDialog } from './components/ImportTwineDialog';
-import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, type AssetManifest, type ImportResult, type EmotionDefinition } from '@asaps/core';
+import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { Character } from './types/character';
@@ -331,6 +331,12 @@ function App() {
   const [emotionPalette, setEmotionPalette] = useState<EmotionDefinition[]>(
     () => DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e })),
   );
+  // Step 6 — project-level trait → emotion modulation table. Drives how
+  // each character's traits scale incoming emotion deltas. Persisted with
+  // the rest of the project's story payload.
+  const [traitModulations, setTraitModulations] = useState<TraitEmotionWeight[]>(
+    () => DEFAULT_TRAIT_MODULATIONS.map((m) => ({ ...m })),
+  );
 
   // Theme state - track current theme ID for asset loading
   const [currentThemeId, setCurrentThemeId] = useState<string | undefined>(undefined);
@@ -366,6 +372,7 @@ function App() {
   const authorRef = useRef(state.author);
   const charactersRef = useRef<Character[]>(characters);
   const emotionPaletteRef = useRef<EmotionDefinition[]>(emotionPalette);
+  const traitModulationsRef = useRef<TraitEmotionWeight[]>(traitModulations);
   const clustersRef = useRef<Cluster[]>(state.clusters || []);
   const containerBeatPositionsRef = useRef<ContainerBeatPosition[]>(state.containerBeatPositions || []);
   const assetsRef = useRef<Asset[]>(assets);
@@ -388,6 +395,10 @@ function App() {
   useEffect(() => {
     emotionPaletteRef.current = emotionPalette;
   }, [emotionPalette]);
+
+  useEffect(() => {
+    traitModulationsRef.current = traitModulations;
+  }, [traitModulations]);
 
   // Preload custom fonts when assets change
   useEffect(() => {
@@ -976,6 +987,7 @@ function App() {
       clusters: currentClusters,
       containerBeatPositions: currentContainerBeatPositions,
       emotionPalette: emotionPaletteRef.current.map((e) => ({ ...e })),
+      traitModulations: traitModulationsRef.current.map((m) => ({ ...m })),
     };
 
     // Debug: Log AI beats specifically
@@ -1928,6 +1940,12 @@ function App() {
               ? persistedPalette.map((e) => ({ ...e }))
               : DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e })),
           );
+          const persistedMods = (projectData as any).traitModulations as TraitEmotionWeight[] | undefined;
+          setTraitModulations(
+            Array.isArray(persistedMods)
+              ? persistedMods.map((m) => ({ ...m }))
+              : DEFAULT_TRAIT_MODULATIONS.map((m) => ({ ...m })),
+          );
         }
         if (projectData.settings) {
           actionsRef.current.updateSettings(projectData.settings);
@@ -2138,6 +2156,7 @@ function App() {
           characters: charactersRef.current,
           connections: connectionsRef.current,
           emotionPalette: emotionPaletteRef.current.map((e) => ({ ...e })),
+          traitModulations: traitModulationsRef.current.map((m) => ({ ...m })),
         };
 
         console.log('[App] Story data to save:', {
@@ -2221,6 +2240,12 @@ function App() {
             Array.isArray(persistedPalette) && persistedPalette.length > 0
               ? persistedPalette.map((e) => ({ ...e }))
               : DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e })),
+          );
+          const persistedMods = (projectData as any).traitModulations as TraitEmotionWeight[] | undefined;
+          setTraitModulations(
+            Array.isArray(persistedMods)
+              ? persistedMods.map((m) => ({ ...m }))
+              : DEFAULT_TRAIT_MODULATIONS.map((m) => ({ ...m })),
           );
         }
         if (projectData.settings) {
@@ -3925,12 +3950,13 @@ function App() {
         assets: assets,
         characters: translatedChars,
         emotionPalette: emotionPalette,
+        traitModulations: traitModulations,
         themeAssets: themeAssets,
         beatId: selectedBeat?.id,
         activeLanguage: translationState.activeLanguage ?? null,
       });
     }
-  }, [state.beats, selectedBeat, assets, characters, emotionPalette, themeAssets, getSerializedStoryData, globalSettings, translationState.activeLanguage, translationState.translations]);
+  }, [state.beats, selectedBeat, assets, characters, emotionPalette, traitModulations, themeAssets, getSerializedStoryData, globalSettings, translationState.activeLanguage, translationState.translations]);
 
   // Keyboard shortcut for preview window (Ctrl/Cmd+Shift+P)
   useEffect(() => {
@@ -3978,6 +4004,7 @@ function App() {
         assets: assets,
         characters: translatedCharacters,
         emotionPalette: emotionPalette,
+        traitModulations: traitModulations,
         themeAssets: themeAssets,
         beatId: selectedBeat?.id,
         activeLanguage: translationState.activeLanguage ?? null,
@@ -3990,7 +4017,7 @@ function App() {
         clearTimeout(previewUpdateTimeoutRef.current);
       }
     };
-  }, [previewWindowOpen, state.beats, state.connections, globalSettings, assets, characters, emotionPalette, themeAssets, getSerializedStoryData, translationState.activeLanguage, selectedBeat]);
+  }, [previewWindowOpen, state.beats, state.connections, globalSettings, assets, characters, emotionPalette, traitModulations, themeAssets, getSerializedStoryData, translationState.activeLanguage, selectedBeat]);
 
   // Auto-navigate preview to selected beat
   useEffect(() => {
@@ -4423,6 +4450,9 @@ function App() {
     // Apply project-level emotion palette so runtime fireEmotion uses the
     // author's weights/decay rates rather than defaults.
     story.setEmotionPalette(emotionPalette);
+    // Apply project-level trait → emotion modulation table so per-character
+    // traits scale incoming deltas as authored.
+    story.setTraitModulations(traitModulations);
 
     state.beats.forEach(beat => {
       story.addBeat(beat);
@@ -4438,7 +4468,7 @@ function App() {
     }
 
     return story;
-  }, [state, globalSettings, emotionPalette]);
+  }, [state, globalSettings, emotionPalette, traitModulations]);
 
   /**
    * Check if the current project is a "default empty" project

@@ -92,7 +92,7 @@ export interface FictionalTime {
 }
 
 export interface Condition {
-  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion';
+  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion' | 'trait';
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
   // New canonical field names
   variableName?: string;
@@ -131,6 +131,11 @@ export interface Condition {
   // for `emotionName` against `value`. The compared scalar is the level
   // ∈ [0, 1] from StoryContext.getCharacterEmotion.
   emotionName?: string;
+  // For trait conditions (Step 6): tests `character`'s static trait value
+  // against `value`. Traits are author-set on Character.traits and stay in
+  // [0, 1] (default Big Five: openness / conscientiousness / extraversion /
+  // agreeableness / neuroticism — but the bag is open).
+  traitName?: string;
 }
 
 export interface Effect {

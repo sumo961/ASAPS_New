@@ -3,3 +3,12 @@ export { StoryContext } from './StoryContext';
 export { Story } from './Story';
 export type { SerializedStoryState, InventoryEntry, ChoiceRecord, ResetOptions, CharacterMood, Sentiment } from './StoryContext';
 export { DEFAULT_EMOTION_PALETTE, findEmotionDefinition, type EmotionDefinition } from './EmotionPalette';
+export {
+  DEFAULT_TRAIT_NAMES,
+  DEFAULT_TRAIT_VALUES,
+  DEFAULT_TRAIT_MODULATIONS,
+  TRAIT_DESCRIPTIONS,
+  modulateEmotionDelta,
+  type DefaultTraitName,
+  type TraitEmotionWeight,
+} from './PersonalityTraits';

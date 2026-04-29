@@ -3,6 +3,7 @@ import type { Condition, Effect, FictionalTime } from '../types';
 import type { Story } from './Story';
 import { TimerManager } from './TimerManager';
 import { resolveCharacterKey } from '../utils/characterRef';
+import { modulateEmotionDelta } from './PersonalityTraits';
 
 /**
  * Inventory entry with quantity support
@@ -657,18 +658,30 @@ export class StoryContext extends EventEmitter {
     const key = this.resolveCharRef(charRef);
     if (!key || !emotion) return 0;
     const lower = emotion.toLowerCase();
+
+    // Step 6 — modulate the incoming delta by the character's traits before
+    // anything else uses it. A neutral or trait-less character produces the
+    // same delta as before (modulateEmotionDelta is a no-op then). Mood
+    // nudging downstream uses the modulated delta too, so a trait-amplified
+    // joy lifts mood proportionally more.
+    const characters = (this.story as any)?.getCharacters?.() as
+      Array<{ id?: string; traits?: Record<string, number> }> | undefined;
+    const character = characters?.find((c) => c?.id === key);
+    const modulations = (this.story as any)?.getTraitModulations?.();
+    const effectiveDelta = modulateEmotionDelta(delta, lower, character?.traits, modulations);
+
     if (!this.state.characterEmotionLevels[key]) this.state.characterEmotionLevels[key] = {};
     const previous = this.state.characterEmotionLevels[key][lower] ?? 0;
-    const next = Math.max(0, Math.min(1, previous + delta));
+    const next = Math.max(0, Math.min(1, previous + effectiveDelta));
     this.state.characterEmotionLevels[key][lower] = next;
-    this.emit('characterEmotionChanged', { characterRef: key, emotion: lower, value: next, previous, delta });
+    this.emit('characterEmotionChanged', { characterRef: key, emotion: lower, value: next, previous, delta: effectiveDelta });
 
     // Auto-nudge mood via the palette weights when the emotion is recognised.
     const palette: any[] | undefined = (this.story as any)?.getEmotionPalette?.();
     const def = palette?.find((e) => (e.name || '').toLowerCase() === lower);
     if (def) {
-      const dV = Number(def.weightToValence ?? 0) * delta;
-      const dA = Number(def.weightToArousal ?? 0) * delta;
+      const dV = Number(def.weightToValence ?? 0) * effectiveDelta;
+      const dA = Number(def.weightToArousal ?? 0) * effectiveDelta;
       if (dV !== 0 || dA !== 0) this.nudgeCharacterMood(charRef, dV, dA);
     }
     return next;
@@ -986,6 +999,34 @@ export class StoryContext extends EventEmitter {
         return false;
       }
       const left = this.getCharacterEmotion(character, emotionName);
+      const right = Number(condition.value ?? condition.right ?? 0);
+      switch (condition.operator) {
+        case '==': return left === right;
+        case '!=': return left !== right;
+        case '>': return left > right;
+        case '<': return left < right;
+        case '>=': return left >= right;
+        case '<=': return left <= right;
+        default: return false;
+      }
+    }
+
+    // Trait conditions (Step 6). Compares a character's static trait value
+    // (e.g. neuroticism, openness, or any author-defined trait) against
+    // `value`. Traits are stored on the Character record as a Record<string,
+    // number> in [0, 1]. Missing trait reads as 0.
+    if (condition.type === 'trait') {
+      const character = condition.character;
+      const traitName = condition.traitName;
+      if (!character || !traitName) {
+        console.warn('trait condition missing character or traitName');
+        return false;
+      }
+      const key = this.resolveCharRef(character);
+      const characters = (this.story as any)?.getCharacters?.() as
+        Array<{ id?: string; traits?: Record<string, number> }> | undefined;
+      const charRecord = characters?.find((c) => c?.id === key);
+      const left = Number(charRecord?.traits?.[traitName] ?? 0);
       const right = Number(condition.value ?? condition.right ?? 0);
       switch (condition.operator) {
         case '==': return left === right;

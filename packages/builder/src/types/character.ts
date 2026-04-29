@@ -54,6 +54,15 @@ export interface Character {
     strength: number;
   }>;
 
+  /**
+   * Personality traits — Step 6. Static, author-set keyed bag in [0, 1].
+   * Default schema is Big Five (openness, conscientiousness, extraversion,
+   * agreeableness, neuroticism). Authors can rename / extend. Traits never
+   * gate choices on their own — they modulate emotion deltas at runtime
+   * via the project's TraitModulationProfile.
+   */
+  traits?: Record<string, number>;
+
   // Metadata
   description?: string;
   tags?: string[];
