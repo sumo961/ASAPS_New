@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import type { Beat, Effect } from '@asaps/core';
 import { useAI } from '../hooks/useAI';
+import { CharacterRefField } from '../components/characters/CharacterRefField';
 import type { DialogGenerationRequest } from '../types/ai';
 import { ChoiceEffectsEditor } from './ChoiceEffectsEditor';
 import { TextFieldWithVariables } from './TextFieldWithVariables';
@@ -31,6 +32,9 @@ import type { AvailableCounter, AvailableVariable, AvailableInventoryItem } from
 interface DialogNode {
   id: string;
   speaker: string;
+  /** Optional Character.id reference (Layer 2 of the rich-character roadmap).
+   * When set and resolvable, takes precedence over `speaker` for stable identity. */
+  characterRef?: string;
   text: string;
   emotion?: string;
   conditions?: Condition[];
@@ -67,6 +71,10 @@ interface DialogTreeEditorProps {
   dialogTree: DialogNode;
   onChange: (tree: DialogNode) => void;
   characters?: string[];
+  /** Full Character records — used by the per-node speaker combobox so dropdowns
+   * can show colors / display names / proper id-keyed routing. When omitted, the
+   * combobox falls back to the simple string list in `characters`. */
+  characterObjects?: Array<{ id: string; name: string; displayName?: string; color?: string; role?: string }>;
   variables?: string[];
   counters?: (string | CounterOption)[];  // Can be string (backward compat) or object
   availableCounters?: AvailableCounter[];
@@ -76,6 +84,9 @@ interface DialogTreeEditorProps {
   expanded?: boolean;
   /** Resolve speaker names to translated display names (for active translation language) */
   speakerNameResolver?: (name: string) => string;
+  /** Called when the user clicks "Define '<name>' as a Character" in the
+   * per-node speaker combobox. Parent typically opens the Character Manager. */
+  onDefineAsCharacter?: (name: string) => void;
 }
 
 // Speaker color palette - consistent colors for each speaker
@@ -106,6 +117,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   dialogTree,
   onChange,
   characters = ['Narrator', 'NPC'],
+  characterObjects,
   variables = [],
   counters = [],
   availableCounters: availableCountersProp,
@@ -114,6 +126,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   allBeats = [],
   expanded = false,
   speakerNameResolver,
+  onDefineAsCharacter,
 }) => {
   // Custom speaker input state
   const [customSpeakerValue, setCustomSpeakerValue] = useState<string>('');
@@ -738,56 +751,31 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
           <h3 className="text-lg font-medium mb-4">Edit NPC Dialog</h3>
           
           <div className="space-y-3">
-            {/* Speaker */}
+            {/* Speaker — combobox stores both characterRef (canonical id) and free-text */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">NPC Speaker</label>
-              {/* Check if current speaker is not in the list (custom value) */}
-              {!characters.includes(node.speaker) && node.speaker !== '__custom__' ? (
-                /* Show input for existing custom value */
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={node.speaker}
-                    onChange={(e) => {
-                      const updated = { ...node, speaker: e.target.value };
-                      setEditingNode({ node: updated, path });
-                    }}
-                    className="flex-1 px-2 py-1 border rounded text-sm"
-                    placeholder="Enter speaker name..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updated = { ...node, speaker: characters[0] || 'Narrator' };
-                      setEditingNode({ node: updated, path });
-                    }}
-                    className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
-                    title="Switch to dropdown"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                /* Show select dropdown */
-                <select
-                  value={characters.includes(node.speaker) ? node.speaker : '__custom__'}
-                  onChange={(e) => {
-                    if (e.target.value === '__custom__') {
-                      const updated = { ...node, speaker: customSpeakerValue || 'New Character' };
-                      setEditingNode({ node: updated, path });
-                    } else {
-                      const updated = { ...node, speaker: e.target.value };
-                      setEditingNode({ node: updated, path });
-                    }
-                  }}
-                  className="w-full px-2 py-1 border rounded text-sm"
-                >
-                  {characters.map(char => (
-                    <option key={char} value={char}>{char}</option>
-                  ))}
-                  <option value="__custom__">Custom...</option>
-                </select>
-              )}
+              <CharacterRefField
+                value={{ characterRef: node.characterRef, freeText: node.speaker }}
+                onChange={(next) => {
+                  const updated: DialogNode = {
+                    ...node,
+                    speaker: next.freeText ?? '',
+                    // Strip the field when not linked, so persisted JSON stays clean.
+                    ...(next.characterRef ? { characterRef: next.characterRef } : { characterRef: undefined }),
+                  };
+                  setEditingNode({ node: updated, path });
+                }}
+                characters={(characterObjects && characterObjects.length > 0
+                  ? characterObjects
+                  : characters.map((s) => ({
+                      id: s, name: s, displayName: s, role: 'npc',
+                      visual: { type: 'static' }, states: [], defaultState: '',
+                      counters: [], inventory: [], createdAt: '', updatedAt: '',
+                    }))
+                ) as any}
+                onDefineAsCharacter={onDefineAsCharacter}
+                placeholder="Type or pick a speaker…"
+              />
             </div>
             
             {/* Text */}

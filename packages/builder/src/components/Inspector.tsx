@@ -2495,6 +2495,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       }}
                       onChange={handleDialogTreeChange}
                       characters={getAvailableCharacters()}
+                      characterObjects={characters}
                       allBeats={availableTargets}
                       counters={availableCounters.map(c => ({ name: c.name, displayName: c.displayName, characterName: c.characterName }))}
                       variables={availableVariables.map(v => v.name)}
@@ -2502,6 +2503,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       availableVariables={availableVariables}
                       speakerNameResolver={speakerNameResolver}
                       availableInventoryItems={availableInventoryItems}
+                      onDefineAsCharacter={onDefineAsCharacter}
                     />
 
                     {showAdvanced && (
