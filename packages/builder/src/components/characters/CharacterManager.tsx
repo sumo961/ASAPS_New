@@ -51,6 +51,13 @@ interface CharacterManagerProps {
   onAssetAdd?: (asset: any) => Promise<boolean>; // Add this for asset management
   selectionMode?: boolean; // When true, clicking a character selects it instead of editing
   onCharacterSelect?: (character: Character) => void; // Callback when character is selected
+  /**
+   * Fired when the user creates a Character via the prefill flow ("Define
+   * '<name>' as a Character" link in CharacterRefField). The host (App.tsx)
+   * uses this to scan for free-text references to that name and offer a
+   * one-click bulk re-link via BulkRelinkDialog.
+   */
+  onCharacterCreated?: (character: Character, sourceName: string) => void;
 }
 
 
@@ -61,6 +68,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   onAssetAdd, // Add this
   selectionMode = false,
   onCharacterSelect,
+  onCharacterCreated,
 }) => {
   // Only use selection management from the hook
   const characters: Character[] = initialCharacters;
@@ -119,6 +127,11 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
     onCharactersChange([...characters, newCharacter]);
     selectCharacter(newCharacter.id);
     setShowEditor(true);
+    // Notify the host so it can offer to re-link existing free-text references
+    // to this character's name (Step 1.d.5 bulk re-link flow).
+    if (onCharacterCreated) {
+      onCharacterCreated(newCharacter, trimmed);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

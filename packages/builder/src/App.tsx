@@ -11,6 +11,8 @@ import { debugWindowManager } from './services/DebugWindowManager';
 import { GlobalSettingsInspector } from './components/settings/GlobalSettingsInspector';
 import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
+import { BulkRelinkDialog } from './components/characters/BulkRelinkDialog';
+import { findReferencesByName, relinkReferences } from './components/characters/relinkReferences';
 import { AssetManager } from './components/assets/AssetManager';
 import { ImportAsmlDialog } from './components/ImportAsmlDialog';
 import { ImportTwineDialog } from './components/ImportTwineDialog';
@@ -303,6 +305,14 @@ function App() {
   const [showGitInitDialog, setShowGitInitDialog] = useState(false);
   const [showCloneRepoDialog, setShowCloneRepoDialog] = useState(false);
   const [showNewGitHubProjectDialog, setShowNewGitHubProjectDialog] = useState(false);
+
+  // Bulk-relink dialog state — fires when CharacterManager creates a character
+  // via the "Define '<name>' as a Character" prefill flow, and there are
+  // existing free-text references to that name elsewhere in the project.
+  const [bulkRelink, setBulkRelink] = useState<{
+    character: { id: string; name?: string; displayName?: string };
+    matches: import('./components/characters/relinkReferences').ReferenceMatch[];
+  } | null>(null);
 
   // Translation state
   const translationState = useTranslationState();
@@ -4178,6 +4188,43 @@ function App() {
     characterSelectionCallbackRef.current = null;
   }, []);
 
+  // Step 1.d.5 — when the Manager creates a character via the
+  // "Define '<name>' as a Character" prefill flow, scan the project for
+  // free-text references to that name and offer a one-click bulk re-link
+  // via BulkRelinkDialog. If no references exist, no dialog is shown.
+  const handleCharacterCreated = useCallback((newChar: Character, sourceName: string) => {
+    const matches = findReferencesByName(
+      beatsRef.current as any,
+      newChar,
+      [...characters, newChar] as any,
+    );
+    if (matches.length === 0) return;
+    setBulkRelink({ character: newChar, matches });
+  }, [characters]);
+
+  const handleBulkRelinkConfirm = useCallback(() => {
+    if (!bulkRelink) return;
+    // Apply each match's update via actions.updateBeat. We compute the new
+    // beats array via relinkReferences and emit one updateBeat per affected
+    // beat with the changed top-level fields and parameters.
+    const beatsBefore = beatsRef.current as any;
+    const beatsAfter = relinkReferences(beatsBefore, bulkRelink.matches, bulkRelink.character);
+    const updateById = new Map<string, any>();
+    for (let i = 0; i < beatsAfter.length; i++) {
+      if (beatsAfter[i] !== beatsBefore[i]) {
+        updateById.set(beatsAfter[i].id, beatsAfter[i]);
+      }
+    }
+    for (const [id, updated] of updateById) {
+      const updates: Record<string, any> = {};
+      if (updated.speaker !== undefined) updates.speaker = updated.speaker;
+      if (updated.characterRef !== undefined) updates.characterRef = updated.characterRef;
+      if (updated.parameters) updates.parameters = updated.parameters;
+      actionsRef.current.updateBeat(id, updates as any);
+    }
+    setBulkRelink(null);
+  }, [bulkRelink]);
+
   const handleOpenAssetManager = useCallback(() => {
     setShowAssetManager(true);
   }, []);
@@ -5509,6 +5556,7 @@ function App() {
                     handleCloseCharacterManager();
                   }
                 }}
+                onCharacterCreated={handleCharacterCreated}
               />
             </div>
           </div>
@@ -5761,6 +5809,17 @@ function App() {
               alert(`Project was created but failed to open: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           }}
+        />
+      )}
+
+      {/* Bulk re-link dialog — fires after defining a Character via the
+          CharacterRefField "Define as Character" flow when free-text refs exist. */}
+      {bulkRelink && (
+        <BulkRelinkDialog
+          character={bulkRelink.character}
+          matches={bulkRelink.matches}
+          onConfirm={handleBulkRelinkConfirm}
+          onSkip={() => setBulkRelink(null)}
         />
       )}
 
