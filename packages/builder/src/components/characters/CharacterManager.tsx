@@ -60,6 +60,14 @@ interface CharacterManagerProps {
    * one-click bulk re-link via BulkRelinkDialog.
    */
   onCharacterCreated?: (character: Character, sourceName: string) => void;
+  /**
+   * Project-level emotion palette. When provided, the palette editor reads
+   * from / writes to the project via these props. When omitted, the manager
+   * falls back to local component state (default Ekman palette) — useful for
+   * unit tests and host shells that haven't wired persistence yet.
+   */
+  emotionPalette?: EmotionDefinition[];
+  onEmotionPaletteChange?: (palette: EmotionDefinition[]) => void;
 }
 
 
@@ -71,6 +79,8 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   selectionMode = false,
   onCharacterSelect,
   onCharacterCreated,
+  emotionPalette: emotionPaletteProp,
+  onEmotionPaletteChange,
 }) => {
   // Only use selection management from the hook
   const characters: Character[] = initialCharacters;
@@ -89,9 +99,11 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   // Step 5 polish — emotion palette editor modal. Local in-memory state until
   // project-level persistence is wired through globalSettings/story save.
   const [showPaletteEditor, setShowPaletteEditor] = useState(false);
-  const [emotionPalette, setEmotionPalette] = useState<EmotionDefinition[]>(
+  const [emotionPaletteLocal, setEmotionPaletteLocal] = useState<EmotionDefinition[]>(
     () => DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e })),
   );
+  const emotionPalette = emotionPaletteProp ?? emotionPaletteLocal;
+  const setEmotionPalette = onEmotionPaletteChange ?? setEmotionPaletteLocal;
   const [showTemplates, setShowTemplates] = useState(false);
 
   // Consume the prefill name set by Inspector → CharacterRefField's "Define

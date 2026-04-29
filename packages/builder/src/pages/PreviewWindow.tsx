@@ -399,6 +399,7 @@ interface PreviewData {
   projectSettings?: { width: number; height: number };
   assets?: Asset[];
   characters?: Character[];
+  emotionPalette?: import('@asaps/core').EmotionDefinition[];
   themeAssets?: any;
   activeLanguage?: string | null;
 }
@@ -759,6 +760,12 @@ export const PreviewWindow: React.FC = () => {
         author: storyData.author || 'Unknown',
         firstBeatId: storyData.firstBeatId,
       });
+
+      // Apply project-level emotion palette so runtime fireEmotion uses the
+      // author's weights / decay rates rather than core defaults.
+      if (previewData.emotionPalette && previewData.emotionPalette.length > 0) {
+        newStory.setEmotionPalette(previewData.emotionPalette);
+      }
 
       // Reconstruct beats from serialized data
       for (const beatData of storyData.beats) {

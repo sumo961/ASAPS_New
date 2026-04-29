@@ -50,6 +50,8 @@ export interface PreviewMessage {
     projectSettings?: { width: number; height: number };
     assets?: any[];
     characters?: any[];
+    /** Project-level emotion palette — drives runtime fireEmotion side-effects. */
+    emotionPalette?: import('@asaps/core').EmotionDefinition[];
     themeAssets?: any;
     /** Active translation resource (for preview in translated language) */
     translationResource?: TranslationResource;

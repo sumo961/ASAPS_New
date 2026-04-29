@@ -16,7 +16,7 @@ import { findReferencesByName, relinkReferences } from './components/characters/
 import { AssetManager } from './components/assets/AssetManager';
 import { ImportAsmlDialog } from './components/ImportAsmlDialog';
 import { ImportTwineDialog } from './components/ImportTwineDialog';
-import { Story, ASMLParser, type AssetManifest, type ImportResult } from '@asaps/core';
+import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, type AssetManifest, type ImportResult, type EmotionDefinition } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { Character } from './types/character';
@@ -325,6 +325,12 @@ function App() {
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
+  // Step 5 — project-level emotion palette. Defaults to Ekman 6 + pride /
+  // shame / interest until the project explicitly overrides it. Persisted
+  // through the project's story payload (see updateStory() callsites).
+  const [emotionPalette, setEmotionPalette] = useState<EmotionDefinition[]>(
+    () => DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e })),
+  );
 
   // Theme state - track current theme ID for asset loading
   const [currentThemeId, setCurrentThemeId] = useState<string | undefined>(undefined);
@@ -359,6 +365,7 @@ function App() {
   const titleRef = useRef(state.title);
   const authorRef = useRef(state.author);
   const charactersRef = useRef<Character[]>(characters);
+  const emotionPaletteRef = useRef<EmotionDefinition[]>(emotionPalette);
   const clustersRef = useRef<Cluster[]>(state.clusters || []);
   const containerBeatPositionsRef = useRef<ContainerBeatPosition[]>(state.containerBeatPositions || []);
   const assetsRef = useRef<Asset[]>(assets);
@@ -377,6 +384,10 @@ function App() {
   useEffect(() => {
     charactersRef.current = characters;
   }, [characters]);
+
+  useEffect(() => {
+    emotionPaletteRef.current = emotionPalette;
+  }, [emotionPalette]);
 
   // Preload custom fonts when assets change
   useEffect(() => {
@@ -964,6 +975,7 @@ function App() {
       connections: currentConnections,
       clusters: currentClusters,
       containerBeatPositions: currentContainerBeatPositions,
+      emotionPalette: emotionPaletteRef.current.map((e) => ({ ...e })),
     };
 
     // Debug: Log AI beats specifically
@@ -1909,6 +1921,14 @@ function App() {
         containerBeatPositionsRef.current = projectData.containerBeatPositions || [];
 
         setCharacters(projectData.characters || []);
+        {
+          const persistedPalette = (projectData as any).emotionPalette as EmotionDefinition[] | undefined;
+          setEmotionPalette(
+            Array.isArray(persistedPalette) && persistedPalette.length > 0
+              ? persistedPalette.map((e) => ({ ...e }))
+              : DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e })),
+          );
+        }
         if (projectData.settings) {
           actionsRef.current.updateSettings(projectData.settings);
         }
@@ -2117,6 +2137,7 @@ function App() {
           beats: beatsRef.current,
           characters: charactersRef.current,
           connections: connectionsRef.current,
+          emotionPalette: emotionPaletteRef.current.map((e) => ({ ...e })),
         };
 
         console.log('[App] Story data to save:', {
@@ -2194,6 +2215,14 @@ function App() {
         containerBeatPositionsRef.current = projectData.containerBeatPositions || [];
 
         setCharacters(projectData.characters || []);
+        {
+          const persistedPalette = (projectData as any).emotionPalette as EmotionDefinition[] | undefined;
+          setEmotionPalette(
+            Array.isArray(persistedPalette) && persistedPalette.length > 0
+              ? persistedPalette.map((e) => ({ ...e }))
+              : DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e })),
+          );
+        }
         if (projectData.settings) {
           actionsRef.current.updateSettings(projectData.settings);
         }
@@ -3895,12 +3924,13 @@ function App() {
         settings: globalSettings,
         assets: assets,
         characters: translatedChars,
+        emotionPalette: emotionPalette,
         themeAssets: themeAssets,
         beatId: selectedBeat?.id,
         activeLanguage: translationState.activeLanguage ?? null,
       });
     }
-  }, [state.beats, selectedBeat, assets, characters, themeAssets, getSerializedStoryData, globalSettings, translationState.activeLanguage, translationState.translations]);
+  }, [state.beats, selectedBeat, assets, characters, emotionPalette, themeAssets, getSerializedStoryData, globalSettings, translationState.activeLanguage, translationState.translations]);
 
   // Keyboard shortcut for preview window (Ctrl/Cmd+Shift+P)
   useEffect(() => {
@@ -3947,6 +3977,7 @@ function App() {
         projectSettings: { width: projectSettings.width, height: projectSettings.height },
         assets: assets,
         characters: translatedCharacters,
+        emotionPalette: emotionPalette,
         themeAssets: themeAssets,
         beatId: selectedBeat?.id,
         activeLanguage: translationState.activeLanguage ?? null,
@@ -3959,7 +3990,7 @@ function App() {
         clearTimeout(previewUpdateTimeoutRef.current);
       }
     };
-  }, [previewWindowOpen, state.beats, state.connections, globalSettings, assets, characters, themeAssets, getSerializedStoryData, translationState.activeLanguage, selectedBeat]);
+  }, [previewWindowOpen, state.beats, state.connections, globalSettings, assets, characters, emotionPalette, themeAssets, getSerializedStoryData, translationState.activeLanguage, selectedBeat]);
 
   // Auto-navigate preview to selected beat
   useEffect(() => {
@@ -4389,6 +4420,10 @@ function App() {
       firstBeatId: knownFirstBeatId || undefined,
     });
 
+    // Apply project-level emotion palette so runtime fireEmotion uses the
+    // author's weights/decay rates rather than defaults.
+    story.setEmotionPalette(emotionPalette);
+
     state.beats.forEach(beat => {
       story.addBeat(beat);
     });
@@ -4403,7 +4438,7 @@ function App() {
     }
 
     return story;
-  }, [state, globalSettings]);
+  }, [state, globalSettings, emotionPalette]);
 
   /**
    * Check if the current project is a "default empty" project
@@ -5557,6 +5592,8 @@ function App() {
                   }
                 }}
                 onCharacterCreated={handleCharacterCreated}
+                emotionPalette={emotionPalette}
+                onEmotionPaletteChange={setEmotionPalette}
               />
             </div>
           </div>

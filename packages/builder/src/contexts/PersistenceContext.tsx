@@ -685,6 +685,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         connections: story.getConnections ? story.getConnections() : story.connections,
         containerBeatPositions: story.containerBeatPositions || [],
         assets: story.assets || [],
+        emotionPalette: story.getEmotionPalette ? story.getEmotionPalette() : story.emotionPalette,
         // Then apply the updates from storyData
         ...storyData,
       };
