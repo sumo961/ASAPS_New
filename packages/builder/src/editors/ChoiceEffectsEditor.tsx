@@ -17,6 +17,8 @@ const EFFECT_TYPE_LABELS: Record<EffectType, string> = {
   // Step 4 / Phase A — character affect inline on choices and dialog nodes.
   nudgeMood: 'Nudge Mood',
   addSentiment: 'Add Sentiment',
+  // Step 5 — fire an emotion at a character (auto-nudges mood per palette).
+  fireEmotion: 'Fire Emotion',
 };
 
 interface ChoiceEffectsEditorProps {
@@ -113,7 +115,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
   return (
     <div className={`space-y-1.5 ${compact ? '' : 'p-2 bg-gray-50 rounded'}`}>
       {effects.map((effect, index) => {
-        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment';
+        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment' || effect.type === 'fireEmotion';
         return (
         <div key={index} className="flex flex-wrap gap-1 items-center">
           {/* Type dropdown */}
@@ -139,6 +141,10 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 updates.sentimentTarget = effect.sentimentTarget ?? '';
                 updates.sentimentEmotion = effect.sentimentEmotion ?? '';
                 updates.strengthDelta = effect.strengthDelta ?? 0.3;
+              } else if (newType === 'fireEmotion') {
+                updates.value = undefined;
+                updates.emotion = effect.emotion ?? '';
+                updates.emotionDelta = effect.emotionDelta ?? 0.3;
               }
               updateEffect(index, updates);
             }}
@@ -193,6 +199,27 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
                 placeholder="±arousal"
                 title="Arousal delta — positive = more excited, negative = calmer. Runtime clamps to [-1, 1]."
+              />
+            </>
+          )}
+          {effect.type === 'fireEmotion' && (
+            <>
+              <input
+                type="text"
+                value={effect.emotion || ''}
+                onChange={(e) => updateEffect(index, { emotion: e.target.value })}
+                placeholder="emotion"
+                className="w-24 px-1.5 py-1 text-xs border rounded flex-shrink-0"
+                title="Emotion name (e.g. joy, anger, fear). Looked up against the project's emotion palette."
+              />
+              <input
+                type="number"
+                step={0.1}
+                value={effect.emotionDelta ?? 0}
+                onChange={(e) => updateEffect(index, { emotionDelta: parseFloat(e.target.value) || 0 })}
+                className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
+                placeholder="±intensity"
+                title="Intensity delta (0–1 typical). Positive bumps the emotion; mood is auto-nudged via palette weights."
               />
             </>
           )}

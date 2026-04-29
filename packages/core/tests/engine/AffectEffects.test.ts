@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StoryContext } from '../../src/engine/StoryContext';
+import { Story } from '../../src/engine/Story';
 import type { Effect } from '../../src/types';
 
 function makeStoryStub(characters: Array<{ id: string; name?: string; displayName?: string }>) {
@@ -106,5 +107,37 @@ describe('applyEffect — addSentiment', () => {
       sentimentTarget: 'wolf', sentimentEmotion: 'fear', strengthDelta: -0.3,
     } as Effect);
     expect(ctx.getSentimentTo('char_1', 'wolf', 'fear')).toBeCloseTo(0.4);
+  });
+});
+
+describe('applyEffect — fireEmotion (Step 5)', () => {
+  let ctx: StoryContext;
+  beforeEach(() => {
+    vi.stubGlobal('window', { setInterval: vi.fn().mockReturnValue(1), clearInterval: vi.fn() });
+    // Use a real Story so the EmotionPalette is available for the side-effect.
+    const story = new Story();
+    story.setCharacters([granny, wolf]);
+    ctx = new StoryContext(undefined, story);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('bumps the emotion level and auto-nudges mood via palette weights', () => {
+    ctx.applyEffect({ type: 'fireEmotion', target: 'char_1', emotion: 'joy', emotionDelta: 0.5 } as Effect);
+    expect(ctx.getCharacterEmotion('char_1', 'joy')).toBe(0.5);
+    // joy weights: valence +0.7, arousal +0.4
+    expect(ctx.getCharacterMood('char_1').valence).toBeCloseTo(0.35);
+    expect(ctx.getCharacterMood('char_1').arousal).toBeCloseTo(0.20);
+  });
+
+  it('skips when emotion or delta is missing', () => {
+    ctx.applyEffect({ type: 'fireEmotion', target: 'char_1', emotionDelta: 0.5 } as Effect);
+    ctx.applyEffect({ type: 'fireEmotion', target: 'char_1', emotion: 'joy' } as Effect);
+    ctx.applyEffect({ type: 'fireEmotion', target: 'char_1', emotion: 'joy', emotionDelta: 0 } as Effect);
+    expect(ctx.getCharacterEmotion('char_1', 'joy')).toBe(0);
+  });
+
+  it('resolves the holder through name / displayName', () => {
+    ctx.applyEffect({ type: 'fireEmotion', target: 'Granny', emotion: 'fear', emotionDelta: 0.4 } as Effect);
+    expect(ctx.getCharacterEmotion('char_1', 'fear')).toBe(0.4);
   });
 });

@@ -127,3 +127,36 @@ describe('checkCondition — sentiment', () => {
     expect(context.checkCondition(cond2)).toBe(true);
   });
 });
+
+describe('checkCondition — emotion (Step 5)', () => {
+  let context: StoryContext;
+  beforeEach(() => {
+    vi.stubGlobal('window', { setInterval: vi.fn().mockReturnValue(1), clearInterval: vi.fn() });
+    context = new StoryContext(undefined, makeStoryStub([granny, wolf]));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('compares emotion intensity against value', () => {
+    context.setCharacterEmotion('char_1', 'fear', 0.6);
+    const cond: Condition = { type: 'emotion', operator: '>=', character: 'char_1', emotionName: 'fear', value: 0.5 };
+    expect(context.checkCondition(cond)).toBe(true);
+    cond.value = 0.7;
+    expect(context.checkCondition(cond)).toBe(false);
+  });
+
+  it('treats unset emotions as 0', () => {
+    const cond: Condition = { type: 'emotion', operator: '==', character: 'char_1', emotionName: 'joy', value: 0 };
+    expect(context.checkCondition(cond)).toBe(true);
+  });
+
+  it('matches emotion name case-insensitively', () => {
+    context.setCharacterEmotion('char_1', 'fear', 0.5);
+    const cond: Condition = { type: 'emotion', operator: '>=', character: 'char_1', emotionName: 'FEAR', value: 0.4 };
+    expect(context.checkCondition(cond)).toBe(true);
+  });
+
+  it('returns false when character or emotionName missing', () => {
+    expect(context.checkCondition({ type: 'emotion', operator: '>', value: 0 } as Condition)).toBe(false);
+    expect(context.checkCondition({ type: 'emotion', operator: '>', character: 'char_1', value: 0 } as Condition)).toBe(false);
+  });
+});

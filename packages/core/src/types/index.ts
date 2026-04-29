@@ -92,7 +92,7 @@ export interface FictionalTime {
 }
 
 export interface Condition {
-  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment';
+  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion';
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
   // New canonical field names
   variableName?: string;
@@ -127,6 +127,10 @@ export interface Condition {
   // toward the target — useful for "does Granny like the player overall?".
   sentimentTarget?: string;
   sentimentEmotion?: string;
+  // For emotion conditions (Step 5): tests `character`'s current intensity
+  // for `emotionName` against `value`. The compared scalar is the level
+  // ∈ [0, 1] from StoryContext.getCharacterEmotion.
+  emotionName?: string;
 }
 
 export interface Effect {
@@ -135,7 +139,11 @@ export interface Effect {
     // Step 4 / Phase A: character affect effects so dialog choices, dialog
     // nodes, and other effect hosts can update mood and sentiments inline
     // without needing a separate UpdateAffect beat in the graph.
-    | 'nudgeMood' | 'addSentiment';
+    | 'nudgeMood' | 'addSentiment'
+    // Step 5: fire an emotion at a character (auto-nudges mood per palette
+    // weights). The same authoring shortcut as nudgeMood/addSentiment, but
+    // routed through the emotion model so palette changes take effect.
+    | 'fireEmotion';
   target: string;
   value?: any;
   // Sentiment-effect parameters (used when type === 'addSentiment'). Kept
@@ -151,6 +159,12 @@ export interface Effect {
   arousalDelta?: number;
   /** Strength delta for addSentiment effects (clamped post-add). */
   strengthDelta?: number;
+  /** Emotion name for fireEmotion effects. Looked up case-insensitively
+   * against the story's EmotionPalette to find weights for the auto
+   * mood nudge. Unknown names update the level but skip the nudge. */
+  emotion?: string;
+  /** Intensity delta for fireEmotion effects (clamped to [0, 1] post-add). */
+  emotionDelta?: number;
 }
 
 /**

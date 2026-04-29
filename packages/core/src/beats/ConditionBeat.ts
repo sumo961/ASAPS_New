@@ -43,6 +43,8 @@ export class ConditionBeat extends Beat {
   // Sentiment-specific parameters (Step 4)
   public sentimentTarget?: string;
   public sentimentEmotion?: string;
+  // Emotion-specific parameter (Step 5)
+  public emotionName?: string;
 
   constructor(config: BeatConfig & {
     conditionType?: string;
@@ -106,6 +108,7 @@ export class ConditionBeat extends Beat {
     this.moodAxis = (conditionObj.moodAxis || (params as any).moodAxis || (config as any).moodAxis || 'valence') as 'valence' | 'arousal';
     this.sentimentTarget = conditionObj.sentimentTarget || (params as any).sentimentTarget || (config as any).sentimentTarget;
     this.sentimentEmotion = conditionObj.sentimentEmotion || (params as any).sentimentEmotion || (config as any).sentimentEmotion;
+    this.emotionName = conditionObj.emotionName || (params as any).emotionName || (config as any).emotionName;
 
     // Build condition object based on type
     this.condition = this.buildCondition();
@@ -170,6 +173,11 @@ export class ConditionBeat extends Beat {
         condition.sentimentEmotion = this.sentimentEmotion;
         condition.value = this.value ?? this.val ?? 0;
         break;
+      case 'emotion':
+        condition.character = this.character;
+        condition.emotionName = this.emotionName;
+        condition.value = this.value ?? this.val ?? 0;
+        break;
       default:
         condition.variableName = this.variableName || this.variable;
         condition.value = this.value ?? this.val;
@@ -212,6 +220,7 @@ export class ConditionBeat extends Beat {
       moodAxis: this.moodAxis,
       sentimentTarget: this.sentimentTarget,
       sentimentEmotion: this.sentimentEmotion,
+      emotionName: this.emotionName,
     };
   }
 
@@ -444,6 +453,9 @@ export class ConditionBeat extends Beat {
       case 'sentiment':
         isValidCondition = !!(this.character && this.sentimentTarget);
         break;
+      case 'emotion':
+        isValidCondition = !!(this.character && this.emotionName);
+        break;
       case 'counter':
       default:
         isValidCondition = !!(this.variableName || this.variable);
@@ -477,6 +489,9 @@ export class ConditionBeat extends Beat {
         const s = context.getSentimentTo(this.character || '', this.sentimentTarget || '', this.sentimentEmotion);
         const emotionLabel = this.sentimentEmotion ? `.${this.sentimentEmotion}` : '';
         reason = `${this.character}.sentiment[→${this.sentimentTarget}${emotionLabel}] (${s.toFixed(2)}) ${this.operator} ${compareValue} = ${conditionResult}`;
+      } else if (this.conditionType === 'emotion') {
+        const v = context.getCharacterEmotion(this.character || '', this.emotionName || '');
+        reason = `${this.character}.emotion.${this.emotionName} (${v.toFixed(2)}) ${this.operator} ${compareValue} = ${conditionResult}`;
       } else {
         const currentValue = this.conditionType === 'counter'
           ? context.getCounter(varName || '')

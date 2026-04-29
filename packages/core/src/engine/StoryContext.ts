@@ -975,6 +975,29 @@ export class StoryContext extends EventEmitter {
       }
     }
 
+    // Emotion conditions (Step 5). Compares the current intensity of
+    // `character`'s `emotionName` against `value`. Both `character` and
+    // `emotionName` are required; emotionName is matched case-insensitively.
+    if (condition.type === 'emotion') {
+      const character = condition.character;
+      const emotionName = condition.emotionName;
+      if (!character || !emotionName) {
+        console.warn('emotion condition missing character or emotionName');
+        return false;
+      }
+      const left = this.getCharacterEmotion(character, emotionName);
+      const right = Number(condition.value ?? condition.right ?? 0);
+      switch (condition.operator) {
+        case '==': return left === right;
+        case '!=': return left !== right;
+        case '>': return left > right;
+        case '<': return left < right;
+        case '>=': return left >= right;
+        case '<=': return left <= right;
+        default: return false;
+      }
+    }
+
     // Sentiment conditions (Step 4). Compares the strength of
     // `character`'s sentiment toward `sentimentTarget` (optionally filtered
     // by `sentimentEmotion`) against `value`.
@@ -1090,6 +1113,17 @@ export class StoryContext extends EventEmitter {
         const d = Number(effect.strengthDelta ?? 0);
         if (t && e && d !== 0) {
           this.addCharacterSentiment(effect.target, t, e, d);
+        }
+        break;
+      }
+      // Step 5 — fire an emotion at the character. The runtime auto-nudges
+      // mood by the palette weights when the emotion is recognised; unknown
+      // emotion names still update the level but skip the mood side-effect.
+      case 'fireEmotion': {
+        const name = effect.emotion;
+        const delta = Number(effect.emotionDelta ?? 0);
+        if (name && delta !== 0) {
+          this.fireCharacterEmotion(effect.target, name, delta);
         }
         break;
       }
