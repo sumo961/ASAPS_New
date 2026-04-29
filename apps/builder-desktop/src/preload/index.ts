@@ -206,6 +206,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu:clone-repo', callback);
     return () => ipcRenderer.removeListener('menu:clone-repo', callback);
   },
+  // New GitHub project menu event
+  onMenuNewGitHubProject: (callback: () => void) => {
+    ipcRenderer.on('menu:new-github-project', callback);
+    return () => ipcRenderer.removeListener('menu:new-github-project', callback);
+  },
+
+  // Streaming command runner (for `gh auth login`-style flows)
+  vcs: {
+    runStreaming: (streamId: string, command: string, args: string[], cwd?: string) =>
+      ipcRenderer.invoke('vcs:run-streaming', streamId, command, args, cwd),
+    cancelStream: (streamId: string) =>
+      ipcRenderer.invoke('vcs:stream-cancel', streamId),
+    onStreamData: (callback: (payload: { streamId: string; channel: 'stdout' | 'stderr'; data: string }) => void) => {
+      const listener = (_: unknown, payload: { streamId: string; channel: 'stdout' | 'stderr'; data: string }) => callback(payload);
+      ipcRenderer.on('vcs:stream-data', listener);
+      return () => ipcRenderer.removeListener('vcs:stream-data', listener);
+    },
+    onStreamEnd: (callback: (payload: { streamId: string; exitCode: number; error?: string }) => void) => {
+      const listener = (_: unknown, payload: { streamId: string; exitCode: number; error?: string }) => callback(payload);
+      ipcRenderer.on('vcs:stream-end', listener);
+      return () => ipcRenderer.removeListener('vcs:stream-end', listener);
+    },
+  },
 
   // Platform info
   platform: process.platform,
@@ -288,6 +311,13 @@ declare global {
       onVCSTogglePanel: (callback: () => void) => () => void;
       onVCSRefresh: (callback: () => void) => () => void;
       onMenuCloneRepo: (callback: () => void) => () => void;
+      onMenuNewGitHubProject: (callback: () => void) => () => void;
+      vcs: {
+        runStreaming: (streamId: string, command: string, args: string[], cwd?: string) => Promise<{ ok: boolean; error?: string }>;
+        cancelStream: (streamId: string) => Promise<{ ok: boolean }>;
+        onStreamData: (callback: (payload: { streamId: string; channel: 'stdout' | 'stderr'; data: string }) => void) => () => void;
+        onStreamEnd: (callback: (payload: { streamId: string; exitCode: number; error?: string }) => void) => () => void;
+      };
       platform: NodeJS.Platform;
       isElectron: boolean;
     };

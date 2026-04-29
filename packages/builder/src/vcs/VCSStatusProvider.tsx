@@ -112,6 +112,14 @@ export interface VCSContextValue extends VCSState {
   /** Initialize a new Git repository and optionally add a remote */
   initRepo: (remoteUrl?: string) => Promise<GitOperationResult>;
 
+  // --- Tools (git, gh) detection ---
+  /** Last detection result, or null if never run this session */
+  tools: import('./ToolsDetector').VCSToolsState | null;
+  /** Whether a tools detection is currently in flight */
+  toolsChecking: boolean;
+  /** Re-run tool detection (manual "Re-check" button) */
+  recheckTools: () => Promise<void>;
+
   // --- Git Operations ---
   /** Stage files */
   stage: (filePaths: string[]) => Promise<GitOperationResult>;
@@ -222,6 +230,28 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   const suppressBehindRef = useRef(false);
   const onBeforeRefreshRef = useRef(onBeforeRefresh);
   onBeforeRefreshRef.current = onBeforeRefresh;
+
+  // --- Tools detection state (git, gh, gh auth) ---
+  // Cached for the session — re-runs only on manual "Re-check" or after the
+  // user completes an install/auth action. Tools rarely appear/disappear
+  // mid-session.
+  const [tools, setTools] = useState<import('./ToolsDetector').VCSToolsState | null>(null);
+  const [toolsChecking, setToolsChecking] = useState(false);
+  const recheckTools = useCallback(async () => {
+    setToolsChecking(true);
+    try {
+      const { detectAll } = await import('./ToolsDetector');
+      const next = await detectAll();
+      setTools(next);
+    } finally {
+      setToolsChecking(false);
+    }
+  }, []);
+  // Auto-run detection once on mount so the onboarding panel can render
+  // synchronously based on cached state.
+  useEffect(() => {
+    void recheckTools();
+  }, [recheckTools]);
 
   const emitEvent = useCallback((event: VCSEvent) => {
     // Append to persistent message log (capped at 50 entries, newest first)
@@ -762,6 +792,9 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     releaseAllEditingLocks: releaseAllEditingLocksOp,
     onEvent,
     clearMessageLog,
+    tools,
+    toolsChecking,
+    recheckTools,
   }), [
     state, refresh, isFileChanged, isBeatChanged, getBeatStatus, getLockedBy,
     initialize, clear, initRepo, stage, unstage, commit, push, forcePushOp, pull,
@@ -770,6 +803,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     p4SubmitChanges, p4SyncLatest, p4EditFile, p4RevertFile, p4LockFile, p4UnlockFile,
     acquireEditingLockOp, releaseEditingLockOp, releaseAllEditingLocksOp,
     onEvent, clearMessageLog,
+    tools, toolsChecking, recheckTools,
   ]);
 
   return (

@@ -5,7 +5,7 @@ import * as fs from 'fs/promises';
 import { getEmbeddedAPIServer, setStoryInjectionCallback } from './api-server';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
 import { startWatching, stopWatching } from './fileWatcher';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 
 // Suppress EPIPE errors from console.log when stdout/stderr pipes are closed
 // (common when the launching terminal is closed while the app keeps running)
@@ -410,8 +410,12 @@ function createMenu(): void {
           click: () => handleOpenProjectFolder(),
         },
         {
-          label: 'Clone Repository...',
+          label: 'Open Project from GitHub...',
           click: () => mainWindow?.webContents.send('menu:clone-repo'),
+        },
+        {
+          label: 'New Project on GitHub...',
+          click: () => mainWindow?.webContents.send('menu:new-github-project'),
         },
         { type: 'separator' },
         {
@@ -813,6 +817,60 @@ ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?
       });
     });
   });
+});
+
+// Streaming command runner — used by `gh auth login` flow so the renderer can
+// show device-code prompts and progress while the long-lived process runs.
+// Renderer subscribes to `vcs:stream-data` (chunked stdout/stderr) and
+// `vcs:stream-end` (final exit code) keyed by streamId. `vcs:stream-cancel`
+// kills the process if the user backs out.
+const streamProcs = new Map<string, ReturnType<typeof spawn>>();
+
+ipcMain.handle('vcs:run-streaming', async (event, streamId: string, command: string, args: string[], cwd?: string) => {
+  console.log('[IPC:vcs] run-streaming:', streamId, command, args.join(' '), cwd ? `(cwd: ${cwd})` : '');
+  const isWin = process.platform === 'win32';
+  const pathSep = isWin ? ';' : ':';
+  const extraPaths = isWin
+    ? ['C:\\Program Files\\Git\\cmd', 'C:\\Program Files\\Git\\bin', 'C:\\Program Files (x86)\\Git\\cmd']
+    : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
+  const augmentedPath = [...new Set([...(process.env.PATH || '').split(pathSep), ...extraPaths])].join(pathSep);
+  const resolvedCommand = isWin && command === 'git' ? findExecutable(command) : command;
+
+  try {
+    const proc = spawn(resolvedCommand, args, {
+      cwd: cwd || undefined,
+      env: { ...process.env, PATH: augmentedPath },
+    });
+    streamProcs.set(streamId, proc);
+
+    proc.stdout?.on('data', (chunk: Buffer) => {
+      event.sender.send('vcs:stream-data', { streamId, channel: 'stdout', data: chunk.toString('utf8') });
+    });
+    proc.stderr?.on('data', (chunk: Buffer) => {
+      event.sender.send('vcs:stream-data', { streamId, channel: 'stderr', data: chunk.toString('utf8') });
+    });
+    proc.on('error', (err) => {
+      streamProcs.delete(streamId);
+      event.sender.send('vcs:stream-end', { streamId, exitCode: -1, error: err.message });
+    });
+    proc.on('close', (code) => {
+      streamProcs.delete(streamId);
+      event.sender.send('vcs:stream-end', { streamId, exitCode: code ?? -1 });
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('vcs:stream-cancel', async (_, streamId: string) => {
+  const proc = streamProcs.get(streamId);
+  if (proc) {
+    proc.kill();
+    streamProcs.delete(streamId);
+    return { ok: true };
+  }
+  return { ok: false };
 });
 
 ipcMain.handle('dialog:open', async (_, options: Electron.OpenDialogOptions) => {

@@ -54,6 +54,7 @@ import { DiffViewer } from './components/vcs/DiffViewer';
 import { VCSToast } from './components/vcs/VCSToast';
 import { GitInitDialog } from './components/vcs/GitInitDialog';
 import { CloneRepoDialog } from './components/vcs/CloneRepoDialog';
+import { NewGitHubProjectDialog } from './components/vcs/NewGitHubProjectDialog';
 import { useTranslationState, useTranslationActions } from './contexts/TranslationContext';
 import { applyTranslationResource, extractCharacterDisplayNameTranslations } from './export/StoryTranslator';
 import { extractSpeakers } from './utils/speakerUtils';
@@ -103,6 +104,7 @@ declare global {
       onVCSTogglePanel?: (callback: () => void) => () => void;
       onVCSRefresh?: (callback: () => void) => () => void;
       onMenuCloneRepo?: (callback: () => void) => () => void;
+      onMenuNewGitHubProject?: (callback: () => void) => () => void;
       isElectron: boolean;
     };
   }
@@ -300,6 +302,7 @@ function App() {
   const [diffViewerFile, setDiffViewerFile] = useState<string | null>(null);
   const [showGitInitDialog, setShowGitInitDialog] = useState(false);
   const [showCloneRepoDialog, setShowCloneRepoDialog] = useState(false);
+  const [showNewGitHubProjectDialog, setShowNewGitHubProjectDialog] = useState(false);
 
   // Translation state
   const translationState = useTranslationState();
@@ -790,30 +793,46 @@ function App() {
   // entire `vcs` object — that object is recreated on every VCS state change
   // and would cause an infinite re-render loop.
   const vcsInitialized = vcs?.initialized ?? false;
+  const vcsCurrentPath = vcs?.projectPath ?? null;
   useEffect(() => {
-    if (projectFormat === 'directory' && projectPath && vcs && !vcsInitialized) {
-      console.log('[App] Auto-initializing VCS for directory project:', projectPath);
-      vcs.initialize(projectPath).then(async () => {
-        // Opportunistically detect remote URL and persist it
-        try {
-          const { gitListRemotes } = await import('./vcs/GitAdapter');
-          const remotes = await gitListRemotes(projectPath);
-          const origin = remotes.find(r => r.name === 'origin');
-          if (origin?.url && currentProject && origin.url !== currentProject.vcsRemoteUrl) {
-            console.log('[App] Detected VCS remote URL:', origin.url);
-            const updatedProject = { ...currentProject, vcsRemoteUrl: origin.url };
-            await storage.updateProject(updatedProject);
-          }
-        } catch (e) {
-          // Non-fatal — remote URL detection is best-effort
-          console.debug('[App] Could not detect VCS remote URL:', e);
-        }
-      });
-    } else if (projectFormat !== 'directory' && vcsInitialized) {
-      vcs?.clear();
+    // Non-directory project: tear down any existing VCS state.
+    if (projectFormat !== 'directory') {
+      if (vcsInitialized) vcs?.clear();
+      return;
     }
+    if (!projectPath || !vcs) return;
+
+    // (Re-)initialize when VCS isn't bound to the current project path yet.
+    // This covers both the first-load case AND switching from one directory
+    // project to another — without the path comparison, switching from GH
+    // project A to GH project B would leave VCS state (origin URL, branch,
+    // ahead/behind, history) pointing at A.
+    const needsReinit = !vcsInitialized || vcsCurrentPath !== projectPath;
+    if (!needsReinit) return;
+
+    if (vcsInitialized && vcsCurrentPath !== projectPath) {
+      console.log('[App] VCS path changed', vcsCurrentPath, '->', projectPath, '— clearing before re-init');
+      vcs.clear();
+    }
+    console.log('[App] Auto-initializing VCS for directory project:', projectPath);
+    vcs.initialize(projectPath).then(async () => {
+      // Opportunistically detect remote URL and persist it
+      try {
+        const { gitListRemotes } = await import('./vcs/GitAdapter');
+        const remotes = await gitListRemotes(projectPath);
+        const origin = remotes.find(r => r.name === 'origin');
+        if (origin?.url && currentProject && origin.url !== currentProject.vcsRemoteUrl) {
+          console.log('[App] Detected VCS remote URL:', origin.url);
+          const updatedProject = { ...currentProject, vcsRemoteUrl: origin.url };
+          await storage.updateProject(updatedProject);
+        }
+      } catch (e) {
+        // Non-fatal — remote URL detection is best-effort
+        console.debug('[App] Could not detect VCS remote URL:', e);
+      }
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectFormat, projectPath, vcsInitialized]);
+  }, [projectFormat, projectPath, vcsInitialized, vcsCurrentPath]);
 
   // Listen for stale-directory events from PersistenceContext (path no longer exists on reload)
   useEffect(() => {
@@ -3181,6 +3200,9 @@ function App() {
     }
     if (api?.onMenuCloneRepo) {
       unsubs.push(api.onMenuCloneRepo(() => setShowCloneRepoDialog(true)));
+    }
+    if (api?.onMenuNewGitHubProject) {
+      unsubs.push(api.onMenuNewGitHubProject(() => setShowNewGitHubProjectDialog(true)));
     }
 
     return () => unsubs.forEach(u => u());
@@ -5717,6 +5739,28 @@ function App() {
             }
           }}
           onClose={() => setShowCloneRepoDialog(false)}
+        />
+      )}
+
+      {/* New Project on GitHub Dialog */}
+      {showNewGitHubProjectDialog && (
+        <NewGitHubProjectDialog
+          onClose={() => setShowNewGitHubProjectDialog(false)}
+          onCreated={async (projectPath, _remoteUrl) => {
+            setShowNewGitHubProjectDialog(false);
+            // Open the freshly-created directory project. VCS auto-init effect
+            // will pick up the origin URL from `git remote get-url origin`.
+            try {
+              pauseAutoSave();
+              resumeAutoSaveAfterLoadRef.current = true;
+              await openDirectoryProject(projectPath);
+            } catch (error) {
+              resumeAutoSaveAfterLoadRef.current = false;
+              resumeAutoSave();
+              console.error('[App] Failed to open newly-created GitHub project:', error);
+              alert(`Project was created but failed to open: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }}
         />
       )}
 

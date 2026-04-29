@@ -7,6 +7,8 @@
 
 import React, { useState } from 'react';
 import { gitClone } from '../../vcs/GitAdapter';
+import { useVCSStatus } from '../../vcs/VCSStatusProvider';
+import { VCSOnboardingPanel } from './VCSOnboardingPanel';
 
 interface CloneRepoDialogProps {
   onCloned: (clonedPath: string) => void;
@@ -30,10 +32,21 @@ function extractRepoName(url: string): string {
 }
 
 export const CloneRepoDialog: React.FC<CloneRepoDialogProps> = ({ onCloned, onClose }) => {
+  const vcs = useVCSStatus();
   const [remoteUrl, setRemoteUrl] = useState('');
   const [parentDir, setParentDir] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tools/auth must be ready before cloning — private invites need gh-managed
+  // HTTPS credentials, and we want a unified onboarding experience whether the
+  // user is creating a new repo or joining one. If anything is missing, hand
+  // off to VCSOnboardingPanel (it covers install + `gh auth login` flows).
+  const toolsReady = !!(
+    vcs?.tools?.git.present &&
+    vcs?.tools?.gh.present &&
+    vcs?.tools?.ghAuth?.authenticated
+  );
 
   const repoName = extractRepoName(remoteUrl);
   const sep = parentDir.includes('\\') ? '\\' : '/';
@@ -102,12 +115,20 @@ export const CloneRepoDialog: React.FC<CloneRepoDialogProps> = ({ onCloned, onCl
         onClick={e => e.stopPropagation()}
       >
         <h3 style={{ margin: '0 0 4px', color: '#f1f5f9', fontSize: 16, fontWeight: 600 }}>
-          Clone Repository
+          Open Project from GitHub
         </h3>
         <p style={{ margin: '0 0 16px', color: '#94a3b8', fontSize: 13 }}>
-          Clone a remote Git repository to work on locally.
+          Download a GitHub project (clone the repository) to work on it locally.
         </p>
 
+        {!toolsReady ? (
+          <VCSOnboardingPanel
+            vcsRemoteUrl={null}
+            defaultRepoName={repoName || 'project'}
+            projectPath={null}
+            onRemoteConfigured={() => { /* not used in clone flow */ }}
+          />
+        ) : (
         <form onSubmit={handleClone}>
           {/* Remote URL */}
           <label
@@ -245,6 +266,7 @@ export const CloneRepoDialog: React.FC<CloneRepoDialogProps> = ({ onCloned, onCl
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );
