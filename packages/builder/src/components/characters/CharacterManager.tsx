@@ -19,6 +19,8 @@ import {
 import { Character, CHARACTER_TEMPLATES } from '../../types/character';
 import { CharacterCard } from './CharacterCard';
 import { CharacterEditor } from './CharacterEditor';
+import { EmotionPaletteEditor } from './EmotionPaletteEditor';
+import { DEFAULT_EMOTION_PALETTE, type EmotionDefinition } from '@asaps/core';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -84,6 +86,12 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   const [filterRole, setFilterRole] = useState<'all' | 'player' | 'npc' | 'companion'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showEditor, setShowEditor] = useState(false);
+  // Step 5 polish — emotion palette editor modal. Local in-memory state until
+  // project-level persistence is wired through globalSettings/story save.
+  const [showPaletteEditor, setShowPaletteEditor] = useState(false);
+  const [emotionPalette, setEmotionPalette] = useState<EmotionDefinition[]>(
+    () => DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e })),
+  );
   const [showTemplates, setShowTemplates] = useState(false);
 
   // Consume the prefill name set by Inspector → CharacterRefField's "Define
@@ -290,6 +298,13 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
             title="Export Characters"
           >
             <Download className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowPaletteEditor(true)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+            title="Edit the project's emotion palette — names, mood-axis weights, decay rate"
+          >
+            Emotion palette…
           </button>
           <button
             onClick={handleCreateNew}
@@ -523,6 +538,17 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           assets={assets}
           onAssetAdd={onAssetAdd} // Pass through the asset handler
         />
+      )}
+
+      {/* Emotion Palette Editor Modal */}
+      {showPaletteEditor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <EmotionPaletteEditor
+            palette={emotionPalette}
+            onChange={setEmotionPalette}
+            onClose={() => setShowPaletteEditor(false)}
+          />
+        </div>
       )}
     </div>
   );
