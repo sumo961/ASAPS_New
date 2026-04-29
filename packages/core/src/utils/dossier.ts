@@ -32,6 +32,17 @@ interface CharacterScopedState {
   flags: Record<string, boolean>;
 }
 
+interface MoodLike {
+  valence: number;
+  arousal: number;
+}
+
+interface SentimentLike {
+  toEntityRef: string;
+  emotion: string;
+  strength: number;
+}
+
 interface BeatLike {
   id: string;
   type?: string;
@@ -72,6 +83,13 @@ export interface BuildDossierOptions {
   interactions?: ReadonlyArray<DossierInteraction>;
   /** Maximum interactions to render (default 8). */
   maxInteractions?: number;
+  /** Current 2D mood (Layer 3 / Step 4). Renders as one descriptive line. */
+  mood?: MoodLike;
+  /** Sentiments held by this character. Top-N rendered (default 5) by
+   * absolute strength so the LLM sees the strongest feelings first. */
+  sentiments?: ReadonlyArray<SentimentLike>;
+  /** Maximum sentiments to render (default 5). */
+  maxSentiments?: number;
 }
 
 /**
@@ -116,6 +134,29 @@ export function buildDossier(
     }
   }
 
+  // Mood (Step 4). Only render when meaningfully different from neutral —
+  // a brand-new character's neutral mood adds noise to the prompt without
+  // signal. Threshold 0.05 keeps tiny rounding artefacts out.
+  if (options.mood && (Math.abs(options.mood.valence) > 0.05 || Math.abs(options.mood.arousal) > 0.05)) {
+    lines.push(`Mood: ${describeMood(options.mood)}`);
+  }
+
+  // Sentiments (Step 4). Top-N by absolute strength, descending.
+  if (options.sentiments && options.sentiments.length > 0) {
+    const cap = options.maxSentiments ?? 5;
+    const top = [...options.sentiments]
+      .filter((s) => Math.abs(s.strength) > 0.05)
+      .sort((a, b) => Math.abs(b.strength) - Math.abs(a.strength))
+      .slice(0, cap);
+    if (top.length > 0) {
+      lines.push('Feels toward others:');
+      for (const s of top) {
+        const intensity = describeSentimentIntensity(s.strength);
+        lines.push(`  - ${intensity} ${s.emotion} toward ${s.toEntityRef}`);
+      }
+    }
+  }
+
   // Recent interactions (Layer 4 / Step 3 narrative memory). Tail-truncated
   // to maxInteractions so the dossier stays bounded.
   if (options.interactions && options.interactions.length > 0) {
@@ -140,6 +181,39 @@ export function buildDossier(
   }
   out.push(...lines);
   return out.join('\n');
+}
+
+/**
+ * Describe a 2D mood in natural language. Pairs a valence word (pleasant /
+ * unpleasant) with an arousal word (calm / energetic). The LLM gets a
+ * compact sentence rather than two opaque numbers.
+ */
+function describeMood(mood: MoodLike): string {
+  const v = mood.valence;
+  const a = mood.arousal;
+  const valenceWord =
+    v >= 0.6 ? 'happy' :
+    v >= 0.2 ? 'pleased' :
+    v <= -0.6 ? 'sad' :
+    v <= -0.2 ? 'displeased' :
+    'even-keeled';
+  const arousalWord =
+    a >= 0.6 ? 'energetic' :
+    a >= 0.2 ? 'alert' :
+    a <= -0.6 ? 'lethargic' :
+    a <= -0.2 ? 'subdued' :
+    'steady';
+  return `${valenceWord}, ${arousalWord} (valence ${v.toFixed(2)}, arousal ${a.toFixed(2)})`;
+}
+
+/** Translate sentiment strength into a qualitative adjective. */
+function describeSentimentIntensity(strength: number): string {
+  const abs = Math.abs(strength);
+  const polarity = strength < 0 ? 'anti-' : '';
+  if (abs >= 0.75) return `intense ${polarity}`.trim();
+  if (abs >= 0.4) return `strong ${polarity}`.trim();
+  if (abs >= 0.15) return `mild ${polarity}`.trim();
+  return `slight ${polarity}`.trim();
 }
 
 /**
@@ -188,6 +262,8 @@ export function buildDossierForRef(
   contextLike: {
     getCharacterState?: (ref: string) => CharacterScopedState;
     getCharacterInteractions?: (ref: string) => ReadonlyArray<DossierInteraction>;
+    getCharacterMood?: (ref: string) => MoodLike;
+    getCharacterSentiments?: (ref: string) => ReadonlyArray<SentimentLike>;
     getStory?: () => any;
     getHistory?: () => ReadonlyArray<string>;
     getChoiceHistory?: () => ReadonlyArray<ChoiceRecordLike>;
@@ -198,6 +274,8 @@ export function buildDossierForRef(
   const character = characters.find((c) => c.id === characterRef) || null;
   if (!character) return '';
   const state = contextLike?.getCharacterState?.(characterRef);
+  const mood = contextLike?.getCharacterMood?.(characterRef);
+  const sentiments = contextLike?.getCharacterSentiments?.(characterRef);
 
   // Resolve interactions from whichever path the caller wired up. Prefer the
   // explicit accessor; fall back to deriving from story + history.
@@ -218,5 +296,5 @@ export function buildDossierForRef(
     }
   }
 
-  return buildDossier(character, { ...options, state, interactions });
+  return buildDossier(character, { ...options, state, interactions, mood, sentiments });
 }

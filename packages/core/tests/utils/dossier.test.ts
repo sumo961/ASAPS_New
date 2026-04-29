@@ -115,6 +115,40 @@ describe('buildDossier', () => {
     expect(out).toContain('- b11');
     expect(out).not.toContain('- b8');
   });
+
+  it('renders mood when sufficiently non-neutral', () => {
+    const out = buildDossier(granny, { mood: { valence: 0.7, arousal: 0.3 } });
+    expect(out).toContain('Mood: happy, alert');
+    expect(out).toContain('valence 0.70');
+    expect(out).toContain('arousal 0.30');
+  });
+
+  it('omits mood line when both axes are near-neutral', () => {
+    const out = buildDossier(granny, { mood: { valence: 0.02, arousal: -0.04 } });
+    expect(out).not.toContain('Mood:');
+  });
+
+  it('renders sentiments sorted by absolute strength, top-N', () => {
+    const out = buildDossier(granny, {
+      sentiments: [
+        { toEntityRef: 'wolf', emotion: 'fear', strength: 0.3 },
+        { toEntityRef: 'player', emotion: 'trust', strength: 0.9 },
+        { toEntityRef: 'wolf', emotion: 'anger', strength: -0.6 },
+      ],
+      maxSentiments: 2,
+    });
+    // Top two by abs strength: trust 0.9, anger -0.6
+    expect(out).toContain('intense trust toward player');
+    expect(out).toContain('strong anti- anger toward wolf');
+    expect(out).not.toContain('fear toward wolf');
+  });
+
+  it('skips sentiments below the noise threshold', () => {
+    const out = buildDossier(granny, {
+      sentiments: [{ toEntityRef: 'wolf', emotion: 'mild_unease', strength: 0.02 }],
+    });
+    expect(out).not.toContain('Feels toward others');
+  });
 });
 
 describe('buildDossierForRef', () => {

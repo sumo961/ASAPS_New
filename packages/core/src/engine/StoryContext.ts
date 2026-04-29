@@ -13,6 +13,40 @@ export interface InventoryEntry {
 }
 
 /**
+ * 2D mood (Layer 3 / Step 4 — mood + sentiments MVP).
+ * `valence`  ∈ [-1, 1]  — negative = unpleasant, positive = pleasant.
+ * `arousal`  ∈ [-1, 1]  — negative = calm/sleepy, positive = excited/agitated.
+ * Authors and beat actions both use `nudgeCharacterMood` which clamps each
+ * axis on write. Default mood is `{ valence: 0, arousal: 0 }` — neutral.
+ */
+export interface CharacterMood {
+  valence: number;
+  arousal: number;
+}
+
+/**
+ * A directed emotional memory (Layer 3 / Step 4). One character "feels
+ * `emotion` toward `toEntityRef` with a given strength."
+ *
+ * `toEntityRef` is intentionally loose: a Character.id, a free-text item
+ * name, a beat id, or any author-chosen tag. `emotion` is also a free
+ * string — Ekman 6 + pride/shame/interest are sensible defaults, but the
+ * runtime doesn't enforce a palette (Step 5 will add an opt-in palette).
+ *
+ * `strength` ∈ [-1, 1]. Negative values mean "anti-emotion toward target"
+ * (e.g. fear-of vs trust-in collapse to one row with opposite signs).
+ * `createdAt` is the timestamp when the sentiment was first recorded —
+ * `addCharacterSentiment` updates an existing sentiment's strength rather
+ * than overwriting createdAt.
+ */
+export interface Sentiment {
+  toEntityRef: string;
+  emotion: string;
+  strength: number;
+  createdAt: number;
+}
+
+/**
  * Rich choice record for AI context
  * Captures what choice was made, not just which beat was visited
  */
@@ -53,6 +87,10 @@ interface StoryState {
   characterCounters: Record<string, Record<string, number>>;
   characterVariables: Record<string, Record<string, any>>;
   characterFlags: Record<string, Record<string, boolean>>;
+  // Mood + sentiments (Layer 3 / Step 4 of the rich-character roadmap).
+  // Both keyed by canonical Character.id (or fallback ref string).
+  characterMoods: Record<string, CharacterMood>;
+  characterSentiments: Record<string, Sentiment[]>;
   visitedBeats: Set<string>;
   visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
@@ -73,6 +111,8 @@ export interface SerializedStoryState {
   // save files / committed contexts still load — the loader fills missing
   // slots with empty objects.
   characterCounters?: Record<string, Record<string, number>>;
+  characterMoods?: Record<string, CharacterMood>;
+  characterSentiments?: Record<string, Sentiment[]>;
   characterVariables?: Record<string, Record<string, any>>;
   characterFlags?: Record<string, Record<string, boolean>>;
   visitedBeats: string[]; // Array instead of Set for JSON serialization
@@ -176,6 +216,8 @@ export class StoryContext extends EventEmitter {
       characterCounters: {},
       characterVariables: {},
       characterFlags: {},
+      characterMoods: {},
+      characterSentiments: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {},
@@ -452,6 +494,117 @@ export class StoryContext extends EventEmitter {
       variables: { ...(this.state.characterVariables[key] || {}) },
       flags: { ...(this.state.characterFlags[key] || {}) },
     };
+  }
+
+  // ======== Character mood + sentiments (Layer 3 / Step 4) ========
+
+  private static clampUnit(v: number): number {
+    if (Number.isNaN(v)) return 0;
+    return Math.min(1, Math.max(-1, v));
+  }
+
+  /** Current 2D mood for the character. Defaults to neutral { 0, 0 } when unset. */
+  getCharacterMood(charRef: string): CharacterMood {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return { valence: 0, arousal: 0 };
+    return { ...(this.state.characterMoods[key] || { valence: 0, arousal: 0 }) };
+  }
+
+  /** Replace the character's mood. Each axis is clamped to [-1, 1]. */
+  setCharacterMood(charRef: string, mood: Partial<CharacterMood>): void {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return;
+    const current = this.state.characterMoods[key] || { valence: 0, arousal: 0 };
+    const next: CharacterMood = {
+      valence: StoryContext.clampUnit(mood.valence ?? current.valence),
+      arousal: StoryContext.clampUnit(mood.arousal ?? current.arousal),
+    };
+    this.state.characterMoods[key] = next;
+    this.emit('characterMoodChanged', { characterRef: key, mood: next, previous: current });
+  }
+
+  /** Add deltas to the mood, clamped per axis. The most common authoring path. */
+  nudgeCharacterMood(charRef: string, dValence: number = 0, dArousal: number = 0): CharacterMood {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return { valence: 0, arousal: 0 };
+    const current = this.state.characterMoods[key] || { valence: 0, arousal: 0 };
+    const next: CharacterMood = {
+      valence: StoryContext.clampUnit(current.valence + dValence),
+      arousal: StoryContext.clampUnit(current.arousal + dArousal),
+    };
+    this.state.characterMoods[key] = next;
+    this.emit('characterMoodChanged', { characterRef: key, mood: next, previous: current });
+    return next;
+  }
+
+  /** All sentiments held by the character. Returns a clone — caller can't mutate state. */
+  getCharacterSentiments(charRef: string): Sentiment[] {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return [];
+    return (this.state.characterSentiments[key] || []).map((s) => ({ ...s }));
+  }
+
+  /**
+   * Sentiment strength from `fromCharRef` toward `toEntityRef` for `emotion`.
+   * Returns 0 when no matching sentiment exists. Use this in conditions like
+   * "if granny.sentimentTo(player, 'trust') >= 0.5".
+   */
+  getSentimentTo(fromCharRef: string, toEntityRef: string, emotion?: string): number {
+    const sentiments = this.getCharacterSentiments(fromCharRef);
+    let total = 0;
+    for (const s of sentiments) {
+      if (s.toEntityRef !== toEntityRef) continue;
+      if (emotion && s.emotion !== emotion) continue;
+      // When `emotion` is unspecified, sum across all emotions toward the
+      // target — gives a rough "overall feeling toward X" scalar.
+      total = emotion ? s.strength : total + s.strength;
+      if (emotion) break;
+    }
+    return total;
+  }
+
+  /**
+   * Add or strengthen a directed emotional memory. When a sentiment with the
+   * same `(toEntityRef, emotion)` already exists, strengths sum (clamped to
+   * [-1, 1]) and `createdAt` is preserved. Otherwise a new sentiment is
+   * recorded with the current timestamp.
+   */
+  addCharacterSentiment(
+    fromCharRef: string,
+    toEntityRef: string,
+    emotion: string,
+    deltaStrength: number,
+  ): Sentiment | null {
+    const key = this.resolveCharRef(fromCharRef);
+    if (!key) return null;
+    if (!this.state.characterSentiments[key]) this.state.characterSentiments[key] = [];
+    const list = this.state.characterSentiments[key];
+    const existingIdx = list.findIndex((s) => s.toEntityRef === toEntityRef && s.emotion === emotion);
+    let next: Sentiment;
+    if (existingIdx >= 0) {
+      const existing = list[existingIdx];
+      next = {
+        ...existing,
+        strength: StoryContext.clampUnit(existing.strength + deltaStrength),
+      };
+      list[existingIdx] = next;
+    } else {
+      next = {
+        toEntityRef,
+        emotion,
+        strength: StoryContext.clampUnit(deltaStrength),
+        createdAt: Date.now(),
+      };
+      list.push(next);
+    }
+    this.emit('characterSentimentChanged', {
+      characterRef: key,
+      toEntityRef,
+      emotion,
+      strength: next.strength,
+      delta: deltaStrength,
+    });
+    return next;
   }
 
   // Timer methods
@@ -939,6 +1092,8 @@ export class StoryContext extends EventEmitter {
       characterCounters: {},
       characterVariables: {},
       characterFlags: {},
+      characterMoods: {},
+      characterSentiments: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {}
@@ -1244,6 +1399,12 @@ export class StoryContext extends EventEmitter {
       characterCounters: cloneNamespacedNumbers(this.state.characterCounters),
       characterVariables: cloneNamespacedAny(this.state.characterVariables),
       characterFlags: cloneNamespacedBools(this.state.characterFlags),
+      characterMoods: Object.fromEntries(
+        Object.entries(this.state.characterMoods).map(([k, v]) => [k, { ...v }])
+      ),
+      characterSentiments: Object.fromEntries(
+        Object.entries(this.state.characterSentiments).map(([k, v]) => [k, v.map((s) => ({ ...s }))])
+      ),
       visitedBeats: Array.from(this.state.visitedBeats),
       visitedChoices: Array.from(this.state.visitedChoices),
       timers: { ...this.state.timers },
@@ -1291,6 +1452,12 @@ export class StoryContext extends EventEmitter {
       characterCounters: cloneNs<number>(serialized.characterCounters),
       characterVariables: cloneNs<any>(serialized.characterVariables),
       characterFlags: cloneNs<boolean>(serialized.characterFlags),
+      characterMoods: serialized.characterMoods
+        ? Object.fromEntries(Object.entries(serialized.characterMoods).map(([k, v]) => [k, { ...v }]))
+        : {},
+      characterSentiments: serialized.characterSentiments
+        ? Object.fromEntries(Object.entries(serialized.characterSentiments).map(([k, v]) => [k, v.map((s: any) => ({ ...s }))]))
+        : {},
       visitedBeats: new Set(serialized.visitedBeats),
       visitedChoices: new Set((serialized as any).visitedChoices || []),
       timers: { ...serialized.timers },
