@@ -54,8 +54,13 @@ export interface CharacterRefFieldProps {
    * Manager prefilled with this name.
    */
   onDefineAsCharacter?: (name: string) => void;
-  /** Optional always-visible top entry (e.g. "Player" for inventory). */
+  /** Optional always-visible top entry (e.g. "Player" for inventory).
+   * @deprecated Use `pinnedOptions` instead. Kept for backwards compatibility. */
   pinnedOption?: { value: string; label: string };
+  /** Optional list of always-visible top entries — useful for special-case
+   * speakers like "(Default — Narrator)", "Narrator", "Player". Selecting any
+   * pinned option stores its `value` as freeText and clears characterRef. */
+  pinnedOptions?: ReadonlyArray<{ value: string; label: string }>;
   placeholder?: string;
   disabled?: boolean;
   /** Test id for unit tests. */
@@ -69,6 +74,7 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
   usedNames = [],
   onDefineAsCharacter,
   pinnedOption,
+  pinnedOptions,
   placeholder = 'Type or pick a character…',
   disabled = false,
   testId,
@@ -158,12 +164,20 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
     setOpen(false);
   }, [onChange]);
 
-  const pickPinned = useCallback(() => {
-    if (!pinnedOption) return;
-    onChange({ characterRef: undefined, freeText: pinnedOption.value });
+  const pickPinned = useCallback((value: string) => {
+    onChange({ characterRef: undefined, freeText: value });
     setIsEditing(false);
     setOpen(false);
-  }, [pinnedOption, onChange]);
+  }, [onChange]);
+
+  // Effective list of pinned options — merges legacy singular `pinnedOption`
+  // (kept for backwards compatibility) with the new plural `pinnedOptions`.
+  const allPinned = useMemo(() => {
+    const list: { value: string; label: string }[] = [];
+    if (pinnedOption) list.push(pinnedOption);
+    if (pinnedOptions) list.push(...pinnedOptions);
+    return list;
+  }, [pinnedOption, pinnedOptions]);
 
   const handleDefineClick = useCallback(() => {
     if (!onDefineAsCharacter) return;
@@ -232,12 +246,19 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
 
       {open && (
         <div style={dropdownStyle} role="listbox">
-          {pinnedOption && (
+          {allPinned.length > 0 && (
             <>
-              <button type="button" style={optionStyle} onMouseDown={(e) => { e.preventDefault(); pickPinned(); }}>
-                <span style={pinnedIconStyle}>★</span>
-                <span style={{ flex: 1 }}>{pinnedOption.label}</span>
-              </button>
+              {allPinned.map((p) => (
+                <button
+                  key={`pinned-${p.value}`}
+                  type="button"
+                  style={optionStyle}
+                  onMouseDown={(e) => { e.preventDefault(); pickPinned(p.value); }}
+                >
+                  <span style={pinnedIconStyle}>★</span>
+                  <span style={{ flex: 1 }}>{p.label}</span>
+                </button>
+              ))}
               <div style={dividerStyle} />
             </>
           )}

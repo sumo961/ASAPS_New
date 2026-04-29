@@ -15,6 +15,7 @@ import type { Character } from '../types/character';
 import { useAvailableCounters, useAvailableVariables, useAvailableInventoryItems } from '../hooks/useAvailableCountersAndVariables';
 import { extractStoryStateReferences } from '../utils/storyStateExtraction';
 import { resolveTranslatedSpeakerName } from '../utils/speakerUtils';
+import { useUsedNames } from './characters/useUsedNames';
 import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
 import { RequirementsEditor } from '../editors/RequirementsEditor';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
@@ -247,6 +248,22 @@ export const Inspector: React.FC<InspectorProps> = ({
     () => extractStoryStateReferences(allBeats as any),
     [allBeats],
   );
+
+  // Free-text speaker / character names used elsewhere in the project — feeds
+  // the "Used names" section of the new <CharacterRefField> combobox.
+  const usedNames = useUsedNames(allBeats as any, characters as any);
+
+  // Bridge from <CharacterRefField>'s "Define '<name>' as a Character" link to
+  // the existing onOpenCharacterManager prop. Opens the Character Manager;
+  // the user fills in details and saves there.
+  const onDefineAsCharacter = useCallback((name: string) => {
+    if (typeof onOpenCharacterManager === 'function') {
+      // Pre-fill with the typed name. The Character Manager's create flow can
+      // read the name and prepopulate the new-character form.
+      (window as any).__asapsPrefillCharacterName = name;
+      onOpenCharacterManager();
+    }
+  }, [onOpenCharacterManager]);
 
   // Force re-render trigger for when we modify beat.locations directly
   const [locationUpdateTrigger, setLocationUpdateTrigger] = useState(0);
@@ -1516,6 +1533,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                     }
                     beatProperties={localBeat}
                     onBeatPropertyChange={handleChange}
+                    usedNames={usedNames}
+                    onDefineAsCharacter={onDefineAsCharacter}
                   />
                 )}
 
@@ -1537,6 +1556,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                       playerCharacterName={playerCharacterName}
                       beatProperties={localBeat}
                       onBeatPropertyChange={handleChange}
+                      usedNames={usedNames}
+                      onDefineAsCharacter={onDefineAsCharacter}
                     />
                   );
                 })()}

@@ -241,7 +241,43 @@ describe('CharacterRefField', () => {
     });
   });
 
-  describe('pinned option', () => {
+  describe('pinned options (plural)', () => {
+    it('renders multiple pinned options when pinnedOptions is set', () => {
+      render(
+        <CharacterRefField
+          value={{}}
+          onChange={() => {}}
+          characters={[granny]}
+          pinnedOptions={[
+            { value: '', label: '(Default — Narrator)' },
+            { value: 'Narrator', label: 'Narrator' },
+            { value: 'Red', label: 'Red (Player)' },
+          ]}
+        />
+      );
+      fireEvent.focus(screen.getByPlaceholderText(/Type or pick/));
+      expect(screen.getByText('(Default — Narrator)')).toBeTruthy();
+      expect(screen.getByText('Narrator')).toBeTruthy();
+      expect(screen.getByText('Red (Player)')).toBeTruthy();
+    });
+
+    it('selecting a pinned option from pinnedOptions stores its value as freeText', () => {
+      const onChange = vi.fn();
+      render(
+        <CharacterRefField
+          value={{}}
+          onChange={onChange}
+          characters={[]}
+          pinnedOptions={[{ value: 'Narrator', label: 'Narrator' }]}
+        />
+      );
+      fireEvent.focus(screen.getByPlaceholderText(/Type or pick/));
+      fireEvent.mouseDown(screen.getByText('Narrator'));
+      expect(onChange).toHaveBeenLastCalledWith({ characterRef: undefined, freeText: 'Narrator' });
+    });
+  });
+
+  describe('pinned option (legacy singular)', () => {
     it('renders the pinned option above defined characters', () => {
       render(
         <CharacterRefField

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Variable, Box, Timer, User, ChevronDown, ChevronRight, Plus, Trash2, Shuffle } from 'lucide-react';
 import type { Beat } from '@asaps/core';
 import type { AvailableCounter, AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
+import { CharacterRefField, type UsedName } from './characters/CharacterRefField';
 
 // Type definitions for beat schema
 interface ParameterDefinition {
@@ -75,6 +76,12 @@ interface SchemaFormGeneratorProps {
   beatProperties?: Record<string, any>;
   // Callback for top-level beat property changes (scope: 'beat' fields)
   onBeatPropertyChange?: (field: string, value: any) => void;
+  /** Free-text speaker / character names used elsewhere in the project — drives
+   * the "Used names" section of the new <CharacterRefField> combobox. */
+  usedNames?: ReadonlyArray<UsedName>;
+  /** Called when the user clicks "Define '<name>' as a Character" in the
+   * speaker combobox. Parent typically opens the Character Manager prefilled. */
+  onDefineAsCharacter?: (name: string) => void;
 }
 
 // Map alias beat types to their canonical schema types
@@ -216,6 +223,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   onCharacterSync,
   beatProperties = {},
   onBeatPropertyChange,
+  usedNames = [],
+  onDefineAsCharacter,
 }) => {
   // Map alias types to canonical types for schema lookup
   const canonicalType = BEAT_TYPE_ALIASES[beatType] || beatType;
@@ -376,30 +385,35 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           );
         }
 
-        // Speaker control - dropdown populated from characters + Narrator + Player Character + Custom
+        // Speaker control — combobox-style CharacterRefField that stores both
+        // the canonical Character.id (when linked) and the free-text speaker
+        // string. Pinned options at the top cover the special-case
+        // story-level speakers ("(Default — Narrator)", "Narrator", "Player").
         if (paramDef.ui?.control === 'speaker') {
           const playerSpeakerValue = playerCharacterName || 'Interactor';
           const playerSpeakerLabel = playerCharacterName ? `${playerCharacterName} (Player)` : 'Interactor';
-          const speakerOptions: { value: string; label: string }[] = [
-            { value: '', label: '(Default — Narrator)' },
-            { value: 'Narrator', label: 'Narrator' },
-            { value: playerSpeakerValue, label: playerSpeakerLabel },
-          ];
-          if (characters) {
-            for (const char of characters) {
-              const name = typeof char === 'string' ? char : (char.displayName || char.name || char.id);
-              if (name && name !== 'Narrator' && name !== 'NPC' && name !== playerSpeakerValue && !speakerOptions.some(o => o.value === name)) {
-                speakerOptions.push({ value: name, label: name });
+          // Materialise the defined-Character list. The combobox accepts
+          // `Character` shape; map string-only entries to a minimal record
+          // keyed by name so they still appear in the dropdown.
+          const definedCharacters = (characters || [])
+            .map((c: any) => {
+              if (typeof c === 'string') {
+                return { id: c, name: c, displayName: c, role: 'npc', visual: { type: 'static' }, states: [], defaultState: '', counters: [], inventory: [], createdAt: '', updatedAt: '' } as any;
               }
-            }
-          }
-          const isCustom = value && !speakerOptions.some(o => o.value === value);
+              return c;
+            })
+            .filter((c: any) => c && c.id);
 
-          // Auto-enable showSpeaker when a non-default speaker is selected
-          const setSpeaker = (newVal: string) => {
-            handleChange(newVal);
-            if (newVal && newVal !== '' && onBeatPropertyChange && beatProperties.showSpeaker == null) {
-              onBeatPropertyChange('showSpeaker', true);
+          const setSpeaker = (next: { characterRef?: string; freeText?: string }) => {
+            const newSpeaker = next.freeText ?? '';
+            handleChange(newSpeaker);
+            if (onBeatPropertyChange) {
+              onBeatPropertyChange('characterRef', next.characterRef || undefined);
+              // Auto-enable showSpeaker when an explicit speaker is selected
+              // (preserves prior behaviour of the legacy select control).
+              if (newSpeaker && newSpeaker !== '' && beatProperties.showSpeaker == null) {
+                onBeatPropertyChange('showSpeaker', true);
+              }
             }
           };
 
@@ -408,30 +422,24 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {paramDef.ui.label || label}
               </label>
-              <select
-                value={isCustom ? '__custom__' : (value || '')}
-                onChange={(e) => {
-                  if (e.target.value === '__custom__') {
-                    setSpeaker(value || '');
-                  } else {
-                    setSpeaker(e.target.value);
-                  }
+              <CharacterRefField
+                value={{
+                  characterRef: beatProperties.characterRef,
+                  freeText: typeof value === 'string' ? value : (value || ''),
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              >
-                {speakerOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-                <option value="__custom__">Custom...</option>
-              </select>
-              {(isCustom || value === '__custom__') && (
-                <input
-                  type="text"
-                  value={isCustom ? value : ''}
-                  onChange={(e) => setSpeaker(e.target.value)}
-                  placeholder="Enter speaker name..."
-                  className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg text-sm"
-                />
+                onChange={setSpeaker}
+                characters={definedCharacters}
+                usedNames={usedNames}
+                onDefineAsCharacter={onDefineAsCharacter}
+                pinnedOptions={[
+                  { value: '', label: '(Default — Narrator)' },
+                  { value: 'Narrator', label: 'Narrator' },
+                  { value: playerSpeakerValue, label: playerSpeakerLabel },
+                ]}
+                placeholder="Type or pick a speaker…"
+              />
+              {paramDef.description && (
+                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
               )}
             </div>
           );
