@@ -2009,29 +2009,57 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
           {/* Archetype dropdown — fast path for picking a coherent profile.
               Shown alongside the empty-state hint and at the top of the
               populated trait list. Selecting overwrites Big Five values
-              and (when defined) appends self-directed sentiments. */}
-          <div className="flex items-center gap-2 mb-3">
-            <label htmlFor="archetype-select" className="text-xs text-gray-600 whitespace-nowrap">
-              Load archetype
-            </label>
-            <select
-              id="archetype-select"
-              value={selectedArchetypeId}
-              onChange={(e) => {
-                const id = e.target.value;
-                setSelectedArchetypeId(id);
-                if (id) applyArchetype(id);
-              }}
-              className="text-xs border rounded px-2 py-1 bg-white"
-              title="Replace Big Five trait values with a preset profile. Custom traits and existing sentiments toward other characters are preserved."
-            >
-              <option value="">— pick a preset —</option>
-              {DEFAULT_PERSONALITY_ARCHETYPES.map((a) => (
-                <option key={a.id} value={a.id} title={a.description}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+              and (when defined) appends self-directed sentiments. The
+              info caption below the dropdown surfaces the description
+              and any sentiment seeds, so the author can see exactly what
+              the preset will do before / after applying. */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2">
+              <label htmlFor="archetype-select" className="text-xs text-gray-600 whitespace-nowrap">
+                Load archetype
+              </label>
+              <select
+                id="archetype-select"
+                value={selectedArchetypeId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedArchetypeId(id);
+                  if (id) applyArchetype(id);
+                }}
+                className="text-xs border rounded px-2 py-1 bg-white"
+                title="Replace Big Five trait values with a preset profile. Custom traits and existing sentiments toward other characters are preserved."
+              >
+                <option value="">— pick a preset —</option>
+                {DEFAULT_PERSONALITY_ARCHETYPES.map((a) => (
+                  <option key={a.id} value={a.id} title={a.description}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {(() => {
+              const picked = findPersonalityArchetype(selectedArchetypeId);
+              if (!picked) return null;
+              const seeds = picked.selfSentiments || [];
+              return (
+                <div className="mt-2 ml-1 text-[11px] text-gray-600 bg-gray-50 rounded px-3 py-2 space-y-1">
+                  <div>{picked.description}</div>
+                  {seeds.length > 0 ? (
+                    <div>
+                      <span className="text-gray-500">Seeded toward self: </span>
+                      {seeds.map((s, i) => (
+                        <span key={i} className="font-mono">
+                          {s.emotion} {s.strength >= 0 ? '+' : ''}{s.strength.toFixed(2)}
+                          {i < seeds.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-gray-500 italic">No sentiment seeded — psychology research doesn't ground a specific self-feeling for this profile, so the preset only sets traits.</div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {Object.keys(traits).length === 0 ? (
