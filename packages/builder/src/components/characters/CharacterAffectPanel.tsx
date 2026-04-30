@@ -12,8 +12,9 @@
  */
 
 import React, { useMemo } from 'react';
-import { describeMoodAxis } from '@asaps/core';
+import { describeMoodAxis, type EmotionDefinition } from '@asaps/core';
 import type { Character } from '../../types/character';
+import { MoodPad } from './MoodPad';
 
 export interface AffectMood {
   valence: number;
@@ -45,6 +46,9 @@ export interface CharacterAffectPanelProps {
   resolveTargetName?: (ref: string) => string;
   /** Optional close callback — when provided, a small ✕ shows in the header. */
   onClose?: () => void;
+  /** Project emotion palette — when supplied, the inline mood pad shows
+   *  emotion markers at their (weightToValence, weightToArousal). */
+  emotionPalette?: ReadonlyArray<EmotionDefinition>;
   /** Test id for unit tests. */
   testId?: string;
 }
@@ -55,6 +59,7 @@ export const CharacterAffectPanel: React.FC<CharacterAffectPanelProps> = ({
   topNSentiments = 3,
   resolveTargetName,
   onClose,
+  emotionPalette,
   testId,
 }) => {
   const charById = useMemo(() => new Map(characters.map((c) => [c.id, c])), [characters]);
@@ -103,13 +108,26 @@ export const CharacterAffectPanel: React.FC<CharacterAffectPanelProps> = ({
                   )}
                 </div>
 
-                {/* Mood */}
-                <MoodBars mood={mood} />
-                {!moodIsNeutral && (
-                  <div style={moodSummaryStyle}>
-                    {describeMoodAxis(mood.valence, 'valence')}, {describeMoodAxis(mood.arousal, 'arousal')}
+                {/* Mood — 2D pad on Russell's circumplex with emotion
+                    markers when the project palette is wired in. The dual
+                    bars stay below as a per-axis numeric readout. */}
+                <div style={moodLayoutStyle}>
+                  <MoodPad
+                    valence={mood.valence}
+                    arousal={mood.arousal}
+                    palette={emotionPalette}
+                    size={120}
+                    showLabels={true}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <MoodBars mood={mood} />
+                    {!moodIsNeutral && (
+                      <div style={moodSummaryStyle}>
+                        {describeMoodAxis(mood.valence, 'valence')}, {describeMoodAxis(mood.arousal, 'arousal')}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Current emotions (Step 5) — small inline bars showing
                     intensity. Decay each beat-entry, so authors watch them
@@ -221,6 +239,7 @@ const charHeaderStyle: React.CSSProperties = { display: 'flex', alignItems: 'cen
 const colorDotStyle: React.CSSProperties = { width: 9, height: 9, borderRadius: '50%' };
 const charNameStyle: React.CSSProperties = { fontWeight: 500, color: '#111827', fontSize: 12 };
 const neutralBadgeStyle: React.CSSProperties = { fontSize: 10, color: '#9ca3af', fontStyle: 'italic', marginLeft: 'auto' };
+const moodLayoutStyle: React.CSSProperties = { display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 2 };
 const moodGridStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 };
 const barRowStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: '46px 1fr 42px 48px', alignItems: 'center', gap: 6, fontSize: 10 };
 const barAxisLabelStyle: React.CSSProperties = { color: '#6b7280' };

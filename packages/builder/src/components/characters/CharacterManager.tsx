@@ -549,6 +549,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           }}
           assets={assets}
           onAssetAdd={onAssetAdd} // Pass through the asset handler
+          emotionPalette={emotionPalette}
         />
       )}
 

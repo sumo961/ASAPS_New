@@ -2757,6 +2757,7 @@ export const PreviewWindow: React.FC = () => {
                         getCharacterSentiments: (id: string) => ctx.getCharacterSentiments(id),
                         getCharacterEmotions: (id: string) => ctx.getCharacterEmotions(id),
                       }}
+                      emotionPalette={previewDataRef.current?.emotionPalette}
                     />
                   );
                 })()}
