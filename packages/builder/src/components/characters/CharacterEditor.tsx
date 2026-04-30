@@ -78,6 +78,11 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>('basic');
   const [editedCharacter, setEditedCharacter] = useState<Character>(character);
+  // Last archetype the author picked from the Personality dropdown. Local
+  // session state — not persisted on Character, since the author might
+  // tweak away from the preset and we don't want a stale label sticking
+  // around in the saved data.
+  const [selectedArchetypeId, setSelectedArchetypeId] = useState<string>('');
   const [hasChanges, setHasChanges] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
@@ -2011,12 +2016,11 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             </label>
             <select
               id="archetype-select"
-              value=""
+              value={selectedArchetypeId}
               onChange={(e) => {
-                if (e.target.value) {
-                  applyArchetype(e.target.value);
-                  e.target.value = '';  // reset so the same archetype can be re-applied
-                }
+                const id = e.target.value;
+                setSelectedArchetypeId(id);
+                if (id) applyArchetype(id);
               }}
               className="text-xs border rounded px-2 py-1 bg-white"
               title="Replace Big Five trait values with a preset profile. Custom traits and existing sentiments toward other characters are preserved."
