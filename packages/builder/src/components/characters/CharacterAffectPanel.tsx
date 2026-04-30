@@ -179,9 +179,13 @@ const MoodBars: React.FC<{ mood: AffectMood }> = ({ mood }) => (
 
 const BarLine: React.FC<{
   label: string; value: number; positiveLabel: string; negativeLabel: string;
-}> = ({ label, value, positiveLabel, negativeLabel }) => {
+}> = ({ label, value }) => {
   // Centre-pivot bar: a horizontal track with a small marker at the value
   // position. Negative values fill leftward, positive fill rightward.
+  // The qualitative descriptor ("happy", "calm", …) is intentionally
+  // omitted here — the panel's `moodSummaryStyle` line below renders the
+  // same info, and crowding it back into a per-axis column makes narrow
+  // panel layouts truncate either the value or the word. Single source.
   const pct = ((value + 1) / 2) * 100; // 0..100
   return (
     <div style={barRowStyle}>
@@ -198,7 +202,6 @@ const BarLine: React.FC<{
         />
       </div>
       <span style={barValueStyle}>{value >= 0 ? '+' : ''}{value.toFixed(2)}</span>
-      <span style={barWordStyle}>{value < -0.2 ? negativeLabel : value > 0.2 ? positiveLabel : ''}</span>
     </div>
   );
 };
@@ -241,13 +244,12 @@ const charNameStyle: React.CSSProperties = { fontWeight: 500, color: '#111827', 
 const neutralBadgeStyle: React.CSSProperties = { fontSize: 10, color: '#9ca3af', fontStyle: 'italic', marginLeft: 'auto' };
 const moodLayoutStyle: React.CSSProperties = { display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 2 };
 const moodGridStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 };
-const barRowStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: '46px 1fr 42px 48px', alignItems: 'center', gap: 6, fontSize: 10 };
+const barRowStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: '46px 1fr 42px', alignItems: 'center', gap: 6, fontSize: 10 };
 const barAxisLabelStyle: React.CSSProperties = { color: '#6b7280' };
 const barTrackStyle: React.CSSProperties = { position: 'relative', height: 6, background: '#f3f4f6', borderRadius: 3 };
 const barCenterTickStyle: React.CSSProperties = { position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: '#d1d5db' };
 const barFillStyle: React.CSSProperties = { position: 'absolute', top: 0, bottom: 0, borderRadius: 3 };
 const barValueStyle: React.CSSProperties = { fontFamily: 'monospace', fontSize: 10, color: '#374151', textAlign: 'right' };
-const barWordStyle: React.CSSProperties = { fontSize: 10, color: '#6b7280', fontStyle: 'italic' };
 const moodSummaryStyle: React.CSSProperties = { fontSize: 11, color: '#6b7280', marginTop: 4, fontStyle: 'italic' };
 const sentimentListStyle: React.CSSProperties = { listStyle: 'none', padding: 0, margin: '6px 0 0', display: 'flex', flexDirection: 'column', gap: 3 };
 const sentimentItemStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 };

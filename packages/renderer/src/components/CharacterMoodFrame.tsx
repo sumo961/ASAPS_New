@@ -151,9 +151,10 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
   const a = clampUnit(arousal);
   const dotColor = config.dotColor || '#111827';
 
-  // SVG coords: 0..100 viewBox, origin at centre. Map (-1..+1) onto 0..100,
-  // arousal inverted because SVG y grows downward.
-  const toPx = (vv: number, aa: number) => ({ x: 50 + vv * 50, y: 50 - aa * 50 });
+  // SVG coords: 0..100 viewBox, origin at centre. Map (-1..+1) onto ±45
+  // (rather than ±50) so the mood dot at extreme values stays fully
+  // inside the disc (r=48) instead of being clipped by the viewBox edge.
+  const toPx = (vv: number, aa: number) => ({ x: 50 + vv * 45, y: 50 - aa * 45 });
   const dot = toPx(v, a);
 
   const showLabels = !!config.showLabels;

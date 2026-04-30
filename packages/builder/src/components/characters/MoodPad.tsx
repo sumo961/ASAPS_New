@@ -50,10 +50,13 @@ export const MoodPad: React.FC<MoodPadProps> = ({
   const padRef = useRef<SVGSVGElement | null>(null);
   const draggingRef = useRef(false);
 
-  // SVG coords: 100 × 100 view-box, origin at centre. We map the (-1, +1)
-  // valence/arousal range to ±50 pixels, so a value of 0.7 valence → x = 35.
-  // Y is inverted because SVG +y goes down but arousal +y should be up.
-  const toPx = (v: number, a: number) => ({ x: 50 + v * 50, y: 50 - a * 50 });
+  // SVG coords: 100 × 100 view-box, origin at centre. We map (-1, +1) onto
+  // ±45 (rather than ±50) so a max-magnitude value still leaves enough
+  // breathing room inside the visible circle (r=48) for the mood dot
+  // (r≈2.6) to render fully — at ±50 the dot would be clipped by the
+  // viewBox / sit half-outside the circle.
+  const POS_SCALE = 45;
+  const toPx = (v: number, a: number) => ({ x: 50 + v * POS_SCALE, y: 50 - a * POS_SCALE });
   const dot = toPx(valence, arousal);
 
   const handlePointer = useCallback((evt: React.PointerEvent<SVGSVGElement>) => {
