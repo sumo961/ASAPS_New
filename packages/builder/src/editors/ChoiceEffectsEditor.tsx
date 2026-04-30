@@ -24,6 +24,9 @@ const EFFECT_TYPE_LABELS: Record<EffectType, string> = {
   // Step 8 — change a character's runtime goal status; auto-fires
   // pride/joy/shame/sadness unless suppressEmotion is set.
   setGoalStatus: 'Set Goal Status',
+  // Switch which variant is active for a character (player picks "play
+  // as introvert / extrovert" etc., or author wires a default).
+  setCharacterVariant: 'Set Character Variant',
 };
 
 interface ChoiceEffectsEditorProps {
@@ -120,7 +123,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
   return (
     <div className={`space-y-1.5 ${compact ? '' : 'p-2 bg-gray-50 rounded'}`}>
       {effects.map((effect, index) => {
-        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment' || effect.type === 'fireEmotion' || effect.type === 'addReflection' || effect.type === 'setGoalStatus';
+        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment' || effect.type === 'fireEmotion' || effect.type === 'addReflection' || effect.type === 'setGoalStatus' || effect.type === 'setCharacterVariant';
         return (
         <div key={index} className="flex flex-wrap gap-1 items-center">
           {/* Type dropdown */}
@@ -158,6 +161,9 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 updates.value = undefined;
                 (updates as any).goalId = (effect as any).goalId ?? '';
                 (updates as any).goalStatus = (effect as any).goalStatus ?? 'met';
+              } else if (newType === 'setCharacterVariant') {
+                updates.value = undefined;
+                (updates as any).variantId = (effect as any).variantId ?? '';
               }
               updateEffect(index, updates);
             }}
@@ -235,6 +241,16 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 title="Intensity delta (0–1 typical). Positive bumps the emotion; mood is auto-nudged via palette weights."
               />
             </>
+          )}
+          {effect.type === 'setCharacterVariant' && (
+            <input
+              type="text"
+              value={(effect as any).variantId || ''}
+              onChange={(e) => updateEffect(index, { variantId: e.target.value } as any)}
+              placeholder="variant-id"
+              className="w-32 px-1.5 py-1 text-xs border rounded font-mono flex-shrink-0"
+              title="Authored variant id (must match Character.variants[].id). Empty clears the active variant."
+            />
           )}
           {effect.type === 'setGoalStatus' && (
             <>

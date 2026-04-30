@@ -92,7 +92,7 @@ export interface FictionalTime {
 }
 
 export interface Condition {
-  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion' | 'trait' | 'goal';
+  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion' | 'trait' | 'goal' | 'characterVariant';
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
   // New canonical field names
   variableName?: string;
@@ -142,6 +142,11 @@ export interface Condition {
   // from `value` (preferred) or `goalStatus` for explicit clarity.
   goalId?: string;
   goalStatus?: 'open' | 'met' | 'failed' | 'abandoned';
+  // For characterVariant conditions: tests which variant is currently
+  // active on `character`. The compared value (variantId) is read from
+  // `value` or `variantId`. Operators: == / !=. An empty / unset
+  // variant compares as the empty string.
+  variantId?: string;
 }
 
 /**
@@ -167,6 +172,29 @@ export interface CharacterGoal {
   satisfaction?: Condition;
 }
 
+/**
+ * A partial overlay on a Character record. Variants let one character
+ * (one stable id, one set of beats) carry several persona profiles —
+ * e.g. Alex-introvert vs Alex-extrovert in a coming-out story, or Player-
+ * man vs Player-woman in a customisable protagonist. Exactly one variant
+ * is active at any time; switching is intended to happen at story-start
+ * via the `setCharacterVariant` effect or the character's authored
+ * `defaultVariantId`. Mid-story switches are allowed but discard mood
+ * and sentiments accumulated under the prior variant when re-seeding.
+ */
+export interface CharacterVariant {
+  id: string;
+  name: string;
+  description?: string;
+  displayName?: string;
+  portrait?: { image?: string; assetId?: string };
+  traits?: Record<string, number>;
+  dossierPolicy?: 'reAnchor' | 'reflection';
+  initialMood?: { valence: number; arousal: number };
+  initialSentiments?: Array<{ toEntityRef: string; emotion: string; strength: number }>;
+  characterDescription?: string;
+}
+
 export interface Effect {
   type:
     | 'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter'
@@ -185,7 +213,13 @@ export interface Effect {
     // Step 8 — change the runtime status of a named goal on a character.
     // Triggers GAMYGDALA-style emotion firing (pride/joy on 'met',
     // shame/sadness on 'failed') unless `suppressEmotion` is set.
-    | 'setGoalStatus';
+    | 'setGoalStatus'
+    // Switch which variant is active for a character. Use on a player-
+    // facing choice (e.g. "play as a man" / "play as a woman") or in a
+    // story-start branch to lock in a persona. By default this re-seeds
+    // the character's mood / sentiments from the variant's authored
+    // values; set `suppressSeed` to keep accumulated affect.
+    | 'setCharacterVariant';
   target: string;
   value?: any;
   // Sentiment-effect parameters (used when type === 'addSentiment'). Kept
@@ -229,6 +263,17 @@ export interface Effect {
    * should not register as emotional events (e.g. quiet abandonment).
    */
   suppressEmotion?: boolean;
+  /**
+   * Variant id for setCharacterVariant effects. The character is
+   * `effect.target`. Empty string clears the active variant.
+   */
+  variantId?: string;
+  /**
+   * When true on setCharacterVariant, runtime keeps the current mood /
+   * sentiments instead of re-seeding from the variant's authored values.
+   * Default false (re-seed) — appropriate for story-start switches.
+   */
+  suppressSeed?: boolean;
 }
 
 /**

@@ -3,6 +3,7 @@ import type { Condition, Effect, FictionalTime } from '../types';
 import type { Story } from './Story';
 import { TimerManager } from './TimerManager';
 import { resolveCharacterKey } from '../utils/characterRef';
+import { resolveCharacterWithVariant, findCharacterVariant } from '../utils/characterVariant';
 import { modulateEmotionDelta } from './PersonalityTraits';
 
 /**
@@ -143,6 +144,12 @@ interface StoryState {
   // entries here. The dossier renders status by joining authored goals
   // with these statuses.
   characterGoalStatus: Record<string, Record<string, GoalStatus>>;
+  // Active variant per character. Variants are partial overlays on a
+  // Character record (alternate persona / portrait / mood seed), exclusive
+  // and chosen at story-start. Outer key = canonical Character.id; value =
+  // CharacterVariant.id. Empty until the runtime hits a setCharacterVariant
+  // effect or the seed step fills it from `Character.defaultVariantId`.
+  activeCharacterVariants: Record<string, string>;
   visitedBeats: Set<string>;
   visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
@@ -168,6 +175,7 @@ export interface SerializedStoryState {
   characterEmotionLevels?: Record<string, Record<string, number>>;
   characterReflections?: Record<string, Reflection[]>;
   characterGoalStatus?: Record<string, Record<string, GoalStatus>>;
+  activeCharacterVariants?: Record<string, string>;
   characterVariables?: Record<string, Record<string, any>>;
   characterFlags?: Record<string, Record<string, boolean>>;
   visitedBeats: string[]; // Array instead of Set for JSON serialization
@@ -276,6 +284,7 @@ export class StoryContext extends EventEmitter {
       characterEmotionLevels: {},
       characterReflections: {},
       characterGoalStatus: {},
+      activeCharacterVariants: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {},
@@ -714,9 +723,10 @@ export class StoryContext extends EventEmitter {
     // same delta as before (modulateEmotionDelta is a no-op then). Mood
     // nudging downstream uses the modulated delta too, so a trait-amplified
     // joy lifts mood proportionally more.
-    const characters = (this.story as any)?.getCharacters?.() as
-      Array<{ id?: string; traits?: Record<string, number> }> | undefined;
-    const character = characters?.find((c) => c?.id === key);
+    // Variants: traits from the active variant overlay take precedence
+    // over the base — so Alex-introvert and Alex-extrovert experience
+    // emotion deltas differently even though they're the same Character.
+    const character = this.getMergedCharacter(key) as { traits?: Record<string, number> } | undefined;
     const modulations = (this.story as any)?.getTraitModulations?.();
     const effectiveDelta = modulateEmotionDelta(delta, lower, character?.traits, modulations);
 
@@ -843,6 +853,79 @@ export class StoryContext extends EventEmitter {
 
     this.emit('characterReflectionAdded', { characterRef: key, reflection: { ...entry } });
     return { ...entry };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Character variants
+  //
+  // A character can carry several persona profiles (Alex-introvert vs
+  // Alex-extrovert; Player-man vs Player-woman). The variant is partial —
+  // only fields it sets override the base. The runtime tracks which
+  // variant is active per character; readers like fireCharacterEmotion,
+  // the dossier, and condition evaluation use `getMergedCharacter` so
+  // they see the effective traits / mood / dossierPolicy / displayName
+  // for the currently-active variant.
+  // ---------------------------------------------------------------------------
+
+  /** Active variant id for a character, or undefined when none is set. */
+  getActiveCharacterVariant(charRef: string): string | undefined {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return undefined;
+    return this.state.activeCharacterVariants[key];
+  }
+
+  /**
+   * Merge the base character with whichever variant is currently active.
+   * Falls back to the base record when no variant has been chosen. Used by
+   * dossier rendering, trait modulation, mood seeding, etc. — anywhere a
+   * downstream reader cares about the *effective* persona.
+   */
+  getMergedCharacter(charRef: string): any {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return undefined;
+    const characters = (this.story as any)?.getCharacters?.() as
+      Array<any> | undefined;
+    const base = characters?.find((c) => c?.id === key);
+    if (!base) return undefined;
+    const variantId = this.state.activeCharacterVariants[key];
+    if (!variantId) return base;
+    const variant = findCharacterVariant(base, variantId);
+    if (!variant) return base;
+    return resolveCharacterWithVariant(base, variant);
+  }
+
+  /**
+   * Switch which variant is active for a character. Returns the previous
+   * variant id (or undefined). When `options.seedAffect` is true (default),
+   * the runtime re-seeds mood + sentiments from the merged variant —
+   * appropriate when the variant is chosen at story-start. Authors
+   * driving mid-story personality shifts should pass false explicitly so
+   * accumulated affect survives.
+   */
+  setActiveCharacterVariant(charRef: string, variantId: string | null, options?: { seedAffect?: boolean }): string | undefined {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return undefined;
+    const previous = this.state.activeCharacterVariants[key];
+    if (variantId == null || variantId === '') {
+      delete this.state.activeCharacterVariants[key];
+    } else {
+      this.state.activeCharacterVariants[key] = variantId;
+    }
+    if (previous === variantId) return previous;
+
+    this.emit('characterVariantChanged', { characterRef: key, variantId, previous });
+
+    const seed = options?.seedAffect !== false;
+    if (seed) {
+      // Wipe per-character affect so the new variant's seed is the
+      // authoritative starting point, then re-seed from authored data
+      // (which now reads the merged character via getMergedCharacter).
+      delete this.state.characterMoods[key];
+      delete this.state.characterSentiments[key];
+      delete this.state.characterEmotionLevels[key];
+      this.seedCharacterAffectFor(key);
+    }
+    return previous;
   }
 
   // ---------------------------------------------------------------------------
@@ -1255,6 +1338,24 @@ export class StoryContext extends EventEmitter {
       }
     }
 
+    // CharacterVariant condition. Compares the active variant id on
+    // `character` with `variantId` (or `value`). Lets authors branch on
+    // which persona was chosen — "if Alex is introvert, take this path".
+    if (condition.type === 'characterVariant') {
+      const character = condition.character;
+      if (!character) {
+        console.warn('characterVariant condition missing character');
+        return false;
+      }
+      const left = this.getActiveCharacterVariant(character) || '';
+      const right = String((condition as any).variantId ?? condition.value ?? '');
+      switch (condition.operator) {
+        case '==': return left === right;
+        case '!=': return left !== right;
+        default: return false;
+      }
+    }
+
     // Goal conditions (Step 8). Compares a character's runtime goal status
     // against an authored target string. When `goalStatus` is set on the
     // condition, the operator compares against it; otherwise falls back to
@@ -1286,10 +1387,8 @@ export class StoryContext extends EventEmitter {
         console.warn('trait condition missing character or traitName');
         return false;
       }
-      const key = this.resolveCharRef(character);
-      const characters = (this.story as any)?.getCharacters?.() as
-        Array<{ id?: string; traits?: Record<string, number> }> | undefined;
-      const charRecord = characters?.find((c) => c?.id === key);
+      const charRecord = this.getMergedCharacter(character) as
+        { traits?: Record<string, number> } | undefined;
       const left = Number(charRecord?.traits?.[traitName] ?? 0);
       const right = Number(condition.value ?? condition.right ?? 0);
       switch (condition.operator) {
@@ -1454,6 +1553,18 @@ export class StoryContext extends EventEmitter {
         if (goalId && status) {
           this.setGoalStatus(effect.target, goalId, status, {
             suppressEmotion: !!(effect as any).suppressEmotion,
+          });
+        }
+        break;
+      }
+      // Switch a character's active variant. Re-seeds the character's
+      // mood / sentiments from the variant's authored values unless
+      // `suppressSeed` is set — appropriate for story-start switches.
+      case 'setCharacterVariant': {
+        const variantId = (effect as any).variantId as string | undefined;
+        if (variantId !== undefined) {
+          this.setActiveCharacterVariant(effect.target, variantId, {
+            seedAffect: !((effect as any).suppressSeed),
           });
         }
         break;
@@ -1640,6 +1751,7 @@ export class StoryContext extends EventEmitter {
       characterEmotionLevels: {},
       characterReflections: {},
       characterGoalStatus: {},
+      activeCharacterVariants: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {}
@@ -1730,41 +1842,58 @@ export class StoryContext extends EventEmitter {
     const story = this.story;
     if (!story) return;
     const characters = (story as any).getCharacters?.() as
-      | Array<{
-          id: string;
-          initialMood?: { valence: number; arousal: number };
-          initialSentiments?: Array<{ toEntityRef: string; emotion: string; strength: number }>;
-        }>
-      | undefined;
+      Array<{ id: string; defaultVariantId?: string }> | undefined;
     if (!characters) return;
-
     for (const char of characters) {
       if (!char?.id) continue;
-      // Mood: seed only when no runtime mood is set for this character.
-      if (char.initialMood && !this.state.characterMoods[char.id]) {
-        this.state.characterMoods[char.id] = {
-          valence: StoryContext.clampUnit(char.initialMood.valence ?? 0),
-          arousal: StoryContext.clampUnit(char.initialMood.arousal ?? 0),
-        };
+      // Apply the authored default variant before seeding affect, so a
+      // character with `defaultVariantId: 'introvert'` boots into the
+      // introvert mood/sentiments without an explicit setCharacterVariant
+      // call. Author can still override via a setCharacterVariant effect
+      // before the first beat fires.
+      if (char.defaultVariantId && !this.state.activeCharacterVariants[char.id]) {
+        this.state.activeCharacterVariants[char.id] = char.defaultVariantId;
       }
-      // Sentiments: seed each authored entry only if no matching
-      // (target, emotion) row already exists in runtime state.
-      if (char.initialSentiments && char.initialSentiments.length > 0) {
-        if (!this.state.characterSentiments[char.id]) this.state.characterSentiments[char.id] = [];
-        const existing = this.state.characterSentiments[char.id];
-        for (const seed of char.initialSentiments) {
-          if (!seed?.toEntityRef || !seed?.emotion) continue;
-          const present = existing.some(
-            (s) => s.toEntityRef === seed.toEntityRef && s.emotion === seed.emotion,
-          );
-          if (!present) {
-            existing.push({
-              toEntityRef: seed.toEntityRef,
-              emotion: seed.emotion,
-              strength: StoryContext.clampUnit(seed.strength ?? 0),
-              createdAt: Date.now(),
-            });
-          }
+      this.seedCharacterAffectFor(char.id);
+    }
+  }
+
+  /**
+   * Seed mood + sentiments for one character from the merged record (so the
+   * active variant's `initialMood` / `initialSentiments` win over the base).
+   * Used both by the cross-character startup walk and by
+   * setActiveCharacterVariant after a runtime variant switch.
+   */
+  private seedCharacterAffectFor(charId: string): void {
+    const merged = this.getMergedCharacter(charId) as
+      | {
+          id?: string;
+          initialMood?: { valence: number; arousal: number };
+          initialSentiments?: Array<{ toEntityRef: string; emotion: string; strength: number }>;
+        }
+      | undefined;
+    if (!merged) return;
+    if (merged.initialMood && !this.state.characterMoods[charId]) {
+      this.state.characterMoods[charId] = {
+        valence: StoryContext.clampUnit(merged.initialMood.valence ?? 0),
+        arousal: StoryContext.clampUnit(merged.initialMood.arousal ?? 0),
+      };
+    }
+    if (merged.initialSentiments && merged.initialSentiments.length > 0) {
+      if (!this.state.characterSentiments[charId]) this.state.characterSentiments[charId] = [];
+      const existing = this.state.characterSentiments[charId];
+      for (const seed of merged.initialSentiments) {
+        if (!seed?.toEntityRef || !seed?.emotion) continue;
+        const present = existing.some(
+          (s) => s.toEntityRef === seed.toEntityRef && s.emotion === seed.emotion,
+        );
+        if (!present) {
+          existing.push({
+            toEntityRef: seed.toEntityRef,
+            emotion: seed.emotion,
+            strength: StoryContext.clampUnit(seed.strength ?? 0),
+            createdAt: Date.now(),
+          });
         }
       }
     }
@@ -2016,6 +2145,7 @@ export class StoryContext extends EventEmitter {
       characterGoalStatus: Object.fromEntries(
         Object.entries(this.state.characterGoalStatus).map(([k, v]) => [k, { ...v }])
       ),
+      activeCharacterVariants: { ...this.state.activeCharacterVariants },
       visitedBeats: Array.from(this.state.visitedBeats),
       visitedChoices: Array.from(this.state.visitedChoices),
       timers: { ...this.state.timers },
@@ -2077,6 +2207,9 @@ export class StoryContext extends EventEmitter {
         : {},
       characterGoalStatus: serialized.characterGoalStatus
         ? Object.fromEntries(Object.entries(serialized.characterGoalStatus).map(([k, v]) => [k, { ...v }]))
+        : {},
+      activeCharacterVariants: serialized.activeCharacterVariants
+        ? { ...serialized.activeCharacterVariants }
         : {},
       visitedBeats: new Set(serialized.visitedBeats),
       visitedChoices: new Set((serialized as any).visitedChoices || []),

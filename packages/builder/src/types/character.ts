@@ -92,6 +92,34 @@ export interface Character {
     satisfaction?: import('@asaps/core').Condition;
   }>;
 
+  /**
+   * Variants — alternate personality / visual profiles for the same
+   * character. Each variant is a *partial overlay* on the base: any field
+   * the variant defines replaces the base value when that variant is
+   * active. Use cases:
+   *   - Two Alexes for a coming-out story (introvert / extrovert) sharing
+   *     the same beats.
+   *   - "Play as a man or a woman" — one Player character with two
+   *     variants differing in displayName + portrait + traits.
+   *
+   * Variants are *exclusive* and *chosen at story-start* (either via a
+   * `setCharacterVariant` effect on a player-facing choice, or via the
+   * `defaultVariantId` field below). Switching mid-story is not
+   * recommended — it would discard accumulated mood / sentiments from
+   * the previous variant.
+   *
+   * The character keeps one stable `id` regardless of active variant —
+   * all beats that reference the character keep working without
+   * duplication. Only the affect / persona slice swaps.
+   */
+  variants?: CharacterVariant[];
+  /**
+   * Variant id that becomes active at story-start when no
+   * `setCharacterVariant` effect has fired yet. Optional — when omitted,
+   * the base character (no overlay) is used until a variant is chosen.
+   */
+  defaultVariantId?: string;
+
   // Metadata
   description?: string;
   tags?: string[];
@@ -109,6 +137,39 @@ export interface Character {
   // Inventory Frame Configuration
   /** Configuration for inventory display (HUD overlay) */
   inventoryFrame?: InventoryFrameConfig;
+}
+
+/**
+ * A partial overlay on a Character — only the fields the variant defines
+ * are replaced; everything else falls through to the base. Variants are
+ * exclusive (one active at a time) and chosen at story-start.
+ */
+export interface CharacterVariant {
+  /** Stable identifier used by setCharacterVariant effect / condition. */
+  id: string;
+  /** Display name shown in the editor's variant picker. */
+  name: string;
+  /** Optional one-line author note. Surfaced in the variant picker UI. */
+  description?: string;
+  /** When set, replaces the base character's user-facing display name. */
+  displayName?: string;
+  /** Portrait override — same shape as the base Character.portrait. */
+  portrait?: { image?: string; assetId?: string };
+  /** Personality traits override (Big Five, [0, 1]). */
+  traits?: Record<string, number>;
+  /** Dossier-policy override (Mode A vs Mode B). */
+  dossierPolicy?: 'reAnchor' | 'reflection';
+  /** Initial 2D mood at story start, when this variant is active. */
+  initialMood?: { valence: number; arousal: number };
+  /** Initial directed sentiments at story start, when this variant is active. */
+  initialSentiments?: Array<{
+    toEntityRef: string;
+    emotion: string;
+    strength: number;
+  }>;
+  /** Description override — useful when the variant has a different
+   *  backstory / authored persona block than the base. */
+  characterDescription?: string;
 }
 
 export interface CharacterState {

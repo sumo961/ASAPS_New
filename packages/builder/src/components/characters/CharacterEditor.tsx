@@ -1974,6 +1974,51 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
       });
     };
 
+    // Variants — alternate persona profiles. One can be marked default
+    // (auto-applies at story-start); authors switch between them via the
+    // setCharacterVariant effect on choices. Per-variant authoring here
+    // covers the high-value slice: identity (displayName), description,
+    // and a Big-Five vector picked from the archetype library. Mood +
+    // sentiments overrides are supported by the runtime today and can
+    // be edited via the project file or a future inline editor.
+    const variants = editedCharacter.variants || [];
+    const defaultVariantId = editedCharacter.defaultVariantId;
+    const updateVariant = (i: number, patch: Partial<typeof variants[number]>) => {
+      const next = variants.map((v, idx) => idx === i ? { ...v, ...patch } : v);
+      setEditedCharacter({ ...editedCharacter, variants: next });
+    };
+    const removeVariant = (i: number) => {
+      const removed = variants[i];
+      const next = variants.filter((_, idx) => idx !== i);
+      const updates: Partial<Character> = {
+        variants: next.length > 0 ? next : undefined,
+      };
+      // If the removed variant was the default, clear the default field.
+      if (removed && removed.id === defaultVariantId) {
+        updates.defaultVariantId = undefined;
+      }
+      setEditedCharacter({ ...editedCharacter, ...updates });
+    };
+    const addVariant = () => {
+      let suffix = variants.length + 1;
+      while (variants.find((v) => v.id === `variant${suffix}`)) suffix += 1;
+      const id = `variant${suffix}`;
+      setEditedCharacter({
+        ...editedCharacter,
+        variants: [...variants, { id, name: id }],
+      });
+    };
+    const setDefaultVariant = (variantId: string | undefined) => {
+      setEditedCharacter({ ...editedCharacter, defaultVariantId: variantId });
+    };
+    const applyArchetypeToVariant = (i: number, archetypeId: string) => {
+      const archetype = findPersonalityArchetype(archetypeId);
+      if (!archetype) return;
+      // Variant traits replace whatever was there — variants are preset-shaped
+      // overlays; the base character's traits remain untouched.
+      updateVariant(i, { traits: { ...archetype.traits } });
+    };
+
     return (
       <div className="space-y-6">
         {/* Personality — Big Five + author-defined traits */}
@@ -2405,6 +2450,140 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                       onClick={() => removeGoal(i)}
                       className="text-gray-400 hover:text-red-600"
                       title="Remove goal"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Variants — alternate persona profiles for one character */}
+        <div className="bg-white border rounded-lg p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                Variants
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Alternate persona profiles for the same character. Useful for "play as a man / woman", an introvert / extrovert version of an NPC, etc. Pick one as default to auto-apply at story-start, or use the <span className="font-mono">setCharacterVariant</span> effect on a player choice. The character keeps one stable id — only the affect / persona slice swaps.
+              </p>
+            </div>
+            <button
+              onClick={addVariant}
+              className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+            >
+              + Add variant
+            </button>
+          </div>
+          {variants.length === 0 ? (
+            <div className="text-xs text-gray-400 italic py-3">
+              No variants. Add one to give the player a persona choice, or to ship a single character in two flavors.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {variants.map((variant, i) => (
+                <div key={i} className="border rounded p-3 bg-gray-50">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer" title="Auto-apply this variant at story start">
+                          <input
+                            type="radio"
+                            name="default-variant"
+                            checked={defaultVariantId === variant.id}
+                            onChange={() => setDefaultVariant(variant.id)}
+                          />
+                          default
+                        </label>
+                        <input
+                          type="text"
+                          value={variant.id}
+                          onChange={(e) => updateVariant(i, { id: e.target.value })}
+                          className="px-2 py-1 text-xs font-mono border rounded"
+                          placeholder="variant-id"
+                          style={{ width: 130 }}
+                          title="Stable identifier — used by setCharacterVariant effect and characterVariant condition"
+                        />
+                        <input
+                          type="text"
+                          value={variant.name}
+                          onChange={(e) => updateVariant(i, { name: e.target.value })}
+                          className="flex-1 px-2 py-1 text-sm border rounded"
+                          placeholder="Variant label (e.g. Anxious introvert)"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-600 w-24 flex-shrink-0">Display name:</span>
+                        <input
+                          type="text"
+                          value={variant.displayName || ''}
+                          onChange={(e) => updateVariant(i, { displayName: e.target.value || undefined })}
+                          className="flex-1 px-2 py-1 text-xs border rounded"
+                          placeholder={`(default: ${editedCharacter.displayName || editedCharacter.name})`}
+                          title="Override the user-facing name when this variant is active. Leave empty to inherit."
+                        />
+                      </div>
+                      <textarea
+                        value={variant.description || ''}
+                        onChange={(e) => updateVariant(i, { description: e.target.value || undefined })}
+                        className="w-full px-2 py-1 text-xs border rounded resize-none"
+                        rows={2}
+                        placeholder="Optional description — shown in this editor and surfaced in the dossier when the variant is active."
+                      />
+                      <div className="flex items-center gap-2">
+                        <label htmlFor={`variant-${i}-archetype`} className="text-[11px] text-gray-600 whitespace-nowrap">
+                          Trait preset:
+                        </label>
+                        <select
+                          id={`variant-${i}-archetype`}
+                          value=""
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            if (id) applyArchetypeToVariant(i, id);
+                          }}
+                          className="text-xs border rounded px-2 py-1 bg-white"
+                          title="Replace this variant's traits with a preset profile."
+                        >
+                          <option value="">
+                            {variant.traits ? '— overwrite with preset —' : '— pick a preset —'}
+                          </option>
+                          {DEFAULT_PERSONALITY_ARCHETYPES.map((a) => (
+                            <option key={a.id} value={a.id} title={a.description}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </select>
+                        {variant.traits && (
+                          <button
+                            onClick={() => updateVariant(i, { traits: undefined })}
+                            className="text-[10px] text-gray-500 hover:text-red-600"
+                            title="Clear variant trait override; falls back to base character traits when active"
+                          >
+                            clear
+                          </button>
+                        )}
+                      </div>
+                      {variant.traits && (
+                        <div className="text-[10px] text-gray-500 font-mono px-2">
+                          O {(variant.traits.openness ?? 0).toFixed(2)} ·
+                          {' '}C {(variant.traits.conscientiousness ?? 0).toFixed(2)} ·
+                          {' '}E {(variant.traits.extraversion ?? 0).toFixed(2)} ·
+                          {' '}A {(variant.traits.agreeableness ?? 0).toFixed(2)} ·
+                          {' '}N {(variant.traits.neuroticism ?? 0).toFixed(2)}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-gray-500">
+                        Mood / sentiment overrides aren't editable in the inline form yet — runtime supports them, edit via the project file. The variant's traits drive emotion modulation when active.
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeVariant(i)}
+                      className="text-gray-400 hover:text-red-600"
+                      title="Remove variant"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

@@ -2,6 +2,7 @@ export { PlayerContextBuilder, type PlayerContextOptions, type PlayerContextData
 export { waitForTTS, waitForReadingTime } from './ttsWait';
 export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
 export { buildDossier, buildDossierForRef, describeMoodAxis, type BuildDossierOptions, type DossierInteraction } from './dossier';
+export { resolveCharacterWithVariant, findCharacterVariant } from './characterVariant';
 export {
   beatsForCharacter,
   choicesForCharacter,

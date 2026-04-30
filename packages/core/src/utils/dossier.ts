@@ -423,6 +423,11 @@ export function buildDossierForRef(
     getCharacterEmotions?: (ref: string) => Record<string, number>;
     getCharacterReflections?: (ref: string) => ReadonlyArray<{ timestamp: number; text: string; salience?: number; beatId?: string }>;
     getCharacterGoalStatuses?: (ref: string) => Record<string, 'open' | 'met' | 'failed' | 'abandoned'>;
+    /** When provided, used to resolve the character record with the
+     *  active variant overlay applied — so the dossier reflects the
+     *  *effective* persona, not the base. Falls back to `characters.find`
+     *  when absent. */
+    getMergedCharacter?: (ref: string) => CharacterLike | undefined;
     getStory?: () => any;
     getHistory?: () => ReadonlyArray<string>;
     getChoiceHistory?: () => ReadonlyArray<ChoiceRecordLike>;
@@ -430,7 +435,12 @@ export function buildDossierForRef(
   options: BuildDossierOptions = {},
 ): string {
   if (!characterRef || !characters) return '';
-  const character = characters.find((c) => c.id === characterRef) || null;
+  // Prefer the merged character (variant overlay applied) when the host
+  // exposes the helper. This is what the LLM should see — "Alex-introvert"
+  // not the base "Alex". Falls back to the raw lookup otherwise.
+  const character = (contextLike?.getMergedCharacter?.(characterRef))
+    || characters.find((c) => c.id === characterRef)
+    || null;
   if (!character) return '';
   const state = contextLike?.getCharacterState?.(characterRef);
   const mood = contextLike?.getCharacterMood?.(characterRef);
