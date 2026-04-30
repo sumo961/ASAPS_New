@@ -29,7 +29,7 @@ import {
   Globe,
   Heart
 } from 'lucide-react';
-import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG, InventoryFrameConfig, DEFAULT_INVENTORY_FRAME_CONFIG } from '../../types/character';
+import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG, InventoryFrameConfig, DEFAULT_INVENTORY_FRAME_CONFIG, MoodFrameConfig, DEFAULT_MOOD_FRAME_CONFIG } from '../../types/character';
 import { describeMoodAxis, DEFAULT_TRAIT_NAMES, DEFAULT_TRAIT_VALUES, TRAIT_DESCRIPTIONS, DEFAULT_PERSONALITY_ARCHETYPES, findPersonalityArchetype } from '@asaps/core';
 import { MoodPad } from './MoodPad';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
@@ -2593,6 +2593,115 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             </div>
           )}
         </div>
+
+        {/* Mood HUD — opt-in 2D mood-pad overlay during play */}
+        {(() => {
+          const mf: MoodFrameConfig = editedCharacter.moodFrame || DEFAULT_MOOD_FRAME_CONFIG;
+          const updateMoodFrame = (patch: Partial<MoodFrameConfig>) => {
+            setEditedCharacter({
+              ...editedCharacter,
+              moodFrame: { ...mf, ...patch },
+            });
+          };
+          return (
+            <div className="bg-white border rounded-lg p-4">
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                Mood HUD
+              </h3>
+              <p className="text-xs text-gray-500 mt-1 mb-3">
+                Show a compact 2D mood pad on stage during play, anchored to this character or a screen corner. Off by default — turn on for characters whose emotional state should be visible to the player.
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer text-sm mb-3">
+                <input
+                  type="checkbox"
+                  checked={!!mf.enabled}
+                  onChange={(e) => updateMoodFrame({ enabled: e.target.checked })}
+                />
+                Enable HUD pad
+              </label>
+              {mf.enabled && (
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <label className="w-24 text-gray-600">Dock mode:</label>
+                    <select
+                      value={mf.dockMode}
+                      onChange={(e) => updateMoodFrame({ dockMode: e.target.value as any })}
+                      className="border rounded px-2 py-1"
+                    >
+                      <option value="character">Anchored to character</option>
+                      <option value="screen">Fixed to screen corner</option>
+                    </select>
+                  </div>
+                  {mf.dockMode === 'character' ? (
+                    <div className="flex items-center gap-2">
+                      <label className="w-24 text-gray-600">Anchor:</label>
+                      <select
+                        value={mf.anchor}
+                        onChange={(e) => updateMoodFrame({ anchor: e.target.value as any })}
+                        className="border rounded px-2 py-1"
+                      >
+                        {['top','bottom','left','right','top-left','top-right','bottom-left','bottom-right'].map((a) => (
+                          <option key={a} value={a}>{a}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <label className="w-24 text-gray-600">Corner:</label>
+                      <select
+                        value={mf.screenPosition}
+                        onChange={(e) => updateMoodFrame({ screenPosition: e.target.value as any })}
+                        className="border rounded px-2 py-1"
+                      >
+                        {['screen-top-left','screen-top-right','screen-bottom-left','screen-bottom-right'].map((a) => (
+                          <option key={a} value={a}>{a.replace('screen-','')}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <label className="w-24 text-gray-600">Size (px):</label>
+                    <input
+                      type="number"
+                      min={48} max={320}
+                      value={mf.size}
+                      onChange={(e) => updateMoodFrame({ size: parseInt(e.target.value) || 96 })}
+                      className="border rounded px-2 py-1 w-20"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="w-24 text-gray-600">Opacity:</label>
+                    <input
+                      type="range"
+                      min={0.2} max={1} step={0.05}
+                      value={mf.backgroundOpacity}
+                      onChange={(e) => updateMoodFrame({ backgroundOpacity: parseFloat(e.target.value) })}
+                      className="flex-1"
+                    />
+                    <span className="font-mono text-gray-700 w-10 text-right">{mf.backgroundOpacity.toFixed(2)}</span>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={mf.showEmotionMarkers}
+                      onChange={(e) => updateMoodFrame({ showEmotionMarkers: e.target.checked })}
+                    />
+                    Show emotion-palette markers
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={mf.showLabels}
+                      onChange={(e) => updateMoodFrame({ showLabels: e.target.checked })}
+                    />
+                    Show axis labels (sad / happy / calm / excited)
+                  </label>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   };

@@ -137,7 +137,43 @@ export interface Character {
   // Inventory Frame Configuration
   /** Configuration for inventory display (HUD overlay) */
   inventoryFrame?: InventoryFrameConfig;
+
+  // Mood Frame Configuration — opt-in 2D mood-pad HUD overlay.
+  /** When set with `enabled: true`, the renderer shows a compact
+   *  Russell's-circumplex mood pad next to the character (or fixed to
+   *  a screen corner). Off by default. */
+  moodFrame?: MoodFrameConfig;
 }
+
+export interface MoodFrameConfig {
+  enabled: boolean;
+  dockMode: MeterFrameDockMode;
+  anchor: MeterFrameAnchor;
+  screenPosition: MeterFrameScreenPosition;
+  offset: { x: number; y: number };
+  /** Square pixel size — defaults to 96. */
+  size: number;
+  /** Plot project emotion-palette markers on the disc. */
+  showEmotionMarkers: boolean;
+  /** Cardinal labels (sad / happy / calm / excited). Off by default for HUD. */
+  showLabels: boolean;
+  /** Override the mood-dot fill colour (defaults to neutral dark). */
+  dotColor?: string;
+  /** Background opacity (0 = transparent, 1 = opaque). */
+  backgroundOpacity: number;
+}
+
+export const DEFAULT_MOOD_FRAME_CONFIG: MoodFrameConfig = {
+  enabled: false,
+  dockMode: 'character',
+  anchor: 'top-right',
+  screenPosition: 'screen-top-right',
+  offset: { x: 0, y: 0 },
+  size: 96,
+  showEmotionMarkers: true,
+  showLabels: false,
+  backgroundOpacity: 0.85,
+};
 
 /**
  * A partial overlay on a Character — only the fields the variant defines

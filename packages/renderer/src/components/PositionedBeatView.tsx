@@ -6,6 +6,7 @@ import { getAudioManager } from '../audio/AudioManager';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
 import { CharacterInventoryFrame, type InventoryFrameConfig, type InventoryItemData } from './CharacterInventoryFrame';
+import { CharacterMoodFrame } from './CharacterMoodFrame';
 import { TimerProgressBar } from './TimerProgressBar';
 import { TimerHudDisplay } from './TimerHudDisplay';
 import { CountdownMeterHud } from './CountdownMeterHud';
@@ -495,6 +496,13 @@ export interface PositionedBeatViewProps {
     items: InventoryItemData[];
     config: InventoryFrameConfig;
   } | null;
+  /** Resolver function to get mood-frame data for a character (HUD pad). */
+  characterMoodFrameResolver?: (characterId: string) => {
+    valence: number;
+    arousal: number;
+    config: import('./CharacterMoodFrame').MoodFrameConfig;
+    palette?: ReadonlyArray<{ name: string; weightToValence: number; weightToArousal: number }>;
+  } | null;
   /** Whether inventory display is visible (controlled by Ctrl/Cmd+I) */
   inventoryVisible?: boolean;
   /** Timer state for default target countdown display */
@@ -952,6 +960,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   counterResolver,
   characterMeterFrameResolver,
   characterInventoryResolver,
+  characterMoodFrameResolver,
   inventoryVisible = false,
   timerState: initialTimerState,
   onSubscribeTimerState,
@@ -1490,6 +1499,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             onTriggerClickAnimation={() => triggerClickAnimation(element.location.id || element.location.name, element.location.name)}
             hasPendingClickAnimation={hasPendingClickAnimation(element.location.id || element.location.name, element.location.name)}
             characterMeterFrameResolver={characterMeterFrameResolver}
+            characterMoodFrameResolver={characterMoodFrameResolver}
             characterInventoryResolver={characterInventoryResolver}
             inventoryVisible={inventoryVisible}
             containerDimensions={{ width: stageWidth, height: stageHeight }}
@@ -1979,6 +1989,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             onTriggerClickAnimation={() => triggerClickAnimation(element.location.id || element.location.name, element.location.name)}
             hasPendingClickAnimation={hasPendingClickAnimation(element.location.id || element.location.name, element.location.name)}
             characterMeterFrameResolver={characterMeterFrameResolver}
+            characterMoodFrameResolver={characterMoodFrameResolver}
             characterInventoryResolver={characterInventoryResolver}
             inventoryVisible={inventoryVisible}
             containerDimensions={{ width: stageWidth, height: stageHeight }}
@@ -2038,6 +2049,13 @@ interface PositionedElementProps {
     items: InventoryItemData[];
     config: InventoryFrameConfig;
   } | null;
+  /** Resolver function to get mood-frame data for a character (HUD pad). */
+  characterMoodFrameResolver?: (characterId: string) => {
+    valence: number;
+    arousal: number;
+    config: import('./CharacterMoodFrame').MoodFrameConfig;
+    palette?: ReadonlyArray<{ name: string; weightToValence: number; weightToArousal: number }>;
+  } | null;
   /** Whether inventory display is visible (controlled by Ctrl/Cmd+I) */
   inventoryVisible?: boolean;
   /** Container dimensions for screen-docked meter frames */
@@ -2088,6 +2106,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   hasPendingClickAnimation,
   characterMeterFrameResolver,
   characterInventoryResolver,
+  characterMoodFrameResolver,
   inventoryVisible = false,
   containerDimensions,
   beatType,
@@ -2454,6 +2473,11 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         ? characterInventoryResolver(location.characterId)
         : null;
 
+      // Get mood-frame data if character has one configured (HUD pad).
+      const moodFrameData = location.characterId && characterMoodFrameResolver
+        ? characterMoodFrameResolver(location.characterId)
+        : null;
+
       // Determine if inventory should be visible (controlled by Ctrl/Cmd+I toggle)
       const shouldShowInventory = inventoryData && inventoryData.items.length > 0 && inventoryVisible;
 
@@ -2547,6 +2571,17 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
               isVisible={true}
               fontScale={mobileFontScale}
               autoMinimize={mobileFontScale > 1.0}
+            />
+          )}
+          {moodFrameData && moodFrameData.config.enabled && (
+            <CharacterMoodFrame
+              valence={moodFrameData.valence}
+              arousal={moodFrameData.arousal}
+              config={moodFrameData.config}
+              palette={moodFrameData.palette}
+              characterPosition={{ x: effectiveX, y: effectiveY }}
+              characterDimensions={{ width: location.width, height: location.height }}
+              containerDimensions={containerDimensions}
             />
           )}
         </>

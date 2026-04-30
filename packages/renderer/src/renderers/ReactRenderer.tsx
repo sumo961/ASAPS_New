@@ -836,6 +836,7 @@ export class ReactRenderer extends BaseRenderer {
   private counterResolver: ((counterName: string) => { value: number; min: number; max: number } | null) | null = null;  // NEW: Counter value resolver
   private characterMeterFrameResolver: ((characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig } | null) | null = null;  // NEW: Character meter frame resolver
   private characterInventoryResolver: ((characterId: string) => { items: InventoryItemData[]; config: InventoryFrameConfig } | null) | null = null;  // NEW: Character inventory resolver
+  private characterMoodFrameResolver: ((characterId: string) => { valence: number; arousal: number; config: import('../components/CharacterMoodFrame').MoodFrameConfig; palette?: ReadonlyArray<{ name: string; weightToValence: number; weightToArousal: number }> } | null) | null = null;
   protected inventoryVisible: boolean = false;  // NEW: Whether inventory is currently visible (controlled by Ctrl/Cmd+I)
   private spriteDataResolver: ((characterId: string) => { frameWidth: number; frameHeight: number; defaultFrame?: number; imageWidth?: number; animations?: Array<{ name: string; frames: number[]; frameDuration: number; loop: boolean }>; activeAnimation?: string } | null) | null = null;  // NEW: Sprite sheet data resolver
   // soundBlobResolver is inherited from BaseRenderer
@@ -1152,6 +1153,17 @@ export class ReactRenderer extends BaseRenderer {
    */
   setCharacterInventoryResolver(resolver: (characterId: string) => { items: InventoryItemData[]; config: InventoryFrameConfig } | null): void {
     this.characterInventoryResolver = resolver;
+  }
+
+  /**
+   * Set the character mood-frame resolver function. Returns a snapshot of
+   * the character's current mood, plus the per-character moodFrame config
+   * and the project's emotion palette so the HUD pad can plot markers.
+   * The renderer re-evaluates this on every render — host should make
+   * sure the data is live (subscribe to mood-changed events upstream).
+   */
+  setCharacterMoodFrameResolver(resolver: (characterId: string) => { valence: number; arousal: number; config: import('../components/CharacterMoodFrame').MoodFrameConfig; palette?: ReadonlyArray<{ name: string; weightToValence: number; weightToArousal: number }> } | null): void {
+    this.characterMoodFrameResolver = resolver;
   }
 
   /**
@@ -1933,6 +1945,7 @@ export class ReactRenderer extends BaseRenderer {
               animations={effectiveAnimations}
               characterMeterFrameResolver={this.characterMeterFrameResolver || undefined}
               characterInventoryResolver={this.characterInventoryResolver || undefined}
+              characterMoodFrameResolver={this.characterMoodFrameResolver || undefined}
               inventoryVisible={this.inventoryVisible}
               timerState={this.timerState}
               onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}

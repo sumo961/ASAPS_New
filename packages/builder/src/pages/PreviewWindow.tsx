@@ -1175,6 +1175,28 @@ export const PreviewWindow: React.FC = () => {
       });
       console.log('[PreviewWindow] Character inventory resolver set up');
 
+      // Mood-frame resolver — when a character has `moodFrame.enabled`, the
+      // renderer mounts a compact 2D mood pad next to (or fixed near) them.
+      // Looks up live mood from the StoryContext on each render so the dot
+      // tracks runtime updates.
+      (reactRenderer as any).setCharacterMoodFrameResolver?.((characterId: string) => {
+        const pd = previewDataRef.current;
+        const character = pd?.characters?.find((c) => c.id === characterId);
+        if (!character || !(character as any).moodFrame || !(character as any).moodFrame.enabled) {
+          return null;
+        }
+        const ctx = engineRef.current?.getContext();
+        if (!ctx) return null;
+        const mood = ctx.getCharacterMood(characterId);
+        return {
+          valence: mood.valence,
+          arousal: mood.arousal,
+          config: (character as any).moodFrame,
+          palette: pd?.emotionPalette,
+        };
+      });
+      console.log('[PreviewWindow] Character mood frame resolver set up');
+
       // Set up sprite data resolver for character spritesheets
       // Uses ref so it always accesses latest data (for folder-based projects where data arrives later)
       (reactRenderer as any).setSpriteDataResolver?.((characterId: string) => {

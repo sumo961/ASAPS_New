@@ -983,6 +983,35 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
       });
       console.log('[PlayerEngine] Character meter frame resolver set up');
     }
+
+    // Mood-frame resolver — opt-in 2D mood-pad HUD per character. Reads
+    // current mood from the live StoryContext so the dot tracks runtime
+    // updates as choices fire affect effects.
+    if ('setCharacterMoodFrameResolver' in renderer) {
+      (renderer as any).setCharacterMoodFrameResolver((characterId: string) => {
+        const character = characters.find((c: any) =>
+          c.id === characterId ||
+          c.name === characterId ||
+          c.displayName === characterId ||
+          c.name?.toLowerCase() === characterId?.toLowerCase() ||
+          c.displayName?.toLowerCase() === characterId?.toLowerCase()
+        );
+        if (!character || !character.moodFrame || !character.moodFrame.enabled) {
+          return null;
+        }
+        const ctx = this.engine?.getContext();
+        if (!ctx) return null;
+        const mood = ctx.getCharacterMood(character.id);
+        const palette = (story as any)?.getEmotionPalette?.();
+        return {
+          valence: mood.valence,
+          arousal: mood.arousal,
+          config: character.moodFrame,
+          palette,
+        };
+      });
+      console.log('[PlayerEngine] Character mood frame resolver set up');
+    }
   }
 
   /**
