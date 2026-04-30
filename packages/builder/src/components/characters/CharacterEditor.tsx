@@ -66,6 +66,10 @@ interface CharacterEditorProps {
    *  shows each emotion at its (weightToValence, weightToArousal) so
    *  authors see the geography of mood-space they're picking from. */
   emotionPalette?: ReadonlyArray<import('@asaps/core').EmotionDefinition>;
+  /** When the user opens the editor by clicking a variant card in the
+   *  manager, jump straight to the Affect tab and scroll the requested
+   *  variant into view. */
+  focusVariantId?: string;
 }
 
 export const CharacterEditor: React.FC<CharacterEditorProps> = ({
@@ -75,9 +79,25 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   assets = [],
   onAssetAdd,
   emotionPalette,
+  focusVariantId,
 }) => {
-  const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>(focusVariantId ? 'affect' : 'basic');
   const [editedCharacter, setEditedCharacter] = useState<Character>(character);
+
+  // When opened with focusVariantId set (variant card click), scroll the
+  // matching variant card into view so the author lands on what they clicked.
+  useEffect(() => {
+    if (!focusVariantId) return;
+    const t = setTimeout(() => {
+      const el = document.querySelector(`[data-variant-id="${focusVariantId}"]`);
+      if (el && 'scrollIntoView' in el) {
+        (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (el as HTMLElement).style.outline = '2px solid #3b82f6';
+        setTimeout(() => { (el as HTMLElement).style.outline = ''; }, 1600);
+      }
+    }, 80);
+    return () => clearTimeout(t);
+  }, [focusVariantId]);
   // Last archetype the author picked from the Personality dropdown. Local
   // session state — not persisted on Character, since the author might
   // tweak away from the preset and we don't want a stale label sticking
@@ -2486,7 +2506,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
           ) : (
             <div className="space-y-3">
               {variants.map((variant, i) => (
-                <div key={i} className="border rounded p-3 bg-gray-50">
+                <div key={i} data-variant-id={variant.id} className="border rounded p-3 bg-gray-50">
                   <div className="flex items-start gap-2">
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2">
@@ -2576,8 +2596,69 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                           {' '}N {(variant.traits.neuroticism ?? 0).toFixed(2)}
                         </div>
                       )}
+
+                      {/* Per-variant portrait override. Variants share the
+                          base character's sprite sheet / states by design —
+                          full visual identity swap (different sprite sheet,
+                          different animations) is out of scope here, but a
+                          different portrait/face is the most common need
+                          and stays safe (no animation-name mismatches). */}
+                      <div className="border-t pt-2 mt-2">
+                        <div className="text-[11px] text-gray-600 mb-1.5">Portrait override (optional):</div>
+                        {(() => {
+                          const variantPortraitUrl = resolveImageUrl(
+                            variant.portrait?.assetId,
+                            variant.portrait?.image,
+                            assets,
+                          );
+                          return (
+                            <div className="flex items-start gap-3">
+                              {variantPortraitUrl ? (
+                                <img
+                                  src={variantPortraitUrl}
+                                  alt={`${variant.name} portrait`}
+                                  className="w-12 h-12 rounded object-cover border border-gray-300 flex-shrink-0"
+                                />
+                              ) : (
+                                <div
+                                  className="w-12 h-12 rounded border border-dashed border-gray-300 flex items-center justify-center text-[9px] text-gray-400 flex-shrink-0"
+                                  title="Falls back to base character's portrait when this variant is active"
+                                >
+                                  inherits
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <DirectAssetUpload
+                                  currentAssetUrl={variantPortraitUrl}
+                                  onAssetSelect={(url, metadata) => {
+                                    updateVariant(i, {
+                                      portrait: {
+                                        image: url,
+                                        assetId: metadata?.id || undefined,
+                                      },
+                                    });
+                                  }}
+                                  onAssetAdd={onAssetAdd}
+                                  acceptTypes={['image/*']}
+                                  maxSize={5}
+                                  label="Upload variant portrait"
+                                />
+                                {variantPortraitUrl && (
+                                  <button
+                                    onClick={() => updateVariant(i, { portrait: undefined })}
+                                    className="mt-1 text-[10px] text-gray-500 hover:text-red-600 flex items-center gap-1"
+                                  >
+                                    <Trash2 className="w-3 h-3" /> Clear (use base portrait)
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
                       <div className="text-[10px] text-gray-500">
-                        Mood / sentiment overrides aren't editable in the inline form yet — runtime supports them, edit via the project file. The variant's traits drive emotion modulation when active.
+                        Variants share the base character's sprite sheet, states, and animations. Mood / sentiment overrides aren't editable in the inline form yet — runtime supports them; edit via the project file or seed via the variant's <span className="font-mono">setCharacterVariant</span> re-seed at story-start.
                       </div>
                     </div>
                     <button

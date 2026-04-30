@@ -85,6 +85,10 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   // Only use selection management from the hook
   const characters: Character[] = initialCharacters;
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  // When the user clicks a variant sub-card, jump straight to it inside
+  // the editor's Affect tab. Cleared whenever the editor is opened the
+  // ordinary way (parent character click / "Add character" / templates).
+  const [focusVariantId, setFocusVariantId] = useState<string | null>(null);
  // const selectedCharacter = selectedCharacterId ? characters.find(c => c.id === selectedCharacterId) || null : null;
   const selectedCharacter = selectedCharacterId ? characters.find((c: Character) => c.id === selectedCharacterId) || null : null;
   
@@ -207,6 +211,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
     } else {
       // In edit mode, open the editor
       selectCharacter(character.id);
+      setFocusVariantId(null);
       setShowEditor(true);
     }
   };
@@ -214,6 +219,16 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   // Open editor for a character (used in selection mode's edit button)
   const handleEditCharacter = (character: Character) => {
     selectCharacter(character.id);
+    setFocusVariantId(null);
+    setShowEditor(true);
+  };
+
+  // Open the editor focused on a specific variant of a character — used by
+  // variant sub-cards in the grouped grid view.
+  const handleVariantClick = (character: Character, variantId: string) => {
+    if (selectionMode) return;
+    selectCharacter(character.id);
+    setFocusVariantId(variantId);
     setShowEditor(true);
   };
 
@@ -377,17 +392,116 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       <div className="flex-1 p-4 overflow-auto">
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {filteredCharacters.map((character) => (
-              <CharacterCard
-                key={character.id}
-                character={character}
-                onClick={() => handleCharacterClick(character)}
-                onRemove={() => handleCharacterRemove(character.id)}
-                onEdit={() => handleEditCharacter(character)}
-                selectionMode={selectionMode}
-                imageUrl={resolveImageUrl(character.visual.defaultAssetId, character.visual.defaultImage, assets)}
-              />
-            ))}
+            {filteredCharacters.map((character) => {
+              const hasVariants = !!(character.variants && character.variants.length > 0);
+              if (!hasVariants) {
+                return (
+                  <CharacterCard
+                    key={character.id}
+                    character={character}
+                    onClick={() => handleCharacterClick(character)}
+                    onRemove={() => handleCharacterRemove(character.id)}
+                    onEdit={() => handleEditCharacter(character)}
+                    selectionMode={selectionMode}
+                    imageUrl={resolveImageUrl(character.visual.defaultAssetId, character.visual.defaultImage, assets)}
+                  />
+                );
+              }
+              // Variant group: parent header + each variant as a sub-card
+              // inside a shared frame, with a visible "linked" cue (color
+              // dot inherited, bracketed by a thin colored border, "↳"
+              // glyph on each variant).
+              const baseColor = character.color || '#94a3b8';
+              const baseImageUrl = resolveImageUrl(character.visual.defaultAssetId, character.visual.defaultImage, assets);
+              return (
+                <div
+                  key={character.id}
+                  className="relative bg-white rounded-lg overflow-hidden flex flex-col"
+                  style={{ border: `2px solid ${baseColor}` }}
+                >
+                  {/* Parent header — clicking opens the base editor. */}
+                  <div
+                    onClick={() => handleCharacterClick(character)}
+                    className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 border-b"
+                    style={{ borderBottomColor: baseColor }}
+                    title="Edit base character (overrides apply to all variants)"
+                  >
+                    <span
+                      className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: baseColor }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold truncate">{character.displayName || character.name}</div>
+                      <div className="text-[10px] text-gray-500">
+                        {character.variants!.length} {character.variants!.length === 1 ? 'variant' : 'variants'}
+                        {character.defaultVariantId ? ` · default: ${character.defaultVariantId}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleCharacterRemove(character.id); }}
+                      className="text-gray-300 hover:text-red-500 text-sm flex-shrink-0"
+                      title="Remove character (and all its variants)"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  {/* Variant sub-cards — clicking each opens the editor
+                      focused on that variant. */}
+                  <div className="flex-1 p-2 space-y-2 bg-gray-50">
+                    {character.variants!.map((v) => {
+                      const variantImageUrl = resolveImageUrl(
+                        v.portrait?.assetId,
+                        v.portrait?.image,
+                        assets,
+                      ) || baseImageUrl;
+                      const isDefault = character.defaultVariantId === v.id;
+                      return (
+                        <div
+                          key={v.id}
+                          onClick={() => handleVariantClick(character, v.id)}
+                          className="flex items-center gap-2 p-2 bg-white rounded border border-gray-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-colors"
+                          title={`Edit variant: ${v.name}${isDefault ? ' (default at story start)' : ''}`}
+                        >
+                          <span
+                            className="text-gray-400 flex-shrink-0 text-sm"
+                            title={`Variant of ${character.displayName || character.name}`}
+                          >↳</span>
+                          {variantImageUrl ? (
+                            <img
+                              src={variantImageUrl}
+                              alt={v.name}
+                              className="w-8 h-8 rounded object-cover flex-shrink-0 border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded bg-gray-100 flex-shrink-0 flex items-center justify-center text-[9px] text-gray-400">
+                              no img
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium truncate">
+                              {v.displayName || v.name}
+                              {isDefault && (
+                                <span className="ml-1 text-[9px] text-blue-600 font-normal">(default)</span>
+                              )}
+                            </div>
+                            {v.description && (
+                              <div className="text-[10px] text-gray-500 truncate">{v.description}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <button
+                      onClick={() => handleVariantClick(character, character.variants![0].id)}
+                      className="w-full text-[10px] text-gray-500 hover:text-blue-600 py-1 italic"
+                      title="Open editor → Affect tab → Variants section to add another"
+                    >
+                      + Add variant…
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
             {/* Add Character Card */}
             <div
               onClick={handleCreateNew}
@@ -550,6 +664,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           assets={assets}
           onAssetAdd={onAssetAdd} // Pass through the asset handler
           emotionPalette={emotionPalette}
+          focusVariantId={focusVariantId || undefined}
         />
       )}
 
