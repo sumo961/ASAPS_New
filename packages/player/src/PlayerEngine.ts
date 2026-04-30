@@ -1003,11 +1003,18 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         if (!ctx) return null;
         const mood = ctx.getCharacterMood(character.id);
         const palette = (story as any)?.getEmotionPalette?.();
+        const merged: any = (ctx as any).getMergedCharacter?.(character.id) || character;
+        const portraitAsset = merged.portrait?.assetId
+          ? assets.find((a: any) => a.id === merged.portrait.assetId)
+          : undefined;
         return {
           valence: mood.valence,
           arousal: mood.arousal,
           config: character.moodFrame,
           palette,
+          characterName: merged.displayName || merged.name || character.id,
+          characterPortraitUrl: portraitAsset?.url || merged.portrait?.image,
+          characterColor: merged.color,
         };
       });
       console.log('[PlayerEngine] Character mood frame resolver set up');

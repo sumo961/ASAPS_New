@@ -2978,6 +2978,14 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                     />
                     Show axis labels (sad / happy / calm / excited)
                   </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={mf.showQualitativeLabel !== false}
+                      onChange={(e) => updateMoodFrame({ showQualitativeLabel: e.target.checked })}
+                    />
+                    Show qualitative mood label below the disc (e.g. "sad, alert")
+                  </label>
                 </div>
               )}
             </div>

@@ -502,6 +502,9 @@ export interface PositionedBeatViewProps {
     arousal: number;
     config: import('./CharacterMoodFrame').MoodFrameConfig;
     palette?: ReadonlyArray<{ name: string; weightToValence: number; weightToArousal: number }>;
+    characterName?: string;
+    characterPortraitUrl?: string;
+    characterColor?: string;
   } | null;
   /** Whether inventory display is visible (controlled by Ctrl/Cmd+I) */
   inventoryVisible?: boolean;
@@ -2055,6 +2058,9 @@ interface PositionedElementProps {
     arousal: number;
     config: import('./CharacterMoodFrame').MoodFrameConfig;
     palette?: ReadonlyArray<{ name: string; weightToValence: number; weightToArousal: number }>;
+    characterName?: string;
+    characterPortraitUrl?: string;
+    characterColor?: string;
   } | null;
   /** Whether inventory display is visible (controlled by Ctrl/Cmd+I) */
   inventoryVisible?: boolean;
@@ -2579,6 +2585,9 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
               arousal={moodFrameData.arousal}
               config={moodFrameData.config}
               palette={moodFrameData.palette}
+              characterName={moodFrameData.characterName}
+              characterPortraitUrl={moodFrameData.characterPortraitUrl}
+              characterColor={moodFrameData.characterColor}
               characterPosition={{ x: effectiveX, y: effectiveY }}
               characterDimensions={{ width: location.width, height: location.height }}
               containerDimensions={containerDimensions}

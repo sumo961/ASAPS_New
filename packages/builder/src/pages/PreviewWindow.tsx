@@ -1188,11 +1188,18 @@ export const PreviewWindow: React.FC = () => {
         const ctx = engineRef.current?.getContext();
         if (!ctx) return null;
         const mood = ctx.getCharacterMood(characterId);
+        const merged: any = (ctx as any).getMergedCharacter?.(characterId) || character;
+        const portraitAsset = merged.portrait?.assetId
+          ? pd?.assets?.find((a: any) => a.id === merged.portrait.assetId)
+          : undefined;
         return {
           valence: mood.valence,
           arousal: mood.arousal,
           config: (character as any).moodFrame,
           palette: pd?.emotionPalette,
+          characterName: merged.displayName || merged.name || characterId,
+          characterPortraitUrl: portraitAsset?.url || merged.portrait?.image,
+          characterColor: merged.color,
         };
       });
       console.log('[PreviewWindow] Character mood frame resolver set up');
@@ -2722,6 +2729,7 @@ export const PreviewWindow: React.FC = () => {
                 if (!ctx) return null;
                 const chars = previewDataRef.current?.characters;
                 const palette = previewDataRef.current?.emotionPalette;
+                const assetsList = previewDataRef.current?.assets || [];
                 if (!chars) return null;
                 // Just touch debugInfo so the linter / React knows we
                 // depend on it for re-renders. Read is cheap.
@@ -2731,7 +2739,15 @@ export const PreviewWindow: React.FC = () => {
                     {chars.map((c) => {
                       const mf: any = (c as any).moodFrame;
                       if (!mf || !mf.enabled || mf.dockMode !== 'screen') return null;
+                      // Use the merged character (variant overlay applied)
+                      // so the HUD shows the variant-specific name /
+                      // portrait when a variant is active.
+                      const merged: any = (ctx as any).getMergedCharacter?.(c.id) || c;
                       const mood = ctx.getCharacterMood(c.id);
+                      const portraitAsset = merged.portrait?.assetId
+                        ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
+                        : undefined;
+                      const portraitUrl = portraitAsset?.url || merged.portrait?.image;
                       return (
                         <CharacterMoodFrame
                           key={`mood-hud-${c.id}`}
@@ -2739,6 +2755,9 @@ export const PreviewWindow: React.FC = () => {
                           arousal={mood.arousal}
                           config={mf}
                           palette={palette}
+                          characterName={merged.displayName || merged.name || c.id}
+                          characterPortraitUrl={portraitUrl}
+                          characterColor={merged.color}
                           characterPosition={{ x: 0, y: 0 }}
                           characterDimensions={{ width: 0, height: 0 }}
                           containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}

@@ -151,13 +151,19 @@ export interface MoodFrameConfig {
   anchor: MeterFrameAnchor;
   screenPosition: MeterFrameScreenPosition;
   offset: { x: number; y: number };
-  /** Square pixel size — defaults to 96. */
+  /** Pixel size of the disc inside the HUD card. The card itself adds
+   *  ~22px header + ~18px qualitative-label rows, so the actual on-stage
+   *  card height is larger than this when those rows are enabled. */
   size: number;
   /** Plot project emotion-palette markers on the disc. */
   showEmotionMarkers: boolean;
-  /** Cardinal labels (sad / happy / calm / excited). Off by default for HUD. */
+  /** Cardinal axis labels (sad / happy / calm / excited) inside the disc. */
   showLabels: boolean;
-  /** Override the mood-dot fill colour (defaults to neutral dark). */
+  /** Qualitative descriptor below the disc (e.g. "sad, alert"). Default
+   *  on — most useful HUD signal beyond the dot itself. */
+  showQualitativeLabel: boolean;
+  /** Override the mood-dot fill colour. Defaults to the character's
+   *  `color`, falling back to a strong default blue. */
   dotColor?: string;
   /** Background opacity (0 = transparent, 1 = opaque). */
   backgroundOpacity: number;
@@ -169,10 +175,11 @@ export const DEFAULT_MOOD_FRAME_CONFIG: MoodFrameConfig = {
   anchor: 'top-right',
   screenPosition: 'screen-top-right',
   offset: { x: 0, y: 0 },
-  size: 96,
+  size: 140,
   showEmotionMarkers: true,
   showLabels: false,
-  backgroundOpacity: 0.85,
+  showQualitativeLabel: true,
+  backgroundOpacity: 0.95,
 };
 
 /**
