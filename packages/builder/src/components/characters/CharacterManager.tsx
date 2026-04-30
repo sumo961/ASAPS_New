@@ -225,12 +225,26 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   };
 
   // Open the editor focused on a specific variant of a character — used by
-  // variant sub-cards in the grouped grid view.
+  // variant sub-cards' edit ✎ button. Always opens the editor regardless
+  // of selectionMode: the edit button is an explicit "I want to edit this
+  // variant" affordance, not a "pick this for the caller" gesture.
   const handleVariantClick = (character: Character, variantId: string) => {
-    if (selectionMode) return;
     selectCharacter(character.id);
     setFocusVariantId(variantId);
     setShowEditor(true);
+  };
+
+  // Body click on a variant sub-card. In selection mode, this is the
+  // "pick this character" affordance — fire the parent character to the
+  // caller's callback. In edit mode, it opens the editor focused on the
+  // variant. Edit ✎ and delete ✕ buttons keep their own explicit handlers
+  // so they work in both modes.
+  const handleVariantBodyClick = (character: Character, variantId: string) => {
+    if (selectionMode && onCharacterSelect) {
+      onCharacterSelect(character);
+    } else {
+      handleVariantClick(character, variantId);
+    }
   };
 
   // Remove a variant from a character. Confirms first because variants
@@ -491,9 +505,9 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                           title={isDefault ? 'Default at story start' : undefined}
                         >
                           <div
-                            onClick={() => handleVariantClick(character, v.id)}
+                            onClick={() => handleVariantBodyClick(character, v.id)}
                             className="flex-1 flex items-center gap-2 p-2 cursor-pointer hover:bg-blue-50 rounded-l min-w-0"
-                            title={`Edit variant: ${v.name}`}
+                            title={selectionMode ? `Select ${character.displayName || character.name}` : `Edit variant: ${v.name}`}
                           >
                             <span
                               className="text-gray-400 flex-shrink-0 text-sm"
