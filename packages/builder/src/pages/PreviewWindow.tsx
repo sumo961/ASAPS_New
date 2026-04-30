@@ -773,6 +773,15 @@ export const PreviewWindow: React.FC = () => {
         newStory.setTraitModulations(previewData.traitModulations);
       }
 
+      // Register characters on the runtime story. Without this,
+      // getMergedCharacter / variant lookups can't find Alex (or any
+      // character with variants), so setCharacterVariant fires but the
+      // merged character is undefined and seedCharacterAffectFor early-
+      // returns — leaving the variant's initialMood unapplied.
+      if (previewData.characters && previewData.characters.length > 0) {
+        newStory.setCharacters(previewData.characters as any[]);
+      }
+
       // Reconstruct beats from serialized data
       for (const beatData of storyData.beats) {
         if (beatData.type === 'panorama') {
