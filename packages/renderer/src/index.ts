@@ -4,6 +4,16 @@ export { EditableReactRenderer, type EditCallbacks } from './renderers/EditableR
 export { WebRenderer } from './renderers/WebRenderer';
 export type { RenderContext, RenderOptions, RenderTheme, AssetCache } from './types';
 
+// Mood-pad HUD widget — exported so PreviewWindow / standalone player
+// can mount screen-docked HUDs as a top-level overlay independent of
+// stage character placement.
+export {
+  CharacterMoodFrame,
+  DEFAULT_MOOD_FRAME_CONFIG,
+  type MoodFrameConfig as RendererMoodFrameConfig,
+  type MoodFrameEmotionMarker,
+} from './components/CharacterMoodFrame';
+
 // Export from components/index for cleaner resolution
 export {
   PositionedBeatView,

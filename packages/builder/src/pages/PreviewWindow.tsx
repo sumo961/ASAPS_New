@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMe
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff } from 'lucide-react';
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
-import { ReactRenderer, getAudioManager } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
 import type { PreviewMessage, SerializedStoryData } from '../services/PreviewWindowManager';
@@ -2709,6 +2709,45 @@ export const PreviewWindow: React.FC = () => {
             >
               {/* Renderer container */}
               <div ref={containerRef} className="absolute inset-0" />
+
+              {/* Mood-pad HUD overlay — top-level layer for screen-docked
+                  HUDs that don't depend on the character being placed on
+                  stage as a character-type location. Anchored-to-character
+                  HUDs are still mounted from PositionedBeatView when the
+                  character is on stage. The `debugInfo` state already
+                  subscribes to characterMoodChanged events, so this layer
+                  re-renders whenever mood updates. */}
+              {(() => {
+                const ctx = engineRef.current?.getContext();
+                if (!ctx) return null;
+                const chars = previewDataRef.current?.characters;
+                const palette = previewDataRef.current?.emotionPalette;
+                if (!chars) return null;
+                // Just touch debugInfo so the linter / React knows we
+                // depend on it for re-renders. Read is cheap.
+                void debugInfo;
+                return (
+                  <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 }}>
+                    {chars.map((c) => {
+                      const mf: any = (c as any).moodFrame;
+                      if (!mf || !mf.enabled || mf.dockMode !== 'screen') return null;
+                      const mood = ctx.getCharacterMood(c.id);
+                      return (
+                        <CharacterMoodFrame
+                          key={`mood-hud-${c.id}`}
+                          valence={mood.valence}
+                          arousal={mood.arousal}
+                          config={mf}
+                          palette={palette}
+                          characterPosition={{ x: 0, y: 0 }}
+                          characterDimensions={{ width: 0, height: 0 }}
+                          containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               {/* Waiting to start overlay - shows when navigated to a beat but not yet started */}
               {isWaitingToStart && (
                 <div

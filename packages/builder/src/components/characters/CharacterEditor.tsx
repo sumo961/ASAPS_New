@@ -2019,14 +2019,68 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
       }
       setEditedCharacter({ ...editedCharacter, ...updates });
     };
+    /**
+     * Adding a variant migrates base personality / mood / sentiments /
+     * dossierPolicy onto the new variant so the author doesn't lose work.
+     * Two cases:
+     *   - First variant ever: clone base values into the new variant AND
+     *     clear those fields from the base record. From this point on,
+     *     personality is authored per-variant. The base owns identity
+     *     (id, role, name, sprite sheet, states, counters, inventory,
+     *     goals, HUD config) but not personality state.
+     *   - Subsequent variants: clone from the FIRST variant's values so
+     *     authors start from a known persona and edit deltas, rather
+     *     than facing a blank form. They can still clear individual
+     *     overrides if they want a different baseline.
+     */
     const addVariant = () => {
       let suffix = variants.length + 1;
       while (variants.find((v) => v.id === `variant${suffix}`)) suffix += 1;
       const id = `variant${suffix}`;
-      setEditedCharacter({
-        ...editedCharacter,
-        variants: [...variants, { id, name: id }],
-      });
+
+      // Source values to seed the new variant from.
+      const isFirst = variants.length === 0;
+      const source = isFirst
+        ? {
+            traits: editedCharacter.traits,
+            initialMood: editedCharacter.initialMood,
+            initialSentiments: editedCharacter.initialSentiments,
+            dossierPolicy: editedCharacter.dossierPolicy,
+          }
+        : {
+            traits: variants[0].traits,
+            initialMood: variants[0].initialMood,
+            initialSentiments: variants[0].initialSentiments,
+            dossierPolicy: variants[0].dossierPolicy,
+          };
+
+      const newVariant = {
+        id,
+        name: id,
+        ...(source.traits ? { traits: { ...source.traits } } : {}),
+        ...(source.initialMood ? { initialMood: { ...source.initialMood } } : {}),
+        ...(source.initialSentiments && source.initialSentiments.length > 0
+          ? { initialSentiments: source.initialSentiments.map((s) => ({ ...s })) }
+          : {}),
+        ...(source.dossierPolicy ? { dossierPolicy: source.dossierPolicy } : {}),
+      };
+
+      const updates: Partial<Character> = {
+        variants: [...variants, newVariant],
+      };
+
+      // First-variant migration: clear base personality fields so they
+      // don't shadow the variant overlay at runtime, and so the editor
+      // hides them cleanly. Only run on the first variant — subsequent
+      // adds leave the base alone (it's already cleared).
+      if (isFirst) {
+        updates.traits = undefined;
+        updates.initialMood = undefined;
+        updates.initialSentiments = undefined;
+        updates.dossierPolicy = undefined;
+      }
+
+      setEditedCharacter({ ...editedCharacter, ...updates });
     };
     const setDefaultVariant = (variantId: string | undefined) => {
       setEditedCharacter({ ...editedCharacter, defaultVariantId: variantId });
@@ -2039,9 +2093,25 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
       updateVariant(i, { traits: { ...archetype.traits } });
     };
 
+    // When the character has variants, personality / initial mood / initial
+    // sentiments / dossier policy are authored *per variant* — variants
+    // become the unit of persona. The parent sections collapse to a single
+    // banner explaining where to edit, and the Variants section grows
+    // inline editors for each variant's full personality slice.
+    const hasVariants = variants.length > 0;
+
     return (
       <div className="space-y-6">
+        {/* When variants exist, surface a one-line explainer at the top so
+            authors don't hunt for the (now-hidden) parent sections. */}
+        {hasVariants && (
+          <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800">
+            This character has <span className="font-semibold">{variants.length}</span> variant{variants.length === 1 ? '' : 's'}. Personality, initial mood, and sentiments are authored per variant below — the base character only owns identity (name, sprite sheet, states, counters, inventory) and shared goals.
+          </div>
+        )}
+
         {/* Personality — Big Five + author-defined traits */}
+        {!hasVariants && (
         <div className="bg-white border rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -2193,8 +2263,10 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             </div>
           )}
         </div>
+        )}
 
         {/* Mood — 2D affect at story start */}
+        {!hasVariants && (
         <div className="bg-white border rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -2287,8 +2359,10 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             )}
           </div>
         </div>
+        )}
 
         {/* Initial sentiments — directed feelings at story start */}
+        {!hasVariants && (
         <div className="bg-white border rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -2353,8 +2427,13 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             </div>
           )}
         </div>
+        )}
 
-        {/* Dossier policy — Mode A re-anchor vs Mode B reflection memory */}
+        {/* Dossier policy — Mode A re-anchor vs Mode B reflection memory.
+            Stays at parent level when no variants exist; hidden once variants
+            take over personality (each variant overrides dossierPolicy
+            individually if needed). */}
+        {!hasVariants && (
         <div className="bg-white border rounded-lg p-4">
           <h3 className="text-sm font-medium flex items-center gap-2">
             <Heart className="w-4 h-4" />
@@ -2394,8 +2473,13 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             </label>
           </div>
         </div>
+        )}
 
-        {/* Goals — authored, status flips at runtime, fires GAMYGDALA-style emotions */}
+        {/* Goals — authored, status flips at runtime, fires GAMYGDALA-style emotions.
+            Goals stay at the character level even when variants exist —
+            "Alex's goal is the same regardless of variant." If a project
+            needs variant-specific goals, that's a future runtime feature
+            (variant-aware getCharacterGoals merge). */}
         <div className="bg-white border rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -2587,15 +2671,131 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                           </button>
                         )}
                       </div>
+                      {/* Inline Big Five trait sliders. Edit per axis when
+                          the archetype dropdown above only got you 80% of
+                          the way there. */}
                       {variant.traits && (
-                        <div className="text-[10px] text-gray-500 font-mono px-2">
-                          O {(variant.traits.openness ?? 0).toFixed(2)} ·
-                          {' '}C {(variant.traits.conscientiousness ?? 0).toFixed(2)} ·
-                          {' '}E {(variant.traits.extraversion ?? 0).toFixed(2)} ·
-                          {' '}A {(variant.traits.agreeableness ?? 0).toFixed(2)} ·
-                          {' '}N {(variant.traits.neuroticism ?? 0).toFixed(2)}
+                        <div className="space-y-1 px-2 pb-1">
+                          {(DEFAULT_TRAIT_NAMES as readonly string[]).map((traitName) => {
+                            const value = variant.traits?.[traitName] ?? 0.5;
+                            return (
+                              <div key={traitName} className="flex items-center gap-2 text-[10px]">
+                                <span className="w-24 text-gray-600 capitalize flex-shrink-0">{traitName}</span>
+                                <input
+                                  type="range"
+                                  min={0} max={1} step={0.05}
+                                  value={value}
+                                  onChange={(e) => {
+                                    const v = parseFloat(e.target.value);
+                                    updateVariant(i, {
+                                      traits: { ...(variant.traits || {}), [traitName]: v },
+                                    });
+                                  }}
+                                  className="flex-1"
+                                />
+                                <span className="font-mono text-gray-700 w-10 text-right">{value.toFixed(2)}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
+
+                      {/* Inline initial mood per variant — Russell's
+                          circumplex pad, sized down for the inline form. */}
+                      <div className="border-t pt-2 mt-2">
+                        <div className="text-[11px] text-gray-600 mb-1.5">Initial mood (when this variant is active):</div>
+                        <div className="flex justify-center">
+                          <MoodPad
+                            valence={variant.initialMood?.valence ?? 0}
+                            arousal={variant.initialMood?.arousal ?? 0}
+                            palette={emotionPalette}
+                            size={180}
+                            onChange={({ valence, arousal }) => {
+                              updateVariant(i, {
+                                initialMood: { valence, arousal },
+                              });
+                            }}
+                            subtitle={variant.initialMood
+                              ? `${describeMoodAxis(variant.initialMood.valence, 'valence')}, ${describeMoodAxis(variant.initialMood.arousal, 'arousal')}`
+                              : 'neutral (click to set)'}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Inline initial sentiments per variant — same
+                          (target, emotion, strength) shape as the base
+                          editor, compact form. */}
+                      <div className="border-t pt-2 mt-2">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="text-[11px] text-gray-600">Initial sentiments:</div>
+                          <button
+                            onClick={() => {
+                              const next = [...(variant.initialSentiments || []), { toEntityRef: '', emotion: '', strength: 0 }];
+                              updateVariant(i, { initialSentiments: next });
+                            }}
+                            className="text-[10px] text-blue-600 hover:bg-blue-50 px-2 py-0.5 rounded"
+                          >
+                            + Add sentiment
+                          </button>
+                        </div>
+                        {(variant.initialSentiments || []).length === 0 ? (
+                          <div className="text-[10px] text-gray-400 italic">None.</div>
+                        ) : (
+                          <div className="space-y-1">
+                            {(variant.initialSentiments || []).map((s, sIdx) => (
+                              <div key={sIdx} className="flex items-center gap-1 text-[10px]">
+                                <input
+                                  type="text"
+                                  value={s.toEntityRef}
+                                  onChange={(e) => {
+                                    const next = [...(variant.initialSentiments || [])];
+                                    next[sIdx] = { ...s, toEntityRef: e.target.value };
+                                    updateVariant(i, { initialSentiments: next });
+                                  }}
+                                  className="px-1 py-0.5 border rounded text-[10px]"
+                                  style={{ width: 80 }}
+                                  placeholder="toward"
+                                />
+                                <input
+                                  type="text"
+                                  value={s.emotion}
+                                  onChange={(e) => {
+                                    const next = [...(variant.initialSentiments || [])];
+                                    next[sIdx] = { ...s, emotion: e.target.value };
+                                    updateVariant(i, { initialSentiments: next });
+                                  }}
+                                  className="px-1 py-0.5 border rounded text-[10px]"
+                                  style={{ width: 70 }}
+                                  placeholder="emotion"
+                                />
+                                <input
+                                  type="number"
+                                  step={0.1}
+                                  min={-1} max={1}
+                                  value={s.strength}
+                                  onChange={(e) => {
+                                    const next = [...(variant.initialSentiments || [])];
+                                    next[sIdx] = { ...s, strength: parseFloat(e.target.value) || 0 };
+                                    updateVariant(i, { initialSentiments: next });
+                                  }}
+                                  className="px-1 py-0.5 border rounded text-[10px]"
+                                  style={{ width: 50 }}
+                                />
+                                <button
+                                  onClick={() => {
+                                    const next = (variant.initialSentiments || []).filter((_, j) => j !== sIdx);
+                                    updateVariant(i, { initialSentiments: next.length > 0 ? next : undefined });
+                                  }}
+                                  className="text-gray-400 hover:text-red-600 text-xs flex-shrink-0"
+                                  title="Remove"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
                       {/* Per-variant portrait override. Variants share the
                           base character's sprite sheet / states by design —
