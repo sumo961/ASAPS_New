@@ -2763,7 +2763,10 @@ export const PreviewWindow: React.FC = () => {
                       const variants = (c as any).variants;
                       if (variants && variants.length > 0) {
                         const activeVariant = (ctx as any).getActiveCharacterVariant?.(c.id);
+                        console.log('[HUD-overlay-gate]', c.id, 'variants=', variants.length, 'activeVariant=', activeVariant, 'hideHUD=', !activeVariant);
                         if (!activeVariant) return null;
+                      } else {
+                        console.log('[HUD-overlay-gate]', c.id, 'no variants — show HUD');
                       }
                       // Use the merged character (variant overlay applied)
                       // so the HUD shows the variant-specific name /
