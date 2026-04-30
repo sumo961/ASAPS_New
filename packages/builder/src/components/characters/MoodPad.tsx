@@ -124,9 +124,9 @@ export const MoodPad: React.FC<MoodPadProps> = ({
             <g key={e.name}>
               <circle cx={p.x} cy={p.y} r={1.6} fill="#a78bfa" opacity={0.85} />
               <text
-                x={p.x + 2.3}
-                y={p.y + 1.1}
-                fontSize={3.3}
+                x={p.x + 2.6}
+                y={p.y + 1.4}
+                fontSize={4}
                 fill="#6d28d9"
                 style={{ pointerEvents: 'none' }}
               >
@@ -139,10 +139,10 @@ export const MoodPad: React.FC<MoodPadProps> = ({
         {/* Axis labels */}
         {showLabels && (
           <>
-            <text x={50} y={6}  textAnchor="middle" fontSize={3.6} fill="#6b7280">excited</text>
-            <text x={50} y={97} textAnchor="middle" fontSize={3.6} fill="#6b7280">calm</text>
-            <text x={3}  y={51} textAnchor="start"  fontSize={3.6} fill="#6b7280">sad</text>
-            <text x={97} y={51} textAnchor="end"    fontSize={3.6} fill="#6b7280">happy</text>
+            <text x={50} y={6.5} textAnchor="middle" fontSize={4.5} fill="#6b7280">excited</text>
+            <text x={50} y={97}  textAnchor="middle" fontSize={4.5} fill="#6b7280">calm</text>
+            <text x={3}  y={51.5} textAnchor="start" fontSize={4.5} fill="#6b7280">sad</text>
+            <text x={97} y={51.5} textAnchor="end"   fontSize={4.5} fill="#6b7280">happy</text>
           </>
         )}
 

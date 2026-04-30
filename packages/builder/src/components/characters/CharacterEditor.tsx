@@ -2058,15 +2058,16 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             )}
           </div>
 
-          <div className="flex items-start gap-5">
-            {/* 2D mood pad — Russell's circumplex. Click / drag to set the
-                starting mood. Emotion markers (when the palette is wired
-                in) show where each emotion sits in mood-space. */}
+          {/* 2D mood pad — Russell's circumplex. Pad is the primary picker
+              (click / drag); sliders below are the numeric fine-tune. The
+              pad is sized large enough that emotion-marker labels stay
+              comfortably readable. */}
+          <div className="flex justify-center mb-4">
             <MoodPad
               valence={mood.valence}
               arousal={mood.arousal}
               palette={emotionPalette}
-              size={180}
+              size={320}
               onChange={({ valence, arousal }) => {
                 setEditedCharacter({
                   ...editedCharacter,
@@ -2077,57 +2078,54 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 ? `${describeMoodAxis(mood.valence, 'valence')}, ${describeMoodAxis(mood.arousal, 'arousal')}`
                 : 'neutral'}
             />
+          </div>
 
-            {/* Slider fine-tune controls. Pad is the primary input but the
-                sliders give precise numeric control when the author already
-                knows the value they want. */}
-            <div className="flex-1 space-y-3">
-              <div>
-                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                  <span>← sad</span>
-                  <span className="font-medium">Valence</span>
-                  <span>happy →</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={-1} max={1} step={0.05}
-                    value={mood.valence}
-                    onChange={(e) => updateMood('valence', parseFloat(e.target.value))}
-                    className="flex-1"
-                  />
-                  <span className="font-mono text-xs w-12 text-right text-gray-700">
-                    {mood.valence >= 0 ? '+' : ''}{mood.valence.toFixed(2)}
-                  </span>
-                </div>
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                <span>← sad</span>
+                <span className="font-medium">Valence</span>
+                <span>happy →</span>
               </div>
-
-              <div>
-                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                  <span>← calm</span>
-                  <span className="font-medium">Arousal</span>
-                  <span>excited →</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={-1} max={1} step={0.05}
-                    value={mood.arousal}
-                    onChange={(e) => updateMood('arousal', parseFloat(e.target.value))}
-                    className="flex-1"
-                  />
-                  <span className="font-mono text-xs w-12 text-right text-gray-700">
-                    {mood.arousal >= 0 ? '+' : ''}{mood.arousal.toFixed(2)}
-                  </span>
-                </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={-1} max={1} step={0.05}
+                  value={mood.valence}
+                  onChange={(e) => updateMood('valence', parseFloat(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="font-mono text-xs w-12 text-right text-gray-700">
+                  {mood.valence >= 0 ? '+' : ''}{mood.valence.toFixed(2)}
+                </span>
               </div>
-
-              {emotionPalette && emotionPalette.length > 0 && (
-                <div className="text-[10px] text-gray-500">
-                  Purple markers on the pad show where each project emotion sits in mood-space — they're the same weights the runtime uses when an emotion fires.
-                </div>
-              )}
             </div>
+
+            <div>
+              <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                <span>← calm</span>
+                <span className="font-medium">Arousal</span>
+                <span>excited →</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={-1} max={1} step={0.05}
+                  value={mood.arousal}
+                  onChange={(e) => updateMood('arousal', parseFloat(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="font-mono text-xs w-12 text-right text-gray-700">
+                  {mood.arousal >= 0 ? '+' : ''}{mood.arousal.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {emotionPalette && emotionPalette.length > 0 && (
+              <div className="text-xs text-gray-500">
+                Purple markers on the pad show where each project emotion sits in mood-space — they're the same weights the runtime uses when an emotion fires.
+              </div>
+            )}
           </div>
         </div>
 
