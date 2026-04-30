@@ -12,3 +12,9 @@ export {
   type DefaultTraitName,
   type TraitEmotionWeight,
 } from './PersonalityTraits';
+export {
+  DEFAULT_PERSONALITY_ARCHETYPES,
+  findPersonalityArchetype,
+  type PersonalityArchetype,
+  type ArchetypeSelfSentiment,
+} from './PersonalityArchetypes';

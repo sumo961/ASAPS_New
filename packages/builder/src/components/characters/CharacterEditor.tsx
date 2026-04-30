@@ -30,7 +30,7 @@ import {
   Heart
 } from 'lucide-react';
 import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG, InventoryFrameConfig, DEFAULT_INVENTORY_FRAME_CONFIG } from '../../types/character';
-import { describeMoodAxis, DEFAULT_TRAIT_NAMES, DEFAULT_TRAIT_VALUES, TRAIT_DESCRIPTIONS } from '@asaps/core';
+import { describeMoodAxis, DEFAULT_TRAIT_NAMES, DEFAULT_TRAIT_VALUES, TRAIT_DESCRIPTIONS, DEFAULT_PERSONALITY_ARCHETYPES, findPersonalityArchetype } from '@asaps/core';
 import { MoodPad } from './MoodPad';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
 import { useTranslationState } from '../../contexts/TranslationContext';
@@ -1899,6 +1899,39 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
       });
     };
 
+    /**
+     * Apply a personality archetype: replaces Big Five traits with the
+     * preset's vector (custom author-named traits are preserved). Self-
+     * sentiments from the preset are appended to initialSentiments using
+     * the character's own id as the toEntityRef — existing sentiments
+     * toward self are deduplicated by emotion (overwritten if the preset
+     * defines the same emotion).
+     */
+    const applyArchetype = (archetypeId: string) => {
+      const archetype = findPersonalityArchetype(archetypeId);
+      if (!archetype) return;
+      // Preserve any author-defined custom traits; only the Big Five
+      // canonical names are replaced.
+      const next = { ...traits, ...archetype.traits };
+      const updates: Partial<Character> = { traits: next };
+
+      if (archetype.selfSentiments && archetype.selfSentiments.length > 0) {
+        const selfRef = editedCharacter.id;
+        const existing = (editedCharacter.initialSentiments || []).filter(
+          (s) => !(s.toEntityRef === selfRef && archetype.selfSentiments!.some((seed) => seed.emotion === s.emotion)),
+        );
+        updates.initialSentiments = [
+          ...existing,
+          ...archetype.selfSentiments.map((seed) => ({
+            toEntityRef: selfRef,
+            emotion: seed.emotion,
+            strength: seed.strength,
+          })),
+        ];
+      }
+      setEditedCharacter({ ...editedCharacter, ...updates });
+    };
+
     // Step 7 — dossier policy fork. Default `'reAnchor'` (Mode A) means the
     // dossier rebuilds from structured state every turn — no drift, no
     // accumulated reflections. `'reflection'` (Mode B) accumulates per-turn
@@ -1968,9 +2001,38 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             )}
           </div>
 
+          {/* Archetype dropdown — fast path for picking a coherent profile.
+              Shown alongside the empty-state hint and at the top of the
+              populated trait list. Selecting overwrites Big Five values
+              and (when defined) appends self-directed sentiments. */}
+          <div className="flex items-center gap-2 mb-3">
+            <label htmlFor="archetype-select" className="text-xs text-gray-600 whitespace-nowrap">
+              Load archetype
+            </label>
+            <select
+              id="archetype-select"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  applyArchetype(e.target.value);
+                  e.target.value = '';  // reset so the same archetype can be re-applied
+                }
+              }}
+              className="text-xs border rounded px-2 py-1 bg-white"
+              title="Replace Big Five trait values with a preset profile. Custom traits and existing sentiments toward other characters are preserved."
+            >
+              <option value="">— pick a preset —</option>
+              {DEFAULT_PERSONALITY_ARCHETYPES.map((a) => (
+                <option key={a.id} value={a.id} title={a.description}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {Object.keys(traits).length === 0 ? (
             <div className="text-xs text-gray-400 italic py-3">
-              No traits set. This character behaves like a neutral one — emotion deltas pass through unchanged.
+              No traits set. This character behaves like a neutral one — emotion deltas pass through unchanged. Pick an archetype above or click "Add Big Five" to start tuning.
             </div>
           ) : (
             <div className="space-y-3">
