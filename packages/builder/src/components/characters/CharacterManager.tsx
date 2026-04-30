@@ -478,51 +478,68 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                         assets,
                       ) || baseImageUrl;
                       const isDefault = character.defaultVariantId === v.id;
+                      // Click on the body opens the editor focused on the
+                      // variant; the action buttons sit as siblings outside
+                      // the clickable region so there's no nested-handler
+                      // race / propagation pitfall. Buttons are always
+                      // visible (not hover-fade) so the affordance is
+                      // discoverable even on touch devices.
                       return (
                         <div
                           key={v.id}
-                          onClick={() => handleVariantClick(character, v.id)}
-                          className="group/variant flex items-center gap-2 p-2 bg-white rounded border border-gray-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-colors"
-                          title={`Edit variant: ${v.name}${isDefault ? ' (default at story start)' : ''}`}
+                          className="flex items-stretch bg-white rounded border border-gray-200 hover:border-blue-400 transition-colors"
+                          title={isDefault ? 'Default at story start' : undefined}
                         >
-                          <span
-                            className="text-gray-400 flex-shrink-0 text-sm"
-                            title={`Variant of ${character.displayName || character.name}`}
-                          >↳</span>
-                          {variantImageUrl ? (
-                            <img
-                              src={variantImageUrl}
-                              alt={v.name}
-                              className="w-8 h-8 rounded object-cover flex-shrink-0 border border-gray-200"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded bg-gray-100 flex-shrink-0 flex items-center justify-center text-[9px] text-gray-400">
-                              no img
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium truncate">
-                              {v.displayName || v.name}
-                              {isDefault && (
-                                <span className="ml-1 text-[9px] text-blue-600 font-normal">(default)</span>
+                          <div
+                            onClick={() => handleVariantClick(character, v.id)}
+                            className="flex-1 flex items-center gap-2 p-2 cursor-pointer hover:bg-blue-50 rounded-l min-w-0"
+                            title={`Edit variant: ${v.name}`}
+                          >
+                            <span
+                              className="text-gray-400 flex-shrink-0 text-sm"
+                              title={`Variant of ${character.displayName || character.name}`}
+                            >↳</span>
+                            {variantImageUrl ? (
+                              <img
+                                src={variantImageUrl}
+                                alt={v.name}
+                                className="w-8 h-8 rounded object-cover flex-shrink-0 border border-gray-200"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-gray-100 flex-shrink-0 flex items-center justify-center text-[9px] text-gray-400">
+                                no img
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium truncate">
+                                {v.displayName || v.name}
+                                {isDefault && (
+                                  <span className="ml-1 text-[9px] text-blue-600 font-normal">(default)</span>
+                                )}
+                              </div>
+                              {v.description && (
+                                <div className="text-[10px] text-gray-500 truncate">{v.description}</div>
                               )}
                             </div>
-                            {v.description && (
-                              <div className="text-[10px] text-gray-500 truncate">{v.description}</div>
-                            )}
                           </div>
-                          {/* Edit / delete affordances — revealed on row hover. */}
-                          <div className="flex items-center gap-1 opacity-0 group-hover/variant:opacity-100 transition-opacity flex-shrink-0">
+                          {/* Action buttons — outside the clickable body so
+                              they get clean event handling without needing
+                              stopPropagation tricks. Always visible (not
+                              hover-only) so they're discoverable on touch
+                              devices and don't depend on cursor position. */}
+                          <div className="flex items-center gap-0.5 px-1 border-l border-gray-100 bg-gray-50 rounded-r flex-shrink-0">
                             <button
-                              onClick={(e) => { e.stopPropagation(); handleVariantClick(character, v.id); }}
-                              className="p-1 text-gray-500 hover:text-blue-600 hover:bg-white rounded"
+                              type="button"
+                              onClick={() => handleVariantClick(character, v.id)}
+                              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-white rounded"
                               title={`Edit ${v.name}`}
                             >
                               <Pencil className="w-3 h-3" />
                             </button>
                             <button
-                              onClick={(e) => { e.stopPropagation(); handleVariantRemove(character, v.id); }}
-                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-white rounded"
+                              type="button"
+                              onClick={() => handleVariantRemove(character, v.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-white rounded"
                               title={`Remove ${v.name}`}
                             >
                               <X className="w-3 h-3" />
