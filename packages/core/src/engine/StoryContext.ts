@@ -1874,14 +1874,21 @@ export class StoryContext extends EventEmitter {
       | undefined;
     if (!merged) return;
     if (merged.initialMood && !this.state.characterMoods[charId]) {
-      this.state.characterMoods[charId] = {
+      const next = {
         valence: StoryContext.clampUnit(merged.initialMood.valence ?? 0),
         arousal: StoryContext.clampUnit(merged.initialMood.arousal ?? 0),
       };
+      this.state.characterMoods[charId] = next;
+      // Emit so HUDs / panels subscribed via characterMoodChanged
+      // re-render. Otherwise a runtime variant switch (which wipes the
+      // mood map and reseeds here) would change state silently and the
+      // overlay would keep showing the prior values.
+      this.emit('characterMoodChanged', { characterRef: charId, mood: next, previous: { valence: 0, arousal: 0 } });
     }
     if (merged.initialSentiments && merged.initialSentiments.length > 0) {
       if (!this.state.characterSentiments[charId]) this.state.characterSentiments[charId] = [];
       const existing = this.state.characterSentiments[charId];
+      let seededAny = false;
       for (const seed of merged.initialSentiments) {
         if (!seed?.toEntityRef || !seed?.emotion) continue;
         const present = existing.some(
@@ -1894,7 +1901,11 @@ export class StoryContext extends EventEmitter {
             strength: StoryContext.clampUnit(seed.strength ?? 0),
             createdAt: Date.now(),
           });
+          seededAny = true;
         }
+      }
+      if (seededAny) {
+        this.emit('characterSentimentChanged', { characterRef: charId });
       }
     }
   }

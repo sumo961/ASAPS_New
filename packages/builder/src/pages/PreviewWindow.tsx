@@ -1187,6 +1187,14 @@ export const PreviewWindow: React.FC = () => {
         }
         const ctx = engineRef.current?.getContext();
         if (!ctx) return null;
+        // Hide HUD when the character has variants but none has been
+        // chosen yet — keep the pre-picker scenes uncluttered and signal
+        // that the persona is unsettled.
+        const variants = (character as any).variants;
+        if (variants && variants.length > 0) {
+          const activeVariant = (ctx as any).getActiveCharacterVariant?.(character.id);
+          if (!activeVariant) return null;
+        }
         const mood = ctx.getCharacterMood(characterId);
         const merged: any = (ctx as any).getMergedCharacter?.(characterId) || character;
         const portraitAsset = merged.portrait?.assetId
@@ -2739,6 +2747,15 @@ export const PreviewWindow: React.FC = () => {
                     {chars.map((c) => {
                       const mf: any = (c as any).moodFrame;
                       if (!mf || !mf.enabled || mf.dockMode !== 'screen') return null;
+                      // If the character has variants, hide the HUD until
+                      // an active variant has been chosen — this keeps the
+                      // pre-picker title screens clean and signals to the
+                      // player that the persona hasn't been settled yet.
+                      const variants = (c as any).variants;
+                      if (variants && variants.length > 0) {
+                        const activeVariant = (ctx as any).getActiveCharacterVariant?.(c.id);
+                        if (!activeVariant) return null;
+                      }
                       // Use the merged character (variant overlay applied)
                       // so the HUD shows the variant-specific name /
                       // portrait when a variant is active.
