@@ -35,6 +35,12 @@ interface ChoiceEffectsEditorProps {
   availableCounters: AvailableCounter[];
   availableVariables: AvailableVariable[];
   availableInventoryItems?: AvailableInventoryItem[];
+  /** Available characters in the project — used to populate the
+   *  target dropdown for affect-style effects (mood, sentiment,
+   *  emotion, reflection, goal, character variant). Optional so
+   *  hosts that don't have characters in scope can still use the
+   *  editor; the field falls back to a free-text input. */
+  availableCharacters?: ReadonlyArray<{ id: string; name?: string; displayName?: string }>;
   /** Hide inventory effect types (for pickProp which handles inventory inherently) */
   hideInventory?: boolean;
   compact?: boolean;
@@ -46,9 +52,26 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
   availableCounters,
   availableVariables,
   availableInventoryItems = [],
+  availableCharacters,
   hideInventory = false,
   compact = false,
 }) => {
+  // Build a dropdown-friendly options array from the available characters.
+  // The user-facing label is the display name (or the `name`/`id` fallback);
+  // the underlying value is always the stable Character.id, since that's
+  // what the runtime resolves against (free-text would silently break when
+  // the displayName is renamed or translated). The "id" is also surfaced
+  // as a small hint so authors learn the convention.
+  const characterOptions: DropdownOption[] = (availableCharacters || []).map((c) => ({
+    name: c.id,
+    displayName: c.displayName || c.name || c.id,
+  }));
+  // Always allow `player` as a sentinel target — many projects use it
+  // without a Character record (the runtime resolves it via getInventoryEntries
+  // and per-character buckets keyed by 'player').
+  if (!characterOptions.some((o) => o.name === 'player')) {
+    characterOptions.unshift({ name: 'player', displayName: 'Player' });
+  }
   const counterOptions: DropdownOption[] = availableCounters.map(c => ({
     name: c.name,
     displayName: c.displayName,
@@ -176,16 +199,30 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
 
           {/* Target field */}
           {isAffect ? (
-            // For affect effects, target = character (free-text input matching
-            // the existing character-ref string convention used elsewhere).
-            <input
-              type="text"
-              value={effect.target || ''}
-              onChange={(e) => updateEffect(index, { target: e.target.value })}
-              placeholder="character"
-              className="px-1.5 py-1 text-xs border rounded flex-shrink-0 w-24"
-              title="Character whose affect changes (id, name, or 'player')"
-            />
+            // Affect effects target a character — present a SmartNameDropdown
+            // backed by the project's actual character roster (plus the
+            // sentinel "player"). Falls back to a free-text input only when
+            // the host didn't pass `availableCharacters`, e.g. compact
+            // sub-editors that don't have the project state in scope.
+            characterOptions.length > 0 ? (
+              <SmartNameDropdown
+                value={effect.target || ''}
+                onChange={(val) => updateEffect(index, { target: val || '' })}
+                options={characterOptions}
+                placeholder="Character..."
+                noSelectionLabel="Select character..."
+                className="flex-shrink-0 min-w-[110px]"
+              />
+            ) : (
+              <input
+                type="text"
+                value={effect.target || ''}
+                onChange={(e) => updateEffect(index, { target: e.target.value })}
+                placeholder="character"
+                className="px-1.5 py-1 text-xs border rounded flex-shrink-0 w-24"
+                title="Character whose affect changes (id, name, or 'player')"
+              />
+            )
           ) : (
             <SmartNameDropdown
               value={effect.target || ''}

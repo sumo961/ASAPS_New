@@ -14,7 +14,8 @@ import {
   Upload,
   Users,
   Pencil,
-  Trash2
+  Trash2,
+  X,
 } from 'lucide-react';
 import { Character, CHARACTER_TEMPLATES } from '../../types/character';
 import { CharacterCard } from './CharacterCard';
@@ -230,6 +231,28 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
     selectCharacter(character.id);
     setFocusVariantId(variantId);
     setShowEditor(true);
+  };
+
+  // Remove a variant from a character. Confirms first because variants
+  // carry distinct trait / mood / portrait overrides that the author
+  // can't trivially recreate from memory. Also clears defaultVariantId
+  // when the removed variant was the default, so the runtime falls back
+  // to the base character cleanly.
+  const handleVariantRemove = (character: Character, variantId: string) => {
+    const variant = character.variants?.find((v) => v.id === variantId);
+    if (!variant) return;
+    const ok = confirm(
+      `Remove variant "${variant.name || variantId}" from ${character.displayName || character.name}?\n\nThe variant's overrides (traits, mood, portrait) will be lost. Other variants and the base character are unaffected.`,
+    );
+    if (!ok) return;
+    const nextVariants = (character.variants || []).filter((v) => v.id !== variantId);
+    const updated: Character = {
+      ...character,
+      variants: nextVariants.length > 0 ? nextVariants : undefined,
+      defaultVariantId: character.defaultVariantId === variantId ? undefined : character.defaultVariantId,
+      updatedAt: new Date().toISOString(),
+    };
+    onCharactersChange(characters.map((c) => (c.id === character.id ? updated : c)));
   };
 
   const handleCharacterRemove = (id: string) => {
@@ -459,7 +482,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                         <div
                           key={v.id}
                           onClick={() => handleVariantClick(character, v.id)}
-                          className="flex items-center gap-2 p-2 bg-white rounded border border-gray-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-colors"
+                          className="group/variant flex items-center gap-2 p-2 bg-white rounded border border-gray-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-colors"
                           title={`Edit variant: ${v.name}${isDefault ? ' (default at story start)' : ''}`}
                         >
                           <span
@@ -487,6 +510,23 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                             {v.description && (
                               <div className="text-[10px] text-gray-500 truncate">{v.description}</div>
                             )}
+                          </div>
+                          {/* Edit / delete affordances — revealed on row hover. */}
+                          <div className="flex items-center gap-1 opacity-0 group-hover/variant:opacity-100 transition-opacity flex-shrink-0">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleVariantClick(character, v.id); }}
+                              className="p-1 text-gray-500 hover:text-blue-600 hover:bg-white rounded"
+                              title={`Edit ${v.name}`}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleVariantRemove(character, v.id); }}
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-white rounded"
+                              title={`Remove ${v.name}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
                           </div>
                         </div>
                       );

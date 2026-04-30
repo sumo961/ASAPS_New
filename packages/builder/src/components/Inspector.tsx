@@ -2735,6 +2735,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 availableCounters={availableCounters}
                                 availableVariables={availableVariables}
                                 availableInventoryItems={availableInventoryItems}
+                                availableCharacters={characters}
                                 compact
                               />
                               <div className="mt-2 pt-2 border-t border-blue-200">
@@ -2943,6 +2944,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 availableCounters={availableCounters}
                                 availableVariables={availableVariables}
                                 availableInventoryItems={availableInventoryItems}
+                                availableCharacters={characters}
                                 compact
                               />
                               <div className="mt-2 pt-2 border-t border-blue-200">
@@ -3238,6 +3240,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               availableCounters={availableCounters}
                               availableVariables={availableVariables}
                               availableInventoryItems={availableInventoryItems}
+                              availableCharacters={characters}
                               hideInventory
                               compact
                             />

@@ -652,6 +652,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                           availableCounters={effectCounters}
                           availableVariables={effectVariables}
                           availableInventoryItems={effectInventoryItems}
+                          availableCharacters={characterObjects}
                           compact
                         />
                       </div>
