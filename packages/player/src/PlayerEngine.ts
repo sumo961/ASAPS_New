@@ -1003,8 +1003,8 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         if (!ctx) return null;
         // Hide HUD when character has variants but none has been chosen.
         if (character.variants && character.variants.length > 0) {
-          const activeVariant = (ctx as any).getActiveCharacterVariant?.(character.id);
-          if (!activeVariant) return null;
+          const explicit = (ctx as any).hasExplicitlySetVariant?.(character.id);
+          if (!explicit) return null;
         }
         const mood = ctx.getCharacterMood(character.id);
         const palette = (story as any)?.getEmotionPalette?.();

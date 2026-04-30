@@ -1196,13 +1196,13 @@ export const PreviewWindow: React.FC = () => {
         }
         const ctx = engineRef.current?.getContext();
         if (!ctx) return null;
-        // Hide HUD when the character has variants but none has been
-        // chosen yet — keep the pre-picker scenes uncluttered and signal
-        // that the persona is unsettled.
+        // Hide HUD until the player has explicitly picked a variant —
+        // engine-applied defaults from Character.defaultVariantId don't
+        // count, so the pre-picker scenes stay uncluttered.
         const variants = (character as any).variants;
         if (variants && variants.length > 0) {
-          const activeVariant = (ctx as any).getActiveCharacterVariant?.(character.id);
-          if (!activeVariant) return null;
+          const explicit = (ctx as any).hasExplicitlySetVariant?.(character.id);
+          if (!explicit) return null;
         }
         const mood = ctx.getCharacterMood(characterId);
         const merged: any = (ctx as any).getMergedCharacter?.(characterId) || character;
@@ -2760,10 +2760,16 @@ export const PreviewWindow: React.FC = () => {
                       // an active variant has been chosen — this keeps the
                       // pre-picker title screens clean and signals to the
                       // player that the persona hasn't been settled yet.
+                      // Gate on EXPLICIT pick (not engine-applied default
+                      // from Character.defaultVariantId), so the HUD stays
+                      // hidden until the player actually picks via the
+                      // picker beat. Even with a defaultVariantId set,
+                      // the flag is only true after a setCharacterVariant
+                      // Effect fires.
                       const variants = (c as any).variants;
                       if (variants && variants.length > 0) {
-                        const activeVariant = (ctx as any).getActiveCharacterVariant?.(c.id);
-                        if (!activeVariant) return null;
+                        const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
+                        if (!explicit) return null;
                       }
                       // Use the merged character (variant overlay applied)
                       // so the HUD shows the variant-specific name /

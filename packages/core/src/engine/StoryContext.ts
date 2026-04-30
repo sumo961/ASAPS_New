@@ -256,6 +256,16 @@ export interface TimelineEvent {
 
 export class StoryContext extends EventEmitter {
   private state: StoryState;
+  /**
+   * Per-character flag tracking whether the variant was explicitly chosen
+   * via `setActiveCharacterVariant` (i.e., a setCharacterVariant Effect or
+   * direct API call). Distinguishes explicit user pick from the
+   * default-variant auto-apply that runs in seedCharacterAffectFromStory.
+   * Reset on full reset() and selectiveReset({history:true}). Not
+   * persisted in the serialized state — variant *id* is, but "how it
+   * was set" is session-local.
+   */
+  private explicitVariantSet: Record<string, boolean> = {};
   private history: string[] = [];
   private choiceHistory: ChoiceRecord[] = [];
   private aiOutputHistory: AIOutputRecord[] = [];
@@ -875,6 +885,20 @@ export class StoryContext extends EventEmitter {
   }
 
   /**
+   * True iff the character's variant was explicitly chosen via a
+   * setCharacterVariant Effect or direct setActiveCharacterVariant call
+   * during this play. False when the active variant is just the engine-
+   * applied default from `Character.defaultVariantId`. Use to gate
+   * runtime UI ("HUD shows once the player has picked") on actual choice
+   * rather than authored default.
+   */
+  hasExplicitlySetVariant(charRef: string): boolean {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return false;
+    return !!this.explicitVariantSet[key];
+  }
+
+  /**
    * Merge the base character with whichever variant is currently active.
    * Falls back to the base record when no variant has been chosen. Used by
    * dossier rendering, trait modulation, mood seeding, etc. — anywhere a
@@ -906,6 +930,15 @@ export class StoryContext extends EventEmitter {
     const key = this.resolveCharRef(charRef);
     if (!key) return undefined;
     const previous = this.state.activeCharacterVariants[key];
+    // Mark this character's variant as explicitly chosen (not default-
+    // applied at startup). Used by HUD overlays that want to gate
+    // "is the persona settled?" on actual user choice rather than the
+    // engine-applied default — see hasExplicitlySetVariant().
+    if (variantId != null && variantId !== '') {
+      this.explicitVariantSet[key] = true;
+    } else {
+      delete this.explicitVariantSet[key];
+    }
     if (variantId == null || variantId === '') {
       delete this.state.activeCharacterVariants[key];
     } else {
@@ -1756,6 +1789,7 @@ export class StoryContext extends EventEmitter {
       visitedChoices: new Set(),
       timers: {}
     };
+    this.explicitVariantSet = {};
     this.history = [];
     this.choiceHistory = [];
     this.aiOutputHistory = [];
