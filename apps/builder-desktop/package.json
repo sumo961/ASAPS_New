@@ -1,6 +1,6 @@
 {
   "name": "@asaps/builder-desktop",
-  "version": "0.9.42",
+  "version": "0.9.43",
   "description": "ASAPS Desktop Builder - Native authoring tool for macOS and Windows",
   "author": "Hartmut Koenitz",
   "private": true,
@@ -48,12 +48,16 @@
       {
         "from": "dist-electron",
         "to": "dist-electron",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "builder",
         "to": "builder",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       "!node_modules/**/*.ts",
       "!node_modules/**/*.map"
