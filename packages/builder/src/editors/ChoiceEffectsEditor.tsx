@@ -6,6 +6,7 @@ import type { AvailableCounter } from '../hooks/useAvailableCountersAndVariables
 import type { AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
 import type { AvailableInventoryItem } from '../hooks/useAvailableCountersAndVariables';
 import { DEFAULT_EFFECT_TEMPLATES, findEffectTemplate } from './effectTemplates';
+import { summarizeChoiceEffects } from './summarizeChoiceEffects';
 
 type EffectType = Effect['type'];
 
@@ -515,6 +516,24 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
           ))}
         </select>
       </div>
+
+      {/* Live "what does this choice do?" summary — synthesises a one-line
+          reading of every effect in plain language. Updates on every value
+          change so authors can sanity-check that the numbers do what they
+          think. Empty when there's nothing to say (no meaningful deltas). */}
+      {(() => {
+        const summary = summarizeChoiceEffects(effects, availableCharacters);
+        if (!summary) return null;
+        return (
+          <div
+            className="text-[11px] text-gray-600 italic bg-blue-50/40 border-l-2 border-blue-200 px-2 py-1 mt-1 rounded-r"
+            title="Live reading of the cumulative effect of this choice — updates as you tweak values. The runtime applies these effects when the player selects this option."
+          >
+            <span className="not-italic text-blue-700 font-medium mr-1">→</span>
+            {summary}
+          </div>
+        );
+      })()}
     </div>
   );
 };
