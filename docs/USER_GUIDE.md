@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Version 0.9.43*
+*Last revised against build 0.9.43.94*
 
 ---
 
@@ -234,7 +234,7 @@ When you select a beat, the Inspector shows everything about it:
 The Inspector changes based on what you've selected. Select a Dialog Tree and you'll see choice options. Select a Video Beat and you'll see playback settings.
 
 ![Inspector Panel](images/05-inspector-panel.png)
-*The Inspector panel shows properties of the selected beat. (Note: this screenshot pre-dates v0.9.41 — the Speaker control is now a unified [Character combobox](#character-combobox) instead of a plain text dropdown.)*
+*The Inspector panel shows properties of the selected beat. The Speaker section uses a unified [Character combobox](#character-combobox) — pick a defined Character, type a free-text name, or leave blank for the narrator. The Dialog Tree Editor opens inline on dialog beats; click it to author choices, per-node speakers, and choice effects.*
 
 ## The Beat Palette (Right Side)
 
@@ -569,11 +569,12 @@ Set a variable to true/false or modify a counter value. This is how your story r
 Check something and go different directions based on the result. "If this, go here. Otherwise, go there."
 
 **Can Check:**
-- Variable values (is hasKey true?)
-- Counter comparisons (is gold > 100?)
+- Variable values (is `hasKey` true?)
+- Counter comparisons (is `gold > 100`?)
 - Inventory contents (does player have "Sword"?)
-- Visited beats (have they seen the secret room?)
 - Timer status (is the countdown active?)
+- Fictional time (is it past midnight in the story?)
+- **Character affect** (added in v0.9.43): mood, emotion intensity, trait value, sentiment toward another character, goal status, or which variant of a character is currently active
 
 **Example Logic:**
 ```
@@ -582,6 +583,10 @@ IF hasKey = true
 ELSE
   → Go to "Locked Door"
 ```
+
+The full set of checks and their per-form fields is documented in [Condition Beats](#condition-beats) further down.
+
+> **Looking for "has the player visited beat X?"** That check lives on a beat's [Requirements section](#condition-beats), not in the standalone Condition Beat dropdown. Open the Requirements panel, click **Add requirement**, and pick *Visited beat*.
 
 ---
 
@@ -845,7 +850,7 @@ Give your characters a face that appears alongside their dialog. Speaker portrai
 3. Scroll down to **Speaker Portrait**
 4. Upload a portrait image (square or near-square works best)
 
-To enable portraits globally, go to **Settings → Speaker Display** and check **Show speaker portraits**. You can also choose where portraits appear and how large they are — see [Speaker Display Settings](#speaker-display) for details.
+To enable portraits globally, go to **Settings → Effects → Speaker Display** and check **Show speaker portraits**. You can also choose where portraits appear and how large they are — see [Speaker Display Settings](#speaker-display) for details.
 
 **Tip:** Portraits are different from character appearances. Appearances are the full-body images placed on the visual stage; portraits are small face images shown in the text box during dialog.
 
@@ -1001,7 +1006,7 @@ Each variant card carries:
 - A 2D MoodPad and sentiment list specific to this variant.
 - A **portrait override** (optional) — leave empty to inherit the base portrait. Variants share the base character's sprite sheet, states, and animations; only the affect/persona slice and the portrait swap.
 
-To switch variants at runtime, drop a **`setCharacterVariant`** effect on a player choice (target = the character, value = the variant id). To branch on the active variant, use a Condition Check beat with the `characterVariant` operator (this operator is exposed via project file or the AI condition; the visual ConditionBeat editor surfaces classic variable / counter / inventory / timer / fictionalTime / visitedBeat — affect-aware operators are reachable via raw conditions on choices and the engine API).
+To switch variants at runtime, drop a **`setCharacterVariant`** effect on a player choice (target = the character, value = the variant id). To branch on the active variant, drop a Condition Check beat and pick **Active variant** from the **Character affect** group in the Condition Type dropdown — the editor will then ask you for the character and the variant id to compare against (cascading from the character's authored variants, with a free-text fallback when none have been authored yet). The runtime evaluates this branch the same way it evaluates "player has lantern" — it just checks a different slice of state.
 
 In the Character Manager the grid changes shape for characters with variants: instead of a single card you get a **grouped card** with a colored border (the parent's color), a parent header showing the display name and variant count, and one inner sub-card per variant.
 
@@ -1053,7 +1058,7 @@ When you fire an emotion via the `fireEmotion` effect or an Update Affect beat, 
 <a id="choice-effects-affect"></a>
 ### Affect-Aware Choice Effects
 
-Anywhere ASAPS lets you attach **Effects** to a player choice — Dialog Tree choices, Movement Choice destinations, dialog node entries — the dropdown now includes seven affect-aware effect types alongside the classic counter / variable / inventory ones:
+Anywhere ASAPS lets you attach **Effects** to a player choice — Dialog Tree choices, Movement Choice destinations, dialog node entries — the dropdown now includes six affect-aware effect types alongside the classic counter / variable / inventory ones:
 
 | Effect | What it does | Extra fields |
 |--------|--------------|--------------|
@@ -1080,11 +1085,13 @@ Assets are your media files—the images, sounds, and videos that bring your exp
 ### Managing Assets
 
 1. Click **Assets** in the header
-2. The Asset Manager opens with tabs for:
-   - **Images** - Backgrounds, characters, props, UI
-   - **Audio** - Music, sound effects, voice-over
-   - **Video** - Cutscenes, animations
-   - **Fonts** - Custom typography
+2. The Asset Manager opens with filter tabs across the top:
+   - **All Assets** — every asset in the project
+   - **Images** — backgrounds, characters, props, UI
+   - **Audio** — music, sound effects, voice-over
+   - **Videos** — cutscenes, animations
+   - **Fonts** — custom typography
+3. Below the tabs, an **Upload Files** button and a row of category shortcuts (Characters, Props, Backgrounds, Videos, Audio, Fonts) make it easy to drop files directly into the right bucket. **From URL** lets you reference web-hosted assets.
 
 ### Uploading Assets
 
@@ -1501,26 +1508,37 @@ Perfect for regression testing—create presets for critical game states and ver
 
 ## Debug Tools
 
-Click the **Debug** button in the header to open the Debug Panel. It has three tabs:
+Click the **Debug** button in the header to open the **Debug Tools** window. It opens in a separate browser/desktop window so you can keep your story canvas visible while you investigate. The window has three tabs:
 
-### Reachability Analysis
+### Reachability
 
-Finds beats that can never be reached -- orphaned content with no paths leading to it.
+![Debug Tools — Reachability tab](images/31-debug-reachability.png)
+*The Reachability tab shows total beats, how many are reachable from start, how many are orphaned, and any warnings detected. Click a beat to highlight it on the main flowchart.*
+
+Finds beats that can never be reached — orphaned content with no paths leading to it. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Clicking a beat in the list highlights it in the main builder flowchart.
 
 ### Path Analysis
 
-Traces all possible routes through your story:
-- Identifies dead ends
-- Shows branch points
-- Validates that all endings are reachable
+![Debug Tools — Path Analysis tab](images/32-debug-path-analysis.png)
+*The Path Analysis tab in Forward mode, showing every possible outcome from story start.*
 
-### Logic Validation
+Enumerates the possible journeys through your story. Three modes:
+- **Forward** — all outcomes reachable from the start.
+- **Tree** — the full branching tree as a hierarchy.
+- **Backward** — given a target ending, which paths lead to it.
 
-Checks for common errors:
-- Missing connections
-- References to undefined variables
-- Missing assets
-- Invalid conditions
+The summary shows *Outcomes*, *Total Paths*, *Unique Endings*, *Reachable Beats*, and how long the analysis took. Each outcome can be expanded to inspect the specific beat sequence and decision points. The query box at the top lets you filter by state ("`adult > 7`", "`has axe`", "`visits beat-123`") so you can ask, "show me only the paths where the player ends up with the axe."
+
+### Story Logic
+
+![Debug Tools — Story Logic tab](images/33-debug-story-logic.png)
+*The Story Logic tab, surfacing hub beats reachable from many paths.*
+
+Pattern-based validation that runs on the project's structure:
+- **Hub Beat Analysis** — beats reachable from multiple paths. Each hub gets a card with its incoming-path count and a reminder to check that the text doesn't assume a specific player state.
+- **Warnings / Info** — undefined variables, missing connections, unused counters, and similar logic issues.
+
+> Story Logic uses keyword pattern matching for now. AI-powered semantic analysis (where an LLM reads each hub beat in context and flags continuity issues) is on the roadmap — when an AI provider is configured, the panel offers richer warnings.
 
 ## Text-to-Speech (TTS)
 
@@ -1698,17 +1716,48 @@ As stories grow, organization becomes crucial.
 
 ## Condition Beats
 
-The Condition Beat provides branching logic—checking variables, counters, or visited beats and routing to different targets based on the result.
+The Condition Beat provides branching logic — checking variables, counters, timers, fictional time, inventory, or any character's affect state, and routing to different targets based on the result.
 
 ### What You Can Check
 
-- **Variables** - True/false flags (hasKey, metWizard)
-- **Counters** - Numeric comparisons (gold > 50)
-- **Visited Beats** - Whether the interactor has seen a specific beat
+The Condition Type dropdown groups the available checks into two families:
+
+**Classic checks** (the original ASAPS condition vocabulary):
+- **Variable** — true/false flags (`hasKey`, `metWizard`)
+- **Counter** / **Counter Compare** — numeric comparisons (`gold > 50`, `reputation == respect`)
+- **Inventory** — whether a character holds a named item, or how many copies
+- **Timer** — whether a named timer has expired or has time left
+- **Fictional Time** — compare the in-world clock to a target year/month/day/hour/minute
+
+**Character affect** (added in v0.9.43, exposed under the *Character affect* optgroup):
+- **Mood (axis ≷ value)** — branch on a character's valence or arousal, e.g. *"Alex's valence ≥ +0.3"*
+- **Emotion intensity ≷ value** — branch on how strongly a single emotion is firing, e.g. *"Alex's fear > 0.4"*
+- **Trait ≷ value** — branch on a Big Five trait (openness, conscientiousness, extraversion, agreeableness, neuroticism), respecting any active variant override, e.g. *"Alex's neuroticism ≥ 0.6"*
+- **Sentiment toward target ≷ value** — branch on how one character feels about another (optionally summed across all emotions, or scoped to a single emotion like *trust*)
+- **Goal status** — branch on whether a character's named goal is `open`, `met`, `failed`, or `abandoned`
+- **Active variant** — branch on which authored variant of a character is currently in play (e.g. anxious-introvert vs. free-spirit)
+
+![Condition Type dropdown showing the Character affect group](images/26-condition-type-dropdown-affect.png)
+*The Condition Type dropdown. Classic checks at the top, the new Character affect group at the bottom. The runtime evaluates these the same way it evaluates "player has lantern" — it just checks a different slice of state.*
+
+### Affect-Aware Forms
+
+Each affect operator renders its own form so you can never enter a meaningless combination. The forms cascade — pick the character first and the goal / variant / trait dropdowns populate from that character's authored content, with a free-text fallback when none has been authored yet.
+
+![Condition Beat editor with mood form populated](images/27-condition-mood-form.png)
+*Mood condition: pick the character, the axis (valence or arousal), the operator, and a value in the range -1 to +1.*
+
+![Condition Beat editor with trait form populated](images/28-condition-trait-form.png)
+*Trait condition: the Trait Name dropdown lists exactly the traits this character has authored — including any traits a variant has overridden. The value is in the range 0 to 1.*
+
+![Condition Beat editor with goal-status form](images/29-condition-goal-form.png)
+*Goal status condition: pick the character, then the goal id (cascading from the character's authored goals), then `==` / `!=` against `open`, `met`, `failed`, or `abandoned`. If the character has no authored goals yet the dropdown becomes a free-text input so you can scaffold the condition before authoring the goal.*
+
+> **Why the affect-aware operators matter.** They let you wire reactivity that *responds to who Alex has become this run* rather than to flags you had to remember to set. A scene-end beat can ask "is Alex lifted right now?" without you having to manually maintain a `currentlyLifted` boolean. Combined with `Update Affect` beats earlier in the path, you get an emergent emotional shape that's much closer to how memory and feeling actually work in human relationships.
 
 ### Compound Conditions
 
-For complex logic requiring multiple checks, chain Condition Beats together:
+For complex logic requiring multiple checks, chain Condition Beats together — each beat handles one comparison, and you wire them into a decision tree:
 
 ```
 [Check hasKey]
@@ -1718,13 +1767,24 @@ For complex logic requiring multiple checks, chain Condition Beats together:
   → false: [Need the key first]
 ```
 
+You can mix and match families freely: *"if Alex's mood is recovering AND the player has the journal, route to the reconciliation scene; otherwise route to the missed-opportunity scene."*
+
 ### Inventory Checks
 
 You can check for item presence:
 - Player HAS "Silver Key" ✓
 - Player DOES NOT HAVE "Curse Mark" ✓
 
-For quantity-based checks (e.g., "Gold > 100"), use the **AI Condition** beat which can evaluate complex states.
+For quantity-based checks (e.g., "Gold > 100"), the inventory condition's **Quantity** mode lets you compare counts directly. The **AI Condition** beat is also available for fuzzier reasoning that doesn't reduce to a single numeric comparison.
+
+### Per-Beat Requirements
+
+The same condition vocabulary is also available on every regular beat under the **Requirements** section (collapsible at the bottom of the Inspector). A requirement is a guard that must hold when the player reaches that beat — if it doesn't, the engine redirects to the fallback beat you choose, and the path analyzer flags the situation as a soft-lock or a warning depending on the severity you set.
+
+![Requirements section with a mood requirement](images/30-requirements-mood.png)
+*A requirement on a regular beat: this beat will only run when Alex's valence is at least +0.3. If unmet at runtime, the engine redirects to the fallback (or just logs a warning if no fallback is set), and the path analyzer treats the unreachable case according to the chosen severity.*
+
+Use requirements when the gating concept *belongs to the destination beat* — "this private conversation only makes sense if Alex is in a state to talk" — rather than when it belongs to the choice that leads there. The runtime treats both the same way; the distinction is for you, the author, when you re-read your own story.
 
 ## Animations
 
@@ -1782,31 +1842,36 @@ Use sprite sheets for frame-by-frame animation:
 - Text box appearance: corners, padding, borders, position
 
 **Settings → Effects:**
-- Text animations (typewriter, fade) and hotspot visibility
+- Text animations (typewriter, fade)
+- Hotspot visibility (Hotspot Area Visibility, Label Display)
+- <a id="speaker-display"></a>**Speaker Display** (sub-section) — controls how speaker names and portrait graphics appear during playback:
+  - **Show speaker names** — Master toggle for displaying character names during dialog
+  - **Show speaker portraits** — Master toggle for character portrait images in text boxes
+  - **Name style** — How the speaker name appears:
+    - *Label* — Name shown above the text box
+    - *Inline* — Name shown bold at the start of the text inside the box
+    - *Off* — Name hidden
+  - **Name position** — Left or right alignment for the speaker name
+  - **Name color** — Custom color for the speaker name text
+  - **Portrait position** — Where the portrait image appears:
+    - *Inside left / Inside right* — Small portrait inside the text box
+    - *Above left / Above right* — Larger portrait above the text box
+  - **Portrait size** — Size in pixels (default: 48px inside, 80px above)
+
+  Individual beats can override these global settings. This lets you hide the speaker name for narration beats while showing it for dialog, for example.
 
 **Settings → HUD:**
-- Timer display and countdown meter overlays
+- Timer / Time Display overlay (timer name, default text, position)
+- Fictional Time overlay
+- Countdown Meter overlay
+Each overlay has its own *Enabled* toggle and renders on the running stage when on.
 
 **Settings → Sound:**
 - Background music and volume settings
 - Background music respects browser autoplay policies -- if the browser blocks automatic playback (common on first page load), playback starts automatically on the interactor's first click, keypress, or tap
 
-<a id="speaker-display"></a>
-**Settings → Speaker Display:**
-- **Show speaker names** — Master toggle for displaying character names during dialog
-- **Show speaker portraits** — Master toggle for character portrait images in text boxes
-- **Name style** — How the speaker name appears:
-  - *Label* — Name shown above the text box
-  - *Inline* — Name shown bold at the start of the text inside the box
-  - *Off* — Name hidden
-- **Name position** — Left or right alignment for the speaker name
-- **Name color** — Custom color for the speaker name text
-- **Portrait position** — Where the portrait image appears:
-  - *Inside left / Inside right* — Small portrait inside the text box
-  - *Above left / Above right* — Larger portrait above the text box
-- **Portrait size** — Size in pixels (default: 48px inside, 80px above)
-
-Individual beats can override these global settings. This lets you hide the speaker name for narration beats while showing it for dialog, for example.
+**Settings → Copyright:**
+- Author name, copyright year, and license text embedded in exports and the credits page.
 
 **Settings → Variables:**
 - Define global variables for tracking story state
@@ -1865,14 +1930,17 @@ ASAPS Modern has two distinct time systems: **real-time timers** that count down
 
 ### Timer HUD
 
-The Timer HUD is a persistent overlay that appears in a corner of the screen. Configure it in **Settings → HUD**:
+The Timer HUD is a persistent overlay that appears in a corner of the stage. Configure it in **Settings → HUD → Timer / Time Display**. Toggle **Enabled** and the configuration unfolds:
 
-- **Position** - Top-left, top-right, bottom-left, bottom-right
-- **Style** - Digital (clock-style) or Minimal
-- **Colors** - Text color, background color, opacity
-- **Label** - Optional label above the time display
+- **Timer Name** — Which named timer to track (leave empty to follow the first active timer)
+- **Show "00:00" when no timer active** — Whether to display a placeholder zero-time when nothing is counting down
+- **Default Text** — What to show when no timer is running (e.g., *"9:00 AM"*, *"Day 1"*, *"2h left"*). Individual beats can override this in the Inspector's Advanced section.
+- **Position** — Top Left, Top Right, Bottom Left, or Bottom Right
+- **Style** — Digital clock font or plain text
+- **Font size**, **text color**, **background color**, **background opacity**, **border radius**, **padding**
+- **Show label** + **Label text** — Optional label rendered above the time display
 
-The HUD automatically shows the active countdown when a timer is running. When no timer is active, it can display fictional time or static text.
+The HUD's display logic is layered: an active timer countdown takes priority, then per-beat time text, then the default text. Two sibling overlays — **Fictional Time** and **Countdown Meter** — sit alongside it on the same Settings page and can be enabled independently.
 
 ### Fictional Time System
 
@@ -2228,7 +2296,7 @@ Quick reference for all beat types.
 | Beat | Purpose | Key Settings |
 |------|---------|--------------|
 | Set Variable/Counter | Change state | variable name, value (true/false), counter operations, or fictional time |
-| Condition Check | Branching | condition type, comparison, true target, false target |
+| Condition Check | Branching | condition type (counter, counterCompare, timer, inventory, variable, fictionalTime, mood, emotion, trait, sentiment, goal, characterVariant), per-type fields, true target, false target. (Per-beat *Requirements* — see [Per-Beat Requirements](#condition-beats) — additionally support a `visitedBeat` check.) |
 | Random Target | Randomization | targets with optional weights |
 | Set Timer | Timed events | timer name, duration, expiration target |
 | Inventory Management | Item management | action (add/remove/transfer), item, quantity, character |
@@ -2403,7 +2471,7 @@ Modern versions of Chrome, Firefox, Safari, and Edge all work. Chrome is recomme
 
 - Check the [README](../README.md) for technical details
 - Report issues at [GitHub Issues](https://github.com/sumo961/ASAPS_New)
-- Review example projects (Import → Examples) to learn techniques
+- Sample projects ship as ZIP files in the project library — open one and use **Import → Import Project (ZIP)** to learn techniques. The canonical demonstration of the affect stack (variants, choice effects, mood-gated endings) is **Standing Beside Alex**.
 
 ---
 
