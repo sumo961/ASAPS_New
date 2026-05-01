@@ -327,7 +327,7 @@ This is where interactivity shines. Present text and multiple choices, each pote
 
 **Recursive Dialogs:** Set a choice's target to `__self__` to loop back to the root of the dialog tree. This is powerful for "hub" conversations where the interactor can ask multiple questions before leaving. Combined with **per-choice visited tracking** (`markVisited`), choices the interactor has already picked can be visually dimmed or hidden.
 
-**Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, add/remove inventory, **nudge a character's mood**, **fire an emotion**, **add a sentiment**, **set a goal's status**, **switch a character's active variant**, or **append a reflection** to a Mode B character's memory. Open the **Effects** section on any choice and pick **+ Add Effect**. The full list of affect-aware effects (and the character-target dropdown that backs them) is documented in [Affect-Aware Choice Effects](#choice-effects-affect).
+**Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, add/remove inventory, **nudge a character's mood**, **fire an emotion**, **add a sentiment**, **set a goal's status**, **switch a character's active variant**, or **append a reflection** to a Mode B character's memory. Open the **Effects** section on any choice and pick **+ Add Effect** (or **+ apply template…** for a preset bundle of affect-stack effects). The full list of affect-aware effects, the character-target dropdown that backs them, the inline labels and palette-backed comboboxes, the eight starter templates, and the live "what does this choice do?" summary are documented in [Affect-Aware Choice Effects](#choice-effects-affect) and [Easier authoring](#effects-easier-authoring).
 
 ---
 
@@ -1072,6 +1072,95 @@ Anywhere ASAPS lets you attach **Effects** to a player choice — Dialog Tree ch
 The **target** field for all six effect types is now a **dropdown of the project's characters** (display name shown, stable id stored under the hood) plus a sentinel **Player** entry pinned at the top. No more typing `char_alex` by hand and hoping you spelled it right. If the editor isn't given a project character roster (some compact sub-editors don't have one in scope), the field falls back to a free-text input.
 
 > **Where to find Effects.** Effects sit on Dialog Tree choices, Dialog Tree nodes, Movement Choice destinations, and Pick Prop choices. Open the **Effects** section on any of these and click **+ Add Effect**.
+
+<a id="effects-easier-authoring"></a>
+### Easier authoring: labels, palette suggestions, templates, and a live summary
+
+Affect effects are powerful — a single choice can stack five, six, or nine rows of mood, emotion, sentiment, and reflection changes — but a wall of anonymous numeric inputs is hard to read at a glance, and the right shape of a "supportive" or "dismissive" choice is something authors tend to learn the hard way. The choice editor now does four things to take that pain off your back.
+
+![Inspector with the choice's effects panel and live summary](images/34-choice-effects-overview.png)
+*A Late Night Follow Up choice in the **Standing Beside Alex** sample project. The Effects section stacks several affect rows; the small italic blue-tinted block at the bottom (`→ Alex: feels happier, calmer; joy spikes; …`) is the live "what does this choice do?" summary, updating every time you nudge a value.*
+
+#### A walk-through
+
+1. **Open a Dialog Tree beat** in the Flowchart and pick a player choice — for example, the third option ("You don't have to teach me perfectly, but I want to keep learning what helps you.") on the *Late Night Follow Up* beat in the Standing Beside Alex sample. The Inspector on the right shows the choice's text, its target, and an **Effects:** section directly below the text.
+2. **If the choice is empty, pick a starting shape.** For a brand-new choice with no effects yet, you'll see two side-by-side controls: **+ Add Effect** (the manual route) and **+ apply template…** (the preset route). Pick a template from the dropdown — say, *Empathetic — full support* — and the editor appends a coherent multi-row bundle of mood, emotion, sentiment, and counter changes ready for fine-tuning.
+3. **Tweak any value** — drop the trust delta from `0.4` to `0.3`, add an extra reflection — and watch the live summary at the bottom of the effects list update on every keystroke. If the summary still sounds right, the numbers are right.
+4. **Use the emotion combobox** when adding `Fire Emotion` or `Add Sentiment` rows. Click into the **emotion** field and the dropdown surfaces every emotion from the project's palette (joy, fear, trust, gratitude, …) — you don't have to remember whether you spelled it `mistrust` or `anti-trust`. Free text still works for custom story emotions.
+
+#### 1. Inline labels on the numeric inputs
+
+Numbers without labels are riddles. Every affect row now wears a small label in front of each delta input, plus a hover tooltip explaining direction:
+
+![Close-up of a Nudge Mood and Fire Emotion row showing val / aro / Δ labels](images/35-effect-row-labels-mood-emotion.png)
+*Nudge Mood rows show **val** (valence — sad ↔ happy) and **aro** (arousal — calm ↔ excited). Fire Emotion rows show **Δ** (intensity delta).*
+
+| Row type | Inline label(s) | What it means |
+|----------|-----------------|---------------|
+| Nudge Mood | **val**, **aro** | Valence delta (positive = happier, negative = sadder) and arousal delta (positive = more activated, negative = calmer). Runtime clamps to `[-1, 1]`. |
+| Fire Emotion | **Δ** | Intensity delta. Positive bumps the emotion; mood is auto-nudged via the palette's authored weights. |
+| Add Sentiment | **→**, **Δ** | The arrow precedes the *toward* (target) field — "this character feels *something* toward *that*". The Δ marks the strength delta. Trust and mistrust live on the same axis with opposite signs. |
+| Add Reflection | **sal** | Salience in `[0, 1]`. Reserve `> 0.7` for moments the character will never forget — high-salience entries survive eviction longest when the per-character reflection cap (32 entries) fills up. |
+
+![Close-up of Add Sentiment rows showing → and Δ labels with player and self-directed targets](images/36-effect-row-labels-sentiment.png)
+*Two Add Sentiment rows from the same choice: `→ player trust Δ +0.5` (Alex's trust toward the player grows) and `→ char_alex shame Δ -0.06` (Alex's self-shame eases — pointing the sentiment at the holding character is the convention for self-directed feelings).*
+
+Hover any label or input to see the full tooltip. The conventions documented in the tooltips match the runtime — there's only one source of truth.
+
+#### 2. Emotion-name auto-complete from the project palette
+
+The **emotion** field on `Fire Emotion` rows, and both the **toward** and **emotion** fields on `Add Sentiment` rows, are now combobox inputs backed by the project's [Emotion Palette](#emotion-palette). Click the field and pick from the suggestions, or keep typing — free text still works for custom story emotions that aren't in the palette. The **toward** field on sentiments additionally suggests every defined character plus the `player` sentinel, so you don't have to remember a character id by hand.
+
+This is purely about discoverability — there's no validation barrier. The runtime accepts whatever you type. The combobox just keeps you from misremembering whether the palette uses `joy` or `happiness`, or whether you wrote `mistrust` or `anti-trust` last time.
+
+#### 3. The effect-templates library
+
+Eight intent-shaped presets cover the common shapes of player intent in support-and-care narrative — heavily inspired by, but not specific to, the Standing Beside Alex sample.
+
+![The Add Effect button alongside the apply-template dropdown, with the live summary showing the cumulative effect of the empathetic-full-support template](images/37-effect-templates-and-live-summary.png)
+*Bottom of a populated effects list. **+ Add Effect** appends a single empty row; **+ apply template…** appends a coherent bundle of 5–9 rows in one click. The italic blue-tinted block underneath is the live summary, reading the cumulative effect back to you in plain language.*
+
+| Template | Player intent it shapes | Roughly what it bundles |
+|----------|------------------------|-------------------------|
+| **Empathetic — full support** | Full support landed exactly the way the character needed. | Mood lifts, joy fires, fear drops, trust grows, self-shame eases. |
+| **Empathetic — partial / well-meaning** | Kind intent that doesn't quite land. | Smaller mood lift, gentle joy, gratitude grows, trust doesn't fully form. |
+| **Pushy / dismissive** | Player overrides what the character needs. | Mood drops, fear and shame spike, trust erodes, self-doubt deepens. |
+| **Silent / felt-abandoned** | Player doesn't step up; the absence registers as harm. | Mood drops, sadness fires, trust erodes. |
+| **Boundary respecting** | Player names the overstep without making it about themselves. | Mood lifts, pride fires, fear softens, deep trust forms. |
+| **Validating / "I see you"** | Player witnesses the feeling without trying to fix it. | Quiet positive shift, gentle joy, gratitude grows. |
+| **Defensive overreach** | Well-meaning but speaks-for the character. | Ambivalent — fear ticks up, mood lifts slightly, trust mixed. |
+| **Quiet recovery** | Small, non-demanding presence. | Mood eases toward neutral, fear softens, no sentiment shift. |
+
+Picking a template **appends** to the existing rows — it never overwrites — so you can stack a template on top of a few hand-crafted effects, or layer two templates if a choice has two distinct shapes (rarely a good idea; usually the second template is a sign the first wasn't quite right).
+
+A few things templates do quietly so you don't have to:
+
+- **They infer the active character target** from any existing affect effect in the choice's list. Add a `Nudge Mood` row pointed at *Alex* first, then apply a template, and every row the template emits will target Alex too. If there's no existing affect row to read from, the template falls back to the first non-player character in the project, then to `player`.
+- **They're project-aware about counters.** The bundles emit `incrementCounter` rows for `supportScore`, `maxSupport`, and `failedSupport` — but only when those counters actually exist in your project. A story without a `supportScore` counter won't have stray support-counter rows seeded.
+- **They're starting points, not contracts.** Tweak the deltas, swap an emotion, drop the reflection — the templates exist to spare you the cold-start, not to lock you in.
+
+#### 4. The live "what does this choice do?" summary
+
+Below the effect rows there's now a small italic blue-tinted block prefixed with `→` that synthesises the cumulative effect in plain language. It reads every row, aggregates them by character, and tells you what the choice will *feel like* when the player picks it. It updates on every value change.
+
+Two real examples from the Standing Beside Alex sample:
+
+> → *Alex: feels happier, calmer; joy spikes; fear softens; trust toward the player grows (+0.50); self-shame eases (−0.06); self-fear eases (−0.06); reflects: "They said they'd keep learning. That's the only promise t…" • +2 supportScore, +1 maxSupport*
+
+> → *Alex: feels sadder, calmer; sadness spikes; trust toward the player eases (−0.20); self-shame grows (+0.05); self-fear grows (+0.04); reflects: "They said they didn't know what to do. So we both don't k…" • -1 supportScore, +1 failedSupport*
+
+How it reads things:
+
+- **Multiple `nudgeMood` rows** are aggregated into a single net qualitative descriptor — *feels happier* / *feels sadder* / *more activated* / *calmer* — dropping deltas below ±0.05 as noise.
+- **Fire Emotion rows** read as *<name> spikes* (positive) or *<name> softens* (negative), with a magnitude qualifier — *sharply* when |Δ| ≥ 0.4, *a little* when |Δ| < 0.2, and unqualified in between.
+- **Sentiments toward someone else** read as *<emotion> toward <character> grows / eases (±0.NN)*; **self-directed sentiments** (where the sentiment target is the holder character) read as *self-<emotion>*, matching the affect panel and dossier conventions.
+- **Goal-status changes** read as *goal '<id>' marked <status>*. **Variant changes** read as *switches to variant '<id>'*. **Reflections** are quoted with a soft truncation around 60 characters.
+- **Counter, variable, and inventory effects** roll into a separate compact tally clause after the bullet (`+2 supportScore, +1 maxSupport`).
+- **The block hides itself entirely** when there's nothing meaningful to say — no clutter on choices that don't move affect.
+
+If the summary doesn't read the way you intended the choice to feel, the numbers are off — that's the test. Tweak until the prose matches your intent.
+
+> **Why this exists.** Authoring affect-rich narrative is hard because the consequences of a single choice ripple across many small dimensions, and "did I get it right?" is hard to verify without playing the whole story. The summary closes that loop at edit time. It's not a substitute for testing the runtime — but it catches the easy mistakes (a sign flip, a forgotten row) before they reach the player.
 
 ---
 
@@ -2378,7 +2467,11 @@ Quick reference for all beat types.
 
 **Conversation Direction** - A trigger + action rule that steers an AI Conversation. Triggers detect what the player says; actions control how the AI responds or where the story goes next.
 
-**Choice Effects** - Variable, counter, inventory, or affect changes (nudge mood, fire emotion, add sentiment, set goal status, set character variant, add reflection) that trigger immediately when a dialog or movement choice is selected.
+**Choice Effects** - Variable, counter, inventory, or affect changes (nudge mood, fire emotion, add sentiment, set goal status, set character variant, add reflection) that trigger immediately when a dialog or movement choice is selected. Authored in the **Effects:** section of any choice via the **+ Add Effect** button or, for affect-stack bundles, the **+ apply template…** dropdown. See [Easier authoring: labels, palette suggestions, templates, and a live summary](#effects-easier-authoring).
+
+**Effect Template** - A preset, intent-shaped bundle of affect-stack effects (mood, emotion, sentiment, reflection, counter changes) that the choice editor appends in one click. Eight defaults ship: *Empathetic — full support*, *Empathetic — partial / well-meaning*, *Pushy / dismissive*, *Silent / felt-abandoned*, *Boundary respecting*, *Validating / "I see you"*, *Defensive overreach*, *Quiet recovery*. Templates infer the target character from existing rows and only emit counter increments for counters that exist in the project.
+
+**Affect Summary** - The small italic blue-tinted block (prefixed with `→`) shown below the effect rows in the Choice Effects editor. Synthesises the cumulative effect of the choice in plain language ("Alex: feels happier; joy spikes; trust toward the player grows (+0.50) · +2 supportScore"), updating live as the author tweaks values. Hidden when no effects or every delta is below noise.
 
 **Personality Archetype** - One of ten research-grounded Big Five presets (Balanced, Narcissist, Anxious introvert, Conscientious leader, Free spirit, Recluse, Hothead, Peacekeeper, Stoic, Trickster) that can be loaded onto a character to seed traits and, in some cases, self-directed sentiments.
 
