@@ -5,13 +5,14 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.43**. This is a **beta**: core functionality works,
+Current release: **v0.9.44**. This is a **beta**: core functionality works,
 features below reflect what has been shipped since active development began.
 
 ## Feature Matrix
 
 | Feature | Status |
 |---------|--------|
+| **Affect Condition Operators in Editor** | **v0.9.44**: The six new ConditionBeat operators introduced in v0.9.43 (mood, sentiment, emotion, trait, goal, characterVariant) are now first-class in both the Inspector's ConditionBeat type-dropdown AND the per-beat Requirements editor. Per-type forms with cascading character → goals/variants/traits dropdowns. User Guide updated with fresh screenshots and a broader content audit (Debug Tools section rebuilt, Speaker Display moved to its real home, Settings catalog restructured, Asset Manager tabs corrected). 8 stale images refreshed, 8 new images added |
 | **Character Variants** | **v0.9.43**: A single Character record can carry multiple persona overlays (e.g., "introvert Alex" / "extrovert Alex" — same id, same beats, only the affect / portrait / displayName slice swaps). `setCharacterVariant` Effect for player-driven picks at story-start, `characterVariant` ConditionBeat operator for branching, atomic re-seed of mood + sentiments on switch. Linked sub-cards in the Character Manager grid with per-variant inline trait/mood/sentiment editors and portrait override |
 | **Mood HUD Overlay** | **v0.9.43**: 2D mood pad on Russell's circumplex mountable as a per-character on-stage HUD or screen-docked overlay. Card layout with portrait + name header, colour-coded quadrant tints (yellow-joy / red-fear / blue-sad / green-serene), emotion-palette markers, optional qualitative descriptor ("pleased, alert"). Available in Preview Window AND deployed standalone web exports |
 | **Goals + GAMYGDALA Emotion Firing** | **v0.9.43**: Authored `Character.goals[]` with optional satisfaction predicates. Runtime tracks status (open / met / failed / abandoned) and auto-fires pride+joy on met / shame+sadness on failed (scaled by goal priority, routed through trait modulation). New `setGoalStatus` Effect, new `goal` ConditionBeat operator |

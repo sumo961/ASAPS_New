@@ -1,5 +1,83 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-01: Affect Condition Operators in the Editor + User Guide Audit (v0.9.44)
+
+### Overview
+
+Closes the v0.9.43 authoring gap that the User Guide had honestly flagged: the six new ConditionBeat operators (`mood`, `sentiment`, `emotion`, `trait`, `goal`, `characterVariant`) were honored by the runtime but unreachable from the visual editor — only the classic operators (counter / counterCompare / timer / inventory / variable / fictionalTime / visitedBeat) were selectable. Authors had to hand-edit raw JSON to use any of the affect-stack operators. Both editor surfaces (Inspector's ConditionBeat type-dropdown + the per-beat Requirements editor) now expose the full set with appropriate per-type forms, cascading character → goals/variants/traits dropdowns, and operator-list gating per type. The User Guide had a thorough two-pass audit by the user-guide-qa agent — the affect-operator paragraphs were rewritten to reflect the closed gap, and a broader sweep refreshed stale content (Debug Tools section was renamed and rebuilt against the actual UI, Speaker Display moved to its real home under Settings → Effects, Settings catalog restructured, 8 stale screenshots replaced and 8 new ones added).
+
+### Affect-stack ConditionBeat operators in the editor UI
+
+**Inspector.tsx — ConditionBeat type-dropdown:** new "Character affect" optgroup at the bottom with six options. Each renders an appropriate per-type form:
+
+- **Mood**: character (dropdown of project characters + Player) → axis radio (valence / arousal) → operator → value (-1..+1, step 0.05).
+- **Emotion**: character → emotion-name input → operator → value (0..1).
+- **Trait**: character → trait-name dropdown (populated from the character's `traits` and any variant-overridden traits, free-text fallback when the character has none) → operator → value (0..1).
+- **Sentiment**: character (sentiment holder) → toward target (text input with datalist of project characters; supports inventory items / tags as raw strings) → emotion (optional, sums all when empty) → operator → value (-1..+1).
+- **Goal**: character → goal-id dropdown (cascading — populated from the character's authored goals, free-text fallback) → ==/!= → status (open / met / failed / abandoned).
+- **Active variant**: character → ==/!= → variant-id dropdown (cascading — populated from the character's variants, free-text fallback).
+
+Operator-list gating applies: the four numeric-affect types (mood / emotion / trait / sentiment) get the full `==/!=/>/>=/</<=` set; goal and characterVariant only get `==/!=`.
+
+**RequirementsEditor.tsx — per-beat requirements:** same dropdown extension and same six per-type forms, sized for the narrower beat-level requirements panel. `CondType` union widened, `condType()` guard recognises the new types, `changeType()` initialises sensible defaults when authors swap. New optional `availableCharacters` prop plumbed through Inspector's mount.
+
+The data shape was already defined by `Condition` in core types from v0.9.43 (Steps 4-8 added `moodAxis`, `emotionName`, `traitName`, `sentimentTarget` / `sentimentEmotion`, `goalId` / `goalStatus`, `variantId`). No core changes required — purely UI plumbing.
+
+**Files modified:**
+- `packages/builder/src/components/Inspector.tsx`
+- `packages/builder/src/editors/RequirementsEditor.tsx`
+
+### User Guide audit — affect-operator paragraphs rewritten + broader content refresh
+
+Two-task pass by the user-guide-qa agent verifying every claim against the live UI on `localhost:5173` via the chrome-devtools MCP.
+
+**Task 1 — Closed gap rewrite:** the previous audit (correctly at the time) flagged that the affect-stack condition operators were honored by the runtime but unreachable from the visual editor. With the gap now closed, the User Guide's affect-operator paragraphs were rewritten to reflect the first-class editor support, and a comprehensive new section was added covering each of the six per-type forms, the cascading character → goals/variants/traits flow, and the per-beat Requirements editor as the same-shape sibling.
+
+**Task 2 — Broader coverage audit found and fixed several stale entries:**
+
+- **Debug Tools section** — was documented as a "Panel with three tabs", actually a separate window named **Debug Tools** with tabs **Reachability** / **Path Analysis** / **Story Logic** (not "Reachability Analysis", "Logic Validation"). Full rewrite + 3 new screenshots covering the Forward / Tree / Backward modes in Path Analysis and Hub Beat Analysis on Story Logic.
+- **Speaker Display** — was documented as a top-level Settings tab, actually lives inside **Settings → Effects → Speaker Display**. Fixed in both reference spots (Part 4 and Part 8 Settings catalog).
+- **Settings catalog** — restructured Effects / HUD / Sound / Speaker Display / Variables / Translation / Debug entries to match the actual tabs; added missing **Copyright** tab.
+- **Timer HUD field list** — replaced the partially-fictional list ("Style — Digital or Minimal" / "Colors — text/bg/opacity") with the actual flat-list visible when Enabled is on.
+- **Asset Manager tabs** — corrected from "Image / Audio / Video / Fonts" to the actual **All Assets / Images / Audio / Videos / Fonts** plus the From URL row.
+- **"Seven affect-aware effect types"** — was inconsistent with its own table. Corrected to "six".
+- **Visited-beat condition** — added an explicit pointer note since it lives only in the Requirements editor, not the ConditionBeat dropdown.
+- **FAQ "Import → Examples"** — referenced a menu item that doesn't exist. Replaced with the project library / Import Project (ZIP) flow, with Standing Beside Alex called out as the canonical affect-stack demo.
+- **Inspector screenshot** — was flagged as pre-v0.9.41 in its own caption. Refreshed.
+- **Glossary completeness check passed**: all v0.9.43 terms (Big Five, Mood Pad, Sentiment, Variant, Reflection, Mood HUD, Goal, Personality Archetype, Emotion Palette, Dossier Policy) are present and consistent with body text.
+
+**Screenshots:** 8 stale images refreshed (main interface, settings panel, character manager with grouped variants, asset manager, Inspector showing the v0.9.41+ combobox + Dialog Tree Editor inline, AI menu, Affect tab with variants populated, Character Manager grouped-card view). 8 new images added: condition-type dropdown showing the Character affect optgroup, mood / trait / goal condition forms populated, Requirements editor with a mood gate on a beat, and the three Debug Tools tabs (Reachability / Path Analysis / Story Logic).
+
+User Guide grew from 2424 → 2492 lines, 30 image files now.
+
+**Items the agent flagged for follow-up that this audit didn't fix in scope:**
+
+- Active-variant condition form needs a manual screenshot (React's controlled-component flow rejected the JS-driven select-and-snap). The form is documented in prose but doesn't have a populated-form screenshot like the others.
+- The Visual Editor screenshot wasn't refreshed (no beat with heavy visual content was loaded).
+- Preview Window screenshots not refreshed this round.
+- A handful of older images (06, 08–16) predate May 2025 and may be due for a freshness pass.
+
+**Files modified:**
+- `docs/USER_GUIDE.md`
+- `docs/images/01-main-interface.png` (replaced)
+- `docs/images/02-settings-panel.png` (replaced)
+- `docs/images/03-character-manager.png` (replaced)
+- `docs/images/04-asset-manager.png` (replaced)
+- `docs/images/05-inspector-panel.png` (replaced)
+- `docs/images/07-ai-menu.png` (replaced)
+- `docs/images/21-affect-with-variants-goals.png` (replaced)
+- `docs/images/24-character-manager-grouped.png` (replaced)
+- `docs/images/26-condition-type-dropdown-affect.png` (new)
+- `docs/images/27-condition-mood-form.png` (new)
+- `docs/images/28-condition-trait-form.png` (new)
+- `docs/images/29-condition-goal-form.png` (new)
+- `docs/images/30-requirements-mood.png` (new)
+- `docs/images/31-debug-reachability.png` (new)
+- `docs/images/32-debug-path-analysis.png` (new)
+- `docs/images/33-debug-story-logic.png` (new)
+
+---
+
 ## 2026-05-01: Character System — Steps 5–8 + Variants + Mood HUD + Alex Example (v0.9.43)
 
 ### Overview
