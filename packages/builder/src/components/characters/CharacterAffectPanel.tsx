@@ -153,7 +153,15 @@ export const CharacterAffectPanel: React.FC<CharacterAffectPanelProps> = ({
                       <li key={`${s.toEntityRef}-${s.emotion}-${idx}`} style={sentimentItemStyle}>
                         <span style={sentimentDotStyle(s.strength)} />
                         <span style={sentimentTextStyle}>
-                          {describeStrength(s.strength)} <strong>{s.emotion}</strong> toward <em>{resolveName(s.toEntityRef)}</em>
+                          {/* Self-directed sentiments render as "mild
+                              self-shame" rather than "mild shame toward
+                              Alex" — clearer when the holder is also the
+                              target. */}
+                          {s.toEntityRef === char.id ? (
+                            <>{describeStrength(s.strength)} <strong>self-{s.emotion}</strong></>
+                          ) : (
+                            <>{describeStrength(s.strength)} <strong>{s.emotion}</strong> toward <em>{resolveName(s.toEntityRef)}</em></>
+                          )}
                         </span>
                       </li>
                     ))}

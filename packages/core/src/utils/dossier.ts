@@ -246,6 +246,11 @@ export function buildDossier(
   }
 
   // Sentiments (Step 4). Top-N by absolute strength, descending.
+  // Split into self-directed vs other-directed so the dossier separates
+  // "feels toward themselves" (anxious Alex's self-shame, narcissist Alex's
+  // self-pride) from "feels toward others" (trust toward player, fear of
+  // wolf). The two read very differently in prose and the LLM should know
+  // which is which.
   if (options.sentiments && options.sentiments.length > 0) {
     const cap = options.maxSentiments ?? 5;
     const top = [...options.sentiments]
@@ -253,10 +258,22 @@ export function buildDossier(
       .sort((a, b) => Math.abs(b.strength) - Math.abs(a.strength))
       .slice(0, cap);
     if (top.length > 0) {
-      lines.push('Feels toward others:');
-      for (const s of top) {
-        const intensity = describeSentimentIntensity(s.strength);
-        lines.push(`  - ${intensity} ${s.emotion} toward ${s.toEntityRef}`);
+      const selfRef = character.id;
+      const selfRows = top.filter((s) => s.toEntityRef === selfRef);
+      const otherRows = top.filter((s) => s.toEntityRef !== selfRef);
+      if (selfRows.length > 0) {
+        lines.push('Feels toward themselves:');
+        for (const s of selfRows) {
+          const intensity = describeSentimentIntensity(s.strength);
+          lines.push(`  - ${intensity} self-${s.emotion}`);
+        }
+      }
+      if (otherRows.length > 0) {
+        lines.push('Feels toward others:');
+        for (const s of otherRows) {
+          const intensity = describeSentimentIntensity(s.strength);
+          lines.push(`  - ${intensity} ${s.emotion} toward ${s.toEntityRef}`);
+        }
       }
     }
   }
