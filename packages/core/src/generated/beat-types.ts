@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-04-24T16:33:43.526Z
+ * Generated: 2026-04-30T11:20:50.713Z
  */
 
 // ============================================
@@ -18,14 +18,6 @@ import type { Connection, Condition, Effect } from '../types';
 export interface DialogNode {
   id: string;
   speaker: string;
-  /**
-   * Optional Character.id for the speaker (Layer 2 of the rich-character roadmap).
-   * When set and resolvable, takes precedence over the free-text `speaker` for
-   * stable identity (TTS voice routing, character-scoped state lookups, dossier
-   * building). The `speaker` string remains for legacy / inline cases and as the
-   * display fallback when no Character record is found.
-   */
-  characterRef?: string;
   text: string;
   emotion?: string;
   conditions?: Condition[];
@@ -418,6 +410,32 @@ export interface AddRemoveInventoryParameters {
 }
 
 /**
+ * Update Affect - Nudge a character's mood and/or strengthen a sentiment toward another entity. The runtime clamps each axis and sentiment strength to [-1, 1].
+ * Category: invisible
+ * Connection Type: single
+ */
+export interface UpdateAffectParameters {
+  /** Character whose affect changes */
+  character: string;
+  /** Pushes the character's mood pleasanter (positive) or unpleasanter (negative). Runtime clamps the resulting mood to [-1, 1]. */
+  moodValenceDelta?: number | undefined;
+  /** Pushes the character calmer (negative) or more excited (positive). Clamped to [-1, 1]. */
+  moodArousalDelta?: number | undefined;
+  /** Entity the sentiment is directed at (Character.id, item name, beat id, or any author tag). */
+  sentimentTarget?: string | undefined;
+  /** Emotion label (e.g. trust, fear, anger, joy, pride, shame). Free-text — no enforced palette. */
+  sentimentEmotion?: string | undefined;
+  /** Adds to (or subtracts from) the existing (target, emotion) sentiment strength. Negative values weaken or invert the feeling. Clamped to [-1, 1]. */
+  sentimentDelta?: number | undefined;
+  /** Emotion name to fire (e.g. joy, anger, fear). When the emotion is in the project's emotion palette, mood is auto-nudged by its weights — no need to also set mood deltas above. Unknown names still update the level but skip the mood side-effect so typos are surfaced. */
+  emotion?: string | undefined;
+  /** Intensity delta for the named emotion. Positive bumps the emotion; negative reduces it. Clamped to [0, 1] post-add. */
+  emotionDelta?: number | undefined;
+  /** Next beat after the affect update */
+  connection: Connection;
+}
+
+/**
  * Input Text - Prompts user for text input and stores in a variable or character display name
  * Category: visible
  * Connection Type: single
@@ -781,6 +799,7 @@ export type BeatType =
   | 'randomTarget'
   | 'setTimer'
   | 'addRemoveInventory'
+  | 'updateAffect'
   | 'inputText'
   | 'keypad'
   | 'hyperText'
@@ -810,6 +829,7 @@ export interface BeatParameterMap {
   'randomTarget': RandomTargetParameters;
   'setTimer': SetTimerParameters;
   'addRemoveInventory': AddRemoveInventoryParameters;
+  'updateAffect': UpdateAffectParameters;
   'inputText': InputTextParameters;
   'keypad': KeypadParameters;
   'hyperText': HyperTextParameters;
