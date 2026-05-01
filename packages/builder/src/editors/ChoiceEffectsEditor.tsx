@@ -1,10 +1,11 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import type { Effect } from '@asaps/core';
+import type { Effect, EmotionDefinition } from '@asaps/core';
 import { SmartNameDropdown, type DropdownOption } from './SmartNameDropdown';
 import type { AvailableCounter } from '../hooks/useAvailableCountersAndVariables';
 import type { AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
 import type { AvailableInventoryItem } from '../hooks/useAvailableCountersAndVariables';
+import { DEFAULT_EFFECT_TEMPLATES, findEffectTemplate } from './effectTemplates';
 
 type EffectType = Effect['type'];
 
@@ -41,6 +42,11 @@ interface ChoiceEffectsEditorProps {
    *  hosts that don't have characters in scope can still use the
    *  editor; the field falls back to a free-text input. */
   availableCharacters?: ReadonlyArray<{ id: string; name?: string; displayName?: string }>;
+  /** Project emotion palette — when supplied, the `fireEmotion` and
+   *  `addSentiment`'s emotion fields render as comboboxes backed by
+   *  the palette's emotion names (case-insensitive lookup; free-text
+   *  still works for custom story emotions). */
+  emotionPalette?: ReadonlyArray<EmotionDefinition>;
   /** Hide inventory effect types (for pickProp which handles inventory inherently) */
   hideInventory?: boolean;
   compact?: boolean;
@@ -53,6 +59,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
   availableVariables,
   availableInventoryItems = [],
   availableCharacters,
+  emotionPalette,
   hideInventory = false,
   compact = false,
 }) => {
@@ -130,16 +137,67 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
     ([type]) => !hideInventory || (type !== 'addInventory' && type !== 'removeInventory')
   );
 
+  // ---------------------------------------------------------------------------
+  // Effect templates (preset-shaped expansions of common author intents)
+  //
+  // Picking a template appends a coherent set of affect-stack effects to the
+  // current list. The default character target is pulled from the existing
+  // affect effect's target if any (so author chains stay consistent within
+  // one choice); otherwise falls back to the first non-player character in
+  // the project, then to free-text 'player'. Templates are aware of which
+  // counters exist in the project so they don't seed maxSupport / failedSupport
+  // rows in stories that don't track them.
+  // ---------------------------------------------------------------------------
+  const counterNames = availableCounters.map((c) => c.name);
+  const inferTargetForTemplate = (): string => {
+    const existingAffect = effects.find((e) =>
+      e.type === 'nudgeMood' || e.type === 'fireEmotion' || e.type === 'addSentiment'
+      || e.type === 'addReflection' || e.type === 'setGoalStatus' || e.type === 'setCharacterVariant'
+    );
+    if (existingAffect?.target) return existingAffect.target;
+    const firstNonPlayer = (availableCharacters || []).find((c) => c.id !== 'player');
+    return firstNonPlayer?.id || 'player';
+  };
+  const applyTemplate = (templateId: string) => {
+    const template = findEffectTemplate(templateId);
+    if (!template) return;
+    const target = inferTargetForTemplate();
+    const newEffects = template.forge({ target, playerRef: 'player', counters: counterNames });
+    onChange([...effects, ...newEffects]);
+  };
+
+  // Lookup palette emotion names for the combobox (case-insensitive
+  // de-dup, sorted by canonical case from the palette).
+  const paletteEmotionNames = (emotionPalette || []).map((e) => e.name);
+
   if (effects.length === 0) {
     return (
-      <button
-        type="button"
-        onClick={addEffect}
-        className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-      >
-        <Plus className="w-3 h-3" />
-        Add Effect
-      </button>
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={addEffect}
+          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+        >
+          <Plus className="w-3 h-3" />
+          Add Effect
+        </button>
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) {
+              applyTemplate(e.target.value);
+              (e.target as HTMLSelectElement).value = '';
+            }
+          }}
+          className="text-xs px-2 py-1 border rounded bg-white"
+          title="Apply a preset bundle of affect effects (mood, emotion, sentiment, reflection) tuned for a common author intent. Tweak the values afterward to taste."
+        >
+          <option value="">— or apply a template —</option>
+          {DEFAULT_EFFECT_TEMPLATES.map((t) => (
+            <option key={t.id} value={t.id} title={t.description}>{t.name}</option>
+          ))}
+        </select>
+      </div>
     );
   }
 
@@ -238,45 +296,56 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
           {/* Type-specific extra fields */}
           {effect.type === 'nudgeMood' && (
             <>
-              <input
-                type="number"
-                step={0.1}
-                value={effect.valenceDelta ?? 0}
-                onChange={(e) => updateEffect(index, { valenceDelta: parseFloat(e.target.value) || 0 })}
-                className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
-                placeholder="±valence"
-                title="Valence delta — positive = happier, negative = sadder. Runtime clamps to [-1, 1]."
-              />
-              <input
-                type="number"
-                step={0.1}
-                value={effect.arousalDelta ?? 0}
-                onChange={(e) => updateEffect(index, { arousalDelta: parseFloat(e.target.value) || 0 })}
-                className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
-                placeholder="±arousal"
-                title="Arousal delta — positive = more excited, negative = calmer. Runtime clamps to [-1, 1]."
-              />
+              <div className="flex items-center gap-1 flex-shrink-0" title="Valence delta — positive = happier, negative = sadder. Runtime clamps to [-1, 1].">
+                <span className="text-[10px] text-gray-500 select-none">val</span>
+                <input
+                  type="number"
+                  step={0.1}
+                  value={effect.valenceDelta ?? 0}
+                  onChange={(e) => updateEffect(index, { valenceDelta: parseFloat(e.target.value) || 0 })}
+                  className="w-14 px-1.5 py-1 text-xs border rounded"
+                  placeholder="±0.0"
+                />
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0" title="Arousal delta — positive = more excited, negative = calmer. Runtime clamps to [-1, 1].">
+                <span className="text-[10px] text-gray-500 select-none">aro</span>
+                <input
+                  type="number"
+                  step={0.1}
+                  value={effect.arousalDelta ?? 0}
+                  onChange={(e) => updateEffect(index, { arousalDelta: parseFloat(e.target.value) || 0 })}
+                  className="w-14 px-1.5 py-1 text-xs border rounded"
+                  placeholder="±0.0"
+                />
+              </div>
             </>
           )}
           {effect.type === 'fireEmotion' && (
             <>
-              <input
-                type="text"
-                value={effect.emotion || ''}
-                onChange={(e) => updateEffect(index, { emotion: e.target.value })}
-                placeholder="emotion"
-                className="w-24 px-1.5 py-1 text-xs border rounded flex-shrink-0"
-                title="Emotion name (e.g. joy, anger, fear). Looked up against the project's emotion palette."
-              />
-              <input
-                type="number"
-                step={0.1}
-                value={effect.emotionDelta ?? 0}
-                onChange={(e) => updateEffect(index, { emotionDelta: parseFloat(e.target.value) || 0 })}
-                className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
-                placeholder="±intensity"
-                title="Intensity delta (0–1 typical). Positive bumps the emotion; mood is auto-nudged via palette weights."
-              />
+              <div className="flex-shrink-0" title="Emotion name. Pick from the project's palette or type a custom name. Palette emotions auto-nudge mood via their authored weights.">
+                <input
+                  type="text"
+                  list={`fire-emotion-options-${index}`}
+                  value={effect.emotion || ''}
+                  onChange={(e) => updateEffect(index, { emotion: e.target.value })}
+                  placeholder="emotion"
+                  className="w-24 px-1.5 py-1 text-xs border rounded"
+                />
+                <datalist id={`fire-emotion-options-${index}`}>
+                  {paletteEmotionNames.map((n) => <option key={n} value={n} />)}
+                </datalist>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0" title="Intensity delta (typical -1 to +1). Positive bumps the emotion; mood is auto-nudged via palette weights.">
+                <span className="text-[10px] text-gray-500 select-none">Δ</span>
+                <input
+                  type="number"
+                  step={0.1}
+                  value={effect.emotionDelta ?? 0}
+                  onChange={(e) => updateEffect(index, { emotionDelta: parseFloat(e.target.value) || 0 })}
+                  className="w-14 px-1.5 py-1 text-xs border rounded"
+                  placeholder="±0.0"
+                />
+              </div>
             </>
           )}
           {effect.type === 'setCharacterVariant' && (
@@ -322,46 +391,67 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 className="flex-1 min-w-[140px] px-1.5 py-1 text-xs border rounded"
                 title="Short narrative note in the character's voice. Mode B only — characters with the default 'reAnchor' policy ignore reflections in their dossier."
               />
-              <input
-                type="number"
-                step={0.1}
-                min={0}
-                max={1}
-                value={effect.reflectionSalience ?? 0.5}
-                onChange={(e) => updateEffect(index, { reflectionSalience: parseFloat(e.target.value) || 0 })}
-                className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
-                placeholder="salience"
-                title="0–1. Higher salience entries survive eviction longer when the per-character cap fills up."
-              />
+              <div className="flex items-center gap-1 flex-shrink-0" title="Salience 0–1. Higher entries survive longer when the per-character reflection cap (32 entries) fills up. Reserve > 0.7 for moments the character will never forget.">
+                <span className="text-[10px] text-gray-500 select-none">sal</span>
+                <input
+                  type="number"
+                  step={0.1}
+                  min={0}
+                  max={1}
+                  value={effect.reflectionSalience ?? 0.5}
+                  onChange={(e) => updateEffect(index, { reflectionSalience: parseFloat(e.target.value) || 0 })}
+                  className="w-14 px-1.5 py-1 text-xs border rounded"
+                  placeholder="0.5"
+                />
+              </div>
             </>
           )}
           {effect.type === 'addSentiment' && (
             <>
-              <input
-                type="text"
-                value={effect.sentimentTarget || ''}
-                onChange={(e) => updateEffect(index, { sentimentTarget: e.target.value })}
-                placeholder="toward"
-                className="w-20 px-1.5 py-1 text-xs border rounded flex-shrink-0"
-                title="Entity the sentiment is directed at (character id, item, or any tag)"
-              />
-              <input
-                type="text"
-                value={effect.sentimentEmotion || ''}
-                onChange={(e) => updateEffect(index, { sentimentEmotion: e.target.value })}
-                placeholder="emotion"
-                className="w-20 px-1.5 py-1 text-xs border rounded flex-shrink-0"
-                title="Emotion label (trust, fear, anger, …)"
-              />
-              <input
-                type="number"
-                step={0.1}
-                value={effect.strengthDelta ?? 0}
-                onChange={(e) => updateEffect(index, { strengthDelta: parseFloat(e.target.value) || 0 })}
-                className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
-                placeholder="±strength"
-                title="Strength delta — positive strengthens the sentiment, negative weakens or inverts it."
-              />
+              <div className="flex items-center gap-1 flex-shrink-0" title="Entity the sentiment is directed at — character id, 'player', inventory item, or any tag. Pointing at the holder character ⇒ self-directed sentiment.">
+                <span className="text-[10px] text-gray-500 select-none">→</span>
+                <input
+                  type="text"
+                  list={`sentiment-target-options-${index}`}
+                  value={effect.sentimentTarget || ''}
+                  onChange={(e) => updateEffect(index, { sentimentTarget: e.target.value })}
+                  placeholder="toward"
+                  className="w-24 px-1.5 py-1 text-xs border rounded"
+                />
+                <datalist id={`sentiment-target-options-${index}`}>
+                  <option value="player" />
+                  {(availableCharacters || []).map((c) => (
+                    <option key={c.id} value={c.id} label={c.displayName || c.name || c.id} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="flex-shrink-0" title="Emotion label — pick from the project palette or type a custom one (trust, fear, anger, gratitude, …)">
+                <input
+                  type="text"
+                  list={`sentiment-emotion-options-${index}`}
+                  value={effect.sentimentEmotion || ''}
+                  onChange={(e) => updateEffect(index, { sentimentEmotion: e.target.value })}
+                  placeholder="emotion"
+                  className="w-24 px-1.5 py-1 text-xs border rounded"
+                />
+                <datalist id={`sentiment-emotion-options-${index}`}>
+                  {paletteEmotionNames.map((n) => <option key={n} value={n} />)}
+                  {/* Common sentiment-only emotions that aren't typically in the palette */}
+                  <option value="trust" />
+                  <option value="gratitude" />
+                </datalist>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0" title="Strength delta (typical -1 to +1). Positive strengthens the sentiment, negative weakens or inverts it. Trust and mistrust live on the same axis with opposite signs.">
+                <span className="text-[10px] text-gray-500 select-none">Δ</span>
+                <input
+                  type="number"
+                  step={0.1}
+                  value={effect.strengthDelta ?? 0}
+                  onChange={(e) => updateEffect(index, { strengthDelta: parseFloat(e.target.value) || 0 })}
+                  className="w-14 px-1.5 py-1 text-xs border rounded"
+                  placeholder="±0.0"
+                />
+              </div>
             </>
           )}
 
@@ -399,14 +489,32 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
         );
       })}
 
-      <button
-        type="button"
-        onClick={addEffect}
-        className="flex items-center gap-1 px-2 py-0.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-      >
-        <Plus className="w-3 h-3" />
-        Add Effect
-      </button>
+      <div className="flex items-center gap-2 flex-wrap pt-1">
+        <button
+          type="button"
+          onClick={addEffect}
+          className="flex items-center gap-1 px-2 py-0.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+        >
+          <Plus className="w-3 h-3" />
+          Add Effect
+        </button>
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) {
+              applyTemplate(e.target.value);
+              (e.target as HTMLSelectElement).value = '';
+            }
+          }}
+          className="text-xs px-2 py-0.5 border rounded bg-white text-gray-600"
+          title="Append a preset bundle of affect effects tuned for a common author intent. Tweak values afterward to taste."
+        >
+          <option value="">+ apply template…</option>
+          {DEFAULT_EFFECT_TEMPLATES.map((t) => (
+            <option key={t.id} value={t.id} title={t.description}>{t.name}</option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 };

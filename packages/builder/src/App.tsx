@@ -5540,6 +5540,7 @@ function App() {
                 }
               }}
               characters={characters}
+              emotionPalette={emotionPalette}
               globalSettings={globalSettings}
             />
           )}

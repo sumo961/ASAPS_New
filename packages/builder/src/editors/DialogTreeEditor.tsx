@@ -87,6 +87,9 @@ interface DialogTreeEditorProps {
   /** Called when the user clicks "Define '<name>' as a Character" in the
    * per-node speaker combobox. Parent typically opens the Character Manager. */
   onDefineAsCharacter?: (name: string) => void;
+  /** Project emotion palette — passed to ChoiceEffectsEditor so the
+   *  fireEmotion / addSentiment emotion fields offer combobox auto-complete. */
+  emotionPalette?: ReadonlyArray<import('@asaps/core').EmotionDefinition>;
 }
 
 // Speaker color palette - consistent colors for each speaker
@@ -127,6 +130,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   expanded = false,
   speakerNameResolver,
   onDefineAsCharacter,
+  emotionPalette,
 }) => {
   // Custom speaker input state
   const [customSpeakerValue, setCustomSpeakerValue] = useState<string>('');
@@ -653,6 +657,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                           availableVariables={effectVariables}
                           availableInventoryItems={effectInventoryItems}
                           availableCharacters={characterObjects}
+                          emotionPalette={emotionPalette}
                           compact
                         />
                       </div>

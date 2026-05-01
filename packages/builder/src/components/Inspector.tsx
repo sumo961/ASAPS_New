@@ -131,6 +131,10 @@ interface InspectorProps {
   onCharacterSync?: (npcName: string, updates: { description?: string }) => void;
   // For counter/variable dropdowns
   characters?: Character[];
+  /** Project emotion palette — passed down to ChoiceEffectsEditor so the
+   *  fireEmotion / addSentiment emotion fields can offer combobox
+   *  auto-complete from the project's authored palette. */
+  emotionPalette?: ReadonlyArray<import('@asaps/core').EmotionDefinition>;
   globalSettings?: {
     variables?: { name: string; type: 'string' | 'number' | 'boolean'; defaultValue?: any; description?: string }[];
     hudOverlays?: { countdownMeter?: { showByDefault?: boolean } };
@@ -163,6 +167,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   onOpenCharacterManager,
   onCharacterSync,
   characters = [],
+  emotionPalette,
   globalSettings,
   width: externalWidth,
   onWidthChange,
@@ -2912,6 +2917,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       speakerNameResolver={speakerNameResolver}
                       availableInventoryItems={availableInventoryItems}
                       onDefineAsCharacter={onDefineAsCharacter}
+                      emotionPalette={emotionPalette}
                     />
 
                     {showAdvanced && (
@@ -3144,6 +3150,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 availableVariables={availableVariables}
                                 availableInventoryItems={availableInventoryItems}
                                 availableCharacters={characters}
+                                emotionPalette={emotionPalette}
                                 compact
                               />
                               <div className="mt-2 pt-2 border-t border-blue-200">
@@ -3353,6 +3360,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 availableVariables={availableVariables}
                                 availableInventoryItems={availableInventoryItems}
                                 availableCharacters={characters}
+                                emotionPalette={emotionPalette}
                                 compact
                               />
                               <div className="mt-2 pt-2 border-t border-blue-200">
@@ -3649,6 +3657,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               availableVariables={availableVariables}
                               availableInventoryItems={availableInventoryItems}
                               availableCharacters={characters}
+                              emotionPalette={emotionPalette}
                               hideInventory
                               compact
                             />
