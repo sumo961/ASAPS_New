@@ -1,5 +1,162 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-01: Character System — Steps 5–8 + Variants + Mood HUD + Alex Example (v0.9.43)
+
+### Overview
+
+Closes the rich-character roadmap end-to-end. Step 5 (emotion nodes with author-editable palette), Step 6 (Big Five personality traits modulating emotion deltas), Step 7 (dossier policy fork with reflection memory), and Step 8 Phase A (goals + GAMYGDALA-style emotion firing on goal status changes) all shipped this window. On top of those layers: a personality archetype library (10 psychology-grounded presets), character variants (alternate persona profiles for one Character id — the "play as introvert / extrovert Alex" feature), the 2D mood pad on Russell's circumplex (in the editor + as a runtime HUD overlay), variant-aware Character Manager UI (linked sub-cards with inline trait / mood / sentiment editors per variant), and full affect-stack parity for the standalone web player so deployed exports match the preview window. The example "Standing Beside Alex" project was reauthored end-to-end to demonstrate every feature: variant picker at start, affect effects on every choice, scene-end mood-reading reactions, mood/trust ending gates, and AI-summary beats writing the friendship retrospective in Alex's voice.
+
+### Step 5 — Emotion Nodes + Author-Editable Palette
+
+Per-character runtime emotion levels in [0, 1], decay each beat-entry at the palette's authored rate, auto-nudge mood on `fireEmotion` via palette weights. Default palette is Ekman 6 (joy, anger, fear, sadness, surprise, disgust) plus pride/shame/interest. `EmotionPaletteEditor` modal in the Character Manager lets authors rename, reweight, add, remove, or reset emotions. Palette persists through the project format (Story serializer + project save/load + preview live-update). New Effect type `fireEmotion`, new ConditionBeat operator `emotion`, UpdateAffect beat fires emotions with auto mood-nudge. CharacterAffectPanel renders top-N emotion intensity bars per character.
+
+**Files modified:**
+- `packages/core/src/engine/StoryContext.ts`
+- `packages/core/src/engine/Story.ts`
+- `packages/core/src/engine/EmotionPalette.ts` (new)
+- `packages/core/src/types/index.ts`
+- `packages/core/src/beats/ConditionBeat.ts`
+- `packages/core/src/beats/UpdateAffectBeat.ts`
+- `packages/core/src/utils/dossier.ts`
+- `packages/builder/src/App.tsx`
+- `packages/builder/src/contexts/PersistenceContext.tsx`
+- `packages/builder/src/components/characters/EmotionPaletteEditor.tsx` (new)
+- `packages/builder/src/components/characters/CharacterManager.tsx`
+- `packages/builder/src/components/characters/CharacterAffectPanel.tsx`
+- `packages/builder/src/pages/PreviewWindow.tsx`
+- `packages/builder/src/services/PreviewWindowManager.ts`
+
+### Step 6 — Personality Traits
+
+Static, author-set Big Five trait bag (openness, conscientiousness, extraversion, agreeableness, neuroticism), each in [0, 1]. Defaults to neutral; authors fine-tune per character. Traits modulate emotion deltas at runtime via `modulateEmotionDelta(base, emotion, traits, modulations)` — `scale = 1 + Σ ((trait - 0.5) × 2) × weight`, clamped [0, 4]. Project-level `TraitModulationProfile` ships defaults wiring traits to the standard palette (neuroticism amplifies negative emotions, extraversion amplifies positive ones, agreeableness dampens anger/disgust, etc.). Both the palette and trait modulations persist through the project format. New `trait` ConditionBeat operator for branching on traits. Dossier renders a `Personality:` line filtering out neutral traits. CharacterEditor's Affect tab gains a Personality section with sliders + descriptions. Traits never gate choices on their own — they only modulate deltas.
+
+**Files modified:**
+- `packages/core/src/engine/PersonalityTraits.ts` (new)
+- `packages/core/src/engine/Story.ts`
+- `packages/core/src/engine/StoryContext.ts`
+- `packages/core/src/beats/ConditionBeat.ts`
+- `packages/core/src/types/index.ts`
+- `packages/core/src/utils/dossier.ts`
+- `packages/builder/src/types/character.ts`
+- `packages/builder/src/components/characters/CharacterEditor.tsx`
+- `packages/builder/src/App.tsx`
+- `packages/builder/src/pages/PreviewWindow.tsx`
+
+### Personality Archetype Library
+
+10 psychology-grounded Big Five presets — balanced, narcissist, anxious-introvert, conscientious-leader, free-spirit, recluse, hothead, peacekeeper, stoic, trickster — with values from Costa & McCrae's NEO-PI-R bands. Each archetype optionally seeds *self-directed* sentiments (narcissist → pride toward self, anxious introvert → shame toward self) — sentiments toward other characters remain author-driven. `findPersonalityArchetype(id)` lookup helper. CharacterEditor's Affect tab gains a "Load archetype…" dropdown that replaces Big Five values (custom traits preserved), appends self-sentiments deduplicated by emotion, and shows a caption explaining what each preset seeds.
+
+**Files modified:**
+- `packages/core/src/engine/PersonalityArchetypes.ts` (new)
+- `packages/core/src/engine/index.ts`
+- `packages/builder/src/components/characters/CharacterEditor.tsx`
+
+### Step 7 — Dossier Policy Fork + Reflection Memory
+
+Per-character `dossierPolicy: 'reAnchor' | 'reflection'` switch. Mode A (default, `reAnchor`) rebuilds the dossier from structured state every turn so the character cannot drift away from authored identity. Mode B (`reflection`) accumulates per-turn reflections so the character is allowed to grow over the session. New `Reflection` type `{timestamp, text, beatId?, salience?}` stored on StoryContext; `appendCharacterReflection` evicts on a 32-entry per-character cap with salience-aware eviction (high-salience reflections survive longer). New `addReflection` Effect for authoring reflections from choices/nodes. Dossier renders a `Recent reflections:` block only in reflection mode; AI beats inherit the switch automatically through their existing `buildDossierForRef` call. CharacterEditor gains a Dossier policy radio block. ChoiceEffectsEditor learns the Add Reflection effect.
+
+**Files modified:**
+- `packages/core/src/engine/StoryContext.ts`
+- `packages/core/src/types/index.ts`
+- `packages/core/src/utils/dossier.ts`
+- `packages/builder/src/types/character.ts`
+- `packages/builder/src/components/characters/CharacterEditor.tsx`
+- `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
+
+### Step 8 Phase A — Goals + GAMYGDALA Emotion Firing
+
+Authored `Character.goals[]` (id, name, description, priority, optional satisfaction predicate). Runtime tracks status (`open` / `met` / `failed` / `abandoned`) on `StoryContext.characterGoalStatus`. New `setGoalStatus` Effect, new `goal` ConditionBeat operator. Per-beat-enter goal evaluation: `markBeatVisited` re-runs every authored satisfaction predicate via `checkCondition`; open goals whose predicate becomes true flip to `met`. GAMYGDALA-style emotion firing on status transitions: `met` fires pride+joy scaled by goal priority, `failed` fires shame+sadness, `abandoned` is silent (intentionally). Routes through `fireCharacterEmotion` so trait modulation + palette weights apply. Authors can opt out with `suppressEmotion` on the effect. Dossier renders `Pursuing:` (open, sorted by priority) and `Recent outcomes:` (met / failed) sections. CharacterEditor's Affect tab gains a Goals section. Phase B (NPCAct / Sandbox agent loop) deferred — the data path is real and an author can write goal-driven branching today.
+
+**Files modified:**
+- `packages/core/src/engine/StoryContext.ts`
+- `packages/core/src/types/index.ts`
+- `packages/core/src/utils/dossier.ts`
+- `packages/builder/src/types/character.ts`
+- `packages/builder/src/components/characters/CharacterEditor.tsx`
+- `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
+
+### Character Variants — Alternate Persona Profiles
+
+A single Character record can now carry multiple persona overlays (Alex-introvert vs Alex-extrovert; Player-man vs Player-woman). One stable id, one set of beats — only the affect / portrait / displayName slice swaps. New `CharacterVariant` type with partial-overlay semantics (any field the variant defines replaces the base; everything else is inherited). `Character.defaultVariantId` for author-set startup, `setCharacterVariant` Effect for player-driven picks at story-start, `characterVariant` ConditionBeat operator for branching on the active variant. Switching variants atomically wipes mood/sentiments/emotions and re-seeds from the variant's authored values, emitting `characterMoodChanged` / `characterSentimentChanged` so HUD overlays refresh. Variants are exclusive (one active at a time), chosen at story-start (mid-story switching allowed via `suppressSeed: true` to keep accumulated affect).
+
+CharacterManager grid now renders characters with variants as a grouped cell — colored border keyed to the parent's color, parent header with display name + variant count, one inner sub-card per variant. Each variant sub-card carries its own portrait override, displayName, description, "(default)" tag if applicable, and edit / delete affordances. Clicking a sub-card opens the editor focused on that variant (Affect tab pre-selected, scrolled to the variant card with a brief blue outline). When a character has variants, the parent's Personality / Initial mood / Initial sentiments / Dossier policy sections collapse to a single explainer banner — variants become the unit of personality. First-variant migration deep-clones base values into the new variant and clears them from the base record so the data model stays unambiguous. Each variant card hosts inline editors for Big Five trait sliders (with the archetype-preset shortcut), a 180px MoodPad for `initialMood`, a compact sentiment list, and per-variant portrait override (DirectAssetUpload). Sprite-sheet / animation-name overrides are deferred to a future "playable character pool" feature.
+
+A new private `explicitVariantSet` flag on StoryContext distinguishes engine-applied default variants from explicit player picks (only set by `setActiveCharacterVariant`, not by `seedCharacterAffectFromStory`'s default-apply). The HUD overlay gates on `hasExplicitlySetVariant(id)` so a character with `defaultVariantId` set still has its HUD hidden until the player makes an actual pick.
+
+**Files modified:**
+- `packages/core/src/types/index.ts`
+- `packages/core/src/utils/characterVariant.ts` (new)
+- `packages/core/src/utils/index.ts`
+- `packages/core/src/utils/dossier.ts`
+- `packages/core/src/engine/StoryContext.ts`
+- `packages/builder/src/types/character.ts`
+- `packages/builder/src/components/characters/CharacterEditor.tsx`
+- `packages/builder/src/components/characters/CharacterManager.tsx`
+- `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
+
+### 2D Mood Pad — Editor + Runtime HUD
+
+`MoodPad` reusable React component renders mood on Russell's circumplex (square + inscribed circle, faint quadrant tints, axis cross, optional emotion-palette markers). Click-and-drag to set valence/arousal interactively; read-only mode for display. The editor's Affect tab uses a 320px pad as the primary picker with sliders below for numeric fine-tune; emotion markers from the project palette show where each emotion sits in mood-space. The runtime `CharacterMoodFrame` HUD widget mirrors the visual — wraps the disc in a small card with a header (color dot or portrait + display name), beefier quadrant colors (yellow-joy / red-fear / blue-sad / green-serene), bigger mood dot using the character's accent color, and an optional qualitative descriptor ("pleased, alert" / "sad, subdued") below. Default size 140 with a 22px header + 18px label rows, on by default for the qualitative line.
+
+PreviewWindow + the standalone WebPlayer both render screen-docked HUDs as a top-level overlay layer (independent of stage character placement), so dialog-only stories show the HUD too. Anchored-to-character HUDs continue to mount from PositionedBeatView when the character is on stage. Mood / variant-changed events bump a `hudTick` state to force re-render. Resolver chain forwards merged-character displayName + portrait URL + color so variant overlays apply to the HUD.
+
+**Files modified:**
+- `packages/builder/src/components/characters/MoodPad.tsx` (new)
+- `packages/builder/src/components/characters/__tests__/MoodPad.test.tsx` (new)
+- `packages/renderer/src/components/CharacterMoodFrame.tsx` (new)
+- `packages/renderer/src/components/PositionedBeatView.tsx`
+- `packages/renderer/src/renderers/ReactRenderer.tsx`
+- `packages/renderer/src/index.ts`
+- `packages/builder/src/components/characters/CharacterAffectPanel.tsx`
+- `packages/builder/src/components/characters/CharacterEditor.tsx`
+- `packages/builder/src/pages/PreviewWindow.tsx`
+- `packages/player/src/PlayerEngine.ts`
+- `packages/player-web/src/WebPlayer.tsx`
+
+### Authoring-UX polish
+
+- **Character dropdown for affect-effect targets.** Effects targeting a character (`nudgeMood`, `addSentiment`, `fireEmotion`, `addReflection`, `setGoalStatus`, `setCharacterVariant`) used to require typing the character id by hand. ChoiceEffectsEditor now renders a SmartNameDropdown of the project's character roster — author picks by display name, the dropdown stores the id, runtime resolves correctly. `player` is always included as a sentinel option.
+- **Self-directed sentiment rendering.** When a character's sentiment targets themselves (`toEntityRef === character.id`), the Preview Window's affect panel and the LLM dossier both render as `mild self-shame` instead of the ambiguous `mild shame toward Alex`. Dossier splits sentiments into separate "Feels toward themselves:" and "Feels toward others:" sections.
+- **Variant edit/delete buttons.** Variant sub-cards in the Character Manager grid carry hover-revealed edit (✎) and delete (✕) buttons with explicit `type="button"`, `confirm()` on delete, defaultVariantId cleared when the deleted variant was the default.
+- **Mood-pad clipping fix.** Mood dot at extreme valence/arousal values used to be clipped by the SVG viewBox edge — now scaled by 45 instead of 50 inside the 100-unit viewBox so the dot stays fully inside the disc at every value.
+- **Affect-panel column overflow.** Per-axis bar rows used to carry a duplicate qualitative word column that got truncated in narrow layouts; dropped since the same info is in the summary line below.
+
+### Webplayer parity (`@asaps/player`, `@asaps/player-web`)
+
+Standalone web exports get every feature the preview window has:
+
+- `PlayerEngine.createStoryFromJSON` registers `setEmotionPalette` + `setTraitModulations` after `setCharacters` so customised palette / trait modulations apply at runtime.
+- `WebPlayer.tsx` mounts a top-level mood-HUD overlay alongside the renderer container (with the `hasExplicitlySetVariant` gate), wraps the renderer in a `position: relative` container, subscribes to `characterMoodChanged` / `characterVariantChanged` to refresh.
+- `PlayerEngine`'s mood-frame resolver passes characterName / portrait / color forward (via merged character) so variant overlays apply in the HUD.
+
+The `packages/player-web/dist/` bundle is rebuilt; `HtmlExporter` ships it with each story. Existing exports need a re-export to pick up the bundled fix.
+
+**Files modified:**
+- `packages/player/src/PlayerEngine.ts`
+- `packages/player-web/src/WebPlayer.tsx`
+- `packages/builder/public/player-web.js` (regenerated bundle)
+
+### Alex Example — End-to-End Demo (`docs/Standing_Beside_Alex_complete.asaps.zip`)
+
+The user's reference story was rewritten through five passes to demonstrate every feature:
+
+1. **Variants picker** at story start: `setCharacterVariant` effects on two `dialogTree` choices ("Free Spirit Alex — bright, open" / "Anxious Introvert Alex — quiet, careful"). Both route into the existing first scene.
+2. **Affect effects on every choice**: 15 dialog choices across 5 scenes, each carrying combinations of `nudgeMood`, `fireEmotion`, `addSentiment` (toward player AND toward self for the variant's self-doubt arc), and `addReflection`. Empathetic choices reduce Alex's variant-seeded self-shame; harmful ones reinforce it.
+3. **Scene-end mood reactions**: 7 ConditionBeat trios (one per pivotal outcome) reading `mood.valence` and routing to one of two short prose lines describing what Alex looks like.
+4. **Affect-driven endings**: ending gates moved from `supportScore` counter to `mood.valence` + `sentiment(trust toward player)`. supportScore stays in the data; three new counters (`maxSupport` / `partialSupport` / `failedSupport`) track choice quality without driving the gate.
+5. **AI synthesis beats**: three `aiSummary` beats (one per ending tier) with tier-specific prompts steering the LLM to write a friendship retrospective in the third person, citing specific moments and counter values.
+
+Mood HUD enabled top-right (160px, qualitative label on, Alex's color #7c3aed). Hidden during title and picker, appears at beat_1 with the variant's seeded mood ("pleased, alert" for Free Spirit, "displeased, steady" for Anxious Introvert).
+
+**Files modified:**
+- (Example zip distributed via `/Users/hartmut/Downloads/`)
+
+### Test Coverage
+
+199 affect-stack tests passing across 14 files (core engine + utils + beats + builder character UI). New test files: `PersonalityTraits`, `PersonalityArchetypes`, `CharacterTraits`, `CharacterReflections`, `CharacterGoals`, `CharacterVariants`, `VariantSeedEvents`, `dossierPolicy`, `dossierGoals`, `MoodPad`. Pre-existing unrelated baseline failures (ConditionBeat counter tests, EndScreen reset, ConversationPromptBuilder format, ttsWait timing) reproduce on main and are untouched.
+
+---
+
 ## 2026-04-29: Character System — Steps 2–4 Complete (Affect, Memory, Dossier) (v0.9.42)
 
 ### Overview

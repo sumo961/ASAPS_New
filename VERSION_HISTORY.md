@@ -5,13 +5,21 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.36**. This is a **beta**: core functionality works,
+Current release: **v0.9.43**. This is a **beta**: core functionality works,
 features below reflect what has been shipped since active development began.
 
 ## Feature Matrix
 
 | Feature | Status |
 |---------|--------|
+| **Character Variants** | **v0.9.43**: A single Character record can carry multiple persona overlays (e.g., "introvert Alex" / "extrovert Alex" — same id, same beats, only the affect / portrait / displayName slice swaps). `setCharacterVariant` Effect for player-driven picks at story-start, `characterVariant` ConditionBeat operator for branching, atomic re-seed of mood + sentiments on switch. Linked sub-cards in the Character Manager grid with per-variant inline trait/mood/sentiment editors and portrait override |
+| **Mood HUD Overlay** | **v0.9.43**: 2D mood pad on Russell's circumplex mountable as a per-character on-stage HUD or screen-docked overlay. Card layout with portrait + name header, colour-coded quadrant tints (yellow-joy / red-fear / blue-sad / green-serene), emotion-palette markers, optional qualitative descriptor ("pleased, alert"). Available in Preview Window AND deployed standalone web exports |
+| **Goals + GAMYGDALA Emotion Firing** | **v0.9.43**: Authored `Character.goals[]` with optional satisfaction predicates. Runtime tracks status (open / met / failed / abandoned) and auto-fires pride+joy on met / shame+sadness on failed (scaled by goal priority, routed through trait modulation). New `setGoalStatus` Effect, new `goal` ConditionBeat operator |
+| **Dossier Policy Fork** | **v0.9.43**: Per-character `dossierPolicy: 'reAnchor' \| 'reflection'` switch. Mode A rebuilds dossier from structured state every turn (no drift). Mode B accumulates per-turn reflections so the character grows. `Reflection` runtime state, 32-entry per-character cap with salience-aware eviction, new `addReflection` Effect |
+| **Personality Traits + Archetypes** | **v0.9.43**: Static Big Five trait bag per character. Traits modulate emotion deltas at runtime via project-level TraitModulationProfile. New `trait` ConditionBeat operator. 10 psychology-grounded archetype presets (narcissist, anxious-introvert, conscientious-leader, free-spirit, recluse, hothead, peacekeeper, stoic, trickster, balanced) loadable from the editor with self-directed sentiment seeds |
+| **Emotion Nodes + Author-Editable Palette** | **v0.9.43**: Per-character runtime emotion levels in [0, 1] decaying each beat. `fireEmotion` Effect auto-nudges mood via palette weights. Default Ekman 6 + pride/shame/interest. EmotionPaletteEditor in the Character Manager lets authors rename/reweight/add/remove |
+| **2D Mood Pad in Editor** | **v0.9.43**: Russell's circumplex MoodPad in the Character Editor's Affect tab — click/drag to set initial mood, emotion-palette markers show emotional geography, sliders below for fine-tune |
+| **Affect-Driven Story Endings** | **v0.9.43**: Example "Standing Beside Alex" project demonstrates mood+trust gating, three counter buckets (max/partial/failed) tracking choice quality, AI-summary beats writing tier-specific friendship retrospectives via dossier injection |
 | **Asset Deletion Round-Trip** | **v0.9.36**: Removing an asset in the UI now removes the binary on disk and prunes the manifest entry for directory-format projects, so deleted assets stop being re-pushed to GitHub |
 | **Git LFS Off for Assets** | **v0.9.36**: Auto-generated `.gitattributes` no longer routes assets through LFS — fixes clone/pull losing assets entirely on systems with `git-lfs` installed. Existing projects auto-migrate on next save |
 | **History Tab Project Switch** | **v0.9.36**: Switching/cloning into a new repo no longer briefly shows the previous project's commit log — HistoryTab clears state synchronously on `projectPath` change |
