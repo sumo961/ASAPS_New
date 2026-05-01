@@ -638,19 +638,18 @@ Give characters items or take them away. Items can be transferred between charac
 
 ### Update Affect
 
-**Purpose:** Drift a character's mood, fire an emotion, or strengthen a sentiment from a beat in the flow.
+**Purpose:** Drift a character's mood, fire an emotion, strengthen a sentiment, flip a goal, switch a variant, append a reflection, or snapshot an affect bookmark — from a beat in the flow rather than from a player choice.
 
 This is the logic-beat counterpart to the [affect-aware choice effects](#choice-effects-affect). Use it when the affect change isn't triggered by a player choice — e.g. *"on entering the haunted house, every NPC's fear rises"*, or *"at the end of Act 1, the player feels pride."*
 
-**Key Settings:**
-- **Character** — whose affect changes
-- **Mood deltas** — optional ±valence and ±arousal (clamped to `[-1, 1]`)
-- **Sentiment** — optional (target, emotion, strength delta) tuple
-- **Emotion** — optional (emotion name, intensity delta); when the emotion is in the project's [Emotion Palette](#emotion-palette), the runtime auto-nudges mood by the palette weights so you don't have to specify mood deltas separately
+**Authoring surface (v0.9.45+).** The Update Affect inspector renders the **same Effects editor as a player choice** — so everything you already know about choice effects works here unchanged: stack as many rows as you like, mix mood nudges with emotion fires and sentiment adds, drop in a `Bookmark Affect State` row to mark an act-break baseline future conditions can compare against, seed a coherent bundle from the **+ apply template…** dropdown, and watch the live "what does this beat do?" summary update under the rows as you tweak. See [Easier authoring: labels, palette suggestions, templates, and a live summary](#effects-easier-authoring) for the full walk-through — there's only one editor and one set of conventions to learn.
 
-All fields are optional — at minimum one of mood deltas, the sentiment trio, or the emotion pair must be set, otherwise the beat is a silent no-op.
+![Update Affect inspector showing the multi-row effects editor with live summary](images/42-update-affect-effects-editor.png)
+*An Update Affect beat populated by the **Empathetic — full support** template: a mood nudge, two `Fire Emotion` rows (joy, fear), and two `Add Sentiment` rows (trust, self-shame). The italic teal block at the bottom — `→ the player: feels happier, calmer; joy spikes; fear softens; self-trust grows (+0.40); self-shame eases (−0.05)` — is the live plain-language summary, the same one you see on choice effects.*
 
-**When to Use:** Atmosphere shifts, story-beat-level emotional pivots, "the world has changed" moments where affect should update without a player action.
+**When to Use:** Atmosphere shifts, story-beat-level emotional pivots, the moment the player crosses a narrative threshold and *every* NPC reacts, an act-break "snapshot the world right now" so later acts can compare against the baseline. Also useful as a one-stop place to bundle several affect changes that are *consequences of* a setVariable or condition the engine just evaluated, rather than of any player choice.
+
+> **Project-file note for v0.9.45.** The on-disk shape changed: new Update Affect beats save with an `<effects>` block (one `<effect>` element per row), matching how a choice's effects are serialised. Older projects that used the legacy single-row attributes (`moodValenceDelta="..."`, `sentimentTarget="..."`, `emotion="..."`, etc.) still load and run unchanged — the runtime falls back to the legacy fields when no `effects` array is present. The first time you open a legacy beat in the editor, its existing values are surfaced as Effect rows so you can see them in the new shape; saving the beat then persists the migrated form. Old projects you never re-touch keep their legacy `<UpdateAffect>` element verbatim.
 
 ---
 
@@ -2477,7 +2476,7 @@ Quick reference for all beat types.
 | Random Target | Randomization | targets with optional weights |
 | Set Timer | Timed events | timer name, duration, expiration target |
 | Inventory Management | Item management | action (add/remove/transfer), item, quantity, character |
-| Update Affect | Mood / sentiment / emotion drift | character, ±valence, ±arousal, sentiment (target+emotion+strength), emotion (name+intensity) |
+| Update Affect | Mood / sentiment / emotion drift, bookmarks, reflections, goal & variant flips | `effects[]` — multi-row Effect array, same shape and editor as a choice's effects (templates, palette auto-complete, live summary, bookmark snapshots). Legacy single-row fields still load and run for older projects. |
 
 ## AI Runtime Beats
 
