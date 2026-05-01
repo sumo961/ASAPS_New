@@ -147,6 +147,28 @@ export interface Condition {
   // `value` or `variantId`. Operators: == / !=. An empty / unset
   // variant compares as the empty string.
   variantId?: string;
+  /**
+   * Baseline-relative comparison switch for the continuous-valued affect
+   * conditions (`mood`, `emotion`, `sentiment`). When set, the operator
+   * compares `current - baseline` (a delta) against `value` instead of
+   * comparing `current` directly. Lets authors phrase requirements as
+   * "trust toward player has *grown* by 0.3" rather than as a fixed
+   * threshold that depends on the character's starting point.
+   *
+   *   - `'literal'` (or undefined) — current behaviour: compare current
+   *     against `value` directly.
+   *   - `'initial'` — compare against the value the slot held when the
+   *     story started (or when the character first picked it up). The
+   *     runtime captures this lazily on first mutation. Missing initial
+   *     reads as 0 — which matches the slot's default rest state.
+   *   - `{ bookmark: name }` — compare against a snapshot taken earlier
+   *     by the `bookmarkAffectState` effect. Missing bookmark or missing
+   *     entry reads as 0.
+   *
+   * No effect on conditions other than mood / emotion / sentiment — the
+   * trait / goal / variant / non-affect predicates ignore this field.
+   */
+  baseline?: 'literal' | 'initial' | { bookmark: string };
 }
 
 /**
@@ -219,7 +241,15 @@ export interface Effect {
     // story-start branch to lock in a persona. By default this re-seeds
     // the character's mood / sentiments from the variant's authored
     // values; set `suppressSeed` to keep accumulated affect.
-    | 'setCharacterVariant';
+    | 'setCharacterVariant'
+    // Snapshot the current mood / emotion / sentiment values of one
+    // character (or every character) under a bookmark name. The bookmark
+    // is then a stable point of comparison for future condition checks
+    // — "trust toward player has improved since the reunion-scene
+    // bookmark" reads as `(current trust) - (bookmarked trust) >= …`.
+    // The bookmark name is the canonical handle: writing the same name
+    // again overwrites the prior snapshot.
+    | 'bookmarkAffectState';
   target: string;
   value?: any;
   // Sentiment-effect parameters (used when type === 'addSentiment'). Kept
@@ -274,6 +304,19 @@ export interface Effect {
    * Default false (re-seed) — appropriate for story-start switches.
    */
   suppressSeed?: boolean;
+  /**
+   * Bookmark name for `bookmarkAffectState` effects. Writing the same
+   * name again overwrites the snapshot. Empty / missing names are
+   * ignored. Bookmarks are referenced by condition `baseline` switches.
+   */
+  bookmarkName?: string;
+  /**
+   * Bookmark scope for `bookmarkAffectState`. `'all'` (default) snapshots
+   * every character's mood / sentiments / emotion levels. `'character'`
+   * snapshots only `effect.target` — useful for per-arc bookmarks that
+   * shouldn't get overwritten by an unrelated character's later snapshot.
+   */
+  scope?: 'all' | 'character';
 }
 
 /**

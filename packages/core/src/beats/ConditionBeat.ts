@@ -47,6 +47,11 @@ export class ConditionBeat extends Beat {
   public emotionName?: string;
   // Trait-specific parameter (Step 6) — branches on a character's static trait value.
   public traitName?: string;
+  // v0.9.45 — baseline switch on mood / emotion / sentiment conditions.
+  // 'literal' (or undefined) compares current value directly; 'initial'
+  // compares (current - story-start value); { bookmark: name } compares
+  // (current - bookmarked value). See Condition.baseline in types.
+  public baseline?: 'literal' | 'initial' | { bookmark: string };
 
   constructor(config: BeatConfig & {
     conditionType?: string;
@@ -112,6 +117,7 @@ export class ConditionBeat extends Beat {
     this.sentimentEmotion = conditionObj.sentimentEmotion || (params as any).sentimentEmotion || (config as any).sentimentEmotion;
     this.emotionName = conditionObj.emotionName || (params as any).emotionName || (config as any).emotionName;
     this.traitName = conditionObj.traitName || (params as any).traitName || (config as any).traitName;
+    this.baseline = conditionObj.baseline ?? (params as any).baseline ?? (config as any).baseline;
 
     // Build condition object based on type
     this.condition = this.buildCondition();
@@ -169,17 +175,20 @@ export class ConditionBeat extends Beat {
         condition.character = this.character;
         condition.moodAxis = this.moodAxis || 'valence';
         condition.value = this.value ?? this.val ?? 0;
+        if (this.baseline !== undefined) condition.baseline = this.baseline;
         break;
       case 'sentiment':
         condition.character = this.character;
         condition.sentimentTarget = this.sentimentTarget;
         condition.sentimentEmotion = this.sentimentEmotion;
         condition.value = this.value ?? this.val ?? 0;
+        if (this.baseline !== undefined) condition.baseline = this.baseline;
         break;
       case 'emotion':
         condition.character = this.character;
         condition.emotionName = this.emotionName;
         condition.value = this.value ?? this.val ?? 0;
+        if (this.baseline !== undefined) condition.baseline = this.baseline;
         break;
       case 'trait':
         // Step 6 — branch on a character's static trait value.
@@ -231,6 +240,7 @@ export class ConditionBeat extends Beat {
       sentimentEmotion: this.sentimentEmotion,
       emotionName: this.emotionName,
       traitName: this.traitName,
+      baseline: this.baseline,
     };
   }
 
@@ -431,6 +441,13 @@ export class ConditionBeat extends Beat {
       this.traitName = params.traitName;
     } else if (conditionObj.traitName !== undefined) {
       this.traitName = conditionObj.traitName;
+    }
+
+    // Baseline switch (v0.9.45) — null/undefined deletes the override.
+    if (params.baseline !== undefined) {
+      this.baseline = params.baseline;
+    } else if (conditionObj.baseline !== undefined) {
+      this.baseline = conditionObj.baseline;
     }
 
     // Rebuild condition object from extracted canonical values

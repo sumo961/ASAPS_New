@@ -29,6 +29,9 @@ const EFFECT_TYPE_LABELS: Record<EffectType, string> = {
   // Switch which variant is active for a character (player picks "play
   // as introvert / extrovert" etc., or author wires a default).
   setCharacterVariant: 'Set Character Variant',
+  // v0.9.45 — snapshot mood / emotion / sentiment state under a name so
+  // future condition baselines can compare against it.
+  bookmarkAffectState: 'Bookmark Affect State',
 };
 
 interface ChoiceEffectsEditorProps {
@@ -205,7 +208,12 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
   return (
     <div className={`space-y-1.5 ${compact ? '' : 'p-2 bg-gray-50 rounded'}`}>
       {effects.map((effect, index) => {
-        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment' || effect.type === 'fireEmotion' || effect.type === 'addReflection' || effect.type === 'setGoalStatus' || effect.type === 'setCharacterVariant';
+        const isAffect = effect.type === 'nudgeMood' || effect.type === 'addSentiment' || effect.type === 'fireEmotion' || effect.type === 'addReflection' || effect.type === 'setGoalStatus' || effect.type === 'setCharacterVariant'
+          // bookmarkAffectState only takes a character target when scope='character'.
+          || (effect.type === 'bookmarkAffectState' && (effect as any).scope === 'character');
+        // Hide the target field entirely for scope='all' bookmark snapshots —
+        // the snapshot covers every character so there's nothing to address.
+        const hideTarget = effect.type === 'bookmarkAffectState' && (effect as any).scope !== 'character';
         return (
         <div key={index} className="flex flex-wrap gap-1 items-center">
           {/* Type dropdown */}
@@ -246,6 +254,14 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
               } else if (newType === 'setCharacterVariant') {
                 updates.value = undefined;
                 (updates as any).variantId = (effect as any).variantId ?? '';
+              } else if (newType === 'bookmarkAffectState') {
+                // Bookmark snapshots mood / emotion / sentiment state under
+                // an author-named handle. Default scope is 'all' (no target
+                // needed); narrowing to a single character is opt-in.
+                updates.value = undefined;
+                updates.target = effect.target ?? '';
+                (updates as any).bookmarkName = (effect as any).bookmarkName ?? '';
+                (updates as any).scope = (effect as any).scope ?? 'all';
               }
               updateEffect(index, updates);
             }}
@@ -257,7 +273,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
           </select>
 
           {/* Target field */}
-          {isAffect ? (
+          {hideTarget ? null : isAffect ? (
             // Affect effects target a character — present a SmartNameDropdown
             // backed by the project's actual character roster (plus the
             // sentinel "player"). Falls back to a free-text input only when
@@ -358,6 +374,27 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
               className="w-32 px-1.5 py-1 text-xs border rounded font-mono flex-shrink-0"
               title="Authored variant id (must match Character.variants[].id). Empty clears the active variant."
             />
+          )}
+          {effect.type === 'bookmarkAffectState' && (
+            <>
+              <input
+                type="text"
+                value={(effect as any).bookmarkName || ''}
+                onChange={(e) => updateEffect(index, { bookmarkName: e.target.value } as any)}
+                placeholder="bookmark-name"
+                className="w-40 px-1.5 py-1 text-xs border rounded font-mono flex-shrink-0"
+                title="Author-named handle for this snapshot. Reference it later from a condition's 'Compared to: bookmark' switch."
+              />
+              <select
+                value={(effect as any).scope || 'all'}
+                onChange={(e) => updateEffect(index, { scope: e.target.value } as any)}
+                className="px-1.5 py-1 text-xs border rounded bg-white flex-shrink-0"
+                title="all = snapshot every character's mood/emotion/sentiment. character = snapshot only the target character."
+              >
+                <option value="all">scope: all characters</option>
+                <option value="character">scope: target only</option>
+              </select>
+            </>
           )}
           {effect.type === 'setGoalStatus' && (
             <>

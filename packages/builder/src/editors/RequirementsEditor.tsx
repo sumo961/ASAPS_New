@@ -12,6 +12,10 @@ import { Plus, Trash2, ShieldCheck } from 'lucide-react';
 import type { Beat } from '@asaps/core';
 import type { StateRequirement, Condition } from '@asaps/core';
 import { SmartNameDropdown } from './SmartNameDropdown';
+import {
+  groupConditionTemplates,
+  findConditionTemplate,
+} from './conditionTemplates';
 
 interface AvailableOption {
   name: string;
@@ -44,6 +48,61 @@ interface RequirementsEditorProps {
 
 type CondType = 'inventory' | 'counter' | 'variable' | 'visitedBeat'
   | 'mood' | 'emotion' | 'trait' | 'sentiment' | 'goal' | 'characterVariant';
+
+/**
+ * Render the v0.9.45 "Compared to" baseline switch for an affect
+ * condition (mood / emotion / sentiment). The control resolves the
+ * current baseline mode from `cond.baseline` and writes the new value
+ * back via `onChange`. Bookmark mode reveals a name input below.
+ */
+function renderBaselinePicker(
+  cond: Condition,
+  onChange: (baseline: Condition['baseline']) => void,
+): React.ReactNode {
+  const baseline = (cond as any).baseline as Condition['baseline'];
+  const mode: 'literal' | 'initial' | 'bookmark' =
+    !baseline || baseline === 'literal' ? 'literal'
+    : baseline === 'initial' ? 'initial' : 'bookmark';
+  const bookmarkName = mode === 'bookmark' && typeof baseline === 'object'
+    ? (baseline as any).bookmark || '' : '';
+  return (
+    <div className="border-t border-dashed border-gray-200 pt-1.5 mt-1.5 space-y-1">
+      <div>
+        <label className="block text-[11px] font-medium text-gray-700 mb-0.5">
+          Compared to
+          <span className="text-[10px] text-gray-500 ml-1">
+            {mode === 'literal'
+              ? '(literal threshold)'
+              : '(value above is a delta — improved/dropped by X since the baseline)'}
+          </span>
+        </label>
+        <select
+          value={mode}
+          onChange={(e) => {
+            const m = e.target.value as 'literal' | 'initial' | 'bookmark';
+            if (m === 'literal') onChange(undefined);
+            else if (m === 'initial') onChange('initial');
+            else onChange({ bookmark: bookmarkName });
+          }}
+          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+        >
+          <option value="literal">literal value (default)</option>
+          <option value="initial">delta from initial (story-start / first-touch)</option>
+          <option value="bookmark">delta from a named bookmark</option>
+        </select>
+      </div>
+      {mode === 'bookmark' && (
+        <input
+          type="text"
+          value={bookmarkName}
+          onChange={(e) => onChange({ bookmark: e.target.value })}
+          placeholder="bookmark name (must match a bookmarkAffectState effect)"
+          className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+        />
+      )}
+    </div>
+  );
+}
 
 function emptyRequirement(): StateRequirement {
   return {
@@ -185,6 +244,41 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
+            </div>
+
+            {/* v0.9.45 — apply a condition template to seed every field at
+                once. Authors fine-tune from there; the select resets after
+                each pick. Templates that target a character read the
+                current 'character' field (or empty) as their target. */}
+            <div className="bg-blue-50 border border-blue-200 rounded p-1.5 space-y-1">
+              <label className="block text-[11px] font-medium text-blue-800">
+                Apply a template (presets the fields below)
+              </label>
+              <select
+                value=""
+                onChange={(e) => {
+                  const tmplId = e.target.value;
+                  if (!tmplId) return;
+                  const tmpl = findConditionTemplate(tmplId);
+                  if (!tmpl) return;
+                  const targetChar = ((cond as any).character || '') as string;
+                  const newCond = tmpl.forge({ target: targetChar, playerRef: 'player' });
+                  update(idx, { condition: newCond });
+                  e.target.value = '';
+                }}
+                className="w-full px-2 py-1 border border-blue-300 rounded text-xs bg-white"
+              >
+                <option value="">— pick a template —</option>
+                {groupConditionTemplates().map((g) => (
+                  <optgroup key={g.category} label={g.label}>
+                    {g.members.map((t) => (
+                      <option key={t.id} value={t.id} title={t.description}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
             </div>
 
             {/* Condition type */}
@@ -367,41 +461,47 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                 <>
                   {charDropdown}
                   {t === 'mood' && (
-                    <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-                      <select
-                        value={(cond as any).moodAxis || 'valence'}
-                        onChange={e => updateCondition(idx, { moodAxis: e.target.value } as any)}
-                        className="px-2 py-1 border border-gray-300 rounded text-xs"
-                      >
-                        <option value="valence">valence (sad↔happy)</option>
-                        <option value="arousal">arousal (calm↔excited)</option>
-                      </select>
-                      {numericOps}
-                      <input
-                        type="number" step={0.05} min={-1} max={1}
-                        value={(cond as any).value ?? 0}
-                        onChange={e => updateCondition(idx, { value: parseFloat(e.target.value) } as any)}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
-                      />
-                    </div>
+                    <>
+                      <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                        <select
+                          value={(cond as any).moodAxis || 'valence'}
+                          onChange={e => updateCondition(idx, { moodAxis: e.target.value } as any)}
+                          className="px-2 py-1 border border-gray-300 rounded text-xs"
+                        >
+                          <option value="valence">valence (sad↔happy)</option>
+                          <option value="arousal">arousal (calm↔excited)</option>
+                        </select>
+                        {numericOps}
+                        <input
+                          type="number" step={0.05} min={-1} max={1}
+                          value={(cond as any).value ?? 0}
+                          onChange={e => updateCondition(idx, { value: parseFloat(e.target.value) } as any)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                      {renderBaselinePicker(cond, (b) => updateCondition(idx, { baseline: b } as any))}
+                    </>
                   )}
                   {t === 'emotion' && (
-                    <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-                      <input
-                        type="text"
-                        value={(cond as any).emotionName || ''}
-                        onChange={e => updateCondition(idx, { emotionName: e.target.value } as any)}
-                        placeholder="emotion name"
-                        className="px-2 py-1 border border-gray-300 rounded text-xs font-mono"
-                      />
-                      {numericOps}
-                      <input
-                        type="number" step={0.05} min={0} max={1}
-                        value={(cond as any).value ?? 0}
-                        onChange={e => updateCondition(idx, { value: parseFloat(e.target.value) } as any)}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
-                      />
-                    </div>
+                    <>
+                      <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                        <input
+                          type="text"
+                          value={(cond as any).emotionName || ''}
+                          onChange={e => updateCondition(idx, { emotionName: e.target.value } as any)}
+                          placeholder="emotion name"
+                          className="px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                        />
+                        {numericOps}
+                        <input
+                          type="number" step={0.05} min={-1} max={1}
+                          value={(cond as any).value ?? 0}
+                          onChange={e => updateCondition(idx, { value: parseFloat(e.target.value) } as any)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                      {renderBaselinePicker(cond, (b) => updateCondition(idx, { baseline: b } as any))}
+                    </>
                   )}
                   {t === 'trait' && (() => {
                     const traitNames = selectedChar?.traits ? Object.keys(selectedChar.traits) : [];
@@ -471,6 +571,7 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                           className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
                         />
                       </div>
+                      {renderBaselinePicker(cond, (b) => updateCondition(idx, { baseline: b } as any))}
                     </div>
                   )}
                   {t === 'goal' && (() => {

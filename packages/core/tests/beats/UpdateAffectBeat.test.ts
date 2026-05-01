@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { UpdateAffectBeat } from '../../src/beats/UpdateAffectBeat';
+import { UpdateAffectBeat, synthesizeEffectsFromLegacyParams } from '../../src/beats/UpdateAffectBeat';
 import { StoryContext } from '../../src/engine/StoryContext';
 import { Story } from '../../src/engine/Story';
 
@@ -165,5 +165,97 @@ describe('UpdateAffectBeat', () => {
     expect(ctxWithStory.getCharacterMood('char_1').valence).toBeCloseTo(0);
     // pride's arousal weight 0.2 × 0.4 = +0.08
     expect(ctxWithStory.getCharacterMood('char_1').arousal).toBeCloseTo(0.08);
+  });
+
+  // v0.9.45 — UpdateAffectBeat now also accepts an effects[] array.
+  // Each row is dispatched through context.applyEffect, so the same
+  // bundles authors compose for choices apply standalone too.
+  describe('v0.9.45 effects[] path', () => {
+    it('applies a multi-row effects[] in order via context.applyEffect', async () => {
+      const beat = new UpdateAffectBeat({
+        id: 'b1', name: 't', type: 'updateAffect',
+        parameters: {
+          // No legacy fields — just the new effects array.
+          effects: [
+            { type: 'nudgeMood', target: 'char_1', valenceDelta: 0.3, arousalDelta: -0.1 },
+            { type: 'addSentiment', target: 'char_1',
+              sentimentTarget: 'player', sentimentEmotion: 'trust', strengthDelta: 0.4 },
+          ],
+        },
+      } as any);
+      await (beat as any).performAction(context, renderer);
+      expect(context.getCharacterMood('char_1')).toEqual({ valence: 0.3, arousal: -0.1 });
+      expect(context.getSentimentTo('char_1', 'player', 'trust')).toBeCloseTo(0.4);
+    });
+
+    it('takes a bookmark via the bookmarkAffectState effect row', async () => {
+      const beat = new UpdateAffectBeat({
+        id: 'b1', name: 't', type: 'updateAffect',
+        parameters: {
+          effects: [
+            { type: 'nudgeMood', target: 'char_1', valenceDelta: 0.5 },
+            { type: 'bookmarkAffectState', target: '', bookmarkName: 'act-one-end' },
+          ],
+        },
+      } as any);
+      await (beat as any).performAction(context, renderer);
+      expect(context.getAffectBookmarkNames()).toContain('act-one-end');
+      const snap = context.getAffectBookmark('act-one-end');
+      expect(snap?.moods['char_1'].valence).toBeCloseTo(0.5);
+    });
+
+    it('prefers effects[] over legacy single-row fields when both are set', async () => {
+      // Legacy field would produce a -0.4 nudge; effects[] produces +0.3.
+      // The new effects[] should win — runtime ignores legacy when effects present.
+      const beat = new UpdateAffectBeat({
+        id: 'b1', name: 't', type: 'updateAffect',
+        parameters: {
+          character: 'char_1',
+          moodValenceDelta: -0.4,
+          effects: [
+            { type: 'nudgeMood', target: 'char_1', valenceDelta: 0.3 },
+          ],
+        },
+      } as any);
+      await (beat as any).performAction(context, renderer);
+      expect(context.getCharacterMood('char_1').valence).toBeCloseTo(0.3);
+    });
+
+    it('synthesizeEffectsFromLegacyParams converts a legacy beat into an Effect[]', () => {
+      const synth = synthesizeEffectsFromLegacyParams({
+        character: 'char_1',
+        moodValenceDelta: 0.3,
+        moodArousalDelta: -0.1,
+        sentimentTarget: 'player',
+        sentimentEmotion: 'trust',
+        sentimentDelta: 0.4,
+        emotion: 'joy',
+        emotionDelta: 0.2,
+      });
+      expect(synth).toHaveLength(3);
+      expect(synth[0]).toMatchObject({ type: 'nudgeMood', target: 'char_1', valenceDelta: 0.3, arousalDelta: -0.1 });
+      expect(synth[1]).toMatchObject({ type: 'addSentiment', target: 'char_1',
+        sentimentTarget: 'player', sentimentEmotion: 'trust', strengthDelta: 0.4 });
+      expect(synth[2]).toMatchObject({ type: 'fireEmotion', target: 'char_1', emotion: 'joy', emotionDelta: 0.2 });
+    });
+
+    it('synthesizeEffectsFromLegacyParams returns empty when no legacy fields populated', () => {
+      expect(synthesizeEffectsFromLegacyParams({})).toEqual([]);
+      // Zero deltas are also no-ops.
+      expect(synthesizeEffectsFromLegacyParams({
+        character: 'char_1', moodValenceDelta: 0, moodArousalDelta: 0,
+      })).toEqual([]);
+    });
+
+    it('synthesizeEffectsFromLegacyParams skips partial sentiment / emotion rows', () => {
+      // Sentiment without target → skip.
+      expect(synthesizeEffectsFromLegacyParams({
+        character: 'char_1', sentimentEmotion: 'trust', sentimentDelta: 0.3,
+      })).toEqual([]);
+      // Emotion without name → skip.
+      expect(synthesizeEffectsFromLegacyParams({
+        character: 'char_1', emotionDelta: 0.5,
+      })).toEqual([]);
+    });
   });
 });

@@ -76,6 +76,7 @@ export function summarizeChoiceEffects(
   const counters: string[] = [];
   const variables: string[] = [];
   const inventory: string[] = [];
+  const bookmarks: string[] = [];
 
   for (const e of effects) {
     switch (e.type) {
@@ -148,6 +149,15 @@ export function summarizeChoiceEffects(
       }
       case 'removeInventory': {
         if (e.target) inventory.push(`−${e.target}`);
+        break;
+      }
+      case 'bookmarkAffectState': {
+        const name = (e as any).bookmarkName;
+        if (name) {
+          const scope = (e as any).scope === 'character' && e.target
+            ? ` (${resolveName(e.target)} only)` : '';
+          bookmarks.push(`bookmark "${name}"${scope}`);
+        }
         break;
       }
     }
@@ -223,6 +233,7 @@ export function summarizeChoiceEffects(
   if (counters.length > 0) tally.push(counters.join(', '));
   if (variables.length > 0) tally.push(variables.join(', '));
   if (inventory.length > 0) tally.push(`inventory ${inventory.join(', ')}`);
+  if (bookmarks.length > 0) tally.push(bookmarks.join(', '));
   if (tally.length > 0) clauses.push(tally.join(' · '));
 
   if (clauses.length === 0) return '';

@@ -1,5 +1,173 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-01: Affect-Effect Authoring UX — Labels, Palette Auto-Complete, Templates, Live Summary (v0.9.45)
+
+### Overview
+
+Three steps of the affect-effect authoring UX roadmap shipped in this window. The choice-effects editor in v0.9.43+ produced bundles like `Nudge Mood 0.3 -0.1 / Fire Emotion pride 0.3 / Fire Emotion fear -0.2 / Add Sentiment player trust 0.4 / …` with no labels on the numeric inputs, no auto-complete on the emotion / target fields, and no way to pre-fill a coherent multi-row bundle representing a common author intent. v0.9.45 closes the loop with: inline labels (val / aro / Δ / sal / →) on every numeric input with hover tooltips explaining direction; combobox auto-complete on the emotion and target fields backed by the project's emotion palette and character roster; a library of 8 intent-shaped effect templates ("empathetic — full support", "pushy / dismissive", "boundary respecting", etc.) accessible via an "+ apply template…" dropdown; and a live "what does this choice do?" summary block underneath the rows that synthesises the cumulative effect in plain language.
+
+The User Guide had a follow-up audit pass to document the four authoring-UX additions with a Standing Beside Alex walk-through, four new screenshots, and three glossary touch-ups.
+
+### Step 1 — Inline labels and combobox auto-complete on affect rows
+
+**Labels.** Authors used to face anonymous numeric inputs like `0.3 -0.1` on Nudge Mood rows with no indication which axis was which. Fix: small text labels (`val` / `aro` for mood, `Δ` for emotion-delta and sentiment-strength-delta, `sal` for reflection salience, `→` for the sentiment target) sit next to each input. Hover tooltips explain direction (positive valence = happier; positive arousal = more activated; negative trust delta = mistrust / erosion on the same axis).
+
+**Palette-backed emotion auto-complete.** `fireEmotion` and `addSentiment`'s emotion fields are now combobox inputs (HTML datalist-backed) listing the project's emotion palette as suggestions. Free-text fallback still works for custom story emotions; this is purely discoverability — authors don't have to remember whether they spelled it `mistrust` or `anti-trust`. The `addSentiment` target field also has a datalist suggesting all defined characters plus the `player` sentinel.
+
+**Files modified:**
+- `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
+
+### Step 2 — Effect templates library
+
+Eight intent-shaped presets shipped in `effectTemplates.ts`:
+
+- `empathetic-max` — full support, mood lifts, joy fires, fear drops, trust grows, self-shame eases.
+- `empathetic-partial` — well-meaning but mixed.
+- `pushy-dismissive` — overrides what the character needs. Mood drops, fear/shame spike, trust erodes.
+- `silent-failed` — absence as harm. Sadness fires, trust erodes.
+- `boundary-respecting` — names the overstep. Pride fires, deep trust forms.
+- `validating` — "I see you" without trying to fix. Quiet positive shift, gratitude.
+- `defensive-overreach` — well-meaning but speaks-for. Ambivalent.
+- `recovery-quiet` — small non-demanding presence. Mood eases, no sentiment shift.
+
+Each template's `forge({target, playerRef, counters})` returns a concrete `Effect[]` with the active character substituted in. Counter increments only emit for counters that exist in the project (so templates don't seed `maxSupport` / `failedSupport` rows in stories that don't track them). Templates target whichever character is set as the choice's affect target — inferred from any existing affect effect in the choice's list (so chains stay coherent within one choice), falling back to the first non-player character in the project, then to `player`. They're starting points, not contracts: authors apply a template and then tweak individual values.
+
+UI: an "+ apply template…" dropdown sits next to the existing "+ Add Effect" button at the bottom of the effects list. When no effects exist yet, the same dropdown appears alongside the inline "+ Add Effect" button as the alternative-action.
+
+**Files modified:**
+- `packages/builder/src/editors/effectTemplates.ts` (new)
+- `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
+- `packages/builder/src/editors/__tests__/effectTemplates.test.ts` (new — 11 tests)
+
+### Step 3 — Live "what does this choice do?" summary
+
+Below the effect rows, a small italic blue-tinted block prefixed with `→` synthesises the cumulative effect in plain language. Updates live as the author tweaks values. Examples:
+
+- **Empathetic-max applied to Alex**: → Alex: feels happier; joy spikes; fear softens; trust toward the player grows (+0.40); self-shame eases (-0.05) · +2 supportScore, +1 maxSupport
+- **Pushy choice**: → Alex: feels sadder, more activated; fear spikes; shame spikes; trust toward the player eases (-0.30); self-shame grows (+0.05) · -1 supportScore, +1 failedSupport
+
+`summarizeChoiceEffects(effects, characters?)` is a pure helper. Buckets affect effects by target character so each character's arc gets its own clause. Aggregates `nudgeMood` deltas into a single net qualitative descriptor ("feels happier" / "feels sadder" / "more activated" / "calmer"), dropping below noise threshold ±0.05. Each `fireEmotion` reads as `<name> spikes` (positive) or `<name> softens` (negative), with magnitude qualifier (`sharply` for |Δ| ≥ 0.4, `a little` for |Δ| < 0.2). Each `addSentiment` reads `<emotion> toward <target> grows/eases (±value)`; self-directed (`sentimentTarget === target`) becomes `self-<emotion> grows/eases`, consistent with the affect panel and dossier rendering. Goal-status changes read as `goal '<id>' marked <status>`, variant changes as `switches to variant '<id>'`. Reflection text quoted with truncation at ~60 chars. Counter / variable / inventory effects roll into a separate compact tally clause. Hidden when there's nothing to say (no effects, or every delta below noise).
+
+Character ref → display name resolution via the optional `characters` arg (falls through to raw ref when not in scope).
+
+**Files modified:**
+- `packages/builder/src/editors/summarizeChoiceEffects.ts` (new)
+- `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
+- `packages/builder/src/editors/__tests__/summarizeChoiceEffects.test.ts` (new — 16 tests)
+
+### Plumbing
+
+`emotionPalette?` prop added to `ChoiceEffectsEditor`, threaded through `Inspector` (3 mounts) and `DialogTreeEditor` from `App.tsx`'s `emotionPalette` state. `availableCharacters?` was already in scope from earlier work.
+
+**Files modified:**
+- `packages/builder/src/components/Inspector.tsx`
+- `packages/builder/src/editors/DialogTreeEditor.tsx`
+- `packages/builder/src/App.tsx`
+
+### User Guide audit
+
+User-guide-qa agent's follow-up pass after this UX work. Added a new sub-section in Part 8 → Affect-Aware Choice Effects ("Easier authoring: labels, palette suggestions, templates, and a live summary") with a Standing Beside Alex walk-through covering all four sub-topics: inline labels (table mapping val/aro/Δ/sal/→ to meanings), palette auto-complete (combobox behaviour + free-text fallback), the 8-template library (table with descriptions + the target-inference and project-aware-counter rules), and the live summary block (two real example outputs captured verbatim from the agent's session, plus six bullets describing the synthesiser's behaviour). Glossary refined: "Choice Effects" mentions the new template route, "Effect Template" entry added listing all 8 defaults, "Affect Summary" entry added describing the live block.
+
+4 new screenshots in `docs/images/`:
+- `34-choice-effects-overview.png` — Inspector showing populated Effects section with the live summary block
+- `35-effect-row-labels-mood-emotion.png` — close-up of val/aro labels on Nudge Mood and Δ on Fire Emotion
+- `36-effect-row-labels-sentiment.png` — close-up of → / Δ on Add Sentiment, including the self-directed convention
+- `37-effect-templates-and-live-summary.png` — populated effects list showing "+ Add Effect" next to "+ apply template…" with the full live summary underneath
+
+Items the agent flagged as not-fixed-in-scope: empty-state screenshot of a fresh choice's effects skipped to avoid mutating the canonical Standing Beside Alex project; native HTML datalist dropdowns can't be screenshotted (OS-rendered, outside page DOM) so the combobox is documented in text only.
+
+**Files modified:**
+- `docs/USER_GUIDE.md`
+- `docs/images/34-37-*.png` (new, 4 files)
+
+### Test Coverage
+
+- 11 new tests in `effectTemplates.test.ts` — library shape, forge() with/without counters, target substitution, signed-trust direction per template, self-shame direction, recovery-quiet's no-sentiment shape, findEffectTemplate hit/miss/empty.
+- 16 new tests in `summarizeChoiceEffects.test.ts` — empty list, positive/negative/aggregated mood, noise-threshold filter, fireEmotion intensity qualifiers, sentiment direction, self-prefix, full Alex-template-shaped bundle, multi-character grouping, ref fallback, goal/variant/reflection rendering, zero-delta skip.
+- Total builder editor tests now 27; previously 0 in `editors/__tests__/`. 72 character UI tests still passing. Type-check clean across builder.
+
+---
+
+## 2026-05-01: Baseline-Relative Affect Conditions + Bookmarks + Condition Templates (v0.9.45 — Round 2)
+
+### Overview
+
+Symmetrical follow-up to the affect-effect authoring UX work above. The condition-check side of the affect stack had the inverse problem: rich runtime support, but author-side phrased only as literal thresholds. Asking *"has Alex's trust toward the player **improved**?"* required computing an absolute threshold and hoping the seeded starting point happened to align — which is fragile for off-neutral seeds (Alex starts at valence -0.3 in *Standing Beside Alex*, so "valence ≥ 0" passes for a character who's still struggling, just less than before).
+
+This round adds three things:
+- **Baseline-relative comparisons** — every continuous affect condition (mood / emotion / sentiment) gets a "Compared to" switch that toggles between literal threshold (current behaviour, the default) and *delta-from-initial* / *delta-from-named-bookmark* modes. The runtime captures initial values lazily on first-touch (or at story-start when the character has authored seeds), so a delta read against a missing initial degrades to 0 — same behaviour as a literal threshold against an untouched slot.
+- **Author-named bookmarks** — a new `bookmarkAffectState` Effect snapshots mood / emotion / sentiment state under a name (e.g. `reunion-scene`). Subsequent conditions can compare current values against that frozen snapshot ("trust grew by ≥ 0.3 since the reunion-scene bookmark"). Scope is `all` (every character, default) or `character` (just the target character).
+- **Condition templates library** — 26 author-friendly presets covering both *threshold* and *delta-from-initial* flavours across mood / emotion / sentiment / trait / goal / variant. Picking *"Sentiment — trust toward player has grown since start"* seeds the type, character, sentimentTarget, sentimentEmotion, operator, value (0.3), and `baseline: 'initial'` in one click. Authors fine-tune from there.
+
+The trio fully answers the *"can we phrase this as 'X has improved'?"* question that motivated the round, and the templates make it as discoverable as the effect templates that shipped above.
+
+### Engine — `packages/core`
+
+**StoryContext.** Three new state slots mirror the live affect maps as initial-value snapshots: `initialMoods`, `initialEmotionLevels`, `initialSentiments`. Population is *idempotent first-touch* — `nudgeCharacterMood` / `setCharacterMood` / `setCharacterEmotion` / `fireCharacterEmotion` / `addCharacterSentiment` each capture the pre-mutation value as the initial baseline before applying their delta. `seedCharacterAffectFor` also writes initials at seed time, so a character authored with `initialMood: { valence: -0.3 }` reads `initial = -0.3` from condition-check time onward (rather than 0). Plus a fourth slot — `affectBookmarks: Record<name, AffectSnapshot>` — for the named-bookmark API. Snapshot shape mirrors the live maps so baseline reads resolve identically against either source.
+
+**API additions.** `takeAffectBookmark(name, options?)` deep-clones mood / emotion / sentiment slots into an entry under `name`. With `options.target` set, only that character's slots are captured (others in a same-named prior snapshot are preserved). `getAffectBookmark(name)` returns the snapshot. `getAffectBookmarkNames()` returns the keyset for editor dropdowns.
+
+**Condition evaluator.** `Condition` gains `baseline?: 'literal' | 'initial' | { bookmark: string }`. The mood / emotion / sentiment branches of `checkCondition` switch on it: `'literal'` (or undefined) compares `current` against `value` directly (legacy behaviour); `'initial'` compares `current - initial`; `{ bookmark: name }` compares `current - bookmarkedValue`. Missing initials / bookmarks resolve to 0. Trait / goal / variant conditions ignore the field — those slots are static or discrete and don't have a meaningful baseline semantics.
+
+**Effect dispatcher.** New `bookmarkAffectState` case routes to `takeAffectBookmark` with the chosen scope. Empty `bookmarkName` is silently ignored.
+
+**Serialization.** `serialize()` and `loadFromSerialized()` round-trip all four new slots so save/load preserves baseline + bookmark state across sessions. Older saves without these fields load with empty maps (forward-compat).
+
+**Files modified:**
+- `packages/core/src/types/index.ts` (Condition.baseline; Effect.bookmarkName / scope; bookmarkAffectState in the Effect.type union)
+- `packages/core/src/engine/StoryContext.ts` (initial maps, bookmarks API, capture instrumentation, baseline-aware checkCondition, bookmarkAffectState dispatcher, serialize/load round-trip, seedCharacterAffectFor initial-capture, AffectSnapshot type)
+- `packages/core/src/beats/ConditionBeat.ts` (baseline field; passed through buildCondition / getParameters / updateParameters for mood / emotion / sentiment)
+
+### Builder — Condition templates library
+
+`packages/builder/src/editors/conditionTemplates.ts` (new) holds 26 templates in 6 categories. Each template's `forge({target, playerRef})` returns a fully-formed `Condition` with the active character substituted in. Threshold templates ("Mood — visibly happy (now)", "Sentiment — trusts the player (now)") produce literal-baseline conditions. Delta-from-initial templates ("Mood — improved since start", "Sentiment — trust toward player has grown since start", "Emotion — fear has eased since start") add `baseline: 'initial'` to the same shape with appropriate operators and values. Goal / variant templates seed an empty id field for the author to fill in.
+
+`groupConditionTemplates()` returns the library bucketed by category (`mood` / `emotion` / `sentiment` / `trait` / `goal` / `variant`) for `<optgroup>`-style rendering. `findConditionTemplate(id)` is the lookup; `conditionToFlatParams(condition)` flattens a Condition object into the flat parameter shape ConditionBeat stores (renaming `type` → `conditionType`, passing the rest through).
+
+**Files modified:**
+- `packages/builder/src/editors/conditionTemplates.ts` (new — 26 templates, helpers)
+- `packages/builder/src/editors/__tests__/conditionTemplates.test.ts` (new — 16 tests)
+
+### Builder — Editor UI wiring
+
+**Inspector.tsx (ConditionBeat block):** A blue-tinted "Apply a template" dropdown above the Condition Type select offers all 26 templates organised by optgroup. Picking one writes its forged Condition's flat params into the beat (`conditionType` + every relevant field including `baseline`); the select resets so the same template can be re-applied. Below the existing "Compare Value" inputs on the mood / emotion / sentiment forms, a "Compared to" select toggles between *literal value* / *delta from initial* / *delta from a named bookmark*; bookmark mode reveals a name-input. Mode-switch hint copy adapts: literal reads as a threshold, deltas read as "improved/dropped/grown/eroded by X since the baseline."
+
+**RequirementsEditor.tsx:** Same template dropdown rendered per-requirement card (so each requirement can adopt a different template). Replacing the requirement's condition swaps the whole shape, including the baseline. The `renderBaselinePicker` helper is shared across the mood / emotion / sentiment forms.
+
+**ChoiceEffectsEditor.tsx:** New `bookmarkAffectState` row type with a `bookmarkName` text input and a `scope` dropdown (`all characters` / `target only`). When scope is `all`, the target field is hidden (since the snapshot covers everyone); when `character`, the standard character SmartNameDropdown shows. The live summary helper picks bookmarks up via the non-affect tally clause, reading as `bookmark "reunion-scene"` (or `bookmark "alex-arc" (Alex only)` when scope-narrow).
+
+**Files modified:**
+- `packages/builder/src/components/Inspector.tsx` (template dropdown + baseline picker on three sub-forms)
+- `packages/builder/src/editors/RequirementsEditor.tsx` (template dropdown + baseline picker via shared helper)
+- `packages/builder/src/editors/ChoiceEffectsEditor.tsx` (bookmarkAffectState row type, hideTarget logic)
+- `packages/builder/src/editors/summarizeChoiceEffects.ts` (bookmark tally entry)
+
+### Test Coverage
+
+- 17 new tests in `AffectBaseline.test.ts` (core) — first-touch initial capture for mood / emotion / sentiment, seeded-initial-as-baseline for off-neutral characters, idempotent second-touch, separate per-(target, emotion) sentiment baselines, takeAffectBookmark snapshot semantics (all vs character scope), delta-from-bookmark condition evaluation, missing-bookmark-resolves-to-zero fallback, scope='character' narrowing, bookmarkAffectState effect dispatch via applyEffect, serialize/load round-trip, older-saves-without-baselines loads with empty defaults, and explicit-literal-baseline equivalent to omitted.
+- 16 new tests in `conditionTemplates.test.ts` (builder) — library shape (categories, unique ids, descriptions), forge() per category (mood threshold, mood delta-from-initial, sentiment with playerRef, sentiment delta-from-initial, emotion negative-delta-fear-eased, trait names, goal/variant empty seed fields), conditionToFlatParams flattening (with baseline passthrough), groupConditionTemplates ordering and non-empty groups, findConditionTemplate hit/miss/empty.
+- All 43 builder editor tests passing. All 17 baseline tests passing. Type-check clean across all packages.
+
+### Why we don't have running-trend conditions ("X has been improving over the last N beats")
+
+Captured for posterity: deliberately scoped out. Would require a per-slot ring buffer of recent values, which multiplies storage in long stories and rarely matches what authors actually mean ("did the relationship grow over the course of the story?" — answered by delta-from-initial). The two cheaper semantics that *do* match author intent — start-of-story baseline (option 1, this round) and bookmarked moments (option 2, this round) — are now both shipping.
+
+### UpdateAffectBeat migrated to ChoiceEffectsEditor
+
+Caught in review: the standalone `UpdateAffectBeat` ("apply a single mood nudge / sentiment / emotion fire as its own beat in the graph, not on a choice") was the *only* affect-authoring surface that didn't get the v0.9.45 templates + live summary + bookmark support. Its data shape — single character + at most one mood-pair + one sentiment-triple + one emotion-fire — couldn't accept the multi-row `Effect[]` bundles the templates produce.
+
+Resolution: UpdateAffectBeat now also accepts an `effects: Effect[]` parameter (preferred) and the Inspector renders it with `ChoiceEffectsEditor` directly. Authoring parity restored — the beat now offers all 8 effect templates, palette-backed combobox auto-complete, the live "what does this do?" summary, AND the new `bookmarkAffectState` row, just like a choice's effects. Legacy single-row params are migrated into a synthesised `Effect[]` the first time the editor opens an old beat (`synthesizeEffectsFromLegacyParams` helper); the runtime prefers `effects[]` when populated and falls back to the legacy fields otherwise. Old projects keep working with no migration step required, and re-saving opts them into the new shape.
+
+**Files modified:**
+- `packages/core/src/beats/UpdateAffectBeat.ts` (effects[] field on the class, applyEffect-per-row in performAction, synthesizeEffectsFromLegacyParams export, renamed local interface from UpdateAffectParameters → UpdateAffectInput to avoid collision with the schema-derived export in generated/beat-types.ts)
+- `packages/core/src/beats/index.ts` (export the class + synth helper; do NOT re-export UpdateAffectParameters since it lives in generated/)
+- `packages/builder/src/components/Inspector.tsx` (exclude updateAffect from SchemaFormGenerator; render its Effects field with ChoiceEffectsEditor and seed from synthesizeEffectsFromLegacyParams when no effects[] yet)
+- `packages/core/tests/beats/UpdateAffectBeat.test.ts` (6 new tests: multi-row effects[] dispatch, bookmarkAffectState row inside an UpdateAffectBeat, effects-take-precedence-over-legacy, synthesizeEffectsFromLegacyParams full / empty / partial cases)
+
+Total UpdateAffectBeat tests: 16 (10 legacy-path + 6 new). All passing.
+
+---
+
 ## 2026-05-01: Affect Condition Operators in the Editor + User Guide Audit (v0.9.44)
 
 ### Overview

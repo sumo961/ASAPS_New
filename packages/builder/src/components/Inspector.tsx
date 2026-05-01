@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Beat } from '@asaps/core';
+import { Beat, synthesizeEffectsFromLegacyParams } from '@asaps/core';
 import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
@@ -19,6 +19,11 @@ import { useUsedNames } from './characters/useUsedNames';
 import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
 import { RequirementsEditor } from '../editors/RequirementsEditor';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
+import {
+  groupConditionTemplates,
+  findConditionTemplate,
+  conditionToFlatParams,
+} from '../editors/conditionTemplates';
 import { TextFieldWithVariables } from '../editors/TextFieldWithVariables';
 import { useTranslationState, useTranslationActions } from '../contexts/TranslationContext';
 import { getAllTranslationEntriesForBeat } from '../export/StoryTranslator';
@@ -1520,7 +1525,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                  beat.type !== 'pickProp' && getCanonicalBeatType(beat.type) !== 'conditionBeat' &&
                  beat.type !== 'setTimer' && beat.type !== 'randomTarget' &&
                  beat.type !== 'hyperText' && beat.type !== 'keypad' &&
-                 beat.type !== 'panorama' && (
+                 beat.type !== 'panorama' && beat.type !== 'updateAffect' && (
                   <SchemaFormGenerator
                     beatType={beat.type}
                     beatDefinition={getBeatDefinition(beat.type)}
@@ -1570,6 +1575,49 @@ export const Inspector: React.FC<InspectorProps> = ({
                 {/* Condition Beat */}
                 {getCanonicalBeatType(beat.type) === 'conditionBeat' && (
                   <>
+                    {/* Template chooser (v0.9.45) — preset condition shapes
+                        ("trust toward player has formed", "mood improved
+                        since start", etc.). Picking a template seeds every
+                        condition field at once; authors fine-tune from
+                        there. The select intentionally resets to the empty
+                        sentinel after each apply so the same template can
+                        be picked twice if the author tweaks and wants the
+                        defaults back. */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 space-y-1">
+                      <label className="block text-xs font-medium text-blue-800">
+                        Apply a template (presets the fields below)
+                      </label>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const tmplId = e.target.value;
+                          if (!tmplId) return;
+                          const tmpl = findConditionTemplate(tmplId);
+                          if (!tmpl) return;
+                          const targetChar = (localBeat.parameters?.character as string) || '';
+                          const cond = tmpl.forge({ target: targetChar, playerRef: 'player' });
+                          const flat = conditionToFlatParams(cond);
+                          for (const [k, v] of Object.entries(flat)) {
+                            handleParameterChange(k, v);
+                          }
+                          // Reset the select so the same template can fire again.
+                          e.target.value = '';
+                        }}
+                        className="w-full px-2 py-1 border border-blue-300 rounded text-xs bg-white"
+                      >
+                        <option value="">— pick a template —</option>
+                        {groupConditionTemplates().map((g) => (
+                          <optgroup key={g.category} label={g.label}>
+                            {g.members.map((t) => (
+                              <option key={t.id} value={t.id} title={t.description}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Condition Type
@@ -2027,7 +2075,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                     {/* ===== Affect-stack condition operators (v0.9.43) =====
                         Each form takes a Character target and a per-type value
                         field. The character dropdown stores the canonical id;
-                        downstream resolveCharRef accepts either id or name. */}
+                        downstream resolveCharRef accepts either id or name.
+
+                        v0.9.45 adds the "Compared to" baseline switch on
+                        mood / emotion / sentiment so the same form can
+                        express a literal threshold OR a delta-from-initial
+                        / delta-from-bookmark check. The baseline param is
+                        either 'literal', 'initial', or { bookmark: name }. */}
 
                     {/* Mood condition — branch on character.mood.<axis> ≷ value */}
                     {localBeat.parameters?.conditionType === 'mood' && (
@@ -2082,6 +2136,59 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />
                         </div>
+                        {(() => {
+                          const baseline = localBeat.parameters?.baseline;
+                          const mode: 'literal' | 'initial' | 'bookmark' =
+                            !baseline || baseline === 'literal' ? 'literal'
+                            : baseline === 'initial' ? 'initial' : 'bookmark';
+                          const bookmarkName = mode === 'bookmark' && typeof baseline === 'object'
+                            ? (baseline as any).bookmark || '' : '';
+                          return (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Compared to
+                                  <span className="text-xs text-gray-500 block">
+                                    {mode === 'literal'
+                                      ? 'Literal threshold — compare value directly.'
+                                      : 'Value above is a delta — "improved/dropped by X" since the baseline.'}
+                                  </span>
+                                </label>
+                                <select
+                                  value={mode}
+                                  onChange={(e) => {
+                                    const m = e.target.value as 'literal' | 'initial' | 'bookmark';
+                                    if (m === 'literal') handleParameterChange('baseline', undefined);
+                                    else if (m === 'initial') handleParameterChange('baseline', 'initial');
+                                    else handleParameterChange('baseline', { bookmark: bookmarkName });
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                >
+                                  <option value="literal">literal value (default)</option>
+                                  <option value="initial">delta from initial (story-start / first-touch)</option>
+                                  <option value="bookmark">delta from a named bookmark</option>
+                                </select>
+                              </div>
+                              {mode === 'bookmark' && (
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Bookmark name
+                                    <span className="text-xs text-gray-500 block">
+                                      Match the name used in an earlier bookmarkAffectState effect.
+                                    </span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={bookmarkName}
+                                    onChange={(e) => handleParameterChange('baseline', { bookmark: e.target.value })}
+                                    placeholder="e.g. reunion-scene"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                                  />
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </>
                     )}
 
@@ -2132,12 +2239,67 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <label className="block text-sm font-medium text-gray-700 mb-1">Compare Value (0 .. 1)</label>
                           <input
                             type="number"
-                            step={0.05} min={0} max={1}
+                            step={0.05} min={-1} max={1}
                             value={localBeat.parameters?.value ?? 0}
                             onChange={(e) => handleParameterChange('value', parseFloat(e.target.value))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />
+                          {/* Note: range widens to [-1, 1] when baseline ≠ literal,
+                              since the value is a delta. Authors can dial below 0. */}
                         </div>
+                        {(() => {
+                          const baseline = localBeat.parameters?.baseline;
+                          const mode: 'literal' | 'initial' | 'bookmark' =
+                            !baseline || baseline === 'literal' ? 'literal'
+                            : baseline === 'initial' ? 'initial' : 'bookmark';
+                          const bookmarkName = mode === 'bookmark' && typeof baseline === 'object'
+                            ? (baseline as any).bookmark || '' : '';
+                          return (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Compared to
+                                  <span className="text-xs text-gray-500 block">
+                                    {mode === 'literal'
+                                      ? 'Literal threshold — compare emotion intensity directly.'
+                                      : 'Value above is a delta — "spiked/eased by X" since the baseline.'}
+                                  </span>
+                                </label>
+                                <select
+                                  value={mode}
+                                  onChange={(e) => {
+                                    const m = e.target.value as 'literal' | 'initial' | 'bookmark';
+                                    if (m === 'literal') handleParameterChange('baseline', undefined);
+                                    else if (m === 'initial') handleParameterChange('baseline', 'initial');
+                                    else handleParameterChange('baseline', { bookmark: bookmarkName });
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                >
+                                  <option value="literal">literal value (default)</option>
+                                  <option value="initial">delta from initial (story-start / first-touch)</option>
+                                  <option value="bookmark">delta from a named bookmark</option>
+                                </select>
+                              </div>
+                              {mode === 'bookmark' && (
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Bookmark name
+                                    <span className="text-xs text-gray-500 block">
+                                      Match the name used in an earlier bookmarkAffectState effect.
+                                    </span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={bookmarkName}
+                                    onChange={(e) => handleParameterChange('baseline', { bookmark: e.target.value })}
+                                    placeholder="e.g. reunion-scene"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                                  />
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </>
                     )}
 
@@ -2291,6 +2453,59 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />
                         </div>
+                        {(() => {
+                          const baseline = localBeat.parameters?.baseline;
+                          const mode: 'literal' | 'initial' | 'bookmark' =
+                            !baseline || baseline === 'literal' ? 'literal'
+                            : baseline === 'initial' ? 'initial' : 'bookmark';
+                          const bookmarkName = mode === 'bookmark' && typeof baseline === 'object'
+                            ? (baseline as any).bookmark || '' : '';
+                          return (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Compared to
+                                  <span className="text-xs text-gray-500 block">
+                                    {mode === 'literal'
+                                      ? 'Literal threshold — compare sentiment strength directly.'
+                                      : 'Value above is a delta — "grown/eroded by X" since the baseline.'}
+                                  </span>
+                                </label>
+                                <select
+                                  value={mode}
+                                  onChange={(e) => {
+                                    const m = e.target.value as 'literal' | 'initial' | 'bookmark';
+                                    if (m === 'literal') handleParameterChange('baseline', undefined);
+                                    else if (m === 'initial') handleParameterChange('baseline', 'initial');
+                                    else handleParameterChange('baseline', { bookmark: bookmarkName });
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                >
+                                  <option value="literal">literal value (default)</option>
+                                  <option value="initial">delta from initial (story-start / first-touch)</option>
+                                  <option value="bookmark">delta from a named bookmark</option>
+                                </select>
+                              </div>
+                              {mode === 'bookmark' && (
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Bookmark name
+                                    <span className="text-xs text-gray-500 block">
+                                      Match the name used in an earlier bookmarkAffectState effect.
+                                    </span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={bookmarkName}
+                                    onChange={(e) => handleParameterChange('baseline', { bookmark: e.target.value })}
+                                    placeholder="e.g. reunion-scene"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                                  />
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </>
                     )}
 
@@ -2425,6 +2640,52 @@ export const Inspector: React.FC<InspectorProps> = ({
                     })()}
                   </>
                 )}
+
+                {/* Update Affect Beat — v0.9.45 migrated to ChoiceEffectsEditor.
+                    A standalone beat that holds an Effect[] (mood nudges, emotion
+                    fires, sentiment adds, reflections, goal flips, variant
+                    switches, bookmark snapshots). Same authoring surface as a
+                    choice's effects, so authors get templates, the live "what
+                    does this do?" summary, palette auto-complete, and bookmarks
+                    all in one move. Legacy single-row params are migrated into
+                    an Effect[] on first open so old projects keep working.
+
+                    The runtime (UpdateAffectBeat.performAction) prefers the
+                    effects[] array; legacy fields are still honoured when no
+                    effects[] is present, so save/load is non-destructive. */}
+                {beat.type === 'updateAffect' && (() => {
+                  const params = (localBeat.parameters || {}) as any;
+                  // Synthesise effects[] from legacy fields the first time
+                  // this beat is opened in an editor that uses the new shape.
+                  const effects: any[] = Array.isArray(params.effects)
+                    ? params.effects
+                    : synthesizeEffectsFromLegacyParams(params);
+                  return (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Effects
+                        <span className="text-xs text-gray-500 block">
+                          One or more affect Effects applied in order. Use the template
+                          dropdown to seed a coherent bundle, then fine-tune. The live
+                          summary below describes the cumulative effect in plain language.
+                        </span>
+                      </label>
+                      <ChoiceEffectsEditor
+                        effects={effects as any}
+                        onChange={(next) => {
+                          // Persisting the new effects[] is the migration: once
+                          // saved, the legacy single-row fields aren't read again.
+                          handleParameterChange('effects', next);
+                        }}
+                        availableCounters={availableCounters}
+                        availableVariables={availableVariables}
+                        availableInventoryItems={availableInventoryItems}
+                        availableCharacters={getAvailableCharacters() as any}
+                        emotionPalette={emotionPalette}
+                      />
+                    </div>
+                  );
+                })()}
 
                 {/* Set Timer Beat */}
                 {beat.type === 'setTimer' && (

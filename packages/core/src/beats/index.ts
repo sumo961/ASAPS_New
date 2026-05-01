@@ -19,6 +19,10 @@ export { SWFBeat } from './SWFBeat';
 export { InputTextBeat } from './InputTextBeat';
 export { HyperTextBeat } from './HyperTextBeat';
 export { PanoramaBeat } from './PanoramaBeat';
+// UpdateAffectBeat: the class itself + the v0.9.45 legacy-to-Effect[]
+// migration helper. Don't re-export UpdateAffectParameters here — it's
+// already exported from generated/beat-types.ts as the canonical home.
+export { UpdateAffectBeat, synthesizeEffectsFromLegacyParams } from './UpdateAffectBeat';
 export { BeatTypeRegistry } from './BeatRegistry';
 
 // AI-powered beats

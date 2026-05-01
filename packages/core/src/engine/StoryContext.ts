@@ -150,10 +150,47 @@ interface StoryState {
   // CharacterVariant.id. Empty until the runtime hits a setCharacterVariant
   // effect or the seed step fills it from `Character.defaultVariantId`.
   activeCharacterVariants: Record<string, string>;
+  // Initial-value capture for delta-from-initial condition baselines
+  // (v0.9.45). Each map mirrors the live affect map but is populated
+  // *lazily on first touch* — the first mutator call for a (character,
+  // slot[, sub-key]) combination records the current pre-mutation value
+  // here, and subsequent calls leave it alone. Authored seed values are
+  // also captured at seed time so a delta-from-initial check after seed
+  // sees the seeded baseline rather than 0. Conditions read this when
+  // `condition.baseline === 'initial'`.
+  initialMoods: Record<string, CharacterMood>;
+  initialEmotionLevels: Record<string, Record<string, number>>;
+  initialSentiments: Record<string, Sentiment[]>;
+  // Author-named affect snapshots (v0.9.45). Each entry is a frozen
+  // mood / emotion / sentiment snapshot taken via the bookmarkAffectState
+  // effect. Authors then reference the bookmark from condition baseline
+  // switches (`condition.baseline = { bookmark: 'reunion-scene' }`).
+  // Writing the same name again overwrites the prior snapshot.
+  affectBookmarks: Record<string, AffectSnapshot>;
   visitedBeats: Set<string>;
   visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
   fictionalTime?: FictionalTime; // Fictional time for in-story time progression
+}
+
+/**
+ * Frozen affect snapshot used by named bookmarks (v0.9.45). The shape
+ * mirrors the live mood / emotion / sentiment maps in `StoryState` so
+ * baseline reads can resolve the same way against either source.
+ */
+export interface AffectSnapshot {
+  moods: Record<string, CharacterMood>;
+  emotionLevels: Record<string, Record<string, number>>;
+  sentiments: Record<string, Sentiment[]>;
+}
+
+/**
+ * Cheap sniff for whether a Condition's baseline switch is literal (the
+ * legacy / default behaviour). Used by checkCondition's affect branches
+ * to choose between `current op value` and `(current - baseline) op value`.
+ */
+function isLiteralBaseline(b: Condition['baseline']): boolean {
+  return !b || b === 'literal';
 }
 
 /**
@@ -178,6 +215,12 @@ export interface SerializedStoryState {
   activeCharacterVariants?: Record<string, string>;
   characterVariables?: Record<string, Record<string, any>>;
   characterFlags?: Record<string, Record<string, boolean>>;
+  // Baseline + bookmark state (v0.9.45). All optional so prior save files
+  // keep loading; the loader fills missing maps with empty objects.
+  initialMoods?: Record<string, CharacterMood>;
+  initialEmotionLevels?: Record<string, Record<string, number>>;
+  initialSentiments?: Record<string, Sentiment[]>;
+  affectBookmarks?: Record<string, AffectSnapshot>;
   visitedBeats: string[]; // Array instead of Set for JSON serialization
   visitedChoices?: string[]; // Per-choice visited tracking (composite keys: "beatId:choiceId")
   timers: Record<string, { value: number; target?: string }>;
@@ -295,6 +338,10 @@ export class StoryContext extends EventEmitter {
       characterReflections: {},
       characterGoalStatus: {},
       activeCharacterVariants: {},
+      initialMoods: {},
+      initialEmotionLevels: {},
+      initialSentiments: {},
+      affectBookmarks: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {},
@@ -594,6 +641,7 @@ export class StoryContext extends EventEmitter {
   setCharacterMood(charRef: string, mood: Partial<CharacterMood>): void {
     const key = this.resolveCharRef(charRef);
     if (!key) return;
+    this.captureInitialMood(key);
     const current = this.state.characterMoods[key] || { valence: 0, arousal: 0 };
     const next: CharacterMood = {
       valence: StoryContext.clampUnit(mood.valence ?? current.valence),
@@ -603,10 +651,197 @@ export class StoryContext extends EventEmitter {
     this.emit('characterMoodChanged', { characterRef: key, mood: next, previous: current });
   }
 
+  // ---------------------------------------------------------------------------
+  // Baseline capture (v0.9.45)
+  //
+  // Continuous-valued affect slots (mood, emotion levels, sentiment strengths)
+  // get a parallel "initial" snapshot that condition baselines can compare
+  // against. The capture is *idempotent first-touch*: each helper writes
+  // only when no entry exists yet. Mutators call these *before* applying a
+  // delta, so the initial reflects the value as of the first time the slot
+  // was about to change. seedCharacterAffectFor also calls these so authored
+  // initialMood / initialSentiments end up as the baseline rather than 0.
+  // ---------------------------------------------------------------------------
+
+  /** Record the current mood as the initial mood for `key` if not already captured. */
+  private captureInitialMood(key: string): void {
+    if (this.state.initialMoods[key]) return;
+    const current = this.state.characterMoods[key] || { valence: 0, arousal: 0 };
+    this.state.initialMoods[key] = { valence: current.valence, arousal: current.arousal };
+  }
+
+  /** Record the current emotion level as the initial level for (key, emotion) if not yet captured. */
+  private captureInitialEmotion(key: string, emotionLower: string): void {
+    if (!this.state.initialEmotionLevels[key]) this.state.initialEmotionLevels[key] = {};
+    if (this.state.initialEmotionLevels[key][emotionLower] !== undefined) return;
+    const current = this.state.characterEmotionLevels[key]?.[emotionLower] ?? 0;
+    this.state.initialEmotionLevels[key][emotionLower] = current;
+  }
+
+  /**
+   * Record the current sentiment strength toward (toEntityRef, emotion) as
+   * the initial value if not yet captured. New sentiment slots default to
+   * 0 — capture before the first delta is applied locks that 0 in as the
+   * baseline, which is correct ("trust started at zero").
+   */
+  private captureInitialSentiment(key: string, toEntityRef: string, emotion: string): void {
+    if (!this.state.initialSentiments[key]) this.state.initialSentiments[key] = [];
+    const list = this.state.initialSentiments[key];
+    const present = list.some((s) => s.toEntityRef === toEntityRef && s.emotion === emotion);
+    if (present) return;
+    const live = (this.state.characterSentiments[key] || []).find(
+      (s) => s.toEntityRef === toEntityRef && s.emotion === emotion,
+    );
+    list.push({
+      toEntityRef,
+      emotion,
+      strength: live?.strength ?? 0,
+      createdAt: live?.createdAt ?? Date.now(),
+    });
+  }
+
+  /** Look up the captured initial mood for a character (or zero). */
+  private getInitialMood(key: string): CharacterMood {
+    return this.state.initialMoods[key] || { valence: 0, arousal: 0 };
+  }
+
+  /** Look up the captured initial emotion level for (key, emotion) or zero. */
+  private getInitialEmotion(key: string, emotionLower: string): number {
+    return this.state.initialEmotionLevels[key]?.[emotionLower] ?? 0;
+  }
+
+  /** Look up the captured initial sentiment strength for (key, target[, emotion]) or zero. */
+  private getInitialSentiment(key: string, toEntityRef: string, emotion?: string): number {
+    const list = this.state.initialSentiments[key] || [];
+    if (emotion) {
+      const found = list.find((s) => s.toEntityRef === toEntityRef && s.emotion === emotion);
+      return found?.strength ?? 0;
+    }
+    return list
+      .filter((s) => s.toEntityRef === toEntityRef)
+      .reduce((sum, s) => sum + s.strength, 0);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Affect bookmarks (v0.9.45) — author-named snapshots of mood / emotion /
+  // sentiment state used as a baseline for "X has improved since the
+  // bookmark moment Y" condition checks. Driven by the bookmarkAffectState
+  // effect; readable via getAffectBookmark for debug / inspection.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Snapshot mood / emotion / sentiment state under `name`. With `target`
+   * given, only that character's slots are captured (other characters'
+   * slots in the same-named prior snapshot are preserved). With `target`
+   * omitted, every character's slots are captured. Writing the same name
+   * with a wider scope overwrites narrower prior captures.
+   */
+  takeAffectBookmark(name: string, options?: { target?: string }): void {
+    if (!name) return;
+    const targetKey = options?.target ? this.resolveCharRef(options.target) : undefined;
+    const prior = this.state.affectBookmarks[name];
+    const next: AffectSnapshot = prior
+      ? {
+          moods: { ...prior.moods },
+          emotionLevels: { ...prior.emotionLevels },
+          sentiments: { ...prior.sentiments },
+        }
+      : { moods: {}, emotionLevels: {}, sentiments: {} };
+
+    const charKeys = targetKey
+      ? [targetKey]
+      : new Set([
+          ...Object.keys(this.state.characterMoods),
+          ...Object.keys(this.state.characterEmotionLevels),
+          ...Object.keys(this.state.characterSentiments),
+        ]);
+    for (const key of charKeys) {
+      const m = this.state.characterMoods[key];
+      if (m) next.moods[key] = { valence: m.valence, arousal: m.arousal };
+      const levels = this.state.characterEmotionLevels[key];
+      if (levels) next.emotionLevels[key] = { ...levels };
+      const sentiments = this.state.characterSentiments[key];
+      if (sentiments) next.sentiments[key] = sentiments.map((s) => ({ ...s }));
+    }
+    this.state.affectBookmarks[name] = next;
+    this.emit('affectBookmarkTaken', { name, target: targetKey });
+  }
+
+  /** Read a bookmark snapshot by name. Returns undefined when none exists. */
+  getAffectBookmark(name: string): AffectSnapshot | undefined {
+    return this.state.affectBookmarks[name];
+  }
+
+  /** All bookmark names currently recorded. Useful for editor dropdowns. */
+  getAffectBookmarkNames(): string[] {
+    return Object.keys(this.state.affectBookmarks);
+  }
+
+  /**
+   * Resolve a baseline mood value for `(key, axis)` against the requested
+   * source ('initial' or { bookmark: name }). Missing entries read as 0
+   * — the slot's default rest state — so a delta-vs-baseline check on a
+   * never-touched character behaves the same as a literal threshold.
+   */
+  private resolveMoodBaseline(
+    key: string,
+    axis: 'valence' | 'arousal',
+    baseline: Condition['baseline'],
+  ): number {
+    if (!baseline || baseline === 'literal') return 0;
+    if (baseline === 'initial') {
+      const init = this.getInitialMood(key);
+      return axis === 'arousal' ? init.arousal : init.valence;
+    }
+    const snap = this.state.affectBookmarks[baseline.bookmark];
+    if (!snap) return 0;
+    const m = snap.moods[key];
+    if (!m) return 0;
+    return axis === 'arousal' ? m.arousal : m.valence;
+  }
+
+  /** Same idea as resolveMoodBaseline, for a single emotion level. */
+  private resolveEmotionBaseline(
+    key: string,
+    emotionLower: string,
+    baseline: Condition['baseline'],
+  ): number {
+    if (!baseline || baseline === 'literal') return 0;
+    if (baseline === 'initial') return this.getInitialEmotion(key, emotionLower);
+    const snap = this.state.affectBookmarks[baseline.bookmark];
+    return snap?.emotionLevels[key]?.[emotionLower] ?? 0;
+  }
+
+  /**
+   * Same idea as resolveMoodBaseline, for a sentiment toward a target
+   * (optionally filtered by emotion). When emotion is omitted, sums all
+   * sentiments toward the target — matches the "overall feeling" read in
+   * getSentimentTo.
+   */
+  private resolveSentimentBaseline(
+    key: string,
+    toEntityRef: string,
+    emotion: string | undefined,
+    baseline: Condition['baseline'],
+  ): number {
+    if (!baseline || baseline === 'literal') return 0;
+    if (baseline === 'initial') return this.getInitialSentiment(key, toEntityRef, emotion);
+    const snap = this.state.affectBookmarks[baseline.bookmark];
+    const list = snap?.sentiments[key] || [];
+    if (emotion) {
+      const found = list.find((s) => s.toEntityRef === toEntityRef && s.emotion === emotion);
+      return found?.strength ?? 0;
+    }
+    return list
+      .filter((s) => s.toEntityRef === toEntityRef)
+      .reduce((sum, s) => sum + s.strength, 0);
+  }
+
   /** Add deltas to the mood, clamped per axis. The most common authoring path. */
   nudgeCharacterMood(charRef: string, dValence: number = 0, dArousal: number = 0): CharacterMood {
     const key = this.resolveCharRef(charRef);
     if (!key) return { valence: 0, arousal: 0 };
+    this.captureInitialMood(key);
     const current = this.state.characterMoods[key] || { valence: 0, arousal: 0 };
     const next: CharacterMood = {
       valence: StoryContext.clampUnit(current.valence + dValence),
@@ -657,6 +892,7 @@ export class StoryContext extends EventEmitter {
   ): Sentiment | null {
     const key = this.resolveCharRef(fromCharRef);
     if (!key) return null;
+    this.captureInitialSentiment(key, toEntityRef, emotion);
     if (!this.state.characterSentiments[key]) this.state.characterSentiments[key] = [];
     const list = this.state.characterSentiments[key];
     const existingIdx = list.findIndex((s) => s.toEntityRef === toEntityRef && s.emotion === emotion);
@@ -709,6 +945,7 @@ export class StoryContext extends EventEmitter {
     const key = this.resolveCharRef(charRef);
     if (!key || !emotion) return;
     const lower = emotion.toLowerCase();
+    this.captureInitialEmotion(key, lower);
     if (!this.state.characterEmotionLevels[key]) this.state.characterEmotionLevels[key] = {};
     const previous = this.state.characterEmotionLevels[key][lower] ?? 0;
     const next = Math.max(0, Math.min(1, value));
@@ -727,6 +964,7 @@ export class StoryContext extends EventEmitter {
     const key = this.resolveCharRef(charRef);
     if (!key || !emotion) return 0;
     const lower = emotion.toLowerCase();
+    this.captureInitialEmotion(key, lower);
 
     // Step 6 — modulate the incoming delta by the character's traits before
     // anything else uses it. A neutral or trait-less character produces the
@@ -1327,6 +1565,8 @@ export class StoryContext extends EventEmitter {
     // Get variable name - support both new (variableName) and old (left) field names
     // Mood conditions (Step 4). `character` is the mood holder; `moodAxis`
     // is 'valence' or 'arousal'; `value` is the threshold to compare against.
+    // v0.9.45 — `baseline` switches the comparison to "delta from initial /
+    // bookmark" instead of literal threshold.
     if (condition.type === 'mood') {
       const character = condition.character;
       const axis = condition.moodAxis || 'valence';
@@ -1334,8 +1574,16 @@ export class StoryContext extends EventEmitter {
         console.warn('mood condition missing required character field');
         return false;
       }
+      const key = this.resolveCharRef(character);
       const mood = this.getCharacterMood(character);
-      const left = axis === 'arousal' ? mood.arousal : mood.valence;
+      const currentVal = axis === 'arousal' ? mood.arousal : mood.valence;
+      const baselineVal = key
+        ? this.resolveMoodBaseline(key, axis, condition.baseline)
+        : 0;
+      // For 'literal' (default) baseline is 0 — compare current directly.
+      // For 'initial' / bookmark baselines, baselineVal is the captured
+      // axis value and the operator compares the *delta*.
+      const left = isLiteralBaseline(condition.baseline) ? currentVal : currentVal - baselineVal;
       const right = Number(condition.value ?? condition.right ?? 0);
       switch (condition.operator) {
         case '==': return left === right;
@@ -1351,6 +1599,7 @@ export class StoryContext extends EventEmitter {
     // Emotion conditions (Step 5). Compares the current intensity of
     // `character`'s `emotionName` against `value`. Both `character` and
     // `emotionName` are required; emotionName is matched case-insensitively.
+    // v0.9.45 — `baseline` switches to delta-from-initial / bookmark.
     if (condition.type === 'emotion') {
       const character = condition.character;
       const emotionName = condition.emotionName;
@@ -1358,7 +1607,13 @@ export class StoryContext extends EventEmitter {
         console.warn('emotion condition missing character or emotionName');
         return false;
       }
-      const left = this.getCharacterEmotion(character, emotionName);
+      const key = this.resolveCharRef(character);
+      const lower = emotionName.toLowerCase();
+      const currentVal = this.getCharacterEmotion(character, emotionName);
+      const baselineVal = key
+        ? this.resolveEmotionBaseline(key, lower, condition.baseline)
+        : 0;
+      const left = isLiteralBaseline(condition.baseline) ? currentVal : currentVal - baselineVal;
       const right = Number(condition.value ?? condition.right ?? 0);
       switch (condition.operator) {
         case '==': return left === right;
@@ -1438,6 +1693,7 @@ export class StoryContext extends EventEmitter {
     // Sentiment conditions (Step 4). Compares the strength of
     // `character`'s sentiment toward `sentimentTarget` (optionally filtered
     // by `sentimentEmotion`) against `value`.
+    // v0.9.45 — `baseline` switches to delta-from-initial / bookmark.
     if (condition.type === 'sentiment') {
       const character = condition.character;
       const target = condition.sentimentTarget;
@@ -1445,7 +1701,12 @@ export class StoryContext extends EventEmitter {
         console.warn('sentiment condition missing character or sentimentTarget');
         return false;
       }
-      const left = this.getSentimentTo(character, target, condition.sentimentEmotion);
+      const key = this.resolveCharRef(character);
+      const currentVal = this.getSentimentTo(character, target, condition.sentimentEmotion);
+      const baselineVal = key
+        ? this.resolveSentimentBaseline(key, target, condition.sentimentEmotion, condition.baseline)
+        : 0;
+      const left = isLiteralBaseline(condition.baseline) ? currentVal : currentVal - baselineVal;
       const right = Number(condition.value ?? condition.right ?? 0);
       switch (condition.operator) {
         case '==': return left === right;
@@ -1599,6 +1860,21 @@ export class StoryContext extends EventEmitter {
           this.setActiveCharacterVariant(effect.target, variantId, {
             seedAffect: !((effect as any).suppressSeed),
           });
+        }
+        break;
+      }
+      // v0.9.45 — snapshot mood / emotion / sentiment state under a name
+      // so subsequent condition baselines can compare against it. With
+      // scope 'all' (default), every character's slots are captured. With
+      // scope 'character' and a target, only that character is captured.
+      case 'bookmarkAffectState': {
+        const name = (effect as any).bookmarkName as string | undefined;
+        if (!name) break;
+        const scope = (effect as any).scope as 'all' | 'character' | undefined;
+        if (scope === 'character' && effect.target) {
+          this.takeAffectBookmark(name, { target: effect.target });
+        } else {
+          this.takeAffectBookmark(name);
         }
         break;
       }
@@ -1785,6 +2061,10 @@ export class StoryContext extends EventEmitter {
       characterReflections: {},
       characterGoalStatus: {},
       activeCharacterVariants: {},
+      initialMoods: {},
+      initialEmotionLevels: {},
+      initialSentiments: {},
+      affectBookmarks: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {}
@@ -1913,6 +2193,11 @@ export class StoryContext extends EventEmitter {
         arousal: StoryContext.clampUnit(merged.initialMood.arousal ?? 0),
       };
       this.state.characterMoods[charId] = next;
+      // Capture the seeded mood as the initial baseline (v0.9.45). Without
+      // this, a "mood improved since the start" condition would compare
+      // against 0 instead of the authored seed for characters who started
+      // off-neutral (e.g. Alex seeded at valence -0.3).
+      this.state.initialMoods[charId] = { valence: next.valence, arousal: next.arousal };
       // Emit so HUDs / panels subscribed via characterMoodChanged
       // re-render. Otherwise a runtime variant switch (which wipes the
       // mood map and reseeds here) would change state silently and the
@@ -1921,7 +2206,9 @@ export class StoryContext extends EventEmitter {
     }
     if (merged.initialSentiments && merged.initialSentiments.length > 0) {
       if (!this.state.characterSentiments[charId]) this.state.characterSentiments[charId] = [];
+      if (!this.state.initialSentiments[charId]) this.state.initialSentiments[charId] = [];
       const existing = this.state.characterSentiments[charId];
+      const initialList = this.state.initialSentiments[charId];
       let seededAny = false;
       for (const seed of merged.initialSentiments) {
         if (!seed?.toEntityRef || !seed?.emotion) continue;
@@ -1929,12 +2216,23 @@ export class StoryContext extends EventEmitter {
           (s) => s.toEntityRef === seed.toEntityRef && s.emotion === seed.emotion,
         );
         if (!present) {
+          const strength = StoryContext.clampUnit(seed.strength ?? 0);
           existing.push({
             toEntityRef: seed.toEntityRef,
             emotion: seed.emotion,
-            strength: StoryContext.clampUnit(seed.strength ?? 0),
+            strength,
             createdAt: Date.now(),
           });
+          // Capture seeded sentiment as the initial baseline so
+          // delta-from-initial conditions read against the authored seed.
+          if (!initialList.some((s) => s.toEntityRef === seed.toEntityRef && s.emotion === seed.emotion)) {
+            initialList.push({
+              toEntityRef: seed.toEntityRef,
+              emotion: seed.emotion,
+              strength,
+              createdAt: Date.now(),
+            });
+          }
           seededAny = true;
         }
       }
@@ -2191,6 +2489,27 @@ export class StoryContext extends EventEmitter {
         Object.entries(this.state.characterGoalStatus).map(([k, v]) => [k, { ...v }])
       ),
       activeCharacterVariants: { ...this.state.activeCharacterVariants },
+      // v0.9.45 — baseline + bookmark snapshots so save/load preserves
+      // delta-vs-initial / delta-vs-bookmark comparisons across sessions.
+      initialMoods: Object.fromEntries(
+        Object.entries(this.state.initialMoods).map(([k, v]) => [k, { ...v }])
+      ),
+      initialEmotionLevels: Object.fromEntries(
+        Object.entries(this.state.initialEmotionLevels).map(([k, v]) => [k, { ...v }])
+      ),
+      initialSentiments: Object.fromEntries(
+        Object.entries(this.state.initialSentiments).map(([k, v]) => [k, v.map((s) => ({ ...s }))])
+      ),
+      affectBookmarks: Object.fromEntries(
+        Object.entries(this.state.affectBookmarks).map(([name, snap]) => [
+          name,
+          {
+            moods: Object.fromEntries(Object.entries(snap.moods).map(([k, v]) => [k, { ...v }])),
+            emotionLevels: Object.fromEntries(Object.entries(snap.emotionLevels).map(([k, v]) => [k, { ...v }])),
+            sentiments: Object.fromEntries(Object.entries(snap.sentiments).map(([k, v]) => [k, v.map((s) => ({ ...s }))])),
+          },
+        ])
+      ),
       visitedBeats: Array.from(this.state.visitedBeats),
       visitedChoices: Array.from(this.state.visitedChoices),
       timers: { ...this.state.timers },
@@ -2255,6 +2574,27 @@ export class StoryContext extends EventEmitter {
         : {},
       activeCharacterVariants: serialized.activeCharacterVariants
         ? { ...serialized.activeCharacterVariants }
+        : {},
+      // v0.9.45 — restore baseline snapshots and named bookmarks; default
+      // to empty maps for older saves (forward-compat).
+      initialMoods: serialized.initialMoods
+        ? Object.fromEntries(Object.entries(serialized.initialMoods).map(([k, v]) => [k, { ...v }]))
+        : {},
+      initialEmotionLevels: serialized.initialEmotionLevels
+        ? Object.fromEntries(Object.entries(serialized.initialEmotionLevels).map(([k, v]) => [k, { ...v }]))
+        : {},
+      initialSentiments: serialized.initialSentiments
+        ? Object.fromEntries(Object.entries(serialized.initialSentiments).map(([k, v]) => [k, v.map((s: any) => ({ ...s }))]))
+        : {},
+      affectBookmarks: serialized.affectBookmarks
+        ? Object.fromEntries(Object.entries(serialized.affectBookmarks).map(([name, snap]: [string, any]) => [
+            name,
+            {
+              moods: Object.fromEntries(Object.entries(snap.moods || {}).map(([k, v]: [string, any]) => [k, { ...v }])),
+              emotionLevels: Object.fromEntries(Object.entries(snap.emotionLevels || {}).map(([k, v]: [string, any]) => [k, { ...v }])),
+              sentiments: Object.fromEntries(Object.entries(snap.sentiments || {}).map(([k, v]: [string, any]) => [k, (v as any[]).map((s: any) => ({ ...s }))])),
+            },
+          ]))
         : {},
       visitedBeats: new Set(serialized.visitedBeats),
       visitedChoices: new Set((serialized as any).visitedChoices || []),
