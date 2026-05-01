@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against build 0.9.43.94*
+*Last revised against build 0.9.45.95*
 
 ---
 
@@ -1058,7 +1058,7 @@ When you fire an emotion via the `fireEmotion` effect or an Update Affect beat, 
 <a id="choice-effects-affect"></a>
 ### Affect-Aware Choice Effects
 
-Anywhere ASAPS lets you attach **Effects** to a player choice — Dialog Tree choices, Movement Choice destinations, dialog node entries — the dropdown now includes six affect-aware effect types alongside the classic counter / variable / inventory ones:
+Anywhere ASAPS lets you attach **Effects** to a player choice — Dialog Tree choices, Movement Choice destinations, dialog node entries — the dropdown now includes seven affect-aware effect types alongside the classic counter / variable / inventory ones:
 
 | Effect | What it does | Extra fields |
 |--------|--------------|--------------|
@@ -1068,8 +1068,9 @@ Anywhere ASAPS lets you attach **Effects** to a player choice — Dialog Tree ch
 | **Add Reflection** | Appends a short narrative note (text + salience) to a Mode B character's reflection memory. Mode A characters ignore it. | reflectionText, reflectionSalience |
 | **Set Goal Status** | Flips a goal to `met` / `failed` / `abandoned` / `open`. `met` and `failed` auto-fire pride/joy and shame/sadness scaled by priority. | goalId, goalStatus |
 | **Set Character Variant** | Switches which variant of a character is active. Empty value clears the active variant. | variantId |
+| **Bookmark Affect State** | Snapshots the current mood / emotion / sentiment state under an author-named handle. Conditions can later reference the bookmark via the **Compared to: bookmark** picker to ask "has trust grown *since the reunion scene*?". See [Baseline-relative comparisons](#baseline-relative-comparisons). | bookmarkName, scope (`all characters` / `target only`) |
 
-The **target** field for all six effect types is now a **dropdown of the project's characters** (display name shown, stable id stored under the hood) plus a sentinel **Player** entry pinned at the top. No more typing `char_alex` by hand and hoping you spelled it right. If the editor isn't given a project character roster (some compact sub-editors don't have one in scope), the field falls back to a free-text input.
+The **target** field for all of these effect types is a **dropdown of the project's characters** (display name shown, stable id stored under the hood) plus a sentinel **Player** entry pinned at the top. No more typing `char_alex` by hand and hoping you spelled it right. If the editor isn't given a project character roster (some compact sub-editors don't have one in scope), the field falls back to a free-text input. The one quirk: when *Bookmark Affect State* is set to scope `all characters`, the target field hides itself entirely — the snapshot covers everyone, so a target would only confuse the read.
 
 > **Where to find Effects.** Effects sit on Dialog Tree choices, Dialog Tree nodes, Movement Choice destinations, and Pick Prop choices. Open the **Effects** section on any of these and click **+ Add Effect**.
 
@@ -1156,6 +1157,7 @@ How it reads things:
 - **Sentiments toward someone else** read as *<emotion> toward <character> grows / eases (±0.NN)*; **self-directed sentiments** (where the sentiment target is the holder character) read as *self-<emotion>*, matching the affect panel and dossier conventions.
 - **Goal-status changes** read as *goal '<id>' marked <status>*. **Variant changes** read as *switches to variant '<id>'*. **Reflections** are quoted with a soft truncation around 60 characters.
 - **Counter, variable, and inventory effects** roll into a separate compact tally clause after the bullet (`+2 supportScore, +1 maxSupport`).
+- **Bookmark Affect State** rows show up in the same tally clause as `+ bookmark "reunion-scene"` (or `+ bookmark "alex-arc" (Alex only)` when scoped to a single character) — so the summary makes it obvious when a choice is recording a baseline future conditions can compare against.
 - **The block hides itself entirely** when there's nothing meaningful to say — no clutter on choices that don't move affect.
 
 If the summary doesn't read the way you intended the choice to feel, the numbers are off — that's the test. Tweak until the prose matches your intent.
@@ -1844,6 +1846,87 @@ Each affect operator renders its own form so you can never enter a meaningless c
 
 > **Why the affect-aware operators matter.** They let you wire reactivity that *responds to who Alex has become this run* rather than to flags you had to remember to set. A scene-end beat can ask "is Alex lifted right now?" without you having to manually maintain a `currentlyLifted` boolean. Combined with `Update Affect` beats earlier in the path, you get an emergent emotional shape that's much closer to how memory and feeling actually work in human relationships.
 
+<a id="baseline-relative-comparisons"></a>
+### Baseline-relative comparisons: literal vs. delta-from-initial vs. bookmark
+
+A literal threshold like *"Alex's valence ≥ +0.3"* answers a useful question — *is Alex visibly happy right now?* — but it's the wrong question for an awful lot of stories. If Alex was authored with a starting valence of `-0.3` (anxious-introvert seed) and the player's choices have lifted him to `+0.1`, that's a meaningful improvement the story should *feel* — but a literal `≥ +0.3` check still reads false. He's better; he just isn't bright. Conversely, a perpetually-cheerful character might pass `≥ +0.3` from the moment the story starts, with no bearing on what the player has done.
+
+The fix is a small dropdown that sits on every Mood, Emotion, and Sentiment condition:
+
+![Mood condition with the Compared-to picker set to delta-from-initial](images/39-condition-baseline-delta-from-initial.png)
+*The **Compared to** picker sits below the Compare Value field. With *delta from initial* selected, the value above is interpreted as a delta — "Alex's valence has improved by ≥ 0.3 since story start" — instead of an absolute threshold. The hint underneath the picker swaps to match: "Value above is a delta — improved/dropped by X since the baseline."*
+
+The picker has three modes:
+
+| Mode | What the value means | Use when |
+|------|----------------------|----------|
+| **literal value** *(default)* | The number is an absolute threshold — *valence ≥ +0.3*, *fear ≥ 0.4*, *trust toward player ≥ 0.5*. Same behaviour as before v0.9.45. | You want a point-in-time read of state. *"Alex is currently visibly happy."* *"Trust right now is high enough for the secret reveal."* |
+| **delta from initial** *(story-start / first-touch)* | The number is a *change* from where the slot started. The runtime captures the initial value either at story-start (when characters carry authored seeds) or on first-touch (when the slot is first written). A character seeded with valence `-0.3` reads `initial = -0.3`, so *"valence ≥ +0.3 from initial"* fires when current valence reaches `0.0` — the natural meaning of "improved by 0.3". | You want to read change, not state — *"trust toward the player has grown since the story began"*, *"fear has eased"*, *"mood has lifted"*. Robust to off-neutral seeds. |
+| **delta from a named bookmark** | The number is a *change* from a snapshot the story took earlier with the [Bookmark Affect State](#bookmark-affect-state-effect) effect. The picker reveals an extra **Bookmark name** input — fill in the same handle the bookmark effect uses (e.g. `reunion-scene`). | You want to gate on change *between two specific moments* — *"has trust grown since the reunion scene?"*, *"has fear softened since the act-one ending?"*. |
+
+The same picker shows up in two surfaces, which mirror each other:
+
+- **Inspector → Condition Beat → Mood / Emotion / Sentiment forms.** Full-width dropdown with the hint text underneath.
+- **Inspector → Beat properties → Requirements → per-requirement card → Mood / Emotion / Sentiment.** A more compact version of the same control under the operator + value row, in the per-requirement card.
+
+> **A worked example.** Alex's anxious-introvert variant seeds his valence at roughly `-0.3`. A summary-time condition that reads "Alex's valence ≥ +0.3 (literal)" will only fire when Alex has lifted *all the way* into bright territory — a high bar that punishes anxious Alex for ever having been anxious. The same condition rewritten as "Alex's valence ≥ +0.3 (delta from initial)" fires when Alex has merely *moved 0.3 in the right direction* — what the story almost certainly meant in the first place.
+
+> **What's deliberately not supported.** There is no "X has been improving over the last N beats" running-trend mode. Conditions are point-in-time (literal) or two-point comparisons (delta from initial / bookmark). A running trend would mean storing per-slot history — expensive in the runtime, and rarely what authors actually want once they unpack the question. If you find yourself reaching for a trend, what you usually want is a bookmark on the prior scene and a delta-from-bookmark check.
+
+### Condition templates
+
+Picking the right operator, character, and value combination for an affect condition takes practice — what counts as "trust" in your project's palette? what threshold reads as "ashamed" rather than "passing thought"? do you actually want a literal check or a delta? The template library is a 28-preset answer to those cold-start questions, accessible via a blue-tinted **Apply a template** dropdown that shows up in two places:
+
+- **Inspector → Condition Beat**, above the Condition Type select.
+- **Inspector → Requirements → per-requirement card**, at the top of each card.
+
+![The condition-templates dropdown open inside the Condition Beat inspector, showing all six optgroups](images/38-condition-templates.png)
+*The Apply-a-template dropdown, expanded. Templates are organised in optgroups by category — Mood, Emotion, Sentiment, Trait (personality), Goal, Active variant. Picking one writes every field of the condition at once: the type, the character target, the operator, the value, the baseline (for delta-flavoured templates), plus per-type fields like sentiment target and emotion name.*
+
+Templates fall into two flavours per affect category:
+
+- **Threshold flavour** — *"is X true right now?"* — uses the literal-value baseline with a sensible cutoff. Read as point-in-time questions: *"Mood — visibly happy (now)"*, *"Sentiment — trusts the player (now)"*, *"Emotion — visibly fearful (now)"*.
+- **Delta-from-initial flavour** — *"has X changed since the story began?"* — uses the `delta from initial` baseline so the condition reads against where the character started, not against absolute zero. Read as change questions: *"Mood — improved since start"*, *"Sentiment — trust toward player has grown since start"*, *"Emotion — fear has eased since start"*.
+
+A representative slice of the library:
+
+| Category | Threshold flavour | Delta-from-initial flavour |
+|----------|-------------------|---------------------------|
+| **Mood** | Visibly happy / sad (now); highly activated / calm (now) | Improved since start; worsened since start |
+| **Emotion** | Visibly fearful / joyful / proud / saddened / carrying shame (now) | Fear has eased since start; joy has grown since start |
+| **Sentiment** | Trusts / distrusts / fears / is grateful to the player (now); overall feels positive toward player (now) | Trust toward player has grown since start; trust toward player has eroded since start |
+| **Trait (personality)** | Highly conscientious; combative (low agreeableness); anxious (high neuroticism); outgoing (high extraversion) | — *(Big Five traits don't drift at runtime; only threshold makes sense)* |
+| **Goal** | Goal — met; failed; still open *(each leaves `goalId` blank for you to fill in)* | — |
+| **Active variant** | Specific persona is active *(leaves `variantId` blank)* | — |
+
+A few things templates do quietly so you don't have to:
+
+- **They infer the active character target.** A template applied inside a condition that already has a character picked keeps that character. Inside an empty Condition Beat, the target is whatever the `character` field currently holds (often empty, in which case you fill it in after).
+- **They never seed bookmark names.** The library can't know what bookmarks your story has authored, so even though the third "Compared to" mode is available, no template starts in bookmark mode. To gate on a bookmark, pick a delta-from-initial template, then switch the **Compared to** picker to *delta from a named bookmark* and fill in the name.
+- **They're starting points, not contracts.** The dropdown resets to the empty sentinel after each apply, so you can tweak, decide it didn't fit, and pick a different one — the second pick overwrites the first cleanly.
+
+> **Why threshold *and* delta both ship.** They're answering different questions. Threshold ("trust ≥ 0.4") is right when the *level* matters — the player isn't going to be told a secret unless trust is genuinely high, regardless of where it started. Delta ("trust has grown by ≥ 0.3 since start") is right when the *journey* matters — the story rewards relationship-building, regardless of whether the destination is "warm" or "merely less cold". Most affect-aware narratives end up using both, on different beats.
+
+<a id="bookmark-affect-state-effect"></a>
+### Bookmark Affect State (effect)
+
+The third "Compared to" mode — *delta from a named bookmark* — only works if the story has *taken* a bookmark earlier. That's what the **Bookmark Affect State** effect is for. Add it from the Effects section of any choice (Dialog Tree, Movement Choice, dialog node, Pick Prop) the same way you'd add a Nudge Mood or Fire Emotion row.
+
+![A Bookmark Affect State effect row in the Choice Effects editor with scope set to all characters](images/40-bookmark-affect-state-row.png)
+*Adding `Bookmark Affect State` to a choice on the **Late Night Follow Up** beat. The row asks for two things: a **bookmark-name** (the handle conditions will reference) and a **scope** (`all characters` snapshots the entire roster's mood / emotion / sentiment state under that name; `target only` snapshots a single character). With scope set to `all characters` the target field hides itself — there's nothing to point at, the snapshot covers everyone.*
+
+The fields:
+
+| Field | What it does |
+|-------|--------------|
+| **bookmark-name** | An author-chosen handle for this snapshot. Match this exact string in the **Bookmark name** input on the condition's *Compared to: bookmark* mode. Names are arbitrary text — `act-one-end`, `reunion-scene`, `alex-arc-midpoint` — pick something that reads well in your own head. |
+| **scope: all characters** | Snapshots the mood, emotion intensities, and sentiments for every character in the project under this name. The single most useful default for "where was everyone, narratively, when this happened?" |
+| **scope: target only** | Snapshots only the chosen target character. Smaller footprint, useful when only one character's arc is being measured. |
+
+The live "what does this choice do?" summary (the italic blue-tinted block under the effects list) picks bookmarks up too: a choice that records `bookmark "reunion-scene"` will say so, in the tally line after the per-character affect read. So you can see at a glance which choices are recording baselines and which are reading from them.
+
+> **A worked rhythm.** Place a *Bookmark Affect State* effect on the choice that ends an act — *act-one-end*, scope: all characters. In the act-two beat that immediately follows, place a Condition Beat (or per-beat requirement) that asks *"Sentiment — trust toward player has grown since start"*, then switch its **Compared to** picker to *delta from a named bookmark* and type `act-one-end`. Now the condition reads "trust has grown since the act-one ending" rather than "since the very beginning of the story" — exactly what an act break usually means dramatically.
+
 ### Compound Conditions
 
 For complex logic requiring multiple checks, chain Condition Beats together — each beat handles one comparison, and you wire them into a decision tree:
@@ -1872,6 +1955,11 @@ The same condition vocabulary is also available on every regular beat under the 
 
 ![Requirements section with a mood requirement](images/30-requirements-mood.png)
 *A requirement on a regular beat: this beat will only run when Alex's valence is at least +0.3. If unmet at runtime, the engine redirects to the fallback (or just logs a warning if no fallback is set), and the path analyzer treats the unreachable case according to the chosen severity.*
+
+Each requirement card carries the same blue-tinted **Apply a template** dropdown the Condition Beat does, plus the same **Compared to** picker on its mood / emotion / sentiment forms — so you can scaffold "trust has grown since start" or "fear has eased since the reunion bookmark" requirements with a single click and a small tweak:
+
+![Requirements editor with a sentiment delta-from-initial condition seeded by a template](images/41-requirement-template-delta.png)
+*A requirement on the **Summary Setup** beat, seeded by the *Sentiment — trust toward player has grown since start* template and pointed at Alex. The template wrote everything below the *Apply a template* row in one click; the only tweak the author has to make is filling in the character. Note the **Compared to** value of *delta from initial (story-start / first-touch)* — the requirement reads "Alex's trust toward the player has grown by at least 0.3 since the start of this run", which is what a "thoughtful-ally" summary beat almost certainly means dramatically.*
 
 Use requirements when the gating concept *belongs to the destination beat* — "this private conversation only makes sense if Alex is in a state to talk" — rather than when it belongs to the choice that leads there. The runtime treats both the same way; the distinction is for you, the author, when you re-read your own story.
 
@@ -2470,6 +2558,14 @@ Quick reference for all beat types.
 **Choice Effects** - Variable, counter, inventory, or affect changes (nudge mood, fire emotion, add sentiment, set goal status, set character variant, add reflection) that trigger immediately when a dialog or movement choice is selected. Authored in the **Effects:** section of any choice via the **+ Add Effect** button or, for affect-stack bundles, the **+ apply template…** dropdown. See [Easier authoring: labels, palette suggestions, templates, and a live summary](#effects-easier-authoring).
 
 **Effect Template** - A preset, intent-shaped bundle of affect-stack effects (mood, emotion, sentiment, reflection, counter changes) that the choice editor appends in one click. Eight defaults ship: *Empathetic — full support*, *Empathetic — partial / well-meaning*, *Pushy / dismissive*, *Silent / felt-abandoned*, *Boundary respecting*, *Validating / "I see you"*, *Defensive overreach*, *Quiet recovery*. Templates infer the target character from existing rows and only emit counter increments for counters that exist in the project.
+
+**Condition Template** - A preset, intent-shaped condition shape (type, character, operator, value, baseline, plus per-type fields like sentiment target or emotion name) that the Inspector seeds in one click. 28 defaults ship across six categories (Mood, Emotion, Sentiment, Trait, Goal, Active variant); most categories ship in two flavours — threshold *(now)* and delta-from-initial *(since start)*. Available in both the Condition Beat editor and per-beat requirement cards. See [Condition templates](#condition-templates).
+
+**Baseline (condition)** - The reference point a Mood / Emotion / Sentiment condition compares against. Three modes: **literal** (compare the slot's current value to a fixed threshold), **delta from initial** (compare the slot's current value to the value at story-start or first-touch — robust to off-neutral seeds), **delta from a named bookmark** (compare against a snapshot recorded earlier with the *Bookmark Affect State* effect). Set via the **Compared to** picker on the condition form. See [Baseline-relative comparisons](#baseline-relative-comparisons).
+
+**Initial value (affect)** - The mood / emotion / sentiment value the runtime captures the first time a condition with `baseline: 'initial'` reads the slot, or — for characters with authored seeds — at story-start. Used as the reference point for *delta from initial* baselines, so a character seeded with valence `-0.3` reads `initial = -0.3` rather than `0`, and *"valence has improved by 0.3"* fires when current valence reaches `0.0`.
+
+**Bookmark / Affect bookmark** - An author-named snapshot of mood / emotion / sentiment state taken at a specific point in the story via the *Bookmark Affect State* effect. Conditions reference it by name through the *delta from a named bookmark* baseline mode — `delta vs. "reunion-scene"`. Bookmarks can scope to all characters or to a single target. See [Bookmark Affect State (effect)](#bookmark-affect-state-effect).
 
 **Affect Summary** - The small italic blue-tinted block (prefixed with `→`) shown below the effect rows in the Choice Effects editor. Synthesises the cumulative effect of the choice in plain language ("Alex: feels happier; joy spikes; trust toward the player grows (+0.50) · +2 supportScore"), updating live as the author tweaks values. Hidden when no effects or every delta is below noise.
 
