@@ -491,6 +491,19 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
       story.setCharacters(storyData.characters);
     }
 
+    // Apply project-level emotion palette so runtime fireEmotion uses
+    // the author's weights / decay rates rather than core defaults.
+    // Same wiring as PreviewWindow's runtime story reconstruction.
+    if (storyData.emotionPalette && Array.isArray(storyData.emotionPalette) && storyData.emotionPalette.length > 0) {
+      story.setEmotionPalette(storyData.emotionPalette);
+    }
+
+    // Apply trait → emotion modulations so per-character traits scale
+    // incoming deltas as authored.
+    if (storyData.traitModulations && Array.isArray(storyData.traitModulations)) {
+      story.setTraitModulations(storyData.traitModulations);
+    }
+
     // Set clusters
     if (storyData.clusters) {
       story.setClusters(storyData.clusters);

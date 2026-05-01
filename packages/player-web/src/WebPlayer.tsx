@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame } from '@asaps/renderer';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
 import { WebSTTService } from './WebSTTProvider';
@@ -62,6 +62,13 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   const [splashFading, setSplashFading] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
   const [aiStatus, setAiStatus] = useState(() => getAIConfigStatus());
+  // Bumped on every characterMoodChanged / characterVariantChanged event
+  // so the HUD overlay re-renders with fresh values from the runtime
+  // context. Same pattern PreviewWindow uses.
+  const [hudTick, setHudTick] = useState(0);
+  // Stage dimensions captured from the loaded story so the HUD overlay
+  // can position screen-docked widgets correctly.
+  const [stageDims, setStageDims] = useState<{ width: number; height: number } | null>(null);
 
   // Handle settings changes from PlayerUI
   const handleSettingsChange = useCallback((settings: PlayerSettings) => {
@@ -229,6 +236,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         const stageDimensions = player.getStageDimensions();
         console.log('[WebPlayer] Stage dimensions:', stageDimensions);
         renderer.setStageDimensions(stageDimensions.width, stageDimensions.height);
+        setStageDims(stageDimensions);
 
         // Set up timer state synchronization and fictional time display
         const engine = player.getEngine();
@@ -236,6 +244,12 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           const context = engine.getContext();
           const timerManager = context.getTimerManager();
           const story = engine.getStory();
+
+          // HUD overlay re-render trigger — subscribe to mood / variant
+          // events so the screen-docked mood pad refreshes during play.
+          const bumpHud = () => setHudTick((t) => t + 1);
+          context.on('characterMoodChanged', bumpHud);
+          context.on('characterVariantChanged', bumpHud);
 
           // Set up global settings for layout and HUD
           const gs = player.getGlobalSettings?.() || (player as any).globalSettings;
@@ -550,9 +564,70 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     padding: '20px',
   };
 
+  // Build the HUD overlay layer for screen-docked moodFrames. Mirrors the
+  // PreviewWindow overlay: gates on hasExplicitlySetVariant so the HUD
+  // stays hidden until the player picks a variant; reads merged
+  // character (variant overlay applied) for name / portrait / color;
+  // re-renders on every characterMoodChanged via hudTick.
+  const renderMoodHudOverlay = () => {
+    void hudTick; // re-render dependency
+    const player = playerRef.current;
+    const ctx = player?.getEngine()?.getContext();
+    const story = player?.getEngine()?.getStory();
+    if (!ctx || !story || !stageDims) return null;
+    const chars = (story as any).getCharacters?.() || [];
+    const palette = (story as any).getEmotionPalette?.();
+    const assetsList = (story as any).getAssets?.() || [];
+    if (chars.length === 0) return null;
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: 0, top: 0,
+          width: stageDims.width, height: stageDims.height,
+          pointerEvents: 'none',
+          zIndex: 40,
+        }}
+      >
+        {chars.map((c: any) => {
+          const mf = c?.moodFrame;
+          if (!mf || !mf.enabled || mf.dockMode !== 'screen') return null;
+          // Hide HUD until variant explicitly picked.
+          if (c.variants && c.variants.length > 0) {
+            const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
+            if (!explicit) return null;
+          }
+          const merged = (ctx as any).getMergedCharacter?.(c.id) || c;
+          const mood = ctx.getCharacterMood(c.id);
+          const portraitAsset = merged.portrait?.assetId
+            ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
+            : undefined;
+          return (
+            <CharacterMoodFrame
+              key={`mood-hud-${c.id}`}
+              valence={mood.valence}
+              arousal={mood.arousal}
+              config={mf}
+              palette={palette}
+              characterName={merged.displayName || merged.name || c.id}
+              characterPortraitUrl={portraitAsset?.url || merged.portrait?.image}
+              characterColor={merged.color}
+              characterPosition={{ x: 0, y: 0 }}
+              characterDimensions={{ width: 0, height: 0 }}
+              containerDimensions={stageDims}
+            />
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="asaps-player" style={containerStyle}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+        {renderMoodHudOverlay()}
+      </div>
 
       {state === 'splash' && (
         <div style={{
