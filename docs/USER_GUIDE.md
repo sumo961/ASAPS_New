@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Version 0.9.41*
+*Version 0.9.43*
 
 ---
 
@@ -151,7 +151,7 @@ Let's take a tour of your system-building workspace. Don't worry about memorizin
 The header spans the top of the screen in three rows:
 
 **Row 1 -- Branding and Title:**
-The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.41.92), and a large text field where you can type or edit your project's title directly.
+The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.43.94), and a large text field where you can type or edit your project's title directly.
 
 **Row 2 -- Main Controls:**
 
@@ -327,7 +327,7 @@ This is where interactivity shines. Present text and multiple choices, each pote
 
 **Recursive Dialogs:** Set a choice's target to `__self__` to loop back to the root of the dialog tree. This is powerful for "hub" conversations where the interactor can ask multiple questions before leaving. Combined with **per-choice visited tracking** (`markVisited`), choices the interactor has already picked can be visually dimmed or hidden.
 
-**Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, or add/remove inventory items—without needing a separate logic beat. Open the **Effects** section on any choice to configure these. This keeps simple state changes co-located with the choice that triggers them.
+**Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, add/remove inventory, **nudge a character's mood**, **fire an emotion**, **add a sentiment**, **set a goal's status**, **switch a character's active variant**, or **append a reflection** to a Mode B character's memory. Open the **Effects** section on any choice and pick **+ Add Effect**. The full list of affect-aware effects (and the character-target dropdown that backs them) is documented in [Affect-Aware Choice Effects](#choice-effects-affect).
 
 ---
 
@@ -631,6 +631,24 @@ Give characters items or take them away. Items can be transferred between charac
 
 ---
 
+### Update Affect
+
+**Purpose:** Drift a character's mood, fire an emotion, or strengthen a sentiment from a beat in the flow.
+
+This is the logic-beat counterpart to the [affect-aware choice effects](#choice-effects-affect). Use it when the affect change isn't triggered by a player choice — e.g. *"on entering the haunted house, every NPC's fear rises"*, or *"at the end of Act 1, the player feels pride."*
+
+**Key Settings:**
+- **Character** — whose affect changes
+- **Mood deltas** — optional ±valence and ±arousal (clamped to `[-1, 1]`)
+- **Sentiment** — optional (target, emotion, strength delta) tuple
+- **Emotion** — optional (emotion name, intensity delta); when the emotion is in the project's [Emotion Palette](#emotion-palette), the runtime auto-nudges mood by the palette weights so you don't have to specify mood deltas separately
+
+All fields are optional — at minimum one of mood deltas, the sentiment trio, or the emotion pair must be set, otherwise the beat is a silent no-op.
+
+**When to Use:** Atmosphere shifts, story-beat-level emotional pivots, "the world has changed" moments where affect should update without a player action.
+
+---
+
 ### AI Condition
 
 **Purpose:** AI-powered branching.
@@ -760,11 +778,17 @@ A great experience needs a great cast and a rich world. Let's populate yours.
 
 ### Why Characters Matter
 
-Characters aren't just pretty faces. They're systems that can:
-- Have multiple visual appearances (happy, sad, angry)
-- Track their own counters (health, trust, energy)
-- Carry inventory items
-- Remember their state throughout the story
+Characters aren't just pretty faces. They're miniature systems in their own right:
+- Multiple visual appearances (happy, sad, angry)
+- Their own counters (health, trust, energy)
+- Inventory they carry from beat to beat
+- A personality (Big Five traits and an archetype) that quietly modulates how they react
+- A 2D mood (valence × arousal) that can drift over the session
+- Directed feelings — sentiments — toward the player and other characters
+- Goals that the runtime tracks and that fire pride/joy or shame/sadness when met or failed
+- Optional **variants** — alternate persona overlays sharing one stable id (introvert/extrovert Alex, masculine/feminine Sam) that the player can switch between
+
+You can ignore all of this and ship a perfectly good story with just names and pictures. But if your AI-driven characters need to *feel like someone* — and especially if you want them to react differently depending on what the player has done — these are the dials.
 
 ### Creating a Character
 
@@ -871,7 +895,7 @@ To go back to plain text, click the **✕** on the chip and type whatever you li
 
 …and lists every beat field across your project that uses *"Town Crier"* as free text — speaker fields, dialog node speakers, AI NPC fields, inventory characters. One click links them all to the new Character and they start following renames automatically. References already linked to **other** Characters are never silently overwritten — the dialog skips them. If you'd rather leave the old refs as free text, click **Keep as free text** instead.
 
-**Why this matters.** ASAPS is moving from treating characters as strings to treating them as identities. When you link a field to a defined Character, the runtime resolves that link to a single canonical record — no matter how the character is referenced (id, name, or display name). That stable identity is what feeds upcoming character-aware features such as per-character mood, sentiment-over-time, and dossier building. Everything still works if you stick with free-text names; linking just unlocks more.
+**Why this matters.** ASAPS treats characters as identities, not strings. When you link a field to a defined Character, the runtime resolves that link to a single canonical record — no matter how the character is referenced (id, name, or display name). That stable identity is what makes character-aware features such as per-character mood, sentiment-over-time, goals, variants, and dossier building work — see [The Affect Tab](#character-affect) for the full picture. Everything still works if you stick with free-text names; linking just unlocks more.
 
 ### The Player Character as Speaker
 
@@ -889,6 +913,160 @@ Start faster with pre-made templates:
 - **Wizard NPC** - Magic-focused stats
 
 Select a template, customize to fit your story.
+
+<a id="character-affect"></a>
+### The Affect Tab — Personality, Mood, Sentiments, Goals & Variants
+
+Open any character in the Character Editor and click the **Affect** tab (heart icon). This is where the character's inner life lives. None of these fields are required — leave the tab untouched and the character behaves as a pleasant blank slate. Fill them in when you want richer, more reactive behavior in AI beats and emotion-aware logic.
+
+![Affect tab overview](images/18-affect-tab-overview.png)
+*The Affect tab on a fresh character — everything starts neutral / empty so authors only see what they care about.*
+
+The tab is organized as a stack of cards, top to bottom: **Personality**, **Initial mood**, **Initial sentiments**, **Dossier policy**, **Goals**, **Variants**, **Mood HUD**. Take them one at a time — most stories only need two or three.
+
+#### Personality — Big Five traits and archetype presets
+
+Personality traits are static numbers in `[0, 1]` that scale how strongly a character's emotions react to events. They never gate choices on their own — they're a quiet multiplier on emotion deltas at runtime.
+
+You have two ways to fill in this card:
+
+**1. Pick an archetype.** The **Load archetype** dropdown ships with ten research-grounded presets — *Balanced, Narcissist, Anxious introvert, Conscientious leader, Free spirit, Recluse, Hothead, Peacekeeper, Stoic, Trickster*. Pick one and ASAPS replaces the Big Five sliders with that profile and shows a description plus any **Seeded toward self:** sentiments the preset implies (the Anxious introvert, for example, seeds a mild self-shame; the Stoic seeds nothing because the research doesn't ground a specific self-feeling for that profile).
+
+![Personality archetype applied](images/20-archetype-applied.png)
+*Picking "Anxious introvert" replaces the Big Five sliders, surfaces the description, and seeds a self-directed sentiment — all visible at a glance.*
+
+**2. Tune by hand.** Click **+ Add Big Five** to seed Openness, Conscientiousness, Extraversion, Agreeableness, and Neuroticism at neutral 0.5. Each trait has its own slider and a one-line description so you don't need to remember which way the axis points. Click **+ Add custom trait** to invent your own (e.g. *bravery*, *curiosity_about_tech*) for story-specific use.
+
+You can mix the two — pick an archetype to get 80% of the way there, then nudge individual sliders to taste. Custom (author-named) traits are preserved when you switch archetypes.
+
+> **Why traits don't gate choices.** Locking a choice behind *"requires Extraversion ≥ 0.7"* would make the character feel deterministic in a way real personalities aren't. Traits modulate; they don't decide. If you want to branch on personality, branch on what the personality has *led the character to do* (mood, sentiment, visited beats) — that's more reactive and more readable.
+
+#### Initial mood — the 2D Mood Pad
+
+Mood is two numbers — **valence** (sad ↔ happy) and **arousal** (calm ↔ excited) — that together place the character on Russell's circumplex of affect. The pad in the editor is a 320-pixel interactive disc:
+
+- Click or drag inside the disc to set both axes at once.
+- Tiny **valence** and **arousal** sliders below the pad are for numeric fine-tune.
+- If a project emotion palette is defined (see [Emotion Palette](#emotion-palette) below), faint purple markers show where each emotion sits in mood-space — *joy* up-and-right, *sadness* down-and-left, *surprise* almost pure-arousal, etc. Picking a mood near *fear* will literally drop the dot near the *fear* marker.
+- A small subtitle under the pad describes the mood in plain language ("happy, alert" / "sad, calm" / "neutral").
+- A **Reset to neutral** link appears whenever the mood isn't already at the origin.
+
+Mood drifts at runtime via `nudgeMood` and `fireEmotion` effects, the **Update Affect** logic beat, and emotion decay (each emotion in the palette has its own decay rate). The Initial mood you set here is just the seed.
+
+#### Initial sentiments — directed feelings at story start
+
+A sentiment is a (target, emotion, strength) tuple: *fear toward wolf +0.7*, *trust toward player +0.5*. Click **Add sentiment**, type or pick the target, the emotion name, and slide the strength between -1 and +1. Each row is one feeling.
+
+Sentiments can target other characters, the player, items, or any string you want to use as a key — but linking to a defined Character via id is what gives you stable references that survive renames.
+
+When the sentiment's holder and target are the same character (a self-shame, self-pride etc.), ASAPS renders it with the *self-* prefix — e.g. **mild self-shame** instead of *mild shame toward Alex*. The same convention is used in the LLM dossier, which splits affect into "Feels toward themselves:" and "Feels toward others:" so prompts don't sound recursive.
+
+#### Dossier policy — how the LLM sees this character
+
+The dossier is the structured summary of the character that ASAPS injects into AI beats (AI Conversation, AI Dialog Tree, etc.) so the LLM knows who's speaking. The dossier policy radio controls how that summary is built each turn:
+
+- **Re-anchor every turn (default — Mode A)** — Rebuilds the dossier from the character's structured state on every AI turn. The character cannot drift away from who they are. Recommended for almost every story.
+- **Accumulate reflections (Mode B)** — Appends short author-or-runtime-seeded *reflections* across turns. The character is allowed to grow and remember subjectively. Choose this for protagonists or NPCs who should change over the session.
+
+Mode B is paired with the new **`addReflection`** effect (see [Choice Effects](#choice-effects-affect) below) — a short narrative note in the character's voice plus a salience score in [0, 1]. Reflections survive longest when salience is high and oldest-low-salience entries are evicted first when the per-character cap fills up. Mode A characters silently ignore reflections in their dossier.
+
+#### Goals — authored objectives with auto-fired emotions
+
+Goals are simple authored objectives: an id, a name, an optional description, and an optional priority slider. The runtime tracks each goal's status (`open`, `met`, `failed`, `abandoned`); when a goal flips to `met` it auto-fires pride and joy on its owner, and when it flips to `failed` it auto-fires shame and sadness — both scaled by priority. The mechanism follows the GAMYGDALA model from the affective-computing literature.
+
+You change a goal's status from a player choice via the new **`setGoalStatus`** effect, which exposes a target dropdown (the character whose goal it is), a `goal-id` field, and a status dropdown (`met`/`failed`/`abandoned`/`open`). For quiet goal updates you don't want to fire emotions on, the runtime supports a `suppressEmotion` flag on the effect.
+
+> **Mode A vs Mode B for goals.** Mode A characters can leave Goals empty — they don't need them. Mode B / agentic stories generally want at least one or two goals to drive emergent behavior; goals are what give a Mode B character forward motion between scenes.
+
+#### Variants — alternate persona overlays for one character
+
+A variant is an alternate persona slice that shares the same character id. Use them when you want:
+
+- *"Play as introvert Alex / extrovert Alex"* (player-picked persona)
+- *"Play as a man / a woman / non-binary"* (gender-flexible protagonist)
+- A single NPC who comes in two flavors and the runtime picks one
+
+Click **+ Add variant** in the Variants section. The first time you add one, ASAPS migrates the base character's personality, mood, sentiments, and dossier policy onto the new variant so you don't lose work — and the parent's Personality / Initial mood / Initial sentiments / Dossier policy cards collapse into a banner reading *"This character has N variants. Personality, initial mood, and sentiments are authored per variant below…"* Subsequent variants clone from the first variant so you can copy-and-tweak.
+
+![Affect tab with variants and a goal](images/21-affect-with-variants-goals.png)
+*Once a character has variants, each variant card carries its own complete persona slice — Big Five sliders, archetype shortcut, MoodPad, sentiments, portrait override, displayName override. The "default" radio picks which variant auto-applies at story start.*
+
+Each variant card carries:
+
+- A **default** radio (one variant per character can be marked default — that one auto-applies at story start when no `setCharacterVariant` effect has fired yet).
+- A **variant id** (stable identifier used by the `setCharacterVariant` effect and `characterVariant` condition).
+- A **variant label** (e.g. *Anxious introvert*) and an optional **display name** override (the user-facing name when this variant is active).
+- An optional description, surfaced in the dossier when the variant is active.
+- A **trait preset** dropdown — the same ten archetypes as the base, but applied to *this variant only*. Variant traits can be cleared to fall back to base character traits.
+- A 2D MoodPad and sentiment list specific to this variant.
+- A **portrait override** (optional) — leave empty to inherit the base portrait. Variants share the base character's sprite sheet, states, and animations; only the affect/persona slice and the portrait swap.
+
+To switch variants at runtime, drop a **`setCharacterVariant`** effect on a player choice (target = the character, value = the variant id). To branch on the active variant, use a Condition Check beat with the `characterVariant` operator (this operator is exposed via project file or the AI condition; the visual ConditionBeat editor surfaces classic variable / counter / inventory / timer / fictionalTime / visitedBeat — affect-aware operators are reachable via raw conditions on choices and the engine API).
+
+In the Character Manager the grid changes shape for characters with variants: instead of a single card you get a **grouped card** with a colored border (the parent's color), a parent header showing the display name and variant count, and one inner sub-card per variant.
+
+![Character Manager showing a grouped card with variants](images/24-character-manager-grouped.png)
+*A character with two variants in the Character Manager. The colored border is the parent's color; clicking the parent header opens the editor on the base character; clicking a variant sub-card opens the editor focused on that variant (Affect tab pre-selected, scrolled to and briefly outlined). The pencil and X buttons on each sub-card edit and remove that variant.*
+
+#### Mood HUD — show a character's mood on stage
+
+Each character can carry an optional **Mood HUD** — a small 2D mood-pad card that mounts on the running stage and shows the character's mood updating in real time during preview and exported web play.
+
+![Mood HUD configuration](images/22-mood-hud.png)
+*The Mood HUD card. Off by default — turn it on for characters whose emotional state should be visible to the player.*
+
+In the **Mood HUD** card on the Affect tab:
+
+- **Enable HUD pad** — master on/off switch. Off by default.
+- **Dock mode** — *Anchored to character* (HUD floats next to the character's sprite on stage) or *Fixed to screen corner* (HUD pinned to one of the four screen corners).
+- **Anchor / Corner** — eight character-relative positions (top, bottom, left, right, top-left, top-right, bottom-left, bottom-right) when docked to a character; four screen corners when fixed.
+- **Size (px)** — between 48 and 320; defaults to ~140.
+- **Opacity** — 0.2 to 1.0.
+- **Show emotion-palette markers** — overlays the project's emotion palette on the disc.
+- **Show axis labels** — the *sad / happy / calm / excited* corner labels.
+- **Show qualitative mood label** — a one-line plain-English description below the disc (e.g. *"sad, alert"*).
+
+If a character has variants, the HUD hides until the player picks a variant — so you don't end up showing a HUD for a character who hasn't been instantiated yet.
+
+<a id="emotion-palette"></a>
+### Emotion Palette — Names, Mood-Axis Weights, Decay Rates
+
+Mood and emotions are project-wide. ASAPS ships with the **Ekman 6** (joy, anger, fear, sadness, surprise, disgust) plus *pride*, *shame*, and *interest* — nine emotions out of the box, each tuned to a position in mood-space and a decay rate.
+
+To edit the palette, click **Emotion palette…** in the Character Manager toolbar (next to **Add Character**).
+
+![Emotion palette editor](images/25-emotion-palette-editor.png)
+*The Emotion Palette editor. Each row is one emotion: name, valence weight, arousal weight, and decay rate per beat-entry tick.*
+
+For each emotion you can set:
+
+- **Name** — what the runtime resolves against (case-sensitive).
+- **Description** (optional) — purely for the author's reference.
+- **Valence weight** in `[-1, 1]` — how strongly firing this emotion nudges the character's mood toward happy / sad.
+- **Arousal weight** in `[-1, 1]` — how strongly it nudges toward excited / calm.
+- **Decay rate** in `[0, 1]` — what fraction of the emotion's intensity bleeds off each beat-entry tick.
+
+Click **Add emotion** to invent a new one, or **Reset to default** to wipe the palette back to the Ekman 6 + pride/shame/interest. The palette persists with the project.
+
+When you fire an emotion via the `fireEmotion` effect or an Update Affect beat, the runtime auto-nudges the target's mood by the emotion's valence and arousal weights, scaled by the firing intensity and the target's neuroticism trait. That's why the palette weights matter: they wire the discrete *"the character felt fear"* event into the continuous mood space the HUD displays.
+
+<a id="choice-effects-affect"></a>
+### Affect-Aware Choice Effects
+
+Anywhere ASAPS lets you attach **Effects** to a player choice — Dialog Tree choices, Movement Choice destinations, dialog node entries — the dropdown now includes seven affect-aware effect types alongside the classic counter / variable / inventory ones:
+
+| Effect | What it does | Extra fields |
+|--------|--------------|--------------|
+| **Nudge Mood** | Shifts the target's mood by a (valence, arousal) delta. Runtime clamps to `[-1, 1]`. | ±valence, ±arousal |
+| **Add Sentiment** | Adds or strengthens a directed feeling (e.g. *trust toward player +0.3*). | sentimentTarget, sentimentEmotion, strengthDelta |
+| **Fire Emotion** | Bumps an emotion intensity; the runtime auto-nudges mood per palette weights. | emotion name, ±intensity |
+| **Add Reflection** | Appends a short narrative note (text + salience) to a Mode B character's reflection memory. Mode A characters ignore it. | reflectionText, reflectionSalience |
+| **Set Goal Status** | Flips a goal to `met` / `failed` / `abandoned` / `open`. `met` and `failed` auto-fire pride/joy and shame/sadness scaled by priority. | goalId, goalStatus |
+| **Set Character Variant** | Switches which variant of a character is active. Empty value clears the active variant. | variantId |
+
+The **target** field for all six effect types is now a **dropdown of the project's characters** (display name shown, stable id stored under the hood) plus a sentinel **Player** entry pinned at the top. No more typing `char_alex` by hand and hoping you spelled it right. If the editor isn't given a project character roster (some compact sub-editors don't have one in scope), the field falls back to a free-text input.
+
+> **Where to find Effects.** Effects sit on Dialog Tree choices, Dialog Tree nodes, Movement Choice destinations, and Pick Prop choices. Open the **Effects** section on any of these and click **+ Add Effect**.
 
 ---
 
@@ -2054,6 +2232,7 @@ Quick reference for all beat types.
 | Random Target | Randomization | targets with optional weights |
 | Set Timer | Timed events | timer name, duration, expiration target |
 | Inventory Management | Item management | action (add/remove/transfer), item, quantity, character |
+| Update Affect | Mood / sentiment / emotion drift | character, ±valence, ±arousal, sentiment (target+emotion+strength), emotion (name+intensity) |
 
 ## AI Runtime Beats
 
@@ -2131,7 +2310,29 @@ Quick reference for all beat types.
 
 **Conversation Direction** - A trigger + action rule that steers an AI Conversation. Triggers detect what the player says; actions control how the AI responds or where the story goes next.
 
-**Choice Effects** - Variable, counter, or inventory changes that trigger immediately when a dialog or movement choice is selected.
+**Choice Effects** - Variable, counter, inventory, or affect changes (nudge mood, fire emotion, add sentiment, set goal status, set character variant, add reflection) that trigger immediately when a dialog or movement choice is selected.
+
+**Personality Archetype** - One of ten research-grounded Big Five presets (Balanced, Narcissist, Anxious introvert, Conscientious leader, Free spirit, Recluse, Hothead, Peacekeeper, Stoic, Trickster) that can be loaded onto a character to seed traits and, in some cases, self-directed sentiments.
+
+**Big Five** - The five static personality traits (Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism) authored on a character in `[0, 1]`. Modulates emotion deltas at runtime; never gates choices on its own.
+
+**Mood (Valence, Arousal)** - A character's two-dimensional affect, plotted on Russell's circumplex. Valence runs sad ↔ happy; arousal runs calm ↔ excited. Both axes are continuous in `[-1, 1]`.
+
+**Mood Pad** - The 2D interactive disc used to set a character's initial mood. Available in the Affect tab (large) and as a runtime HUD overlay (small).
+
+**Sentiment** - A directed feeling — a (holder, target, emotion, strength) tuple. *Trust toward player +0.5*, *fear toward wolf +0.7*. Self-directed sentiments (where holder = target) render as *self-shame*, *self-pride*, etc.
+
+**Emotion Palette** - The project-wide list of emotions characters can feel. Defaults to the Ekman 6 (joy, anger, fear, sadness, surprise, disgust) plus pride, shame, and interest. Each emotion has valence and arousal weights and a decay rate.
+
+**Goal** - An authored objective on a character (id, name, optional description, optional priority). The runtime tracks status; goals flipped to `met` or `failed` auto-fire pride/joy or shame/sadness scaled by priority (GAMYGDALA-style).
+
+**Variant** - An alternate persona overlay on a character that shares the character's stable id but carries its own personality, mood, sentiments, dossier policy, portrait, and (optional) display name. Switched at runtime via the `setCharacterVariant` effect.
+
+**Dossier Policy** - How the LLM sees a character in AI beats. *Mode A (re-anchor)* rebuilds the dossier from structured state every turn. *Mode B (accumulate reflections)* appends short narrative notes the character has made about themselves over the session.
+
+**Reflection** - A short narrative note in a character's voice, paired with a salience score in `[0, 1]`, appended to a Mode B character's memory. Seeded via the `addReflection` choice effect or the runtime API.
+
+**Mood HUD** - An optional small 2D mood-pad overlay that mounts on the running stage to show a character's mood updating in real time during play.
 
 **NPC Auto-Exit** - A Dialog Tree feature where a dialog node automatically advances to a target beat after the NPC speaks, without showing choices to the player.
 
