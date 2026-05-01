@@ -29,9 +29,21 @@ interface RequirementsEditorProps {
   availableCounters: AvailableOption[];
   availableVariables: AvailableOption[];
   availableInventoryItems: AvailableOption[];
+  /** Project characters (Big Five traits / variants / goals are read off
+   *  these to populate dependent dropdowns). Optional — when omitted, the
+   *  affect-stack types just show free-text inputs. */
+  availableCharacters?: ReadonlyArray<{
+    id: string;
+    name?: string;
+    displayName?: string;
+    traits?: Record<string, number>;
+    variants?: Array<{ id: string; name?: string; traits?: Record<string, number> }>;
+    goals?: Array<{ id: string; name?: string }>;
+  }>;
 }
 
-type CondType = 'inventory' | 'counter' | 'variable' | 'visitedBeat';
+type CondType = 'inventory' | 'counter' | 'variable' | 'visitedBeat'
+  | 'mood' | 'emotion' | 'trait' | 'sentiment' | 'goal' | 'characterVariant';
 
 function emptyRequirement(): StateRequirement {
   return {
@@ -45,6 +57,8 @@ function emptyRequirement(): StateRequirement {
 function condType(c: Condition): CondType {
   const t = (c as any).type;
   if (t === 'counter' || t === 'variable' || t === 'inventory' || t === 'visitedBeat') return t;
+  if (t === 'mood' || t === 'emotion' || t === 'trait' || t === 'sentiment'
+      || t === 'goal' || t === 'characterVariant') return t;
   return 'inventory';
 }
 
@@ -57,6 +71,7 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
   availableCounters,
   availableVariables,
   availableInventoryItems,
+  availableCharacters,
 }) => {
   const items = value ?? [];
 
@@ -92,6 +107,24 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
         break;
       case 'visitedBeat':
         newCond = { type: 'visitedBeat', beatId: '', value: true } as any;
+        break;
+      case 'mood':
+        newCond = { type: 'mood', operator: '>=', character: '', moodAxis: 'valence', value: 0 } as any;
+        break;
+      case 'emotion':
+        newCond = { type: 'emotion', operator: '>=', character: '', emotionName: '', value: 0 } as any;
+        break;
+      case 'trait':
+        newCond = { type: 'trait', operator: '>=', character: '', traitName: '', value: 0.5 } as any;
+        break;
+      case 'sentiment':
+        newCond = { type: 'sentiment', operator: '>=', character: '', sentimentTarget: '', value: 0 } as any;
+        break;
+      case 'goal':
+        newCond = { type: 'goal', operator: '==', character: '', goalId: '', goalStatus: 'met' } as any;
+        break;
+      case 'characterVariant':
+        newCond = { type: 'characterVariant', operator: '==', character: '', variantId: '' } as any;
         break;
     }
     update(idx, { condition: newCond });
@@ -168,6 +201,14 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                 <option value="counter">Counter compared to value</option>
                 <option value="variable">Variable equals value</option>
                 <option value="visitedBeat">Visited beat</option>
+                <optgroup label="Character affect">
+                  <option value="mood">Mood (axis ≷ value)</option>
+                  <option value="emotion">Emotion intensity ≷ value</option>
+                  <option value="trait">Trait ≷ value</option>
+                  <option value="sentiment">Sentiment toward target ≷ value</option>
+                  <option value="goal">Goal status</option>
+                  <option value="characterVariant">Active variant</option>
+                </optgroup>
               </select>
             </div>
 
@@ -279,6 +320,230 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                 ))}
               </select>
             )}
+
+            {/* ===== Affect-stack condition operators ===== */}
+            {(t === 'mood' || t === 'emotion' || t === 'trait' || t === 'sentiment'
+              || t === 'goal' || t === 'characterVariant') && (() => {
+              const charId = (cond as any).character || '';
+              const selectedChar = (availableCharacters || []).find((c) => c.id === charId);
+              const numericOps = (
+                <select
+                  value={(cond as any).operator || '>='}
+                  onChange={e => updateCondition(idx, { operator: e.target.value } as any)}
+                  className="px-2 py-1 border border-gray-300 rounded text-xs"
+                >
+                  <option value=">=">≥</option>
+                  <option value=">">&gt;</option>
+                  <option value="<=">≤</option>
+                  <option value="<">&lt;</option>
+                  <option value="==">=</option>
+                  <option value="!=">≠</option>
+                </select>
+              );
+              const eqOps = (
+                <select
+                  value={(cond as any).operator || '=='}
+                  onChange={e => updateCondition(idx, { operator: e.target.value } as any)}
+                  className="px-2 py-1 border border-gray-300 rounded text-xs"
+                >
+                  <option value="==">is</option>
+                  <option value="!=">is not</option>
+                </select>
+              );
+              const charDropdown = (
+                <select
+                  value={charId}
+                  onChange={e => updateCondition(idx, { character: e.target.value } as any)}
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                >
+                  <option value="">— pick a character —</option>
+                  <option value="player">Player</option>
+                  {(availableCharacters || []).map((c) => (
+                    <option key={c.id} value={c.id}>{c.displayName || c.name || c.id}</option>
+                  ))}
+                </select>
+              );
+              return (
+                <>
+                  {charDropdown}
+                  {t === 'mood' && (
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                      <select
+                        value={(cond as any).moodAxis || 'valence'}
+                        onChange={e => updateCondition(idx, { moodAxis: e.target.value } as any)}
+                        className="px-2 py-1 border border-gray-300 rounded text-xs"
+                      >
+                        <option value="valence">valence (sad↔happy)</option>
+                        <option value="arousal">arousal (calm↔excited)</option>
+                      </select>
+                      {numericOps}
+                      <input
+                        type="number" step={0.05} min={-1} max={1}
+                        value={(cond as any).value ?? 0}
+                        onChange={e => updateCondition(idx, { value: parseFloat(e.target.value) } as any)}
+                        className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                    </div>
+                  )}
+                  {t === 'emotion' && (
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                      <input
+                        type="text"
+                        value={(cond as any).emotionName || ''}
+                        onChange={e => updateCondition(idx, { emotionName: e.target.value } as any)}
+                        placeholder="emotion name"
+                        className="px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                      />
+                      {numericOps}
+                      <input
+                        type="number" step={0.05} min={0} max={1}
+                        value={(cond as any).value ?? 0}
+                        onChange={e => updateCondition(idx, { value: parseFloat(e.target.value) } as any)}
+                        className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                    </div>
+                  )}
+                  {t === 'trait' && (() => {
+                    const traitNames = selectedChar?.traits ? Object.keys(selectedChar.traits) : [];
+                    const variantTraits = selectedChar?.variants?.flatMap((v: any) => v.traits ? Object.keys(v.traits) : []) || [];
+                    const allTraits = Array.from(new Set([...traitNames, ...variantTraits])).sort();
+                    return (
+                      <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                        {allTraits.length > 0 ? (
+                          <select
+                            value={(cond as any).traitName || ''}
+                            onChange={e => updateCondition(idx, { traitName: e.target.value } as any)}
+                            className="px-2 py-1 border border-gray-300 rounded text-xs"
+                          >
+                            <option value="">— pick a trait —</option>
+                            {allTraits.map((tr) => (
+                              <option key={tr} value={tr}>{tr}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={(cond as any).traitName || ''}
+                            onChange={e => updateCondition(idx, { traitName: e.target.value } as any)}
+                            placeholder={charId ? "trait name" : "pick character first"}
+                            className="px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                          />
+                        )}
+                        {numericOps}
+                        <input
+                          type="number" step={0.05} min={0} max={1}
+                          value={(cond as any).value ?? 0.5}
+                          onChange={e => updateCondition(idx, { value: parseFloat(e.target.value) } as any)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                    );
+                  })()}
+                  {t === 'sentiment' && (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        list="rmt-sentiment-targets"
+                        value={(cond as any).sentimentTarget || ''}
+                        onChange={e => updateCondition(idx, { sentimentTarget: e.target.value } as any)}
+                        placeholder="toward (player / character / item / tag)"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                      />
+                      <datalist id="rmt-sentiment-targets">
+                        <option value="player">Player</option>
+                        {(availableCharacters || []).map((c) => (
+                          <option key={c.id} value={c.id}>{c.displayName || c.name || c.id}</option>
+                        ))}
+                      </datalist>
+                      <input
+                        type="text"
+                        value={(cond as any).sentimentEmotion || ''}
+                        onChange={e => updateCondition(idx, { sentimentEmotion: e.target.value } as any)}
+                        placeholder="emotion (optional — empty sums all emotions toward target)"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                      />
+                      <div className="grid grid-cols-[auto_1fr] gap-2 items-center">
+                        {numericOps}
+                        <input
+                          type="number" step={0.05} min={-1} max={1}
+                          value={(cond as any).value ?? 0}
+                          onChange={e => updateCondition(idx, { value: parseFloat(e.target.value) } as any)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {t === 'goal' && (() => {
+                    const goals = selectedChar?.goals || [];
+                    return (
+                      <div className="space-y-2">
+                        {goals.length > 0 ? (
+                          <select
+                            value={(cond as any).goalId || ''}
+                            onChange={e => updateCondition(idx, { goalId: e.target.value } as any)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          >
+                            <option value="">— pick a goal —</option>
+                            {goals.map((g: any) => (
+                              <option key={g.id} value={g.id}>{g.name || g.id}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={(cond as any).goalId || ''}
+                            onChange={e => updateCondition(idx, { goalId: e.target.value } as any)}
+                            placeholder={charId ? "goal id" : "pick character first"}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                          />
+                        )}
+                        <div className="grid grid-cols-[auto_1fr] gap-2 items-center">
+                          {eqOps}
+                          <select
+                            value={(cond as any).goalStatus || 'met'}
+                            onChange={e => updateCondition(idx, { goalStatus: e.target.value } as any)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          >
+                            <option value="open">open</option>
+                            <option value="met">met</option>
+                            <option value="failed">failed</option>
+                            <option value="abandoned">abandoned</option>
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {t === 'characterVariant' && (() => {
+                    const variants = selectedChar?.variants || [];
+                    return (
+                      <div className="grid grid-cols-[auto_1fr] gap-2 items-center">
+                        {eqOps}
+                        {variants.length > 0 ? (
+                          <select
+                            value={(cond as any).variantId || ''}
+                            onChange={e => updateCondition(idx, { variantId: e.target.value } as any)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          >
+                            <option value="">— pick a variant —</option>
+                            {variants.map((v: any) => (
+                              <option key={v.id} value={v.id}>{v.name || v.id}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={(cond as any).variantId || ''}
+                            onChange={e => updateCondition(idx, { variantId: e.target.value } as any)}
+                            placeholder={charId ? "variant id" : "pick character first"}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+                </>
+              );
+            })()}
 
             {/* Explanation */}
             <div>

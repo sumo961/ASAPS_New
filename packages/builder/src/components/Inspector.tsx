@@ -1580,6 +1580,14 @@ export const Inspector: React.FC<InspectorProps> = ({
                         <option value="inventory">Inventory</option>
                         <option value="variable">Variable</option>
                         <option value="fictionalTime">Fictional Time</option>
+                        <optgroup label="Character affect">
+                          <option value="mood">Mood (axis ≷ value)</option>
+                          <option value="emotion">Emotion intensity ≷ value</option>
+                          <option value="trait">Trait ≷ value</option>
+                          <option value="sentiment">Sentiment toward target ≷ value</option>
+                          <option value="goal">Goal status</option>
+                          <option value="characterVariant">Active variant</option>
+                        </optgroup>
                       </select>
                     </div>
                     
@@ -2010,6 +2018,406 @@ export const Inspector: React.FC<InspectorProps> = ({
                         </div>
                       </>
                     )}
+
+                    {/* ===== Affect-stack condition operators (v0.9.43) =====
+                        Each form takes a Character target and a per-type value
+                        field. The character dropdown stores the canonical id;
+                        downstream resolveCharRef accepts either id or name. */}
+
+                    {/* Mood condition — branch on character.mood.<axis> ≷ value */}
+                    {localBeat.parameters?.conditionType === 'mood' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Character</label>
+                          <select
+                            value={localBeat.parameters?.character || ''}
+                            onChange={(e) => handleParameterChange('character', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="">— pick a character —</option>
+                            <option value="player">Player</option>
+                            {(characters || []).map((c) => (
+                              <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Mood Axis</label>
+                          <select
+                            value={localBeat.parameters?.moodAxis || 'valence'}
+                            onChange={(e) => handleParameterChange('moodAxis', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="valence">valence (sad ↔ happy)</option>
+                            <option value="arousal">arousal (calm ↔ excited)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Operator</label>
+                          <select
+                            value={localBeat.parameters?.operator || '>='}
+                            onChange={(e) => handleParameterChange('operator', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value=">">&gt;</option>
+                            <option value=">=">&gt;=</option>
+                            <option value="<">&lt;</option>
+                            <option value="<=">&lt;=</option>
+                            <option value="==">==</option>
+                            <option value="!=">!=</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Compare Value (-1 .. +1)</label>
+                          <input
+                            type="number"
+                            step={0.05} min={-1} max={1}
+                            value={localBeat.parameters?.value ?? 0}
+                            onChange={(e) => handleParameterChange('value', parseFloat(e.target.value))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Emotion condition — branch on character emotion intensity */}
+                    {localBeat.parameters?.conditionType === 'emotion' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Character</label>
+                          <select
+                            value={localBeat.parameters?.character || ''}
+                            onChange={(e) => handleParameterChange('character', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="">— pick a character —</option>
+                            <option value="player">Player</option>
+                            {(characters || []).map((c) => (
+                              <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Emotion Name</label>
+                          <input
+                            type="text"
+                            value={localBeat.parameters?.emotionName || ''}
+                            onChange={(e) => handleParameterChange('emotionName', e.target.value)}
+                            placeholder="e.g. fear, joy, pride"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                            title="Looked up against the project emotion palette (case-insensitive). Unknown names just resolve to 0."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Operator</label>
+                          <select
+                            value={localBeat.parameters?.operator || '>='}
+                            onChange={(e) => handleParameterChange('operator', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value=">">&gt;</option>
+                            <option value=">=">&gt;=</option>
+                            <option value="<">&lt;</option>
+                            <option value="<=">&lt;=</option>
+                            <option value="==">==</option>
+                            <option value="!=">!=</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Compare Value (0 .. 1)</label>
+                          <input
+                            type="number"
+                            step={0.05} min={0} max={1}
+                            value={localBeat.parameters?.value ?? 0}
+                            onChange={(e) => handleParameterChange('value', parseFloat(e.target.value))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Trait condition — branch on character trait value */}
+                    {localBeat.parameters?.conditionType === 'trait' && (() => {
+                      const charId = localBeat.parameters?.character;
+                      const selectedChar = (characters || []).find((c) => c.id === charId);
+                      const traitNames = selectedChar?.traits ? Object.keys(selectedChar.traits) : [];
+                      // Variants override traits; merge in their trait keys too so authors see the full set.
+                      const variantTraitNames = selectedChar?.variants?.flatMap((v) => v.traits ? Object.keys(v.traits) : []) || [];
+                      const allTraits = Array.from(new Set([...traitNames, ...variantTraitNames])).sort();
+                      return (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Character</label>
+                            <select
+                              value={charId || ''}
+                              onChange={(e) => handleParameterChange('character', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            >
+                              <option value="">— pick a character —</option>
+                              {(characters || []).map((c) => (
+                                <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Trait Name</label>
+                            {allTraits.length > 0 ? (
+                              <select
+                                value={localBeat.parameters?.traitName || ''}
+                                onChange={(e) => handleParameterChange('traitName', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              >
+                                <option value="">— pick a trait —</option>
+                                {allTraits.map((t) => (
+                                  <option key={t} value={t}>{t}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={localBeat.parameters?.traitName || ''}
+                                onChange={(e) => handleParameterChange('traitName', e.target.value)}
+                                placeholder={charId ? "Character has no traits — type a trait name to author one" : "Pick a character first"}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Operator</label>
+                            <select
+                              value={localBeat.parameters?.operator || '>='}
+                              onChange={(e) => handleParameterChange('operator', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            >
+                              <option value=">">&gt;</option>
+                              <option value=">=">&gt;=</option>
+                              <option value="<">&lt;</option>
+                              <option value="<=">&lt;=</option>
+                              <option value="==">==</option>
+                              <option value="!=">!=</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Compare Value (0 .. 1)</label>
+                            <input
+                              type="number"
+                              step={0.05} min={0} max={1}
+                              value={localBeat.parameters?.value ?? 0.5}
+                              onChange={(e) => handleParameterChange('value', parseFloat(e.target.value))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            />
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    {/* Sentiment condition — character feels emotion toward target ≷ value */}
+                    {localBeat.parameters?.conditionType === 'sentiment' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Character (sentiment-holder)</label>
+                          <select
+                            value={localBeat.parameters?.character || ''}
+                            onChange={(e) => handleParameterChange('character', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="">— pick a character —</option>
+                            <option value="player">Player</option>
+                            {(characters || []).map((c) => (
+                              <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Toward (target)
+                            <span className="text-gray-400 text-xs ml-2">character or free-text tag</span>
+                          </label>
+                          <input
+                            type="text"
+                            list="sentiment-target-suggestions"
+                            value={localBeat.parameters?.sentimentTarget || ''}
+                            onChange={(e) => handleParameterChange('sentimentTarget', e.target.value)}
+                            placeholder="player / character id / inventory item / tag"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                          />
+                          <datalist id="sentiment-target-suggestions">
+                            <option value="player">Player</option>
+                            {(characters || []).map((c) => (
+                              <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                            ))}
+                          </datalist>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Emotion (optional)
+                            <span className="text-gray-400 text-xs ml-2">empty = sum across all emotions toward target</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={localBeat.parameters?.sentimentEmotion || ''}
+                            onChange={(e) => handleParameterChange('sentimentEmotion', e.target.value)}
+                            placeholder="e.g. trust, fear"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Operator</label>
+                          <select
+                            value={localBeat.parameters?.operator || '>='}
+                            onChange={(e) => handleParameterChange('operator', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value=">">&gt;</option>
+                            <option value=">=">&gt;=</option>
+                            <option value="<">&lt;</option>
+                            <option value="<=">&lt;=</option>
+                            <option value="==">==</option>
+                            <option value="!=">!=</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Compare Value (-1 .. +1)</label>
+                          <input
+                            type="number"
+                            step={0.05} min={-1} max={1}
+                            value={localBeat.parameters?.value ?? 0}
+                            onChange={(e) => handleParameterChange('value', parseFloat(e.target.value))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Goal condition — branch on goal status (open/met/failed/abandoned) */}
+                    {localBeat.parameters?.conditionType === 'goal' && (() => {
+                      const charId = localBeat.parameters?.character;
+                      const selectedChar = (characters || []).find((c) => c.id === charId);
+                      const goals = selectedChar?.goals || [];
+                      return (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Character</label>
+                            <select
+                              value={charId || ''}
+                              onChange={(e) => handleParameterChange('character', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            >
+                              <option value="">— pick a character —</option>
+                              {(characters || []).map((c) => (
+                                <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Goal</label>
+                            {goals.length > 0 ? (
+                              <select
+                                value={localBeat.parameters?.goalId || ''}
+                                onChange={(e) => handleParameterChange('goalId', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              >
+                                <option value="">— pick a goal —</option>
+                                {goals.map((g: any) => (
+                                  <option key={g.id} value={g.id}>{g.name || g.id}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={localBeat.parameters?.goalId || ''}
+                                onChange={(e) => handleParameterChange('goalId', e.target.value)}
+                                placeholder={charId ? "Character has no authored goals — type a goal id" : "Pick a character first"}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Operator</label>
+                            <select
+                              value={localBeat.parameters?.operator || '=='}
+                              onChange={(e) => handleParameterChange('operator', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            >
+                              <option value="==">is</option>
+                              <option value="!=">is not</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                            <select
+                              value={localBeat.parameters?.goalStatus || 'met'}
+                              onChange={(e) => handleParameterChange('goalStatus', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            >
+                              <option value="open">open</option>
+                              <option value="met">met</option>
+                              <option value="failed">failed</option>
+                              <option value="abandoned">abandoned</option>
+                            </select>
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    {/* CharacterVariant condition — which variant is currently active on character */}
+                    {localBeat.parameters?.conditionType === 'characterVariant' && (() => {
+                      const charId = localBeat.parameters?.character;
+                      const selectedChar = (characters || []).find((c) => c.id === charId);
+                      const variants = selectedChar?.variants || [];
+                      return (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Character</label>
+                            <select
+                              value={charId || ''}
+                              onChange={(e) => handleParameterChange('character', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            >
+                              <option value="">— pick a character —</option>
+                              {(characters || []).map((c) => (
+                                <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Operator</label>
+                            <select
+                              value={localBeat.parameters?.operator || '=='}
+                              onChange={(e) => handleParameterChange('operator', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            >
+                              <option value="==">is</option>
+                              <option value="!=">is not</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Variant</label>
+                            {variants.length > 0 ? (
+                              <select
+                                value={localBeat.parameters?.variantId || ''}
+                                onChange={(e) => handleParameterChange('variantId', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              >
+                                <option value="">— pick a variant —</option>
+                                {variants.map((v: any) => (
+                                  <option key={v.id} value={v.id}>{v.name || v.id}</option>
+                                ))}
+                                <option value="">(none / no variant active)</option>
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={localBeat.parameters?.variantId || ''}
+                                onChange={(e) => handleParameterChange('variantId', e.target.value)}
+                                placeholder={charId ? "Character has no variants — type a variant id" : "Pick a character first"}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                              />
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </>
                 )}
 
@@ -3622,6 +4030,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ...fromStory,
                           ];
                         })()}
+                        availableCharacters={characters}
                       />
                     </div>
                   )}
