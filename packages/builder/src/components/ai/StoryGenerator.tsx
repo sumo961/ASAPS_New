@@ -35,6 +35,10 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
   const [length, setLength] = useState<'short' | 'medium' | 'long'>('medium');
   const [complexity, setComplexity] = useState<'linear' | 'moderate' | 'complex'>('moderate');
   const [includeAIBeats, setIncludeAIBeats] = useState(false);
+  // v0.9.46+ — affect depth dial. 'auto' lets the AI read the prompt
+  // and pick a tier; explicit tiers force the depth regardless of prompt.
+  // See packages/core/src/prompts/affectPrompt.ts for tier definitions.
+  const [affectDepth, setAffectDepth] = useState<'auto' | 'sparse' | 'standard' | 'rich'>('auto');
 
   /**
    * Generate story from prompt
@@ -52,6 +56,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
       length,
       complexity,
       includeAIBeats,
+      affectDepth,
     };
 
     const result = await generateStory(request);
@@ -229,6 +234,36 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Affect Depth (v0.9.46+) — gates how much of the rich-character /
+              affect system the generated story uses. 'auto' lets the AI pick
+              based on the user prompt; explicit tiers override. See
+              packages/core/src/prompts/affectPrompt.ts for tier definitions. */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Affect Depth
+              <span className="text-xs font-normal text-gray-500 ml-2">
+                How much character interiority (mood, traits, goals, etc.) to deploy
+              </span>
+            </label>
+            <select
+              value={affectDepth}
+              onChange={(e) => setAffectDepth(e.target.value as 'auto' | 'sparse' | 'standard' | 'rich')}
+              disabled={isGenerating}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+            >
+              <option value="auto">Auto — let AI pick based on the prompt (default)</option>
+              <option value="sparse">Sparse — characters are speakers, no affect annotations</option>
+              <option value="standard">Standard — mood seeds + affect Effects on key choices</option>
+              <option value="rich">Rich — full deployment (traits, goals, variants, bookmarks)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              {affectDepth === 'auto' && 'The AI will read your prompt and pick the appropriate tier — sparse for puzzles/quizzes, rich for emotional drama.'}
+              {affectDepth === 'sparse' && 'Lean output. No mood/sentiment/traits. Use for puzzles, quizzes, or trivially branching narratives.'}
+              {affectDepth === 'standard' && 'Mood seeds for major characters, affect Effects on emotionally salient choices. The default for most narrative prompts.'}
+              {affectDepth === 'rich' && 'Full affect deployment with traits, goals, variants, dossier-reflection on evolving characters, and bookmark-relative conditions.'}
+            </p>
           </div>
 
           {/* AI-Powered Beats Toggle */}

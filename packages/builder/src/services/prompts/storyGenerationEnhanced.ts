@@ -5,6 +5,7 @@
  */
 
 import type { StoryGenerationRequest } from '../../types/ai';
+import { buildAffectPromptSection, type AffectDepth } from '@asaps/core';
 
 /**
  * Theme presets guide for AI - describes available visual themes
@@ -1283,12 +1284,18 @@ function buildCondensedSchema(schema: any): string {
 /**
  * Build enhanced system prompt for story generation
  */
-export function buildEnhancedStoryGenerationSystemPrompt(schema: any): string {
+export function buildEnhancedStoryGenerationSystemPrompt(
+  schema: any,
+  affectDepth: AffectDepth = 'auto',
+): string {
   const beatTypesList = Object.keys(schema.beatTypes || {});
   const beatTypes = beatTypesList.join(', ');
   const condensedSchema = buildCondensedSchema(schema);
+  const affectSection = buildAffectPromptSection(affectDepth);
 
   return `You are an expert interactive narrative designer and game writer. You create sophisticated, branching stories using the ASAPS beat system with deep understanding of how different beat types work together.
+
+${affectSection}
 
 🚨🚨🚨 CRITICAL RULE: If you use counters, you MUST include a conditionBeat! 🚨🚨🚨
 - Every counter that gets incremented MUST be checked by a conditionBeat before endings

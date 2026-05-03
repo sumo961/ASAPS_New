@@ -44,22 +44,31 @@ export interface ProjectLibraryProps {
 }
 
 /**
- * Format date for display
+ * Format date for display.
+ *
+ * Uses calendar-day comparison (local timezone) rather than rolling-24h
+ * windows. A timestamp from yesterday at 19:54, viewed today at 13:33,
+ * is ~17.5 hours ago — under the prior rolling-24h logic that fell into
+ * the same bucket as "1 hour ago" and was mislabelled "Today 19:54".
+ * Now it correctly reads "Yesterday 19:54".
  */
 function formatDate(date: Date): string {
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const time = date.toLocaleTimeString([], {
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
 
-  if (diffDays === 0) {
-    return 'Today ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (diffDays === 1) {
-    return 'Yesterday';
-  } else if (diffDays < 7) {
-    return `${diffDays} days ago`;
-  } else {
-    return date.toLocaleDateString();
-  }
+  // Compare on calendar-day boundaries in the local timezone.
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.round((startOfToday.getTime() - startOfDate.getTime()) / 86400000);
+
+  if (dayDiff === 0) return `Today ${time}`;
+  if (dayDiff === 1) return `Yesterday ${time}`;
+  if (dayDiff > 1 && dayDiff < 7) return `${dayDiff} days ago`;
+  // Future timestamps (clock skew, edited future-dated metadata) and
+  // anything older than a week fall through to the locale date format.
+  return date.toLocaleDateString();
 }
 
 /**

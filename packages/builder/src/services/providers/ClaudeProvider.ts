@@ -196,11 +196,17 @@ export class ClaudeProvider extends BaseAIProvider {
     await validator.ensureSchemaLoaded();
     const schema = validator.getSchema();
 
-    // Build enhanced prompts with deep beat type understanding
-    const systemPrompt = buildEnhancedStoryGenerationSystemPrompt(schema);
+    // Build enhanced prompts with deep beat type understanding.
+    // affectDepth ('auto' / 'sparse' / 'standard' / 'rich') gates how
+    // much of the rich-character / affect system the AI deploys.
+    const systemPrompt = buildEnhancedStoryGenerationSystemPrompt(
+      schema,
+      request.affectDepth ?? 'auto',
+    );
     const userPrompt = buildEnhancedUserPrompt(request);
 
-    console.log('[ClaudeProvider] Generating story with Claude...');
+    console.log('[ClaudeProvider] Generating story with Claude (affectDepth='
+      + (request.affectDepth ?? 'auto') + ')...');
 
     return this.withRetry(async () => {
       // Use configured maxTokens if available

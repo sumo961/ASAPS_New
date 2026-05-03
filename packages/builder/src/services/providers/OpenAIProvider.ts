@@ -859,11 +859,17 @@ export class OpenAIProvider extends BaseAIProvider {
     await validator.ensureSchemaLoaded();
     const schema = validator.getSchema();
 
-    // Build enhanced prompts with deep beat type understanding
-    const systemPrompt = buildEnhancedStoryGenerationSystemPrompt(schema);
+    // Build enhanced prompts with deep beat type understanding.
+    // affectDepth ('auto' / 'sparse' / 'standard' / 'rich') gates how
+    // much of the rich-character / affect system the AI deploys.
+    const systemPrompt = buildEnhancedStoryGenerationSystemPrompt(
+      schema,
+      request.affectDepth ?? 'auto',
+    );
     const userPrompt = buildEnhancedUserPrompt(request);
 
-    console.log('[OpenAIProvider] Generating story with GPT...');
+    console.log('[OpenAIProvider] Generating story with GPT (affectDepth='
+      + (request.affectDepth ?? 'auto') + ')...');
 
     return this.withRetry(async () => {
       // GPT-5 reasoning models need much higher max_completion_tokens because reasoning tokens

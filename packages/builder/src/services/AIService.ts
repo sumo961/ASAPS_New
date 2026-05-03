@@ -1205,6 +1205,109 @@ export class AIService {
   }
 
   /**
+   * v0.9.46+ — auto-fix orphan bookmark references.
+   *
+   * The AI consistently authors `baseline: { bookmark: "X" }` references
+   * in late-story conditionBeats *without* the upstream `bookmarkAffectState`
+   * Effect that takes the snapshot. At runtime, missing bookmarks resolve
+   * to 0, so the condition silently behaves as a literal threshold against
+   * zero — broken, not what the author intended.
+   *
+   * Three rounds of progressively stronger prompt engineering didn't close
+   * this gap (the AI handles the bookmark concept locally in the Condition
+   * but doesn't model the non-local invariant that an Effect must exist
+   * upstream). We patch deterministically here:
+   *
+   *   - For each conditionBeat with `baseline: { bookmark: "X" }`:
+   *     scan all beats / choice effects / updateAffect effects for an
+   *     upstream `bookmarkAffectState` Effect with `bookmarkName: "X"`.
+   *   - If found: leave the reference alone (author intent honoured).
+   *   - If missing: convert `baseline: { bookmark: "X" }` to
+   *     `baseline: 'initial'`. Same condition shape, same operator and
+   *     value — but now reads against story-start (which the runtime
+   *     captures automatically), giving the condition meaningful semantics.
+   *
+   * Logs each conversion as a warning so authors can move the bookmark
+   * back if they actually wanted it. This is the conservative fix —
+   * preserves the *intent* of the comparison (delta from a snapshot)
+   * while sidestepping the runtime-zero bug.
+   */
+  private autoFixOrphanBookmarkReferences(response: StoryGenerationResponse): void {
+    if (!response.beats) return;
+
+    // Step 1: collect every bookmarkAffectState Effect's name (regardless
+    // of where it appears — choice effects, dialog choices, updateAffect
+    // beat effects). We don't validate reachability here; if the name
+    // exists *anywhere* in the story we trust it. (Reachability across
+    // branching paths is harder; the conservative fix is to only convert
+    // when the name appears nowhere.)
+    const takenBookmarks = new Set<string>();
+    const collectBookmarkNamesFromEffects = (effects: any[] | undefined) => {
+      if (!Array.isArray(effects)) return;
+      for (const e of effects) {
+        if (e?.type === 'bookmarkAffectState' && typeof e.bookmarkName === 'string' && e.bookmarkName) {
+          takenBookmarks.add(e.bookmarkName);
+        }
+      }
+    };
+    const collectBookmarkNamesFromChoices = (choices: any[] | undefined) => {
+      if (!Array.isArray(choices)) return;
+      for (const ch of choices) {
+        collectBookmarkNamesFromEffects(ch?.effects);
+        // Recurse into nested dialog nodes too.
+        if (ch?.dialogNode) {
+          collectBookmarkNamesFromChoices(ch.dialogNode.choices);
+        }
+      }
+    };
+    for (const beat of response.beats) {
+      const params: any = beat.parameters || {};
+      // Choice effects on dialogTree / movementChoice / pickProp / hyperText.
+      collectBookmarkNamesFromChoices(params.choices);
+      if (params.dialogTree) {
+        collectBookmarkNamesFromChoices(params.dialogTree.choices);
+      }
+      // updateAffect beat's effects[] field (post-v0.9.45 shape).
+      if (beat.type === 'updateAffect') {
+        collectBookmarkNamesFromEffects(params.effects);
+      }
+    }
+
+    // Step 2: walk every conditionBeat looking for baseline-bookmark refs.
+    // Convert orphans to baseline:'initial'.
+    let fixCount = 0;
+    for (const beat of response.beats) {
+      if (beat.type !== 'conditionBeat') continue;
+      const params: any = beat.parameters || {};
+      const cond: any = params.condition;
+      if (!cond) continue;
+      const baseline = cond.baseline;
+      if (!baseline || typeof baseline !== 'object' || !baseline.bookmark) continue;
+
+      const refName = String(baseline.bookmark);
+      if (takenBookmarks.has(refName)) continue;
+
+      // Orphan — convert to baseline:'initial'. Preserves the intent
+      // (delta-from-some-snapshot) while sidestepping the runtime-zero bug.
+      cond.baseline = 'initial';
+      fixCount++;
+      console.warn(
+        `[AIService.autoFix] ✓ Orphan bookmark "${refName}" on conditionBeat ${beat.id} ` +
+          `→ converted to baseline:'initial'. ` +
+          `(No upstream bookmarkAffectState Effect with that name was found; ` +
+          `runtime would have read 0 and made this condition fire wrongly. ` +
+          `If you wanted a real bookmark, add an upstream Effect with bookmarkName:"${refName}" ` +
+          `and revert this baseline manually.)`
+      );
+    }
+    if (fixCount > 0) {
+      console.warn(
+        `[AIService.autoFix] Auto-converted ${fixCount} orphan bookmark reference(s) to baseline:'initial'`
+      );
+    }
+  }
+
+  /**
    * Helper to collect all targets from a dialogTree recursively
    */
   private collectDialogTreeTargets(node: any, targets: Set<string>): void {
@@ -1251,6 +1354,12 @@ export class AIService {
       // count (e.g. 220) instead of the schema's enum "short"|"medium"|"long".
       // Coerce numeric values so validation doesn't fail on an otherwise fine story.
       this.autoFixAiSummaryMaxLength(response);
+
+      // Auto-fix orphan bookmark references (v0.9.46+). The AI tends to
+      // author baseline:{bookmark:"X"} refs without the upstream
+      // bookmarkAffectState Effect. Convert orphans to baseline:'initial'
+      // so the condition reads sanely instead of comparing against zero.
+      this.autoFixOrphanBookmarkReferences(response);
 
       // Validate if enabled
       let validationErrors: any[] = [];

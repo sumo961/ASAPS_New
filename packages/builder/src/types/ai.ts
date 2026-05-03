@@ -62,6 +62,25 @@ export interface StoryGenerationRequest {
 
   /** Target languages for the generated story (e.g., ["en", "de", "fr"]) */
   languages?: string[];
+
+  /**
+   * How much of the rich-character / affect system the generated story
+   * should use. Defaults to 'auto' — the AI reads the user prompt and
+   * picks a tier itself. Force a tier when you want explicit control.
+   *
+   *   - 'sparse': characters as speakers, no mood / traits / goals;
+   *     classic Condition operators only. Lean output.
+   *   - 'standard': mood seeds on major characters, affect Effects on
+   *     emotionally salient choices, mood/sentiment Conditions on
+   *     branches. No traits/variants unless prompted.
+   *   - 'rich': full deployment — traits, goals, variants, dossier
+   *     reflection policy on evolving characters, effect templates,
+   *     baseline-relative conditions, bookmarks at act breaks.
+   *
+   * See packages/core/src/prompts/affectPrompt.ts for the canonical
+   * tier definitions and AI-facing guidance.
+   */
+  affectDepth?: 'auto' | 'sparse' | 'standard' | 'rich';
 }
 
 /**

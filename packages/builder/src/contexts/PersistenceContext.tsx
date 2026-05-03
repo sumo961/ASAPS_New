@@ -14,6 +14,7 @@ import { CommandManager, type Command } from '../commands';
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave';
 import type { ProjectFormat } from '../storage/adapters/PersistenceAdapter';
 import { DirectoryAdapter, isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
+import { findUniqueProjectName } from '../utils/uniqueProjectName';
 
 // ============================================================================
 // Context Types
@@ -521,15 +522,41 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       const { v4: uuidv4 } = await import('uuid');
       const newProjectId = uuidv4();
 
+      // Auto-uniquify the name against existing projects so AI generation
+      // (which often produces convergent titles for the same prompt) and
+      // any other create path don't silently produce duplicates. The
+      // 'Untitled Project' sentinel is exempt because the auto-save
+      // logic below treats it specially — uniquifying it would defeat
+      // the "untitled means don't auto-save yet" check. Untitled
+      // projects also don't appear in the library list so collisions
+      // there are harmless.
+      let resolvedName = name;
+      if (name !== 'Untitled Project') {
+        try {
+          const listResult = await storage.listProjects();
+          if (listResult.success && Array.isArray(listResult.data)) {
+            const existingNames = listResult.data.map((p: Project) => p.name);
+            resolvedName = findUniqueProjectName(name, existingNames);
+            if (resolvedName !== name) {
+              console.log(`[PersistenceProvider] Project name "${name}" already in use; using "${resolvedName}"`);
+            }
+          }
+        } catch (err) {
+          // Non-fatal — if listing fails, proceed with the requested
+          // name and let any downstream uniqueness constraint handle it.
+          console.warn('[PersistenceProvider] Could not list projects for name uniqueness check:', err);
+        }
+      }
+
       // Create a new Story instance
       const story = new (await import('@asaps/core')).Story({
-        title: name,
+        title: resolvedName,
         firstBeatId: '',
       });
 
       const newProject: Project = {
         id: newProjectId,
-        name,
+        name: resolvedName,
         description,
         story: story as any, // Cast needed - Story class vs serialized format
         settings: {
