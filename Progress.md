@@ -1,5 +1,48 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-03: Test-Suite Repair — Two Production Bugs + Stale-Test Alignment (v0.9.47)
+
+### Overview
+
+Hotfix for two production bugs and a sweep of stale tests, fixing 37 long-standing failures across `@asaps/core` (28) and `@asaps/builder` (9). The full test suite is now green for the first time on this branch — **2,384 tests passing** (1,391 core + 993 builder).
+
+### Production bug 1: ConditionBeat timeline reporting clobbered branch decisions
+
+`ConditionBeat.performAction` evaluated the condition correctly, then called `context.getStory().getBeat(targetId)` purely for the diagnostic timeline event's `targetBeatName` field. When the context had no story attached — which happens in unit tests but is also a theoretical runtime corner case — `getStory()` throws. The throw was caught by the *outer* try/catch wrapping the whole condition evaluation, which then returned `getNextBeat(context)` (null in tests) **instead of** the correctly-computed `trueTarget` / `falseTarget`. Diagnostic code corrupted the actual return value.
+
+Fixed by wrapping the timeline reporting in its own defensive try/catch so a missing story (or any other non-essential failure) can't cascade up to disturb the branch decision. The condition-evaluation path now strictly returns the right target regardless of whether the timeline lookup succeeds.
+
+This was masked for years because in production every real run has a story attached. The 25 failing ConditionBeat unit tests had been flagged as pre-existing during the v0.9.45 work — turns out they were pointing at a real bug.
+
+### Production bug 2: EndScreen `reset: true` no-op when `showRestart: false`
+
+`reset: true` on an EndScreen only fired inside `doRestart()`, which was only called when the player clicked restart/play/again. With `showRestart: false`, the player exited the story via the implicit "no buttons match" fall-through, leaving the context state intact. The `reset: true` flag became a silent no-op for any story that ended without a player-facing restart button.
+
+Fixed by extracting a `doExit()` helper that applies the reset before returning null. `reset: true` now means "clear state when the story ends, regardless of how it ends" — the consistent semantic and the one the existing test had been asserting all along.
+
+### Stale tests realigned to production
+
+- **ConversationPromptBuilder** — the section header text was renamed `CONVERSATION RULES` → `CONVERSATION GOALS` at some point (semantic shift toward "guide the conversation toward these" rather than "follow these rules"); test hadn't caught up.
+- **ttsWait** — test wanted reading delay to fire when TTS is enabled but currently silent. Production sensibly skips it because the TTS pipeline's own post-pause already provides pacing. Adding 2s on top would make every NPC auto-advance feel sluggish. Test rewritten with a comment explaining the production semantic.
+- **ElevenLabsProvider, OpenAITTSProvider, CustomTTSProvider, TTSService** — tests were stale relative to a streaming-mode refactor of the cloud TTS path. Providers now return `{ audio: null, response }` for streaming, so AudioManager can pick MediaSource streaming or blob fallback. Default ElevenLabs model upgraded to `eleven_v3` (was `eleven_multilingual_v2`). Error messages unified across browser-proxy and Electron-direct paths ("ElevenLabs error N" — no longer distinguishing "proxy error" vs direct). Electron path uses `/stream` URLs with optional `optimize_streaming_latency` query param. TTSService calls `playSoundFromBlobAndWait` (waits for playback to finish so `isSpeaking()` stays true) rather than fire-and-forget `playSoundFromBlob`.
+
+### Test counts
+
+| Package | Before | After |
+|---|---|---|
+| `@asaps/core` | 28 failing, 1,343 passing | **0 failing, 1,391 passing** |
+| `@asaps/builder` | 9 failing, 965 passing | **0 failing, 993 passing** |
+
+**Files modified:**
+- `packages/core/src/beats/ConditionBeat.ts` (defensive try/catch on timeline event)
+- `packages/core/src/beats/EndScreenBeat.ts` (extract doExit helper, apply reset on all exit paths)
+- `packages/core/src/utils/ttsWait.ts` (no behaviour change — clearer comment on the production semantic)
+- `packages/core/tests/utils/ConversationPromptBuilder.test.ts` (label update)
+- `packages/core/tests/utils/ttsWait.test.ts` (rewritten test for current semantic)
+- `packages/builder/src/services/tts/__tests__/{ElevenLabsProvider,OpenAITTSProvider,CustomTTSProvider,TTSService}.test.ts` (streaming-mode result, current default model, unified error messages, /stream URLs, AudioManager method names)
+
+---
+
 ## 2026-05-03: Affect-Aware AI Generation + Uniquify + Calendar-Day Formatter (v0.9.46)
 
 ### Overview
