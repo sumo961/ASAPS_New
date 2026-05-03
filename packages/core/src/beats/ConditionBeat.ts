@@ -545,16 +545,35 @@ export class ConditionBeat extends Beat {
       console.log(`ConditionBeat ${this.id}: ${reason}`);
 
       const targetId = conditionResult ? this.trueTarget : (this.falseTarget || this.getNextBeat(context));
-      const targetBeat = targetId ? context.getStory().getBeat(targetId) : undefined;
-      context.recordTimelineEvent({
-        type: 'branch',
-        beatId: this.id,
-        beatName: this.name || this.id,
-        beatType: 'condition',
-        targetBeatId: targetId || undefined,
-        targetBeatName: targetBeat?.name,
-        reason,
-      });
+
+      // Timeline-event reporting is purely diagnostic — it must NOT disrupt
+      // the condition's actual return value. context.getStory() throws when
+      // the context has no story attached (typical of unit tests that
+      // exercise ConditionBeat in isolation). Wrap the whole block so a
+      // missing story or a failing recordTimelineEvent can't cascade up to
+      // the outer try/catch and replace our trueTarget / falseTarget with
+      // a fallback null. The branch decision happened above; everything
+      // here is just bookkeeping.
+      try {
+        let targetBeat: { name?: string } | undefined;
+        try {
+          targetBeat = targetId ? context.getStory().getBeat(targetId) : undefined;
+        } catch {
+          // No story set (test context) — fall through with undefined.
+        }
+        context.recordTimelineEvent({
+          type: 'branch',
+          beatId: this.id,
+          beatName: this.name || this.id,
+          beatType: 'condition',
+          targetBeatId: targetId || undefined,
+          targetBeatName: targetBeat?.name,
+          reason,
+        });
+      } catch (timelineErr) {
+        // recordTimelineEvent failure is non-fatal too. Log and continue.
+        console.warn(`ConditionBeat ${this.id}: timeline event failed (non-fatal):`, timelineErr);
+      }
 
       if (conditionResult) {
         return this.trueTarget;

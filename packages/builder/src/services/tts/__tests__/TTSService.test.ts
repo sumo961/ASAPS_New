@@ -2,11 +2,19 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { TTSService, getTTSService, resetTTSService } from '../TTSService';
 import type { ITTSProvider, TTSVoiceConfig, TTSSynthesisResult } from '../../../types/tts';
 
-// Shared mock AudioManager so we can inspect calls
-const mockPlaySoundFromBlob = vi.fn().mockResolvedValue(undefined);
+// Shared mock AudioManager so we can inspect calls. Production uses
+// `playSoundFromBlobAndWait` for the blob path (so isSpeaking stays
+// true until playback finishes) and `playStreamingAudio` for the
+// streaming Response path. Both are mocked here.
+const mockPlaySoundFromBlobAndWait = vi.fn().mockResolvedValue(undefined);
+const mockPlayStreamingAudio = vi.fn().mockResolvedValue(undefined);
+// Kept as an alias for older tests that still reference the old name.
+const mockPlaySoundFromBlob = mockPlaySoundFromBlobAndWait;
 vi.mock('@asaps/renderer', () => ({
   getAudioManager: vi.fn(() => ({
-    playSoundFromBlob: mockPlaySoundFromBlob,
+    playSoundFromBlob: mockPlaySoundFromBlobAndWait,
+    playSoundFromBlobAndWait: mockPlaySoundFromBlobAndWait,
+    playStreamingAudio: mockPlayStreamingAudio,
   })),
 }));
 
