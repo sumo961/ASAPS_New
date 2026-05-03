@@ -1,5 +1,90 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-03: Affect-Aware AI Generation + Uniquify + Calendar-Day Formatter (v0.9.46)
+
+### Overview
+
+Three independent features bundled into v0.9.46. The headline is **affect-aware AI generation** — both AI generation paths (in-app providers and the standalone MCP servers) now teach the LLM the full Layer-2 + affect stack landed across v0.9.43-v0.9.45 (characters as runtime entities, mood / sentiments / emotions / traits / goals / variants / dossier policies, baseline-relative conditions, bookmarks, the symmetry rule between Effects and Conditions). Authors get an `affectDepth` dial (Auto / Sparse / Standard / Rich) so the same engine can produce a lean state-capitals quiz or an interactive drama with full character interiority depending on the prompt and the dial setting.
+
+The other two are smaller-but-real fixes flagged during the AI-generation testing pass: AI-generation was bypassing the duplicate-name check (convergent titles produced "Holding the Line" four times for the same prompt), and the project library's "Today HH:mm" labels used rolling-24h diffs that mislabelled yesterday-evening timestamps as today's.
+
+### Affect-aware AI generation
+
+**The design question** was tiered always-on vs. checkbox toggle. Picked tiered always-on with auto-depth dial. Reasoning: a "use rich characters" checkbox would imply the affect system is exotic / off by default, contradicting the work that landed it as the core authoring style across v0.9.43-v0.9.45. The tiered approach scales the affect-overlay depth to the prompt:
+- `auto` (default) — AI reads the prompt and picks
+- `sparse` — characters as speakers, no affect annotations, classic Conditions only
+- `standard` — mood seeds + affect Effects on key choices, mood/sentiment Conditions on at least one branch, no traits/variants
+- `rich` — full system: traits, goals, variants, dossier reflection on evolving characters, effect templates, baseline-relative conditions, act-break bookmarks
+
+**The shared module** lives at `packages/core/src/prompts/affectPrompt.ts`, exporting `buildAffectPromptSection(depth)` and the `AffectDepth` type. The in-app provider stack imports it directly via `@asaps/core`; the MCP servers (which are deliberately decoupled from core for portability) keep manually-synced copies marked with `SYNC SOURCE` comments. The module is composed of five sections — Layer-2 foundations (always shown), affect catalog (standard+), effects/conditions reference (standard+), dossier-policy heuristic (standard+), depth-dial guidance (always shown). Sparse mode skips the middle three so the prompt stays at ~1,200 tokens; standard / rich expand to ~4,150 tokens including the full worked examples.
+
+**The hard-won lessons** in the prompt: (1) a SYMMETRY RULE — "if you author ≥3 affect Effects on a character, at least one downstream conditionBeat MUST branch on that character's affect, not on a derived flag"; (2) a worked example for `baseline: 'initial'` showing a sentiment trust-evolution branch; (3) a separate worked example for the bookmark TWO-STEP protocol explicitly teaching that bookmarks require a `bookmarkAffectState` Effect upstream AND a baseline-bookmark Condition downstream with matching names. The two-step worked example was added after v1 of the prompt produced consistent orphan bookmark references on weaker models.
+
+**Plumbing**:
+- `StoryGenerationRequest.affectDepth?: AffectDepth` (request type)
+- Both ClaudeProvider and OpenAIProvider thread it through to `buildEnhancedStoryGenerationSystemPrompt`
+- `StoryGenerator` dialog gets a single Affect Depth dropdown (Auto by default) with hint text per tier
+- MCP `generateStory` tool input schema gains `affectDepth` (auto / sparse / standard / rich)
+- New `asaps_get_affect_guide` tool on the desktop MCP server so Claude Desktop can fetch the guide on demand with its own depth preference
+
+**Smoke tests across 8 generation runs**:
+- GPT-5.4 + auto reasoning: deploys all six affect dimensions on rich prompts (mood, sentiments, emotions, traits, goals, dossier policies, addReflection effects), 60-70 affect Effects per story, ≥1 baseline:'initial' condition. **Bookmark symmetry was broken** — orphan refs without upstream Effects.
+- GPT-5.5 + highest reasoning: full bookmark symmetry, 75-82 affect Effects, 2-3 affect-aware Conditions per story, baseline:'initial' twice in a single story. The model upgrade closed the bookmark gap that three rounds of progressively-stronger prompt iteration couldn't.
+- Sparse-forced on a drama prompt: 0 affect Effects, 0 rich characters, structurally minimal output despite the dramatic content. The dial overrides prompt content correctly.
+- AUTO on "5-question state-capitals quiz": 0 affect Effects, 0 rich characters. AUTO correctly reads educational/quiz prompts as sparse.
+
+The feature works across model tiers: capable models (5.5 + high) reach the full affect stack including bookmarks; weaker models (5.4 / Claude with low thinking) get most of it but produce orphan bookmarks. The validator below catches that case deterministically.
+
+**Files modified:**
+- `packages/core/src/prompts/affectPrompt.ts` (new — canonical shared module)
+- `packages/core/src/prompts/index.ts` (new — barrel)
+- `packages/core/src/index.ts` (re-export)
+- `packages/core/tests/prompts/affectPrompt.test.ts` (new — 25 tests)
+- `packages/builder/src/types/ai.ts` (`affectDepth` on the request)
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts` (inject affect section)
+- `packages/builder/src/services/providers/{ClaudeProvider,OpenAIProvider}.ts` (thread depth through)
+- `packages/builder/src/components/ai/StoryGenerator.tsx` (dial dropdown)
+- `mcp-server/src/tools/generateStory.ts` (tool input schema)
+- `mcp-server/src/utils/aiHelper.ts` (mirror prompt content)
+- `mcp-server-desktop/src/index.ts` (mirror prompt content + new asaps_get_affect_guide tool)
+
+### Auto-fix for orphan bookmark references
+
+Three rounds of progressively-stronger prompt engineering didn't close the bookmark-symmetry gap on weaker models. The pattern is sticky because bookmarks require a non-local invariant (the bookmark name in a Condition must match an Effect somewhere upstream in the story tree) and LLMs handle local patterns much more reliably than non-local ones.
+
+Switched tactics: deterministic auto-fix in the post-generation pipeline. New `autoFixOrphanBookmarkReferences` pass detects condition `baseline: { bookmark: "X" }` references whose names aren't taken by any upstream `bookmarkAffectState` Effect, and converts those refs to `baseline: 'initial'`. Same condition shape, same operator, same value — but now reads against story-start (which the runtime captures automatically) instead of resolving to 0 (which would silently fire the condition for the wrong reason).
+
+Lives next to `autoFixEndingRestartConnections` and `autoFixAiSummaryMaxLength` in both `packages/builder/src/services/AIService.ts` and `mcp-server/src/utils/aiHelper.ts`. Walks all beats, collects bookmark Effect names from choice effects (recursively into dialogNode.choices), `updateAffect` beat `effects[]` arrays, and inline choice effects. Logs a warning per conversion so authors can manually correct if they actually wanted a real bookmark.
+
+**Files modified:**
+- `packages/builder/src/services/AIService.ts` (autoFixOrphanBookmarkReferences method + call site in pipeline)
+- `packages/builder/src/services/__tests__/autoFixOrphanBookmarks.test.ts` (new — 9 tests)
+- `mcp-server/src/utils/aiHelper.ts` (mirror function + call site)
+
+### Project-name uniquify on every create entry point
+
+AI generation was bypassing the duplicate-name check that other create paths used. Convergent AI titles ("Holding the Line" produced four times for the same drama prompt) were silently colliding in IndexedDB.
+
+New helper at `packages/builder/src/utils/uniqueProjectName.ts` — `findUniqueProjectName(desired, existing)` returns the desired name if unused, else `desired 1`, `desired 2`, … skipping holes. Case-insensitive, whitespace-trimmed, falls back to `'Untitled Project'` for empty input, bounded at 9999 with a timestamp escape hatch for the pathological case.
+
+Wired into `createProject` in `PersistenceContext.tsx` so every entry point benefits — AI generation, manual create, ASML import, Twine import. Skips the `'Untitled Project'` sentinel because the auto-save logic depends on that exact string. Listing-failure is non-fatal (logs and proceeds with the requested name). 10 unit tests including the exact "Holding the Line 0..3" scenario.
+
+**Files modified:**
+- `packages/builder/src/utils/uniqueProjectName.ts` (new — helper)
+- `packages/builder/src/utils/__tests__/uniqueProjectName.test.ts` (new — 10 tests)
+- `packages/builder/src/contexts/PersistenceContext.tsx` (wire into createProject)
+
+### Calendar-day-aware date formatter
+
+`ProjectLibrary` was computing `Math.floor(diffMs / 86400000) === 0` for the "Today HH:mm" branch — a rolling-24h window. A timestamp from yesterday at 19:54 viewed today at 13:33 is ~17.5 hours ago, fell into the same bucket as "1 hour ago", and got mislabelled "Today 19:54" — the `Modified Today 13:33 / Created Today 19:54` impossibility shown in the user's screenshot.
+
+Replaced with calendar-day comparison in local timezone (`new Date(y, m, d)` for both timestamps, integer-divide by 86400000). Also added time-of-day to the `Yesterday` branch and switched all branches to 24h notation per the existing display style.
+
+**Files modified:**
+- `packages/builder/src/components/ProjectLibrary.tsx` (formatDate function)
+
+---
+
 ## 2026-05-01: Affect-Effect Authoring UX — Labels, Palette Auto-Complete, Templates, Live Summary (v0.9.45)
 
 ### Overview
