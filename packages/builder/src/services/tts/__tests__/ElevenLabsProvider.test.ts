@@ -56,12 +56,15 @@ describe('ElevenLabsProvider', () => {
       await expect(unconfigured.synthesize('hello')).rejects.toThrow('not configured');
     });
 
-    it('should POST to proxy endpoint', async () => {
-      const mockBlob = new Blob(['audio'], { type: 'audio/mpeg' });
-      global.fetch = vi.fn().mockResolvedValue({
+    it('should POST to proxy endpoint and return raw Response for streaming', async () => {
+      // The provider now returns { audio: null, response } so the
+      // AudioManager can decide between MediaSource streaming and blob
+      // fallback. Tests assert on the raw response, not a pre-built blob.
+      const mockResponse = {
         ok: true,
-        blob: () => Promise.resolve(mockBlob),
-      });
+        blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mpeg' })),
+      };
+      global.fetch = vi.fn().mockResolvedValue(mockResponse);
 
       const result = await provider.synthesize('Hello');
 
@@ -69,7 +72,8 @@ describe('ElevenLabsProvider', () => {
         '/api/tts/elevenlabs',
         expect.objectContaining({ method: 'POST' })
       );
-      expect(result.audio).toBe(mockBlob);
+      expect(result.audio).toBeNull();
+      expect(result.response).toBe(mockResponse);
     });
 
     it('should include voiceId, text, and model_id in body', async () => {
@@ -83,7 +87,8 @@ describe('ElevenLabsProvider', () => {
       const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
       expect(body.voiceId).toBe('custom-voice-id');
       expect(body.text).toBe('Test');
-      expect(body.model_id).toBe('eleven_multilingual_v2');
+      // Default model upgraded to eleven_v3 (latest ElevenLabs flagship).
+      expect(body.model_id).toBe('eleven_v3');
     });
 
     it('should use custom model from config', async () => {
@@ -118,8 +123,11 @@ describe('ElevenLabsProvider', () => {
         text: () => Promise.resolve('Forbidden'),
       });
 
+      // Error message format unified across browser-proxy and Electron-direct
+      // paths — single "ElevenLabs error N: …" instead of distinguishing
+      // proxy vs direct in the message.
       await expect(provider.synthesize('Hello')).rejects.toThrow(
-        'ElevenLabs proxy error 403: Forbidden'
+        'ElevenLabs error 403: Forbidden'
       );
     });
   });
@@ -133,7 +141,7 @@ describe('ElevenLabsProvider', () => {
       provider.configure({ provider: 'elevenlabs', apiKey: 'xi-test123' });
     });
 
-    it('should call ElevenLabs API directly in Electron', async () => {
+    it('should call ElevenLabs streaming endpoint directly in Electron', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         blob: () => Promise.resolve(new Blob()),
@@ -141,8 +149,11 @@ describe('ElevenLabsProvider', () => {
 
       await provider.synthesize('Hello', { voiceId: 'voice123' });
 
+      // Provider now uses the /stream endpoint for faster time-to-first-audio.
+      // eleven_v3 (default) doesn't support optimize_streaming_latency, so the
+      // URL has no query params for the default model.
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.elevenlabs.io/v1/text-to-speech/voice123',
+        'https://api.elevenlabs.io/v1/text-to-speech/voice123/stream',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({

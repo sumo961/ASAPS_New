@@ -93,7 +93,12 @@ describe('ConversationPromptBuilder', () => {
         maxTurns: 10,
       });
 
-      expect(prompt).toContain('CONVERSATION RULES');
+      // The section header is "CONVERSATION GOALS" — directions with
+      // `action.type === 'steer'` are framed as goals to guide the
+      // conversation toward, not hard rules. Test was authored against
+      // an earlier "CONVERSATION RULES" label; the label changed, the
+      // semantics didn't.
+      expect(prompt).toContain('CONVERSATION GOALS');
       expect(prompt).toContain('weapons');
       expect(prompt).toContain('enchanted blade');
     });

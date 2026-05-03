@@ -83,13 +83,19 @@ describe('waitForReadingTime', () => {
     expect(Date.now() - start).toBeLessThan(100);
   });
 
-  it('should apply reading delay when TTS is enabled but not speaking', async () => {
+  it('should skip reading delay when TTS is enabled, regardless of current speaking state', async () => {
+    // In production, waitForReadingTime is always preceded by waitForTTS,
+    // which ensures any active audio has finished and added a 500ms
+    // post-pause. If TTS is enabled in the project, that pacing IS the
+    // reading time — adding another 2s on top would make every NPC
+    // auto-advance feel sluggish. So when TTS is enabled at all
+    // (whether currently speaking or quiescent), the reading delay is
+    // skipped and the TTS pipeline carries the pacing.
     const renderer = createMockRenderer({
       ttsService: { isEnabled: () => true, isSpeaking: () => false },
     });
     const start = Date.now();
     await waitForReadingTime(renderer, 'Hello', 200);
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeGreaterThanOrEqual(190);
+    expect(Date.now() - start).toBeLessThan(100);
   });
 });

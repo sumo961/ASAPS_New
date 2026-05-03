@@ -100,12 +100,14 @@ describe('OpenAITTSProvider', () => {
       );
     });
 
-    it('should POST to proxy endpoint in browser mode', async () => {
-      const mockBlob = new Blob(['audio'], { type: 'audio/mpeg' });
-      global.fetch = vi.fn().mockResolvedValue({
+    it('should POST to proxy endpoint in browser mode and return raw Response', async () => {
+      // Provider returns { audio: null, response } so AudioManager can
+      // stream via MediaSource (or fall back to blob() lazily).
+      const mockResponse = {
         ok: true,
-        blob: () => Promise.resolve(mockBlob),
-      });
+        blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mpeg' })),
+      };
+      global.fetch = vi.fn().mockResolvedValue(mockResponse);
 
       const result = await provider.synthesize('Hello');
 
@@ -116,7 +118,8 @@ describe('OpenAITTSProvider', () => {
           headers: { 'Content-Type': 'application/json' },
         })
       );
-      expect(result.audio).toBe(mockBlob);
+      expect(result.audio).toBeNull();
+      expect(result.response).toBe(mockResponse);
     });
 
     it('should include voice, model, and speed in request body', async () => {
@@ -167,8 +170,10 @@ describe('OpenAITTSProvider', () => {
         text: () => Promise.resolve('Unauthorized'),
       });
 
+      // Error message format unified — single "OpenAI TTS error N: …"
+      // for both browser-proxy and Electron-direct paths.
       await expect(provider.synthesize('Hello')).rejects.toThrow(
-        'OpenAI TTS proxy error 401: Unauthorized'
+        'OpenAI TTS error 401: Unauthorized'
       );
     });
   });
@@ -182,12 +187,12 @@ describe('OpenAITTSProvider', () => {
       provider.configure({ provider: 'openai', apiKey: 'sk-test123' });
     });
 
-    it('should call OpenAI API directly in Electron', async () => {
-      const mockBlob = new Blob(['audio'], { type: 'audio/mpeg' });
-      global.fetch = vi.fn().mockResolvedValue({
+    it('should call OpenAI API directly in Electron and return raw Response', async () => {
+      const mockResponse = {
         ok: true,
-        blob: () => Promise.resolve(mockBlob),
-      });
+        blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mpeg' })),
+      };
+      global.fetch = vi.fn().mockResolvedValue(mockResponse);
 
       const result = await provider.synthesize('Hello');
 
@@ -200,7 +205,9 @@ describe('OpenAITTSProvider', () => {
           }),
         })
       );
-      expect(result.audio).toBe(mockBlob);
+      // Streaming-mode result: audio is null, response is the raw Response.
+      expect(result.audio).toBeNull();
+      expect(result.response).toBe(mockResponse);
     });
 
     it('should use custom baseUrl in Electron', async () => {

@@ -145,6 +145,16 @@ export class EndScreenBeat extends Beat {
       return target;
     };
 
+    // Helper: exit the story (no restart). Apply reset if configured —
+    // semantically `reset: true` means "clear state when the story ends",
+    // independent of whether the player gets a restart button. Without
+    // this, an EndScreen with `reset: true, showRestart: false` would
+    // leak state into a fresh session restart-from-titlescreen flow.
+    const doExit = (): null => {
+      this.applyReset(context);
+      return null;
+    };
+
     // Loop so the EndScreen re-renders after the credits page is closed.
     while (true) {
       const action = await renderer.renderEndScreen(processedMessage, this.showRestart, this.showCredits, locations);
@@ -161,7 +171,7 @@ export class EndScreenBeat extends Beat {
           await this.showCreditsPage(context, renderer);
           continue; // re-render EndScreen after credits close
         }
-        return null;
+        return doExit();
       }
 
       // Generic button names from visual editor (button1 = restart, button2 = credits)
@@ -174,7 +184,7 @@ export class EndScreenBeat extends Beat {
           await this.showCreditsPage(context, renderer);
           continue;
         }
-        return null;
+        return doExit();
       }
 
       // If only one button exists and showRestart is true, any click should restart
@@ -182,7 +192,7 @@ export class EndScreenBeat extends Beat {
         return doRestart();
       }
 
-      return null;
+      return doExit();
     }
   }
 

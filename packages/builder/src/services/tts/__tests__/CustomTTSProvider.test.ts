@@ -69,12 +69,13 @@ describe('CustomTTSProvider', () => {
       await expect(unconfigured.synthesize('hello')).rejects.toThrow('not configured');
     });
 
-    it('should POST to baseUrl/audio/speech', async () => {
-      const mockBlob = new Blob(['audio'], { type: 'audio/mpeg' });
-      global.fetch = vi.fn().mockResolvedValue({
+    it('should POST to baseUrl/audio/speech and return raw Response for streaming', async () => {
+      // Streaming-mode result: provider returns { audio: null, response }.
+      const mockResponse = {
         ok: true,
-        blob: () => Promise.resolve(mockBlob),
-      });
+        blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mpeg' })),
+      };
+      global.fetch = vi.fn().mockResolvedValue(mockResponse);
 
       const result = await provider.synthesize('Hello');
 
@@ -82,7 +83,8 @@ describe('CustomTTSProvider', () => {
         'http://localhost:8080/v1/audio/speech',
         expect.objectContaining({ method: 'POST' })
       );
-      expect(result.audio).toBe(mockBlob);
+      expect(result.audio).toBeNull();
+      expect(result.response).toBe(mockResponse);
     });
 
     it('should strip trailing slash from baseUrl', async () => {
