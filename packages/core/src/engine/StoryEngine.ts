@@ -12,11 +12,21 @@ export class StoryEngine extends EventEmitter {
   private currentBeatId: string | null = null;
   private timerInterruptBeat: string | null = null;
 
-  constructor(renderer: IRenderer) {
+  /**
+   * v0.9.48+ — `opts.mockMode` forces the StoryContext to use the
+   * MockSensorService for XR sensor access. PreviewWindow / desktop
+   * authoring passes `true` so authors can simulate location and
+   * orientation without real hardware. Production playback omits this
+   * and gets WebSensorService via capability detection.
+   */
+  private mockMode: boolean;
+
+  constructor(renderer: IRenderer, opts?: { mockMode?: boolean }) {
     super();
     this.renderer = renderer;
-    this.context = new StoryContext();
-    
+    this.mockMode = !!opts?.mockMode;
+    this.context = new StoryContext(undefined, undefined, { mockMode: this.mockMode });
+
     // Listen to timer expiration events
     this.context.on('timerExpired', this.handleTimerExpired.bind(this));
   }
@@ -33,13 +43,15 @@ export class StoryEngine extends EventEmitter {
 
   async loadStory(story: Story): Promise<void> {
     this.story = story;
-    this.context = new StoryContext({
-      currentBeatId: story.getFirstBeatId()
-    }, story);
-    
+    this.context = new StoryContext(
+      { currentBeatId: story.getFirstBeatId() },
+      story,
+      { mockMode: this.mockMode },
+    );
+
     // Re-attach timer listener after context recreation
     this.context.on('timerExpired', this.handleTimerExpired.bind(this));
-    
+
     this.emit('storyLoaded', story);
   }
 

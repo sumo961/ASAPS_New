@@ -1,5 +1,104 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-04: XR Substrate — LocationSettings + SensorService (S1+S2)
+
+### Overview
+
+First two pieces of the XR roadmap landed: project-level location
+settings and the SensorService runtime. Pure infrastructure — no XR
+beats yet, no permission UX, no condition operators. Designed so the
+upcoming GpsLocationBeat / IndoorLocationBeat / ARDisplayBeat can
+build on a stable substrate without each beat re-implementing
+sensor-access patterns.
+
+See `docs/XR-Roadmap.md` for the broader plan and `docs/XR-S1-S2-Plan.md`
+for the implementation plan this work executed against.
+
+### S1 — LocationSettings on GlobalSettings
+
+New optional block appended to `GlobalSettings` in
+`packages/builder/src/storage/types.ts`:
+
+- `originLat` / `originLng` — story origin / GPS anchor
+- `venue` — indoor venue with floorplan asset + dimensions in metres
+- `defaultProximityRadiusM` — fallback radius for proximity triggers
+- `onPermissionDenied` (`'skip'` | `'fallback'`) + `fallbackBeatId`
+- `mockLocation` — desktop authoring fallback that the
+  MockSensorService seeds from at construction time
+
+Optional everywhere — projects without XR pay zero cost.
+
+### S2 — SensorService runtime
+
+New module at `packages/core/src/engine/SensorService.ts` with:
+
+- `SensorService` interface — `getCurrentLocation`, `watchLocation`,
+  `scanBeacons`, `watchOrientation`, `getCapabilities`, plus
+  mock-injection methods (`setMockLocation` / `setMockBeacons` /
+  `setMockOrientation`).
+- `WebSensorService` — production path. Wraps Geolocation API,
+  DeviceOrientationEvent, and getUserMedia. Bluetooth scanning ships
+  as a stub (deferred to v2 with IndoorLocationBeat).
+- `MockSensorService` — desktop authoring path. Caches the current
+  location/beacons/orientation in memory, emits to subscribers
+  immediately on subscribe + on every mutation.
+- `createSensorService({ mockMode? })` factory — picks the right
+  implementation based on capability detection and the explicit
+  `mockMode` override.
+
+**Critical correctness property exercised in tests**: subscribers
+share ONE underlying watcher per sensor. Ten GPS-watch beats running
+concurrently produce ONE `navigator.geolocation.watchPosition` call,
+fanned out via the subscriber set. Lazy init (first subscribe starts
+the watcher) + reference-counted teardown (last unsubscribe clears
+it). Otherwise mobile battery dies in 30 minutes during real
+playback.
+
+Tests: 21 cases in `packages/core/tests/engine/SensorService.test.ts`
+covering normalised reading shape, error/null fallbacks, capability
+detection, the de-dupe property, callback de-duplication via Set
+semantics, fresh-watcher-after-full-teardown, mock-injection, and
+the factory's mockMode override.
+
+### Wiring
+
+- `StoryContext` constructor accepts an additive
+  `{ mockMode?: boolean }` option. Constructs the SensorService at
+  construction time and seeds it from `GlobalSettings.location.mockLocation`
+  when in mock mode.
+- `StoryEngine` constructor accepts the same option and forwards it
+  through to every StoryContext it creates (initial + on `loadStory`).
+- `PreviewWindow` constructs `new StoryEngine(reactRenderer, { mockMode: true })`
+  so all desktop authoring uses MockSensorService.
+- New `MockSensorPanel` component in
+  `packages/builder/src/components/preview/MockSensorPanel.tsx` —
+  editable lat/lng + N/S/E/W walk-direction nudge buttons +
+  three orientation sliders (alpha 0-360, beta -90..90, gamma -90..90)
+  + "Snap to story origin" button.
+- `MockSensorPanelToggle` wraps it in a default-collapsed
+  bottom-right floating overlay with a toggle button. Mounts only
+  when the project has any LocationSettings — non-XR stories see
+  nothing.
+
+### Test counts
+
+Core: 1,412 passing (up from 1,391; +21 new SensorService tests).
+All packages type-check clean.
+
+### Files
+
+- `packages/core/src/engine/SensorService.ts` (new)
+- `packages/core/src/engine/index.ts` (export new types)
+- `packages/core/src/engine/StoryContext.ts` (constructor option, getter)
+- `packages/core/src/engine/StoryEngine.ts` (constructor option, forward)
+- `packages/core/tests/engine/SensorService.test.ts` (new — 21 tests)
+- `packages/builder/src/storage/types.ts` (LocationSettings on GlobalSettings)
+- `packages/builder/src/components/preview/MockSensorPanel.tsx` (new)
+- `packages/builder/src/pages/PreviewWindow.tsx` (mockMode + panel mount)
+- `docs/XR-Roadmap.md` (mark S1+S2 done)
+
+---
+
 ## 2026-05-03: Test-Suite Repair — Two Production Bugs + Stale-Test Alignment (v0.9.47)
 
 ### Overview

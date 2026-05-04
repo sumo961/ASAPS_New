@@ -18,3 +18,15 @@ export {
   type PersonalityArchetype,
   type ArchetypeSelfSentiment,
 } from './PersonalityArchetypes';
+export {
+  WebSensorService,
+  MockSensorService,
+  createSensorService,
+} from './SensorService';
+export type {
+  SensorService,
+  GpsReading,
+  BeaconReading,
+  OrientationReading,
+  SensorCapabilities,
+} from './SensorService';

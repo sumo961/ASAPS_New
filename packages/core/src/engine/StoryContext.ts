@@ -5,6 +5,7 @@ import { TimerManager } from './TimerManager';
 import { resolveCharacterKey } from '../utils/characterRef';
 import { resolveCharacterWithVariant, findCharacterVariant } from '../utils/characterVariant';
 import { modulateEmotionDelta } from './PersonalityTraits';
+import { createSensorService, MockSensorService, type SensorService } from './SensorService';
 
 /**
  * Inventory entry with quantity support
@@ -315,13 +316,24 @@ export class StoryContext extends EventEmitter {
   private timeline: TimelineEvent[] = [];
   private story?: Story;
   private timerManager: TimerManager;
+  /**
+   * Sensor service for XR beats (v0.9.48+). Lazily resolves to either
+   * WebSensorService (PWA / mobile playback) or MockSensorService
+   * (desktop authoring via PreviewWindow). Beats access this via
+   * getSensorService(); they should not construct their own.
+   */
+  private sensorService: SensorService;
 
   // Debug features
   private debugSession?: DebugSession;
   private analysisCache: AnalysisCache = {};
   private aiSuggestions: AISuggestion[] = [];
 
-  constructor(initialState?: Partial<StoryState>, story?: Story) {
+  constructor(
+    initialState?: Partial<StoryState>,
+    story?: Story,
+    opts?: { mockMode?: boolean },
+  ) {
     super();
     this.state = {
       currentBeatId: '0',
@@ -349,6 +361,16 @@ export class StoryContext extends EventEmitter {
     };
     this.story = story;
     this.timerManager = new TimerManager();
+    // v0.9.48+ — XR sensor service. Mock-mode comes from PreviewWindow
+    // (desktop authoring); production playback gets the Web service via
+    // capability detection. Seed mock location from project settings if
+    // available so MockSensorService.getCurrentLocation returns sensibly
+    // before the author drags any panel control.
+    this.sensorService = createSensorService({ mockMode: opts?.mockMode });
+    if (opts?.mockMode && this.sensorService instanceof MockSensorService) {
+      const mockLoc = (story as any)?.getGlobalSettings?.()?.location?.mockLocation;
+      if (mockLoc) this.sensorService.seedFromSettings(mockLoc);
+    }
     // Seed authored initial affect (mood + sentiments) into the runtime
     // state. No-op when no story or no characters declare initial affect.
     if (story) this.seedCharacterAffectFromStory();
@@ -356,6 +378,16 @@ export class StoryContext extends EventEmitter {
     // Forward timer events
     this.timerManager.on('timerExpired', (data) => this.emit('timerExpired', data));
     this.timerManager.on('timerTick', (data) => this.emit('timerTick', data));
+  }
+
+  /**
+   * Get the SensorService for this context. Beats use this to access
+   * GPS / beacons / orientation. The same service instance lives for
+   * the lifetime of the context — beats subscribe and unsubscribe but
+   * don't construct their own.
+   */
+  getSensorService(): SensorService {
+    return this.sensorService;
   }
 
   getVariable(name: string): any {

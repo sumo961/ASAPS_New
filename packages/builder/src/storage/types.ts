@@ -162,6 +162,61 @@ export interface GlobalSettings {
       counterMax?: number; // Counter maximum value (default 100)
     };
   };
+  /**
+   * XR / location settings (v0.9.48+). Optional — projects without any
+   * XR beats leave this undefined and pay no runtime cost. When XR beats
+   * are present, they read origin / venue / mockLocation off this block.
+   *
+   * The story origin is a single GPS anchor used by:
+   *   - GpsLocationBeat (default centre when no targetLat/targetLng given)
+   *   - ARDisplayBeat (yaw=0 reference for 'origin-relative' anchorMode)
+   *   - DirectionalSound (bearing reference for spatialPosition)
+   *   - All proximity radii (haversine-from-origin shortcuts)
+   *
+   * See docs/XR-Roadmap.md for the broader design context.
+   */
+  location?: {
+    /** Story origin / anchor — single GPS point. */
+    originLat?: number;
+    originLng?: number;
+    /**
+     * Indoor venue — for indoor-positioning beats. Floorplan dimensions
+     * are in metres; the floorplan asset is rendered at scale on top of
+     * the player's known beacon position.
+     */
+    venue?: {
+      name: string;
+      floorPlan?: string;        // assetId of the floorplan image
+      floorWidth: number;        // metres
+      floorHeight: number;       // metres
+    };
+    /**
+     * Default radius (metres) for proximity triggers when an XR beat
+     * doesn't specify its own. Typical values: 5m for room-scale,
+     * 25m for "you've arrived at the building", 100m for "you're in
+     * the right neighbourhood".
+     */
+    defaultProximityRadiusM?: number;
+    /**
+     * What the engine does when an XR beat requires a permission the
+     * player has denied:
+     *   - 'skip'     — fall through to the next beat (silent).
+     *   - 'fallback' — redirect to fallbackBeatId (or to next beat if
+     *                  fallbackBeatId is unset).
+     *
+     * This is the global default; individual beats can override.
+     */
+    onPermissionDenied?: 'skip' | 'fallback';
+    fallbackBeatId?: string;
+    /**
+     * Mock location for desktop authoring / testing. The
+     * MockSensorService uses this when no real GPS is available. The
+     * PreviewWindow's MockSensorPanel surfaces editable fields seeded
+     * from this value. `floor` is optional (1 = ground, 2 = first up,
+     * etc.); used by the indoor-position beat's mock path.
+     */
+    mockLocation?: { lat: number; lng: number; floor?: number };
+  };
 }
 
 // ============================================================================

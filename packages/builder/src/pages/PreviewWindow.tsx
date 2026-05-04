@@ -24,6 +24,7 @@ import { getSTTService, WebSpeechSTTProvider, WhisperSTTProvider, LocalSTTProvid
 import { getSavedSTTConfig } from '../hooks/useSTT';
 import { resolvePortraitUrl } from '../utils/speakerUtils';
 import { CharacterAffectPanel } from '../components/characters/CharacterAffectPanel';
+import { MockSensorPanel } from '../components/preview/MockSensorPanel';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { buildChatRequestBody } from '../services/providers/openai-utils';
@@ -1368,7 +1369,10 @@ export const PreviewWindow: React.FC = () => {
       reactRenderer.setState('sttService', sttService);
       reactRenderer.setState('ttsService', getTTSService());
 
-      const engine = new StoryEngine(reactRenderer as any);
+      // v0.9.48+ — mockMode: true so XR beats hit MockSensorService
+      // (PreviewWindow runs on desktop with no real GPS / device-orientation
+      // hardware). Authors drive simulated readings via MockSensorPanel.
+      const engine = new StoryEngine(reactRenderer as any, { mockMode: true });
       rendererRef.current = reactRenderer;
       engineRef.current = engine;
     }
@@ -2357,6 +2361,26 @@ export const PreviewWindow: React.FC = () => {
     );
   }
 
+  // v0.9.48+ — Mock sensor panel: collapsible overlay shown when the
+  // project has any LocationSettings configured (origin or mockLocation).
+  // Lets authors simulate GPS / orientation while testing on desktop.
+  // Hidden by default to keep the preview chrome clean; toggle button
+  // sits in the bottom-right.
+  const locationSettings = (previewData?.settings as any)?.location as
+    | { originLat?: number; originLng?: number; mockLocation?: { lat: number; lng: number } }
+    | undefined;
+  const hasLocationSettings = !!(
+    locationSettings &&
+    (locationSettings.originLat !== undefined ||
+      locationSettings.originLng !== undefined ||
+      locationSettings.mockLocation)
+  );
+  const sensorService = engineRef.current?.getContext()?.getSensorService();
+  const storyOrigin =
+    locationSettings?.originLat !== undefined && locationSettings?.originLng !== undefined
+      ? { lat: locationSettings.originLat, lng: locationSettings.originLng }
+      : locationSettings?.mockLocation;
+
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Header */}
@@ -3175,6 +3199,56 @@ export const PreviewWindow: React.FC = () => {
             setPendingPreset(null);
           }}
         />
+      )}
+
+      {/* Mock sensor panel — only when the project has location settings.
+          Floats bottom-right so it doesn't interfere with story content. */}
+      {hasLocationSettings && sensorService && (
+        <MockSensorPanelToggle
+          sensorService={sensorService}
+          storyOrigin={storyOrigin}
+        />
+      )}
+    </div>
+  );
+};
+
+/**
+ * Tiny wrapper to provide a show/hide toggle for the MockSensorPanel.
+ * Default-hidden so the panel doesn't impose on author attention.
+ */
+const MockSensorPanelToggle: React.FC<{
+  sensorService: any;
+  storyOrigin?: { lat: number; lng: number };
+}> = ({ sensorService, storyOrigin }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="fixed bottom-4 right-4 z-40">
+      {open ? (
+        <div className="w-72 shadow-xl">
+          <div className="flex items-center justify-between bg-purple-700 text-white px-2 py-1 rounded-t-lg">
+            <span className="text-xs font-medium">Mock Sensors (XR)</span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="text-white/80 hover:text-white text-sm"
+              aria-label="Hide mock sensor panel"
+            >
+              ×
+            </button>
+          </div>
+          <div className="rounded-b-lg overflow-hidden">
+            <MockSensorPanel sensorService={sensorService} storyOrigin={storyOrigin} />
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="bg-purple-700 text-white text-xs px-3 py-2 rounded-lg shadow hover:bg-purple-800"
+        >
+          📍 Mock Sensors
+        </button>
       )}
     </div>
   );
