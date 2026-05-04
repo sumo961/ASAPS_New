@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.2.0
- * Generated: 2026-05-02T14:08:44.335Z
+ * Generated: 2026-05-04T15:22:36.442Z
  */
 
 // ============================================
@@ -436,6 +436,36 @@ export interface UpdateAffectParameters {
 }
 
 /**
+ * GPS Location - Show a map with a target GPS coordinate. In trigger modes, wait for the player to walk into (or out of) a radius around the point. The runtime probes GPS permission via ensureXRPermission and falls back per the project's LocationSettings.onPermissionDenied policy.
+ * Category: xr
+ * Connection Type: single
+ */
+export interface GpsLocationParameters {
+  /** Behaviour mode: 'display' shows the map with a continue button (no waiting); 'trigger-on-arrival' resolves when the player enters the radius; 'trigger-on-departure' resolves when the player leaves it. */
+  mode: string;
+  /** Target latitude in degrees (WGS84). E.g. 51.5074 for London. */
+  targetLat: number;
+  /** Target longitude in degrees (WGS84). E.g. -0.1278 for London. */
+  targetLng: number;
+  /** Proximity radius in metres. Falls back to the project's LocationSettings.defaultProximityRadiusM when unset, then 25m. */
+  radiusMeters?: number | undefined;
+  /** Instructional text shown over the map (e.g. 'Walk to the meeting point at the fountain'). */
+  text?: string | undefined;
+  /** Continue button label (display mode). */
+  buttonText?: string | undefined;
+  /** Optional skip / cancel button label. Lets the player exit the beat without waiting for arrival. */
+  cancelButtonText?: string | undefined;
+  /** Optional timeout in milliseconds. The beat resolves with 'timeout' if no arrival / departure / skip happens within this window. */
+  timeoutMs?: number | undefined;
+  /** Visual style for the map. */
+  mapStyle?: string | undefined;
+  /** Whether to show the player's current location on the map. */
+  showPlayerMarker?: boolean | undefined;
+  /** Next beat after the GPS beat resolves (regardless of how — arrival, timeout, skip). */
+  connection: Connection;
+}
+
+/**
  * Input Text - Prompts user for text input and stores in a variable or character display name
  * Category: visible
  * Connection Type: single
@@ -800,6 +830,7 @@ export type BeatType =
   | 'setTimer'
   | 'addRemoveInventory'
   | 'updateAffect'
+  | 'gpsLocation'
   | 'inputText'
   | 'keypad'
   | 'hyperText'
@@ -830,6 +861,7 @@ export interface BeatParameterMap {
   'setTimer': SetTimerParameters;
   'addRemoveInventory': AddRemoveInventoryParameters;
   'updateAffect': UpdateAffectParameters;
+  'gpsLocation': GpsLocationParameters;
   'inputText': InputTextParameters;
   'keypad': KeypadParameters;
   'hyperText': HyperTextParameters;

@@ -258,6 +258,7 @@ change). Then build ARDisplayBeat on top.
 1. **S1**: project location settings ✅ *(landed 2026-05-04)*
 2. **S2**: SensorService skeleton with mock + web implementations ✅ *(landed 2026-05-04)*
 3. **S3**: permissions plumbing + condition operators ✅ *(landed 2026-05-04)*
+4. **GpsLocationBeat (XR1)** — placeholder UI, full runtime, MockSensorPanel-driven ✅ *(landed 2026-05-04)*. Leaflet integration deferred to its own commit.
 4. **GpsLocationBeat** (XR1) — simplest of the five, validates the whole stack (days 7-9)
 5. **gpsProximity ConditionBeat operator** (XR5) — comes practically free once S2 lands (day 10)
 6. **DirectionalSound option (a)** — `spatialPosition` on existing sound configs (days 11-12)

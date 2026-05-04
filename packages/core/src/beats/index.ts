@@ -23,6 +23,8 @@ export { PanoramaBeat } from './PanoramaBeat';
 // migration helper. Don't re-export UpdateAffectParameters here — it's
 // already exported from generated/beat-types.ts as the canonical home.
 export { UpdateAffectBeat, synthesizeEffectsFromLegacyParams } from './UpdateAffectBeat';
+// XR beats (S4+) — see docs/XR-Roadmap.md for the broader plan.
+export { GpsLocationBeat, type GpsLocationBeatParameters } from './GpsLocationBeat';
 export { BeatTypeRegistry } from './BeatRegistry';
 
 // AI-powered beats

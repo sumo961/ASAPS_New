@@ -19,6 +19,8 @@ import { InputTextBeat } from './InputTextBeat';
 import { HyperTextBeat } from './HyperTextBeat';
 import { KeypadBeat } from './KeypadBeat';
 import { PanoramaBeat } from './PanoramaBeat';
+// XR beats (S4+)
+import { GpsLocationBeat } from './GpsLocationBeat';
 // AI-powered beats
 import { OnlineContentBeat } from './OnlineContentBeat';
 import { AIConditionBeat } from './AIConditionBeat';
@@ -90,6 +92,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('setTimer', SetTimerBeat);
     this.registerBeatType('addRemoveInventory', AddRemoveInventoryBeat);
     this.registerBeatType('updateAffect', UpdateAffectBeat);
+    this.registerBeatType('gpsLocation', GpsLocationBeat);
     this.registerBeatType('addInventory', AddRemoveInventoryBeat); // Common AI variation
     this.registerBeatType('removeInventory', AddRemoveInventoryBeat); // Common AI variation
 

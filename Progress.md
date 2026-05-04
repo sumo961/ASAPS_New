@@ -1,5 +1,101 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-04: XR Beat #1 — GpsLocationBeat with placeholder map (S4)
+
+### Overview
+
+First XR beat lands. The whole substrate from S1+S2+S3 (LocationSettings,
+SensorService, ensureXRPermission, three condition operators) gets
+exercised end-to-end by a real beat that authors can drop into a story.
+
+The beat ships with a clean placeholder UI rather than a Leaflet-based
+map. Distance readout, threshold detection, mode-aware status, timeout
+and skip — all functional. The visual map polish is the only thing
+deferred; the runtime is real and fully testable via the MockSensorPanel.
+
+### S4-A: 'xr' beat-category + IRenderer.renderMap
+
+- `BeatTypeDefinition.category` union extended with `'xr'`.
+- `IRenderer.renderMap` optional method declared. Renderer resolves with
+  one of `'arrived'` / `'departed'` / `'continue'` / `'timeout'` /
+  `'skipped'` — informational; the beat advances regardless.
+
+### S4-B: GpsLocationBeat runtime
+
+`packages/core/src/beats/GpsLocationBeat.ts`:
+
+- Three modes: `'display'` (continue button, no waiting),
+  `'trigger-on-arrival'` (resolves when player walks into radius),
+  `'trigger-on-departure'` (resolves when player walks out).
+- Reads `LocationSettings.onPermissionDenied` for the fallback policy
+  and `LocationSettings.defaultProximityRadiusM` for the radius default
+  (explicit beat value > project default > 25m).
+- Probes GPS permission via `ensureXRPermission` in trigger modes
+  (display mode skips the probe — no GPS needed to render a fixed map).
+- Permission denied + `'fallback'` policy → returns `fallbackBeatId`.
+  Denied + `'skip'` policy → advances to next. No fallbackBeatId
+  configured → degrades to skip.
+- `ensureLocationCacheActive()` while the beat runs so the renderer
+  and any concurrent `gpsProximity` Condition share a fresh location.
+- Propagates the SensorService into renderer state (`'sensorService'`
+  slot) so the map UI can subscribe to live updates without needing
+  direct StoryContext access.
+
+### S4-C: Registration + beat-definitions entry
+
+- Registered in `BeatRegistry` as `'gpsLocation'`.
+- New entry in `beat-definitions/core-beats.json` with
+  `category: 'xr'`, full parameter schema including UI hints (label,
+  control type, options for the mode dropdown). Schema-driven editor
+  picks it up automatically — no Inspector hardcoding needed.
+
+### S4-D: Placeholder MapBeat renderer
+
+`packages/renderer/src/components/MapBeatPlaceholder.tsx`:
+
+- Subscribes to `sensorService.watchLocation` for live distance updates.
+- Computes haversine distance to target every reading.
+- Mode-aware status indicator: "Waiting for location…" / "Arrived ✓"
+  ({distance}m away" / "{distance}m inside (waiting to depart)" /
+  "Departed ✓".
+- Auto-resolves on threshold crossing for trigger modes.
+- Optional timeout firing 'timeout'.
+- Continue button (display mode) and optional Skip button.
+- Footer note flagging this as a placeholder awaiting Leaflet.
+
+`ReactRenderer.renderMap` mounts the component, reads sensorService
+from state, threads everything through.
+
+### S4-E: Tests
+
+14 new GpsLocationBeat tests covering:
+- Parameter handling (defaults, top-level vs nested, getParameters /
+  updateParameters round-trip)
+- Display mode renders without permission probe + propagates SensorService
+- Trigger modes proceed when permission granted; populate cache
+- Permission denied + fallback policy returns the fallback beat id
+- Permission denied + skip policy advances silently
+- Permission denied with no fallbackBeatId degrades to skip
+- Radius defaulting cascade (explicit > project > 25m)
+- Edge cases: missing target coordinates, renderer without renderMap
+
+Test counts: core 1,457 passing (up from 1,443 in S3; +14 new).
+All packages type-check clean.
+
+### Files
+
+- `packages/core/src/types/index.ts` (xr category, renderMap interface)
+- `packages/core/src/beats/GpsLocationBeat.ts` (new)
+- `packages/core/src/beats/index.ts` (export)
+- `packages/core/src/beats/BeatRegistry.ts` (register)
+- `packages/core/tests/beats/GpsLocationBeat.test.ts` (new — 14 tests)
+- `beat-definitions/core-beats.json` (gpsLocation entry)
+- `packages/renderer/src/components/MapBeatPlaceholder.tsx` (new)
+- `packages/renderer/src/renderers/ReactRenderer.tsx` (renderMap impl)
+- `docs/XR-Roadmap.md` (mark S4 / first XR beat done)
+
+---
+
 ## 2026-05-04: XR Substrate — Permissions + Condition Operators (S3)
 
 ### Overview

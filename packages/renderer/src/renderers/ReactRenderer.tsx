@@ -10,6 +10,7 @@ import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 import { isMobileDevice } from '../utils/mobileDetection';
 import { PanoramaView } from '../components/PanoramaView';
+import { MapBeatPlaceholder } from '../components/MapBeatPlaceholder';
 
 // ============= SCALED STAGE COMPONENT =============
 // Handles viewport-responsive scaling for the story stage
@@ -2798,6 +2799,49 @@ export class ReactRenderer extends BaseRenderer {
             } : undefined}
           />
         </div>
+      );
+    });
+  }
+
+  /**
+   * GpsLocationBeat renderer (v0.9.48 / S4+). Mounts the MapBeatPlaceholder
+   * component which subscribes to the SensorService for live distance
+   * updates and resolves with one of: 'arrived' / 'departed' / 'continue'
+   * / 'timeout' / 'skipped'. The placeholder is functional — only the
+   * map polish is missing. Leaflet integration ships in a follow-up.
+   */
+  async renderMap(options: {
+    mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
+    targetLat: number;
+    targetLng: number;
+    radiusMeters: number;
+    text?: string;
+    buttonText?: string;
+    cancelButtonText?: string;
+    timeoutMs?: number;
+    mapStyle?: 'streets' | 'satellite' | 'minimal';
+    showPlayerMarker?: boolean;
+  }, _locations?: Location[]): Promise<string> {
+    const sensorService = this.getState('sensorService');
+    if (options.text) {
+      this.ttsSpeakCallback?.(options.text, this.currentSpeaker, true);
+    }
+    return new Promise<string>((resolve) => {
+      this.renderComponent(
+        <MapBeatPlaceholder
+          mode={options.mode}
+          targetLat={options.targetLat}
+          targetLng={options.targetLng}
+          radiusMeters={options.radiusMeters}
+          text={options.text}
+          buttonText={options.buttonText}
+          cancelButtonText={options.cancelButtonText}
+          timeoutMs={options.timeoutMs}
+          mapStyle={options.mapStyle}
+          showPlayerMarker={options.showPlayerMarker}
+          sensorService={sensorService}
+          onResolve={(path) => resolve(path)}
+        />
       );
     });
   }

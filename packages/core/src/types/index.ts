@@ -573,6 +573,31 @@ export interface IRenderer {
     skinId?: string;
   }, locations?: Location[]): Promise<string>;
 
+  // GPS Location beat (v0.9.48 / S4+) — renders a map UI showing the
+  // target location and (when available) the player's current position
+  // and distance. In trigger modes, the renderer should resolve when
+  // the proximity threshold is crossed or the timeout expires (or the
+  // player explicitly skips). Returning a string lets the beat report
+  // back which path it took: 'arrived' / 'departed' / 'timeout' /
+  // 'skipped' / 'continue' (display-mode click).
+  //
+  // The renderer reads live location updates from the StoryContext's
+  // SensorService — it doesn't need to take location data via this
+  // call. The mode + target + radius parameters tell the renderer how
+  // to display and when to resolve.
+  renderMap?(options: {
+    mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
+    targetLat: number;
+    targetLng: number;
+    radiusMeters: number;
+    text?: string;
+    buttonText?: string;
+    cancelButtonText?: string;
+    timeoutMs?: number;
+    mapStyle?: 'streets' | 'satellite' | 'minimal';
+    showPlayerMarker?: boolean;
+  }, locations?: Location[]): Promise<string>;
+
   // Transition and effects
   prepareTransition?(transition: Transition): void;  // Set up initial hidden state before rendering
   applyTransition(transition: Transition): Promise<void>;  // Animate to visible after rendering
@@ -613,7 +638,7 @@ export interface IRenderer {
 }
 
 export interface BeatTypeDefinition {
-  category: 'visible' | 'invisible' | 'custom';
+  category: 'visible' | 'invisible' | 'custom' | 'xr';
   displayName: string;
   icon: string;
   parameters: Record<string, any>;

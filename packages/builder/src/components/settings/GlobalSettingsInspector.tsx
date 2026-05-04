@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search } from 'lucide-react';
+import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search, MapPin } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
@@ -205,7 +205,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     }
     return initialSettings;
   });
-  const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'copyright' | 'variables' | 'translation' | 'debug'>('project');
+  const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'xr' | 'copyright' | 'variables' | 'translation' | 'debug'>('project');
   const [hasChanges, setHasChanges] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
@@ -808,6 +808,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
           >
             <Music className="w-4 h-4" />
             Sound
+          </button>
+          <button
+            onClick={() => setActiveTab('xr')}
+            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'xr' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
+            }`}
+            title="Location & XR — story origin, mock location for desktop testing, default proximity radius, permission-denied policy"
+          >
+            <MapPin className="w-4 h-4" />
+            Location & XR
           </button>
           <button
             onClick={() => setActiveTab('copyright')}
@@ -2852,6 +2862,273 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               </div>
             </div>
           )}
+
+          {/* Location & XR — v0.9.48 / S4+. Project-level location settings
+              that XR beats (GpsLocationBeat etc.) read at runtime: story
+              origin, mock location for desktop authoring, default
+              proximity radius, permission-denied policy. */}
+          {activeTab === 'xr' && (() => {
+            // Read the location block defensively — older projects load
+            // with `location` undefined.
+            const loc = (settings as any).location || {};
+            // All three helpers mark the settings dirty so the Save button
+            // becomes pressable — same contract as handleChange /
+            // handleNestedChange. Without this, edits in the XR tab save
+            // silently on dialog close but the Save button stays disabled.
+            const writeLoc = (patch: Record<string, any>) => {
+              setSettings((prev) => ({
+                ...prev,
+                location: { ...((prev as any).location || {}), ...patch },
+              } as any));
+              setHasChanges(true);
+            };
+            const writeMockLocation = (patch: Record<string, any>) => {
+              setSettings((prev) => ({
+                ...prev,
+                location: {
+                  ...((prev as any).location || {}),
+                  mockLocation: { ...((prev as any).location?.mockLocation || {}), ...patch },
+                },
+              } as any));
+              setHasChanges(true);
+            };
+            const writeVenue = (patch: Record<string, any>) => {
+              setSettings((prev) => ({
+                ...prev,
+                location: {
+                  ...((prev as any).location || {}),
+                  venue: { ...((prev as any).location?.venue || {}), ...patch },
+                },
+              } as any));
+              setHasChanges(true);
+            };
+            return (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-medium text-gray-700 mb-1 flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Location & XR Settings
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Project-level location settings used by XR beats (GpsLocation, IndoorLocation, ARDisplay).
+                    Optional — projects without XR beats can leave everything unset.
+                    See <code className="bg-gray-100 px-1 rounded">docs/XR-Roadmap.md</code> for the bigger picture.
+                  </p>
+                </div>
+
+                {/* Story origin */}
+                <section className="border border-gray-200 rounded-lg p-4 space-y-3">
+                  <div>
+                    <h4 className="font-medium text-sm text-gray-800">Story origin</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      A single GPS anchor point used by XR beats as the story's "centre."
+                      The map beat defaults to centring here when no target is given;
+                      AR beats use it as the yaw=0 reference. Leave blank if the story isn't location-anchored.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Origin latitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={loc.originLat ?? ''}
+                        onChange={(e) => writeLoc({ originLat: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        placeholder="e.g. 51.5074"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Origin longitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={loc.originLng ?? ''}
+                        onChange={(e) => writeLoc({ originLng: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        placeholder="e.g. -0.1278"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Default proximity radius (metres)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={loc.defaultProximityRadiusM ?? ''}
+                      onChange={(e) => writeLoc({ defaultProximityRadiusM: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                      placeholder="e.g. 25"
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Used by XR beats and the gpsProximity Condition when no per-beat radius is set.
+                      Typical values: 5m room-scale, 25m "you've arrived at the building", 100m neighbourhood.
+                    </p>
+                  </div>
+                </section>
+
+                {/* Mock location for desktop testing */}
+                <section className="border border-purple-200 bg-purple-50/30 rounded-lg p-4 space-y-3">
+                  <div>
+                    <h4 className="font-medium text-sm text-purple-900">Mock location (desktop authoring)</h4>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      The PreviewWindow's MockSensorPanel seeds from this value. Authors can simulate
+                      "the player is here" while testing XR beats on a desktop without real GPS hardware.
+                      In production playback (PWA / mobile), the WebSensorService uses the real device
+                      Geolocation API instead and ignores this value.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Mock latitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={loc.mockLocation?.lat ?? ''}
+                        onChange={(e) => writeMockLocation({ lat: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        placeholder="e.g. 51.5"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Mock longitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={loc.mockLocation?.lng ?? ''}
+                        onChange={(e) => writeMockLocation({ lng: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        placeholder="e.g. -0.1"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Mock floor (indoor)</label>
+                      <input
+                        type="number"
+                        step={1}
+                        value={loc.mockLocation?.floor ?? ''}
+                        onChange={(e) => writeMockLocation({ floor: e.target.value === '' ? undefined : parseInt(e.target.value, 10) })}
+                        placeholder="e.g. 1 = ground floor"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                      />
+                    </div>
+                    {loc.originLat !== undefined && loc.originLng !== undefined && (
+                      <button
+                        type="button"
+                        onClick={() => writeMockLocation({ lat: loc.originLat, lng: loc.originLng })}
+                        className="px-3 py-1.5 text-xs border border-purple-300 text-purple-800 rounded hover:bg-purple-100"
+                        title="Copy lat/lng from the story origin above"
+                      >
+                        Snap to origin
+                      </button>
+                    )}
+                  </div>
+                </section>
+
+                {/* Permission-denied fallback */}
+                <section className="border border-gray-200 rounded-lg p-4 space-y-3">
+                  <div>
+                    <h4 className="font-medium text-sm text-gray-800">Permission-denied fallback</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      What to do when an XR beat needs a permission (GPS / camera / etc.) and the player denies it.
+                      'Skip' silently advances to the next beat. 'Fallback' redirects to a specific beat — typically
+                      a non-XR alternative ("we couldn't get your location, so here's a description of the place").
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">On permission denied</label>
+                    <select
+                      value={loc.onPermissionDenied || 'fallback'}
+                      onChange={(e) => writeLoc({ onPermissionDenied: e.target.value })}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    >
+                      <option value="fallback">Fallback — redirect to fallback beat</option>
+                      <option value="skip">Skip — advance to next beat silently</option>
+                    </select>
+                  </div>
+                  {(loc.onPermissionDenied || 'fallback') === 'fallback' && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Fallback beat ID</label>
+                      <input
+                        type="text"
+                        value={loc.fallbackBeatId || ''}
+                        onChange={(e) => writeLoc({ fallbackBeatId: e.target.value || undefined })}
+                        placeholder="e.g. beat_no_gps_alternative"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                      />
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        Beat the engine routes to when permission is denied.
+                        Leave blank to degrade to silent skip in that case.
+                      </p>
+                    </div>
+                  )}
+                </section>
+
+                {/* Indoor venue */}
+                <section className="border border-gray-200 rounded-lg p-4 space-y-3">
+                  <div>
+                    <h4 className="font-medium text-sm text-gray-800">Indoor venue (optional)</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      For stories that use IndoorLocationBeat with Bluetooth beacons.
+                      The floorplan asset is rendered at scale on top of the player's
+                      known beacon position. Leave blank if your story doesn't use indoor positioning.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Venue name</label>
+                    <input
+                      type="text"
+                      value={loc.venue?.name || ''}
+                      onChange={(e) => writeVenue({ name: e.target.value })}
+                      placeholder="e.g. Acme Museum, Hall A"
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Floor width (metres)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={0.1}
+                        value={loc.venue?.floorWidth ?? ''}
+                        onChange={(e) => writeVenue({ floorWidth: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Floor height (metres)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={0.1}
+                        value={loc.venue?.floorHeight ?? ''}
+                        onChange={(e) => writeVenue({ floorHeight: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Floor plan asset ID</label>
+                    <input
+                      type="text"
+                      value={loc.venue?.floorPlan || ''}
+                      onChange={(e) => writeVenue({ floorPlan: e.target.value || undefined })}
+                      placeholder="(asset id from the asset manager)"
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Indoor positioning beats ship in v2. The schema is reserved here so authoring
+                      can proceed today and the runtime catches up later.
+                    </p>
+                  </div>
+                </section>
+              </div>
+            );
+          })()}
 
           {activeTab === 'copyright' && (
             <div className="space-y-4">

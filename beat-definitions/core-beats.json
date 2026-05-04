@@ -1203,6 +1203,104 @@
       "renderer": "none"
     },
 
+    "gpsLocation": {
+      "category": "xr",
+      "displayName": "GPS Location",
+      "icon": "📍",
+      "description": "Show a map with a target GPS coordinate. In trigger modes, wait for the player to walk into (or out of) a radius around the point. The runtime probes GPS permission via ensureXRPermission and falls back per the project's LocationSettings.onPermissionDenied policy.",
+      "connectionType": "single",
+      "parameters": {
+        "mode": {
+          "type": "string",
+          "required": true,
+          "default": "display",
+          "description": "Behaviour mode: 'display' shows the map with a continue button (no waiting); 'trigger-on-arrival' resolves when the player enters the radius; 'trigger-on-departure' resolves when the player leaves it.",
+          "ui": {
+            "label": "Mode",
+            "control": "select",
+            "options": [
+              { "value": "display", "label": "Display only (continue button)" },
+              { "value": "trigger-on-arrival", "label": "Trigger on arrival" },
+              { "value": "trigger-on-departure", "label": "Trigger on departure" }
+            ]
+          }
+        },
+        "targetLat": {
+          "type": "number",
+          "required": true,
+          "description": "Target latitude in degrees (WGS84). E.g. 51.5074 for London.",
+          "ui": { "label": "Target latitude", "step": 0.000001 }
+        },
+        "targetLng": {
+          "type": "number",
+          "required": true,
+          "description": "Target longitude in degrees (WGS84). E.g. -0.1278 for London.",
+          "ui": { "label": "Target longitude", "step": 0.000001 }
+        },
+        "radiusMeters": {
+          "type": "number",
+          "required": false,
+          "description": "Proximity radius in metres. Falls back to the project's LocationSettings.defaultProximityRadiusM when unset, then 25m.",
+          "ui": { "label": "Radius (metres)", "min": 1 }
+        },
+        "text": {
+          "type": "string",
+          "required": false,
+          "description": "Instructional text shown over the map (e.g. 'Walk to the meeting point at the fountain').",
+          "ui": { "label": "Instructional text", "control": "textarea" }
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Continue",
+          "description": "Continue button label (display mode).",
+          "ui": { "label": "Continue button text" }
+        },
+        "cancelButtonText": {
+          "type": "string",
+          "required": false,
+          "description": "Optional skip / cancel button label. Lets the player exit the beat without waiting for arrival.",
+          "ui": { "label": "Skip button text" }
+        },
+        "timeoutMs": {
+          "type": "number",
+          "required": false,
+          "description": "Optional timeout in milliseconds. The beat resolves with 'timeout' if no arrival / departure / skip happens within this window.",
+          "ui": { "label": "Timeout (ms)", "min": 0 }
+        },
+        "mapStyle": {
+          "type": "string",
+          "required": false,
+          "default": "streets",
+          "description": "Visual style for the map.",
+          "ui": {
+            "label": "Map style",
+            "control": "select",
+            "options": [
+              { "value": "streets", "label": "Streets" },
+              { "value": "satellite", "label": "Satellite" },
+              { "value": "minimal", "label": "Minimal" }
+            ]
+          }
+        },
+        "showPlayerMarker": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Whether to show the player's current location on the map.",
+          "ui": { "label": "Show player marker" }
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Next beat after the GPS beat resolves (regardless of how — arrival, timeout, skip)."
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "map"
+    },
+
     "inputText": {
       "category": "visible",
       "displayName": "Input Text",
