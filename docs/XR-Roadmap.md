@@ -259,6 +259,10 @@ change). Then build ARDisplayBeat on top.
 2. **S2**: SensorService skeleton with mock + web implementations ✅ *(landed 2026-05-04)*
 3. **S3**: permissions plumbing + condition operators ✅ *(landed 2026-05-04)*
 4. **GpsLocationBeat (XR1)** — placeholder UI, full runtime, MockSensorPanel-driven ✅ *(landed 2026-05-04)*. Leaflet integration deferred to its own commit.
+5. **gpsProximity ConditionBeat operator (XR5)** ✅ *(landed alongside S3)*
+6. **DirectionalSound option (a)** — `spatialPosition` on existing sound configs ✅ *(landed 2026-05-04)*. Geographic (lat/lng) and azimuth modes via Web Audio PannerNode. Editor UI for sound configs deferred to a follow-up.
+
+**v1 of the XR roadmap is functionally complete.** Authors can build location-anchored stories end-to-end: configure project location settings, place GPS-proximity beats, gate logic with `gpsProximity` Conditions, attach directional sound to specific real-world coordinates. The remaining work is polish (Leaflet for the GPS beat's UI, editor surface for `spatialPosition` on sounds) and v2 features (IndoorLocationBeat, ARDisplayBeat).
 4. **GpsLocationBeat** (XR1) — simplest of the five, validates the whole stack (days 7-9)
 5. **gpsProximity ConditionBeat operator** (XR5) — comes practically free once S2 lands (day 10)
 6. **DirectionalSound option (a)** — `spatialPosition` on existing sound configs (days 11-12)

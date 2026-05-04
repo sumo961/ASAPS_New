@@ -1375,6 +1375,13 @@ export const PreviewWindow: React.FC = () => {
       const engine = new StoryEngine(reactRenderer as any, { mockMode: true });
       rendererRef.current = reactRenderer;
       engineRef.current = engine;
+
+      // Push the SensorService into renderer state right after engine
+      // construction so spatial sounds, the GPS beat's renderMap, and
+      // anything else that needs sensor access can read from
+      // renderer.getState('sensorService') uniformly. Same pattern as
+      // ttsService / sttService above.
+      reactRenderer.setState('sensorService', engine.getContext().getSensorService());
     }
 
     // Set TTS language from translation settings

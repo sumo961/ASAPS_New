@@ -5,6 +5,8 @@
  * Uses Web Audio API for better control and performance.
  */
 
+import { haversineMeters as haversine, bearingDegrees as bearingFromGeo } from '@asaps/core';
+
 export interface AudioManagerOptions {
   masterVolume?: number; // 0-1, default 0.7
   preloadSounds?: boolean; // Whether to preload sounds, default true
@@ -871,6 +873,183 @@ export class AudioManager {
    */
   isAvailable(): boolean {
     return !!(window.AudioContext || (window as any).webkitAudioContext);
+  }
+
+  /**
+   * Play a sound through a Web Audio PannerNode for spatial / directional
+   * positioning (v0.9.48 / S4+).
+   *
+   * Two flavours per the Sound.spatialPosition schema:
+   *
+   *   - **Geographic** (`source.lat` + `source.lng` set, `playerLat` +
+   *     `playerLng` provided in the live readings): bearing from the
+   *     player's current position to the source determines the panner
+   *     orientation. As the player walks around, the panner updates.
+   *     Distance attenuates volume; beyond `maxDistanceMeters` the
+   *     sound is silent.
+   *   - **Azimuth** (`source.azimuth` set, `source.lat`/`lng` absent):
+   *     fixed compass direction. The panner uses the device's
+   *     orientation `alpha` (compass heading) to compute the relative
+   *     bearing, so spinning the phone pans the audio.
+   *
+   * `subscribeToSensor` is a small adapter the caller passes in — it
+   * receives an updater function and calls it whenever the player's
+   * location or orientation changes. It returns an unsubscribe. This
+   * keeps AudioManager from needing direct knowledge of SensorService.
+   *
+   * Returns an `unsubscribe` function. Calling it stops the sound and
+   * tears down the sensor subscription. The renderer should call this
+   * when the beat or scene changes.
+   */
+  playSpatialSound(
+    url: string,
+    spatial: {
+      lat?: number;
+      lng?: number;
+      azimuth?: number;
+      elevation?: number;
+      maxDistanceMeters?: number;
+    },
+    options: {
+      volume?: number;
+      loop?: boolean;
+    },
+    subscribeToSensor: (
+      updater: (state: {
+        playerLat?: number;
+        playerLng?: number;
+        compassAlpha?: number | null;
+      }) => void,
+    ) => () => void,
+  ): Promise<() => void> {
+    return new Promise(async (resolve, reject) => {
+      if (this.muted) {
+        resolve(() => {});
+        return;
+      }
+      this.initAudioContext();
+      if (!this.audioContext || !this.masterGainNode) {
+        console.warn('[AudioManager] Audio context not available');
+        resolve(() => {});
+        return;
+      }
+      const ctx = this.audioContext;
+      try {
+        if (ctx.state === 'suspended') await ctx.resume();
+
+        // Load buffer (reuse the same cache as playSound).
+        let buffer = this.soundBuffers.get(url);
+        if (!buffer) {
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          buffer = await ctx.decodeAudioData(arrayBuffer);
+          if (this.shouldPreloadSounds) this.soundBuffers.set(url, buffer);
+        }
+
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = options.loop ?? false;
+
+        const gain = ctx.createGain();
+        gain.gain.value = Math.max(0, Math.min(1, options.volume ?? 1.0));
+
+        // Panner: HRTF model gives convincing left/right + front/back when
+        // headphones are on. distanceModel 'inverse' falls off realistically.
+        const panner = ctx.createPanner();
+        panner.panningModel = 'HRTF';
+        panner.distanceModel = 'inverse';
+        panner.refDistance = 1;
+        panner.maxDistance = spatial.maxDistanceMeters ?? 100;
+        panner.rolloffFactor = 1;
+
+        source.connect(gain);
+        gain.connect(panner);
+        panner.connect(this.masterGainNode);
+
+        // Geographic vs azimuth path. updatePanner is called whenever the
+        // sensor adapter delivers fresh state.
+        const elevation = spatial.elevation ?? 0;
+        const updatePanner = (state: {
+          playerLat?: number;
+          playerLng?: number;
+          compassAlpha?: number | null;
+        }) => {
+          if (!this.audioContext || ctx.state === 'closed') return;
+          let bearingRad: number | null = null;
+          let distanceM = 1;
+
+          if (
+            spatial.lat !== undefined && spatial.lng !== undefined &&
+            state.playerLat !== undefined && state.playerLng !== undefined
+          ) {
+            // Geographic: bearing + distance from player to source. The
+            // device's compass alpha rotates the listener's frame, so the
+            // *relative* bearing is bearing-to-source minus compass-heading.
+            const bearingToSource = bearingFromGeo(state.playerLat, state.playerLng, spatial.lat, spatial.lng);
+            const compass = state.compassAlpha ?? 0;
+            bearingRad = ((bearingToSource - compass) * Math.PI) / 180;
+            distanceM = haversine(state.playerLat, state.playerLng, spatial.lat, spatial.lng);
+          } else if (spatial.azimuth !== undefined) {
+            // Azimuth-only: fixed source direction; relative bearing depends
+            // only on which way the device is pointing.
+            const compass = state.compassAlpha ?? 0;
+            bearingRad = ((spatial.azimuth - compass) * Math.PI) / 180;
+            distanceM = 1;
+          }
+
+          if (bearingRad === null) return;
+          // Place the source on a unit-radius sphere around the listener.
+          // Web Audio's coordinate convention: +X right, +Y up, -Z forward
+          // (away from the listener). bearing 0 = directly ahead.
+          const x = Math.sin(bearingRad);
+          const z = -Math.cos(bearingRad);
+          // Scale by distance so the panner's distance model can attenuate
+          // properly. Skip when source is co-located (distance 0) — keep
+          // the previous position rather than dividing by zero.
+          const scale = Math.max(distanceM, 0.5);
+          const px = x * scale;
+          const py = elevation;
+          const pz = z * scale;
+          // setPosition is deprecated in favour of positionX/Y/Z AudioParams,
+          // but the deprecated form is widely supported and avoids a feature-
+          // detect dance. We try the new API first when available.
+          if (panner.positionX) {
+            panner.positionX.value = px;
+            panner.positionY.value = py;
+            panner.positionZ.value = pz;
+          } else {
+            (panner as any).setPosition(px, py, pz);
+          }
+        };
+
+        // Subscribe to sensor updates — caller's adapter calls back into
+        // updatePanner whenever location or orientation changes.
+        const unsubscribeSensor = subscribeToSensor(updatePanner);
+
+        this.activeSourceNodes.add(source);
+        let stopped = false;
+        const stop = () => {
+          if (stopped) return;
+          stopped = true;
+          unsubscribeSensor();
+          try { source.stop(0); } catch { /* already stopped */ }
+          try { source.disconnect(); } catch { /* already disconnected */ }
+          try { gain.disconnect(); } catch { /* already disconnected */ }
+          try { panner.disconnect(); } catch { /* already disconnected */ }
+          this.activeSourceNodes.delete(source);
+        };
+        source.onended = () => {
+          this.activeSourceNodes.delete(source);
+          unsubscribeSensor();
+        };
+
+        source.start(0);
+        resolve(stop);
+      } catch (error) {
+        console.error(`[AudioManager] Error playing spatial sound ${url}:`, error);
+        reject(error);
+      }
+    });
   }
 }
 

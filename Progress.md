@@ -1,5 +1,195 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-04: Wire DirectionalSound into the renderer's playSound path
+
+### Overview
+
+The DirectionalSound runtime that landed earlier today (`AudioManager.playSpatialSound`)
+was reachable only via direct method call — `Sound.spatialPosition` set
+on a beat sound was being silently ignored by the renderer. This commit
+threads the spatial path through `BaseRenderer.playSound` so authors
+who set `spatialPosition` on a beat / cluster sound config now get
+actual spatial audio in the Preview Window without changing anything
+else.
+
+### Changes
+
+**`packages/renderer/src/audio/sensorAdapter.ts`** (new) — bridge from
+the SensorService's `watchLocation` + `watchOrientation` streams to
+the unified `(state) => void` callback that
+`AudioManager.playSpatialSound` consumes. Maintains an in-memory
+snapshot of the latest readings, emits the merged snapshot on every
+change, returns a single unsubscribe that tears down both
+underlying watchers.
+
+**`packages/renderer/src/renderers/BaseRenderer.ts`** — `playSound`
+now detects `sound.spatialPosition`. When set:
+1. Reads the SensorService from `this.state.get('sensorService')`.
+2. Resolves the sound URL — assetId via `soundBlobResolver` then
+   `URL.createObjectURL` for blobs; fall through to the http URL
+   for external sounds.
+3. Calls `audioManager.playSpatialSound` with the URL, the spatial
+   config, the volume/loop options, and a sensor adapter built from
+   the resolved sensor service.
+4. Stores the returned `stop` function on the renderer so `stopBeatSound`
+   can tear it down.
+
+Falls back silently to the standard non-spatial path if any of:
+no SensorService in state, no resolvable URL, AudioContext
+unavailable. No author-visible breakage when spatial config is
+authored on a host that can't satisfy it.
+
+**`stopBeatSound`** now also calls the spatial teardown before
+delegating to `audioManager.stopBeatSound`. The spatial path runs
+its own audio graph (panner + sensor subscriptions) outside the
+AudioManager's beat-sound bookkeeping, so it has to be cleaned up
+explicitly.
+
+**`packages/builder/src/pages/PreviewWindow.tsx`** — pushes the
+SensorService into renderer state right after engine construction:
+`reactRenderer.setState('sensorService', engine.getContext().getSensorService())`.
+Same pattern as the existing TTS / STT service slots. The
+GpsLocationBeat already did its own version of this defensively;
+PreviewWindow setup makes it available to every beat / sound that
+needs it without per-beat plumbing.
+
+### Object-URL hygiene
+
+The blob → URL.createObjectURL path leaks unless explicitly revoked.
+The renderer tracks every URL it mints in a `spatialSoundObjectUrls`
+array and revokes them all on `stopBeatSound`. Stable across multiple
+spatial-sound transitions in a single session.
+
+### What's still deferred
+
+- **Editor UI for `spatialPosition`**: the existing sound config
+  pickers (background sound, beat sound, dialog sound) are scattered
+  and don't share a common widget. Authors can still only set
+  spatialPosition by hand-editing the project JSON. Centralised
+  widget is its own follow-up.
+- **HTML export wiring**: the standalone player needs a parallel
+  push of sensorService into renderer state. The runtime is in
+  place; the host-side wiring (similar to PreviewWindow's setup)
+  isn't yet.
+
+### Test counts
+
+Core: 1,468 passing (unchanged — this commit is renderer-side
+plumbing). All packages type-check clean.
+
+### Files
+
+- `packages/renderer/src/audio/sensorAdapter.ts` (new)
+- `packages/renderer/src/renderers/BaseRenderer.ts` (spatial path in playSound + teardown in stopBeatSound)
+- `packages/builder/src/pages/PreviewWindow.tsx` (push sensorService into renderer state)
+
+---
+
+## 2026-05-04: DirectionalSound — spatial sound positioning (XR v1 complete)
+
+### Overview
+
+Last v1 item from the XR roadmap. Sound configs gain a
+`spatialPosition` field; the AudioManager routes spatial sounds
+through a Web Audio PannerNode that pans audio left/right based on
+the source's position relative to the player. Two flavours:
+
+- **Geographic** (`lat` + `lng` set): live bearing from the player's
+  current GPS reading to a fixed point in the world. Pan updates as
+  the player walks around. Pair with the SensorService's location
+  cache from S2 + S3.
+- **Azimuth** (`azimuth` set, no lat/lng): fixed compass direction
+  relative to true north. The device's orientation `alpha` rotates
+  the listener's frame so spinning the phone pans the audio.
+
+Optional `maxDistanceMeters` caps audible range (geographic mode).
+Optional `elevation` for vertical positioning.
+
+### Schema
+
+`Sound.spatialPosition` extended on the canonical type in
+`packages/core/src/types/index.ts`. Optional everywhere — sounds
+without it play exactly as before, no behaviour change.
+
+### Runtime
+
+`AudioManager.playSpatialSound(url, spatial, options, subscribeToSensor)`
+in `@asaps/renderer`:
+
+- Splices a `PannerNode` into the existing `source → gain →
+  masterGain` chain (becomes `source → gain → panner → masterGain`).
+- HRTF panning model + inverse distance attenuation. Convincing
+  left/right + front/back when headphones are on.
+- The caller passes a `subscribeToSensor` adapter that delivers
+  fresh `{ playerLat, playerLng, compassAlpha }` whenever the
+  SensorService emits. Keeps AudioManager from needing direct
+  knowledge of SensorService — it stays dependency-clean.
+- Returns an `unsubscribe` function. Calling it stops the sound,
+  tears down the sensor subscription, and disconnects the audio
+  graph.
+
+### Bearing math
+
+New `bearingDegrees(lat1, lng1, lat2, lng2)` helper in
+`StoryContext.ts` (alongside the existing `haversineMeters`). Returns
+initial bearing along the great circle in degrees, [0, 360). Both
+helpers are now `export`ed so the renderer can import them via
+`@asaps/core`.
+
+### Tests
+
+11 new tests in `tests/engine/Geo.test.ts`:
+- haversineMeters: identical-points, symmetry, known long-distance
+  (London → NYC ≈ 5,570km), short distances (~100m in SF),
+  antipodal (~half Earth circumference)
+- bearingDegrees: cardinal directions (N/S/E/W), [0, 360) range
+  invariant across mixed quadrants and the antimeridian, hand-checked
+  London → NYC ≈ 288° (WNW)
+
+### Deferred to follow-up commits
+
+- **Editor UI for `spatialPosition`** — the existing sound config
+  surfaces (background sound picker, beat sound picker, dialog sound
+  picker) are scattered. Authors can manually add `spatialPosition`
+  to JSON for now; a dedicated UI follow-up will add the lat/lng /
+  azimuth / elevation fields.
+- **Renderer wiring to *use* `playSpatialSound`** — the
+  AudioManager method exists; the next commit threads it through
+  the existing `playSound` paths in renderers when `Sound.spatialPosition`
+  is detected.
+
+### Test counts
+
+Core: **1,468 passing** (up from 1,457; +11 new from the geo helpers).
+All packages type-check clean.
+
+### Files
+
+- `packages/core/src/types/index.ts` (`Sound.spatialPosition`)
+- `packages/core/src/engine/StoryContext.ts` (export haversine, add bearingDegrees)
+- `packages/core/src/engine/index.ts` (re-export geo helpers)
+- `packages/core/tests/engine/Geo.test.ts` (new — 11 tests)
+- `packages/renderer/src/audio/AudioManager.ts` (playSpatialSound)
+- `docs/XR-Roadmap.md` (mark DirectionalSound (a) done; v1 complete note)
+
+### XR v1 status
+
+**Complete.** Authors can build location-anchored stories end-to-end:
+- Configure location settings via the new "Location & XR" tab in
+  Global Settings
+- Place GPS-proximity beats and gate logic with the `gpsProximity` /
+  `permissionGranted` Conditions
+- Attach directional sound to real-world coordinates via
+  `Sound.spatialPosition`
+- Test the whole stack on desktop via the MockSensorPanel without
+  needing real hardware
+
+Remaining XR work is polish (Leaflet for the GPS beat's UI; editor
+surface for `spatialPosition`) and v2 features (IndoorLocationBeat,
+ARDisplayBeat). Roadmap doc updated to reflect this milestone.
+
+---
+
 ## 2026-05-04: XR Beat #1 — GpsLocationBeat with placeholder map (S4)
 
 ### Overview

@@ -1,5 +1,5 @@
 export { StoryEngine } from './StoryEngine';
-export { StoryContext } from './StoryContext';
+export { StoryContext, haversineMeters, bearingDegrees } from './StoryContext';
 export { Story } from './Story';
 export type { SerializedStoryState, InventoryEntry, ChoiceRecord, ResetOptions, CharacterMood, Sentiment, Reflection } from './StoryContext';
 export { DEFAULT_EMOTION_PALETTE, findEmotionDefinition, type EmotionDefinition } from './EmotionPalette';

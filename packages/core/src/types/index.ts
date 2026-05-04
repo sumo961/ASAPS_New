@@ -65,6 +65,41 @@ export interface Sound {
   loop?: boolean;
   fadeIn?: number;
   fadeOut?: number;
+  /**
+   * Spatial / directional sound configuration (v0.9.48 / S4+).
+   *
+   * When set, the renderer routes this sound through a Web Audio
+   * PannerNode that pans audio left/right (and front/back / up/down
+   * via HRTF when supported) based on the source's position relative
+   * to the player. Two flavours, mutually exclusive in practice but
+   * coexisting in the schema for future extension:
+   *
+   *   - **Geographic** (`lat` + `lng` set): the runtime computes
+   *     bearing from the player's current GPS reading to this fixed
+   *     point and updates the panner as the player walks around.
+   *     Pair with a story that has GPS authoring (the SensorService
+   *     keeps a fresh location cache via S2 + S3).
+   *   - **Azimuth** (`azimuth` set, no lat/lng): the source has a
+   *     fixed compass direction relative to true north (0=N, 90=E).
+   *     The panner uses the device's orientation (alpha) to compute
+   *     left/right pan. Cheaper, no GPS required — works for "the
+   *     sound is always to your left" effects in any beat.
+   *
+   * `maxDistanceMeters` (geographic only) caps audible range — beyond
+   * the threshold, the sound is silent. Default 100m.
+   */
+  spatialPosition?: {
+    /** Source latitude (geographic mode). */
+    lat?: number;
+    /** Source longitude (geographic mode). */
+    lng?: number;
+    /** Fixed azimuth in degrees, 0=N (azimuth-only mode). */
+    azimuth?: number;
+    /** Optional elevation offset in metres for vertical positioning. */
+    elevation?: number;
+    /** Audible-range cap in metres (geographic mode). Default 100m. */
+    maxDistanceMeters?: number;
+  };
 }
 
 export interface Video {

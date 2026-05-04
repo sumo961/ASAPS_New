@@ -1,6 +1,7 @@
 import type { IRenderer, RenderContext, RenderTheme, AssetCache, RenderOptions } from '../types';
 import type { Transition, Sound, Location } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
+import { buildSensorAdapter } from '../audio/sensorAdapter';
 
 export abstract class BaseRenderer implements IRenderer {
   protected context: RenderContext;
@@ -9,6 +10,19 @@ export abstract class BaseRenderer implements IRenderer {
   protected state: Map<string, any> = new Map();
   private stateListeners: Map<string, Set<(value: any) => void>> = new Map();
   protected soundBlobResolver: ((assetId: string) => Promise<Blob | null>) | null = null;
+  /**
+   * Active spatial-sound teardown for the current beat. When a sound
+   * with `spatialPosition` is playing, this holds the unsubscribe
+   * returned by AudioManager.playSpatialSound — calling it stops the
+   * panner sound and tears down the sensor subscription. Cleared on
+   * every stopBeatSound.
+   */
+  private spatialBeatSoundStop: (() => void) | null = null;
+  /**
+   * Object-URLs we minted for spatial sounds (assetId → blob → URL).
+   * Revoked when the spatial sound stops to avoid leaking memory.
+   */
+  private spatialSoundObjectUrls: string[] = [];
 
   constructor(context: RenderContext, options: RenderOptions = {}) {
     this.context = context;
@@ -132,6 +146,46 @@ export abstract class BaseRenderer implements IRenderer {
       const volume = sound.volume ?? 1.0;
       const loop = sound.loop ?? false;
 
+      // v0.9.48 / S4+ — spatial sound path. When the sound has a
+      // spatialPosition (lat/lng or fixed azimuth), route through
+      // AudioManager.playSpatialSound which inserts a Web Audio
+      // PannerNode into the chain and subscribes to the SensorService
+      // for live position / orientation updates. Falls back to the
+      // standard beat-sound path silently if no SensorService is
+      // available (e.g., in a context that didn't push it into state).
+      if (sound.spatialPosition) {
+        const sensorService = this.state.get('sensorService');
+        if (sensorService) {
+          // Resolve URL: prefer assetId-blob → object URL, else http URL.
+          let url: string | null = null;
+          if (sound.assetId && this.soundBlobResolver) {
+            const blob = await this.soundBlobResolver(sound.assetId);
+            if (blob) {
+              url = URL.createObjectURL(blob);
+              this.spatialSoundObjectUrls.push(url);
+            }
+          }
+          if (!url && sound.file && sound.file.startsWith('http')) {
+            url = sound.file;
+          }
+          if (url) {
+            // Stop any prior spatial sound on this beat before starting a new one.
+            this.stopSpatialBeatSound();
+            const stop = await audioManager.playSpatialSound(
+              url,
+              sound.spatialPosition,
+              { volume, loop },
+              buildSensorAdapter(sensorService),
+            );
+            this.spatialBeatSoundStop = stop;
+            return;
+          }
+          console.warn(`[BaseRenderer] Spatial sound has spatialPosition but no resolvable URL — falling back to non-spatial`);
+        } else {
+          console.warn(`[BaseRenderer] Spatial sound requested but no sensorService in renderer state — falling back to non-spatial`);
+        }
+      }
+
       // Prefer assetId for blob-based playback (works across sessions)
       if (sound.assetId && this.soundBlobResolver) {
         console.log(`[BaseRenderer] Loading beat sound from assetId: ${sound.assetId}`);
@@ -152,6 +206,24 @@ export abstract class BaseRenderer implements IRenderer {
       console.warn(`[BaseRenderer] Cannot play beat sound - no valid assetId or URL: ${sound.file}`);
     } catch (error) {
       console.warn(`[BaseRenderer] Failed to play beat sound: ${sound.file}`, error);
+    }
+  }
+
+  /**
+   * Tear down the current spatial beat sound (sensor subscriptions +
+   * audio nodes) and revoke any object-URLs minted for it. Idempotent
+   * — safe to call when no spatial sound is active.
+   */
+  private stopSpatialBeatSound(): void {
+    if (this.spatialBeatSoundStop) {
+      try { this.spatialBeatSoundStop(); } catch { /* swallow */ }
+      this.spatialBeatSoundStop = null;
+    }
+    if (this.spatialSoundObjectUrls.length > 0) {
+      for (const url of this.spatialSoundObjectUrls) {
+        try { URL.revokeObjectURL(url); } catch { /* swallow */ }
+      }
+      this.spatialSoundObjectUrls = [];
     }
   }
 
@@ -191,9 +263,14 @@ export abstract class BaseRenderer implements IRenderer {
   }
 
   /**
-   * Stop the current beat sound (called when leaving a beat)
+   * Stop the current beat sound (called when leaving a beat).
+   * Tears down both the standard beat sound (managed by AudioManager)
+   * and any active spatial sound + its sensor subscriptions.
    */
   stopBeatSound(): void {
+    // Spatial sound first — has its own teardown chain that includes
+    // sensor unsubscribes; doesn't go through AudioManager.stopBeatSound.
+    this.stopSpatialBeatSound();
     try {
       const audioManager = getAudioManager();
       audioManager.stopBeatSound();

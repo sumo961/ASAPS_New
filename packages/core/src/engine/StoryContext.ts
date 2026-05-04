@@ -207,7 +207,7 @@ function isLiteralBaseline(b: Condition['baseline']): boolean {
  * (the model assumes a sphere, ignoring Earth's oblateness). Plenty
  * good for "are you within 50 metres of the meeting point?" checks.
  */
-function haversineMeters(
+export function haversineMeters(
   lat1: number, lng1: number,
   lat2: number, lng2: number,
 ): number {
@@ -218,6 +218,31 @@ function haversineMeters(
   const a = Math.sin(dLat / 2) ** 2
     + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/**
+ * Initial bearing in degrees (0=N, 90=E, 180=S, 270=W) from `(lat1,lng1)`
+ * to `(lat2,lng2)` along the great circle. Used by spatial-sound
+ * positioning (S4+) to derive "which way is the sound coming from?"
+ * relative to the player's current location.
+ *
+ * The result is always in [0, 360). Antipodal / co-located inputs are
+ * stable but meaningless — caller should treat bearing as undefined
+ * when distance is zero.
+ */
+export function bearingDegrees(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number,
+): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const toDeg = (rad: number) => (rad * 180) / Math.PI;
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+  const dLambda = toRad(lng2 - lng1);
+  const y = Math.sin(dLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2)
+    - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLambda);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
 /**
