@@ -1,5 +1,149 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-04: XR Substrate — Permissions + Condition Operators (S3)
+
+### Overview
+
+Third piece of the XR roadmap landed: permissions plumbing and the
+three new XR condition operators (`gpsProximity`, `indoorProximity`,
+`permissionGranted`). Together with S1 (LocationSettings) and S2
+(SensorService) earlier today, the substrate is now complete enough
+that XR beats can start landing in v2.
+
+Everything authoring-side is wired up — authors can pick the new
+operators from both the per-beat Requirements editor and the
+ConditionBeat editor in the Inspector — but no XR beat actually
+*requires* a permission yet, so this round is still infrastructure
+without immediately-visible runtime behaviour.
+
+### S3-A: Cached-reading getters on SensorService
+
+Synchronous reads of the most recent sensor reading so condition
+evaluators (which run synchronously) can branch on fresh sensor data:
+
+- `getLastKnownLocation()` / `getLastKnownOrientation()` /
+  `getLastKnownBeacons()` return the most recent reading the service
+  has observed (or null when none).
+- `ensureLocationCacheActive()` / `ensureOrientationCacheActive()` /
+  `ensureBeaconCacheActive()` start a passive watcher with a no-op
+  subscriber, returning an unsubscribe. Reuses the de-dupe-shared-watcher
+  property from S2 — repeated calls don't spawn extra watchers.
+
+The cache is populated by the same underlying `watchPosition` /
+`deviceorientation` listener that fans readings out to active
+subscribers; condition evaluators just read the cache field
+synchronously. No new platform calls required.
+
+### S3-B: Permission state API
+
+`getPermissionState(name): PermissionState` and `requestPermission(name)`
+on the service interface. Returns `'granted'` | `'denied'` | `'prompt'`
+| `'unavailable'`.
+
+WebSensorService uses `navigator.permissions.query()` where supported
+(Chromium-family browsers expose `geolocation` and `camera` query
+names; orientation and beacons fall through to `'prompt'` with the
+underlying API surfacing the platform dialog on first use). For iOS
+13+, `requestPermission` invokes
+`DeviceOrientationEvent.requestPermission()` for orientation. For
+camera, it briefly probes via `getUserMedia` then releases the track.
+
+MockSensorService tracks per-permission state in an in-memory map,
+defaults everything to `'granted'`, and surfaces a
+`setMockPermissionState` mutation for unit tests and the Mock panel
+to drive denial / prompt flows.
+
+### S3-C / S3-D: Condition type extensions + checkCondition handlers
+
+Three new condition operators added to the `Condition` union:
+
+- **`gpsProximity`** — `{ targetLat, targetLng, radiusMeters,
+  proximityMode: 'within' | 'outside' }`. Evaluator computes the
+  haversine great-circle distance between the player's last cached
+  GPS reading and the target, then applies the mode. Returns false
+  when no cached location exists (fail-closed: don't trigger an
+  arrival on unknown state).
+
+- **`indoorProximity`** — `{ beaconUuid, beaconMajor?, beaconMinor?,
+  minRssi }`. Evaluator scans the cached beacon list for a
+  uuid+major+minor match and tests the RSSI threshold. RSSI is in
+  dBm, closer to 0 = stronger signal. -65 dBm ≈ 1m, -85 dBm ≈ 10m.
+
+- **`permissionGranted`** — `{ permissions: ('gps'|'camera'|
+  'orientation'|'beacons')[] }`. Reads the StoryContext's
+  permissionStateCache (populated by `ensureXRPermission`) and
+  returns true iff every listed permission is currently `'granted'`.
+  Untouched permissions are treated as not-granted (fail-closed —
+  a beat that wants to gate on a permission must run a probe first).
+
+The haversine helper lives at module scope in StoryContext.ts. Mean
+Earth radius from WGS84 (6,371,008.8m), spherical-Earth assumption
+(±0.5% accurate, plenty good for "within 50 metres" checks).
+
+### S3-E: ensureXRPermission helper
+
+`packages/core/src/utils/xrPermissions.ts` exports `ensureXRPermission(context, permissions, policy)`
+returning `'granted'` | `'fallback'` | `'skip'`. Probes each
+permission via `getPermissionState`, prompts on `'prompt'`-state
+permissions when `policy.prompt !== false`, records every observed
+state into the context's `permissionStateCache`, then returns the
+verdict. Choice between `'fallback'` and `'skip'` follows the
+policy's `onDenied` field (mirrors `LocationSettings.onPermissionDenied`).
+
+Future XR beats will call this from their `onEnter`. The verdict
+semantics let beats route into a fallback beat, silently advance, or
+proceed cleanly without each beat re-implementing the probe-and-route
+dance.
+
+### S3-F: Editor UI
+
+Both **per-beat Requirements editor** and the **ConditionBeat editor
+in the Inspector** gain three new entries in their condition-type
+select (under a new `XR / sensors` optgroup) plus per-type forms:
+
+- `gpsProximity` — lat / lng numeric inputs + radius (metres) + mode
+  dropdown (within / outside).
+- `indoorProximity` — beacon UUID + optional major/minor + min RSSI
+  numeric input. Footer note that Bluetooth scanning ships in v2.
+- `permissionGranted` — checkbox group for the four sensor capabilities
+  (gps / camera / orientation / beacons). Footer note explaining the
+  fail-closed semantic and the requirement for an upstream probe.
+
+### Tests
+
+- 11 new tests in `SensorService.test.ts` (S3 cached-reading getters
+  + permission state API for both Web and Mock).
+- 20 new tests in `XRConditions.test.ts` covering gpsProximity
+  (within / outside / no-cache / invalid-input), indoorProximity
+  (RSSI threshold, beacon major/minor filtering, no-match cases),
+  permissionGranted (empty list, fail-closed default, all-granted,
+  any-denied), and ensureXRPermission (granted path, fallback policy,
+  skip policy, prompt-then-record, no-prompt option, empty-list
+  trivial-grant, unavailable-as-fallback).
+
+Test counts: core 1,443 passing (up from 1,412 in S2; +31 new). All
+packages type-check clean.
+
+### Files
+
+- `packages/core/src/engine/SensorService.ts` (cached getters,
+  permission API, mock injection)
+- `packages/core/src/engine/index.ts` (export new types)
+- `packages/core/src/engine/StoryContext.ts` (permission cache,
+  haversine, three new checkCondition branches)
+- `packages/core/src/types/index.ts` (Condition union + new fields)
+- `packages/core/src/utils/xrPermissions.ts` (new helper)
+- `packages/core/src/utils/index.ts` (export)
+- `packages/core/tests/engine/SensorService.test.ts` (extended)
+- `packages/core/tests/engine/XRConditions.test.ts` (new — 20 tests)
+- `packages/builder/src/editors/RequirementsEditor.tsx` (new condition
+  types + per-type forms)
+- `packages/builder/src/components/Inspector.tsx` (same, in the
+  ConditionBeat block)
+- `docs/XR-Roadmap.md` (mark S3 done)
+
+---
+
 ## 2026-05-04: XR Substrate — LocationSettings + SensorService (S1+S2)
 
 ### Overview

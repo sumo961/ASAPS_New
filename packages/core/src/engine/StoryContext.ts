@@ -5,7 +5,13 @@ import { TimerManager } from './TimerManager';
 import { resolveCharacterKey } from '../utils/characterRef';
 import { resolveCharacterWithVariant, findCharacterVariant } from '../utils/characterVariant';
 import { modulateEmotionDelta } from './PersonalityTraits';
-import { createSensorService, MockSensorService, type SensorService } from './SensorService';
+import {
+  createSensorService,
+  MockSensorService,
+  type SensorService,
+  type SensorPermissionName,
+  type PermissionState,
+} from './SensorService';
 
 /**
  * Inventory entry with quantity support
@@ -195,6 +201,26 @@ function isLiteralBaseline(b: Condition['baseline']): boolean {
 }
 
 /**
+ * Haversine great-circle distance in metres between two lat/lng points.
+ * Used by the `gpsProximity` condition. Mean Earth radius from WGS84
+ * (6,371,008.8m) — accurate to within ±0.5% for any pair of points
+ * (the model assumes a sphere, ignoring Earth's oblateness). Plenty
+ * good for "are you within 50 metres of the meeting point?" checks.
+ */
+function haversineMeters(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number,
+): number {
+  const R = 6_371_008.8;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/**
  * Serializable version of StoryState for save/load functionality
  * Used by the standalone player's save system
  */
@@ -323,6 +349,18 @@ export class StoryContext extends EventEmitter {
    * getSensorService(); they should not construct their own.
    */
   private sensorService: SensorService;
+  /**
+   * Permission state cache (v0.9.48 / S3+). Populated by
+   * `ensureXRPermission` (or any code that calls
+   * `recordPermissionState`) so synchronous condition evaluators
+   * (`permissionGranted`) can branch without awaiting. Keys are the
+   * SensorPermissionName strings; values are the most recent observed
+   * PermissionState. Untouched permissions resolve to undefined and
+   * are treated as "not granted" by the condition evaluator (fail-
+   * closed semantics — a beat that wants to gate on a permission
+   * must run a probe first).
+   */
+  private permissionStateCache = new Map<SensorPermissionName, PermissionState>();
 
   // Debug features
   private debugSession?: DebugSession;
@@ -388,6 +426,27 @@ export class StoryContext extends EventEmitter {
    */
   getSensorService(): SensorService {
     return this.sensorService;
+  }
+
+  /**
+   * Record an observed permission state in the cache. Called by
+   * `ensureXRPermission` and any other code that probes a permission,
+   * so the synchronous `permissionGranted` condition evaluator has a
+   * value to read. Idempotent — overwrites any prior cached value.
+   */
+  recordPermissionState(name: SensorPermissionName, state: PermissionState): void {
+    this.permissionStateCache.set(name, state);
+    this.emit('permissionStateChanged', { name, state });
+  }
+
+  /**
+   * Read a previously-cached permission state. Returns undefined when
+   * the permission has never been probed in this session — synchronous
+   * caller (the condition evaluator) interprets undefined as
+   * not-granted.
+   */
+  getCachedPermissionState(name: SensorPermissionName): PermissionState | undefined {
+    return this.permissionStateCache.get(name);
   }
 
   getVariable(name: string): any {
@@ -1749,6 +1808,68 @@ export class StoryContext extends EventEmitter {
         case '<=': return left <= right;
         default: return false;
       }
+    }
+
+    // ===== XR / sensor conditions (v0.9.48 / S3+) =====
+    // gpsProximity — test player's distance to a target lat/lng against
+    // radiusMeters. Reads the SensorService's last cached location
+    // synchronously (no awaiting). When the cache is empty, the
+    // condition evaluates false (the player can't be near a place we
+    // don't know about; better to fail closed than fire spuriously).
+    if (condition.type === 'gpsProximity') {
+      const targetLat = Number(condition.targetLat ?? NaN);
+      const targetLng = Number(condition.targetLng ?? NaN);
+      const radius = Number(condition.radiusMeters ?? 0);
+      if (Number.isNaN(targetLat) || Number.isNaN(targetLng) || radius <= 0) {
+        console.warn('gpsProximity condition needs targetLat, targetLng, radiusMeters > 0');
+        return false;
+      }
+      const reading = this.sensorService.getLastKnownLocation();
+      if (!reading) return false;
+      const distance = haversineMeters(reading.lat, reading.lng, targetLat, targetLng);
+      const within = distance <= radius;
+      return condition.proximityMode === 'outside' ? !within : within;
+    }
+
+    // indoorProximity — test whether the named beacon is detected with
+    // at least minRssi (signal strength in dBm; closer to 0 = stronger).
+    // No matching beacon in the cache → condition is false.
+    if (condition.type === 'indoorProximity') {
+      const uuid = condition.beaconUuid;
+      const minRssi = Number(condition.minRssi ?? -100);
+      if (!uuid) {
+        console.warn('indoorProximity condition missing beaconUuid');
+        return false;
+      }
+      const beacons = this.sensorService.getLastKnownBeacons();
+      const match = beacons.find((b) => {
+        if (b.uuid !== uuid) return false;
+        if (condition.beaconMajor !== undefined && b.major !== condition.beaconMajor) return false;
+        if (condition.beaconMinor !== undefined && b.minor !== condition.beaconMinor) return false;
+        return true;
+      });
+      if (!match) return false;
+      // RSSI comparison: a beacon at -60 dBm beats a -70 dBm minRssi
+      // threshold (the value is "less negative" / closer to 0).
+      return match.rssi >= minRssi;
+    }
+
+    // permissionGranted — every listed permission must be 'granted'. Reads
+    // the SensorService synchronously by relying on a pre-warmed
+    // permissionStateCache populated whenever permission state is queried
+    // through the engine. Conditions can't await; the cache is the
+    // synchronous read path.
+    if (condition.type === 'permissionGranted') {
+      const requested = condition.permissions || [];
+      if (requested.length === 0) return true;  // empty list → trivially granted
+      for (const p of requested) {
+        const cached = this.permissionStateCache.get(p);
+        // Treat unknown / un-probed permissions as not-granted. A beat
+        // that wants to gate on a permission must have run a probe
+        // (ensureXRPermission) earlier in the story to populate the cache.
+        if (cached !== 'granted') return false;
+      }
+      return true;
     }
 
     // Trim to handle ASML imports that may have leading/trailing whitespace in names

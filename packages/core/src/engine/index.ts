@@ -29,4 +29,6 @@ export type {
   BeaconReading,
   OrientationReading,
   SensorCapabilities,
+  PermissionState,
+  SensorPermissionName,
 } from './SensorService';

@@ -276,6 +276,119 @@ describe('MockSensorService', () => {
 });
 
 // =============================================================================
+// S3 — cached-reading getters
+// =============================================================================
+
+describe('cached-reading getters (S3)', () => {
+  let geo: GeolocationStub;
+  let service: WebSensorService;
+
+  beforeEach(() => {
+    geo = installGeolocationMock();
+    service = new WebSensorService();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('getLastKnownLocation returns null before any reading is observed', () => {
+    expect(service.getLastKnownLocation()).toBeNull();
+  });
+
+  it('getLastKnownLocation returns the latest reading once the watcher fires', () => {
+    service.watchLocation(() => {});  // start the watcher
+    geo.emitSuccess?.({
+      coords: { latitude: 51.5, longitude: -0.1, accuracy: 5, altitude: null, heading: null, speed: null },
+      timestamp: 1_700_000_000_000,
+    });
+    expect(service.getLastKnownLocation()).toEqual(expect.objectContaining({ lat: 51.5, lng: -0.1 }));
+  });
+
+  it('ensureLocationCacheActive starts a watcher with a no-op subscriber', () => {
+    expect(geo.watchPosition).not.toHaveBeenCalled();
+    const unsub = service.ensureLocationCacheActive();
+    expect(geo.watchPosition).toHaveBeenCalledTimes(1);
+    unsub();  // last subscriber leaves; underlying watcher tears down
+    expect(geo.clearWatch).toHaveBeenCalled();
+  });
+
+  it('MockSensorService getLastKnownLocation reflects setMockLocation', () => {
+    const mock = new MockSensorService();
+    expect(mock.getLastKnownLocation()).toBeNull();
+    mock.setMockLocation({ lat: 1, lng: 2, accuracy: 1, timestamp: 0 });
+    expect(mock.getLastKnownLocation()).toEqual(expect.objectContaining({ lat: 1, lng: 2 }));
+  });
+
+  it('MockSensorService getLastKnownOrientation returns the seeded default before any setMockOrientation', () => {
+    const mock = new MockSensorService();
+    const reading = mock.getLastKnownOrientation();
+    expect(reading?.alpha).toBe(0);
+    expect(reading?.absolute).toBe(false);
+  });
+});
+
+// =============================================================================
+// S3 — permission state API
+// =============================================================================
+
+describe('permission state API (S3)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('Mock returns "granted" for every permission by default', async () => {
+    const mock = new MockSensorService();
+    expect(await mock.getPermissionState('gps')).toBe('granted');
+    expect(await mock.getPermissionState('camera')).toBe('granted');
+    expect(await mock.getPermissionState('orientation')).toBe('granted');
+    expect(await mock.getPermissionState('beacons')).toBe('granted');
+  });
+
+  it('Mock honours setMockPermissionState overrides', async () => {
+    const mock = new MockSensorService();
+    mock.setMockPermissionState('gps', 'denied');
+    expect(await mock.getPermissionState('gps')).toBe('denied');
+    expect(await mock.getPermissionState('camera')).toBe('granted');
+  });
+
+  it('Mock requestPermission flips prompt → granted', async () => {
+    const mock = new MockSensorService();
+    mock.setMockPermissionState('gps', 'prompt');
+    const result = await mock.requestPermission('gps');
+    expect(result).toBe('granted');
+    expect(await mock.getPermissionState('gps')).toBe('granted');
+  });
+
+  it('Mock requestPermission preserves prior denied state (no auto-flip)', async () => {
+    const mock = new MockSensorService();
+    mock.setMockPermissionState('camera', 'denied');
+    expect(await mock.requestPermission('camera')).toBe('denied');
+  });
+
+  it('Web reports "unavailable" for capabilities the platform lacks', async () => {
+    vi.stubGlobal('navigator', {});  // no geolocation, no mediaDevices
+    const svc = new WebSensorService();
+    expect(await svc.getPermissionState('gps')).toBe('unavailable');
+    expect(await svc.getPermissionState('camera')).toBe('unavailable');
+    // beacons is always 'unavailable' on Web in v1 (scanBeacons is a stub).
+    expect(await svc.getPermissionState('beacons')).toBe('unavailable');
+  });
+
+  it('Web uses navigator.permissions.query when available', async () => {
+    installGeolocationMock();
+    const queryFn = vi.fn().mockResolvedValue({ state: 'granted' });
+    vi.stubGlobal('navigator', {
+      geolocation: { getCurrentPosition: vi.fn(), watchPosition: vi.fn(), clearWatch: vi.fn() },
+      permissions: { query: queryFn },
+    });
+    const svc = new WebSensorService();
+    expect(await svc.getPermissionState('gps')).toBe('granted');
+    expect(queryFn).toHaveBeenCalledWith({ name: 'geolocation' });
+  });
+});
+
+// =============================================================================
 // createSensorService factory
 // =============================================================================
 

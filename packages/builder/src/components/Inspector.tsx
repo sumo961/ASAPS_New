@@ -1641,6 +1641,11 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <option value="goal">Goal status</option>
                           <option value="characterVariant">Active variant</option>
                         </optgroup>
+                        <optgroup label="XR / sensors">
+                          <option value="gpsProximity">GPS proximity (within / outside radius)</option>
+                          <option value="indoorProximity">Indoor proximity (beacon RSSI)</option>
+                          <option value="permissionGranted">Permission granted</option>
+                        </optgroup>
                       </select>
                     </div>
                     
@@ -2638,6 +2643,134 @@ export const Inspector: React.FC<InspectorProps> = ({
                         </>
                       );
                     })()}
+
+                    {/* ===== XR / sensor ConditionBeat operators (S3+) ===== */}
+                    {localBeat.parameters?.conditionType === 'gpsProximity' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Target Latitude</label>
+                          <input
+                            type="number" step={0.000001}
+                            value={localBeat.parameters?.targetLat ?? 0}
+                            onChange={(e) => handleParameterChange('targetLat', parseFloat(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Target Longitude</label>
+                          <input
+                            type="number" step={0.000001}
+                            value={localBeat.parameters?.targetLng ?? 0}
+                            onChange={(e) => handleParameterChange('targetLng', parseFloat(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Radius (metres)</label>
+                          <input
+                            type="number" min={1} step={1}
+                            value={localBeat.parameters?.radiusMeters ?? 25}
+                            onChange={(e) => handleParameterChange('radiusMeters', parseFloat(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Mode
+                            <span className="text-xs text-gray-500 block">
+                              within = player is inside the radius (you've arrived). outside = player has left the area.
+                            </span>
+                          </label>
+                          <select
+                            value={localBeat.parameters?.proximityMode || 'within'}
+                            onChange={(e) => handleParameterChange('proximityMode', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="within">within radius</option>
+                            <option value="outside">outside radius</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    {localBeat.parameters?.conditionType === 'indoorProximity' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Beacon UUID</label>
+                          <input
+                            type="text"
+                            value={localBeat.parameters?.beaconUuid || ''}
+                            onChange={(e) => handleParameterChange('beaconUuid', e.target.value)}
+                            placeholder="e.g. f7826da6-4fa2-4e98-8024-bc5b71e0893e"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Major</label>
+                            <input
+                              type="number"
+                              value={localBeat.parameters?.beaconMajor ?? ''}
+                              onChange={(e) => handleParameterChange('beaconMajor', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Minor</label>
+                            <input
+                              type="number"
+                              value={localBeat.parameters?.beaconMinor ?? ''}
+                              onChange={(e) => handleParameterChange('beaconMinor', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1" title="Closer to 0 = stronger. -65 ≈ 1m. -85 ≈ 10m.">Min RSSI (dBm)</label>
+                            <input
+                              type="number" step={1}
+                              value={localBeat.parameters?.minRssi ?? -65}
+                              onChange={(e) => handleParameterChange('minRssi', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 italic">
+                          Bluetooth scanning ships in v2 of the XR roadmap. Authoring works now;
+                          runtime relies on a stub on Web until then.
+                        </p>
+                      </>
+                    )}
+
+                    {localBeat.parameters?.conditionType === 'permissionGranted' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Required permissions
+                          <span className="text-xs text-gray-500 block">
+                            All listed permissions must be granted for the condition to evaluate true.
+                            An earlier beat must run a permission probe (ensureXRPermission) for these to be cached.
+                          </span>
+                        </label>
+                        <div className="flex flex-wrap gap-3">
+                          {(['gps', 'camera', 'orientation', 'beacons'] as const).map((p) => {
+                            const list = (localBeat.parameters?.permissions || []) as string[];
+                            const checked = list.includes(p);
+                            return (
+                              <label key={p} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    const next = checked ? list.filter((x) => x !== p) : [...list, p];
+                                    handleParameterChange('permissions', next);
+                                  }}
+                                />
+                                <span>{p}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
 

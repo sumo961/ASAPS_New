@@ -92,7 +92,16 @@ export interface FictionalTime {
 }
 
 export interface Condition {
-  type: 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion' | 'trait' | 'goal' | 'characterVariant';
+  type:
+    | 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare'
+    | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion'
+    | 'trait' | 'goal' | 'characterVariant'
+    // XR / sensor conditions (v0.9.48 / S3+).
+    //   gpsProximity     — branch on player's distance to a GPS target
+    //   indoorProximity  — branch on a beacon's signal strength
+    //   permissionGranted — branch on whether the player has granted the
+    //                       listed sensor permissions
+    | 'gpsProximity' | 'indoorProximity' | 'permissionGranted';
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
   // New canonical field names
   variableName?: string;
@@ -147,6 +156,31 @@ export interface Condition {
   // `value` or `variantId`. Operators: == / !=. An empty / unset
   // variant compares as the empty string.
   variantId?: string;
+  // For gpsProximity conditions (S3+): test the player's distance to a
+  // target lat/lng against `radiusMeters`. `proximityMode` distinguishes
+  // 'within' (player is inside the radius — "you've arrived") from
+  // 'outside' (player is outside — "you've left the area"). When the
+  // SensorService has no cached location yet, the condition evaluates
+  // false (the player can't be near a place we don't know about).
+  targetLat?: number;
+  targetLng?: number;
+  radiusMeters?: number;
+  proximityMode?: 'within' | 'outside';
+  // For indoorProximity conditions (S3+): test whether a specific beacon
+  // is detected with at least the given signal strength. `minRssi` is in
+  // dBm — closer to 0 = stronger signal. -65 dBm ≈ within 1 metre,
+  // -85 dBm ≈ within 10 metres (highly variable). When no cached beacon
+  // matches the uuid, the condition evaluates false.
+  beaconUuid?: string;
+  beaconMajor?: number;
+  beaconMinor?: number;
+  minRssi?: number;
+  // For permissionGranted conditions (S3+): a list of sensor capabilities
+  // that must ALL be 'granted' for the condition to evaluate true. Use to
+  // gate XR beats behind a permission probe ("did the player accept the
+  // GPS prompt?") and route to a fallback when not. Names are the same
+  // strings the SensorService.getPermissionState API takes.
+  permissions?: Array<'gps' | 'camera' | 'orientation' | 'beacons'>;
   /**
    * Baseline-relative comparison switch for the continuous-valued affect
    * conditions (`mood`, `emotion`, `sentiment`). When set, the operator

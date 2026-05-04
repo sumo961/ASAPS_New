@@ -38,3 +38,8 @@ export {
   DEFAULT_PROXY_PORT,
   DEFAULT_AI_TIMEOUT_MS,
 } from './AIProxyHandlers';
+export {
+  ensureXRPermission,
+  type XRPermissionVerdict,
+  type XRPermissionPolicy,
+} from './xrPermissions';

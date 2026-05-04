@@ -47,7 +47,9 @@ interface RequirementsEditorProps {
 }
 
 type CondType = 'inventory' | 'counter' | 'variable' | 'visitedBeat'
-  | 'mood' | 'emotion' | 'trait' | 'sentiment' | 'goal' | 'characterVariant';
+  | 'mood' | 'emotion' | 'trait' | 'sentiment' | 'goal' | 'characterVariant'
+  // XR / sensor condition operators (v0.9.48 / S3+).
+  | 'gpsProximity' | 'indoorProximity' | 'permissionGranted';
 
 /**
  * Render the v0.9.45 "Compared to" baseline switch for an affect
@@ -118,6 +120,7 @@ function condType(c: Condition): CondType {
   if (t === 'counter' || t === 'variable' || t === 'inventory' || t === 'visitedBeat') return t;
   if (t === 'mood' || t === 'emotion' || t === 'trait' || t === 'sentiment'
       || t === 'goal' || t === 'characterVariant') return t;
+  if (t === 'gpsProximity' || t === 'indoorProximity' || t === 'permissionGranted') return t;
   return 'inventory';
 }
 
@@ -184,6 +187,24 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
         break;
       case 'characterVariant':
         newCond = { type: 'characterVariant', operator: '==', character: '', variantId: '' } as any;
+        break;
+      // XR / sensor conditions (S3+).
+      case 'gpsProximity':
+        newCond = {
+          type: 'gpsProximity', operator: '==',
+          targetLat: 0, targetLng: 0, radiusMeters: 25, proximityMode: 'within',
+        } as any;
+        break;
+      case 'indoorProximity':
+        newCond = {
+          type: 'indoorProximity', operator: '==',
+          beaconUuid: '', minRssi: -65,
+        } as any;
+        break;
+      case 'permissionGranted':
+        newCond = {
+          type: 'permissionGranted', operator: '==', permissions: ['gps'],
+        } as any;
         break;
     }
     update(idx, { condition: newCond });
@@ -302,6 +323,11 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                   <option value="sentiment">Sentiment toward target ≷ value</option>
                   <option value="goal">Goal status</option>
                   <option value="characterVariant">Active variant</option>
+                </optgroup>
+                <optgroup label="XR / sensors">
+                  <option value="gpsProximity">GPS proximity (within / outside radius)</option>
+                  <option value="indoorProximity">Indoor proximity (beacon RSSI)</option>
+                  <option value="permissionGranted">Permission granted</option>
                 </optgroup>
               </select>
             </div>
@@ -645,6 +671,127 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                 </>
               );
             })()}
+
+            {/* ===== XR / sensor condition operators (S3+) ===== */}
+            {t === 'gpsProximity' && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-gray-600">
+                    Target lat
+                    <input
+                      type="number" step={0.000001}
+                      value={(cond as any).targetLat ?? 0}
+                      onChange={e => updateCondition(idx, { targetLat: parseFloat(e.target.value) || 0 } as any)}
+                      className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                    />
+                  </label>
+                  <label className="text-xs text-gray-600">
+                    Target lng
+                    <input
+                      type="number" step={0.000001}
+                      value={(cond as any).targetLng ?? 0}
+                      onChange={e => updateCondition(idx, { targetLng: parseFloat(e.target.value) || 0 } as any)}
+                      className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                    />
+                  </label>
+                </div>
+                <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                  <label className="text-xs text-gray-600">
+                    Radius (metres)
+                    <input
+                      type="number" min={1} step={1}
+                      value={(cond as any).radiusMeters ?? 25}
+                      onChange={e => updateCondition(idx, { radiusMeters: parseFloat(e.target.value) || 0 } as any)}
+                      className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                    />
+                  </label>
+                  <select
+                    value={(cond as any).proximityMode || 'within'}
+                    onChange={e => updateCondition(idx, { proximityMode: e.target.value } as any)}
+                    className="self-end px-2 py-1 border border-gray-300 rounded text-xs"
+                    title="within = player is inside the radius (you've arrived); outside = player has left"
+                  >
+                    <option value="within">within radius</option>
+                    <option value="outside">outside radius</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {t === 'indoorProximity' && (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={(cond as any).beaconUuid || ''}
+                  onChange={e => updateCondition(idx, { beaconUuid: e.target.value } as any)}
+                  placeholder="beacon UUID (iBeacon / Eddystone)"
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <label className="text-xs text-gray-600">
+                    Major (optional)
+                    <input
+                      type="number"
+                      value={(cond as any).beaconMajor ?? ''}
+                      onChange={e => updateCondition(idx, { beaconMajor: e.target.value ? parseInt(e.target.value, 10) : undefined } as any)}
+                      className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                    />
+                  </label>
+                  <label className="text-xs text-gray-600">
+                    Minor (optional)
+                    <input
+                      type="number"
+                      value={(cond as any).beaconMinor ?? ''}
+                      onChange={e => updateCondition(idx, { beaconMinor: e.target.value ? parseInt(e.target.value, 10) : undefined } as any)}
+                      className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                    />
+                  </label>
+                  <label className="text-xs text-gray-600">
+                    Min RSSI (dBm)
+                    <input
+                      type="number" step={1}
+                      value={(cond as any).minRssi ?? -65}
+                      onChange={e => updateCondition(idx, { minRssi: parseFloat(e.target.value) || 0 } as any)}
+                      className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      title="Closer to 0 = stronger signal. -65 ≈ within 1m. -85 ≈ within 10m."
+                    />
+                  </label>
+                </div>
+                <p className="text-[10px] text-gray-500 italic">
+                  Bluetooth scanning ships in v2 (with the IndoorLocationBeat).
+                  Authoring works now; runtime relies on a stub on Web.
+                </p>
+              </div>
+            )}
+
+            {t === 'permissionGranted' && (
+              <div className="space-y-1.5">
+                <div className="text-xs text-gray-600">Required permissions (all must be granted)</div>
+                <div className="flex flex-wrap gap-2">
+                  {(['gps', 'camera', 'orientation', 'beacons'] as const).map((p) => {
+                    const list = ((cond as any).permissions || []) as string[];
+                    const checked = list.includes(p);
+                    return (
+                      <label key={p} className="flex items-center gap-1 text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            const next = checked ? list.filter((x) => x !== p) : [...list, p];
+                            updateCondition(idx, { permissions: next } as any);
+                          }}
+                        />
+                        <span>{p}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-gray-500 italic">
+                  Earlier in the story, an XR beat or a setup beat must run a permission probe (ensureXRPermission).
+                  Untouched permissions evaluate as not-granted (fail-closed).
+                </p>
+              </div>
+            )}
 
             {/* Explanation */}
             <div>
