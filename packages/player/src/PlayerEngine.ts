@@ -328,6 +328,19 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
 
       this.engine = new StoryEngine(this.config.renderer);
 
+      // v0.9.48 / S4+ — push the SensorService into renderer state so
+      // XR features (spatial sounds, GPS-beat live position) work in
+      // standalone player / HTML exports. Mirrors what PreviewWindow
+      // does for desktop authoring; here we get the production
+      // WebSensorService via capability detection (no mockMode).
+      // Defensive cast — the renderer interface declares setState
+      // optionally on the IRenderer surface but every concrete
+      // renderer implements it.
+      const ctx = this.engine.getContext();
+      if (ctx?.getSensorService && (this.config.renderer as any).setState) {
+        (this.config.renderer as any).setState('sensorService', ctx.getSensorService());
+      }
+
       // Configure renderer's resolvers using preloaded assets
       this.setupRendererResolvers(story);
 

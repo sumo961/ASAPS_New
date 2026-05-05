@@ -50,8 +50,14 @@ export const MockSensorPanel: React.FC<MockSensorPanelProps> = ({
   stepMeters = 5,
 }) => {
   const caps = sensorService.getCapabilities();
-  const [lat, setLat] = useState<number>(storyOrigin?.lat ?? 0);
-  const [lng, setLng] = useState<number>(storyOrigin?.lng ?? 0);
+  // Prefer the service's seeded reading (PreviewWindow seeds from
+  // LocationSettings.mockLocation at engine-construction time) over
+  // storyOrigin. Without this, the useEffect below would push storyOrigin
+  // back into the service on first render and silently overwrite the
+  // mock-location seed.
+  const seeded = sensorService.getLastKnownLocation?.() ?? null;
+  const [lat, setLat] = useState<number>(seeded?.lat ?? storyOrigin?.lat ?? 0);
+  const [lng, setLng] = useState<number>(seeded?.lng ?? storyOrigin?.lng ?? 0);
   const [alpha, setAlpha] = useState<number>(0);
   const [beta, setBeta] = useState<number>(0);
   const [gamma, setGamma] = useState<number>(0);
@@ -67,8 +73,6 @@ export const MockSensorPanel: React.FC<MockSensorPanelProps> = ({
   }, [sensorService]);
 
   // Push lat/lng changes back to the service whenever the inputs change.
-  // Skip the very first render — useEffect would otherwise re-emit the
-  // initial 0,0 over the just-seeded value.
   useEffect(() => {
     const reading: GpsReading = { lat, lng, accuracy: 5, timestamp: Date.now() };
     sensorService.setMockLocation(reading);

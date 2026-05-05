@@ -25,6 +25,7 @@
     "@asaps/core": "^2.0.0",
     "@photo-sphere-viewer/core": "^5.14.1",
     "@photo-sphere-viewer/markers-plugin": "^5.14.1",
+    "leaflet": "^1.9.4",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
@@ -33,6 +34,7 @@
     "react-dom": "^18.0.0"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",

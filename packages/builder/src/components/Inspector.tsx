@@ -24,6 +24,7 @@ import {
   findConditionTemplate,
   conditionToFlatParams,
 } from '../editors/conditionTemplates';
+import { SpatialPositionEditor, type SpatialPosition } from '../editors/SpatialPositionEditor';
 import { TextFieldWithVariables } from '../editors/TextFieldWithVariables';
 import { useTranslationState, useTranslationActions } from '../contexts/TranslationContext';
 import { getAllTranslationEntriesForBeat } from '../export/StoryTranslator';
@@ -1207,14 +1208,20 @@ export const Inspector: React.FC<InspectorProps> = ({
     beat.showTimer = beatToUpdate.showTimer;
     beat.transition = beatToUpdate.transition;
 
-    // Convert backgroundSound from parameters to proper Sound object
+    // Convert backgroundSound from parameters to proper Sound object.
+    // v0.9.48+ — also propagate spatialPosition (from the
+    // SpatialPositionEditor) onto the Sound so the renderer's spatial
+    // path (BaseRenderer.playSound → AudioManager.playSpatialSound)
+    // picks it up.
     const backgroundSoundId = parametersForUpdate?.backgroundSound;
     if (backgroundSoundId) {
+      const spatial = parametersForUpdate?.backgroundSoundSpatial;
       beat.sound = {
         file: backgroundSoundId,  // For compatibility
         assetId: backgroundSoundId,  // Preferred reference
         volume: beatToUpdate.sound?.volume ?? 1.0,
         loop: beatToUpdate.sound?.loop ?? false,
+        ...(spatial ? { spatialPosition: spatial } : {}),
       };
     } else {
       beat.sound = undefined;
@@ -1514,6 +1521,25 @@ export const Inspector: React.FC<InspectorProps> = ({
                     >
                       Add Background Sound
                     </button>
+                  )}
+                  {/* v0.9.48 / S4+ — directional positioning for the background
+                      sound. Stored at parameters.backgroundSoundSpatial; the
+                      Sound-conversion path below picks it up and threads it
+                      onto beat.sound.spatialPosition. Only shown when there's
+                      an actual sound configured — no point editing spatial
+                      data for a non-existent sound. */}
+                  {localBeat.parameters?.backgroundSound && (
+                    <SpatialPositionEditor
+                      value={localBeat.parameters?.backgroundSoundSpatial as SpatialPosition | undefined}
+                      onChange={(next) => handleParameterChange('backgroundSoundSpatial', next)}
+                      defaultGeoSeed={(() => {
+                        const loc = (globalSettings as any)?.location;
+                        if (loc?.originLat !== undefined && loc?.originLng !== undefined) {
+                          return { lat: loc.originLat, lng: loc.originLng };
+                        }
+                        return undefined;
+                      })()}
+                    />
                   )}
                 </div>
 

@@ -10,7 +10,10 @@ import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 import { isMobileDevice } from '../utils/mobileDetection';
 import { PanoramaView } from '../components/PanoramaView';
-import { MapBeatPlaceholder } from '../components/MapBeatPlaceholder';
+// MapBeatLeaflet replaces the v0.9.48 MapBeatPlaceholder. Same props,
+// real interactive OpenStreetMap tiles + target/player markers + radius
+// circle. Placeholder kept around for fallback / unit tests.
+import { MapBeatLeaflet } from '../components/MapBeatLeaflet';
 
 // ============= SCALED STAGE COMPONENT =============
 // Handles viewport-responsive scaling for the story stage
@@ -2828,7 +2831,7 @@ export class ReactRenderer extends BaseRenderer {
     }
     return new Promise<string>((resolve) => {
       this.renderComponent(
-        <MapBeatPlaceholder
+        <MapBeatLeaflet
           mode={options.mode}
           targetLat={options.targetLat}
           targetLng={options.targetLng}

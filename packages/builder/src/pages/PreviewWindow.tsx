@@ -1381,7 +1381,25 @@ export const PreviewWindow: React.FC = () => {
       // anything else that needs sensor access can read from
       // renderer.getState('sensorService') uniformly. Same pattern as
       // ttsService / sttService above.
-      reactRenderer.setState('sensorService', engine.getContext().getSensorService());
+      const sensorSvc = engine.getContext().getSensorService();
+      reactRenderer.setState('sensorService', sensorSvc);
+
+      // Seed MockSensorService from project's LocationSettings.mockLocation
+      // so the map opens with the player marker at the configured location
+      // instead of defaulting to the target position. StoryContext can't do
+      // this itself — globalSettings live on previewData, not on the Story
+      // object passed to the engine.
+      const mockLoc = (previewData?.settings as any)?.location?.mockLocation;
+      if (mockLoc && typeof mockLoc.lat === 'number' && typeof mockLoc.lng === 'number'
+          && typeof (sensorSvc as any).setMockLocation === 'function') {
+        (sensorSvc as any).setMockLocation({
+          lat: mockLoc.lat,
+          lng: mockLoc.lng,
+          accuracy: 5,
+          timestamp: Date.now(),
+        });
+        console.log('[PreviewWindow] seeded MockSensorService from settings:', mockLoc);
+      }
     }
 
     // Set TTS language from translation settings
@@ -2383,10 +2401,16 @@ export const PreviewWindow: React.FC = () => {
       locationSettings.mockLocation)
   );
   const sensorService = engineRef.current?.getContext()?.getSensorService();
+  // Player-position semantics: mockLocation is "where the simulated player
+  // is right now" (used for desktop testing). originLat/Lng is the project's
+  // geographical anchor (venue center, e.g.) — meaningful for relative-coord
+  // beats but NOT a starting position. Prefer mockLocation; fall back to
+  // origin only when no mock is set.
   const storyOrigin =
-    locationSettings?.originLat !== undefined && locationSettings?.originLng !== undefined
-      ? { lat: locationSettings.originLat, lng: locationSettings.originLng }
-      : locationSettings?.mockLocation;
+    locationSettings?.mockLocation
+      ?? (locationSettings?.originLat !== undefined && locationSettings?.originLng !== undefined
+        ? { lat: locationSettings.originLat, lng: locationSettings.originLng }
+        : undefined);
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
