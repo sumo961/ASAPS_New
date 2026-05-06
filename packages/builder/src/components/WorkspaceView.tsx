@@ -54,6 +54,8 @@ interface WorkspaceViewProps {
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
+  /** Update the indoor venue's beacons array (forwarded to VisualWorkspace for XRFloorPlanEditor). */
+  onUpdateVenueBeacons?: (beacons: Array<{ uuid: string; displayName?: string; x: number; y: number }>) => void;
   characters?: Character[];
   themeAssets?: ThemeAssetUrls | null;
   // Beat context menu actions
@@ -117,6 +119,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onViewBeatDiff,
   onViewBeatHistory,
   onRevertBeat,
+  onUpdateVenueBeacons,
 }) => {
   const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
 
@@ -140,7 +143,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       'aiInfoText',
       'aiDurScreen',
       'keypad',
-      'panorama'
+      'panorama',
+      'gpsLocation',
+      'indoorLocation'
     ];
     return visualBeatTypes.includes(beat.type);
   };
@@ -270,6 +275,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               themeAssets={themeAssets}
               cluster={selectedBeatCluster}
               onSetClusterSharedVisuals={onSetClusterSharedVisuals}
+              onUpdateVenueBeacons={onUpdateVenueBeacons}
             />
           </div>
         )}

@@ -6,6 +6,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
+import { XRMapEditor } from './XRMapEditor';
+import { XRFloorPlanEditor } from './XRFloorPlanEditor';
 type PanoramaViewMode = 'layout' | 'preview';
 import { VisualPropertiesPanel } from './VisualPropertiesPanel';
 import { AnimationPanel } from './AnimationPanel';
@@ -773,6 +775,11 @@ interface VisualWorkspaceProps {
   // Cluster containing this beat (for shared visuals)
   cluster?: Cluster | null;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: SharedVisualContent | undefined) => void;
+  /**
+   * Update the indoor venue's beacons array (project-level settings).
+   * Used by XRFloorPlanEditor when authors drag beacons or add new ones.
+   */
+  onUpdateVenueBeacons?: (beacons: Array<{ uuid: string; displayName?: string; x: number; y: number }>) => void;
 }
 
 export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
@@ -791,6 +798,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   themeAssets,
   cluster,
   onSetClusterSharedVisuals,
+  onUpdateVenueBeacons,
 }) => {
   const [visualElements, setVisualElements] = useState<VisualElement[]>([]);
   const [backgroundAssetId, setBackgroundAssetId] = useState<string>('');
@@ -3799,6 +3807,71 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     onSetClusterSharedVisuals(cluster.id, newSharedVisuals);
     console.log('[VisualWorkspace] Shared element to cluster:', elementToShare.name, cluster.name);
   }, [cluster, onSetClusterSharedVisuals, selectedElementId, visualElements]);
+
+  // XR beats use dedicated visual editors (Leaflet map for GPS, SVG floor
+  // plan for indoor). Short-circuit the standard pipeline since their data
+  // model is location entries, not stage-positioned visual elements.
+  if (beat && (beat.type === 'gpsLocation' || beat.type === 'indoorLocation')) {
+    const params = (beat.getParameters?.() ?? {}) as any;
+    const xrLocations: any[] = Array.isArray(params.xrLocations) ? params.xrLocations : [];
+    const beatRadius: number | undefined = params.radiusMeters;
+    const projectDefault = (globalSettings as any)?.location?.defaultProximityRadiusM as number | undefined;
+    const availableTargets = beats.filter((b: any) => b.id !== beat.id).map((b: any) => ({
+      id: b.id,
+      name: b.name,
+    }));
+    const writeLocations = (next: any[]) => {
+      const updated = (beat as any).getParameters?.() ?? {};
+      onBeatUpdate?.(beat.id, { parameters: { ...updated, xrLocations: next } } as any);
+    };
+    if (beat.type === 'gpsLocation') {
+      const loc = (globalSettings as any)?.location;
+      const storyOrigin = loc?.originLat !== undefined && loc?.originLng !== undefined
+        ? { lat: loc.originLat, lng: loc.originLng }
+        : (loc?.mockLocation || undefined);
+      return (
+        <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+          <XRMapEditor
+            locations={xrLocations}
+            beatRadiusMeters={beatRadius}
+            projectDefaultRadius={projectDefault}
+            mapStyle={params.mapStyle}
+            availableTargets={availableTargets}
+            storyOrigin={storyOrigin}
+            onChange={writeLocations}
+          />
+        </div>
+      );
+    }
+    // indoorLocation
+    const venueRaw = (globalSettings as any)?.location?.venue as
+      | { name?: string; floorPlan?: string; floorWidth: number; floorHeight: number;
+          beacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }> }
+      | undefined;
+    const venueBeacons = venueRaw?.beacons || [];
+    const floorPlanUrl = venueRaw?.floorPlan
+      ? assets.find((a: any) => a.id === venueRaw.floorPlan)?.url
+      : undefined;
+    return (
+      <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+        <XRFloorPlanEditor
+          locations={xrLocations}
+          beatRadiusMeters={beatRadius}
+          projectDefaultRadius={projectDefault}
+          venueBeacons={venueBeacons}
+          venue={venueRaw ? {
+            name: venueRaw.name,
+            floorPlanUrl,
+            floorWidth: venueRaw.floorWidth,
+            floorHeight: venueRaw.floorHeight,
+          } : undefined}
+          availableTargets={availableTargets}
+          onLocationsChange={writeLocations}
+          onVenueBeaconsChange={(next) => onUpdateVenueBeacons?.(next)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex bg-gray-100 relative">

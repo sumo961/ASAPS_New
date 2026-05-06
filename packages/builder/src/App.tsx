@@ -5480,6 +5480,18 @@ function App() {
                 markChanged();
               }
             }}
+            onUpdateVenueBeacons={(beacons) => {
+              applyGlobalSettingsChange({
+                ...globalSettings,
+                location: {
+                  ...((globalSettings as any).location || {}),
+                  venue: {
+                    ...((globalSettings as any).location?.venue || {}),
+                    beacons,
+                  },
+                },
+              } as any);
+            }}
             characters={characters}
             themeAssets={themeAssets}
             onBeatDuplicate={handleBeatDuplicate}
