@@ -23,6 +23,9 @@ export interface XRLocationEntry {
   lat?: number;
   lng?: number;
   beaconUuid?: string;
+  /** Indoor floor-plan position (metres from top-left). */
+  x?: number;
+  y?: number;
   radiusMeters?: number;
   target: string;
   effects?: Effect[];
@@ -282,10 +285,40 @@ export const XRLocationsEditor: React.FC<XRLocationsEditorProps> = ({
             </div>
           )}
 
+          {/* Floor-plan position (indoor only — metres from top-left). */}
+          {flavour === 'indoor' && (
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-[11px] text-gray-600">
+                x (metres from left)
+                <input
+                  type="number"
+                  step="0.1"
+                  value={loc.x ?? ''}
+                  onChange={(e) => updateLocation(index, {
+                    x: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')),
+                  })}
+                  className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                />
+              </label>
+              <label className="block text-[11px] text-gray-600">
+                y (metres from top)
+                <input
+                  type="number"
+                  step="0.1"
+                  value={loc.y ?? ''}
+                  onChange={(e) => updateLocation(index, {
+                    y: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')),
+                  })}
+                  className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                />
+              </label>
+            </div>
+          )}
+
           {/* Per-location radius (optional override) */}
           <div>
             <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
-              Radius override (metres) — leave blank to inherit beat default
+              Radius for this location (leave blank to inherit beat default)
             </label>
             <input
               type="number"

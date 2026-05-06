@@ -17,11 +17,19 @@ import { ensureXRPermission } from '../utils/xrPermissions';
 export interface IndoorLocationBeatParameters {
   mode?: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
   /**
-   * Multi-location array. Each entry has a beaconUuid + target + effects.
-   * Named `xrLocations` (not `locations`) to avoid clashing with
-   * BeatConfig.locations.
+   * Multi-location array. Each entry has a beaconUuid + x/y + target +
+   * effects. x/y are floor-plan coordinates in metres (top-left origin)
+   * — independent of the beacon's physical UUID identity.
    */
   xrLocations?: XRLocationEntry[];
+  /**
+   * Beat-level floor plan (v0.9.49+). When set, replaces the project's
+   * venue settings for this beat. Authors can have many indoor beats,
+   * each with its own room/floor/scale.
+   */
+  floorPlanAssetId?: string;
+  floorWidthM?: number;
+  floorHeightM?: number;
   /** Display-mode continue / timeout / skip target. */
   defaultTarget?: string;
   /** Beat-level radius default — used when a location doesn't override. */
@@ -30,16 +38,18 @@ export interface IndoorLocationBeatParameters {
   buttonText?: string;
   cancelButtonText?: string;
   timeoutMs?: number;
-  /** @deprecated use `locations[0].beaconUuid`. Kept for backward compat. */
+  /** @deprecated use `xrLocations[0].beaconUuid`. Kept for backward compat. */
   targetBeaconUuid?: string;
 }
 
 export class IndoorLocationBeat extends Beat {
   public mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
   // Renamed from `locations` to avoid clashing with Beat.locations
-  // (the legacy Map<string, Location> on the base class). Serialized
-  // parameter key is still `locations`.
+  // (the legacy Map<string, Location> on the base class).
   public xrLocations?: XRLocationEntry[];
+  public floorPlanAssetId?: string;
+  public floorWidthM?: number;
+  public floorHeightM?: number;
   public defaultTarget?: string;
   public radiusMeters?: number;
   public text?: string;
@@ -55,6 +65,9 @@ export class IndoorLocationBeat extends Beat {
     const p = (config.parameters || {}) as Partial<IndoorLocationBeatParameters>;
     this.mode = (config as any).mode ?? p.mode ?? 'display';
     this.xrLocations = (config as any).xrLocations ?? p.xrLocations;
+    this.floorPlanAssetId = (config as any).floorPlanAssetId ?? p.floorPlanAssetId;
+    this.floorWidthM = (config as any).floorWidthM ?? p.floorWidthM;
+    this.floorHeightM = (config as any).floorHeightM ?? p.floorHeightM;
     this.defaultTarget = (config as any).defaultTarget ?? p.defaultTarget;
     this.radiusMeters = (config as any).radiusMeters ?? p.radiusMeters;
     this.text = (config as any).text ?? p.text;
@@ -68,6 +81,9 @@ export class IndoorLocationBeat extends Beat {
     return {
       mode: this.mode,
       ...(this.xrLocations !== undefined ? { xrLocations: this.xrLocations } : {}),
+      ...(this.floorPlanAssetId !== undefined ? { floorPlanAssetId: this.floorPlanAssetId } : {}),
+      ...(this.floorWidthM !== undefined ? { floorWidthM: this.floorWidthM } : {}),
+      ...(this.floorHeightM !== undefined ? { floorHeightM: this.floorHeightM } : {}),
       ...(this.defaultTarget !== undefined ? { defaultTarget: this.defaultTarget } : {}),
       ...(this.radiusMeters !== undefined ? { radiusMeters: this.radiusMeters } : {}),
       ...(this.text !== undefined ? { text: this.text } : {}),
@@ -81,6 +97,9 @@ export class IndoorLocationBeat extends Beat {
   updateParameters(params: Record<string, any>): void {
     if (params.mode !== undefined) this.mode = params.mode;
     if (params.xrLocations !== undefined) this.xrLocations = params.xrLocations;
+    if (params.floorPlanAssetId !== undefined) this.floorPlanAssetId = params.floorPlanAssetId;
+    if (params.floorWidthM !== undefined) this.floorWidthM = params.floorWidthM;
+    if (params.floorHeightM !== undefined) this.floorHeightM = params.floorHeightM;
     if (params.defaultTarget !== undefined) this.defaultTarget = params.defaultTarget;
     if (params.radiusMeters !== undefined) this.radiusMeters = params.radiusMeters;
     if (params.text !== undefined) this.text = params.text;
@@ -171,12 +190,23 @@ export class IndoorLocationBeat extends Beat {
     }
 
     const projectDefault = locationSettings?.defaultProximityRadiusM ?? 5;
-    const renderLocations = valid.map((loc) => ({
-      id: loc.id,
-      name: loc.name,
-      beaconUuid: loc.beaconUuid!,
-      radiusMeters: loc.radiusMeters ?? this.radiusMeters ?? projectDefault,
-    }));
+    // Resolve x/y per location. Prefer the location's own x/y (v0.9.49+
+    // beat-level model). Fall back to the project's beacon registry when
+    // the location predates that field — same beacon id appearing at the
+    // same fixed position. Default to (0, 0) if neither has it; the
+    // renderer will still draw, just centred.
+    const projectBeacons = locationSettings?.venue?.beacons || [];
+    const renderLocations = valid.map((loc) => {
+      const fallback = projectBeacons.find((b) => b.uuid === loc.beaconUuid);
+      return {
+        id: loc.id,
+        name: loc.name,
+        beaconUuid: loc.beaconUuid!,
+        x: loc.x ?? fallback?.x ?? 0,
+        y: loc.y ?? fallback?.y ?? 0,
+        radiusMeters: loc.radiusMeters ?? this.radiusMeters ?? projectDefault,
+      };
+    });
 
     const unsubscribe = context.getSensorService().ensureBeaconCacheActive();
     (renderer as any).setState?.('sensorService', context.getSensorService());
@@ -187,14 +217,26 @@ export class IndoorLocationBeat extends Beat {
         console.warn(`[IndoorLocationBeat ${this.id}] renderer doesn't implement renderIndoorMap — advancing`);
         return this.getNextBeat(context);
       }
-      const venue = locationSettings?.venue
+      // Beat-level venue wins; project venue is the fallback so existing
+      // single-venue stories keep working without per-beat reconfiguration.
+      const beatHasVenue = !!this.floorPlanAssetId
+        || this.floorWidthM !== undefined
+        || this.floorHeightM !== undefined;
+      const venue = beatHasVenue
         ? {
-            name: locationSettings.venue.name,
-            floorPlanAssetId: locationSettings.venue.floorPlan,
-            floorWidth: locationSettings.venue.floorWidth,
-            floorHeight: locationSettings.venue.floorHeight,
+            name: undefined,
+            floorPlanAssetId: this.floorPlanAssetId,
+            floorWidth: this.floorWidthM ?? locationSettings?.venue?.floorWidth ?? 20,
+            floorHeight: this.floorHeightM ?? locationSettings?.venue?.floorHeight ?? 20,
           }
-        : undefined;
+        : locationSettings?.venue
+          ? {
+              name: locationSettings.venue.name,
+              floorPlanAssetId: locationSettings.venue.floorPlan,
+              floorWidth: locationSettings.venue.floorWidth,
+              floorHeight: locationSettings.venue.floorHeight,
+            }
+          : undefined;
       result = await renderer.renderIndoorMap({
         mode: this.mode,
         locations: renderLocations,
@@ -203,7 +245,6 @@ export class IndoorLocationBeat extends Beat {
         cancelButtonText: this.cancelButtonText,
         timeoutMs: this.timeoutMs,
         venue,
-        beacons: locationSettings?.venue?.beacons,
       });
     } finally {
       unsubscribe();

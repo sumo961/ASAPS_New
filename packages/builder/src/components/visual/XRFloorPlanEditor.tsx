@@ -1,30 +1,40 @@
 /**
  * XRFloorPlanEditor (v0.9.49+) — Visual Editor for IndoorLocationBeat.
  *
- * SVG-based authoring surface that renders the project's floor plan
- * with venue beacons as draggable dots. Beacons referenced by this
- * beat's locations are highlighted (red halo + radius ring); other
- * venue beacons are grey "available" dots.
+ * Beat-level model: each indoor beat carries its own floor plan + dimensions,
+ * and each location has its own (x, y) on that floor plan. Locations
+ * reference physical beacons by UUID (for runtime proximity matching),
+ * but the visual position is per-beat — the same beacon can appear at
+ * different x/y on different beats' floor plans.
  *
- * Two scopes mixed in one canvas:
- *   - Beacon positions (x/y in metres) are venue-level — dragging
- *     a beacon updates globalSettings.location.venue.beacons[i] and
- *     affects every indoor beat that references that beacon.
- *   - Location selection + per-location radius are beat-level — only
- *     this beat changes when the author edits them.
+ * Interactions:
+ *   - Click empty floor plan → adds a new location at that point with
+ *     an auto-name and empty beaconUuid; author picks the beacon in
+ *     Properties.
+ *   - Drag a location marker → updates its x/y on this beat.
+ *   - Click a location marker → selects it; Inspector pans to its row.
+ *   - Selection sync via window CustomEvents (matches XRMapEditor).
  *
- * Click a grey beacon → adds it to this beat's locations.
- * Click a red beacon → opens the inline panel (name / target / radius / delete).
- * Drag any beacon → updates venue position (with a small "venue-level" badge).
- * "Add new beacon" button → creates a venue beacon at the floor-plan
- *   centre with a generated UUID and adds it as a location.
+ * Data scope is purely beat-level. Project-venue settings provide the
+ * floor plan / dimensions when this beat hasn't overridden them.
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Wifi, Plus } from 'lucide-react';
+import { Wifi, Plus, Maximize2 } from 'lucide-react';
 
-/** Compute the next "Location N" auto-name. Same logic as the GPS editor. */
-function nextLocationName(locations: Array<{ name?: string }>): string {
+interface XRLocation {
+  id: string;
+  name?: string;
+  beaconUuid?: string;
+  x?: number;
+  y?: number;
+  radiusMeters?: number;
+  target?: string;
+  effects?: any[];
+}
+
+/** Compute the next "Location N" auto-name. */
+function nextLocationName(locations: XRLocation[]): string {
   let max = 0;
   for (const loc of locations) {
     const m = (loc.name || '').match(/^Location\s+(\d+)$/i);
@@ -36,20 +46,8 @@ function nextLocationName(locations: Array<{ name?: string }>): string {
   return `Location ${max + 1}`;
 }
 
-interface XRLocation {
-  id: string;
-  name?: string;
-  beaconUuid?: string;
-  radiusMeters?: number;
-  target?: string;
-  effects?: any[];
-}
-
-interface VenueBeacon {
-  uuid: string;
-  displayName?: string;
-  x: number;
-  y: number;
+function makeLocId(): string {
+  return `loc_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
 }
 
 interface XRFloorPlanEditorProps {
@@ -58,38 +56,18 @@ interface XRFloorPlanEditorProps {
   /** Beat-level radius default. */
   beatRadiusMeters?: number;
   projectDefaultRadius?: number;
-  /** All venue beacons (project-level). */
-  venueBeacons: VenueBeacon[];
   /** Floor-plan dimensions in metres + resolved image URL. */
   venue?: { name?: string; floorPlanUrl?: string; floorWidth: number; floorHeight: number };
   /** Update this beat's locations. */
   onLocationsChange: (next: XRLocation[]) => void;
-  /** Update the venue's beacons array (project-level). */
-  onVenueBeaconsChange: (next: VenueBeacon[]) => void;
-}
-
-function makeLocId(): string {
-  return `loc_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
-}
-function makeUuid(): string {
-  if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
-    return (crypto as any).randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 }
 
 export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
   locations,
   beatRadiusMeters,
   projectDefaultRadius,
-  venueBeacons,
   venue,
   onLocationsChange,
-  onVenueBeaconsChange,
 }) => {
   const fallbackRadius = beatRadiusMeters ?? projectDefaultRadius ?? 5;
   const floorWidth = venue?.floorWidth ?? 20;
@@ -97,24 +75,20 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
-  // Drag state — null when not dragging.
-  const [dragging, setDragging] = useState<{ uuid: string; pointerId: number } | null>(null);
-  // Latest locations + venueBeacons in refs so window-event handlers always
-  // see the current values without re-binding.
+  const [dragging, setDragging] = useState<{ locId: string; pointerId: number } | null>(null);
+
+  // Refs so window-event handlers see the latest values.
   const locationsRef = useRef(locations);
   locationsRef.current = locations;
+  const onLocationsChangeRef = useRef(onLocationsChange);
+  onLocationsChangeRef.current = onLocationsChange;
 
-  const targetBeaconUuids = useMemo(
-    () => new Set(locations.map((l) => l.beaconUuid).filter((x): x is string => !!x)),
-    [locations],
+  const selectedLoc = useMemo(
+    () => locations.find((l) => l.id === selectedLocId) || null,
+    [locations, selectedLocId],
   );
 
-  const selectedLoc = locations.find((l) => l.id === selectedLocId) || null;
-  const selectedBeacon = selectedLoc?.beaconUuid
-    ? venueBeacons.find((b) => b.uuid === selectedLoc.beaconUuid)
-    : null;
-
-  // Inspector → VE focus events. Same protocol as XRMapEditor.
+  // Inspector → VE focus events.
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { id: string } | undefined;
@@ -125,7 +99,6 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
     return () => window.removeEventListener('asaps:xr-focus-location', handler);
   }, []);
 
-  // Helper to dispatch VE → Inspector selection.
   const announceSelection = (id: string | null) => {
     setSelectedLocId(id);
     if (id) {
@@ -135,7 +108,7 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
     }
   };
 
-  // Convert mouse-event client coords to floor-plan metric coords.
+  // Convert a pointer event to floor-plan metric coords.
   const eventToMetres = (e: React.PointerEvent | PointerEvent): { x: number; y: number } | null => {
     const svg = svgRef.current;
     if (!svg) return null;
@@ -148,7 +121,7 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
     return { x: transformed.x, y: transformed.y };
   };
 
-  // Pointer-move while dragging — update venue beacon position live.
+  // Pointer-move while dragging a marker — update the location's own x/y.
   useEffect(() => {
     if (!dragging) return;
     const onMove = (e: PointerEvent) => {
@@ -158,8 +131,8 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
         x: Math.max(0, Math.min(floorWidth, pos.x)),
         y: Math.max(0, Math.min(floorHeight, pos.y)),
       };
-      onVenueBeaconsChange(
-        venueBeacons.map((b) => b.uuid === dragging.uuid ? { ...b, ...clamped } : b),
+      onLocationsChangeRef.current(
+        locationsRef.current.map((l) => l.id === dragging.locId ? { ...l, ...clamped } : l),
       );
     };
     const onUp = () => setDragging(null);
@@ -171,239 +144,183 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [dragging, venueBeacons, onVenueBeaconsChange, floorWidth, floorHeight]);
+  }, [dragging, floorWidth, floorHeight]);
 
-  const onBeaconPointerDown = (e: React.PointerEvent, uuid: string) => {
+  const onMarkerPointerDown = (e: React.PointerEvent, locId: string) => {
     e.stopPropagation();
     (e.target as Element).setPointerCapture?.(e.pointerId);
-    setDragging({ uuid, pointerId: e.pointerId });
+    setDragging({ locId, pointerId: e.pointerId });
   };
-  const onBeaconClick = (e: React.MouseEvent, beacon: VenueBeacon) => {
+  const onMarkerClick = (e: React.MouseEvent, locId: string) => {
     e.stopPropagation();
-    if (targetBeaconUuids.has(beacon.uuid)) {
-      // Already a location — select it (and broadcast to Inspector)
-      const loc = locations.find((l) => l.beaconUuid === beacon.uuid);
-      if (loc) announceSelection(loc.id);
-    } else {
-      // Add as a new location with auto-name; the beacon's display name
-      // is preferred over a generic "Location N" so the row is recognizable.
-      const fresh: XRLocation = {
-        id: makeLocId(),
-        name: beacon.displayName || nextLocationName(locationsRef.current),
-        beaconUuid: beacon.uuid,
-        target: '',
-      };
-      onLocationsChange([...locations, fresh]);
-      announceSelection(fresh.id);
-    }
+    announceSelection(locId);
   };
-  const addNewBeaconAtCentre = () => {
-    const uuid = makeUuid();
-    const newBeacon: VenueBeacon = {
-      uuid,
-      displayName: `Beacon ${venueBeacons.length + 1}`,
-      x: floorWidth / 2,
-      y: floorHeight / 2,
-    };
-    onVenueBeaconsChange([...venueBeacons, newBeacon]);
+
+  /** Click empty floor plan → add new location at click point. */
+  const onSvgClick = (e: React.MouseEvent) => {
+    if (dragging) return;
+    const pos = eventToMetres(e as any);
+    if (!pos) return;
     const fresh: XRLocation = {
       id: makeLocId(),
-      name: newBeacon.displayName,
-      beaconUuid: uuid,
+      name: nextLocationName(locationsRef.current),
+      x: Math.max(0, Math.min(floorWidth, pos.x)),
+      y: Math.max(0, Math.min(floorHeight, pos.y)),
       target: '',
     };
     onLocationsChange([...locations, fresh]);
     announceSelection(fresh.id);
   };
 
-  const radiusFor = (loc: XRLocation) => loc.radiusMeters ?? fallbackRadius;
+  const addAtCentre = () => {
+    const fresh: XRLocation = {
+      id: makeLocId(),
+      name: nextLocationName(locationsRef.current),
+      x: floorWidth / 2,
+      y: floorHeight / 2,
+      target: '',
+    };
+    onLocationsChange([...locations, fresh]);
+    announceSelection(fresh.id);
+  };
 
-  // Stroke widths scale with floor width so they look consistent at any aspect.
+  // Stroke widths scale with floor dimensions for consistent look.
   const strokeMain = Math.max(0.05, floorWidth / 400);
   const strokeFine = Math.max(0.03, floorWidth / 600);
   const dotR = Math.max(0.2, floorWidth / 150);
   const haloR = Math.max(0.4, floorWidth / 80);
-  const greyDotR = Math.max(0.15, floorWidth / 200);
   const labelSize = Math.max(0.4, floorWidth / 50);
 
+  const radiusFor = (loc: XRLocation) => loc.radiusMeters ?? fallbackRadius;
+
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
-      <div style={{ flex: 1, minWidth: 0, height: '100%', position: 'relative', background: '#0f172a' }}>
-        {/* Floor plan + beacons SVG */}
+    <div style={{ position: 'absolute', inset: 0 }}>
+      <div
+        style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16, background: '#0f172a',
+        }}
+      >
         <div
           style={{
-            position: 'absolute', inset: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 16,
+            background: 'white',
+            aspectRatio: `${floorWidth} / ${floorHeight}`,
+            width: 'min(95%, 1200px)',
+            maxHeight: '100%',
+            position: 'relative',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            borderRadius: 8,
+            overflow: 'hidden',
           }}
         >
-          {venueBeacons.length === 0 ? (
-            <div className="text-center text-amber-50 bg-amber-900/40 border border-amber-600 rounded-lg p-6 max-w-md">
-              <div className="font-medium mb-2">No venue beacons configured yet</div>
-              <div className="text-xs text-amber-100">
-                Add beacons here or in Project Settings → Location & XR → Indoor venue.
-              </div>
-              <button
-                type="button"
-                onClick={addNewBeaconAtCentre}
-                className="mt-3 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 inline-flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" />
-                Add first beacon
-              </button>
-            </div>
-          ) : (
-            <div
+          {venue?.floorPlanUrl && (
+            <img
+              src={venue.floorPlanUrl}
+              alt={venue.name || 'Floor plan'}
               style={{
-                background: 'white',
-                aspectRatio: `${floorWidth} / ${floorHeight}`,
-                width: 'min(95%, 1200px)',
-                maxHeight: '100%',
-                position: 'relative',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-                borderRadius: 8,
-                overflow: 'hidden',
+                position: 'absolute', inset: 0, width: '100%', height: '100%',
+                objectFit: 'contain', pointerEvents: 'none',
               }}
-            >
-              {venue?.floorPlanUrl && (
-                <img
-                  src={venue.floorPlanUrl}
-                  alt={venue.name || 'Floor plan'}
-                  style={{
-                    position: 'absolute', inset: 0, width: '100%', height: '100%',
-                    objectFit: 'contain', pointerEvents: 'none',
-                  }}
-                />
-              )}
-              <svg
-                ref={svgRef}
-                viewBox={`0 0 ${floorWidth} ${floorHeight}`}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'default' }}
-                preserveAspectRatio="xMidYMid meet"
-              >
-                {/* Per-target radius rings */}
-                {locations.map((loc) => {
-                  const beacon = venueBeacons.find((b) => b.uuid === loc.beaconUuid);
-                  if (!beacon) return null;
-                  return (
-                    <circle
-                      key={`ring-${loc.id}`}
-                      cx={beacon.x}
-                      cy={beacon.y}
-                      r={radiusFor(loc)}
-                      fill={loc.id === selectedLocId ? 'rgba(22,163,74,0.10)' : 'rgba(220,38,38,0.10)'}
-                      stroke={loc.id === selectedLocId ? '#16a34a' : '#dc2626'}
-                      strokeWidth={strokeMain}
-                      strokeDasharray={`${floorWidth / 100} ${floorWidth / 200}`}
-                      pointerEvents="none"
-                    />
-                  );
-                })}
-
-                {/* Beacons. Order: grey first, red on top so they're easier to grab. */}
-                {venueBeacons.filter((b) => !targetBeaconUuids.has(b.uuid)).map((beacon) => (
-                  <g key={`grey-${beacon.uuid}`}>
-                    <circle
-                      cx={beacon.x}
-                      cy={beacon.y}
-                      r={greyDotR}
-                      fill="#94a3b8"
-                      stroke="#fff"
-                      strokeWidth={strokeFine}
-                      style={{ cursor: dragging ? 'grabbing' : 'grab' }}
-                      onPointerDown={(e) => onBeaconPointerDown(e, beacon.uuid)}
-                      onClick={(e) => onBeaconClick(e, beacon)}
-                    />
-                    {beacon.displayName && (
-                      <text
-                        x={beacon.x}
-                        y={beacon.y - greyDotR - labelSize * 0.3}
-                        fontSize={labelSize * 0.7}
-                        fill="#475569"
-                        textAnchor="middle"
-                        style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: floorWidth / 400, pointerEvents: 'none' }}
-                      >
-                        {beacon.displayName}
-                      </text>
-                    )}
-                  </g>
-                ))}
-                {venueBeacons.filter((b) => targetBeaconUuids.has(b.uuid)).map((beacon) => {
-                  const loc = locations.find((l) => l.beaconUuid === beacon.uuid);
-                  const isSelected = loc?.id === selectedLocId;
-                  return (
-                    <g key={`target-${beacon.uuid}`}>
-                      <circle
-                        cx={beacon.x}
-                        cy={beacon.y}
-                        r={haloR}
-                        fill={isSelected ? 'rgba(22,163,74,0.25)' : 'rgba(220,38,38,0.25)'}
-                        pointerEvents="none"
-                      />
-                      <circle
-                        cx={beacon.x}
-                        cy={beacon.y}
-                        r={dotR}
-                        fill={isSelected ? '#16a34a' : '#dc2626'}
-                        stroke="#fff"
-                        strokeWidth={strokeMain}
-                        style={{ cursor: dragging ? 'grabbing' : 'grab' }}
-                        onPointerDown={(e) => onBeaconPointerDown(e, beacon.uuid)}
-                        onClick={(e) => onBeaconClick(e, beacon)}
-                      />
-                      {(loc?.name || beacon.displayName) && (
-                        <text
-                          x={beacon.x}
-                          y={beacon.y - haloR - labelSize * 0.2}
-                          fontSize={labelSize}
-                          fill="#1f2937"
-                          textAnchor="middle"
-                          style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: floorWidth / 200, pointerEvents: 'none' }}
-                        >
-                          {loc?.name || beacon.displayName}
-                        </text>
-                      )}
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
+            />
           )}
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${floorWidth} ${floorHeight}`}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'crosshair' }}
+            preserveAspectRatio="xMidYMid meet"
+            onClick={onSvgClick}
+          >
+            {locations.map((loc) => {
+              if (loc.x === undefined || loc.y === undefined) return null;
+              const isSelected = loc.id === selectedLocId;
+              return (
+                <g key={loc.id}>
+                  <circle
+                    cx={loc.x}
+                    cy={loc.y}
+                    r={radiusFor(loc)}
+                    fill={isSelected ? 'rgba(22,163,74,0.10)' : 'rgba(220,38,38,0.10)'}
+                    stroke={isSelected ? '#16a34a' : '#dc2626'}
+                    strokeWidth={strokeMain}
+                    strokeDasharray={`${floorWidth / 100} ${floorWidth / 200}`}
+                    pointerEvents="none"
+                  />
+                  <circle
+                    cx={loc.x}
+                    cy={loc.y}
+                    r={haloR}
+                    fill={isSelected ? 'rgba(22,163,74,0.25)' : 'rgba(220,38,38,0.25)'}
+                    pointerEvents="none"
+                  />
+                  <circle
+                    cx={loc.x}
+                    cy={loc.y}
+                    r={dotR}
+                    fill={isSelected ? '#16a34a' : '#dc2626'}
+                    stroke="#fff"
+                    strokeWidth={strokeFine}
+                    style={{ cursor: dragging ? 'grabbing' : 'grab' }}
+                    onPointerDown={(e) => onMarkerPointerDown(e, loc.id)}
+                    onClick={(e) => onMarkerClick(e, loc.id)}
+                  />
+                  {loc.name && (
+                    <text
+                      x={loc.x}
+                      y={loc.y - haloR - labelSize * 0.2}
+                      fontSize={labelSize}
+                      fill={isSelected ? '#15803d' : '#1f2937'}
+                      textAnchor="middle"
+                      style={{
+                        paintOrder: 'stroke',
+                        stroke: 'white',
+                        strokeWidth: floorWidth / 200,
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      {loc.name}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
         </div>
+      </div>
 
-        {/* Top-left HUD: counts + add beacon button */}
-        <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>
-          <div className="bg-white/95 shadow-md rounded-lg px-3 py-2 text-xs space-y-1">
-            <div className="flex items-center gap-2 font-medium text-gray-800">
-              <Wifi className="w-3.5 h-3.5 text-red-600" />
-              {locations.length} location{locations.length === 1 ? '' : 's'}
-              <span className="text-gray-400">·</span>
-              <span className="text-gray-600">{venueBeacons.length} venue beacon{venueBeacons.length === 1 ? '' : 's'}</span>
-            </div>
-            <div className="text-gray-600">
-              Click a grey beacon to add it. Drag any beacon to reposition.
-            </div>
+      {/* Top-left HUD */}
+      <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>
+        <div className="bg-white/95 shadow-md rounded-lg px-3 py-2 text-xs space-y-1.5">
+          <div className="flex items-center gap-2 font-medium text-gray-800">
+            <Wifi className="w-3.5 h-3.5 text-red-600" />
+            {locations.length} location{locations.length === 1 ? '' : 's'}
+            <span className="text-gray-400">·</span>
+            <span className="text-gray-600">
+              {floorWidth}m × {floorHeight}m
+            </span>
+          </div>
+          <div className="text-gray-600">
+            Click empty floor to add. Drag markers to move. Edit names, beacon UUIDs, targets, and effects in Properties.
+          </div>
+          <div className="flex gap-1.5">
             <button
               type="button"
-              onClick={addNewBeaconAtCentre}
+              onClick={addAtCentre}
               className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700 inline-flex items-center gap-1"
             >
               <Plus className="w-3 h-3" />
-              Add new beacon
+              Add at centre
             </button>
           </div>
         </div>
       </div>
 
-      {/* Top-right HUD — selection indicator. The full edit form lives in
-          the Properties tab; this is just a "you're editing X" pill. */}
+      {/* Top-right selection pill */}
       {selectedLoc && (
         <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
           <div className="bg-green-50 border border-green-300 shadow-md rounded-lg px-3 py-1.5 text-xs">
             <span className="font-medium text-green-900">Selected:</span>{' '}
-            <span className="text-green-800">
-              {selectedLoc.name || selectedBeacon?.displayName || '(unnamed)'}
-            </span>
+            <span className="text-green-800">{selectedLoc.name || '(unnamed)'}</span>
           </div>
         </div>
       )}

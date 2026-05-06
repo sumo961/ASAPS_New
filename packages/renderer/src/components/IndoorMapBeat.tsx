@@ -20,6 +20,9 @@ interface IndoorLocationEntry {
   id: string;
   name?: string;
   beaconUuid: string;
+  /** Floor-plan position in metres from the top-left (v0.9.49+). */
+  x: number;
+  y: number;
   radiusMeters: number;
 }
 
@@ -36,7 +39,6 @@ interface IndoorMapBeatProps {
     floorWidth: number;
     floorHeight: number;
   };
-  beacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }>;
   sensorService?: any;
   onResolve: (resolution: {
     path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped';
@@ -52,7 +54,6 @@ export const IndoorMapBeat: React.FC<IndoorMapBeatProps> = ({
   cancelButtonText,
   timeoutMs,
   venue,
-  beacons = [],
   sensorService,
   onResolve,
 }) => {
@@ -63,15 +64,6 @@ export const IndoorMapBeat: React.FC<IndoorMapBeatProps> = ({
 
   /** Map of beaconUuid → live distance (m) or null when not seen. */
   const [distances, setDistances] = useState<Record<string, number | null>>({});
-
-  // For each location, look up its beacon in the venue catalog.
-  const enrichedLocations = useMemo(
-    () => locations.map((loc) => ({
-      ...loc,
-      beacon: beacons.find((b) => b.uuid === loc.beaconUuid),
-    })),
-    [locations, beacons],
-  );
 
   // The set of UUIDs we care about for distance tracking.
   const watchedUuids = useMemo(
@@ -156,13 +148,10 @@ export const IndoorMapBeat: React.FC<IndoorMapBeatProps> = ({
   };
 
   // Find the closest in-distance location for the status bar.
-  const closest = enrichedLocations
+  const closest = locations
     .map((l) => ({ loc: l, distance: distances[l.beaconUuid] ?? null }))
     .filter((x) => x.distance !== null)
     .sort((a, b) => (a.distance! - b.distance!))[0];
-
-  const targetBeaconUuids = new Set(locations.map((l) => l.beaconUuid));
-  const missingTargetBeacons = enrichedLocations.filter((l) => !l.beacon);
 
   return (
     <div className="w-full h-full flex flex-col bg-gray-50">
@@ -173,13 +162,10 @@ export const IndoorMapBeat: React.FC<IndoorMapBeatProps> = ({
       )}
 
       <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden">
-        {missingTargetBeacons.length === locations.length ? (
+        {locations.length === 0 ? (
           <div className="text-center text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-6 max-w-md">
-            <div className="font-medium mb-2">No target beacons configured</div>
-            <div className="text-xs">
-              None of the location UUIDs match a beacon in Project Settings →
-              Location & XR → Indoor venue → Beacons. Define them there first.
-            </div>
+            <div className="font-medium mb-2">No locations configured</div>
+            <div className="text-xs">Add locations to this beat in the Properties tab.</div>
           </div>
         ) : (
           <div
@@ -204,61 +190,47 @@ export const IndoorMapBeat: React.FC<IndoorMapBeatProps> = ({
               className="absolute inset-0 w-full h-full"
               preserveAspectRatio="xMidYMid meet"
             >
-              {/* Non-target beacons as small grey dots */}
-              {beacons.filter((b) => !targetBeaconUuids.has(b.uuid)).map((b) => (
-                <circle
-                  key={b.uuid}
-                  cx={b.x}
-                  cy={b.y}
-                  r={Math.max(0.15, floorWidth / 200)}
-                  fill="#94a3b8"
-                  stroke="#fff"
-                  strokeWidth={Math.max(0.03, floorWidth / 600)}
-                />
+              {/* Per-target: radius ring + halo + dot. Each location
+                  carries its own (x, y) on this beat's floor plan. */}
+              {locations.map((loc) => (
+                <g key={loc.id}>
+                  <circle
+                    cx={loc.x}
+                    cy={loc.y}
+                    r={loc.radiusMeters}
+                    fill="rgba(220, 38, 38, 0.10)"
+                    stroke="#dc2626"
+                    strokeWidth={Math.max(0.05, floorWidth / 400)}
+                    strokeDasharray={`${floorWidth / 100} ${floorWidth / 200}`}
+                  />
+                  <circle
+                    cx={loc.x}
+                    cy={loc.y}
+                    r={Math.max(0.4, floorWidth / 80)}
+                    fill="rgba(220, 38, 38, 0.25)"
+                  />
+                  <circle
+                    cx={loc.x}
+                    cy={loc.y}
+                    r={Math.max(0.2, floorWidth / 150)}
+                    fill="#dc2626"
+                    stroke="#fff"
+                    strokeWidth={Math.max(0.04, floorWidth / 500)}
+                  />
+                  {loc.name && (
+                    <text
+                      x={loc.x}
+                      y={loc.y - Math.max(0.6, floorWidth / 60)}
+                      fontSize={Math.max(0.4, floorWidth / 50)}
+                      fill="#1f2937"
+                      textAnchor="middle"
+                      style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: floorWidth / 200 }}
+                    >
+                      {loc.name}
+                    </text>
+                  )}
+                </g>
               ))}
-              {/* Per-target: radius ring + halo + dot. */}
-              {enrichedLocations.map((loc) => {
-                if (!loc.beacon) return null;
-                return (
-                  <g key={loc.id}>
-                    <circle
-                      cx={loc.beacon.x}
-                      cy={loc.beacon.y}
-                      r={loc.radiusMeters}
-                      fill="rgba(220, 38, 38, 0.10)"
-                      stroke="#dc2626"
-                      strokeWidth={Math.max(0.05, floorWidth / 400)}
-                      strokeDasharray={`${floorWidth / 100} ${floorWidth / 200}`}
-                    />
-                    <circle
-                      cx={loc.beacon.x}
-                      cy={loc.beacon.y}
-                      r={Math.max(0.4, floorWidth / 80)}
-                      fill="rgba(220, 38, 38, 0.25)"
-                    />
-                    <circle
-                      cx={loc.beacon.x}
-                      cy={loc.beacon.y}
-                      r={Math.max(0.2, floorWidth / 150)}
-                      fill="#dc2626"
-                      stroke="#fff"
-                      strokeWidth={Math.max(0.04, floorWidth / 500)}
-                    />
-                    {loc.name && (
-                      <text
-                        x={loc.beacon.x}
-                        y={loc.beacon.y - Math.max(0.6, floorWidth / 60)}
-                        fontSize={Math.max(0.4, floorWidth / 50)}
-                        fill="#1f2937"
-                        textAnchor="middle"
-                        style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: floorWidth / 200 }}
-                      >
-                        {loc.name}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
             </svg>
           </div>
         )}
@@ -273,7 +245,7 @@ export const IndoorMapBeat: React.FC<IndoorMapBeatProps> = ({
           ) : (
             <span>
               <span className="font-medium">
-                {closest.loc.name || closest.loc.beacon?.displayName || 'Target'}:
+                {closest.loc.name || 'Target'}:
               </span>{' '}
               <span className={closest.distance! <= closest.loc.radiusMeters ? 'text-green-700 font-medium' : 'text-gray-700'}>
                 {closest.distance!.toFixed(1)} m away

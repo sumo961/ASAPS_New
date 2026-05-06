@@ -1305,7 +1305,7 @@
       "category": "xr",
       "displayName": "Indoor Location",
       "icon": "🏛️",
-      "description": "Show an indoor floor-plan with one or more target Bluetooth beacons. Each location has its own next-beat target and Effects bundle — the first beacon the player approaches within radius wins. Indoor proximity uses RSSI-derived distance estimates and is suited to room-scale interactions (typical accuracy 1–3m).",
+      "description": "Show a floor plan for this beat with one or more target Bluetooth beacons. Each beat carries its own floor plan + dimensions, so different beats can show different rooms or scales. Each location has its own (x, y) on this floor plan, beaconUuid, target beat, and Effects bundle. The first beacon the player walks within radius wins.",
       "connectionType": "multiple",
       "parameters": {
         "mode": {

@@ -306,6 +306,14 @@ export interface XRLocationEntry {
   /** Indoor beacon target — set for IndoorLocationBeat. */
   beaconUuid?: string;
   /**
+   * Indoor floor-plan position in metres from the top-left of this beat's
+   * floor plan (v0.9.49+). Authoring-time visual coordinate — distinct
+   * from the beacon's stable physical UUID, so the same beacon can be
+   * drawn at different positions on different beats' floor plans.
+   */
+  x?: number;
+  y?: number;
+  /**
    * Per-location radius. Falls back to the beat's `radiusMeters`,
    * then the project's `defaultProximityRadiusM`, then a beat-type
    * default (25m for GPS, 5m for indoor).
@@ -690,14 +698,17 @@ export interface IRenderer {
   renderIndoorMap?(options: {
     mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
     /**
-     * Target locations referencing beacons by UUID. v0.9.49+ supports
-     * multiple per beat. The renderer resolves on first crossing and
-     * reports `locationId` so the runtime knows which Effects fire.
+     * Target locations on the floor plan. Each carries its own x/y
+     * (metres from top-left), so the renderer doesn't need to look up
+     * positions in a project-level beacon registry. beaconUuid identifies
+     * the physical beacon for proximity matching at runtime.
      */
     locations: Array<{
       id: string;
       name?: string;
       beaconUuid: string;
+      x: number;
+      y: number;
       radiusMeters: number;
     }>;
     text?: string;
@@ -711,8 +722,6 @@ export interface IRenderer {
       floorWidth: number;
       floorHeight: number;
     };
-    /** All authored beacons with floor-plan positions in metres. */
-    beacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }>;
   }): Promise<{
     path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped';
     locationId?: string;

@@ -3882,6 +3882,64 @@ export const Inspector: React.FC<InspectorProps> = ({
                         </div>
                       </div>
 
+                      {/* Indoor-only: per-beat floor plan (v0.9.49+).
+                          Each indoor beat carries its own room/space —
+                          floor plan asset + dimensions in metres. Falls
+                          back to project venue settings if blank. */}
+                      {flavour === 'indoor' && (
+                        <div className="space-y-2 p-3 bg-purple-50/50 border border-purple-200 rounded-lg">
+                          <div className="text-xs font-medium text-purple-900">
+                            Floor plan for this beat
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                              Floor plan asset ID
+                            </label>
+                            <input
+                              type="text"
+                              value={localBeat.parameters?.floorPlanAssetId || ''}
+                              onChange={(e) => handleParameterChange('floorPlanAssetId', e.target.value || undefined)}
+                              placeholder="(asset id from Asset Manager — leave blank to use project venue)"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="block text-[11px] text-gray-600">
+                              Floor width (metres)
+                              <input
+                                type="number"
+                                min={1}
+                                step={0.1}
+                                value={localBeat.parameters?.floorWidthM ?? ''}
+                                onChange={(e) => handleParameterChange('floorWidthM',
+                                  e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.'))
+                                )}
+                                placeholder="e.g. 20"
+                                className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                              />
+                            </label>
+                            <label className="block text-[11px] text-gray-600">
+                              Floor height (metres)
+                              <input
+                                type="number"
+                                min={1}
+                                step={0.1}
+                                value={localBeat.parameters?.floorHeightM ?? ''}
+                                onChange={(e) => handleParameterChange('floorHeightM',
+                                  e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.'))
+                                )}
+                                placeholder="e.g. 30"
+                                className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                              />
+                            </label>
+                          </div>
+                          <p className="text-[11px] text-gray-500">
+                            Each indoor beat is one physical space. Leave blank to use the
+                            project's venue (Settings → Location & XR → Indoor venue).
+                          </p>
+                        </div>
+                      )}
+
                       {/* GPS-only: map style + player marker toggle */}
                       {flavour === 'gps' && (
                         <div className="grid grid-cols-2 gap-2">

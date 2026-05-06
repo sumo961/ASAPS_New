@@ -2854,7 +2854,7 @@ export class ReactRenderer extends BaseRenderer {
    */
   async renderIndoorMap(options: {
     mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
-    locations: Array<{ id: string; name?: string; beaconUuid: string; radiusMeters: number }>;
+    locations: Array<{ id: string; name?: string; beaconUuid: string; x: number; y: number; radiusMeters: number }>;
     text?: string;
     buttonText?: string;
     cancelButtonText?: string;
@@ -2865,7 +2865,6 @@ export class ReactRenderer extends BaseRenderer {
       floorWidth: number;
       floorHeight: number;
     };
-    beacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }>;
   }): Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }> {
     const sensorService = this.getState('sensorService');
     if (options.text) {
@@ -2892,7 +2891,6 @@ export class ReactRenderer extends BaseRenderer {
           cancelButtonText={options.cancelButtonText}
           timeoutMs={options.timeoutMs}
           venue={venue}
-          beacons={options.beacons}
           sensorService={sensorService}
           onResolve={(resolution) => resolve(resolution)}
         />

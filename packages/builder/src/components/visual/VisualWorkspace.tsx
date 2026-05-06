@@ -3853,14 +3853,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         </div>
       );
     }
-    // indoorLocation
+    // indoorLocation — beat-level venue wins, project venue is the
+    // fallback. Same resolution rule as IndoorLocationBeat.performAction.
     const venueRaw = (globalSettings as any)?.location?.venue as
-      | { name?: string; floorPlan?: string; floorWidth: number; floorHeight: number;
-          beacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }> }
+      | { name?: string; floorPlan?: string; floorWidth: number; floorHeight: number }
       | undefined;
-    const venueBeacons = venueRaw?.beacons || [];
-    const floorPlanUrl = venueRaw?.floorPlan
-      ? assets.find((a: any) => a.id === venueRaw.floorPlan)?.url
+    const beatHasVenue = !!params.floorPlanAssetId
+      || params.floorWidthM !== undefined
+      || params.floorHeightM !== undefined;
+    const floorPlanAssetId = params.floorPlanAssetId ?? (beatHasVenue ? undefined : venueRaw?.floorPlan);
+    const floorWidth = params.floorWidthM ?? venueRaw?.floorWidth ?? 20;
+    const floorHeight = params.floorHeightM ?? venueRaw?.floorHeight ?? 20;
+    const floorPlanUrl = floorPlanAssetId
+      ? assets.find((a: any) => a.id === floorPlanAssetId)?.url
       : undefined;
     return (
       <div style={{ position: 'relative', height: '100%', width: '100%' }}>
@@ -3868,15 +3873,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           locations={xrLocations}
           beatRadiusMeters={beatRadius}
           projectDefaultRadius={projectDefault}
-          venueBeacons={venueBeacons}
-          venue={venueRaw ? {
-            name: venueRaw.name,
+          venue={{
+            name: beatHasVenue ? undefined : venueRaw?.name,
             floorPlanUrl,
-            floorWidth: venueRaw.floorWidth,
-            floorHeight: venueRaw.floorHeight,
-          } : undefined}
+            floorWidth,
+            floorHeight,
+          }}
           onLocationsChange={writeLocations}
-          onVenueBeaconsChange={(next) => onUpdateVenueBeacons?.(next)}
         />
       </div>
     );
