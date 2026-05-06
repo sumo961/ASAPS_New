@@ -819,6 +819,14 @@ export interface HtmlExportOptions {
    * manually enables TTS via the export's UI.
    */
   ttsEnabled?: boolean;
+  /**
+   * Override the starting beat for this export (v0.9.49+). When
+   * supplied, the exported metadata.firstBeatId is replaced so the
+   * published story always begins at this beat. Picked from a
+   * dropdown in the export dialog and defaults to the currently-
+   * selected beat in the builder.
+   */
+  startBeatId?: string;
   /** Pre-made translations to bundle with the export */
   existingTranslations?: TranslationResource[];
   /** Enable AI on-the-fly translation in the exported player */
@@ -853,8 +861,10 @@ export async function exportAsHtml(
 
   const project = projectResult.data;
 
-  // First, export the project as a playable .asaps.zip
-  const storyZipBlob = await createStoryZip(projectId);
+  // First, export the project as a playable .asaps.zip. The optional
+  // startBeatId from the export dialog overrides metadata.firstBeatId so
+  // the published story begins at the author's chosen beat.
+  const storyZipBlob = await createStoryZip(projectId, options.startBeatId);
 
   if (options.mode === 'single-file') {
     return exportAsSingleFile(project, storyZipBlob, options);
@@ -866,9 +876,9 @@ export async function exportAsHtml(
 /**
  * Create story ZIP blob for export (same format as regular export)
  */
-async function createStoryZip(projectId: string): Promise<Blob> {
+async function createStoryZip(projectId: string, startBeatId?: string): Promise<Blob> {
   const { exportProjectAsZip } = await import('../utils/projectZipManager');
-  return exportProjectAsZip(projectId);
+  return exportProjectAsZip(projectId, startBeatId ? { overrideFirstBeatId: startBeatId } : undefined);
 }
 
 /**

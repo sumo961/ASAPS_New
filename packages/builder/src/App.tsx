@@ -5811,6 +5811,8 @@ function App() {
           onClose={() => setShowHtmlExportDialog(false)}
           projectId={currentProject.id}
           projectName={currentProject.name}
+          availableBeats={state.beats.map((b: any) => ({ id: b.id, name: b.name, type: b.type }))}
+          selectedBeatId={selectedBeat?.id}
         />
       )}
 

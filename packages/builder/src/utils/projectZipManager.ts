@@ -12,9 +12,17 @@ import type { Project, StoredAsset, AssetType } from '../storage/types';
 
 /**
  * Export project as ZIP file
- * Creates a ZIP containing project data and all assets
+ * Creates a ZIP containing project data and all assets.
+ *
+ * `overrideFirstBeatId` (v0.9.49+) lets the caller force a specific
+ * starting beat into the exported metadata — used by the HTML export
+ * dialog so the author can pick which beat the published story
+ * begins at, separate from the project's persistent firstBeatId.
  */
-export async function exportProjectAsZip(projectId: string): Promise<Blob> {
+export async function exportProjectAsZip(
+  projectId: string,
+  options?: { overrideFirstBeatId?: string },
+): Promise<Blob> {
   const storage = getStorageManager();
 
   // Get project data
@@ -98,7 +106,7 @@ export async function exportProjectAsZip(projectId: string): Promise<Blob> {
       globalSettings: project.globalSettings,  // Full global settings
       themeId: project.themeId,                // Theme reference
       themeOverrides: project.themeOverrides,  // Theme customizations
-      story: serializeStory(project.story)
+      story: applyStartBeatOverride(serializeStory(project.story), options?.overrideFirstBeatId)
     }
   };
 
@@ -688,6 +696,24 @@ function getAssetTypeFromFolder(folder: string): AssetType {
  * Serialize story for ZIP export
  * Handles both Story instances and plain objects
  */
+/**
+ * Apply an explicit start-beat override on top of an already-serialized
+ * story object. Used by the HTML export dialog to honour the author's
+ * "Start beat" dropdown without mutating the persisted project.
+ */
+function applyStartBeatOverride(serialized: any, overrideId?: string): any {
+  if (!overrideId || !serialized) return serialized;
+  const beats = Array.isArray(serialized.beats) ? serialized.beats : [];
+  if (!beats.some((b: any) => b.id === overrideId)) {
+    console.warn(`[exportProjectAsZip] overrideFirstBeatId='${overrideId}' not in beats — ignoring`);
+    return serialized;
+  }
+  return {
+    ...serialized,
+    metadata: { ...(serialized.metadata || {}), firstBeatId: overrideId },
+  };
+}
+
 function serializeStory(story: any): any {
   // If it's a Story instance with methods
   if (story.getAllBeats && typeof story.getAllBeats === 'function') {

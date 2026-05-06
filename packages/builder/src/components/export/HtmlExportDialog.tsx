@@ -15,6 +15,10 @@ interface HtmlExportDialogProps {
   onClose: () => void;
   projectId: string;
   projectName: string;
+  /** Beats authors can pick from for the "Start beat" dropdown. */
+  availableBeats?: Array<{ id: string; name?: string; type?: string }>;
+  /** Currently-selected beat in the builder, used as the dropdown's default. */
+  selectedBeatId?: string;
 }
 
 export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
@@ -22,6 +26,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   onClose,
   projectId,
   projectName,
+  availableBeats = [],
+  selectedBeatId,
 }) => {
   const [mode, setMode] = useState<'folder' | 'single-file'>('folder');
   const [enableAI, setEnableAI] = useState(true);
@@ -37,6 +43,20 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   const [enableAIOnTheFly, setEnableAIOnTheFly] = useState(false);
   const [showSessionLog, setShowSessionLog] = useState(false);
   const [includedTranslations, setIncludedTranslations] = useState<Set<string>>(new Set());
+  // Start-beat picker (v0.9.49+). Defaults to the currently-selected beat
+  // if any, else the project's first titleScreen, else the first beat in
+  // the list. Author can change before clicking Download.
+  const defaultStartBeat = useMemo(() => {
+    if (selectedBeatId && availableBeats.some((b) => b.id === selectedBeatId)) return selectedBeatId;
+    const titleScreen = availableBeats.find((b) => b.type === 'titleScreen');
+    if (titleScreen) return titleScreen.id;
+    return availableBeats[0]?.id || '';
+  }, [selectedBeatId, availableBeats]);
+  const [startBeatId, setStartBeatId] = useState<string>(defaultStartBeat);
+  // Re-sync the default if the dialog re-opens with a fresh selection.
+  useEffect(() => {
+    if (isOpen) setStartBeatId(defaultStartBeat);
+  }, [isOpen, defaultStartBeat]);
   const hasPopulatedRef = useRef(false);
 
   // Access pre-made translations from context
@@ -146,6 +166,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,
+        startBeatId: startBeatId || undefined,
       };
 
       await downloadHtmlExport(projectId, projectName, options);
@@ -195,6 +216,34 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
 
         {/* Content */}
         <div className="px-6 py-5 space-y-6 overflow-y-auto flex-1">
+          {/* Start beat — author picks where the published story begins.
+              Defaults to whatever is currently selected in the builder
+              (or the project's titleScreen if nothing's selected). */}
+          {availableBeats.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Start beat
+              </label>
+              <select
+                value={startBeatId}
+                onChange={(e) => setStartBeatId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                {availableBeats.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name ? `${b.name}` : b.id}
+                    {b.type ? ` (${b.type})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                The published story will begin here. Defaults to your current
+                selection in the builder; you can change it for this export
+                without affecting the project.
+              </p>
+            </div>
+          )}
+
           {/* Export Mode */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
