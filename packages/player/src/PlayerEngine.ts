@@ -483,9 +483,19 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         }
       }
 
-      // Set firstBeatId if not already set
-      if (!metadata.firstBeatId && beats.length > 0) {
-        story.setFirstBeatId(beats[0].id);
+      // Set firstBeatId if not already set OR if it points at a beat that
+      // doesn't exist in the deserialized story (e.g. stale '0' default).
+      // Prefer a titleScreen beat over arbitrary beats[0] so legacy projects
+      // that never had firstBeatId explicitly set still start at the title.
+      const allBeats = story.getAllBeats();
+      const currentFirst = metadata.firstBeatId;
+      const currentValid = currentFirst && allBeats.some((b) => b.id === currentFirst);
+      if (!currentValid && allBeats.length > 0) {
+        const titleScreen = allBeats.find((b) => b.type === 'titleScreen');
+        story.setFirstBeatId(titleScreen ? titleScreen.id : allBeats[0].id);
+        if (currentFirst) {
+          console.warn(`[PlayerEngine] metadata.firstBeatId='${currentFirst}' not found in beats — falling back to ${story.getFirstBeatId()}`);
+        }
       }
     }
 

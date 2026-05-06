@@ -691,9 +691,24 @@ function getAssetTypeFromFolder(folder: string): AssetType {
 function serializeStory(story: any): any {
   // If it's a Story instance with methods
   if (story.getAllBeats && typeof story.getAllBeats === 'function') {
+    // Apply the same firstBeatId auto-detect that PreviewWindow uses, so
+    // the exported metadata always carries a valid id. Without this, projects
+    // whose saved state has the default '0' (no beat with that id) export
+    // with metadata.firstBeatId = '0', and the runtime falls through to
+    // beats[0].id (first in array, usually NOT the titleScreen).
+    const metadata = { ...story.getMetadata() };
+    const beats = story.getAllBeats();
+    if (typeof story.getFirstBeatId === 'function') {
+      const detected = story.getFirstBeatId();
+      if (detected) metadata.firstBeatId = detected;
+    } else if (!metadata.firstBeatId || !beats.some((b: any) => b.id === metadata.firstBeatId)) {
+      const titleScreen = beats.find((b: any) => b.type === 'titleScreen');
+      if (titleScreen) metadata.firstBeatId = titleScreen.id;
+      else if (beats.length > 0) metadata.firstBeatId = beats[0].id;
+    }
     return {
-      metadata: story.getMetadata(),
-      beats: story.getAllBeats().map((beat: any) => beat.toJSON ? beat.toJSON() : beat),
+      metadata,
+      beats: beats.map((beat: any) => beat.toJSON ? beat.toJSON() : beat),
       settings: story.getSettings(),
       environment: story.getEnvironment(),
       characters: story.getCharacters(),
@@ -701,7 +716,19 @@ function serializeStory(story: any): any {
     };
   }
 
-  // Already serialized or plain object
+  // Plain object — apply the same auto-detect against the persisted shape.
+  if (story && Array.isArray(story.beats)) {
+    const cloned = { ...story, metadata: { ...(story.metadata || {}) } };
+    const beats = story.beats;
+    const current = cloned.metadata.firstBeatId;
+    const validCurrent = current && beats.some((b: any) => b.id === current);
+    if (!validCurrent) {
+      const titleScreen = beats.find((b: any) => b.type === 'titleScreen');
+      if (titleScreen) cloned.metadata.firstBeatId = titleScreen.id;
+      else if (beats.length > 0) cloned.metadata.firstBeatId = beats[0].id;
+    }
+    return cloned;
+  }
   return story;
 }
 
