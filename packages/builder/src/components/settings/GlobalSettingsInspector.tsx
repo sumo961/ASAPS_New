@@ -3095,7 +3095,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         min={1}
                         step={0.1}
                         value={loc.venue?.floorWidth ?? ''}
-                        onChange={(e) => writeVenue({ floorWidth: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        onChange={(e) => writeVenue({ floorWidth: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')) })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                       />
                     </div>
@@ -3106,7 +3106,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         min={1}
                         step={0.1}
                         value={loc.venue?.floorHeight ?? ''}
-                        onChange={(e) => writeVenue({ floorHeight: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        onChange={(e) => writeVenue({ floorHeight: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')) })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                       />
                     </div>
@@ -3202,32 +3202,36 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                             </button>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={beacon.x}
-                              onChange={(e) => {
-                                const next = [...(loc.venue?.beacons || [])];
-                                next[idx] = { ...next[idx], x: parseFloat(e.target.value.replace(',', '.')) || 0 };
-                                writeVenue({ beacons: next });
-                              }}
-                              placeholder="x (m from left)"
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
-                              title="Metres from floor-plan left edge"
-                            />
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={beacon.y}
-                              onChange={(e) => {
-                                const next = [...(loc.venue?.beacons || [])];
-                                next[idx] = { ...next[idx], y: parseFloat(e.target.value.replace(',', '.')) || 0 };
-                                writeVenue({ beacons: next });
-                              }}
-                              placeholder="y (m from top)"
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
-                              title="Metres from floor-plan top edge"
-                            />
+                            <label className="text-[11px] text-gray-600">
+                              x (metres from left)
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={beacon.x}
+                                onChange={(e) => {
+                                  const next = [...(loc.venue?.beacons || [])];
+                                  next[idx] = { ...next[idx], x: parseFloat(e.target.value.replace(',', '.')) || 0 };
+                                  writeVenue({ beacons: next });
+                                }}
+                                className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                                title="Metres from floor-plan left edge"
+                              />
+                            </label>
+                            <label className="text-[11px] text-gray-600">
+                              y (metres from top)
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={beacon.y}
+                                onChange={(e) => {
+                                  const next = [...(loc.venue?.beacons || [])];
+                                  next[idx] = { ...next[idx], y: parseFloat(e.target.value.replace(',', '.')) || 0 };
+                                  writeVenue({ beacons: next });
+                                }}
+                                className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                                title="Metres from floor-plan top edge"
+                              />
+                            </label>
                           </div>
                         </div>
                         <button
