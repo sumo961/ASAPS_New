@@ -124,7 +124,7 @@ export class GpsLocationBeat extends Beat {
   ): Promise<string | null> {
     // Read project-level XR settings for permission policy + radius default.
     const story = (context as any).getStory?.();
-    const locationSettings = (story as any)?.getGlobalSettings?.()?.location as
+    const locationSettings = (story as any)?.getSettings?.()?.location as
       | { onPermissionDenied?: 'skip' | 'fallback'; fallbackBeatId?: string; defaultProximityRadiusM?: number }
       | undefined;
 

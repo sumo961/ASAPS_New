@@ -31,7 +31,7 @@ function makeStoryStub(opts: {
   return {
     getCharacters: () => [],
     getFirstBeatId: () => '0',
-    getGlobalSettings: () => opts.globalSettings,
+    getSettings: () => opts.globalSettings,
     getBeat: (id: string) => opts.beats?.find((b) => b.id === id),
   } as any;
 }

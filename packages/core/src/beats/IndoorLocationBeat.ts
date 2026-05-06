@@ -98,7 +98,7 @@ export class IndoorLocationBeat extends Beat {
     renderer: IRenderer,
   ): Promise<string | null> {
     const story = (context as any).getStory?.();
-    const locationSettings = (story as any)?.getGlobalSettings?.()?.location as
+    const locationSettings = (story as any)?.getSettings?.()?.location as
       | {
           onPermissionDenied?: 'skip' | 'fallback';
           fallbackBeatId?: string;

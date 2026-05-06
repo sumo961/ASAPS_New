@@ -438,7 +438,7 @@ export class StoryContext extends EventEmitter {
     this.sensorService = opts?.existingSensorService
       ?? createSensorService({ mockMode: opts?.mockMode });
     if (opts?.mockMode && !opts?.existingSensorService && this.sensorService instanceof MockSensorService) {
-      const mockLoc = (story as any)?.getGlobalSettings?.()?.location?.mockLocation;
+      const mockLoc = (story as any)?.getSettings?.()?.location?.mockLocation;
       if (mockLoc) this.sensorService.seedFromSettings(mockLoc);
     }
     // Seed authored initial affect (mood + sentiments) into the runtime
