@@ -1,5 +1,309 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-06: XR Substrate — GPS, Permissions, Map, Spatial Sound (v0.9.48)
+
+### Overview
+
+The first XR-capable release. Stories can now anchor to the physical world via GPS, gate beats on real-time proximity / permission state, render an interactive Leaflet map for "walk to here" beats, and place sounds at fixed lat/lng coordinates with HRTF spatial panning that updates as the player walks. All XR features land behind a SensorService abstraction with a desktop-authoring MockSensorPanel, so authors can test the geo / orientation pipeline without leaving their laptop.
+
+This is a fat release — six feature commits and two fix commits since v0.9.47. Highlights:
+
+- **GpsLocationBeat** with real OpenStreetMap tiles, target marker + radius ring, live player marker, recenter control, and three trigger modes (`display`, `trigger-on-arrival`, `trigger-on-departure`).
+- **Three new Condition operators** — `gpsProximity`, `indoorProximity`, `permissionGranted` — synchronously evaluable from cached sensor reads, available everywhere Conditions are (ConditionBeat, choice requirements, MovementChoice).
+- **DirectionalSound** — Sound objects gain an optional `spatialPosition` field; the renderer routes those through a Web Audio PannerNode with HRTF panning and linear distance falloff. Geographic mode (lat/lng with bearing recomputed live) and azimuth-only mode (fixed compass direction) both supported.
+- **Location & XR settings tab** in Global Settings — origin, mock-location, default proximity radius, on-permission-denied fallback policy.
+- **MockSensorPanel** in the PreviewWindow — N/S/E/W walk buttons, lat/lng inputs, orientation sliders. Drives the story's runtime state for desktop testing.
+- **HTML export host wiring** — SensorService is also pushed into the standalone player's renderer state, so exported stories work in the browser too (with the WebSensorService backend that talks to navigator.geolocation).
+
+### XR substrate (S1+S2): LocationSettings + SensorService
+
+`SensorService` is the abstraction every XR feature depends on. Two concrete implementations:
+
+- **WebSensorService** — production playback. Talks to `navigator.geolocation`, `DeviceOrientationEvent`, and the (still-experimental) Bluetooth Web API for beacons.
+- **MockSensorService** — desktop authoring. Returns values seeded from project settings + runtime updates from the PreviewWindow's MockSensorPanel.
+
+Capability detection picks one at engine construction time. Beats access the service via `context.getSensorService()`; they never construct their own. Cached-reading getters (`getLastKnownLocation`, `getLastKnownOrientation`, `getLastKnownBeacons`) make synchronous condition evaluation possible without awaiting promises mid-graph traversal.
+
+`LocationSettings` was added to `GlobalSettings`: `originLat`, `originLng`, `defaultProximityRadiusM`, `mockLocation: { lat, lng, floor? }`, `onPermissionDenied: 'skip' | 'fallback'`, `fallbackBeatId`, `venue` (indoor floor plan). The Location & XR tab in Global Settings exposes all of these.
+
+`StoryContext.getSensorService()` lazily resolves and caches the chosen service; the engine forwards `mockMode: true` from PreviewWindow so authoring contexts always get the mock.
+
+### XR substrate (S3): Permissions + new Condition operators
+
+Three new Condition types extended the existing condition system:
+
+- **`gpsProximity`** — true when player is within N metres of a target lat/lng. Uses cached location reads; falls back to the project's `defaultProximityRadiusM` if the beat doesn't override.
+- **`indoorProximity`** — true when player is within N metres of a beacon UUID. Same cache pattern, but reads from `getLastKnownBeacons()`.
+- **`permissionGranted`** — true when a sensor permission (`gps`, `camera`, `orientation`, `beacons`) is in 'granted' state. Pairs with `ensureXRPermission` (helper that probes / prompts and writes the result into the context's `permissionStateCache`).
+
+The condition evaluator is purely synchronous — beats that need a fresh reading first call `ensureLocationCacheActive()` to start the underlying watcher, then evaluate the condition off the cache. This keeps the condition path zero-await-cost while still updating every time the sensor fires.
+
+Editor UI for all three operators added to RequirementsEditor (choice requirements) and the ConditionBeat block in Inspector. Each operator gets its own form with the right inputs (lat/lng + radius for gps, UUID + radius for indoor, sensor name dropdown for permission).
+
+### XR Beat #1: GpsLocationBeat
+
+`gpsLocation` is the first XR-category beat. Three modes:
+
+- **`display`** — show a map with a target marker, radius ring, and the player's live position. Continue button advances. No permission needed.
+- **`trigger-on-arrival`** — same map, but the beat resolves automatically when the player walks within `radiusMeters` of `(targetLat, targetLng)`. Optional cancel button. Permission required.
+- **`trigger-on-departure`** — resolves when the player walks *out* of the radius. Same permission requirement.
+
+Permission denial is configurable per project: `'skip'` advances to the next beat, `'fallback'` jumps to a specified `fallbackBeatId`. `ensureXRPermission` returns `'granted' | 'fallback' | 'skip'` and the beat branches accordingly.
+
+Renderer: replaced the v0.9.48-RC `MapBeatPlaceholder` with **MapBeatLeaflet** — a real Leaflet 1.9.4 component with OpenStreetMap streets / Esri satellite / CartoDB minimal tile choices, zoom controls, attribution, target marker (red dot), 300m radius ring, blue player marker, distance-to-target indicator, and a custom "recenter on me" control top-right. Auto-zoom-in on first walk so 5m steps are visible at street level; pan-follow when the player drifts toward the viewport edge; never overrides manual zoom.
+
+Two production-fidelity fixes hit during integration:
+- **Library-build CSS** — `import 'leaflet/dist/leaflet.css'` in a Vite library build emits a sibling `style.css` that consumers don't auto-load. Switched to `?inline` import so leaflet's CSS rides inside the JS bundle and self-injects on mount. Same pattern for the scoped reset that defeats Tailwind preflight stripping `<a>` background and `<img>` max-width on the leaflet-bar buttons and tile images.
+- **Container-size race** — `L.map()` runs in the React effect before flex layout has settled, so Leaflet's tile grid is computed against the wrong container size. Added `requestAnimationFrame + setTimeout(250)` `invalidateSize` calls plus a `ResizeObserver` watching the container.
+
+### DirectionalSound — XR v1 audio
+
+`Sound.spatialPosition` is a new optional field with two flavours:
+
+- **Geographic** (`lat`, `lng`) — bearing and distance recomputed live from the player's GPS reading. As the player walks around, the panner rotates and attenuates the sound based on heading + distance. `maxDistanceMeters` is the silence-beyond-this threshold.
+- **Azimuth-only** (`azimuth: 0–360°`) — fixed compass direction. Spinning the device pans the audio.
+
+Both flavours flow through `AudioManager.playSpatialSound` which inserts a Web Audio PannerNode with HRTF panning model and linear distance falloff (refDistance: 5m for a small "full-volume bubble", linear fade to silence at maxDistance). The renderer's standard `playSound` path now branches on `sound.spatialPosition`: present → spatial route, absent → existing non-spatial route. Existing sounds without spatialPosition behave identically to before.
+
+`buildSensorAdapter` (in `packages/renderer/src/audio/sensorAdapter.ts`) bridges the core `SensorService` to AudioManager's `subscribeToSensor` callback, keeping AudioManager core-decoupled.
+
+The **SpatialPositionEditor** disclosure is a reusable component in `packages/builder/src/editors/`. Closed by default (sounds without spatial positioning behave as before), expands into a mode-aware form. Currently wired into Inspector's Background Sound block; reusable for cluster sound, dialog sound, or any other sound surface that wants positioning.
+
+### Five compounding bugs the spatial-sound integration shook loose
+
+The spatial-sound path went through five layers of compounding bugs before producing audible output:
+
+1. **SensorService instance churn** — `StoryEngine.loadStory()` created a new `StoryContext`, which spawned a fresh `MockSensorService`. The renderer state and audio adapter stayed subscribed to the original; the panel and map talked to the new one. Walks landed on the new instance; the audio adapter was deaf. Fixed by passing the existing service through to the new context (`existingSensorService` constructor opt) so the engine reuses the same instance across context recreations.
+
+2. **Distance model wrong** — PannerNode used `distanceModel: 'inverse'` with `refDistance: 1`, giving gain = 1/distance. At 50m the sound was -34dB (effectively silent). Switched to `'linear'` with `refDistance: 5` for a predictable "full-volume bubble + linear fade to maxDistance" curve.
+
+3. **Blob URL fetch failed** — `playSpatialSound` called `fetch(blobUrl)`, which fails intermittently in some Electron / dev-server CSP setups. Same blob worked through the non-spatial path because that uses `blob.arrayBuffer()` directly. Spatial path now accepts `Blob | string` and uses `arrayBuffer()` for blobs.
+
+4. **Inspector load path missing read** — the load-init at line 833 of Inspector.tsx initialized `parameters.backgroundSound` from `beat.sound` but didn't initialize `parameters.backgroundSoundSpatial` from `beat.sound.spatialPosition`. The SpatialPositionEditor reverted to "Off" on every beat re-select even though the value was correctly saved.
+
+5. **Locale comma → period** — `<input type="number">` returns the locale-formatted string (`"51,50632"`) in some browsers; `parseFloat` reads only the leading `"51"`, placing sound sources tens of kilometres away. Added `.replace(',', '.')` in MockSensorPanel, SpatialPositionEditor, and the four Location & XR inputs in GlobalSettingsInspector.
+
+The mock-sensor flow also required two earlier fixes: PreviewWindow seeds `MockSensorService.setMockLocation` from `globalSettings.location.mockLocation` right after engine construction (StoryContext can't see globalSettings on the Story object). And MockSensorPanel reads its initial state from `sensorService.getLastKnownLocation()` before falling back to `storyOrigin`, so the panel's first-render emit doesn't clobber the seed.
+
+### MockSensorPanel + recenter UX
+
+The MockSensorPanel is the desktop-authoring stand-in for real GPS / orientation hardware. Bottom-right floating panel (auto-hidden, toggle button), N/S/E/W walk buttons (5m steps), manual lat/lng inputs, three orientation sliders (alpha / beta / gamma), Snap-to-origin button. Pushes setMockLocation / setMockOrientation on every change.
+
+The Leaflet map's recenter-on-me crosshair control reads the latest player position from a ref and recenters at street zoom on click. Works for both desktop authoring (mock player position) and production XR (real GPS reading).
+
+### HTML export host wiring
+
+The `@asaps/player` package's `PlayerEngine` now pushes the SensorService into the renderer state on construction, so standalone HTML exports get the same spatial-sound + GPS-beat support as the in-app preview. Production deployment uses WebSensorService (real `navigator.geolocation`); desktop authoring uses MockSensorService.
+
+**Files modified (XR substrate):**
+- `packages/core/src/engine/SensorService.ts` (new — interface, WebSensorService, MockSensorService, factory)
+- `packages/core/src/utils/xrPermissions.ts` (new — ensureXRPermission helper)
+- `packages/core/src/engine/StoryContext.ts` (sensorService field, condition operators, geo helpers, existingSensorService constructor opt)
+- `packages/core/src/engine/StoryEngine.ts` (mockMode forwarding, sensor service preservation in loadStory)
+- `packages/core/src/types/index.ts` (LocationSettings, xr category, gpsProximity/indoorProximity/permissionGranted Conditions, Sound.spatialPosition, IRenderer.renderMap)
+- `packages/core/src/beats/GpsLocationBeat.ts` (new)
+- `packages/core/tests/{engine/SensorService,engine/XRConditions,engine/Geo,beats/GpsLocationBeat}.test.ts` (66 new tests)
+
+**Files modified (renderer):**
+- `packages/renderer/src/components/MapBeatLeaflet.tsx` (new — full Leaflet integration with CSS injection, recenter control, follow-camera, ResizeObserver)
+- `packages/renderer/src/components/MapBeatPlaceholder.tsx` (new — kept for reference)
+- `packages/renderer/src/audio/AudioManager.ts` (playSpatialSound with PannerNode, linear distance model, Blob | string source)
+- `packages/renderer/src/audio/sensorAdapter.ts` (new — SensorService → AudioManager bridge)
+- `packages/renderer/src/renderers/BaseRenderer.ts` (spatial sound path, blob-direct source)
+- `packages/renderer/src/renderers/ReactRenderer.tsx` (renderMap implementation)
+- `packages/renderer/package.json` (leaflet@^1.9.4 + @types/leaflet)
+
+**Files modified (builder):**
+- `packages/builder/src/components/preview/MockSensorPanel.tsx` (new — N/S/E/W walk buttons, orientation sliders)
+- `packages/builder/src/pages/PreviewWindow.tsx` (mockMode engine, MockSensorPanel toggle, seed from settings)
+- `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` (Location & XR tab, locale-comma fix)
+- `packages/builder/src/components/Inspector.tsx` (XR optgroup, spatial-position load-restore, SpatialPositionEditor wiring)
+- `packages/builder/src/editors/RequirementsEditor.tsx` (XR optgroup + per-type forms)
+- `packages/builder/src/editors/SpatialPositionEditor.tsx` (new — reusable disclosure, locale-comma fix)
+- `packages/builder/src/storage/types.ts` (LocationSettings on GlobalSettings)
+
+**Files modified (player + assets):**
+- `packages/player/src/PlayerEngine.ts` (sensorService into renderer state for HTML exports)
+- `packages/builder/public/player-web.{js,css}` (rebuilt artifacts)
+- `beat-definitions/core-beats.json` (gpsLocation entry)
+
+---
+
+## 2026-05-05: Leaflet integration — real interactive map for GpsLocationBeat
+
+### Overview
+
+Replaces the v0.9.48 MapBeatPlaceholder with a real interactive map.
+Same resolution semantics as the placeholder ('arrived' / 'departed'
+/ 'continue' / 'timeout' / 'skipped') so the GpsLocationBeat runtime
+is unchanged. The placeholder file is kept around for reference and
+fallback / unit tests; ReactRenderer now mounts MapBeatLeaflet.
+
+### What's new
+
+- **Real OpenStreetMap tiles** via Leaflet 1.9.4 (~40KB, MIT licensed,
+  free for any use). Three tile-layer choices selected by the
+  beat's `mapStyle` parameter:
+  - `streets` — default, OpenStreetMap classic
+  - `satellite` — Esri's free World Imagery (non-commercial use)
+  - `minimal` — CartoDB's light-grey basemap, less visual noise
+- **Target marker** at `targetLat/targetLng` (red dot with white border)
+  plus a **radius circle** showing the proximity threshold visually.
+- **Player marker** (blue dot) that updates live from the SensorService.
+- **Auto-fit bounds** the first time the player position is known so
+  both the target and the player are visible. Subsequent updates
+  don't re-pan — author retains manual zoom/scroll control.
+- **Status banner** at the bottom: "Arrived ✓" / "47 m away" /
+  "Departed ✓" / "Waiting for location…" with mode-aware colour.
+- **Continue / skip buttons** unchanged from the placeholder.
+
+### Dependencies
+
+- `leaflet@^1.9.4` and `@types/leaflet@^1.9.21` added to
+  `@asaps/renderer`. Leaflet's CSS is imported in the component, so
+  Vite picks it up automatically. Total bundle bump: ~45KB compressed.
+
+### Coordinate / bearing math
+
+The placeholder's local haversine helper is duplicated in
+MapBeatLeaflet (renderer-package; no need to round-trip through core
+for a tiny formula). Shape is identical to the engine's
+gpsProximity / DirectionalSound calculation, so the visual readout
+matches the runtime decision exactly.
+
+### Marker icons
+
+Leaflet's default marker assumes images at `/images/...`, which
+breaks under bundler-driven asset paths. Workaround: use
+`L.divIcon` with inline HTML for both target and player markers.
+Reliable across desktop / PWA / HTML export contexts. Authors
+who want custom marker images can override later.
+
+### Test counts
+
+Core 1,468 (unchanged — the runtime tests don't exercise the
+renderer). All packages type-check clean.
+
+### Files
+
+- `packages/renderer/src/components/MapBeatLeaflet.tsx` (new)
+- `packages/renderer/src/renderers/ReactRenderer.tsx` (swap to
+  MapBeatLeaflet from MapBeatPlaceholder)
+- `packages/renderer/package.json` (leaflet + @types/leaflet)
+
+### XR v1 status: feature-complete + polished
+
+All deferred polish items are now in:
+  - DirectionalSound editor UI ✅ (this session)
+  - HTML export host wiring ✅ (this session)
+  - Leaflet for the GPS beat ✅ (this commit)
+
+The next XR work is v2 features (IndoorLocationBeat with real
+Bluetooth scanning, ARDisplayBeat with WebXR + camera tracking,
+DirectionalSound option (b) for stand-alone audio-trail beats).
+v1 ships as a coherent unit.
+
+---
+
+## 2026-05-05: HTML export host wiring — SensorService for standalone playback
+
+### Overview
+
+Final piece of XR-substrate plumbing. PreviewWindow has been pushing
+SensorService into renderer state since S2 (desktop authoring with
+MockSensorService). Production playback via standalone HTML export
+went through `@asaps/player`'s `PlayerEngine`, which constructed its
+own StoryEngine but never pushed `sensorService` into renderer state.
+Result: deployed stories silently lost spatial sound and live-position
+features, even though the engine was tracking everything correctly.
+
+### Changes
+
+`packages/player/src/PlayerEngine.ts` — right after engine
+construction, push the SensorService into renderer state. Mirrors
+the PreviewWindow setup pattern. Defensive cast on the renderer
+since IRenderer's setState is optional in the interface, but every
+concrete renderer in the codebase implements it.
+
+Without `mockMode`, the engine's `createSensorService` factory
+detects platform capability and returns the production
+WebSensorService (real Geolocation API + DeviceOrientationEvent +
+camera). HTML exports now have functional XR features matching what
+authors saw in PreviewWindow.
+
+### Test counts
+
+Core 1,468 (unchanged — this is host plumbing). Type-check clean
+across player and builder.
+
+### Files
+
+- `packages/player/src/PlayerEngine.ts` (push sensorService into renderer state)
+
+---
+
+## 2026-05-05: SpatialPositionEditor — UI for Sound.spatialPosition
+
+### Overview
+
+Final piece of authoring polish for DirectionalSound. Until this
+landed, only programmer-authors who hand-edit project JSON could use
+spatial sound. Now there's a proper UI surface — disclosure-style
+"Directional positioning (optional)" panel that expands to mode-aware
+fields right under the Background Sound block in the Inspector.
+
+### Changes
+
+**`packages/builder/src/editors/SpatialPositionEditor.tsx`** (new) —
+reusable component, ~200 lines. Closed by default; opens to:
+
+- **Mode** select: Off / Geographic / Azimuth-only.
+- **Geographic**: lat/lng inputs, max-distance, "Snap source to
+  story origin" button (when project has an origin set).
+- **Azimuth-only**: degrees input (0=N) with cardinal-direction hint.
+- **Both modes**: optional elevation field.
+
+The header shows a `GPS` or `azimuth` badge when active so
+authors can scan a beat list and see at a glance which sounds are
+spatial. Closed-state stays out of the way for non-spatial sounds.
+
+Component is purely presentational — parent owns the
+`SpatialPosition` value, this just renders + emits onChange.
+
+**`packages/builder/src/components/Inspector.tsx`** — mounted under
+the Background Sound block when an actual sound is configured. No
+point editing spatial data for a non-existent sound. Reads/writes
+via `parameters.backgroundSoundSpatial`. Seeds the geographic-mode
+default from the project's origin lat/lng (Location & XR settings),
+so the lat/lng fields don't start at 0,0.
+
+The Sound-conversion path that runs on save now also propagates
+`backgroundSoundSpatial` onto `beat.sound.spatialPosition`, completing
+the chain Inspector → Sound object → BaseRenderer.playSound →
+AudioManager.playSpatialSound.
+
+### What's deferred to later
+
+Cluster sounds and dialog sounds also have config surfaces but they
+go through different paths — extending `SpatialPositionEditor` to
+those is straightforward (the component itself is already reusable)
+but each surface needs its own param-key + Sound-conversion update.
+This commit covers the most-visible case (Background Sound on a
+beat); the others land as their own focused commits when authoring
+demand surfaces.
+
+### Test counts
+
+Core 1,468 (unchanged — this is builder-only UI). Type-check clean
+across all packages.
+
+### Files
+
+- `packages/builder/src/editors/SpatialPositionEditor.tsx` (new)
+- `packages/builder/src/components/Inspector.tsx` (mount + Sound conversion)
+
+---
+
 ## 2026-05-04: Wire DirectionalSound into the renderer's playSound path
 
 ### Overview

@@ -22,7 +22,7 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.47** — this is a **beta**. Core functionality works
+Current release: **v0.9.48** — this is a **beta**. Core functionality works
 and new features arrive frequently. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
@@ -88,6 +88,14 @@ This is a high-level overview, grouped by theme. For per-version details see [VE
 - **Text-to-Speech**: Cloud providers (OpenAI, ElevenLabs) plus Web Speech API (browser-native) plus self-hosted (mlx-audio Kokoro for fully offline). Per-speaker voice routing, streaming audio, embedded in HTML exports with language-aware switching
 - **Speech-to-Text**: Web Speech API, whisper.cpp, Vosk, or OpenAI Whisper for AI Conversation voice input
 - **Language-Aware AI**: AI beats generate content in the active translation language with translated preview UI
+
+### XR & Location-Based Storytelling
+- **GpsLocationBeat**: First XR-category beat. `display` mode shows an interactive Leaflet map with target marker + radius ring + live player position; `trigger-on-arrival` / `trigger-on-departure` modes auto-resolve when the player walks across the threshold
+- **Three new Conditions**: `gpsProximity` (within N metres of a target), `indoorProximity` (within N metres of a beacon), `permissionGranted` (sensor permission state) — synchronously evaluable from cached sensor reads, available in ConditionBeat, choice requirements, and MovementChoice gates
+- **Directional Sound**: Sounds gain optional `spatialPosition` — geographic mode (lat/lng with bearing recomputed live) or azimuth-only (fixed compass direction). Routes through Web Audio HRTF panning + linear distance falloff. As the player walks, audio rotates and attenuates
+- **Location & XR Settings**: Project-level origin coordinates, default proximity radius, on-permission-denied policy (`skip` / `fallback`), mock location for desktop authoring, optional indoor venue floor plan
+- **MockSensorPanel**: Desktop-authoring stand-in for real GPS / orientation hardware. Walk N/S/E/W in 5m steps, simulate compass + tilt, drives the runtime state for testing without a phone
+- **SensorService Abstraction**: `WebSensorService` (production — `navigator.geolocation`, `DeviceOrientationEvent`, Bluetooth Web API) and `MockSensorService` (authoring) selected automatically by capability detection. HTML exports get the same XR support as the in-app preview
 
 ### Collaboration & Distribution
 - **Git VCS Integration**: Full Git inside the app — commit, push, pull, branch, merge, clone, history. Force-push option for rejection recovery; advisory beat-level editing locks for collaboration
