@@ -17,6 +17,7 @@ import { extractStoryStateReferences } from '../utils/storyStateExtraction';
 import { resolveTranslatedSpeakerName } from '../utils/speakerUtils';
 import { useUsedNames } from './characters/useUsedNames';
 import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
+import { XRLocationsEditor, type XRLocationEntry } from '../editors/XRLocationsEditor';
 import { RequirementsEditor } from '../editors/RequirementsEditor';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
 import {
@@ -1559,7 +1560,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                  beat.type !== 'pickProp' && getCanonicalBeatType(beat.type) !== 'conditionBeat' &&
                  beat.type !== 'setTimer' && beat.type !== 'randomTarget' &&
                  beat.type !== 'hyperText' && beat.type !== 'keypad' &&
-                 beat.type !== 'panorama' && beat.type !== 'updateAffect' && (
+                 beat.type !== 'panorama' && beat.type !== 'updateAffect' &&
+                 beat.type !== 'gpsLocation' && beat.type !== 'indoorLocation' && (
                   <SchemaFormGenerator
                     beatType={beat.type}
                     beatDefinition={getBeatDefinition(beat.type)}
@@ -1579,60 +1581,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                     onBeatPropertyChange={handleChange}
                     usedNames={usedNames}
                     onDefineAsCharacter={onDefineAsCharacter}
-                    customRenderers={
-                      beat.type === 'indoorLocation'
-                        ? {
-                            // Replace free-text targetBeaconUuid with a dropdown sourced
-                            // from globalSettings.location.venue.beacons. Falls back to
-                            // a free-text input + helpful hint when no beacons configured.
-                            targetBeaconUuid: (paramName, paramDef) => {
-                              const beacons = (globalSettings as any)?.location?.venue?.beacons as
-                                | Array<{ uuid: string; displayName?: string; x: number; y: number }>
-                                | undefined;
-                              const value = localBeat.parameters?.[paramName] || '';
-                              return (
-                                <div key={paramName}>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {paramDef.ui?.label || 'Target beacon'}{' '}
-                                    {paramDef.required && <span className="text-red-500">*</span>}
-                                  </label>
-                                  {beacons && beacons.length > 0 ? (
-                                    <select
-                                      value={value}
-                                      onChange={(e) => handleParameterChange(paramName, e.target.value)}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                    >
-                                      <option value="">— select a beacon —</option>
-                                      {beacons.map((b) => (
-                                        <option key={b.uuid} value={b.uuid}>
-                                          {b.displayName ? `${b.displayName} — ${b.uuid.slice(0, 8)}…` : b.uuid}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  ) : (
-                                    <>
-                                      <input
-                                        type="text"
-                                        value={value}
-                                        onChange={(e) => handleParameterChange(paramName, e.target.value)}
-                                        placeholder="No beacons configured — paste a UUID"
-                                        className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm font-mono"
-                                      />
-                                      <p className="text-xs text-amber-700 mt-1">
-                                        Add beacons in Project Settings → Location & XR → Indoor venue → Beacons
-                                        to get a picker here.
-                                      </p>
-                                    </>
-                                  )}
-                                  {paramDef.description && (
-                                    <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
-                                  )}
-                                </div>
-                              );
-                            },
-                          }
-                        : undefined
-                    }
                   />
                 )}
 
@@ -3862,6 +3810,164 @@ export const Inspector: React.FC<InspectorProps> = ({
                     </div>
                   </div>
                 )}
+
+                {/* XR location beats — shared editor for gpsLocation + indoorLocation. */}
+                {(beat.type === 'gpsLocation' || beat.type === 'indoorLocation') && (() => {
+                  const flavour = beat.type === 'gpsLocation' ? 'gps' : 'indoor';
+                  const locations = (localBeat.parameters?.xrLocations || []) as XRLocationEntry[];
+                  const venueBeacons = (globalSettings as any)?.location?.venue?.beacons as
+                    | Array<{ uuid: string; displayName?: string; x: number; y: number }>
+                    | undefined;
+                  return (
+                    <div className="space-y-3">
+                      {/* Mode selector */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Mode</label>
+                        <select
+                          value={localBeat.parameters?.mode || 'display'}
+                          onChange={(e) => handleParameterChange('mode', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="display">Display only (continue button)</option>
+                          <option value="trigger-on-arrival">Trigger on arrival</option>
+                          <option value="trigger-on-departure">Trigger on departure</option>
+                        </select>
+                      </div>
+
+                      {/* Instructional text */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Instructional text</label>
+                        <textarea
+                          value={localBeat.parameters?.text || ''}
+                          onChange={(e) => handleParameterChange('text', e.target.value)}
+                          placeholder={flavour === 'gps' ? 'Walk to the meeting point' : 'Find the artefact in the east wing'}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          rows={2}
+                        />
+                      </div>
+
+                      {/* Beat-level radius default */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-0.5">
+                            Default radius (m)
+                          </label>
+                          <input
+                            type="number"
+                            min={0.5}
+                            step={0.5}
+                            value={localBeat.parameters?.radiusMeters ?? ''}
+                            onChange={(e) => handleParameterChange('radiusMeters',
+                              e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.'))
+                            )}
+                            placeholder={flavour === 'gps' ? '25' : '5'}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-0.5">
+                            Timeout (ms, optional)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1000}
+                            value={localBeat.parameters?.timeoutMs ?? ''}
+                            onChange={(e) => handleParameterChange('timeoutMs',
+                              e.target.value === '' ? undefined : parseFloat(e.target.value)
+                            )}
+                            placeholder="(no timeout)"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {/* GPS-only: map style + player marker toggle */}
+                      {flavour === 'gps' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-0.5">Map style</label>
+                            <select
+                              value={localBeat.parameters?.mapStyle || 'streets'}
+                              onChange={(e) => handleParameterChange('mapStyle', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="streets">Streets</option>
+                              <option value="satellite">Satellite</option>
+                              <option value="minimal">Minimal</option>
+                            </select>
+                          </div>
+                          <label className="flex items-center gap-2 mt-5 text-sm text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={localBeat.parameters?.showPlayerMarker !== false}
+                              onChange={(e) => handleParameterChange('showPlayerMarker', e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            Show player marker
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Continue / cancel button labels */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-0.5">Continue button</label>
+                          <input
+                            type="text"
+                            value={localBeat.parameters?.buttonText || ''}
+                            onChange={(e) => handleParameterChange('buttonText', e.target.value)}
+                            placeholder="Continue"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-0.5">Skip button (optional)</label>
+                          <input
+                            type="text"
+                            value={localBeat.parameters?.cancelButtonText || ''}
+                            onChange={(e) => handleParameterChange('cancelButtonText', e.target.value)}
+                            placeholder="(no skip button)"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Locations list */}
+                      <XRLocationsEditor
+                        flavour={flavour}
+                        locations={locations}
+                        onChange={(next) => handleParameterChange('xrLocations', next)}
+                        availableTargets={availableTargets}
+                        venueBeacons={venueBeacons}
+                        availableCounters={availableCounters}
+                        availableVariables={availableVariables}
+                        availableInventoryItems={availableInventoryItems}
+                        availableCharacters={characters}
+                        emotionPalette={emotionPalette}
+                      />
+
+                      {/* Default target — used in display mode + on timeout / skip / no-match */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-0.5">
+                          Default target — used on Continue / timeout / skip
+                        </label>
+                        <select
+                          value={localBeat.parameters?.defaultTarget || ''}
+                          onChange={(e) => handleParameterChange('defaultTarget', e.target.value || undefined)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                        >
+                          <option value="">— none (uses graph connection) —</option>
+                          {availableTargets.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name ? `${t.name} (${t.id})` : t.id}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Pick Prop */}
                 {beat.type === 'pickProp' && (

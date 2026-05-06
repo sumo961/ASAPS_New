@@ -36,13 +36,23 @@ function makeStoryStub(opts: {
   } as any;
 }
 
-function makeRenderer(resolveValue: string = 'continue') {
+function makeRenderer(
+  resolveValue:
+    | string
+    | { path: string; locationId?: string }
+    = { path: 'continue' },
+) {
   const calls: any[] = [];
   const stateMap = new Map<string, any>();
+  // Accept legacy string resolveValue (just 'continue', 'arrived', etc) so
+  // older tests stay readable; convert to the new {path, locationId?} shape.
+  const normalised = typeof resolveValue === 'string'
+    ? { path: resolveValue }
+    : resolveValue;
   return {
     renderMap: vi.fn(async (options: any) => {
       calls.push(options);
-      return resolveValue;
+      return normalised;
     }),
     setState: (k: string, v: any) => stateMap.set(k, v),
     getState: (k: string) => stateMap.get(k),
@@ -118,9 +128,11 @@ describe('GpsLocationBeat', () => {
       } as any);
       await (beat as any).performAction(context, renderer);
       expect(renderer.renderMap).toHaveBeenCalledTimes(1);
-      expect(renderer.calls[0]).toMatchObject({
-        mode: 'display', targetLat: 51.5, targetLng: -0.1, radiusMeters: 25,
-      });
+      expect(renderer.calls[0]).toMatchObject({ mode: 'display' });
+      // Legacy single-target params synthesize a one-element locations array.
+      expect(renderer.calls[0].locations).toEqual([
+        expect.objectContaining({ lat: 51.5, lng: -0.1, radiusMeters: 25 }),
+      ]);
     });
 
     it('propagates SensorService into renderer state', async () => {
@@ -206,7 +218,7 @@ describe('GpsLocationBeat', () => {
         parameters: { mode: 'display', targetLat: 0, targetLng: 0, radiusMeters: 7 },
       } as any);
       await (beat as any).performAction(context, renderer);
-      expect(renderer.calls[0].radiusMeters).toBe(7);
+      expect(renderer.calls[0].locations[0].radiusMeters).toBe(7);
     });
 
     it('falls through to project defaultProximityRadiusM when beat has no radius', async () => {
@@ -219,7 +231,7 @@ describe('GpsLocationBeat', () => {
         parameters: { mode: 'display', targetLat: 0, targetLng: 0 },
       } as any);
       await (beat as any).performAction(context, renderer);
-      expect(renderer.calls[0].radiusMeters).toBe(100);
+      expect(renderer.calls[0].locations[0].radiusMeters).toBe(100);
     });
 
     it('falls through to 25m when neither beat nor project sets a radius', async () => {
@@ -229,7 +241,7 @@ describe('GpsLocationBeat', () => {
         parameters: { mode: 'display', targetLat: 0, targetLng: 0 },
       } as any);
       await (beat as any).performAction(context, renderer);
-      expect(renderer.calls[0].radiusMeters).toBe(25);
+      expect(renderer.calls[0].locations[0].radiusMeters).toBe(25);
     });
   });
 

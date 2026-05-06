@@ -35,13 +35,21 @@ function makeStoryStub(opts: {
   } as any;
 }
 
-function makeRenderer(resolveValue: string = 'continue') {
+function makeRenderer(
+  resolveValue:
+    | string
+    | { path: string; locationId?: string }
+    = { path: 'continue' },
+) {
   const calls: any[] = [];
   const stateMap = new Map<string, any>();
+  const normalised = typeof resolveValue === 'string'
+    ? { path: resolveValue }
+    : resolveValue;
   return {
     renderIndoorMap: vi.fn(async (options: any) => {
       calls.push(options);
-      return resolveValue;
+      return normalised;
     }),
     setState: (k: string, v: any) => stateMap.set(k, v),
     getState: (k: string) => stateMap.get(k),
@@ -118,9 +126,11 @@ describe('IndoorLocationBeat', () => {
       } as any);
       await (beat as any).performAction(context, renderer);
       expect(renderer.renderIndoorMap).toHaveBeenCalledTimes(1);
-      expect(renderer.calls[0]).toMatchObject({
-        mode: 'display', targetBeaconUuid: TEST_UUID, radiusMeters: 5,
-      });
+      expect(renderer.calls[0]).toMatchObject({ mode: 'display' });
+      // Legacy single-target params synthesize a one-element locations array.
+      expect(renderer.calls[0].locations).toEqual([
+        expect.objectContaining({ beaconUuid: TEST_UUID, radiusMeters: 5 }),
+      ]);
     });
 
     it('propagates SensorService into renderer state', async () => {
@@ -204,7 +214,7 @@ describe('IndoorLocationBeat', () => {
         parameters: { mode: 'display', targetBeaconUuid: TEST_UUID, radiusMeters: 2 },
       } as any);
       await (beat as any).performAction(context, renderer);
-      expect(renderer.calls[0].radiusMeters).toBe(2);
+      expect(renderer.calls[0].locations[0].radiusMeters).toBe(2);
     });
 
     it('falls through to project defaultProximityRadiusM when beat has no radius', async () => {
@@ -217,7 +227,7 @@ describe('IndoorLocationBeat', () => {
         parameters: { mode: 'display', targetBeaconUuid: TEST_UUID },
       } as any);
       await (beat as any).performAction(context, renderer);
-      expect(renderer.calls[0].radiusMeters).toBe(10);
+      expect(renderer.calls[0].locations[0].radiusMeters).toBe(10);
     });
 
     it('falls through to 5m room-scale default when neither beat nor project sets a radius', async () => {
@@ -228,7 +238,7 @@ describe('IndoorLocationBeat', () => {
       } as any);
       await (beat as any).performAction(context, renderer);
       // Indoor default is 5m (tighter than GPS's 25m).
-      expect(renderer.calls[0].radiusMeters).toBe(5);
+      expect(renderer.calls[0].locations[0].radiusMeters).toBe(5);
     });
   });
 
@@ -254,6 +264,120 @@ describe('IndoorLocationBeat', () => {
       } as any);
       await (beat as any).performAction(context, renderer);
       expect(warn).toHaveBeenCalled();
+    });
+  });
+
+  describe('multi-location', () => {
+    const UUID_A = '11111111-1111-1111-1111-111111111111';
+    const UUID_B = '22222222-2222-2222-2222-222222222222';
+
+    it('forwards all locations to the renderer', async () => {
+      const renderer = makeRenderer();
+      const beat = new IndoorLocationBeat({
+        id: 'b1', name: 'Indoor', type: 'indoorLocation',
+        parameters: {
+          mode: 'display',
+          xrLocations: [
+            { id: 'loc-a', beaconUuid: UUID_A, radiusMeters: 3, name: 'Reception', target: 'b-reception' },
+            { id: 'loc-b', beaconUuid: UUID_B, radiusMeters: 7, name: 'Stairs', target: 'b-stairs' },
+          ],
+        },
+      } as any);
+      await (beat as any).performAction(context, renderer);
+      expect(renderer.calls[0].locations).toHaveLength(2);
+      expect(renderer.calls[0].locations[0]).toMatchObject({ id: 'loc-a', beaconUuid: UUID_A, radiusMeters: 3 });
+      expect(renderer.calls[0].locations[1]).toMatchObject({ id: 'loc-b', beaconUuid: UUID_B, radiusMeters: 7 });
+    });
+
+    it('returns the matched location\'s target on resolution', async () => {
+      const renderer = makeRenderer({ path: 'arrived', locationId: 'loc-b' });
+      const beat = new IndoorLocationBeat({
+        id: 'b1', name: 'Indoor', type: 'indoorLocation',
+        parameters: {
+          mode: 'trigger-on-arrival',
+          xrLocations: [
+            { id: 'loc-a', beaconUuid: UUID_A, target: 'b-reception' },
+            { id: 'loc-b', beaconUuid: UUID_B, target: 'b-stairs' },
+          ],
+        },
+      } as any);
+      const result = await (beat as any).performAction(context, renderer);
+      expect(result).toBe('b-stairs');
+    });
+
+    it('applies the matched location\'s effects on resolution', async () => {
+      const renderer = makeRenderer({ path: 'arrived', locationId: 'loc-b' });
+      const beat = new IndoorLocationBeat({
+        id: 'b1', name: 'Indoor', type: 'indoorLocation',
+        parameters: {
+          mode: 'trigger-on-arrival',
+          xrLocations: [
+            { id: 'loc-a', beaconUuid: UUID_A, target: 'a' },
+            {
+              id: 'loc-b',
+              beaconUuid: UUID_B,
+              target: 'b',
+              effects: [
+                { type: 'incrementCounter', target: 'visited_stairs', value: 1 },
+              ],
+            },
+          ],
+        },
+      } as any);
+      await (beat as any).performAction(context, renderer);
+      // Counter should have been incremented from 0 → 1.
+      expect(context.getCounter('visited_stairs')).toBe(1);
+    });
+
+    it('falls back to defaultTarget on display-mode continue', async () => {
+      const renderer = makeRenderer({ path: 'continue' });
+      const beat = new IndoorLocationBeat({
+        id: 'b1', name: 'Indoor', type: 'indoorLocation',
+        parameters: {
+          mode: 'display',
+          defaultTarget: 'b-overview-next',
+          xrLocations: [
+            { id: 'loc-a', beaconUuid: UUID_A, target: 'a' },
+            { id: 'loc-b', beaconUuid: UUID_B, target: 'b' },
+          ],
+        },
+      } as any);
+      const result = await (beat as any).performAction(context, renderer);
+      expect(result).toBe('b-overview-next');
+    });
+
+    it('per-location radius overrides beat-level radius', async () => {
+      const renderer = makeRenderer();
+      const beat = new IndoorLocationBeat({
+        id: 'b1', name: 'Indoor', type: 'indoorLocation',
+        parameters: {
+          mode: 'display',
+          radiusMeters: 10, // beat-level default
+          xrLocations: [
+            { id: 'loc-a', beaconUuid: UUID_A, target: 'a' }, // inherits 10
+            { id: 'loc-b', beaconUuid: UUID_B, radiusMeters: 2, target: 'b' }, // override
+          ],
+        },
+      } as any);
+      await (beat as any).performAction(context, renderer);
+      expect(renderer.calls[0].locations[0].radiusMeters).toBe(10);
+      expect(renderer.calls[0].locations[1].radiusMeters).toBe(2);
+    });
+
+    it('exposes one connection per location via getConnections', () => {
+      const beat = new IndoorLocationBeat({
+        id: 'b1', name: 'Indoor', type: 'indoorLocation',
+        parameters: {
+          xrLocations: [
+            { id: 'loc-a', beaconUuid: UUID_A, target: 'b-reception', name: 'Reception' },
+            { id: 'loc-b', beaconUuid: UUID_B, target: 'b-stairs', name: 'Stairs' },
+          ],
+        },
+      } as any);
+      const connections = beat.getConnections();
+      const targets = connections.map((c: any) => c.targetId);
+      expect(targets).toContain('b-reception');
+      expect(targets).toContain('b-stairs');
     });
   });
 });

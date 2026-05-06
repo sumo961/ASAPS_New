@@ -2816,27 +2816,23 @@ export class ReactRenderer extends BaseRenderer {
    */
   async renderMap(options: {
     mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
-    targetLat: number;
-    targetLng: number;
-    radiusMeters: number;
+    locations: Array<{ id: string; name?: string; lat: number; lng: number; radiusMeters: number }>;
     text?: string;
     buttonText?: string;
     cancelButtonText?: string;
     timeoutMs?: number;
     mapStyle?: 'streets' | 'satellite' | 'minimal';
     showPlayerMarker?: boolean;
-  }, _locations?: Location[]): Promise<string> {
+  }, _locations?: Location[]): Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }> {
     const sensorService = this.getState('sensorService');
     if (options.text) {
       this.ttsSpeakCallback?.(options.text, this.currentSpeaker, true);
     }
-    return new Promise<string>((resolve) => {
+    return new Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }>((resolve) => {
       this.renderComponent(
         <MapBeatLeaflet
           mode={options.mode}
-          targetLat={options.targetLat}
-          targetLng={options.targetLng}
-          radiusMeters={options.radiusMeters}
+          locations={options.locations}
           text={options.text}
           buttonText={options.buttonText}
           cancelButtonText={options.cancelButtonText}
@@ -2844,7 +2840,7 @@ export class ReactRenderer extends BaseRenderer {
           mapStyle={options.mapStyle}
           showPlayerMarker={options.showPlayerMarker}
           sensorService={sensorService}
-          onResolve={(path) => resolve(path)}
+          onResolve={(resolution) => resolve(resolution)}
         />
       );
     });
@@ -2858,8 +2854,7 @@ export class ReactRenderer extends BaseRenderer {
    */
   async renderIndoorMap(options: {
     mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
-    targetBeaconUuid: string;
-    radiusMeters: number;
+    locations: Array<{ id: string; name?: string; beaconUuid: string; radiusMeters: number }>;
     text?: string;
     buttonText?: string;
     cancelButtonText?: string;
@@ -2871,14 +2866,11 @@ export class ReactRenderer extends BaseRenderer {
       floorHeight: number;
     };
     beacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }>;
-  }): Promise<string> {
+  }): Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }> {
     const sensorService = this.getState('sensorService');
     if (options.text) {
       this.ttsSpeakCallback?.(options.text, this.currentSpeaker, true);
     }
-    // Resolve floor-plan asset id to a URL via the renderer's asset
-    // resolver (same path used by image elements). The component
-    // gracefully renders a beacons-only SVG when there's no floor plan.
     const floorPlanUrl = options.venue?.floorPlanAssetId
       ? this.resolveAssetUrl(options.venue.floorPlanAssetId) ?? undefined
       : undefined;
@@ -2890,12 +2882,11 @@ export class ReactRenderer extends BaseRenderer {
           floorHeight: options.venue.floorHeight,
         }
       : undefined;
-    return new Promise<string>((resolve) => {
+    return new Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }>((resolve) => {
       this.renderComponent(
         <IndoorMapBeat
           mode={options.mode}
-          targetBeaconUuid={options.targetBeaconUuid}
-          radiusMeters={options.radiusMeters}
+          locations={options.locations}
           text={options.text}
           buttonText={options.buttonText}
           cancelButtonText={options.cancelButtonText}
@@ -2903,7 +2894,7 @@ export class ReactRenderer extends BaseRenderer {
           venue={venue}
           beacons={options.beacons}
           sensorService={sensorService}
-          onResolve={(path) => resolve(path)}
+          onResolve={(resolution) => resolve(resolution)}
         />
       );
     });

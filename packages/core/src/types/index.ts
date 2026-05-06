@@ -286,6 +286,37 @@ export interface CharacterVariant {
   characterDescription?: string;
 }
 
+/**
+ * One location entry on a multi-location XR beat (v0.9.49+). Mirrors the
+ * shape of MovementChoice's `choices` — each location has its own
+ * target beat and optional Effects bundle that fires when this
+ * specific location is the one the player crossed into / out of.
+ *
+ * Two flavours: GPS (lat/lng) and indoor (beaconUuid). The `kind`
+ * discriminator lets a beat type filter to the right one.
+ */
+export interface XRLocationEntry {
+  /** Stable id for this location. Used by the renderer to identify which one fired. */
+  id: string;
+  /** Author-facing label (e.g. "Front gate", "Statue", "Bookshelf"). */
+  name?: string;
+  /** GPS target — set for GpsLocationBeat. */
+  lat?: number;
+  lng?: number;
+  /** Indoor beacon target — set for IndoorLocationBeat. */
+  beaconUuid?: string;
+  /**
+   * Per-location radius. Falls back to the beat's `radiusMeters`,
+   * then the project's `defaultProximityRadiusM`, then a beat-type
+   * default (25m for GPS, 5m for indoor).
+   */
+  radiusMeters?: number;
+  /** Beat id to advance to when this location is the resolution. Required. */
+  target: string;
+  /** Effects to apply on resolution (counters, mood, sentiment, etc). */
+  effects?: Effect[];
+}
+
 export interface Effect {
   type:
     | 'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter'
@@ -622,16 +653,32 @@ export interface IRenderer {
   // to display and when to resolve.
   renderMap?(options: {
     mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
-    targetLat: number;
-    targetLng: number;
-    radiusMeters: number;
+    /**
+     * Locations to render on the map. v0.9.49+ supports multiple per
+     * beat — each entry has its own lat/lng + radius + name. The
+     * renderer reports back which location the player crossed via
+     * the resolution's `locationId`. Single-location beats produce a
+     * one-element array.
+     */
+    locations: Array<{
+      id: string;
+      name?: string;
+      lat: number;
+      lng: number;
+      radiusMeters: number;
+    }>;
     text?: string;
     buttonText?: string;
     cancelButtonText?: string;
     timeoutMs?: number;
     mapStyle?: 'streets' | 'satellite' | 'minimal';
     showPlayerMarker?: boolean;
-  }, locations?: Location[]): Promise<string>;
+  }, _locations?: Location[]): Promise<{
+    /** Resolution path. */
+    path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped';
+    /** Which location resolved (when path is arrival/departure). */
+    locationId?: string;
+  }>;
 
   /**
    * Render an indoor floor-plan view for the IndoorLocationBeat (v0.9.49+).
@@ -642,8 +689,17 @@ export interface IRenderer {
    */
   renderIndoorMap?(options: {
     mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
-    targetBeaconUuid: string;
-    radiusMeters: number;
+    /**
+     * Target locations referencing beacons by UUID. v0.9.49+ supports
+     * multiple per beat. The renderer resolves on first crossing and
+     * reports `locationId` so the runtime knows which Effects fire.
+     */
+    locations: Array<{
+      id: string;
+      name?: string;
+      beaconUuid: string;
+      radiusMeters: number;
+    }>;
     text?: string;
     buttonText?: string;
     cancelButtonText?: string;
@@ -657,7 +713,10 @@ export interface IRenderer {
     };
     /** All authored beacons with floor-plan positions in metres. */
     beacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }>;
-  }): Promise<string>;
+  }): Promise<{
+    path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped';
+    locationId?: string;
+  }>;
 
   // Transition and effects
   prepareTransition?(transition: Transition): void;  // Set up initial hidden state before rendering

@@ -98,11 +98,22 @@ function ensureLeafletResetStyle() {
   document.head.appendChild(style);
 }
 
+interface MapLocation {
+  id: string;
+  name?: string;
+  lat: number;
+  lng: number;
+  radiusMeters: number;
+}
+
 interface MapBeatLeafletProps {
   mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
-  targetLat: number;
-  targetLng: number;
-  radiusMeters: number;
+  /**
+   * One or more target locations. Each is rendered with a marker + radius
+   * ring; in trigger modes, the first location the player crosses
+   * resolves the beat and its `id` is reported back via onResolve.
+   */
+  locations: MapLocation[];
   text?: string;
   buttonText?: string;
   cancelButtonText?: string;
@@ -111,7 +122,10 @@ interface MapBeatLeafletProps {
   showPlayerMarker?: boolean;
   /** SensorService — passed via renderer state. */
   sensorService?: any;
-  onResolve: (path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped') => void;
+  onResolve: (resolution: {
+    path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped';
+    locationId?: string;
+  }) => void;
 }
 
 /** Haversine in metres — same formula as the engine's gpsProximity. */
@@ -164,9 +178,7 @@ const DEFAULT_PLAYER_ICON = L.divIcon({
 
 export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
   mode,
-  targetLat,
-  targetLng,
-  radiusMeters,
+  locations,
   text,
   buttonText = 'Continue',
   cancelButtonText,
@@ -198,14 +210,16 @@ export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
   // Initialise the Leaflet map once on mount.
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
+    if (!locations || locations.length === 0) return;
     // Inject leaflet's own CSS first (library build doesn't auto-load it),
     // then our scoped reset to defeat host img-resets.
     ensureLeafletCoreStyle();
     ensureLeafletResetStyle();
 
     const tile = TILE_URLS[mapStyle] || TILE_URLS.streets;
+    const initialCenter: [number, number] = [locations[0].lat, locations[0].lng];
     const map = L.map(mapContainerRef.current, {
-      center: [targetLat, targetLng],
+      center: initialCenter,
       zoom: 17,
       zoomControl: true,
       attributionControl: true,
@@ -215,15 +229,33 @@ export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
       maxZoom: tile.maxZoom,
     }).addTo(map);
 
-    // Target marker + radius ring.
-    L.marker([targetLat, targetLng], { icon: DEFAULT_TARGET_ICON, title: 'Target' }).addTo(map);
-    L.circle([targetLat, targetLng], {
-      radius: radiusMeters,
-      color: '#dc2626',
-      fillColor: '#dc2626',
-      fillOpacity: 0.1,
-      weight: 2,
-    }).addTo(map);
+    // One marker + radius ring per location. Author-supplied name appears
+    // as the marker tooltip (so authors can hover to verify which is which).
+    for (const loc of locations) {
+      const marker = L.marker([loc.lat, loc.lng], {
+        icon: DEFAULT_TARGET_ICON,
+        title: loc.name || loc.id,
+      }).addTo(map);
+      if (loc.name) marker.bindTooltip(loc.name, { permanent: false, direction: 'top', offset: [0, -8] });
+      L.circle([loc.lat, loc.lng], {
+        radius: loc.radiusMeters,
+        color: '#dc2626',
+        fillColor: '#dc2626',
+        fillOpacity: 0.1,
+        weight: 2,
+      }).addTo(map);
+    }
+
+    // If multiple locations, fit them all in view immediately. With one
+    // location, leave default zoom (17) so the player gets close-range detail.
+    if (locations.length > 1) {
+      try {
+        map.fitBounds(
+          L.latLngBounds(locations.map((l) => [l.lat, l.lng] as [number, number])).pad(0.3),
+          { maxZoom: 17 },
+        );
+      } catch { /* ignore */ }
+    }
 
     mapRef.current = map;
 
@@ -296,7 +328,11 @@ export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
       mapRef.current = null;
       playerMarkerRef.current = null;
     };
-  }, [mapStyle, targetLat, targetLng, radiusMeters]);
+    // Effect intentionally only re-runs on mapStyle changes — the locations
+    // array is rendered once at mount; re-rendering markers on every update
+    // would tear down the user's manual pans/zooms.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapStyle]);
 
   // Subscribe to live location updates.
   useEffect(() => {
@@ -317,20 +353,18 @@ export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
 
     if (!playerMarkerRef.current) {
       // First time we know where the player is — drop the marker and fit
-      // bounds to show both target and player ("overview").
+      // bounds to show every location plus the player ("overview").
       playerMarkerRef.current = L.marker([playerLat, playerLng], {
         icon: DEFAULT_PLAYER_ICON,
         title: 'You',
       }).addTo(map);
       initialPlayerPosRef.current = { lat: playerLat, lng: playerLng };
       try {
-        map.fitBounds(
-          L.latLngBounds([
-            [targetLat, targetLng],
-            [playerLat, playerLng],
-          ]).pad(0.4),
-          { maxZoom: 18 },
-        );
+        const points: [number, number][] = [
+          [playerLat, playerLng],
+          ...locations.map((l) => [l.lat, l.lng] as [number, number]),
+        ];
+        map.fitBounds(L.latLngBounds(points).pad(0.4), { maxZoom: 18 });
       } catch { /* invalid bounds (e.g. identical points) — ignore */ }
       return;
     }
@@ -358,24 +392,32 @@ export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
         map.panTo([playerLat, playerLng], { animate: true });
       }
     }
-  }, [playerLat, playerLng, targetLat, targetLng, showPlayerMarker]);
+  }, [playerLat, playerLng, locations, showPlayerMarker]);
 
-  // Threshold-crossing detection for trigger modes.
+  // Threshold-crossing detection for trigger modes. Iterate every location;
+  // the first one that satisfies the mode's condition resolves the beat,
+  // and its id is reported back so the runtime can fire its specific
+  // Effects + advance to its target.
   useEffect(() => {
     if (mode === 'display' || resolvedRef.current) return;
     if (playerLat === null || playerLng === null) return;
-    const distance = haversineMeters(playerLat, playerLng, targetLat, targetLng);
-    const within = distance <= radiusMeters;
-    if (mode === 'trigger-on-arrival' && within) {
-      resolvedRef.current = true;
-      setResolved(true);
-      onResolveRef.current('arrived');
-    } else if (mode === 'trigger-on-departure' && !within) {
-      resolvedRef.current = true;
-      setResolved(true);
-      onResolveRef.current('departed');
+    for (const loc of locations) {
+      const distance = haversineMeters(playerLat, playerLng, loc.lat, loc.lng);
+      const within = distance <= loc.radiusMeters;
+      if (mode === 'trigger-on-arrival' && within) {
+        resolvedRef.current = true;
+        setResolved(true);
+        onResolveRef.current({ path: 'arrived', locationId: loc.id });
+        return;
+      }
+      if (mode === 'trigger-on-departure' && !within) {
+        resolvedRef.current = true;
+        setResolved(true);
+        onResolveRef.current({ path: 'departed', locationId: loc.id });
+        return;
+      }
     }
-  }, [mode, playerLat, playerLng, targetLat, targetLng, radiusMeters]);
+  }, [mode, playerLat, playerLng, locations]);
 
   // Optional timeout.
   useEffect(() => {
@@ -384,43 +426,56 @@ export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
       if (resolvedRef.current) return;
       resolvedRef.current = true;
       setResolved(true);
-      onResolveRef.current('timeout');
+      onResolveRef.current({ path: 'timeout' });
     }, timeoutMs);
     return () => window.clearTimeout(handle);
   }, [timeoutMs]);
 
-  const distance = playerLat !== null && playerLng !== null
-    ? haversineMeters(playerLat, playerLng, targetLat, targetLng)
-    : null;
-  const within = distance !== null && distance <= radiusMeters;
+  // Compute distance to the closest location (so the status bar shows
+  // the most useful number when there are multiple targets).
+  let nearest: { loc: MapLocation; distance: number } | null = null;
+  if (playerLat !== null && playerLng !== null) {
+    for (const loc of locations) {
+      const d = haversineMeters(playerLat, playerLng, loc.lat, loc.lng);
+      if (!nearest || d < nearest.distance) nearest = { loc, distance: d };
+    }
+  }
 
   let statusText: string;
   let statusColour: string;
   if (mode === 'display') {
-    statusText = 'Map view';
+    const count = locations.length;
+    statusText = count === 1 ? 'Map view' : `${count} locations`;
     statusColour = '#1d4ed8';
-  } else if (distance === null) {
+  } else if (!nearest) {
     statusText = 'Waiting for location…';
     statusColour = '#6b7280';
-  } else if (mode === 'trigger-on-arrival') {
-    statusText = within ? 'Arrived ✓' : `${Math.round(distance)} m away`;
-    statusColour = within ? '#15803d' : '#b45309';
   } else {
-    statusText = within ? `${Math.round(distance)} m inside (waiting to depart)` : 'Departed ✓';
-    statusColour = within ? '#b45309' : '#15803d';
+    const within = nearest.distance <= nearest.loc.radiusMeters;
+    const label = nearest.loc.name || 'target';
+    if (mode === 'trigger-on-arrival') {
+      statusText = within ? `At ${label} ✓` : `${Math.round(nearest.distance)} m to ${label}`;
+      statusColour = within ? '#15803d' : '#b45309';
+    } else {
+      // departure mode: in-range = still inside (waiting); out-of-range = departed.
+      statusText = within
+        ? `${Math.round(nearest.distance)} m inside ${label} (waiting to depart)`
+        : `Departed ${label} ✓`;
+      statusColour = within ? '#b45309' : '#15803d';
+    }
   }
 
   const handleContinue = () => {
     if (resolvedRef.current) return;
     resolvedRef.current = true;
     setResolved(true);
-    onResolveRef.current('continue');
+    onResolveRef.current({ path: 'continue' });
   };
   const handleSkip = () => {
     if (resolvedRef.current) return;
     resolvedRef.current = true;
     setResolved(true);
-    onResolveRef.current('skipped');
+    onResolveRef.current({ path: 'skipped' });
   };
 
   return (

@@ -1,61 +1,52 @@
 /**
- * IndoorLocationBeat (v0.9.49+) — second XR beat, indoor-positioning twin
- * of GpsLocationBeat.
+ * IndoorLocationBeat (v0.9.49+) — multi-location indoor twin of
+ * GpsLocationBeat. Each location references a beacon UUID; the beat
+ * resolves on first crossing, fires that location's Effects, and
+ * advances to its target.
  *
- * Renders a floor-plan UI showing a target Bluetooth beacon and, in
- * trigger modes, waits for the player to walk into (or out of) a
- * radius around that beacon. The renderer reads beacon definitions
- * (UUID + display name + x/y on the floor plan) from
- * `globalSettings.location.venue.beacons` and live BeaconReadings from
- * the StoryContext's SensorService.
- *
- * Symmetric with GpsLocationBeat — same three modes, same five
- * resolution paths, same permission-policy integration. The only
- * differences are the sensor type (beacons vs GPS) and the rendering
- * surface (floor-plan image vs Leaflet map).
- *
- * Resolution paths (renderer returns one of these):
- *   - 'arrived'   — player walked within radiusMeters of the target beacon
- *   - 'departed'  — player walked beyond radiusMeters (trigger-on-departure)
- *   - 'continue'  — player clicked the continue button (display mode)
- *   - 'timeout'   — the optional timeout elapsed
- *   - 'skipped'   — player explicitly skipped the beat
+ * Modes mirror GpsLocationBeat. Backward compatibility kept via the
+ * legacy `targetBeaconUuid` field — beats authored with the v0.9.49
+ * single-target form synthesize a one-element location array at runtime.
  */
 
 import { Beat } from './Beat';
-import type { BeatConfig, IRenderer } from '../types';
+import type { BeatConfig, IRenderer, Effect, XRLocationEntry } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { ensureXRPermission } from '../utils/xrPermissions';
 
 export interface IndoorLocationBeatParameters {
-  /** Behaviour mode. Default: 'display'. */
   mode?: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
-  /** Target beacon UUID — must match a beacon defined in venue.beacons. */
-  targetBeaconUuid?: string;
   /**
-   * Proximity radius in metres. Defaults to the project's
-   * `LocationSettings.defaultProximityRadiusM` if set, else 5m
-   * (room-scale by default — indoor proximity is tighter than GPS).
+   * Multi-location array. Each entry has a beaconUuid + target + effects.
+   * Named `xrLocations` (not `locations`) to avoid clashing with
+   * BeatConfig.locations.
    */
+  xrLocations?: XRLocationEntry[];
+  /** Display-mode continue / timeout / skip target. */
+  defaultTarget?: string;
+  /** Beat-level radius default — used when a location doesn't override. */
   radiusMeters?: number;
-  /** Instructional text shown over the floor plan. */
   text?: string;
-  /** Continue button label (display mode). */
   buttonText?: string;
-  /** Optional explicit skip / cancel button label. */
   cancelButtonText?: string;
-  /** Timeout in milliseconds — beat resolves with 'timeout' if no other resolution fires. */
   timeoutMs?: number;
+  /** @deprecated use `locations[0].beaconUuid`. Kept for backward compat. */
+  targetBeaconUuid?: string;
 }
 
 export class IndoorLocationBeat extends Beat {
   public mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
-  public targetBeaconUuid?: string;
+  // Renamed from `locations` to avoid clashing with Beat.locations
+  // (the legacy Map<string, Location> on the base class). Serialized
+  // parameter key is still `locations`.
+  public xrLocations?: XRLocationEntry[];
+  public defaultTarget?: string;
   public radiusMeters?: number;
   public text?: string;
   public buttonText?: string;
   public cancelButtonText?: string;
   public timeoutMs?: number;
+  public targetBeaconUuid?: string;
 
   constructor(config: BeatConfig & {
     parameters?: Partial<IndoorLocationBeatParameters>;
@@ -63,34 +54,77 @@ export class IndoorLocationBeat extends Beat {
     super(config);
     const p = (config.parameters || {}) as Partial<IndoorLocationBeatParameters>;
     this.mode = (config as any).mode ?? p.mode ?? 'display';
-    this.targetBeaconUuid = (config as any).targetBeaconUuid ?? p.targetBeaconUuid;
+    this.xrLocations = (config as any).xrLocations ?? p.xrLocations;
+    this.defaultTarget = (config as any).defaultTarget ?? p.defaultTarget;
     this.radiusMeters = (config as any).radiusMeters ?? p.radiusMeters;
     this.text = (config as any).text ?? p.text;
     this.buttonText = (config as any).buttonText ?? p.buttonText;
     this.cancelButtonText = (config as any).cancelButtonText ?? p.cancelButtonText;
     this.timeoutMs = (config as any).timeoutMs ?? p.timeoutMs;
+    this.targetBeaconUuid = (config as any).targetBeaconUuid ?? p.targetBeaconUuid;
   }
 
   getParameters(): Record<string, any> {
     return {
       mode: this.mode,
-      ...(this.targetBeaconUuid !== undefined ? { targetBeaconUuid: this.targetBeaconUuid } : {}),
+      ...(this.xrLocations !== undefined ? { xrLocations: this.xrLocations } : {}),
+      ...(this.defaultTarget !== undefined ? { defaultTarget: this.defaultTarget } : {}),
       ...(this.radiusMeters !== undefined ? { radiusMeters: this.radiusMeters } : {}),
       ...(this.text !== undefined ? { text: this.text } : {}),
       ...(this.buttonText !== undefined ? { buttonText: this.buttonText } : {}),
       ...(this.cancelButtonText !== undefined ? { cancelButtonText: this.cancelButtonText } : {}),
       ...(this.timeoutMs !== undefined ? { timeoutMs: this.timeoutMs } : {}),
+      ...(this.targetBeaconUuid !== undefined ? { targetBeaconUuid: this.targetBeaconUuid } : {}),
     };
   }
 
   updateParameters(params: Record<string, any>): void {
     if (params.mode !== undefined) this.mode = params.mode;
-    if (params.targetBeaconUuid !== undefined) this.targetBeaconUuid = params.targetBeaconUuid;
+    if (params.xrLocations !== undefined) this.xrLocations = params.xrLocations;
+    if (params.defaultTarget !== undefined) this.defaultTarget = params.defaultTarget;
     if (params.radiusMeters !== undefined) this.radiusMeters = params.radiusMeters;
     if (params.text !== undefined) this.text = params.text;
     if (params.buttonText !== undefined) this.buttonText = params.buttonText;
     if (params.cancelButtonText !== undefined) this.cancelButtonText = params.cancelButtonText;
     if (params.timeoutMs !== undefined) this.timeoutMs = params.timeoutMs;
+    if (params.targetBeaconUuid !== undefined) this.targetBeaconUuid = params.targetBeaconUuid;
+  }
+
+  private getEffectiveLocations(): XRLocationEntry[] {
+    if (this.xrLocations && this.xrLocations.length > 0) return this.xrLocations;
+    if (this.targetBeaconUuid) {
+      return [{
+        id: 'legacy',
+        beaconUuid: this.targetBeaconUuid,
+        radiusMeters: this.radiusMeters,
+        target: '',
+      }];
+    }
+    return [];
+  }
+
+  getConnections(): Array<{ targetId: string; label?: string; condition?: any }> {
+    const connections: Array<{ targetId: string; label?: string; condition?: any }> = [];
+    const seen = new Set<string>();
+    if (this.xrLocations) {
+      for (const loc of this.xrLocations) {
+        if (loc.target && !seen.has(loc.target)) {
+          connections.push({ targetId: loc.target, label: loc.name || loc.id });
+          seen.add(loc.target);
+        }
+      }
+    }
+    if (this.defaultTarget && !seen.has(this.defaultTarget)) {
+      connections.push({ targetId: this.defaultTarget, label: 'Default' });
+      seen.add(this.defaultTarget);
+    }
+    for (const conn of super.getConnections()) {
+      if (!seen.has(conn.targetId)) {
+        connections.push(conn);
+        seen.add(conn.targetId);
+      }
+    }
+    return connections;
   }
 
   protected async performAction(
@@ -113,40 +147,41 @@ export class IndoorLocationBeat extends Beat {
         }
       | undefined;
 
-    // Permission probe — trigger modes need beacon scanning permission.
     if (this.mode !== 'display') {
       const verdict = await ensureXRPermission(context, ['beacons'], {
         onDenied: locationSettings?.onPermissionDenied,
       });
       if (verdict === 'fallback') {
         const fallback = locationSettings?.fallbackBeatId;
-        if (fallback) {
-          console.log(`[IndoorLocationBeat ${this.id}] beacon permission denied — falling back to ${fallback}`);
-          return fallback;
-        }
-        console.warn(`[IndoorLocationBeat ${this.id}] beacon permission denied and no fallbackBeatId — advancing`);
+        if (fallback) return fallback;
         return this.getNextBeat(context);
       }
-      if (verdict === 'skip') {
-        console.log(`[IndoorLocationBeat ${this.id}] beacon permission denied — skipping`);
-        return this.getNextBeat(context);
-      }
+      if (verdict === 'skip') return this.getNextBeat(context);
     }
 
-    if (!this.targetBeaconUuid) {
-      console.warn(`[IndoorLocationBeat ${this.id}] missing targetBeaconUuid — skipping`);
+    const effective = this.getEffectiveLocations();
+    if (effective.length === 0) {
+      console.warn(`[IndoorLocationBeat ${this.id}] no locations configured — skipping`);
+      return this.getNextBeat(context);
+    }
+    const valid = effective.filter((l) => !!l.beaconUuid);
+    if (valid.length === 0) {
+      console.warn(`[IndoorLocationBeat ${this.id}] no valid beaconUuid on any location — skipping`);
       return this.getNextBeat(context);
     }
 
-    // Indoor radius defaults are tighter than outdoor — 5m room-scale.
-    const radius = this.radiusMeters ?? locationSettings?.defaultProximityRadiusM ?? 5;
+    const projectDefault = locationSettings?.defaultProximityRadiusM ?? 5;
+    const renderLocations = valid.map((loc) => ({
+      id: loc.id,
+      name: loc.name,
+      beaconUuid: loc.beaconUuid!,
+      radiusMeters: loc.radiusMeters ?? this.radiusMeters ?? projectDefault,
+    }));
 
-    // Start beacon-cache watcher so renderer + downstream conditions see fresh reads.
     const unsubscribe = context.getSensorService().ensureBeaconCacheActive();
-
-    // Push sensor service into renderer state for the floor-plan component.
     (renderer as any).setState?.('sensorService', context.getSensorService());
 
+    let result: { path: string; locationId?: string };
     try {
       if (!renderer.renderIndoorMap) {
         console.warn(`[IndoorLocationBeat ${this.id}] renderer doesn't implement renderIndoorMap — advancing`);
@@ -160,10 +195,9 @@ export class IndoorLocationBeat extends Beat {
             floorHeight: locationSettings.venue.floorHeight,
           }
         : undefined;
-      const result = await renderer.renderIndoorMap({
+      result = await renderer.renderIndoorMap({
         mode: this.mode,
-        targetBeaconUuid: this.targetBeaconUuid,
-        radiusMeters: radius,
+        locations: renderLocations,
         text: this.text,
         buttonText: this.buttonText,
         cancelButtonText: this.cancelButtonText,
@@ -171,11 +205,24 @@ export class IndoorLocationBeat extends Beat {
         venue,
         beacons: locationSettings?.venue?.beacons,
       });
-      console.log(`[IndoorLocationBeat ${this.id}] resolved with: ${result}`);
     } finally {
       unsubscribe();
     }
 
+    if (result.locationId) {
+      const matched = valid.find((l) => l.id === result.locationId);
+      if (matched) {
+        if (matched.effects && matched.effects.length > 0) {
+          for (const eff of matched.effects) {
+            try { context.applyEffect(eff as Effect); }
+            catch (err) { console.warn(`[IndoorLocationBeat ${this.id}] applyEffect failed:`, err); }
+          }
+        }
+        if (matched.target) return matched.target;
+      }
+    }
+
+    if (this.defaultTarget) return this.defaultTarget;
     return this.getNextBeat(context);
   }
 }

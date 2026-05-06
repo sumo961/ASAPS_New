@@ -1207,8 +1207,8 @@
       "category": "xr",
       "displayName": "GPS Location",
       "icon": "📍",
-      "description": "Show a map with a target GPS coordinate. In trigger modes, wait for the player to walk into (or out of) a radius around the point. The runtime probes GPS permission via ensureXRPermission and falls back per the project's LocationSettings.onPermissionDenied policy.",
-      "connectionType": "single",
+      "description": "Show one or more GPS-anchored locations on a map. Each location has its own next-beat target and Effects bundle (counters, mood, sentiment, etc) — the first location the player crosses into (or out of) wins, like a movement choice on a map. The runtime probes GPS permission via ensureXRPermission and falls back per the project's LocationSettings.onPermissionDenied policy.",
+      "connectionType": "multiple",
       "parameters": {
         "mode": {
           "type": "string",
@@ -1305,8 +1305,8 @@
       "category": "xr",
       "displayName": "Indoor Location",
       "icon": "🏛️",
-      "description": "Show an indoor floor-plan with a target Bluetooth beacon. In trigger modes, wait for the player to walk into (or out of) a radius around the beacon. Indoor proximity uses RSSI-derived distance estimates and is suited to room-scale interactions (typical accuracy 1–3m).",
-      "connectionType": "single",
+      "description": "Show an indoor floor-plan with one or more target Bluetooth beacons. Each location has its own next-beat target and Effects bundle — the first beacon the player approaches within radius wins. Indoor proximity uses RSSI-derived distance estimates and is suited to room-scale interactions (typical accuracy 1–3m).",
+      "connectionType": "multiple",
       "parameters": {
         "mode": {
           "type": "string",
