@@ -154,9 +154,15 @@ export const XRMapEditor: React.FC<XRMapEditorProps> = ({
   // Effective radius for a location — per-loc > beat > project > 25m.
   const fallbackRadius = beatRadiusMeters ?? projectDefaultRadius ?? 25;
 
-  // Initial centre/zoom: first location, else story origin, else London.
+  // Initial centre/zoom: first *meaningfully positioned* location, else
+  // story origin, else London. Locations at (0,0) are treated as
+  // "unset" placeholders — centring there shows ocean tiles only and is
+  // never what an author wants.
   const initialCentre = useMemo<[number, number]>(() => {
-    const first = locations.find((l) => l.lat !== undefined && l.lng !== undefined);
+    const first = locations.find(
+      (l) => l.lat !== undefined && l.lng !== undefined
+        && !(Math.abs(l.lat) < 0.01 && Math.abs(l.lng) < 0.01),
+    );
     if (first) return [first.lat!, first.lng!];
     if (storyOrigin) return [storyOrigin.lat, storyOrigin.lng];
     return [51.5074, -0.1278];
