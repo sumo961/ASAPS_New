@@ -3166,17 +3166,41 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                             placeholder="Display name (e.g. Reception desk)"
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                           />
-                          <input
-                            type="text"
-                            value={beacon.uuid}
-                            onChange={(e) => {
-                              const next = [...(loc.venue?.beacons || [])];
-                              next[idx] = { ...next[idx], uuid: e.target.value.trim() };
-                              writeVenue({ beacons: next });
-                            }}
-                            placeholder="UUID (e.g. f7826da6-4fa2-4e98-8024-bc5b71e0893e)"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
-                          />
+                          <div className="flex gap-1">
+                            <input
+                              type="text"
+                              value={beacon.uuid}
+                              onChange={(e) => {
+                                const next = [...(loc.venue?.beacons || [])];
+                                next[idx] = { ...next[idx], uuid: e.target.value.trim() };
+                                writeVenue({ beacons: next });
+                              }}
+                              placeholder="UUID (e.g. f7826da6-4fa2-4e98-8024-bc5b71e0893e)"
+                              className="flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // crypto.randomUUID is available in all modern browsers + Electron.
+                                // Fall back to a manual v4-style generator just in case.
+                                const fresh =
+                                  typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function'
+                                    ? (crypto as any).randomUUID()
+                                    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                                        const r = (Math.random() * 16) | 0;
+                                        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                                        return v.toString(16);
+                                      });
+                                const next = [...(loc.venue?.beacons || [])];
+                                next[idx] = { ...next[idx], uuid: fresh };
+                                writeVenue({ beacons: next });
+                              }}
+                              className="shrink-0 px-2 py-1 text-[11px] border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded"
+                              title="Generate a random UUID for testing"
+                            >
+                              Generate
+                            </button>
+                          </div>
                           <div className="grid grid-cols-2 gap-2">
                             <input
                               type="number"
