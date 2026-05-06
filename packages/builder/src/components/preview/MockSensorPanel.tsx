@@ -22,7 +22,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import type { SensorService, GpsReading, OrientationReading } from '@asaps/core';
+import type { SensorService, GpsReading, OrientationReading, BeaconReading } from '@asaps/core';
 
 interface MockSensorPanelProps {
   /** Active SensorService — should report mock=true. */
@@ -31,6 +31,13 @@ interface MockSensorPanelProps {
   storyOrigin?: { lat: number; lng: number };
   /** Step size in metres for walk-direction nudge. Default 5m. */
   stepMeters?: number;
+  /**
+   * Authored venue beacons (v0.9.49+). When set, the panel renders a
+   * distance slider per beacon so authors can simulate "you're 3m from
+   * Beacon A" without real Bluetooth hardware. The panel pushes
+   * `setMockBeacons` with synthesized BeaconReadings on every change.
+   */
+  venueBeacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }>;
 }
 
 /**
@@ -48,6 +55,7 @@ export const MockSensorPanel: React.FC<MockSensorPanelProps> = ({
   sensorService,
   storyOrigin,
   stepMeters = 5,
+  venueBeacons = [],
 }) => {
   const caps = sensorService.getCapabilities();
   // Prefer the service's seeded reading (PreviewWindow seeds from
@@ -61,6 +69,9 @@ export const MockSensorPanel: React.FC<MockSensorPanelProps> = ({
   const [alpha, setAlpha] = useState<number>(0);
   const [beta, setBeta] = useState<number>(0);
   const [gamma, setGamma] = useState<number>(0);
+  // Per-beacon simulated distances (metres). Initialised to 99 = "out of range"
+  // so authors start with all beacons silent and dial them in deliberately.
+  const [beaconDistances, setBeaconDistances] = useState<Record<string, number>>({});
 
   // Subscribe once on mount to seed the panel from whatever the service
   // already has cached (e.g., from project's mockLocation).
@@ -88,6 +99,26 @@ export const MockSensorPanel: React.FC<MockSensorPanelProps> = ({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alpha, beta, gamma]);
+
+  // Push beacon distance changes back to the service. We synthesize
+  // BeaconReadings with the distance set directly (skipping the
+  // RSSI → distance derivation). Beacons not yet touched by the
+  // author are excluded so they don't show up as 0m-away.
+  useEffect(() => {
+    if (!venueBeacons.length) return;
+    const readings: BeaconReading[] = venueBeacons
+      .filter((b) => b.uuid && beaconDistances[b.uuid] !== undefined)
+      .map((b) => ({
+        uuid: b.uuid,
+        rssi: -59 - 20 * Math.log10(Math.max(0.5, beaconDistances[b.uuid])),
+        distance: beaconDistances[b.uuid],
+        timestamp: Date.now(),
+      }));
+    if (typeof (sensorService as any).setMockBeacons === 'function') {
+      (sensorService as any).setMockBeacons(readings);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beaconDistances, venueBeacons]);
 
   const walkNorth = () => setLat((l) => l + stepMeters / METRES_PER_DEG_LAT);
   const walkSouth = () => setLat((l) => l - stepMeters / METRES_PER_DEG_LAT);
@@ -185,6 +216,41 @@ export const MockSensorPanel: React.FC<MockSensorPanelProps> = ({
           />
         </label>
       </div>
+
+      {/* Beacons (v0.9.49+) — only shown when the project has beacons configured. */}
+      {venueBeacons.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-medium text-gray-700">Beacons (simulated distance)</div>
+          {venueBeacons.map((beacon) => {
+            const dist = beaconDistances[beacon.uuid] ?? 99;
+            const out = dist >= 99;
+            return (
+              <label key={beacon.uuid} className="block text-xs text-gray-600">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="truncate">
+                    {beacon.displayName || (beacon.uuid ? beacon.uuid.slice(0, 8) + '…' : 'Unnamed')}
+                  </span>
+                  <span className={out ? 'text-gray-400 italic' : 'font-mono'}>
+                    {out ? 'out of range' : `${dist.toFixed(1)} m`}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="99"
+                  step="0.5"
+                  value={dist}
+                  onChange={(e) => setBeaconDistances((prev) => ({
+                    ...prev,
+                    [beacon.uuid]: parseFloat(e.target.value),
+                  }))}
+                  className="w-full"
+                />
+              </label>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

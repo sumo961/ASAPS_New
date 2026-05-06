@@ -1579,6 +1579,60 @@ export const Inspector: React.FC<InspectorProps> = ({
                     onBeatPropertyChange={handleChange}
                     usedNames={usedNames}
                     onDefineAsCharacter={onDefineAsCharacter}
+                    customRenderers={
+                      beat.type === 'indoorLocation'
+                        ? {
+                            // Replace free-text targetBeaconUuid with a dropdown sourced
+                            // from globalSettings.location.venue.beacons. Falls back to
+                            // a free-text input + helpful hint when no beacons configured.
+                            targetBeaconUuid: (paramName, paramDef) => {
+                              const beacons = (globalSettings as any)?.location?.venue?.beacons as
+                                | Array<{ uuid: string; displayName?: string; x: number; y: number }>
+                                | undefined;
+                              const value = localBeat.parameters?.[paramName] || '';
+                              return (
+                                <div key={paramName}>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    {paramDef.ui?.label || 'Target beacon'}{' '}
+                                    {paramDef.required && <span className="text-red-500">*</span>}
+                                  </label>
+                                  {beacons && beacons.length > 0 ? (
+                                    <select
+                                      value={value}
+                                      onChange={(e) => handleParameterChange(paramName, e.target.value)}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                    >
+                                      <option value="">— select a beacon —</option>
+                                      {beacons.map((b) => (
+                                        <option key={b.uuid} value={b.uuid}>
+                                          {b.displayName ? `${b.displayName} — ${b.uuid.slice(0, 8)}…` : b.uuid}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <>
+                                      <input
+                                        type="text"
+                                        value={value}
+                                        onChange={(e) => handleParameterChange(paramName, e.target.value)}
+                                        placeholder="No beacons configured — paste a UUID"
+                                        className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm font-mono"
+                                      />
+                                      <p className="text-xs text-amber-700 mt-1">
+                                        Add beacons in Project Settings → Location & XR → Indoor venue → Beacons
+                                        to get a picker here.
+                                      </p>
+                                    </>
+                                  )}
+                                  {paramDef.description && (
+                                    <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+                                  )}
+                                </div>
+                              );
+                            },
+                          }
+                        : undefined
+                    }
                   />
                 )}
 

@@ -3121,9 +3121,104 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
                     />
                     <p className="text-[11px] text-gray-500 mt-1">
-                      Indoor positioning beats ship in v2. The schema is reserved here so authoring
-                      can proceed today and the runtime catches up later.
+                      Used by IndoorLocationBeat as the background of the floor plan view.
                     </p>
+                  </div>
+
+                  {/* Beacon definitions (v0.9.49+) — IndoorLocationBeat references
+                      these by UUID; the renderer reads x/y from here to place
+                      markers on the floor plan. */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-medium text-gray-600">Bluetooth beacons</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const existing = loc.venue?.beacons || [];
+                          const next = [
+                            ...existing,
+                            { uuid: '', displayName: '', x: 0, y: 0 },
+                          ];
+                          writeVenue({ beacons: next });
+                        }}
+                        className="text-[11px] px-2 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        + Add beacon
+                      </button>
+                    </div>
+                    {(!loc.venue?.beacons || loc.venue.beacons.length === 0) && (
+                      <p className="text-[11px] text-gray-500 italic">
+                        No beacons configured. Add one per physical Bluetooth beacon you've deployed in
+                        the venue. Authors reference beacons by UUID from IndoorLocationBeat.
+                      </p>
+                    )}
+                    {loc.venue?.beacons?.map((beacon: { uuid: string; displayName?: string; x: number; y: number }, idx: number) => (
+                      <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-start border border-gray-200 rounded p-2 bg-white">
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            value={beacon.displayName || ''}
+                            onChange={(e) => {
+                              const next = [...(loc.venue?.beacons || [])];
+                              next[idx] = { ...next[idx], displayName: e.target.value };
+                              writeVenue({ beacons: next });
+                            }}
+                            placeholder="Display name (e.g. Reception desk)"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                          <input
+                            type="text"
+                            value={beacon.uuid}
+                            onChange={(e) => {
+                              const next = [...(loc.venue?.beacons || [])];
+                              next[idx] = { ...next[idx], uuid: e.target.value.trim() };
+                              writeVenue({ beacons: next });
+                            }}
+                            placeholder="UUID (e.g. f7826da6-4fa2-4e98-8024-bc5b71e0893e)"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={beacon.x}
+                              onChange={(e) => {
+                                const next = [...(loc.venue?.beacons || [])];
+                                next[idx] = { ...next[idx], x: parseFloat(e.target.value.replace(',', '.')) || 0 };
+                                writeVenue({ beacons: next });
+                              }}
+                              placeholder="x (m from left)"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                              title="Metres from floor-plan left edge"
+                            />
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={beacon.y}
+                              onChange={(e) => {
+                                const next = [...(loc.venue?.beacons || [])];
+                                next[idx] = { ...next[idx], y: parseFloat(e.target.value.replace(',', '.')) || 0 };
+                                writeVenue({ beacons: next });
+                              }}
+                              placeholder="y (m from top)"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                              title="Metres from floor-plan top edge"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = (loc.venue?.beacons || []).filter((_: any, i: number) => i !== idx);
+                            writeVenue({ beacons: next.length ? next : undefined });
+                          }}
+                          className="text-xs px-2 py-0.5 text-red-600 hover:bg-red-50 border border-red-200 rounded"
+                          title="Remove beacon"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </section>
               </div>

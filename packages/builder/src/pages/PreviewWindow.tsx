@@ -3238,6 +3238,7 @@ export const PreviewWindow: React.FC = () => {
         <MockSensorPanelToggle
           sensorService={sensorService}
           storyOrigin={storyOrigin}
+          venueBeacons={(previewData?.settings as any)?.location?.venue?.beacons}
         />
       )}
     </div>
@@ -3251,7 +3252,8 @@ export const PreviewWindow: React.FC = () => {
 const MockSensorPanelToggle: React.FC<{
   sensorService: any;
   storyOrigin?: { lat: number; lng: number };
-}> = ({ sensorService, storyOrigin }) => {
+  venueBeacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }>;
+}> = ({ sensorService, storyOrigin, venueBeacons }) => {
   const [open, setOpen] = useState(false);
   return (
     <div className="fixed bottom-4 right-4 z-40">
@@ -3269,7 +3271,7 @@ const MockSensorPanelToggle: React.FC<{
             </button>
           </div>
           <div className="rounded-b-lg overflow-hidden">
-            <MockSensorPanel sensorService={sensorService} storyOrigin={storyOrigin} />
+            <MockSensorPanel sensorService={sensorService} storyOrigin={storyOrigin} venueBeacons={venueBeacons} />
           </div>
         </div>
       ) : (
