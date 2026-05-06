@@ -902,7 +902,7 @@ export class AudioManager {
    * when the beat or scene changes.
    */
   playSpatialSound(
-    url: string,
+    source_: string | Blob,
     spatial: {
       lat?: number;
       lng?: number;
@@ -937,13 +937,24 @@ export class AudioManager {
       try {
         if (ctx.state === 'suspended') await ctx.resume();
 
-        // Load buffer (reuse the same cache as playSound).
-        let buffer = this.soundBuffers.get(url);
+        // Load buffer. For Blobs we go via blob.arrayBuffer() — same as the
+        // non-spatial blob path — because fetch() against blob: URLs fails
+        // intermittently in some Electron / dev-server CSP setups. For
+        // string URLs (http/https assets), fetch is fine. The cache key is
+        // the URL string (Blobs aren't cacheable since the asset id isn't
+        // visible here — caller can wrap if it wants caching).
+        const cacheKey = typeof source_ === 'string' ? source_ : null;
+        let buffer = cacheKey ? this.soundBuffers.get(cacheKey) : undefined;
         if (!buffer) {
-          const response = await fetch(url);
-          const arrayBuffer = await response.arrayBuffer();
+          let arrayBuffer: ArrayBuffer;
+          if (typeof source_ === 'string') {
+            const response = await fetch(source_);
+            arrayBuffer = await response.arrayBuffer();
+          } else {
+            arrayBuffer = await source_.arrayBuffer();
+          }
           buffer = await ctx.decodeAudioData(arrayBuffer);
-          if (this.shouldPreloadSounds) this.soundBuffers.set(url, buffer);
+          if (cacheKey && this.shouldPreloadSounds) this.soundBuffers.set(cacheKey, buffer);
         }
 
         const source = ctx.createBufferSource();
@@ -954,12 +965,23 @@ export class AudioManager {
         gain.gain.value = Math.max(0, Math.min(1, options.volume ?? 1.0));
 
         // Panner: HRTF model gives convincing left/right + front/back when
-        // headphones are on. distanceModel 'inverse' falls off realistically.
+        // headphones are on.
+        //
+        // distanceModel: 'linear' is much more predictable for authoring
+        // than 'inverse' — gain falls linearly from 1.0 at refDistance to
+        // 0 at maxDistance. With 'inverse' + refDistance=1, the gain at
+        // even modest distances (50m) drops to ~0.02 (-34dB) and the
+        // sound becomes inaudible without authors realising why.
+        //
+        // refDistance: 5m feels right for "full volume when you're near
+        // the source" — within a small audible bubble the source plays
+        // at full strength, then fades smoothly out to maxDistance.
         const panner = ctx.createPanner();
         panner.panningModel = 'HRTF';
-        panner.distanceModel = 'inverse';
-        panner.refDistance = 1;
-        panner.maxDistance = spatial.maxDistanceMeters ?? 100;
+        panner.distanceModel = 'linear';
+        const maxDist = Math.max(spatial.maxDistanceMeters ?? 100, 10);
+        panner.refDistance = Math.min(5, maxDist - 1);
+        panner.maxDistance = maxDist;
         panner.rolloffFactor = 1;
 
         source.connect(gain);
@@ -1046,7 +1068,7 @@ export class AudioManager {
         source.start(0);
         resolve(stop);
       } catch (error) {
-        console.error(`[AudioManager] Error playing spatial sound ${url}:`, error);
+        console.error('[AudioManager] Error playing spatial sound:', error);
         reject(error);
       }
     });

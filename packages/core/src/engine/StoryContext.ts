@@ -395,7 +395,7 @@ export class StoryContext extends EventEmitter {
   constructor(
     initialState?: Partial<StoryState>,
     story?: Story,
-    opts?: { mockMode?: boolean },
+    opts?: { mockMode?: boolean; existingSensorService?: SensorService },
   ) {
     super();
     this.state = {
@@ -426,11 +426,18 @@ export class StoryContext extends EventEmitter {
     this.timerManager = new TimerManager();
     // v0.9.48+ — XR sensor service. Mock-mode comes from PreviewWindow
     // (desktop authoring); production playback gets the Web service via
-    // capability detection. Seed mock location from project settings if
-    // available so MockSensorService.getCurrentLocation returns sensibly
-    // before the author drags any panel control.
-    this.sensorService = createSensorService({ mockMode: opts?.mockMode });
-    if (opts?.mockMode && this.sensorService instanceof MockSensorService) {
+    // capability detection.
+    //
+    // existingSensorService preserves the SAME service instance across
+    // context recreations (StoryEngine.loadStory creates a new context;
+    // without preservation, the engine's sensorService getter returns a
+    // fresh MockSensorService while the renderer state and any subscribed
+    // adapters still point at the old one — the panel's setMockLocation
+    // calls land on a different instance than the audio adapter is
+    // subscribed to).
+    this.sensorService = opts?.existingSensorService
+      ?? createSensorService({ mockMode: opts?.mockMode });
+    if (opts?.mockMode && !opts?.existingSensorService && this.sensorService instanceof MockSensorService) {
       const mockLoc = (story as any)?.getGlobalSettings?.()?.location?.mockLocation;
       if (mockLoc) this.sensorService.seedFromSettings(mockLoc);
     }

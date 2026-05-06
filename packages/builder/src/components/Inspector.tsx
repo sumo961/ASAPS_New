@@ -834,6 +834,14 @@ export const Inspector: React.FC<InspectorProps> = ({
       if (!beatData.parameters.backgroundSound) {
         beatData.parameters.backgroundSound = beatData.sound?.assetId || beatData.sound?.file || '';
       }
+      // v0.9.48+ — mirror beat.sound.spatialPosition into the parameters
+      // bag so SpatialPositionEditor (which reads from
+      // parameters.backgroundSoundSpatial) shows the persisted value.
+      // Without this, switching beats or re-syncing reverts the editor to
+      // "Off" even though the data lives correctly on beat.sound.
+      if (beatData.sound?.spatialPosition && !beatData.parameters.backgroundSoundSpatial) {
+        beatData.parameters.backgroundSoundSpatial = beatData.sound.spatialPosition;
+      }
       
       const beatDef = getBeatDefinition(beat.type);
       if (beatDef?.connectionType === 'multiple') {

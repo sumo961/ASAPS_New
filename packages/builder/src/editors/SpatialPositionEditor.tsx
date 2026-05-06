@@ -85,7 +85,13 @@ export const SpatialPositionEditor: React.FC<SpatialPositionEditorProps> = ({
     if (raw === '') {
       delete (next as any)[field];
     } else {
-      const n = parseFloat(raw);
+      // Normalise locale comma → period before parseFloat. <input type="number">
+      // can return the locale-formatted string ("51,50632") in some browsers
+      // when the user's locale uses comma as decimal separator; parseFloat
+      // reads only up to the first non-numeric, so the precision after the
+      // comma is silently dropped (51,50632 → 51), placing the sound source
+      // tens of km away and making it inaudible.
+      const n = parseFloat(raw.replace(',', '.'));
       if (!Number.isFinite(n)) return;
       (next as any)[field] = n;
     }

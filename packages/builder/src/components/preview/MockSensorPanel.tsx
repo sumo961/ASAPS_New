@@ -131,7 +131,7 @@ export const MockSensorPanel: React.FC<MockSensorPanelProps> = ({
               type="number"
               step="0.000001"
               value={lat}
-              onChange={(e) => setLat(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setLat(parseFloat(e.target.value.replace(',', '.')) || 0)}
               className="mt-0.5 w-full px-1.5 py-0.5 border border-gray-300 rounded text-xs font-mono"
             />
           </label>
@@ -141,7 +141,7 @@ export const MockSensorPanel: React.FC<MockSensorPanelProps> = ({
               type="number"
               step="0.000001"
               value={lng}
-              onChange={(e) => setLng(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setLng(parseFloat(e.target.value.replace(',', '.')) || 0)}
               className="mt-0.5 w-full px-1.5 py-0.5 border border-gray-300 rounded text-xs font-mono"
             />
           </label>

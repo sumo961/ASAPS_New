@@ -156,23 +156,23 @@ export abstract class BaseRenderer implements IRenderer {
       if (sound.spatialPosition) {
         const sensorService = this.state.get('sensorService');
         if (sensorService) {
-          // Resolve URL: prefer assetId-blob → object URL, else http URL.
-          let url: string | null = null;
+          // Resolve audio source: prefer the blob directly (avoids fetch
+          // against blob: URLs which fails in some Electron / dev-server
+          // CSP setups). Fall back to an http URL when the asset isn't
+          // in storage.
+          let audioSource: Blob | string | null = null;
           if (sound.assetId && this.soundBlobResolver) {
             const blob = await this.soundBlobResolver(sound.assetId);
-            if (blob) {
-              url = URL.createObjectURL(blob);
-              this.spatialSoundObjectUrls.push(url);
-            }
+            if (blob) audioSource = blob;
           }
-          if (!url && sound.file && sound.file.startsWith('http')) {
-            url = sound.file;
+          if (!audioSource && sound.file && sound.file.startsWith('http')) {
+            audioSource = sound.file;
           }
-          if (url) {
+          if (audioSource) {
             // Stop any prior spatial sound on this beat before starting a new one.
             this.stopSpatialBeatSound();
             const stop = await audioManager.playSpatialSound(
-              url,
+              audioSource,
               sound.spatialPosition,
               { volume, loop },
               buildSensorAdapter(sensorService),
@@ -180,7 +180,7 @@ export abstract class BaseRenderer implements IRenderer {
             this.spatialBeatSoundStop = stop;
             return;
           }
-          console.warn(`[BaseRenderer] Spatial sound has spatialPosition but no resolvable URL — falling back to non-spatial`);
+          console.warn(`[BaseRenderer] Spatial sound has spatialPosition but no resolvable source — falling back to non-spatial`);
         } else {
           console.warn(`[BaseRenderer] Spatial sound requested but no sensorService in renderer state — falling back to non-spatial`);
         }

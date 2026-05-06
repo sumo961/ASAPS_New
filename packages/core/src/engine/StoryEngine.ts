@@ -43,10 +43,14 @@ export class StoryEngine extends EventEmitter {
 
   async loadStory(story: Story): Promise<void> {
     this.story = story;
+    // Preserve the sensor service across context recreations — without
+    // this, the renderer state and audio adapter end up subscribed to a
+    // discarded MockSensorService while the panel writes to the new one.
+    const existingSensorService = this.context.getSensorService();
     this.context = new StoryContext(
       { currentBeatId: story.getFirstBeatId() },
       story,
-      { mockMode: this.mockMode },
+      { mockMode: this.mockMode, existingSensorService },
     );
 
     // Re-attach timer listener after context recreation

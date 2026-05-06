@@ -2933,7 +2933,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         type="number"
                         step="0.000001"
                         value={loc.originLat ?? ''}
-                        onChange={(e) => writeLoc({ originLat: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        onChange={(e) => writeLoc({ originLat: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')) })}
                         placeholder="e.g. 51.5074"
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
                       />
@@ -2944,7 +2944,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         type="number"
                         step="0.000001"
                         value={loc.originLng ?? ''}
-                        onChange={(e) => writeLoc({ originLng: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        onChange={(e) => writeLoc({ originLng: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')) })}
                         placeholder="e.g. -0.1278"
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
                       />
@@ -2986,7 +2986,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         type="number"
                         step="0.000001"
                         value={loc.mockLocation?.lat ?? ''}
-                        onChange={(e) => writeMockLocation({ lat: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        onChange={(e) => writeMockLocation({ lat: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')) })}
                         placeholder="e.g. 51.5"
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
                       />
@@ -2997,7 +2997,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         type="number"
                         step="0.000001"
                         value={loc.mockLocation?.lng ?? ''}
-                        onChange={(e) => writeMockLocation({ lng: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        onChange={(e) => writeMockLocation({ lng: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')) })}
                         placeholder="e.g. -0.1"
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
                       />
