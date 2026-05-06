@@ -5300,6 +5300,8 @@ function App() {
         onAssets={handleOpenAssetManager}
         onSettings={handleOpenSettings}
         onDebug={handleOpenDebugPanel}
+        onSearch={() => setShowSearchPanel(prev => !prev)}
+        searchPanelOpen={showSearchPanel}
         onSave={handleSave}
         onInterceptNewProject={() => handleShowSaveDialog('newProject')}
         onInterceptProjectLibrary={() => handleShowSaveDialog('projectLibrary')}

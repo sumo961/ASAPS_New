@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectLibrary } from './ProjectLibrary';
@@ -35,6 +35,8 @@ interface HeaderProps {
   onSettings?: () => void;
   onAssets?: () => void;
   onCharacters?: () => void;
+  onSearch?: () => void;
+  searchPanelOpen?: boolean;
   onSave?: () => void;
   onDebug?: () => void;
   onInterceptNewProject?: () => boolean;
@@ -84,6 +86,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSettings,
   onAssets,
   onCharacters,
+  onSearch,
+  searchPanelOpen,
   onSave,
   onDebug,
   onInterceptNewProject,
@@ -464,6 +468,21 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right: Feature buttons */}
         <div className="flex items-center space-x-2">
+          {onSearch && (
+            <button
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                searchPanelOpen
+                  ? 'bg-slate-700 text-white ring-2 ring-slate-300'
+                  : 'bg-slate-500 text-white hover:bg-slate-600'
+              }`}
+              onClick={onSearch}
+              title="Search & replace text across all beats (Cmd+F)"
+            >
+              <Search className="w-4 h-4" />
+              Search
+            </button>
+          )}
+
           {onCharacters && (
             <button
               className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors flex items-center gap-1.5"
