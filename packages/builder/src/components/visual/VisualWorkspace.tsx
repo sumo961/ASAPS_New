@@ -2807,8 +2807,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const centerY = projectSettings?.height ? projectSettings.height / 2 : 384;
 
     // SCHEMA-DRIVEN LOCATION INITIALIZATION
-    // Use SchemaLocationInitializer to generate elements from schema
-    if (elements.length === 0 && beat.locations.size === 0) {
+    // Use SchemaLocationInitializer to generate elements from schema.
+    // XR beats (gpsLocation, indoorLocation) don't render stage-positioned
+    // elements — their data model is location entries (lat/lng or beacon
+    // UUID), and they're handled by the dedicated XRMapEditor /
+    // XRFloorPlanEditor early-return below. Skip the schema lookup so it
+    // doesn't warn about a missing `locations` array on XR beat schemas.
+    const isXrBeat = beat.type === 'gpsLocation' || beat.type === 'indoorLocation';
+    if (!isXrBeat && elements.length === 0 && beat.locations.size === 0) {
       console.log(`[VisualWorkspace] Using SchemaLocationInitializer for ${beat.type}`);
       const schemaElements = initializeLocationsFromSchema(beat, params, projectSettings);
       elements = schemaElements;
@@ -2982,13 +2988,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
     // Smart sizing is now computed at render time by PositionedBeatView
 
-    console.warn(`[VisualWorkspace] ★★★ Setting ${elements.length} elements for ${beat.type} ★★★`);
-    console.warn(`[VisualWorkspace] ========== ELEMENT POSITIONS BEING SET ==========`);
-    elements.forEach((e, idx) => {
-      console.warn(`[VisualWorkspace]   [${idx}] ${e.type}/${e.name}: x=${e.x}, y=${e.y}, z=${e.z}, w=${e.width}, h=${e.height}, size=${e.size}, fontSize=${e.fontSize}`);
-    });
-    console.warn(`[VisualWorkspace] ================================================`);
-    console.log(`[VisualWorkspace] Background: bgId=${bgId?.substring?.(0, 8) || 'none'}, bgUrl=${bgUrl ? 'set' : 'none'}`);
+    // XR beats render via XRMapEditor / XRFloorPlanEditor and don't use
+    // the stage-element pipeline — silence the diagnostic logs that
+    // would only show 0 elements / no background for them.
+    if (!isXrBeat) {
+      console.warn(`[VisualWorkspace] ★★★ Setting ${elements.length} elements for ${beat.type} ★★★`);
+      console.warn(`[VisualWorkspace] ========== ELEMENT POSITIONS BEING SET ==========`);
+      elements.forEach((e, idx) => {
+        console.warn(`[VisualWorkspace]   [${idx}] ${e.type}/${e.name}: x=${e.x}, y=${e.y}, z=${e.z}, w=${e.width}, h=${e.height}, size=${e.size}, fontSize=${e.fontSize}`);
+      });
+      console.warn(`[VisualWorkspace] ================================================`);
+      console.log(`[VisualWorkspace] Background: bgId=${bgId?.substring?.(0, 8) || 'none'}, bgUrl=${bgUrl ? 'set' : 'none'}`);
+    }
 
     setVisualElements(elements);
     setBackgroundAssetId(bgId);
