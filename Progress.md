@@ -1,5 +1,263 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-06: XR v2 — IndoorLocationBeat + Multi-Location + Visual Editors (v0.9.49)
+
+### Overview
+
+Second-generation XR release. Builds on v0.9.48's substrate to ship the
+IndoorLocationBeat, refactor both XR beats into multi-location form
+(MovementChoice-shaped), and add dedicated Visual Editors for GPS maps
+and indoor floor plans. Plus a string of in-flight fixes uncovered
+during integration: HTML-export TTS-toggle leak, exported-HTML
+first-beat picker, builder-side search-button discoverability, asset
+modal blocker on every background/character/prop pick.
+
+### IndoorLocationBeat
+
+Indoor twin of GpsLocationBeat, also multi-location from day one. Each
+location targets a Bluetooth beacon by UUID; the renderer draws on a
+floor plan with per-location radius rings. Three modes match
+GpsLocationBeat: `display`, `trigger-on-arrival`, `trigger-on-departure`.
+Permission probe targets the `beacons` sensor and respects the
+project's `onPermissionDenied` policy.
+
+Initial v2-A shape: project-level venue with shared beacon list (UUID +
+position). Refined later in this release (see "venue moves to the
+beat" below) into a model where each beat carries its own floor plan
+and each location carries its own (x, y).
+
+**Authoring**:
+- Beacon list editor in Settings → Location & XR with `Generate UUID`
+  button for desktop testing without real hardware
+- MockSensorPanel grows beacon-distance sliders so authors can
+  simulate "you're 3m from Beacon A"
+- Inspector beacon picker dropdown
+- Tests: 14 covering parameter handling, modes, permission flow,
+  radius defaulting, edge cases. Plus 6 multi-location tests
+  (forwarding, target routing, effect application, default-target
+  fallback, per-location radius override, getConnections exposure).
+
+### Multi-location refactor (both beats)
+
+Rewritten to mirror MovementChoice. Each location entry has:
+
+- Stable `id` (used by renderer to identify which fired)
+- Optional `name` (shown as marker tooltip / status label)
+- Position (lat/lng for GPS, beaconUuid + x/y for indoor)
+- Optional radius override (per-location > beat-level > project default)
+- Target beat — where to advance when this location resolves
+- Optional Effects bundle — full ChoiceEffectsEditor range (counters,
+  mood nudges, emotion fires, sentiment changes, bookmarks, variant
+  switches, reflections, goal-status flips)
+
+The runtime resolves on first crossing in trigger modes; the renderer
+reports the locationId, the beat applies that location's effects via
+`context.applyEffect`, then routes to that location's target. Display
+mode shows all locations and continues to a `defaultTarget`.
+
+The graph editor now renders one outgoing edge per location, just like
+MovementChoice's choices. Backward compatibility preserved — legacy
+single-location params (targetLat/targetLng for GPS, targetBeaconUuid
+for indoor) synthesize a one-element xrLocations array at runtime so
+v0.9.48 stories keep working.
+
+Internal field renamed `locations` → `xrLocations` to avoid clashing
+with `BeatConfig.locations` (the legacy positioned-rendering Location[]
+on the base Beat class).
+
+### Visual Editors for both XR beats
+
+`gpsLocation` and `indoorLocation` get a Visual Editor tab in the
+workspace — same architecture as MovementChoice / Panorama / DialogTree.
+
+**XRMapEditor (GPS)**:
+- Leaflet-based, reuses the runtime tile layers + CSS reset
+- Each location is a draggable marker with its radius circle
+- Click empty map to add a location at click point
+- "Add at centre" + "Fit all" toolbar buttons
+- Auto-zoom-in on first walk; pan-follow when player drifts toward
+  viewport edge; never overrides manual zoom
+- "Recenter on me" Leaflet control (works in production XR too)
+
+**XRFloorPlanEditor (indoor)**:
+- SVG floor plan with the venue's image as backdrop
+- Click empty floor to add location at click coords
+- Drag markers to update each location's own (x, y)
+- Top-left HUD shows count + floor dimensions
+
+**Both editors**:
+- No side panel — pure spatial canvas, no duplicated form fields
+- Selection sync to Inspector via window CustomEvents:
+  - VE marker click → Inspector row scrolls + highlights
+  - Inspector row click → VE marker pans into view + selects
+- Auto-name new locations as "Location N" (rename freely; subsequent
+  adds skip taken numbers)
+- New locations inherit project storyOrigin (no more landing in the
+  Atlantic at lat=0/lng=0)
+
+### Per-beat floor plan + per-location x/y (architectural refinement)
+
+The initial v2-A indoor design lived entirely at the project level —
+one floor plan, one set of beacon positions. That collapsed the moment
+authors wanted multiple rooms or different scales per beat.
+
+Restructured:
+
+- **Beat parameters** add `floorPlanAssetId`, `floorWidthM`, `floorHeightM`.
+  Each indoor beat is one physical space.
+- **Each location entry** adds its own `x` and `y` (metres from
+  top-left on this beat's floor plan). Visual position is now per-beat
+  — the same beacon UUID can be drawn at different positions on
+  different beats' floor plans, which actually matches real-world
+  authoring intent.
+- **Project venue settings** still exist as the fallback floor plan +
+  dimensions for beats that don't override. Existing single-venue
+  stories keep working unchanged.
+- **Project beacon registry** stays optional — a list of `{uuid, displayName}`
+  for picking from a dropdown. Position no longer lives there.
+
+Inspector indoor block grows a "Floor plan for this beat" section at
+the top: asset id picker (uses Asset Selection modal — pick existing
+or upload new) + floor width + height in metres.
+
+### HTML-export fixes (in-flight bugs surfaced during the v0.9.48
+release week)
+
+**TTS toggle now respected**: WebTTSService defaulted `enabled=true`
+and never read the embedded config's enabled flag. Authors who toggled
+TTS off in the builder header still got speaking voices in the
+exported HTML. Three-spot fix: HtmlExporter writes the toggle as
+`enabled: ttsEnabledFlag` into ttsConfig, dialog reads
+`localStorage('asaps_tts_enabled')`, WebTTSService respects the flag
+at construction. Default true for back-compat with old exports.
+
+**Start beat now correct**: exported HTML always landed on the first
+beat in the array instead of the configured `firstBeatId`. Two
+compounding bugs:
+1. `projectZipManager.serializeStory` wrote metadata.firstBeatId
+   verbatim from the persisted project state. Many projects had the
+   default '0' (no beat with that id), which PlayerEngine fell
+   through to `beats[0].id` for. Fix: apply the same
+   titleScreen-preferred auto-detect at serialize time.
+2. PlayerEngine handled "metadata.firstBeatId is missing" but not
+   "metadata.firstBeatId is set to a non-existent id". Added a
+   defensive fallback through the same titleScreen path.
+
+**"Start beat" dropdown in export dialog**: authors can pick which
+beat the published story begins at, defaulting to whatever's currently
+selected in the builder. Honours the choice for that one export
+without touching persistent project state.
+
+**Search button in builder header**: the search-and-replace panel was
+reachable only via Cmd+F. Added a slate-grey Search button in the
+upper-right toolbar that toggles the same panel — open state shows a
+ring-2 highlight matching the Preview-Open pattern.
+
+### Five compounding bugs in spatial-sound integration (already in
+v0.9.48, but only surfaced in author testing this week — included
+here so the troubleshooting trail is captured)
+
+The spatial-sound path went through five layers of compounding bugs
+before producing audible output:
+
+1. **SensorService instance churn** — `StoryEngine.loadStory()` created
+   a new MockSensorService on each context recreation. The renderer
+   state and audio adapter stayed subscribed to the original; the
+   panel and map talked to the new one. Walks landed on the new
+   instance; the audio adapter was deaf. Fixed by passing the
+   existing service through to the new context (`existingSensorService`
+   constructor opt) so the engine reuses the same instance across
+   context recreations.
+
+2. **Distance model wrong** — PannerNode used `distanceModel:'inverse'`
+   with `refDistance:1`, giving gain = 1/distance. At 50m the sound
+   was -34dB (effectively silent). Switched to `'linear'` with
+   `refDistance:5` for a predictable "full-volume bubble + linear
+   fade to maxDistance" curve.
+
+3. **Blob URL fetch failed** — `playSpatialSound` called `fetch(blobUrl)`,
+   which fails intermittently in some Electron / dev-server CSP setups.
+   Spatial path now accepts `Blob | string` and uses `arrayBuffer()`
+   for blobs.
+
+4. **Inspector load path missing read** — the load-init at line 833 of
+   Inspector.tsx initialized `parameters.backgroundSound` but didn't
+   initialize `parameters.backgroundSoundSpatial`. The
+   SpatialPositionEditor reverted to "Off" on every beat re-select.
+
+5. **Locale comma → period** — `<input type="number">` returns the
+   locale-formatted string (`"51,50632"`) in some browsers; `parseFloat`
+   reads only the leading "51", placing sound sources tens of
+   kilometres away. Added `.replace(',', '.')` everywhere.
+
+### Asset Modal blocker (general, not XR-specific)
+
+The Asset Selection modal rejected every asset when invoked with
+`'background'`, `'character'`, or `'prop'` types. The Inspector was
+forwarding the local picker name verbatim with a misleading
+TypeScript cast; the modal's `asset.type !== assetType` filter then
+rejected everything (no asset has `type === 'background'`). Same bug
+for character + prop. Mapped them to `'image'` (mirroring the existing
+`'sound' → 'audio'` mapping). Also relaxed the `'background'` subtype
+filter from JPG-only to "any image" so PNG floor plans qualify.
+
+### "Indoor venue settings — what's still useful?"
+
+Author question during the v2 architectural shift. Resolution: the
+project-level venue stays useful as the **default** floor plan for
+single-venue stories (museum, exhibition, escape room). When a beat
+sets its own venue, it overrides. Beacons-as-physical-hardware
+registry is still project-level (UUIDs + display names, no positions).
+
+### Tests
+
+- 28 XR beat tests (14 GPS + 20 indoor) all passing
+- New multi-location tests: forwards locations, returns matched target,
+  applies matched effects, default-target fallback, per-location
+  radius override, getConnections exposes multiple targets
+- Total core suite: 1,482 passing
+- Per-beat-floor-plan migration verified — locations with beaconUuid
+  but no x/y resolve via the project beacon registry one-time fallback
+
+**Files modified (XR runtime)**:
+- `packages/core/src/types/index.ts` — XRLocationEntry, IRenderer.renderIndoorMap
+- `packages/core/src/beats/IndoorLocationBeat.ts` — multi-location, beat-level venue
+- `packages/core/src/beats/GpsLocationBeat.ts` — multi-location, getConnections override
+- `packages/core/src/engine/StoryContext.ts` — fix getGlobalSettings → getSettings
+- `packages/core/src/engine/StoryEngine.ts` — preserve sensorService across loadStory
+- `packages/core/tests/beats/{IndoorLocationBeat,GpsLocationBeat}.test.ts` — multi-location coverage
+
+**Files modified (renderer)**:
+- `packages/renderer/src/components/IndoorMapBeat.tsx` — per-location x/y
+- `packages/renderer/src/components/MapBeatLeaflet.tsx` — multi-location
+- `packages/renderer/src/audio/AudioManager.ts` — linear distance model, Blob | string source
+- `packages/renderer/src/audio/sensorAdapter.ts` — bridge layer
+- `packages/renderer/src/renderers/ReactRenderer.tsx` — renderMap + renderIndoorMap multi-location
+
+**Files modified (builder — XR + visual)**:
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — XR dispatch, suppress noise logs
+- `packages/builder/src/components/visual/XRMapEditor.tsx` (new) — Leaflet-based GPS visual editor
+- `packages/builder/src/components/visual/XRFloorPlanEditor.tsx` (new) — SVG floor-plan editor
+- `packages/builder/src/components/WorkspaceView.tsx` — visual-tab gating
+- `packages/builder/src/components/Inspector.tsx` — XR custom block, floor-plan picker, target dropdowns
+- `packages/builder/src/editors/XRLocationsEditor.tsx` — selection sync, auto-name, x/y inputs
+- `packages/builder/src/components/preview/MockSensorPanel.tsx` — beacon distance sliders
+- `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` — Beacons editor with Generate UUID
+- `packages/builder/src/pages/PreviewWindow.tsx` — venueBeacons forwarding, sensor service seeding
+
+**Files modified (export + general)**:
+- `packages/builder/src/export/HtmlExporter.ts` — startBeatId, ttsEnabled
+- `packages/builder/src/components/export/HtmlExportDialog.tsx` — Start beat dropdown
+- `packages/builder/src/utils/projectZipManager.ts` — serialize-time auto-detect, override
+- `packages/builder/src/components/Header.tsx` — Search button
+- `packages/builder/src/components/assets/AssetSelectionModal.tsx` — relaxed background filter
+- `packages/builder/src/App.tsx` — Search wiring, onUpdateVenueBeacons, availableBeats prop
+- `packages/player/src/PlayerEngine.ts` — defensive firstBeatId fallback
+- `packages/player-web/src/WebTTSProvider.ts` — respect embedded enabled flag
+- `beat-definitions/core-beats.json` — indoorLocation entry, connectionType: multiple
+
+---
+
 ## 2026-05-06: XR Substrate — GPS, Permissions, Map, Spatial Sound (v0.9.48)
 
 ### Overview

@@ -22,7 +22,7 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.48** — this is a **beta**. Core functionality works
+Current release: **v0.9.49** — this is a **beta**. Core functionality works
 and new features arrive frequently. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
@@ -90,11 +90,13 @@ This is a high-level overview, grouped by theme. For per-version details see [VE
 - **Language-Aware AI**: AI beats generate content in the active translation language with translated preview UI
 
 ### XR & Location-Based Storytelling
-- **GpsLocationBeat**: First XR-category beat. `display` mode shows an interactive Leaflet map with target marker + radius ring + live player position; `trigger-on-arrival` / `trigger-on-departure` modes auto-resolve when the player walks across the threshold
+- **GpsLocationBeat & IndoorLocationBeat**: Both are multi-location beats — like MovementChoice on a map / floor plan. Each location has its own next-beat target and Effects bundle (counters, mood, sentiment, bookmarks, the full ChoiceEffectsEditor range). The first location the player crosses wins
+- **Visual Editors for both XR beats**: drag markers to reposition, click empty map / floor to add a new location, "Fit all" button for overview, selection sync between Visual Editor and Properties tab
+- **Per-beat floor plans**: each indoor beat carries its own room/space — floor plan asset + dimensions in metres. Different beats can show different rooms or scales. Locations carry their own (x, y); the same beacon UUID can appear at different positions on different beats
 - **Three new Conditions**: `gpsProximity` (within N metres of a target), `indoorProximity` (within N metres of a beacon), `permissionGranted` (sensor permission state) — synchronously evaluable from cached sensor reads, available in ConditionBeat, choice requirements, and MovementChoice gates
 - **Directional Sound**: Sounds gain optional `spatialPosition` — geographic mode (lat/lng with bearing recomputed live) or azimuth-only (fixed compass direction). Routes through Web Audio HRTF panning + linear distance falloff. As the player walks, audio rotates and attenuates
-- **Location & XR Settings**: Project-level origin coordinates, default proximity radius, on-permission-denied policy (`skip` / `fallback`), mock location for desktop authoring, optional indoor venue floor plan
-- **MockSensorPanel**: Desktop-authoring stand-in for real GPS / orientation hardware. Walk N/S/E/W in 5m steps, simulate compass + tilt, drives the runtime state for testing without a phone
+- **Location & XR Settings**: Project-level origin coordinates, default proximity radius, on-permission-denied policy (`skip` / `fallback`), mock location for desktop authoring, optional indoor venue floor plan + beacon UUID registry (with Generate button for testing)
+- **MockSensorPanel**: Desktop-authoring stand-in for real GPS / orientation / Bluetooth hardware. Walk N/S/E/W in 5m steps, simulate compass + tilt, slide beacon distances per project beacon, drives the runtime state for testing without a phone
 - **SensorService Abstraction**: `WebSensorService` (production — `navigator.geolocation`, `DeviceOrientationEvent`, Bluetooth Web API) and `MockSensorService` (authoring) selected automatically by capability detection. HTML exports get the same XR support as the in-app preview
 
 ### Collaboration & Distribution
