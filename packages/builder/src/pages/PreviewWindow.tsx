@@ -783,6 +783,17 @@ export const PreviewWindow: React.FC = () => {
         newStory.setCharacters(previewData.characters as any[]);
       }
 
+      // Forward project-level GlobalSettings onto the runtime story.
+      // XR beats (GpsLocationBeat, IndoorLocationBeat) read
+      // settings.location at performAction time for permission policy,
+      // default radius, mock location seed, and venue.beacons. Without
+      // this call the beats see {} and silently fall back to defaults
+      // — including showing "target beacon not configured" even when
+      // beacons ARE authored.
+      if (previewData.settings) {
+        newStory.setSettings(previewData.settings);
+      }
+
       // Reconstruct beats from serialized data
       for (const beatData of storyData.beats) {
         if (beatData.type === 'panorama') {
