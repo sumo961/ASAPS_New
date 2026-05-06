@@ -4805,8 +4805,17 @@ export const Inspector: React.FC<InspectorProps> = ({
         onAssetAdd={onAssetAdd!}
         onAssetRemove={onAssetRemove!}
         onAssetUpdate={onAssetUpdate!}
-        assetType={assetSelectionModal.type === 'sound' ? 'audio' :
-                  (assetSelectionModal.type as 'image' | 'audio' | 'video' | 'font' | undefined)}
+        // assetType maps the local picker name to the asset-storage primary
+        // type. background / character / prop are all 'image'; sound is
+        // 'audio'. Without this mapping the modal's asset.type !== assetType
+        // filter rejects every asset (no asset has type === 'background').
+        assetType={
+          assetSelectionModal.type === 'sound' ? 'audio' :
+          (assetSelectionModal.type === 'background' ||
+           assetSelectionModal.type === 'character' ||
+           assetSelectionModal.type === 'prop') ? 'image' :
+          undefined
+        }
         // For 'sound' (Background Sound) we deliberately leave subType blank
         // so every audio file qualifies — background music is not a sound
         // effect, and tagging it as `sfx` was misleading the asset filter.

@@ -53,13 +53,11 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
     // Note: Use asset.name for extension checks since blob URLs don't have extensions
     if (assetSubType) {
       if (assetSubType === 'background') {
-        // Backgrounds: JPG/JPEG images OR explicitly marked as background
-        const isBackground = asset.type === 'image' &&
-          (asset.name.toLowerCase().match(/\.(jpg|jpeg)$/i) ||
-           asset.subType === 'background' ||
-           asset.name.toLowerCase().includes('bg') ||
-           asset.name.toLowerCase().includes('background'));
-        if (!isBackground) return false;
+        // Backgrounds: any image. JPG/PNG/WebP/SVG all qualify — floor
+        // plans, scene backdrops, and panorama tiles are commonly PNG
+        // and the old JPG-only filter rejected legitimate uploads.
+        // Authors can still tag explicitly via asset.subType.
+        if (asset.type !== 'image') return false;
       } else if (assetSubType === 'character') {
         // Characters: PNG images OR explicitly marked as character
         const isCharacter = asset.type === 'image' &&
