@@ -1301,6 +1301,76 @@
       "renderer": "map"
     },
 
+    "indoorLocation": {
+      "category": "xr",
+      "displayName": "Indoor Location",
+      "icon": "🏛️",
+      "description": "Show an indoor floor-plan with a target Bluetooth beacon. In trigger modes, wait for the player to walk into (or out of) a radius around the beacon. Indoor proximity uses RSSI-derived distance estimates and is suited to room-scale interactions (typical accuracy 1–3m).",
+      "connectionType": "single",
+      "parameters": {
+        "mode": {
+          "type": "string",
+          "required": true,
+          "default": "display",
+          "description": "Behaviour mode: 'display' shows the floor plan with a continue button; 'trigger-on-arrival' resolves when the player enters the radius around the target beacon; 'trigger-on-departure' resolves when the player leaves it.",
+          "ui": {
+            "label": "Mode",
+            "control": "select",
+            "options": [
+              { "value": "display", "label": "Display only (continue button)" },
+              { "value": "trigger-on-arrival", "label": "Trigger on arrival" },
+              { "value": "trigger-on-departure", "label": "Trigger on departure" }
+            ]
+          }
+        },
+        "targetBeaconUuid": {
+          "type": "string",
+          "required": true,
+          "description": "UUID of the target beacon — must match a beacon configured in Project Settings → Location & XR → Indoor venue → Beacons.",
+          "ui": { "label": "Target beacon UUID" }
+        },
+        "radiusMeters": {
+          "type": "number",
+          "required": false,
+          "description": "Proximity radius in metres. Falls back to LocationSettings.defaultProximityRadiusM when unset, then 5m (room-scale default — indoor is tighter than outdoor).",
+          "ui": { "label": "Radius (metres)", "min": 0.5 }
+        },
+        "text": {
+          "type": "string",
+          "required": false,
+          "description": "Instructional text shown over the floor plan (e.g. 'Find the artefact in the east wing').",
+          "ui": { "label": "Instructional text", "control": "textarea" }
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Continue",
+          "description": "Continue button label (display mode).",
+          "ui": { "label": "Continue button text" }
+        },
+        "cancelButtonText": {
+          "type": "string",
+          "required": false,
+          "description": "Optional skip / cancel button label.",
+          "ui": { "label": "Skip button text" }
+        },
+        "timeoutMs": {
+          "type": "number",
+          "required": false,
+          "description": "Optional timeout in milliseconds. Beat resolves with 'timeout' if no arrival / departure / skip within this window.",
+          "ui": { "label": "Timeout (ms)", "min": 0 }
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Next beat after the indoor-location beat resolves."
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "indoorMap"
+    },
+
     "inputText": {
       "category": "visible",
       "displayName": "Input Text",

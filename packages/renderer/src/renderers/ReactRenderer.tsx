@@ -14,6 +14,7 @@ import { PanoramaView } from '../components/PanoramaView';
 // real interactive OpenStreetMap tiles + target/player markers + radius
 // circle. Placeholder kept around for fallback / unit tests.
 import { MapBeatLeaflet } from '../components/MapBeatLeaflet';
+import { IndoorMapBeat } from '../components/IndoorMapBeat';
 
 // ============= SCALED STAGE COMPONENT =============
 // Handles viewport-responsive scaling for the story stage
@@ -2842,6 +2843,65 @@ export class ReactRenderer extends BaseRenderer {
           timeoutMs={options.timeoutMs}
           mapStyle={options.mapStyle}
           showPlayerMarker={options.showPlayerMarker}
+          sensorService={sensorService}
+          onResolve={(path) => resolve(path)}
+        />
+      );
+    });
+  }
+
+  /**
+   * IndoorLocationBeat renderer (v0.9.49+). Mounts the IndoorMapBeat
+   * component which subscribes to the SensorService for live beacon
+   * readings, computes distance to the target beacon, and resolves
+   * with the standard XR-beat path strings.
+   */
+  async renderIndoorMap(options: {
+    mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
+    targetBeaconUuid: string;
+    radiusMeters: number;
+    text?: string;
+    buttonText?: string;
+    cancelButtonText?: string;
+    timeoutMs?: number;
+    venue?: {
+      name?: string;
+      floorPlanAssetId?: string;
+      floorWidth: number;
+      floorHeight: number;
+    };
+    beacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }>;
+  }): Promise<string> {
+    const sensorService = this.getState('sensorService');
+    if (options.text) {
+      this.ttsSpeakCallback?.(options.text, this.currentSpeaker, true);
+    }
+    // Resolve floor-plan asset id to a URL via the renderer's asset
+    // resolver (same path used by image elements). The component
+    // gracefully renders a beacons-only SVG when there's no floor plan.
+    const floorPlanUrl = options.venue?.floorPlanAssetId
+      ? this.resolveAssetUrl(options.venue.floorPlanAssetId) ?? undefined
+      : undefined;
+    const venue = options.venue
+      ? {
+          name: options.venue.name,
+          floorPlanUrl,
+          floorWidth: options.venue.floorWidth,
+          floorHeight: options.venue.floorHeight,
+        }
+      : undefined;
+    return new Promise<string>((resolve) => {
+      this.renderComponent(
+        <IndoorMapBeat
+          mode={options.mode}
+          targetBeaconUuid={options.targetBeaconUuid}
+          radiusMeters={options.radiusMeters}
+          text={options.text}
+          buttonText={options.buttonText}
+          cancelButtonText={options.cancelButtonText}
+          timeoutMs={options.timeoutMs}
+          venue={venue}
+          beacons={options.beacons}
           sensorService={sensorService}
           onResolve={(path) => resolve(path)}
         />

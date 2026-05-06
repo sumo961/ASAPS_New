@@ -25,6 +25,7 @@ export { PanoramaBeat } from './PanoramaBeat';
 export { UpdateAffectBeat, synthesizeEffectsFromLegacyParams } from './UpdateAffectBeat';
 // XR beats (S4+) — see docs/XR-Roadmap.md for the broader plan.
 export { GpsLocationBeat, type GpsLocationBeatParameters } from './GpsLocationBeat';
+export { IndoorLocationBeat, type IndoorLocationBeatParameters } from './IndoorLocationBeat';
 export { BeatTypeRegistry } from './BeatRegistry';
 
 // AI-powered beats

@@ -633,6 +633,32 @@ export interface IRenderer {
     showPlayerMarker?: boolean;
   }, locations?: Location[]): Promise<string>;
 
+  /**
+   * Render an indoor floor-plan view for the IndoorLocationBeat (v0.9.49+).
+   * The beat resolves venue + beacon definitions from globalSettings before
+   * the call so the renderer doesn't need direct access to story state. Live
+   * BeaconReadings come from the StoryContext's SensorService (in renderer
+   * state). Resolves with the same path strings as renderMap.
+   */
+  renderIndoorMap?(options: {
+    mode: 'display' | 'trigger-on-arrival' | 'trigger-on-departure';
+    targetBeaconUuid: string;
+    radiusMeters: number;
+    text?: string;
+    buttonText?: string;
+    cancelButtonText?: string;
+    timeoutMs?: number;
+    /** Resolved venue floorplan info (assetId + dimensions in metres). */
+    venue?: {
+      name?: string;
+      floorPlanAssetId?: string;
+      floorWidth: number;
+      floorHeight: number;
+    };
+    /** All authored beacons with floor-plan positions in metres. */
+    beacons?: Array<{ uuid: string; displayName?: string; x: number; y: number }>;
+  }): Promise<string>;
+
   // Transition and effects
   prepareTransition?(transition: Transition): void;  // Set up initial hidden state before rendering
   applyTransition(transition: Transition): Promise<void>;  // Animate to visible after rendering

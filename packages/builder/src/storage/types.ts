@@ -189,6 +189,20 @@ export interface GlobalSettings {
       floorPlan?: string;        // assetId of the floorplan image
       floorWidth: number;        // metres
       floorHeight: number;       // metres
+      /**
+       * Authored beacon definitions (v0.9.49+). Each beacon has a stable
+       * UUID that the deployed hardware advertises, an optional display
+       * name for the editor, and a position on the floor plan in metres
+       * (origin top-left). IndoorLocationBeat references beacons by UUID;
+       * the renderer reads x/y from here to place markers on the
+       * floor-plan image.
+       */
+      beacons?: Array<{
+        uuid: string;
+        displayName?: string;
+        x: number;  // metres from floor-plan left
+        y: number;  // metres from floor-plan top
+      }>;
     };
     /**
      * Default radius (metres) for proximity triggers when an XR beat
