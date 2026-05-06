@@ -3875,7 +3875,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             floorWidth: venueRaw.floorWidth,
             floorHeight: venueRaw.floorHeight,
           } : undefined}
-          availableTargets={availableTargets}
           onLocationsChange={writeLocations}
           onVenueBeaconsChange={(next) => onUpdateVenueBeacons?.(next)}
         />

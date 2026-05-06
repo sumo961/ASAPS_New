@@ -21,7 +21,20 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Wifi, Plus, Trash2, X } from 'lucide-react';
+import { Wifi, Plus } from 'lucide-react';
+
+/** Compute the next "Location N" auto-name. Same logic as the GPS editor. */
+function nextLocationName(locations: Array<{ name?: string }>): string {
+  let max = 0;
+  for (const loc of locations) {
+    const m = (loc.name || '').match(/^Location\s+(\d+)$/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > max) max = n;
+    }
+  }
+  return `Location ${max + 1}`;
+}
 
 interface XRLocation {
   id: string;
@@ -49,8 +62,6 @@ interface XRFloorPlanEditorProps {
   venueBeacons: VenueBeacon[];
   /** Floor-plan dimensions in metres + resolved image URL. */
   venue?: { name?: string; floorPlanUrl?: string; floorWidth: number; floorHeight: number };
-  /** Beats authors can target. */
-  availableTargets: Array<{ id: string; name?: string }>;
   /** Update this beat's locations. */
   onLocationsChange: (next: XRLocation[]) => void;
   /** Update the venue's beacons array (project-level). */
@@ -77,7 +88,6 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
   projectDefaultRadius,
   venueBeacons,
   venue,
-  availableTargets,
   onLocationsChange,
   onVenueBeaconsChange,
 }) => {
@@ -89,6 +99,10 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
   const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
   // Drag state — null when not dragging.
   const [dragging, setDragging] = useState<{ uuid: string; pointerId: number } | null>(null);
+  // Latest locations + venueBeacons in refs so window-event handlers always
+  // see the current values without re-binding.
+  const locationsRef = useRef(locations);
+  locationsRef.current = locations;
 
   const targetBeaconUuids = useMemo(
     () => new Set(locations.map((l) => l.beaconUuid).filter((x): x is string => !!x)),
@@ -99,6 +113,27 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
   const selectedBeacon = selectedLoc?.beaconUuid
     ? venueBeacons.find((b) => b.uuid === selectedLoc.beaconUuid)
     : null;
+
+  // Inspector → VE focus events. Same protocol as XRMapEditor.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id: string } | undefined;
+      if (!detail?.id) return;
+      setSelectedLocId(detail.id);
+    };
+    window.addEventListener('asaps:xr-focus-location', handler);
+    return () => window.removeEventListener('asaps:xr-focus-location', handler);
+  }, []);
+
+  // Helper to dispatch VE → Inspector selection.
+  const announceSelection = (id: string | null) => {
+    setSelectedLocId(id);
+    if (id) {
+      try {
+        window.dispatchEvent(new CustomEvent('asaps:xr-location-selected', { detail: { id } }));
+      } catch { /* ignore */ }
+    }
+  };
 
   // Convert mouse-event client coords to floor-plan metric coords.
   const eventToMetres = (e: React.PointerEvent | PointerEvent): { x: number; y: number } | null => {
@@ -146,19 +181,20 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
   const onBeaconClick = (e: React.MouseEvent, beacon: VenueBeacon) => {
     e.stopPropagation();
     if (targetBeaconUuids.has(beacon.uuid)) {
-      // Already a location — select it
+      // Already a location — select it (and broadcast to Inspector)
       const loc = locations.find((l) => l.beaconUuid === beacon.uuid);
-      if (loc) setSelectedLocId(loc.id);
+      if (loc) announceSelection(loc.id);
     } else {
-      // Add as a new location
+      // Add as a new location with auto-name; the beacon's display name
+      // is preferred over a generic "Location N" so the row is recognizable.
       const fresh: XRLocation = {
         id: makeLocId(),
-        name: beacon.displayName || '',
+        name: beacon.displayName || nextLocationName(locationsRef.current),
         beaconUuid: beacon.uuid,
         target: '',
       };
       onLocationsChange([...locations, fresh]);
-      setSelectedLocId(fresh.id);
+      announceSelection(fresh.id);
     }
   };
   const addNewBeaconAtCentre = () => {
@@ -177,17 +213,7 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
       target: '',
     };
     onLocationsChange([...locations, fresh]);
-    setSelectedLocId(fresh.id);
-  };
-
-  const updateSelected = (patch: Partial<XRLocation>) => {
-    if (!selectedLoc) return;
-    onLocationsChange(locations.map((l) => l.id === selectedLoc.id ? { ...l, ...patch } : l));
-  };
-  const removeSelected = () => {
-    if (!selectedLoc) return;
-    onLocationsChange(locations.filter((l) => l.id !== selectedLoc.id));
-    setSelectedLocId(null);
+    announceSelection(fresh.id);
   };
 
   const radiusFor = (loc: XRLocation) => loc.radiusMeters ?? fallbackRadius;
@@ -369,104 +395,15 @@ export const XRFloorPlanEditor: React.FC<XRFloorPlanEditorProps> = ({
         </div>
       </div>
 
-      {/* Right-side panel for the selected location */}
+      {/* Top-right HUD — selection indicator. The full edit form lives in
+          the Properties tab; this is just a "you're editing X" pill. */}
       {selectedLoc && (
-        <div
-          style={{
-            width: 320, height: '100%', background: 'white',
-            borderLeft: '1px solid #e5e7eb',
-          }}
-          className="flex flex-col"
-        >
-          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-green-50">
-            <div className="text-sm font-medium text-green-900">Selected location</div>
-            <button
-              type="button"
-              onClick={() => setSelectedLocId(null)}
-              className="p-1 text-gray-500 hover:text-gray-700"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 text-sm">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">Name</label>
-              <input
-                type="text"
-                value={selectedLoc.name || ''}
-                onChange={(e) => updateSelected({ name: e.target.value })}
-                placeholder="e.g. Reception desk"
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              />
-            </div>
-            {selectedBeacon && (
-              <div className="text-[11px] text-gray-500 bg-gray-50 rounded p-2 space-y-0.5">
-                <div>
-                  <span className="font-medium">Beacon UUID:</span>{' '}
-                  <span className="font-mono">{selectedBeacon.uuid.slice(0, 8)}…</span>
-                </div>
-                <div>
-                  Floor position: x={selectedBeacon.x.toFixed(1)}m, y={selectedBeacon.y.toFixed(1)}m
-                </div>
-                <div className="italic text-gray-400">
-                  Drag the dot to reposition. Position is shared across all indoor beats.
-                </div>
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">
-                Radius — {radiusFor(selectedLoc).toFixed(1)} m
-                {selectedLoc.radiusMeters === undefined && (
-                  <span className="ml-1 text-[10px] italic text-gray-500">(beat default)</span>
-                )}
-              </label>
-              <input
-                type="range"
-                min={0.5}
-                max={Math.max(20, fallbackRadius * 2)}
-                step={0.5}
-                value={radiusFor(selectedLoc)}
-                onChange={(e) => updateSelected({ radiusMeters: parseFloat(e.target.value) })}
-                className="w-full"
-              />
-              {selectedLoc.radiusMeters !== undefined && (
-                <button
-                  type="button"
-                  onClick={() => updateSelected({ radiusMeters: undefined })}
-                  className="mt-1 text-[11px] text-blue-600 hover:underline"
-                >
-                  Reset to beat default ({fallbackRadius}m)
-                </button>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">Target beat</label>
-              <select
-                value={selectedLoc.target || ''}
-                onChange={(e) => updateSelected({ target: e.target.value })}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="">— select a beat —</option>
-                {availableTargets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name ? `${t.name} (${t.id})` : t.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="text-[11px] text-gray-500 italic pt-1 border-t border-gray-100">
-              Effects (counters, mood, sentiment, etc) live in the Properties tab.
-            </div>
-          </div>
-          <div className="flex-shrink-0 px-3 py-2 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={removeSelected}
-              className="w-full px-2 py-1.5 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 inline-flex items-center justify-center gap-1"
-            >
-              <Trash2 className="w-3 h-3" />
-              Remove location
-            </button>
+        <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+          <div className="bg-green-50 border border-green-300 shadow-md rounded-lg px-3 py-1.5 text-xs">
+            <span className="font-medium text-green-900">Selected:</span>{' '}
+            <span className="text-green-800">
+              {selectedLoc.name || selectedBeacon?.displayName || '(unnamed)'}
+            </span>
           </div>
         </div>
       )}
