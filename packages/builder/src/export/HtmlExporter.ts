@@ -811,6 +811,14 @@ export interface HtmlExportOptions {
   ttsSpeakerVoices?: Record<string, string>;
   /** Default voice ID */
   ttsDefaultVoiceId?: string;
+  /**
+   * Whether TTS should be enabled at playback time. Mirrors the
+   * builder's TTS toggle. Default true (backward-compat with exports
+   * that pre-date this field). Set to false to ship a player that
+   * has a provider configured but stays silent unless the player
+   * manually enables TTS via the export's UI.
+   */
+  ttsEnabled?: boolean;
   /** Pre-made translations to bundle with the export */
   existingTranslations?: TranslationResource[];
   /** Enable AI on-the-fly translation in the exported player */
@@ -916,7 +924,11 @@ async function exportAsSingleFile(
       })
     : 'null';
 
-  // Build TTS config object (or null if not provided)
+  // Build TTS config object (or null if not provided).
+  // The `enabled` flag mirrors the builder's TTS toggle so the exported
+  // player matches the author's intent. Default true for backward compat
+  // with exports that pre-date this field.
+  const ttsEnabledFlag = options.ttsEnabled ?? true;
   const ttsConfig = options.ttsProvider && options.ttsProvider !== 'web-speech'
     ? JSON.stringify({
         provider: options.ttsProvider,
@@ -925,9 +937,10 @@ async function exportAsSingleFile(
         baseUrl: options.ttsBaseUrl || undefined,
         speakerVoices: options.ttsSpeakerVoices || undefined,
         defaultVoiceId: options.ttsDefaultVoiceId || undefined,
+        enabled: ttsEnabledFlag,
       })
     : options.ttsProvider === 'web-speech'
-      ? JSON.stringify({ provider: 'web-speech' })
+      ? JSON.stringify({ provider: 'web-speech', enabled: ttsEnabledFlag })
       : 'null';
 
   // Get mobile settings from project

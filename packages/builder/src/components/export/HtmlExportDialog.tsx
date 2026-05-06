@@ -137,6 +137,12 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         ttsBaseUrl: savedTTS?.baseUrl,
         ttsDefaultVoiceId: savedTTS?.defaultVoiceId,
         ttsSpeakerVoices: speakerVoices,
+        // Honour the builder's TTS toggle — same key the Header reads.
+        // Default true if the user has never touched the toggle so existing
+        // workflows keep working; explicit false ships a silent player.
+        ttsEnabled: typeof window !== 'undefined'
+          ? localStorage.getItem('asaps_tts_enabled') !== 'false'
+          : true,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,

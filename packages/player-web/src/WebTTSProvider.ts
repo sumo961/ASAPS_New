@@ -16,6 +16,12 @@ export interface TTSConfig {
   speakerVoices?: Record<string, string>;
   /** Default voice ID */
   defaultVoiceId?: string;
+  /**
+   * Author's TTS toggle state at export time. When false, the player
+   * stays silent unless the listener explicitly enables TTS via export
+   * UI. Undefined defaults to true for backward compat with old exports.
+   */
+  enabled?: boolean;
   /** Local TTS request template */
   localTemplate?: {
     method: 'GET' | 'POST';
@@ -50,7 +56,10 @@ export class WebTTSService {
   constructor() {
     this.config = getEmbeddedTTSConfig();
     if (this.config) {
-      console.log(`[WebTTS] Initialized with provider: ${this.config.provider}`);
+      // Honour the author's export-time TTS toggle. Undefined defaults to
+      // true so old exports (pre-v0.9.49) keep behaving as before.
+      this.enabled = this.config.enabled !== false;
+      console.log(`[WebTTS] Initialized with provider: ${this.config.provider}, enabled: ${this.enabled}`);
     }
   }
 
