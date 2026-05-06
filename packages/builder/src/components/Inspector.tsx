@@ -3893,15 +3893,44 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </div>
                           <div>
                             <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
-                              Floor plan asset ID
+                              Floor plan image
                             </label>
-                            <input
-                              type="text"
-                              value={localBeat.parameters?.floorPlanAssetId || ''}
-                              onChange={(e) => handleParameterChange('floorPlanAssetId', e.target.value || undefined)}
-                              placeholder="(asset id from Asset Manager — leave blank to use project venue)"
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
-                            />
+                            {localBeat.parameters?.floorPlanAssetId ? (
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 px-2 py-1 bg-white border border-gray-300 rounded text-xs truncate">
+                                  {assets?.find(a => a.id === localBeat.parameters?.floorPlanAssetId)?.name
+                                    || localBeat.parameters.floorPlanAssetId.substring(0, 12) + '…'}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAssetSelection('background', (asset) => {
+                                    handleParameterChange('floorPlanAssetId', asset.id);
+                                  })}
+                                  className="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50"
+                                  title="Replace floor plan"
+                                >
+                                  Change
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleParameterChange('floorPlanAssetId', undefined)}
+                                  className="px-2 py-1 text-red-600 hover:bg-red-50 rounded"
+                                  title="Remove floor plan"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleAssetSelection('background', (asset) => {
+                                  handleParameterChange('floorPlanAssetId', asset.id);
+                                })}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50 bg-white"
+                              >
+                                Pick or upload floor plan…
+                              </button>
+                            )}
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <label className="block text-[11px] text-gray-600">
