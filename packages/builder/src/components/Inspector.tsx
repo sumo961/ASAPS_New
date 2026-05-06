@@ -3940,6 +3940,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                         onChange={(next) => handleParameterChange('xrLocations', next)}
                         availableTargets={availableTargets}
                         venueBeacons={venueBeacons}
+                        storyOrigin={(() => {
+                          const loc = (globalSettings as any)?.location;
+                          if (loc?.originLat !== undefined && loc?.originLng !== undefined) {
+                            return { lat: loc.originLat, lng: loc.originLng };
+                          }
+                          return loc?.mockLocation || undefined;
+                        })()}
                         availableCounters={availableCounters}
                         availableVariables={availableVariables}
                         availableInventoryItems={availableInventoryItems}

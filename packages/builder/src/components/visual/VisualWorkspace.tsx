@@ -3847,7 +3847,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             beatRadiusMeters={beatRadius}
             projectDefaultRadius={projectDefault}
             mapStyle={params.mapStyle}
-            availableTargets={availableTargets}
             storyOrigin={storyOrigin}
             onChange={writeLocations}
           />

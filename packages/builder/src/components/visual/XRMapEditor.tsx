@@ -19,7 +19,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import leafletCss from 'leaflet/dist/leaflet.css?inline';
-import { X, Plus, MapPin, Trash2 } from 'lucide-react';
+import { Plus, MapPin, Maximize2 } from 'lucide-react';
 
 interface XRLocation {
   id: string;
@@ -40,11 +40,22 @@ interface XRMapEditorProps {
   projectDefaultRadius?: number;
   /** Map style passed through from the beat's parameters. */
   mapStyle?: 'streets' | 'satellite' | 'minimal';
-  /** Beats authors can target. */
-  availableTargets: Array<{ id: string; name?: string }>;
-  /** Project origin from LocationSettings, used as the centre when no locations exist yet. */
+  /** Project origin from LocationSettings, used as fallback for new locations. */
   storyOrigin?: { lat: number; lng: number };
   onChange: (next: XRLocation[]) => void;
+}
+
+/** Compute the next "Location N" auto-name based on existing entries. */
+function nextLocationName(locations: XRLocation[]): string {
+  let max = 0;
+  for (const loc of locations) {
+    const m = (loc.name || '').match(/^Location\s+(\d+)$/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > max) max = n;
+    }
+  }
+  return `Location ${max + 1}`;
 }
 
 const TILE_URLS: Record<string, { url: string; attribution: string; maxZoom: number }> = {
@@ -140,7 +151,6 @@ export const XRMapEditor: React.FC<XRMapEditorProps> = ({
   beatRadiusMeters,
   projectDefaultRadius,
   mapStyle = 'streets',
-  availableTargets,
   storyOrigin,
   onChange,
 }) => {
@@ -148,9 +158,12 @@ export const XRMapEditor: React.FC<XRMapEditorProps> = ({
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Map<string, { marker: L.Marker; ring: L.Circle }>>(new Map());
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Hold a ref to the latest onChange so click handlers see the current callback.
+  // Hold refs to the latest onChange and locations so the map's click
+  // handler (registered once at mount) always sees the current values.
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const locationsRef = useRef(locations);
+  locationsRef.current = locations;
   // Effective radius for a location — per-loc > beat > project > 25m.
   const fallbackRadius = beatRadiusMeters ?? projectDefaultRadius ?? 25;
 
@@ -182,18 +195,23 @@ export const XRMapEditor: React.FC<XRMapEditorProps> = ({
     L.tileLayer(tile.url, { attribution: tile.attribution, maxZoom: tile.maxZoom }).addTo(map);
     mapRef.current = map;
 
-    // Click empty map → add a new location at the click point.
+    // Click empty map → add a new location at the click point with an
+    // auto-name. Author can rename in the Inspector. The window event
+    // notifies the Inspector so it scrolls to and highlights the new row.
     map.on('click', (e: L.LeafletMouseEvent) => {
       const { lat, lng } = e.latlng;
       const fresh: XRLocation = {
         id: makeId(),
-        name: '',
+        name: nextLocationName(locationsRef.current),
         lat,
         lng,
         target: '',
       };
-      onChangeRef.current([...locations, fresh]);
+      onChangeRef.current([...locationsRef.current, fresh]);
       setSelectedId(fresh.id);
+      try {
+        window.dispatchEvent(new CustomEvent('asaps:xr-location-selected', { detail: { id: fresh.id } }));
+      } catch { /* ignore */ }
     });
 
     // Force a re-layout once container has its real size. Two timing
@@ -264,6 +282,9 @@ export const XRMapEditor: React.FC<XRMapEditorProps> = ({
         marker.on('click', (e: L.LeafletMouseEvent) => {
           L.DomEvent.stopPropagation(e);
           setSelectedId(loc.id);
+          try {
+            window.dispatchEvent(new CustomEvent('asaps:xr-location-selected', { detail: { id: loc.id } }));
+          } catch { /* ignore */ }
         });
         marker.on('drag', (e: any) => {
           const ll = e.target.getLatLng();
@@ -287,179 +308,133 @@ export const XRMapEditor: React.FC<XRMapEditorProps> = ({
     }
   }, [selectedId]);
 
+  // Listen for "focus this location" events from the Inspector. When the
+  // author clicks a location row in Properties, pan the map to that
+  // marker and select it.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id: string } | undefined;
+      if (!detail?.id) return;
+      const loc = locationsRef.current.find((l) => l.id === detail.id);
+      if (!loc || loc.lat === undefined || loc.lng === undefined) {
+        // Still highlight so the author sees the selection link visually,
+        // even if the marker has no coords yet.
+        setSelectedId(detail.id);
+        return;
+      }
+      const map = mapRef.current;
+      if (map) {
+        // Use a closer zoom only if we're currently zoomed out very far.
+        const target = map.getZoom() < 14 ? 17 : map.getZoom();
+        map.setView([loc.lat, loc.lng], target, { animate: true });
+      }
+      setSelectedId(detail.id);
+    };
+    window.addEventListener('asaps:xr-focus-location', handler);
+    return () => window.removeEventListener('asaps:xr-focus-location', handler);
+  }, []);
+
   const selected = locations.find((l) => l.id === selectedId) || null;
 
-  const updateSelected = (patch: Partial<XRLocation>) => {
-    if (!selected) return;
-    onChangeRef.current(locations.map((l) => l.id === selected.id ? { ...l, ...patch } : l));
-  };
-  const removeSelected = () => {
-    if (!selected) return;
-    onChangeRef.current(locations.filter((l) => l.id !== selected.id));
-    setSelectedId(null);
-  };
   const addLocationAtCentre = () => {
     const map = mapRef.current;
-    if (!map) return;
-    const centre = map.getCenter();
+    // Prefer the current map view's centre; fall back to storyOrigin /
+    // London when the map isn't ready yet (component just mounted).
+    const fallback = storyOrigin || { lat: 51.5074, lng: -0.1278 };
+    const centre = map ? map.getCenter() : fallback;
     const fresh: XRLocation = {
       id: makeId(),
-      name: '',
+      name: nextLocationName(locations),
       lat: centre.lat,
       lng: centre.lng,
       target: '',
     };
     onChangeRef.current([...locations, fresh]);
     setSelectedId(fresh.id);
+    try {
+      window.dispatchEvent(new CustomEvent('asaps:xr-location-selected', { detail: { id: fresh.id } }));
+    } catch { /* ignore */ }
+  };
+
+  const fitAllLocations = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const valid = locations.filter(
+      (l) => l.lat !== undefined && l.lng !== undefined
+        && !(Math.abs(l.lat) < 0.01 && Math.abs(l.lng) < 0.01),
+    );
+    if (valid.length === 0) {
+      // No valid markers — just centre on storyOrigin so we're not in the ocean.
+      const fallback = storyOrigin || { lat: 51.5074, lng: -0.1278 };
+      map.setView([fallback.lat, fallback.lng], 13, { animate: true });
+      return;
+    }
+    if (valid.length === 1) {
+      map.setView([valid[0].lat!, valid[0].lng!], 17, { animate: true });
+      return;
+    }
+    try {
+      map.fitBounds(
+        L.latLngBounds(valid.map((l) => [l.lat!, l.lng!] as [number, number])).pad(0.3),
+        { maxZoom: 17, animate: true },
+      );
+    } catch { /* ignore */ }
   };
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
-      {/* Map fills the workspace */}
+    <div style={{ position: 'absolute', inset: 0 }}>
+      {/* Map fills the workspace edge to edge — no side panel. All
+          location data lives in the Properties tab; this view is purely
+          for spatial manipulation (drag, click-to-add, zoom). */}
       <div
         ref={containerRef}
-        style={{ flex: 1, minWidth: 0, height: '100%' }}
+        style={{ position: 'absolute', inset: 0 }}
       />
 
-      {/* Top-left: instructions + add button */}
+      {/* Top-left HUD — counts + action buttons. */}
       <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 1000 }}>
-        <div className="bg-white/95 shadow-md rounded-lg px-3 py-2 text-xs space-y-1">
+        <div className="bg-white/95 shadow-md rounded-lg px-3 py-2 text-xs space-y-1.5">
           <div className="flex items-center gap-2 font-medium text-gray-800">
             <MapPin className="w-3.5 h-3.5 text-red-600" />
             GPS locations ({locations.length})
           </div>
           <div className="text-gray-600">
-            Click the map to add a location, drag markers to reposition.
+            Click empty map to add. Drag markers to move. Edit names, targets, and effects in the Properties tab.
           </div>
-          <button
-            type="button"
-            onClick={addLocationAtCentre}
-            className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700 inline-flex items-center gap-1"
-          >
-            <Plus className="w-3 h-3" />
-            Add at centre
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={addLocationAtCentre}
+              className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700 inline-flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" />
+              Add at centre
+            </button>
+            <button
+              type="button"
+              onClick={fitAllLocations}
+              className="text-xs px-2 py-0.5 border border-gray-300 bg-white text-gray-700 rounded hover:bg-gray-50 inline-flex items-center gap-1"
+              title="Zoom out to show every location"
+            >
+              <Maximize2 className="w-3 h-3" />
+              Fit all
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Right-side panel for the selected location */}
+      {/* Top-right HUD — current selection (read-only display so the
+          author always knows which location they're editing in
+          Properties). Vacant when nothing is selected. */}
       {selected && (
-        <div
-          style={{
-            width: 320,
-            height: '100%',
-            background: 'white',
-            borderLeft: '1px solid #e5e7eb',
-            zIndex: 1001,
-          }}
-          className="flex flex-col"
-        >
-          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-green-50">
-            <div className="text-sm font-medium text-green-900">Selected location</div>
-            <button
-              type="button"
-              onClick={() => setSelectedId(null)}
-              className="p-1 text-gray-500 hover:text-gray-700"
-              title="Close panel"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 text-sm">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">Name</label>
-              <input
-                type="text"
-                value={selected.name || ''}
-                onChange={(e) => updateSelected({ name: e.target.value })}
-                placeholder="e.g. Front gate"
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-xs text-gray-600">
-                Latitude
-                <input
-                  type="number"
-                  step="0.000001"
-                  value={selected.lat ?? ''}
-                  onChange={(e) => updateSelected({
-                    lat: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')),
-                  })}
-                  className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
-                />
-              </label>
-              <label className="block text-xs text-gray-600">
-                Longitude
-                <input
-                  type="number"
-                  step="0.000001"
-                  value={selected.lng ?? ''}
-                  onChange={(e) => updateSelected({
-                    lng: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')),
-                  })}
-                  className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
-                />
-              </label>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">
-                Radius — {(selected.radiusMeters ?? fallbackRadius).toFixed(1)} m
-                {selected.radiusMeters === undefined && (
-                  <span className="ml-1 text-[10px] italic text-gray-500">(beat default)</span>
-                )}
-              </label>
-              <input
-                type="range"
-                min={1}
-                max={500}
-                step={1}
-                value={selected.radiusMeters ?? fallbackRadius}
-                onChange={(e) => updateSelected({ radiusMeters: parseFloat(e.target.value) })}
-                className="w-full"
-              />
-              {selected.radiusMeters !== undefined && (
-                <button
-                  type="button"
-                  onClick={() => updateSelected({ radiusMeters: undefined })}
-                  className="mt-1 text-[11px] text-blue-600 hover:underline"
-                >
-                  Reset to beat default ({fallbackRadius}m)
-                </button>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">Target beat</label>
-              <select
-                value={selected.target || ''}
-                onChange={(e) => updateSelected({ target: e.target.value })}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="">— select a beat —</option>
-                {availableTargets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name ? `${t.name} (${t.id})` : t.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="text-[11px] text-gray-500 italic pt-1 border-t border-gray-100">
-              Effects (counters, mood, sentiment, etc) live in the
-              Properties tab — they don't have a spatial dimension.
-            </div>
-          </div>
-          <div className="flex-shrink-0 px-3 py-2 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={removeSelected}
-              className="w-full px-2 py-1.5 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 inline-flex items-center justify-center gap-1"
-            >
-              <Trash2 className="w-3 h-3" />
-              Remove location
-            </button>
+        <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 1000 }}>
+          <div className="bg-green-50 border border-green-300 shadow-md rounded-lg px-3 py-1.5 text-xs">
+            <span className="font-medium text-green-900">Selected:</span>{' '}
+            <span className="text-green-800">{selected.name || '(unnamed)'}</span>
           </div>
         </div>
       )}
+
     </div>
   );
 };
