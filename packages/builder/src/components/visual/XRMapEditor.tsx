@@ -79,11 +79,55 @@ const TARGET_ICON_SELECTED = L.divIcon({
 });
 
 const CSS_STYLE_ID = 'asaps-leaflet-core';
+const RESET_STYLE_ID = 'asaps-leaflet-reset';
 function ensureLeafletCoreStyle() {
   if (typeof document === 'undefined' || document.getElementById(CSS_STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = CSS_STYLE_ID;
   style.textContent = leafletCss;
+  document.head.appendChild(style);
+}
+/**
+ * Defeat host CSS resets (Tailwind preflight) that would scale leaflet's
+ * 256×256 tiles arbitrarily and strip leaflet-bar button styling. Same
+ * rules the runtime MapBeatLeaflet injects.
+ */
+function ensureLeafletResetStyle() {
+  if (typeof document === 'undefined' || document.getElementById(RESET_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = RESET_STYLE_ID;
+  style.textContent = `
+    .leaflet-container img.leaflet-tile,
+    .leaflet-container .leaflet-marker-icon,
+    .leaflet-container .leaflet-marker-shadow {
+      max-width: none !important;
+      max-height: none !important;
+      height: auto;
+      width: auto;
+    }
+    .leaflet-container img.leaflet-tile {
+      width: 256px !important;
+      height: 256px !important;
+    }
+    .leaflet-container .leaflet-bar a,
+    .leaflet-container .leaflet-bar a:hover {
+      background-color: #fff !important;
+      color: #000 !important;
+      text-decoration: none !important;
+      display: block !important;
+      width: 26px !important;
+      height: 26px !important;
+      line-height: 26px !important;
+      text-align: center !important;
+      border-bottom: 1px solid #ccc !important;
+    }
+    .leaflet-container .leaflet-bar a:hover {
+      background-color: #f4f4f4 !important;
+    }
+    .leaflet-container .leaflet-bar a:last-child {
+      border-bottom: none !important;
+    }
+  `;
   document.head.appendChild(style);
 }
 
@@ -122,6 +166,7 @@ export const XRMapEditor: React.FC<XRMapEditorProps> = ({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     ensureLeafletCoreStyle();
+    ensureLeafletResetStyle();
     const tile = TILE_URLS[mapStyle] || TILE_URLS.streets;
     const map = L.map(containerRef.current, {
       center: initialCentre,
@@ -145,13 +190,26 @@ export const XRMapEditor: React.FC<XRMapEditorProps> = ({
       setSelectedId(fresh.id);
     });
 
-    // Force a re-layout once container has its real size.
+    // Force a re-layout once container has its real size. Two timing
+    // checkpoints (raf + 250ms) catch slow-arriving CSS / fonts; a
+    // ResizeObserver picks up later resizes (workspace splits, sidebar
+    // toggles, etc.).
     const raf = window.requestAnimationFrame(() => map.invalidateSize());
     const settle = window.setTimeout(() => map.invalidateSize(), 250);
+    let resizeObserver: ResizeObserver | null = null;
+    const onWindowResize = () => map.invalidateSize();
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      resizeObserver = new ResizeObserver(() => map.invalidateSize());
+      resizeObserver.observe(containerRef.current);
+    } else {
+      window.addEventListener('resize', onWindowResize);
+    }
 
     return () => {
       window.cancelAnimationFrame(raf);
       window.clearTimeout(settle);
+      if (resizeObserver) resizeObserver.disconnect();
+      else window.removeEventListener('resize', onWindowResize);
       try { map.remove(); } catch { /* ignore */ }
       mapRef.current = null;
       markersRef.current.clear();
