@@ -1205,6 +1205,44 @@ export class AIService {
   }
 
   /**
+   * Coerce primitive parameter values whose type doesn't match the schema
+   * but whose runtime accepts the alternate form. Examples:
+   *   - addRemoveInventory.quantity: schema says string ("$var" or "1"),
+   *     AI emits a number. Runtime is permissive — coerce to string so the
+   *     validator passes.
+   *   - any string-typed schema param where the AI emitted a primitive number
+   *     or boolean.
+   */
+  private autoCoerceParameterPrimitives(response: StoryGenerationResponse): void {
+    if (!response.beats) return;
+    const schema = (this.validator as any).schema;
+    if (!schema?.beatTypes) return;
+    let fixCount = 0;
+    for (const beat of response.beats) {
+      const beatDef = schema.beatTypes[beat.type];
+      if (!beatDef?.parameters) continue;
+      const params: any = beat.parameters || {};
+      for (const [paramName, paramDef] of Object.entries(beatDef.parameters as any)) {
+        const expected = (paramDef as any).type;
+        if (expected !== 'string') continue;
+        const value = params[paramName];
+        if (value === undefined || value === null) continue;
+        if (typeof value === 'string') continue;
+        if (typeof value === 'number' || typeof value === 'boolean') {
+          params[paramName] = String(value);
+          fixCount++;
+          console.log(
+            `[AIService.autoFix] ✓ ${beat.type} ${beat.id}: coerced ${paramName} ${typeof value} → string ("${params[paramName]}")`
+          );
+        }
+      }
+    }
+    if (fixCount > 0) {
+      console.log(`[AIService.autoFix] Auto-coerced ${fixCount} primitive parameter values to string`);
+    }
+  }
+
+  /**
    * v0.9.46+ — auto-fix orphan bookmark references.
    *
    * The AI consistently authors `baseline: { bookmark: "X" }` references
@@ -1354,6 +1392,10 @@ export class AIService {
       // count (e.g. 220) instead of the schema's enum "short"|"medium"|"long".
       // Coerce numeric values so validation doesn't fail on an otherwise fine story.
       this.autoFixAiSummaryMaxLength(response);
+
+      // Coerce primitive params (e.g. addRemoveInventory.quantity) where the
+      // schema is `string` but the AI emitted a number/boolean.
+      this.autoCoerceParameterPrimitives(response);
 
       // Auto-fix orphan bookmark references (v0.9.46+). The AI tends to
       // author baseline:{bookmark:"X"} refs without the upstream
