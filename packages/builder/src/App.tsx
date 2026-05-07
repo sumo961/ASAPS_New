@@ -1412,6 +1412,19 @@ function App() {
         injectionId,
       });
 
+      // DIAGNOSTIC: dump character names at every step of the AI-injection
+      // pipeline so we can spot where the AI characters get replaced by
+      // prior-project characters. The "all generated stories have wrong
+      // characters" pattern points at a deterministic clobber somewhere
+      // in this flow; the analytic trace through createProject →
+      // syncProjectData → updateProjectStory says the AI characters
+      // should win, yet authored projects show otherwise. Reproduce
+      // once with this in place and the divergence will jump out.
+      console.log('[AI-CHAR-DIAG] AFTER setCharacters:', {
+        storyCharIds: storyCharacters.map((c: any) => c.id),
+        appCharIds: charactersRef.current.map((c: any) => c.id),
+      });
+
       // Auto-save: Create a new project and save the injected story
       // Use an async IIFE that runs immediately - don't use setTimeout that can be cancelled by HMR
       // The injectionId check protects against duplicate processing
@@ -1443,9 +1456,16 @@ function App() {
           // THEN sync beats. This prevents writing AI beats to the current directory project.
           const newProjectId = await createProject(storyTitle, description);
           console.log('[App] Injected story saved successfully, new project ID:', newProjectId);
+          console.log('[AI-CHAR-DIAG] AFTER createProject (before syncProjectData):', {
+            newProjectId,
+            appCharIds: charactersRef.current.map((c: any) => c.id),
+          });
 
           // NOW sync beats to the new project (createProject updated currentProjectRef)
           syncProjectData();
+          console.log('[AI-CHAR-DIAG] AFTER syncProjectData:', {
+            appCharIds: charactersRef.current.map((c: any) => c.id),
+          });
 
           // CRITICAL: Update both refs atomically
           // pendingNewProjectIdRef stores the new ID so the load effect knows to skip
