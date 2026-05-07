@@ -4844,6 +4844,44 @@ function App() {
       ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections, firstBeatIdForLayout)
       : new Map();
 
+    // Auto-create clusters from the AI's per-beat `cluster` strings.
+    // The AI emits e.g. `cluster: "Act II - The Morning After"` on each beat
+    // but the builder needs Cluster container objects in state.clusters
+    // for them to render in the graph. Group beats by cluster name, compute
+    // a bounding box from their (post-layout) positions, and register a
+    // Cluster with id = name (GraphEditor compares strings).
+    if (story.beats && Array.isArray(story.beats)) {
+      const PADDING = 80;
+      const BEAT_W = 240;
+      const BEAT_H = 100;
+      const buckets = new Map<string, Array<{ x: number; y: number }>>();
+      for (const b of story.beats) {
+        const name = typeof b.cluster === 'string' ? b.cluster.trim() : '';
+        if (!name) continue;
+        const pos = adjustedPositions.get(b.id) || b.position;
+        if (!pos || typeof pos.x !== 'number' || typeof pos.y !== 'number') continue;
+        if (!buckets.has(name)) buckets.set(name, []);
+        buckets.get(name)!.push(pos);
+      }
+      for (const [name, positions] of buckets.entries()) {
+        const minX = Math.min(...positions.map(p => p.x));
+        const minY = Math.min(...positions.map(p => p.y));
+        const maxX = Math.max(...positions.map(p => p.x + BEAT_W));
+        const maxY = Math.max(...positions.map(p => p.y + BEAT_H));
+        actions.addCluster({
+          id: name,
+          name,
+          type: 'organizational',
+          containerPosition: { x: minX - PADDING, y: minY - PADDING },
+          containerBounds: { width: (maxX - minX) + PADDING * 2, height: (maxY - minY) + PADDING * 2 },
+          isExpanded: true,
+        });
+      }
+      if (buckets.size > 0) {
+        console.log(`[App] Auto-created ${buckets.size} cluster(s) from AI metadata:`, [...buckets.keys()]);
+      }
+    }
+
     // Add all generated beats, preserving AI-generated IDs with adjusted positions
     if (story.beats && Array.isArray(story.beats)) {
       story.beats.forEach((beatData: any) => {
@@ -4856,6 +4894,16 @@ function App() {
           position,
           { id: beatData.id, name: beatData.label || beatData.name }
         );
+
+        // Associate beat with its cluster (AI emits cluster: "<name>";
+        // we registered Clusters above keyed by name).
+        if (typeof beatData.cluster === 'string' && beatData.cluster.trim()) {
+          actions.updateBeat(beatData.id, { cluster: beatData.cluster.trim() } as any);
+        }
+        // Carry over notes if the AI emitted them
+        if (typeof beatData.notes === 'string' && beatData.notes.trim()) {
+          actions.updateBeat(beatData.id, { notes: beatData.notes } as any);
+        }
 
         // Update beat with generated parameters
         if (beatData.parameters) {
@@ -4878,6 +4926,19 @@ function App() {
               params.character = cond.character || params.character;
               params.checkType = cond.checkType || params.checkType;
               params.beatId = cond.beatId || params.beatId;
+              // Affect-stack & XR condition subfields — must copy to top-level
+              // before `delete params.condition` or they're lost on save.
+              const condPassthroughFields = [
+                'baseline', 'sentimentTarget', 'sentimentEmotion', 'moodAxis',
+                'emotionName', 'traitName', 'goalId', 'goalStatus', 'variantId',
+                'targetLat', 'targetLng', 'radiusMeters', 'beaconUuid',
+                'beaconRangeMeters', 'permission', 'quantityCheck', 'compareSource',
+              ];
+              for (const f of condPassthroughFields) {
+                if (cond[f] !== undefined && params[f] === undefined) {
+                  params[f] = cond[f];
+                }
+              }
               delete params.condition;
             }
             // Extract targets from connection objects

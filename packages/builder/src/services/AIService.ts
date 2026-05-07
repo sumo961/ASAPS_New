@@ -523,6 +523,35 @@ export class AIService {
         if (cond.checkType && !params.checkType) {
           params.checkType = cond.checkType;
         }
+        // Affect-stack condition subfields (v0.9.45+).
+        // The Inspector reads these from top-level params, but the AI
+        // reliably nests them under condition.* alongside type/operator/value.
+        // Without explicit flattening they are silently dropped on save.
+        const passthroughFields = [
+          'baseline',           // 'literal' | 'initial' | { bookmark: name }
+          'sentimentTarget',    // sentiment
+          'sentimentEmotion',   // sentiment
+          'moodAxis',           // mood: 'valence' | 'arousal'
+          'emotionName',        // emotion
+          'traitName',          // trait
+          'goalId',             // goal
+          'goalStatus',         // goal
+          'variantId',          // characterVariant
+          'targetLat',          // gpsProximity
+          'targetLng',          // gpsProximity
+          'radiusMeters',       // gpsProximity
+          'beaconUuid',         // indoorProximity
+          'beaconRangeMeters',  // indoorProximity
+          'permission',         // permissionGranted
+          'quantityCheck',      // inventory
+          'compareSource',      // inventory
+        ];
+        for (const field of passthroughFields) {
+          if (cond[field] !== undefined && params[field] === undefined) {
+            params[field] = cond[field];
+            console.log(`[AIService] Flattened condition.${field} → ${field} for beat ${beat.id}`);
+          }
+        }
       }
 
       // CRITICAL FIX: For inventory conditions, AI often uses variableName instead of item
