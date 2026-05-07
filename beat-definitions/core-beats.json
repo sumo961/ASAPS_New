@@ -1,7 +1,7 @@
 {
-  "schema": "asaps-beat-definitions-v2.2",
-  "version": "2.2.0",
-  "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture and cluster container support",
+  "schema": "asaps-beat-definitions-v2.3",
+  "version": "2.3.0",
+  "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
     "description": "Defines how connections are structured within beats",
@@ -128,6 +128,94 @@
         "effects": "effect[]?"
       },
       "notes": "pitch is vertical angle (-90 to 90), yaw is horizontal angle (-180 to 180). target is the beat ID to navigate to when clicked. locationName optionally references a hotspot, prop, or character from beat.locations by name. soundEffect plays when this hotspot is selected."
+    }
+  },
+
+  "conditionTypes": {
+    "_meta": {
+      "description": "Per-condition-type field requirements. Drives the schema-driven normalize/validate pipeline (v0.9.51+). Each entry lists the condition's discriminator value, its required fields, and optional fields. The 'type' field itself is always required as the discriminator. The pipeline uses this to: (1) flatten condition.* into top-level params via the conditionBeat 'nested' block, (2) validate that the required fields for the chosen type are present, (3) emit warnings for unknown fields. Replaces the hardcoded per-condition-type required-field map in AIValidator.ts and the partial flattening passes in AIService and App.tsx.",
+      "discriminator": "type",
+      "operators": ["==", "!=", ">", "<", ">=", "<=", "contains", "not"]
+    },
+    "variable": {
+      "required": ["variableName", "operator", "value"],
+      "optional": [],
+      "description": "Compare a story variable against a value"
+    },
+    "counter": {
+      "required": ["variableName", "operator", "value"],
+      "optional": [],
+      "description": "Compare a counter against a value (variableName is the counter name)"
+    },
+    "counterCompare": {
+      "required": ["counter1", "counter2", "operator"],
+      "optional": [],
+      "description": "Compare two counters against each other"
+    },
+    "timer": {
+      "required": ["timer", "operator", "value"],
+      "optional": [],
+      "description": "Compare a timer's remaining seconds against a value"
+    },
+    "inventory": {
+      "required": ["item"],
+      "optional": ["character", "checkType", "operator", "value", "quantityCheck", "quantityOperator", "quantityValue", "compareSource", "compareVariable"],
+      "description": "Check whether a character holds an item (character defaults to 'player'; checkType: has | notHas | quantity)"
+    },
+    "visitedBeat": {
+      "required": ["beatId"],
+      "optional": ["operator"],
+      "description": "Branch on whether a named beat has been visited"
+    },
+    "fictionalTime": {
+      "required": ["operator"],
+      "optional": ["timeYear", "timeMonth", "timeDay", "timeHour", "timeMinute"],
+      "description": "Compare the story's fictional time against a target time"
+    },
+    "mood": {
+      "required": ["character", "moodAxis", "operator", "value"],
+      "optional": ["baseline"],
+      "description": "Compare a character's mood (valence or arousal axis) against a value. baseline: 'literal' | 'initial' | { bookmark: name }"
+    },
+    "emotion": {
+      "required": ["character", "emotionName", "operator", "value"],
+      "optional": ["baseline"],
+      "description": "Compare a character's emotion intensity against a value"
+    },
+    "sentiment": {
+      "required": ["character", "sentimentTarget", "operator", "value"],
+      "optional": ["sentimentEmotion", "baseline"],
+      "description": "Compare a character's sentiment toward a target against a value. sentimentEmotion optional — empty sums all emotions toward target"
+    },
+    "trait": {
+      "required": ["character", "traitName", "operator", "value"],
+      "optional": [],
+      "description": "Compare a character's static trait value against a value"
+    },
+    "goal": {
+      "required": ["character", "goalId", "operator"],
+      "optional": ["goalStatus", "value"],
+      "description": "Branch on a character's goal status (open | met | failed | abandoned). Status read from goalStatus or value."
+    },
+    "characterVariant": {
+      "required": ["character", "operator"],
+      "optional": ["variantId", "value"],
+      "description": "Branch on which variant is currently active on a character. variantId or value carries the compared variant id."
+    },
+    "gpsProximity": {
+      "required": ["targetLat", "targetLng"],
+      "optional": ["radiusMeters", "operator", "proximityMode"],
+      "description": "Branch on player's distance to a GPS target. proximityMode: 'within' | 'outside'."
+    },
+    "indoorProximity": {
+      "required": ["beaconUuid"],
+      "optional": ["beaconRangeMeters", "operator", "proximityMode"],
+      "description": "Branch on a Bluetooth beacon's signal strength. proximityMode: 'within' | 'outside'."
+    },
+    "permissionGranted": {
+      "required": ["permission"],
+      "optional": ["operator"],
+      "description": "Branch on whether the player has granted a sensor permission (location | beacons | …)"
     }
   },
 
@@ -903,12 +991,24 @@
         "trueConnection": {
           "type": "connection",
           "required": true,
-          "description": "Target if condition is true"
+          "description": "Target if condition is true",
+          "aliases": ["trueTarget"]
         },
         "falseConnection": {
           "type": "connection",
           "required": false,
-          "description": "Target if condition is false"
+          "description": "Target if condition is false",
+          "aliases": ["falseTarget"]
+        }
+      },
+      "nested": {
+        "condition": {
+          "discriminator": "type",
+          "discriminatorMapsTo": "conditionType",
+          "registry": "conditionTypes",
+          "flattenAll": true,
+          "deleteAfterFlatten": true,
+          "description": "AI emits the condition as a nested object. Pipeline flattens its fields to top-level params (using the conditionTypes registry to know which fields are valid for the chosen type), then deletes the nested object. After flatten, conditionType is the top-level discriminator."
         }
       },
       "transitions": false,
@@ -1046,9 +1146,10 @@
         },
         "quantity": {
           "type": "string",
+          "coerce": "primitiveToString",
           "required": false,
           "default": "1",
-          "description": "Number of items to add/remove/transfer. Can be a number or variable name (e.g., $goldAmount)",
+          "description": "Number of items to add/remove/transfer. Can be a number or variable name (e.g., $goldAmount). The runtime accepts both forms; the schema declares string because it's the most general (variable refs need to be strings). The pipeline coerces emitted numbers/booleans to string so AI output validates without per-field carve-outs.",
           "ui": {
             "control": "text",
             "label": "Quantity",
@@ -1398,9 +1499,10 @@
         },
         "variable": {
           "type": "string",
+          "aliases": ["variableName"],
           "required": false,
           "default": "userInput",
-          "description": "Variable name to store the input (when saveToType='variable')"
+          "description": "Variable name to store the input (when saveToType='variable'). AI sometimes emits 'variableName' — pipeline aliases it to 'variable'."
         },
         "characterId": {
           "type": "string",
