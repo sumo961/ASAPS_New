@@ -4701,6 +4701,36 @@ function App() {
     actions.clearStory();
     translationActionsRef.current?.clearTranslations();
 
+    // Inject AI-generated characters into App-level character state.
+    // Without this, charactersRef.current still holds the *previous* project's
+    // characters, and the subsequent syncProjectData() writes those stale
+    // characters into the new project — i.e. the AI's characters are dropped
+    // and prior-project characters appear instead. Backfill the editor-only
+    // shape (visual, states, defaultState, timestamps) the same way
+    // loadStoryData (MCP path) does, otherwise the Character Editor crashes.
+    if (story.characters && Array.isArray(story.characters)) {
+      const now = new Date().toISOString();
+      const normalized = story.characters.map((c: any) => ({
+        ...c,
+        visual: c.visual || { type: 'static' },
+        states: c.states && c.states.length > 0
+          ? c.states
+          : [{ id: 'default', name: 'default', displayName: 'Default', visual: {} }],
+        defaultState: c.defaultState || 'default',
+        counters: c.counters || [],
+        inventory: c.inventory || [],
+        tags: c.tags || [],
+        createdAt: c.createdAt || now,
+        updatedAt: c.updatedAt || now,
+      }));
+      console.log('[App] Injecting', normalized.length, 'AI-generated characters:', normalized.map((c: any) => c.id || c.name));
+      setCharacters(normalized);
+    } else {
+      // No characters from AI — clear so prior-project characters don't leak in.
+      console.log('[App] No characters in AI response; clearing character state');
+      setCharacters([]);
+    }
+
     // Add metadata
     if (story.metadata) {
       actions.setTitle(storyTitle);
