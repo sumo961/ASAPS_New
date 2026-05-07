@@ -598,7 +598,11 @@ async function callAnthropic(
     },
     body: JSON.stringify({
       model: model || 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
+      // 32K (was 8192) for Brahmic / CJK / RTL targets where one source
+      // word can expand to 5-10 output tokens. Sonnet 4 supports up to
+      // 64K. Hindi / Gujarati / Sinhala / Bengali / Thai / Burmese / etc
+      // all benefit; Latin-script targets ignore the headroom entirely.
+      max_tokens: 32768,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }),
@@ -611,6 +615,15 @@ async function callAnthropic(
   }
 
   const data = await response.json();
+  // Surface a clear diagnostic when the response was truncated by
+  // max_tokens — otherwise the truncated JSON bubbles up as an
+  // opaque "Unterminated string" parse error.
+  if (data.stop_reason === 'max_tokens') {
+    throw new Error(
+      'Translation response truncated — the AI hit its output-token limit. ' +
+      'Try translating fewer beats at a time, or use a model with a larger output budget.'
+    );
+  }
   return data.content?.[0]?.text || '';
 }
 
@@ -650,6 +663,9 @@ async function callOpenAI(
       { role: 'user', content: userMessage },
     ],
     temperature: 0.3,
+    // Same headroom as the Anthropic path — prevents Brahmic / CJK / RTL
+    // translations from being silently truncated mid-JSON.
+    max_tokens: 32768,
   };
   if (jsonMode) {
     body.response_format = { type: 'json_object' };
@@ -668,6 +684,14 @@ async function callOpenAI(
   }
 
   const data = await response.json();
+  // Surface clear diagnostic on truncation so it doesn't manifest as a
+  // confusing JSON-parse error downstream.
+  if (data.choices?.[0]?.finish_reason === 'length') {
+    throw new Error(
+      'Translation response truncated — the AI hit its output-token limit. ' +
+      'Try translating fewer beats at a time, or use a model with a larger output budget.'
+    );
+  }
   return data.choices?.[0]?.message?.content || '';
 }
 
