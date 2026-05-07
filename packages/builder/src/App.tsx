@@ -1377,14 +1377,28 @@ function App() {
         characters: storyCharacters,
       });
 
-      // Update characters state separately (for App-level character management)
-      // Normalize: ensure required arrays exist (AI may omit them)
+      // Update characters state separately (for App-level character management).
+      // Normalize: AI generations carry the affect-stack fields (traits,
+      // initialMood, goals, dossierPolicy, …) but skip the editor-only
+      // shape (visual, states, defaultState, timestamps). Without those,
+      // CharacterManager / CharacterEditor crash on first paint
+      // (`character.visual.defaultAssetId`, `character.states.length`).
+      // Backfill the same default shape that "Add Character → Blank"
+      // produces so AI characters open in the editor without a TypeError.
       if (story.characters && Array.isArray(story.characters)) {
+        const now = new Date().toISOString();
         const normalized = story.characters.map((c: any) => ({
           ...c,
-          states: c.states || [],
+          visual: c.visual || { type: 'static' },
+          states: c.states && c.states.length > 0
+            ? c.states
+            : [{ id: 'default', name: 'default', displayName: 'Default', visual: {} }],
+          defaultState: c.defaultState || 'default',
           counters: c.counters || [],
           inventory: c.inventory || [],
+          tags: c.tags || [],
+          createdAt: c.createdAt || now,
+          updatedAt: c.updatedAt || now,
         }));
         setCharacters(normalized);
       }

@@ -602,13 +602,33 @@ export function loadProjectData(project: Project): {
     environment = story.environment;
   }
 
-  // Extract characters
+  // Extract characters. Imported / AI-generated stories may carry only
+  // the affect-stack fields (traits, initialMood, goals, dossierPolicy,
+  // …) without the editor-only shape (visual, states, defaultState,
+  // timestamps). Without those defaults CharacterManager / CharacterEditor
+  // crash on first paint with TypeError on character.visual.defaultAssetId
+  // or character.states.length. Backfill the same default shape that
+  // "Add Character → Blank" produces so any character source is editable.
   let characters: any[] = [];
   if (story.getCharacters && typeof story.getCharacters === 'function') {
     characters = story.getCharacters();
   } else if (story.characters) {
     characters = story.characters;
   }
+  const nowIso = new Date().toISOString();
+  characters = characters.map((c: any) => ({
+    ...c,
+    visual: c.visual || { type: 'static' },
+    states: c.states && c.states.length > 0
+      ? c.states
+      : [{ id: 'default', name: 'default', displayName: 'Default', visual: {} }],
+    defaultState: c.defaultState || 'default',
+    counters: c.counters || [],
+    inventory: c.inventory || [],
+    tags: c.tags || [],
+    createdAt: c.createdAt || nowIso,
+    updatedAt: c.updatedAt || nowIso,
+  }));
 
   // Extract clusters
   let clusters: any[] = [];
