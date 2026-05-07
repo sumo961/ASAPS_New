@@ -1,5 +1,150 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-08: AI Generation Fidelity Fixes (v0.9.50)
+
+### Overview
+
+Bug-fix release targeting AI story generation. Several fields the AI was
+emitting — character definitions, sentiment / mood / baseline subfields,
+cluster groupings, per-beat author notes — were silently dropped before
+the project saved, leaving generated stories with empty Character
+Editors, half-filled condition Inspectors, no cluster containers, and no
+notes. Plus a translator-truncation fix for non-Latin scripts and a
+schema-vs-AI type mismatch on inventory `quantity`.
+
+This release intentionally keeps the patches narrow; the underlying
+peacemeal-cleanup architecture (multiple flatteners + cleanups across
+OpenAIProvider, AIService, and App.tsx) has been flagged for a
+schema-driven refactor as the next planned task.
+
+### AI character injection
+
+`handleStoryGenerated` (the StoryGenerator-dialog generation path)
+never called `setCharacters`, so `story.characters` from the AI
+response was silently dropped. The downstream `syncProjectData` then
+wrote whatever was in `charactersRef.current` — usually the previous
+project's characters — into the freshly created project.
+
+Symptoms: first generation in a fresh session showed an empty Character
+Editor; subsequent generations showed characters carried over from
+whatever project was loaded before. Both paths trace back to the same
+missing setter.
+
+Fix: normalize AI characters (mirroring the MCP path's `loadStoryData`)
+and call `setCharacters(normalized)` before the createProject + sync
+timer fires. Backfill editor-only fields (`visual`, `states`,
+`defaultState`, `counters`, `inventory`, `tags`, timestamps) so the
+Character Editor doesn't crash on `character.visual.defaultAssetId`.
+
+### Affect-stack condition subfields
+
+The AI emits `condition: { type: "sentiment", character, sentimentTarget,
+sentimentEmotion, operator, value, baseline }` for sentiment-style
+conditions. Two flattening passes (in `AIService.transformBeatFormat`
+and again in `App.tsx handleStoryGenerated`) only copied the basic
+fields (type, operator, value, character) to top-level params, then
+deleted `params.condition` — losing `sentimentTarget`,
+`sentimentEmotion`, `baseline`, and the rest.
+
+Inspector then showed half-filled forms (Mara as the sentiment-holder,
+operator and value populated, but Toward / Emotion / Compared-to
+baseline empty). On save the truncated condition was unrecoverable.
+
+Fix: extend both flatteners with a passthrough list covering
+`baseline`, `sentimentTarget`, `sentimentEmotion`, `moodAxis`,
+`emotionName`, `traitName`, `goalId`, `goalStatus`, `variantId`, plus
+XR-condition fields (`targetLat`, `targetLng`, `radiusMeters`,
+`beaconUuid`, `beaconRangeMeters`, `permission`), plus
+`quantityCheck`/`compareSource` for inventory.
+
+### Cluster auto-creation
+
+The AI emits a `cluster: "Act II - The Morning After"` string per beat
+to organize them in the graph. The builder needs Cluster container
+objects in `state.clusters` for the GraphEditor to draw them — and
+those were never being created. Beats sat with their cluster strings
+unattached, no containers visible.
+
+Fix: in `handleStoryGenerated`, group beats by cluster name, compute
+the bounding box from post-layout positions, register one Cluster per
+name (id = name verbatim, since GraphEditor compares strings).
+Containers expanded by default, padded so member beats sit comfortably
+inside.
+
+### Per-beat author notes
+
+The AI emits per-beat `notes: "AFFECT BOOKMARK …"` / `notes: "AFFECT
+CHECK …"` annotations explaining its baseline and condition reasoning.
+These never reached `beat.notes`. Now carried over via `updateBeat`.
+
+### Inventory quantity coercion
+
+Schema declares `addRemoveInventory.quantity` as `string` (since the
+runtime accepts both `"1"` and `"$gold"`-style variable references),
+but the AI naturally emits a number. Validation rejected this as a
+type mismatch and failed generation entirely.
+
+Fix: new `autoCoerceParameterPrimitives()` pass walks every beat,
+looks up the schema, and coerces `number` / `boolean` values to
+`string` when the schema declares `string`. Generic — covers future
+similar mismatches without per-field carve-outs.
+
+### AI validator: per-condition-type required fields
+
+The validator's required-field map was a single flat list, regardless
+of the condition type. Sentiment conditions need `character`,
+`sentimentTarget`, `sentimentEmotion`; mood conditions need
+`character`, `moodAxis`; goal conditions need `character`, `goalId`,
+`goalStatus`; etc. The flat map was producing bogus warnings for
+condition types that legitimately don't carry the listed fields.
+
+Fix: per-condition-type required-field map covering all variants
+(`inventory`, `mood`, `emotion`, `sentiment`, `trait`, `goal`,
+`characterVariant`, `gpsProximity`, `indoorProximity`,
+`permissionGranted`, `counter`/`variable`/legacy).
+
+### EndScreen connection alias
+
+The AI emits `connection` on EndScreens; the schema expects
+`restartConnection`. Added `connection` as a hidden alias that
+auto-maps to `restartConnection` so EndScreens with their restart
+target authored as `connection` validate cleanly.
+
+### Character normalization on import
+
+Mirror the AI-path normalization on zip-import (`projectDeserializer`)
+so that debug-file imports don't crash the Character Editor when the
+file lacks editor-only fields.
+
+### Translator truncation fix
+
+`max_tokens=8192` truncated translations of long stories into Brahmic
+/ CJK / RTL targets, producing mid-JSON `Unterminated string` errors
+that masked the real cause. Bumped to 32768 and added explicit
+`stop_reason` / `finish_reason` detection so the truncation surfaces
+as a clear "translation truncated" error if it happens again.
+
+### Files modified
+
+**AI generation pipeline**:
+- `packages/builder/src/services/AIService.ts` — `autoCoerceParameterPrimitives`,
+  passthroughFields list in `transformBeatFormat`
+- `packages/builder/src/services/AIValidator.ts` — per-condition-type
+  required-field map; EndScreen connection alias
+- `packages/builder/src/App.tsx` — character injection + normalize,
+  cluster auto-create, beat.notes carry-over, condition passthrough fields
+
+**Translation / import**:
+- `packages/builder/src/export/StoryTranslator.ts` — max_tokens 8192 → 32768,
+  truncation diagnostic
+- `packages/builder/src/utils/projectDeserializer.ts` — character normalize
+  on zip-import
+
+**Schema**:
+- `beat-definitions/core-beats.json` — `endScreen.connection` hidden alias
+
+---
+
 ## 2026-05-06: XR v2 — IndoorLocationBeat + Multi-Location + Visual Editors (v0.9.49)
 
 ### Overview

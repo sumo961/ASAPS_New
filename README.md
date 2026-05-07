@@ -22,7 +22,7 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.49** — this is a **beta**. Core functionality works
+Current release: **v0.9.50** — this is a **beta**. Core functionality works
 and new features arrive frequently. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
