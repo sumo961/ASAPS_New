@@ -667,6 +667,12 @@
           "type": "connection",
           "required": false,
           "description": "Target beat for restart (usually beat 0)"
+        },
+        "connection": {
+          "type": "connection",
+          "required": false,
+          "description": "Alias of restartConnection — accepted because AI generation commonly emits this name. Both shapes resolve to the restart target.",
+          "ui": { "hidden": true }
         }
       },
       "locations": ["message", "restartButton", "creditsButton"],
