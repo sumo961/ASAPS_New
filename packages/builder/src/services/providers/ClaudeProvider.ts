@@ -179,8 +179,17 @@ export class ClaudeProvider extends BaseAIProvider {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Proxy request failed');
+      // Body may be JSON (Anthropic error) or plaintext (gateway / CDN error
+      // like Envoy "upstream connect error..."). Tolerate both.
+      const rawText = await response.text();
+      let message: string;
+      try {
+        const error = JSON.parse(rawText);
+        message = error.message || error.error?.message || error.error || 'Proxy request failed';
+      } catch {
+        message = rawText.trim().slice(0, 300) || 'Proxy request failed';
+      }
+      throw new Error(`${response.status}: ${message}`);
     }
 
     return response.json();

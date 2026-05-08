@@ -124,14 +124,26 @@ export class OpenAIProvider extends BaseAIProvider {
     }
 
     if (!response.ok) {
-      const errorData = await response.json();
-      // Handle different error response formats from various providers
-      const errorMessage =
-        errorData.error?.message ||  // OpenAI/Moonshot format: {"error":{"message":"..."}}
-        errorData.message ||         // Simple format: {"message":"..."}
-        errorData.error ||           // String format: {"error":"..."}
-        JSON.stringify(errorData) || // Fallback: stringify the whole thing
-        'Proxy request failed';
+      // The error body might be JSON (provider format) OR plaintext (CDN /
+      // gateway errors like Envoy "upstream connect error..."). Read as text
+      // first, then try to parse — falling back to the raw text on parse
+      // failure so the caller sees a meaningful message instead of a
+      // SyntaxError from response.json().
+      const rawText = await response.text();
+      let errorMessage: string;
+      try {
+        const errorData = JSON.parse(rawText);
+        errorMessage =
+          errorData.error?.message ||  // OpenAI/Moonshot format: {"error":{"message":"..."}}
+          errorData.message ||         // Simple format: {"message":"..."}
+          errorData.error ||           // String format: {"error":"..."}
+          JSON.stringify(errorData) || // Fallback: stringify the whole thing
+          'Proxy request failed';
+      } catch {
+        // Body wasn't JSON — typical for upstream gateway errors.
+        // Trim to a useful length so a giant HTML error page doesn't flood the UI.
+        errorMessage = rawText.trim().slice(0, 300) || 'Proxy request failed';
+      }
       throw new Error(`${response.status}: ${errorMessage}`);
     }
 
