@@ -25,6 +25,7 @@ import type {
   StructuredAction,
 } from '../types/helperCommand';
 import { getAIValidator } from './AIValidator';
+import { normalizeStory } from '@asaps/core';
 
 /**
  * AI Service
@@ -1233,43 +1234,11 @@ export class AIService {
     }
   }
 
-  /**
-   * Coerce primitive parameter values whose type doesn't match the schema
-   * but whose runtime accepts the alternate form. Examples:
-   *   - addRemoveInventory.quantity: schema says string ("$var" or "1"),
-   *     AI emits a number. Runtime is permissive — coerce to string so the
-   *     validator passes.
-   *   - any string-typed schema param where the AI emitted a primitive number
-   *     or boolean.
-   */
-  private autoCoerceParameterPrimitives(response: StoryGenerationResponse): void {
-    if (!response.beats) return;
-    const schema = (this.validator as any).schema;
-    if (!schema?.beatTypes) return;
-    let fixCount = 0;
-    for (const beat of response.beats) {
-      const beatDef = schema.beatTypes[beat.type];
-      if (!beatDef?.parameters) continue;
-      const params: any = beat.parameters || {};
-      for (const [paramName, paramDef] of Object.entries(beatDef.parameters as any)) {
-        const expected = (paramDef as any).type;
-        if (expected !== 'string') continue;
-        const value = params[paramName];
-        if (value === undefined || value === null) continue;
-        if (typeof value === 'string') continue;
-        if (typeof value === 'number' || typeof value === 'boolean') {
-          params[paramName] = String(value);
-          fixCount++;
-          console.log(
-            `[AIService.autoFix] ✓ ${beat.type} ${beat.id}: coerced ${paramName} ${typeof value} → string ("${params[paramName]}")`
-          );
-        }
-      }
-    }
-    if (fixCount > 0) {
-      console.log(`[AIService.autoFix] Auto-coerced ${fixCount} primitive parameter values to string`);
-    }
-  }
+  // autoCoerceParameterPrimitives — DELETED in v0.9.51 refactor.
+  // The same coercion now lives in the schema-driven pipeline:
+  // packages/core/src/normalize/normalizeBeat.ts, driven by the
+  // `coerce: "primitiveToString"` metadata declared on the relevant
+  // schema parameters (e.g. addRemoveInventory.quantity).
 
   /**
    * v0.9.46+ — auto-fix orphan bookmark references.
@@ -1404,11 +1373,48 @@ export class AIService {
       // Generate with current provider
       let response = await this.currentProvider!.generateStory(request);
 
-      // Transform beat format to match schema
-      response = this.transformStoryResponse(response);
-      console.log('[AIService] Transformed beat format for schema compatibility');
+      // Schema-driven normalize/validate pipeline (v0.9.51+). Single pass
+      // covering: condition flattening (incl. all affect-stack + XR fields),
+      // per-condition-type aliases (variable/left → variableName etc.),
+      // primitive coercion (numeric quantity → string), schema defaults,
+      // editor-only character backfill, and auto-creation of cluster
+      // containers from per-beat cluster strings. Replaces the partial
+      // hand-rolled transform/cleanup passes that preceded it.
+      await this.validator.ensureSchemaLoaded();
+      const schema = this.validator.getSchema();
+      if (schema?.beatTypes) {
+        const pipelineResult = normalizeStory(response as any, schema);
+        // The pipeline returns a new story object; splat normalized fields
+        // back over the response (preserving any provider-specific extras
+        // like suggestedTheme that aren't part of the canonical story).
+        if (pipelineResult.story) {
+          response = { ...response, ...(pipelineResult.story as any) };
+        }
+        if (pipelineResult.report.changes.length > 0) {
+          console.log(
+            `[AIService.normalize] Pipeline applied ${pipelineResult.report.changes.length} changes ` +
+              `(${pipelineResult.report.beatsNormalized} beats, ` +
+              `${pipelineResult.report.charactersNormalized} characters, ` +
+              `${pipelineResult.report.clustersCreated.length} clusters auto-created)`
+          );
+        }
+        if (pipelineResult.warnings.length > 0) {
+          console.warn(
+            `[AIService.normalize] Pipeline emitted ${pipelineResult.warnings.length} warning(s):`,
+            pipelineResult.warnings.slice(0, 5)
+          );
+        }
+      } else {
+        console.warn('[AIService.normalize] Schema not available, skipping pipeline');
+      }
 
-      // Clean up redundant parameters that AI models often add
+      // Provider-specific structural transforms (DialogTree root unwrap,
+      // hyperlink validation). These are NOT shape-normalization and stay.
+      response = this.transformStoryResponse(response);
+
+      // Beat-type-specific aliases not yet in the schema (setTimer.timerName
+      // → name, videoBeat.videoAssetId → videoFile, addRemoveInventory.propId
+      // → item). Migrating these to schema aliases is a Phase 3a follow-up.
       this.cleanupRedundantParameters(response);
 
       // Auto-fix missing connections on linear beats (common smaller model issue)
@@ -1421,10 +1427,6 @@ export class AIService {
       // count (e.g. 220) instead of the schema's enum "short"|"medium"|"long".
       // Coerce numeric values so validation doesn't fail on an otherwise fine story.
       this.autoFixAiSummaryMaxLength(response);
-
-      // Coerce primitive params (e.g. addRemoveInventory.quantity) where the
-      // schema is `string` but the AI emitted a number/boolean.
-      this.autoCoerceParameterPrimitives(response);
 
       // Auto-fix orphan bookmark references (v0.9.46+). The AI tends to
       // author baseline:{bookmark:"X"} refs without the upstream

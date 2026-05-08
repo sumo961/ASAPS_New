@@ -194,78 +194,35 @@ export class AIValidator {
 
     // ConditionBeat validation
     if (beat.type === 'conditionBeat') {
-      const cond = params.condition;
+      // Post-pipeline (v0.9.51+) condition fields live at top-level
+      // (params.conditionType + params.character / sentimentTarget / …).
+      // Pre-pipeline / unprocessed input still has them nested under
+      // params.condition. Read from whichever exists so this validator
+      // works for both — pipeline output and raw test fixtures.
+      const cond: any = params.conditionType
+        ? { type: params.conditionType, ...params }
+        : params.condition;
       if (!cond) {
         errors.push({
           path: 'parameters.condition',
           message: 'ConditionBeat missing condition parameter',
           severity: 'error'
         });
-      } else {
-        // Per-type required-field map. v0.9.45+ added the affect stack
-        // (mood/sentiment/emotion/trait/goal/characterVariant/bookmark…),
-        // and v0.9.48 added XR (gpsProximity/indoorProximity/permissionGranted)
-        // — none of those use a `variable` field, so the old
-        // "everything-not-inventory needs variable" heuristic produced
-        // bogus warnings on every affect or XR condition.
-        const t = cond.type;
-        if (t === 'inventory') {
-          if (!cond.item) warnings.push('ConditionBeat inventory condition missing item');
-          // checkType is optional (defaults to 'has')
-        } else if (t === 'mood') {
-          if (!cond.character) warnings.push('ConditionBeat mood condition missing character');
-          if (!cond.axis) warnings.push('ConditionBeat mood condition missing axis (valence|arousal)');
-          if (!cond.operator) warnings.push('ConditionBeat missing operator in condition');
-        } else if (t === 'emotion') {
-          if (!cond.character) warnings.push('ConditionBeat emotion condition missing character');
-          if (!cond.emotion) warnings.push('ConditionBeat emotion condition missing emotion');
-          if (!cond.operator) warnings.push('ConditionBeat missing operator in condition');
-        } else if (t === 'sentiment') {
-          if (!cond.character) warnings.push('ConditionBeat sentiment condition missing character');
-          if (!cond.sentimentTarget) warnings.push('ConditionBeat sentiment condition missing sentimentTarget');
-          if (!cond.sentimentEmotion) warnings.push('ConditionBeat sentiment condition missing sentimentEmotion');
-          if (!cond.operator) warnings.push('ConditionBeat missing operator in condition');
-        } else if (t === 'trait') {
-          if (!cond.character) warnings.push('ConditionBeat trait condition missing character');
-          if (!cond.trait) warnings.push('ConditionBeat trait condition missing trait');
-          if (!cond.operator) warnings.push('ConditionBeat missing operator in condition');
-        } else if (t === 'goal') {
-          if (!cond.character) warnings.push('ConditionBeat goal condition missing character');
-          if (!cond.goalId) warnings.push('ConditionBeat goal condition missing goalId');
-          // status is optional; defaults check goalId presence only
-        } else if (t === 'characterVariant') {
-          if (!cond.character) warnings.push('ConditionBeat characterVariant condition missing character');
-          if (!cond.variantId) warnings.push('ConditionBeat characterVariant condition missing variantId');
-        } else if (t === 'gpsProximity') {
-          if (cond.targetLat === undefined) warnings.push('ConditionBeat gpsProximity condition missing targetLat');
-          if (cond.targetLng === undefined) warnings.push('ConditionBeat gpsProximity condition missing targetLng');
-        } else if (t === 'indoorProximity') {
-          if (!cond.beaconUuid) warnings.push('ConditionBeat indoorProximity condition missing beaconUuid');
-        } else if (t === 'permissionGranted') {
-          if (!cond.permission) warnings.push('ConditionBeat permissionGranted condition missing permission');
-        } else if (t === 'counter' || t === 'variable' || !t) {
-          // Counter / variable conditions — original behaviour. Type may be
-          // omitted (back-compat — old projects defaulted to counter).
-          if (!cond.variable && !cond.variableName && !cond.name) {
-            warnings.push('ConditionBeat missing variable name in condition');
-          }
-          if (!cond.operator) warnings.push('ConditionBeat missing operator in condition');
-        }
-        // Other / future condition types: no warnings — better quiet than
-        // a flood of false positives whenever a new operator lands.
       }
+      // Per-condition-type required-field validation now lives in the
+      // schema-driven pipeline (packages/core/src/normalize/validateBeat.ts),
+      // which reads the conditionTypes registry from core-beats.json.
+      // The legacy hardcoded map here had stale field names (axis vs
+      // moodAxis, emotion vs emotionName, trait vs traitName) that caused
+      // false-positive warnings; removed in the v0.9.51 refactor.
       // Check for connection targets
       if (!params.trueConnection && !params.trueTarget) {
         warnings.push('ConditionBeat missing trueConnection/trueTarget');
       }
-
-      // Detect incorrectly duplicated parameters at top level (common AI generation error)
-      const forbiddenTopLevel = ['item', 'character', 'checkType', 'variable', 'variableName', 'operator', 'value', 'conditionType'];
-      for (const field of forbiddenTopLevel) {
-        if (params[field] !== undefined) {
-          warnings.push(`ConditionBeat has '${field}' at top level - should only be inside 'condition' object`);
-        }
-      }
+      // Note: the v0.9.51 normalize/validate pipeline intentionally lifts
+      // condition.* to top-level params for the inspector. The legacy
+      // "forbidden top-level params" warning was removed in that refactor —
+      // top-level fields are now the canonical post-pipeline shape.
     }
 
     // HyperText validation
