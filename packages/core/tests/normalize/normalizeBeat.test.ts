@@ -124,6 +124,59 @@ describe('normalizeBeat — affect-stack condition flattening', () => {
   });
 });
 
+describe('normalizeBeat — registry-level aliases (per-condition-type)', () => {
+  it('renames condition.variable → condition.variableName for variable conditions', () => {
+    // The AI consistently emits `variable` (not `variableName`) on
+    // variable / counter conditions. The schema's conditionTypes.variable.aliases
+    // teaches the pipeline this rename.
+    const raw = {
+      id: 'b14',
+      type: 'conditionBeat',
+      parameters: {
+        condition: { type: 'variable', variable: 'satWithMaya', operator: '==', value: true },
+        trueConnection: { target: 'b15' },
+        falseConnection: { target: 'b16' },
+      },
+    };
+    const { beat, changes } = normalizeBeat(raw, schema);
+    expect(beat.parameters.conditionType).toBe('variable');
+    expect(beat.parameters.variableName).toBe('satWithMaya');
+    expect(beat.parameters.variable).toBeUndefined();
+    expect(beat.parameters.value).toBe(true);
+    const aliased = changes.find(c => c.kind === 'aliased' && c.path.includes('variableName'));
+    expect(aliased).toBeDefined();
+  });
+
+  it('renames condition.left → condition.variableName (legacy alias)', () => {
+    const raw = {
+      id: 'b',
+      type: 'conditionBeat',
+      parameters: {
+        condition: { type: 'variable', left: 'flag', operator: '==', value: true },
+        trueConnection: { target: 'x' },
+      },
+    };
+    const { beat } = normalizeBeat(raw, schema);
+    expect(beat.parameters.variableName).toBe('flag');
+    expect(beat.parameters.left).toBeUndefined();
+  });
+
+  it('renames condition.counter → condition.variableName for counter conditions', () => {
+    const raw = {
+      id: 'b24',
+      type: 'conditionBeat',
+      parameters: {
+        condition: { type: 'counter', counter: 'friendshipPoints', operator: '>=', value: 4 },
+        trueConnection: { target: 'b25' },
+      },
+    };
+    const { beat } = normalizeBeat(raw, schema);
+    expect(beat.parameters.conditionType).toBe('counter');
+    expect(beat.parameters.variableName).toBe('friendshipPoints');
+    expect(beat.parameters.counter).toBeUndefined();
+  });
+});
+
 describe('normalizeBeat — primitive coercion', () => {
   it('coerces numeric quantity to string on addRemoveInventory', () => {
     const raw = {

@@ -68,6 +68,15 @@ export interface BeatSchema {
 export interface ConditionTypeSpec {
   required?: string[];
   optional?: string[];
+  /**
+   * Per-canonical-name list of aliases the AI commonly emits.
+   * Example: { variableName: ['variable', 'left'] } means the pipeline
+   * accepts condition.variable / condition.left and renames either to
+   * condition.variableName before the flatten step copies it up to
+   * top-level params. Lets the schema absorb model-specific quirks
+   * without per-field carve-outs in the pipeline code.
+   */
+  aliases?: Record<string, string[]>;
   description?: string;
 }
 

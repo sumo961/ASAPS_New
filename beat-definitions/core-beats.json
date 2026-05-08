@@ -140,12 +140,18 @@
     "variable": {
       "required": ["variableName", "operator", "value"],
       "optional": [],
-      "description": "Compare a story variable against a value"
+      "aliases": {
+        "variableName": ["variable", "left"]
+      },
+      "description": "Compare a story variable against a value. AI commonly emits `variable` or `left`; pipeline aliases either to `variableName`."
     },
     "counter": {
       "required": ["variableName", "operator", "value"],
       "optional": [],
-      "description": "Compare a counter against a value (variableName is the counter name)"
+      "aliases": {
+        "variableName": ["variable", "left", "counter"]
+      },
+      "description": "Compare a counter against a value (variableName is the counter name). AI commonly emits `variable`, `left`, or `counter` — pipeline aliases all to `variableName`."
     },
     "counterCompare": {
       "required": ["counter1", "counter2", "operator"],

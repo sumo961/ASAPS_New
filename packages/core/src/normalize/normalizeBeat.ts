@@ -68,8 +68,9 @@ export function normalizeBeat(
       if (!nested || typeof nested !== 'object' || Array.isArray(nested)) continue;
 
       // Discriminator (e.g. type → conditionType)
+      let discValue: any;
       if (nestedSpec.discriminator && nestedSpec.discriminatorMapsTo) {
-        const discValue = nested[nestedSpec.discriminator];
+        discValue = nested[nestedSpec.discriminator];
         const target = nestedSpec.discriminatorMapsTo;
         if (discValue !== undefined && params[target] === undefined) {
           params[target] = discValue;
@@ -80,6 +81,37 @@ export function normalizeBeat(
             from: undefined,
             to: discValue,
           });
+        }
+      }
+
+      // Look up the registry entry for this discriminator value (e.g.
+      // conditionTypes.sentiment) so we can honor per-type field aliases
+      // (e.g. variable.aliases = { variableName: ['variable', 'left'] }).
+      let registryEntry: any = undefined;
+      if (nestedSpec.registry === 'conditionTypes' && discValue && schema.conditionTypes) {
+        registryEntry = schema.conditionTypes[discValue];
+      }
+      const registryAliases: Record<string, string[]> | undefined = registryEntry?.aliases;
+
+      // Apply registry-level aliases to the nested object IN PLACE so the
+      // subsequent flatten copies the canonical name to top-level.
+      if (registryAliases) {
+        for (const [canonical, aliasList] of Object.entries(registryAliases)) {
+          if (nested[canonical] !== undefined) continue;
+          for (const alias of aliasList) {
+            if (nested[alias] !== undefined) {
+              nested[canonical] = nested[alias];
+              delete nested[alias];
+              changes.push({
+                beatId,
+                path: `parameters.${nestedKey}.${alias} → parameters.${nestedKey}.${canonical}`,
+                kind: 'aliased',
+                to: nested[canonical],
+                note: `via conditionTypes.${discValue}.aliases`,
+              });
+              break;
+            }
+          }
         }
       }
 
