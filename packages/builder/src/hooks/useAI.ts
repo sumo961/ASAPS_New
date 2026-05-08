@@ -88,6 +88,12 @@ export interface AIServiceState {
   isGenerating: boolean;
   error: string | null;
   currentProvider: string | null;
+  /**
+   * Cumulative content characters received so far during a streaming
+   * generation. Reset to 0 at the start of each call; updated as the
+   * provider's stream forwards content. 0 when no streaming is in flight.
+   */
+  generationProgress: number;
 }
 
 /**
@@ -99,6 +105,7 @@ export function useAI() {
     isGenerating: false,
     error: null,
     currentProvider: null,
+    generationProgress: 0,
   });
 
   const aiService = getAIService();
@@ -142,6 +149,7 @@ export function useAI() {
       isGenerating: false,
       error: null,
       currentProvider: providerType || provider,
+      generationProgress: 0,
     });
 
     console.log('[useAI] Configured provider:', providerType || provider);
@@ -234,16 +242,28 @@ export function useAI() {
       return null;
     }
 
-    setState(prev => ({ ...prev, isGenerating: true, error: null }));
+    setState(prev => ({ ...prev, isGenerating: true, error: null, generationProgress: 0 }));
+
+    // Wrap any caller-supplied onProgress so we also update hook state.
+    // The dialog uses generationProgress to show "Generating... (N chars)".
+    const callerOnProgress = request.onProgress;
+    const wrappedRequest: StoryGenerationRequest = {
+      ...request,
+      onProgress: (chars: number) => {
+        setState(prev => ({ ...prev, generationProgress: chars }));
+        callerOnProgress?.(chars);
+      },
+    };
 
     try {
-      const response = await aiService.generateStory(request);
-      setState(prev => ({ ...prev, isGenerating: false }));
+      const response = await aiService.generateStory(wrappedRequest);
+      setState(prev => ({ ...prev, isGenerating: false, generationProgress: 0 }));
       return response;
     } catch (error) {
       setState(prev => ({
         ...prev,
         isGenerating: false,
+        generationProgress: 0,
         error: error instanceof Error ? error.message : 'Story generation failed',
       }));
       return null;

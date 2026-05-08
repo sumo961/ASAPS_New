@@ -12,7 +12,7 @@
 
 import type { Plugin } from 'vite';
 import { request as httpsRequest } from 'https';
-import { request as httpRequest, type IncomingMessage } from 'http';
+import { request as httpRequest, type IncomingMessage, type ServerResponse } from 'http';
 
 /**
  * Make an outgoing request using Node.js native https/http modules
@@ -69,6 +69,132 @@ function readBody(req: IncomingMessage): Promise<string> {
     req.on('data', (chunk: string) => (body += chunk));
     req.on('end', () => resolve(body));
     req.on('error', reject);
+  });
+}
+
+/**
+ * Streaming-mode proxy: opens a Server-Sent-Events connection to the
+ * upstream provider, parses each SSE chunk, extracts the assistant's
+ * content delta, and writes the plain content text to the client
+ * response as a chunked text/plain stream.
+ *
+ * The two big wins versus the buffered path:
+ *
+ *   1. The connection stays warm. Long reasoning pauses on the model
+ *      side don't get killed by intermediaries because chunks (or at
+ *      worst SSE keepalive pings) keep flowing. This eliminates the
+ *      504 timeouts seen with the buffered path on slow models.
+ *   2. The client can show progress (chars received) without polling.
+ *
+ * The proxy writes only content tokens, NOT the OpenAI SSE wrapper —
+ * the client's job is just to accumulate the text and parse it as
+ * JSON at the end. That's the same shape the buffered path already
+ * extracts via response.choices[0].message.content.
+ */
+function streamingProxyRequest(
+  endpoint: string,
+  headers: Record<string, string>,
+  body: string,
+  res: ServerResponse,
+  provider: 'openai' | 'claude',
+  timeoutMs: number,
+): Promise<{ totalChars: number; status: number }> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(endpoint);
+    const isHttps = url.protocol === 'https:';
+    const requestFn = isHttps ? httpsRequest : httpRequest;
+
+    const upstream = requestFn(
+      {
+        hostname: url.hostname,
+        port: url.port || (isHttps ? 443 : 80),
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Length': Buffer.byteLength(body),
+          // Some upstreams (e.g. Cloudflare in front of OpenAI) only enable
+          // chunked SSE when Accept includes text/event-stream.
+          Accept: 'text/event-stream',
+        },
+      },
+      (upstreamRes: IncomingMessage) => {
+        const status = upstreamRes.statusCode || 500;
+
+        // Upstream error — read the full body, return as JSON to the client
+        if (status >= 400) {
+          const chunks: Buffer[] = [];
+          upstreamRes.on('data', (c: Buffer) => chunks.push(c));
+          upstreamRes.on('end', () => {
+            const text = Buffer.concat(chunks).toString('utf-8');
+            res.writeHead(status, { 'Content-Type': 'application/json' });
+            // Pass the upstream body straight through. The client's error
+            // handler tolerates both JSON and plaintext shapes.
+            res.end(text || JSON.stringify({ error: `Upstream ${status}` }));
+            resolve({ totalChars: 0, status });
+          });
+          upstreamRes.on('error', reject);
+          return;
+        }
+
+        // Streaming success — open the response with chunked text/plain.
+        res.writeHead(200, {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Transfer-Encoding': 'chunked',
+          'Cache-Control': 'no-cache, no-transform',
+          'X-Accel-Buffering': 'no',
+        });
+
+        let lineBuffer = '';
+        let totalChars = 0;
+
+        upstreamRes.on('data', (chunk: Buffer) => {
+          lineBuffer += chunk.toString('utf-8');
+          // SSE framing: chunks are `data: <json>\n\n`. Process complete
+          // lines; keep partial.
+          const lines = lineBuffer.split('\n');
+          lineBuffer = lines.pop() || '';
+          for (const raw of lines) {
+            const line = raw.trim();
+            if (!line.startsWith('data:')) continue;
+            const payload = line.slice(5).trim();
+            if (!payload || payload === '[DONE]') continue;
+            try {
+              const json = JSON.parse(payload);
+              // OpenAI: { choices: [{ delta: { content: "..." } }] }
+              // Anthropic: { type: 'content_block_delta', delta: { text: "..." } }
+              const content =
+                provider === 'openai'
+                  ? json?.choices?.[0]?.delta?.content
+                  : json?.delta?.text || json?.delta?.partial_json;
+              if (content) {
+                res.write(content);
+                totalChars += (content as string).length;
+              }
+            } catch {
+              // Malformed line — ignore (rare with well-formed SSE)
+            }
+          }
+        });
+
+        upstreamRes.on('end', () => {
+          res.end();
+          resolve({ totalChars, status });
+        });
+        upstreamRes.on('error', (err) => {
+          res.end();
+          reject(err);
+        });
+      },
+    );
+
+    upstream.on('error', reject);
+    upstream.setTimeout(timeoutMs, () => {
+      upstream.destroy(new Error('Request timeout'));
+    });
+
+    upstream.write(body);
+    upstream.end();
   });
 }
 
@@ -183,14 +309,26 @@ export function viteAIProxyPlugin(): Plugin {
             };
           }
 
-          console.log(`[Vite AI Proxy] ${req.url === '/api/ai/openai' ? 'OpenAI' : 'Claude'} → ${endpoint}`);
+          const isStreaming = requestBody?.stream === true;
+          console.log(`[Vite AI Proxy] ${req.url === '/api/ai/openai' ? 'OpenAI' : 'Claude'} → ${endpoint}${isStreaming ? ' (streaming)' : ''}`);
 
-          const { status, text } = await nativeRequest(endpoint, headers, requestBodyStr, AI_TIMEOUT_MS);
-
-          console.log(`[Vite AI Proxy] Response: ${status} (${text.length} chars)`);
-
-          res.writeHead(status, { 'Content-Type': 'application/json' });
-          res.end(text);
+          if (isStreaming) {
+            const provider = req.url === '/api/ai/openai' ? 'openai' : 'claude';
+            const { totalChars, status } = await streamingProxyRequest(
+              endpoint,
+              headers,
+              requestBodyStr,
+              res,
+              provider,
+              AI_TIMEOUT_MS,
+            );
+            console.log(`[Vite AI Proxy] Stream complete: ${status} (${totalChars} content chars)`);
+          } else {
+            const { status, text } = await nativeRequest(endpoint, headers, requestBodyStr, AI_TIMEOUT_MS);
+            console.log(`[Vite AI Proxy] Response: ${status} (${text.length} chars)`);
+            res.writeHead(status, { 'Content-Type': 'application/json' });
+            res.end(text);
+          }
         } catch (error) {
           console.error('[Vite AI Proxy] Error:', error);
           const isTimeout = error instanceof Error && error.message === 'Request timeout';

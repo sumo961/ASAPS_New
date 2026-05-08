@@ -89,6 +89,16 @@ export interface StoryGenerationRequest {
    * continuing the loop.
    */
   signal?: AbortSignal;
+
+  /**
+   * Optional progress callback invoked as the streaming response from
+   * the AI provider grows. `charsReceived` is the cumulative content
+   * length so far. Called frequently while the model produces tokens —
+   * the UI can use it to show a progress indicator. Not all providers
+   * stream (Ollama / direct API mode use buffered responses) so this
+   * may not fire even when set.
+   */
+  onProgress?: (charsReceived: number) => void;
 }
 
 /**

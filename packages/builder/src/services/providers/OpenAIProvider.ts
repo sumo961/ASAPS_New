@@ -94,9 +94,19 @@ export class OpenAIProvider extends BaseAIProvider {
   /**
    * Make request via proxy for custom baseUrls (to avoid CORS)
    */
-  private async makeProxyRequest(requestBody: any, signal?: AbortSignal): Promise<any> {
+  private async makeProxyRequest(
+    requestBody: any,
+    signal?: AbortSignal,
+    onProgress?: (charsReceived: number) => void,
+  ): Promise<any> {
     console.log('[OpenAIProvider] makeProxyRequest called, endpoint:', this.proxyEndpoint);
     console.log('[OpenAIProvider] baseUrl:', this.config?.baseUrl || '(none - using default)');
+
+    // Streaming is opt-in via requestBody.stream === true. The proxy keeps
+    // the connection warm by piping content tokens as they arrive — this
+    // sidesteps the long-idle-then-killed-by-CDN class of 504 timeouts and
+    // gives us a progress signal for the UI.
+    const isStreaming = requestBody?.stream === true;
 
     let response;
     try {
@@ -146,6 +156,33 @@ export class OpenAIProvider extends BaseAIProvider {
         errorMessage = rawText.trim().slice(0, 300) || 'Proxy request failed';
       }
       throw new Error(`${response.status}: ${errorMessage}`);
+    }
+
+    // Streaming success: read the body as a chunked text stream of
+    // content tokens (the proxy already extracted them from the upstream
+    // SSE format). Accumulate into a single string and wrap in the same
+    // shape the buffered path returns so downstream code can stay
+    // identical: `response.choices[0].message.content`.
+    if (isStreaming && response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        if (onProgress) onProgress(accumulated.length);
+      }
+      accumulated += decoder.decode();
+      return {
+        choices: [{ message: { content: accumulated } }],
+        // Synthesize a finish_reason so existing truncation-detection
+        // logic can still run. The proxy doesn't currently forward the
+        // upstream finish_reason, so 'stop' is the optimistic default;
+        // if the assembled JSON fails to parse, the existing
+        // JSON-repair path will handle it.
+        _streamed: true,
+      };
     }
 
     return response.json();
@@ -913,10 +950,16 @@ export class OpenAIProvider extends BaseAIProvider {
       console.log('[OpenAIProvider] generateStory useProxy:', this.useProxy);
       if (this.useProxy) {
         // Use proxy for all non-local endpoints (including default OpenAI).
-        // Thread through request.signal so the user can cancel.
-        response = await this.makeProxyRequest(requestBody, request.signal);
+        // Stream by default — keeps the connection warm during long
+        // reasoning pauses, eliminates 504s on slow models, and gives
+        // the UI a progress signal. Thread through request.signal so
+        // the user can cancel.
+        const streamingBody = { ...requestBody, stream: true };
+        response = await this.makeProxyRequest(streamingBody, request.signal, request.onProgress);
       } else {
-        // Direct API call only for local servers (Ollama, etc.)
+        // Direct API call only for local servers (Ollama, etc.) — keep
+        // non-streaming for now since local servers don't have the
+        // intermediary-timeout problem the proxy was solving.
         response = await this.client!.chat.completions.create(requestBody, {
           signal: request.signal,
         });

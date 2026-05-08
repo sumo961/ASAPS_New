@@ -28,7 +28,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
   onClose,
   onStoryGenerated,
 }) => {
-  const { isConfigured, isGenerating, error, generateStory, clearError, cancelGeneration, currentProvider } = useAI();
+  const { isConfigured, isGenerating, error, generateStory, clearError, cancelGeneration, currentProvider, generationProgress } = useAI();
 
   const [prompt, setPrompt] = useState('');
   const [genre, setGenre] = useState<string>('');
@@ -323,7 +323,9 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating...
+                  {generationProgress > 0
+                    ? `Generating… ${generationProgress.toLocaleString()} chars`
+                    : 'Generating…'}
                 </>
               ) : (
                 <>
