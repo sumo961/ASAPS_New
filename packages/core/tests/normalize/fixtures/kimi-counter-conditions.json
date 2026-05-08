@@ -1,0 +1,952 @@
+{
+  "title": "New Kid",
+  "generatedAt": "2026-05-08T15:47:15.192Z",
+  "status": "success",
+  "beatCount": 29,
+  "beatTypes": [
+    "titleScreen",
+    "infoText",
+    "dialogTree",
+    "infoText",
+    "infoText",
+    "infoText",
+    "dialogTree",
+    "infoText",
+    "dialogTree",
+    "infoText",
+    "infoText",
+    "infoText",
+    "dialogTree",
+    "infoText",
+    "infoText",
+    "infoText",
+    "dialogTree",
+    "infoText",
+    "infoText",
+    "infoText",
+    "dialogTree",
+    "infoText",
+    "infoText",
+    "infoText",
+    "conditionBeat",
+    "endScreen",
+    "conditionBeat",
+    "endScreen",
+    "endScreen"
+  ],
+  "errors": [],
+  "warnings": [],
+  "story": {
+    "metadata": {
+      "title": "New Kid",
+      "author": "AI Assistant",
+      "description": "A short story about a kid moving to a new school and trying to make friends on the first day.",
+      "genre": "drama"
+    },
+    "suggestedTheme": {
+      "themeId": "builtin-visual-novel",
+      "reason": "Character-driven drama with emotional beats, dialog-heavy interactions, and relationship-building arcs."
+    },
+    "beats": [
+      {
+        "id": "beat_0",
+        "name": "Title Screen",
+        "type": "titleScreen",
+        "position": {
+          "x": 100,
+          "y": 300
+        },
+        "parameters": {
+          "title": "New Kid",
+          "author": "AI Assistant",
+          "connection": {
+            "target": "beat_1"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_1"
+          }
+        ]
+      },
+      {
+        "id": "beat_1",
+        "name": "Arrival",
+        "type": "infoText",
+        "position": {
+          "x": 400,
+          "y": 300
+        },
+        "notes": "ASSET: School exterior, morning light. AUDIO: Distant school bell, car sounds.",
+        "parameters": {
+          "text": "Your mom's car pulls up to the curb. Newbridge Middle School towers in front of you, a maze of brick hallways and echoing cafeterias. 'Have a great first day, honey!' she says. You swallow hard and step out.",
+          "buttonText": "Enter the school",
+          "connection": {
+            "target": "beat_2"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_2"
+          }
+        ]
+      },
+      {
+        "id": "beat_2",
+        "name": "Jordan Drops Books",
+        "type": "dialogTree",
+        "position": {
+          "x": 700,
+          "y": 300
+        },
+        "notes": "INTENT: First meaningful choice. Helping Jordan is the first friendship opportunity.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "",
+            "text": "The hallway is chaos. Lockers slamming, kids shouting. Up ahead, a tall kid with a basketball jersey drops an armful of books. Papers scatter everywhere.",
+            "choices": [
+              {
+                "id": "c_help",
+                "text": "Rush to help pick them up",
+                "target": "beat_3",
+                "counter": "friendshipScore",
+                "counterOperation": "add",
+                "counterValue": 1
+              },
+              {
+                "id": "c_ignore",
+                "text": "Step around the mess",
+                "target": "beat_4"
+              },
+              {
+                "id": "c_trip",
+                "text": "Try to jump over and accidentally kick a book",
+                "target": "beat_5"
+              }
+            ]
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_3"
+          },
+          {
+            "targetId": "beat_4"
+          },
+          {
+            "targetId": "beat_5"
+          }
+        ]
+      },
+      {
+        "id": "beat_3",
+        "name": "Helped Jordan",
+        "type": "infoText",
+        "position": {
+          "x": 1000,
+          "y": 150
+        },
+        "notes": "CHARACTER: Jordan should look grateful and energetic.",
+        "parameters": {
+          "text": "You kneel down, gathering papers. The kid grins. 'Thanks! I'm Jordan. You must be the new kid everyone's talking about.' They slap your shoulder. 'Come on, I'll show you where homeroom is.'",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_6"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_6"
+          }
+        ]
+      },
+      {
+        "id": "beat_4",
+        "name": "Ignored Jordan",
+        "type": "infoText",
+        "position": {
+          "x": 1000,
+          "y": 300
+        },
+        "parameters": {
+          "text": "You sidestep the papers. Jordan scrambles to collect them alone, glancing up at you with a disappointed look. You keep walking, shoulders tight.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_6"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_6"
+          }
+        ]
+      },
+      {
+        "id": "beat_5",
+        "name": "Tripped Over Books",
+        "type": "infoText",
+        "position": {
+          "x": 1000,
+          "y": 450
+        },
+        "notes": "AUDIO: Light comedic stumble sound.",
+        "parameters": {
+          "text": "Your foot catches a notebook, sending it sliding. Jordan looks up, then bursts out laughing. 'Smooth move, New Kid. I'm Jordan.' They offer a hand. 'Let me guess, you need help finding homeroom?'",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_6"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_6"
+          }
+        ]
+      },
+      {
+        "id": "beat_6",
+        "name": "Jordan at Locker",
+        "type": "dialogTree",
+        "position": {
+          "x": 1300,
+          "y": 300
+        },
+        "notes": "INTENT: Second friendship gate. Positive energy builds rapport.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Jordan",
+            "text": "Jordan stops at a locker, spinning the combination. 'So, new kid. You play any sports? Or are you more of a... library type?' They grin.",
+            "choices": [
+              {
+                "id": "c_sports",
+                "text": "I love basketball! Want to play sometime?",
+                "target": "beat_7",
+                "counter": "friendshipScore",
+                "counterOperation": "add",
+                "counterValue": 1
+              },
+              {
+                "id": "c_read",
+                "text": "I like reading, actually.",
+                "target": "beat_7"
+              },
+              {
+                "id": "c_both",
+                "text": "A little of both. This school seems cool.",
+                "target": "beat_7",
+                "counter": "friendshipScore",
+                "counterOperation": "add",
+                "counterValue": 1
+              }
+            ]
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_7",
+        "name": "Homeroom",
+        "type": "infoText",
+        "position": {
+          "x": 1600,
+          "y": 300
+        },
+        "parameters": {
+          "text": "Ms. Chen's homeroom is bright and loud. She introduces you to the class. Twenty pairs of eyes stare at you. You scan for an empty seat. Jordan is in the back row, waving. In the corner, a quiet kid with headphones is sketching in a notebook.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_8"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_8"
+          }
+        ]
+      },
+      {
+        "id": "beat_8",
+        "name": "Seat Choice",
+        "type": "dialogTree",
+        "position": {
+          "x": 1900,
+          "y": 300
+        },
+        "notes": "INTENT: Major branch. Sitting with a potential friend earns a friendship point and opens that path.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "",
+            "text": "The teacher clears her throat. 'Take any open seat, dear.'",
+            "choices": [
+              {
+                "id": "c_jordan",
+                "text": "Sit with Jordan in the back",
+                "target": "beat_9",
+                "counter": "friendshipScore",
+                "counterOperation": "add",
+                "counterValue": 1
+              },
+              {
+                "id": "c_sam",
+                "text": "Sit with the kid drawing in the corner",
+                "target": "beat_10",
+                "counter": "friendshipScore",
+                "counterOperation": "add",
+                "counterValue": 1
+              },
+              {
+                "id": "c_alone",
+                "text": "Sit alone in the front row",
+                "target": "beat_11"
+              }
+            ]
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_9"
+          },
+          {
+            "targetId": "beat_10"
+          },
+          {
+            "targetId": "beat_11"
+          }
+        ]
+      },
+      {
+        "id": "beat_9",
+        "name": "Sat with Jordan",
+        "type": "infoText",
+        "position": {
+          "x": 2200,
+          "y": 150
+        },
+        "notes": "CHARACTER: Jordan is open, gestures a lot.",
+        "parameters": {
+          "text": "Jordan saves you a seat. 'This is the best spot,' they whisper. 'You can see the clock and the door.' They tell you about the basketball team, the terrible pizza, and which teachers are secretly cool. You feel included.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_12"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_12"
+          }
+        ]
+      },
+      {
+        "id": "beat_10",
+        "name": "Sat with Sam",
+        "type": "infoText",
+        "position": {
+          "x": 2200,
+          "y": 300
+        },
+        "notes": "CHARACTER: Sam is shy, soft-spoken.",
+        "parameters": {
+          "text": "The kid looks up as you sit. 'Oh. Hi.' They turn their sketchbook slightly toward you. It's a detailed robot with dragon wings. 'I'm Sam,' they mumble. You think it's the coolest thing you've seen all day.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_12"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_12"
+          }
+        ]
+      },
+      {
+        "id": "beat_11",
+        "name": "Sat Alone",
+        "type": "infoText",
+        "position": {
+          "x": 2200,
+          "y": 450
+        },
+        "parameters": {
+          "text": "You slide into a front-row seat, staring at the whiteboard. The lesson drags. You can feel eyes on the back of your neck, but nobody says hello.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_12"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_12"
+          }
+        ]
+      },
+      {
+        "id": "beat_12",
+        "name": "Taylor Confrontation",
+        "type": "dialogTree",
+        "position": {
+          "x": 2500,
+          "y": 300
+        },
+        "notes": "INTENT: Bully encounter. No points here, but shows different facets of the player character.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Taylor",
+            "text": "Between classes, a big kid in a leather jacket steps in front of you, blocking the hallway. 'New kid,' Taylor says, smirking. 'Give me your lunch money.'",
+            "choices": [
+              {
+                "id": "c_stand",
+                "text": "'No. Find someone else to bother.'",
+                "target": "beat_13"
+              },
+              {
+                "id": "c_joke",
+                "text": "'Only if you give me a welcoming bouquet first.'",
+                "target": "beat_14"
+              },
+              {
+                "id": "c_avoid",
+                "text": "Duck your head and speed-walk around them",
+                "target": "beat_15"
+              }
+            ]
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_13"
+          },
+          {
+            "targetId": "beat_14"
+          },
+          {
+            "targetId": "beat_15"
+          }
+        ]
+      },
+      {
+        "id": "beat_13",
+        "name": "Stood Firm",
+        "type": "infoText",
+        "position": {
+          "x": 2800,
+          "y": 150
+        },
+        "parameters": {
+          "text": "Taylor towers over you. You don't back down. After a tense second, Taylor smirks. 'Got guts, New Kid. I like that.' They walk away, laughing.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_16"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_16"
+          }
+        ]
+      },
+      {
+        "id": "beat_14",
+        "name": "Made a Joke",
+        "type": "infoText",
+        "position": {
+          "x": 2800,
+          "y": 300
+        },
+        "parameters": {
+          "text": "Taylor blinks, caught off guard. Then they bark a laugh. 'You're weird. I like weird.' They stroll off, shaking their head.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_16"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_16"
+          }
+        ]
+      },
+      {
+        "id": "beat_15",
+        "name": "Avoided Taylor",
+        "type": "infoText",
+        "position": {
+          "x": 2800,
+          "y": 450
+        },
+        "parameters": {
+          "text": "You duck your head and speed-walk past. Taylor shouts 'Coward!' after you. Your face burns, but you don't turn around.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_16"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_16"
+          }
+        ]
+      },
+      {
+        "id": "beat_16",
+        "name": "Lunch Choice",
+        "type": "dialogTree",
+        "position": {
+          "x": 3100,
+          "y": 300
+        },
+        "notes": "INTENT: Midpoint friendship gate. Eating with someone is a major bonding moment.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "",
+            "text": "The cafeteria is a maze of noise and smells. Trays clatter. You spot Jordan at a loud table near the windows, and Sam tucked in a corner with headphones and a sketchbook.",
+            "choices": [
+              {
+                "id": "c_lunch_jordan",
+                "text": "Walk over to Jordan's table",
+                "target": "beat_17",
+                "counter": "friendshipScore",
+                "counterOperation": "add",
+                "counterValue": 1
+              },
+              {
+                "id": "c_lunch_sam",
+                "text": "Sit quietly with Sam in the corner",
+                "target": "beat_18",
+                "counter": "friendshipScore",
+                "counterOperation": "add",
+                "counterValue": 1
+              },
+              {
+                "id": "c_lunch_alone",
+                "text": "Hide in the bathroom and eat there",
+                "target": "beat_19"
+              }
+            ]
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_17"
+          },
+          {
+            "targetId": "beat_18"
+          },
+          {
+            "targetId": "beat_19"
+          }
+        ]
+      },
+      {
+        "id": "beat_17",
+        "name": "Ate with Jordan",
+        "type": "infoText",
+        "position": {
+          "x": 3400,
+          "y": 150
+        },
+        "parameters": {
+          "text": "Jordan's friends are loud and joke about teachers, but they make room for you immediately. Someone passes you a fry. 'So, New Kid,' Jordan says, 'what position do you play?'",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_20"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_20"
+          }
+        ]
+      },
+      {
+        "id": "beat_18",
+        "name": "Ate with Sam",
+        "type": "infoText",
+        "position": {
+          "x": 3400,
+          "y": 300
+        },
+        "parameters": {
+          "text": "Sam pulls out a sketchbook. 'This is my comic,' they explain quietly. The art is incredible—space knights and alien dragons. They tear out a doodle and hand it to you. 'For luck,' they say.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_20"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_20"
+          }
+        ]
+      },
+      {
+        "id": "beat_19",
+        "name": "Ate Alone",
+        "type": "infoText",
+        "position": {
+          "x": 3400,
+          "y": 450
+        },
+        "parameters": {
+          "text": "The bathroom stall is quiet. Too quiet. You eat your sandwich staring at graffiti on the door, trying not to think about the laughter from the cafeteria.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_20"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_20"
+          }
+        ]
+      },
+      {
+        "id": "beat_20",
+        "name": "Group Project",
+        "type": "dialogTree",
+        "position": {
+          "x": 3700,
+          "y": 300
+        },
+        "notes": "INTENT: Final friendship opportunity. Helping Sam shows kindness even if you haven't been friendly all day.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Ms. Chen",
+            "text": "Ms. Chen claps her hands. 'Partner up for the science worksheet!' You're near Sam, who is quietly reading the textbook. Across the room, Taylor's group is being loud and throwing paper.",
+            "choices": [
+              {
+                "id": "c_help_sam",
+                "text": "Ask Sam if they want to work together",
+                "target": "beat_21",
+                "counter": "friendshipScore",
+                "counterOperation": "add",
+                "counterValue": 1
+              },
+              {
+                "id": "c_taylor_group",
+                "text": "Try to join Taylor's group",
+                "target": "beat_22"
+              },
+              {
+                "id": "c_work_alone",
+                "text": "Work alone in silence",
+                "target": "beat_22"
+              }
+            ]
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_21"
+          },
+          {
+            "targetId": "beat_22"
+          }
+        ]
+      },
+      {
+        "id": "beat_21",
+        "name": "Helped Sam",
+        "type": "infoText",
+        "position": {
+          "x": 4000,
+          "y": 200
+        },
+        "parameters": {
+          "text": "Sam smiles, pushing their glasses up. 'Thanks. You're a good partner.' You finish the worksheet together, Sam explaining the diagrams with surprising passion. It feels good to belong.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_23"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_23"
+          }
+        ]
+      },
+      {
+        "id": "beat_22",
+        "name": "Worked Alone",
+        "type": "infoText",
+        "position": {
+          "x": 4000,
+          "y": 400
+        },
+        "parameters": {
+          "text": "Taylor's group ignores you completely. You end up doing the whole worksheet by yourself, eraser shavings collecting on the desk. The bell can't come fast enough.",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_23"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_23"
+          }
+        ]
+      },
+      {
+        "id": "beat_23",
+        "name": "Final Bell",
+        "type": "infoText",
+        "position": {
+          "x": 4300,
+          "y": 300
+        },
+        "notes": "INTENT: Build tension before the ending check.",
+        "parameters": {
+          "text": "The final bell rings. Your first day is over. You pack your bag, heart pounding. Did you make it? Did you make friends?",
+          "speaker": "Narrator",
+          "connection": {
+            "target": "beat_24"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_24"
+          }
+        ]
+      },
+      {
+        "id": "beat_24",
+        "name": "Check Friendship High",
+        "type": "conditionBeat",
+        "position": {
+          "x": 4600,
+          "y": 300
+        },
+        "parameters": {
+          "trueConnection": {
+            "target": "beat_25",
+            "label": "Made friends!"
+          },
+          "falseConnection": {
+            "target": "beat_26",
+            "label": "Not quite..."
+          },
+          "conditionType": "counter",
+          "operator": ">=",
+          "value": 3,
+          "variableName": "friendshipScore",
+          "trueTarget": "beat_25",
+          "falseTarget": "beat_26"
+        }
+      },
+      {
+        "id": "beat_25",
+        "name": "Good Ending",
+        "type": "endScreen",
+        "position": {
+          "x": 4900,
+          "y": 150
+        },
+        "parameters": {
+          "message": "You survived your first day—and you made real friends. Jordan invited you to shoot hoops after school tomorrow, and Sam wants to loan you their favorite graphic novel. High school might not be so scary after all.",
+          "showRestart": true,
+          "reset": true,
+          "connection": {
+            "target": "beat_0"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_0"
+          }
+        ]
+      },
+      {
+        "id": "beat_26",
+        "name": "Check Friendship Medium",
+        "type": "conditionBeat",
+        "position": {
+          "x": 4900,
+          "y": 300
+        },
+        "parameters": {
+          "trueConnection": {
+            "target": "beat_27",
+            "label": "An okay start"
+          },
+          "falseConnection": {
+            "target": "beat_28",
+            "label": "A lonely day"
+          },
+          "conditionType": "counter",
+          "operator": ">=",
+          "value": 1,
+          "variableName": "friendshipScore",
+          "trueTarget": "beat_27",
+          "falseTarget": "beat_28"
+        }
+      },
+      {
+        "id": "beat_27",
+        "name": "Okay Ending",
+        "type": "endScreen",
+        "position": {
+          "x": 5200,
+          "y": 250
+        },
+        "parameters": {
+          "message": "Your first day was... okay. You didn't make enemies, but you didn't find your people either. The week is young, though. Tomorrow, you'll try again.",
+          "showRestart": true,
+          "reset": true,
+          "connection": {
+            "target": "beat_0"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_0"
+          }
+        ]
+      },
+      {
+        "id": "beat_28",
+        "name": "Lonely Ending",
+        "type": "endScreen",
+        "position": {
+          "x": 5200,
+          "y": 350
+        },
+        "parameters": {
+          "message": "The first day ended the way it began—alone. But as you walk home, you make a decision: tomorrow, you'll try harder. Everyone starts somewhere.",
+          "showRestart": true,
+          "reset": true,
+          "connection": {
+            "target": "beat_0"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_0"
+          }
+        ]
+      }
+    ],
+    "variables": [
+      {
+        "name": "friendshipScore",
+        "initialValue": 0,
+        "description": "Tracks positive social connections made during the day"
+      }
+    ],
+    "characters": [
+      {
+        "id": "char_player",
+        "name": "Alex",
+        "displayName": "Alex",
+        "role": "player",
+        "description": "The new kid at Newbridge Middle School",
+        "visual": {
+          "type": "static"
+        },
+        "states": [
+          {
+            "id": "default",
+            "name": "default",
+            "displayName": "Default",
+            "visual": {}
+          }
+        ],
+        "defaultState": "default",
+        "counters": [],
+        "inventory": [],
+        "tags": [],
+        "traits": [],
+        "goals": [],
+        "createdAt": "2026-05-08T15:47:15.187Z",
+        "updatedAt": "2026-05-08T15:47:15.187Z"
+      },
+      {
+        "id": "char_jordan",
+        "name": "Jordan",
+        "displayName": "Jordan",
+        "role": "npc",
+        "description": "Athletic, outgoing, potential friend",
+        "visual": {
+          "type": "static"
+        },
+        "states": [
+          {
+            "id": "default",
+            "name": "default",
+            "displayName": "Default",
+            "visual": {}
+          }
+        ],
+        "defaultState": "default",
+        "counters": [],
+        "inventory": [],
+        "tags": [],
+        "traits": [],
+        "goals": [],
+        "createdAt": "2026-05-08T15:47:15.187Z",
+        "updatedAt": "2026-05-08T15:47:15.187Z"
+      },
+      {
+        "id": "char_sam",
+        "name": "Sam",
+        "displayName": "Sam",
+        "role": "npc",
+        "description": "Quiet, artistic, potential friend",
+        "visual": {
+          "type": "static"
+        },
+        "states": [
+          {
+            "id": "default",
+            "name": "default",
+            "displayName": "Default",
+            "visual": {}
+          }
+        ],
+        "defaultState": "default",
+        "counters": [],
+        "inventory": [],
+        "tags": [],
+        "traits": [],
+        "goals": [],
+        "createdAt": "2026-05-08T15:47:15.187Z",
+        "updatedAt": "2026-05-08T15:47:15.187Z"
+      },
+      {
+        "id": "char_taylor",
+        "name": "Taylor",
+        "displayName": "Taylor",
+        "role": "npc",
+        "description": "The school bully with a soft side",
+        "visual": {
+          "type": "static"
+        },
+        "states": [
+          {
+            "id": "default",
+            "name": "default",
+            "displayName": "Default",
+            "visual": {}
+          }
+        ],
+        "defaultState": "default",
+        "counters": [],
+        "inventory": [],
+        "tags": [],
+        "traits": [],
+        "goals": [],
+        "createdAt": "2026-05-08T15:47:15.187Z",
+        "updatedAt": "2026-05-08T15:47:15.187Z"
+      }
+    ],
+    "reasoning": "The story uses a hub-and-spoke structure centered around key first-day milestones: hallway encounter, homeroom seating, bully confrontation, lunch choice, and group project. Each major choice point offers three options, with two typically offering a friendshipScore increment. The score accumulates across five possible opportunities (max 5), and chained conditionBeats at the end gate three endings: good (>=3), okay (>=1), and lonely (0). Reconvergence after each branch keeps the beat count manageable while ensuring every player experiences the full school day arc. The visual-novel theme fits the dialog-heavy, character-driven nature of the story."
+  }
+}

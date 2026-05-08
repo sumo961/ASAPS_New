@@ -1,0 +1,1505 @@
+{
+  "title": "First Day, First Friends",
+  "generatedAt": "2026-05-08T10:59:54.125Z",
+  "status": "success",
+  "beatCount": 29,
+  "beatTypes": [
+    "titleScreen",
+    "infoText",
+    "dialogTree",
+    "infoText",
+    "infoText",
+    "setVariable",
+    "infoText",
+    "pickProp",
+    "infoText",
+    "infoText",
+    "infoText",
+    "dialogTree",
+    "infoText",
+    "infoText",
+    "infoText",
+    "conditionBeat",
+    "infoText",
+    "infoText",
+    "conditionBeat",
+    "dialogTree",
+    "dialogTree",
+    "dialogTree",
+    "infoText",
+    "conditionBeat",
+    "conditionBeat",
+    "conditionBeat",
+    "endScreen",
+    "endScreen",
+    "endScreen"
+  ],
+  "errors": [],
+  "warnings": [
+    "beats[23]: Parameter 'baseline' not defined in schema for beat type 'conditionBeat'",
+    "beats[23]: Parameter 'sentimentTarget' not defined in schema for beat type 'conditionBeat'",
+    "beats[23]: Parameter 'sentimentEmotion' not defined in schema for beat type 'conditionBeat'",
+    "beats[26]: Parameter 'connection' not defined in schema for beat type 'endScreen'",
+    "beats[27]: Parameter 'connection' not defined in schema for beat type 'endScreen'",
+    "beats[28]: Parameter 'connection' not defined in schema for beat type 'endScreen'"
+  ],
+  "story": {
+    "metadata": {
+      "title": "First Day, First Friends",
+      "author": "AI Assistant",
+      "description": "A short interactive drama about Ari's first day at a new school, where small choices shape whether new classmates become real friends.",
+      "genre": "drama"
+    },
+    "suggestedTheme": {
+      "themeId": "builtin-visual-novel",
+      "reason": "This is a character-driven school story focused on dialogue, emotional choices, and relationship outcomes, so the visual novel theme fits best."
+    },
+    "beats": [
+      {
+        "id": "beat_0",
+        "name": "Title Screen",
+        "type": "titleScreen",
+        "position": {
+          "x": 100,
+          "y": 300
+        },
+        "cluster": "Opening",
+        "notes": "ASSET: Warm school entrance in morning light. AUDIO: Gentle, hopeful piano. INTENT: Establish first-day nerves and possibility.",
+        "parameters": {
+          "title": "First Day, First Friends",
+          "author": "AI Assistant",
+          "connection": {
+            "target": "beat_1",
+            "label": "Start"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_1",
+            "label": "Start"
+          }
+        ]
+      },
+      {
+        "id": "beat_1",
+        "name": "New School Morning",
+        "type": "infoText",
+        "position": {
+          "x": 400,
+          "y": 300
+        },
+        "cluster": "Opening",
+        "notes": "ASSET: Hallway with lockers and classroom doors. CHARACTER: Ari holding a too-new backpack.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "Ari's backpack feels too stiff, their shoes squeak on the shiny hallway floor, and every classroom door looks like it belongs to someone else. Today is Ari's first day at Maple Grove School. Mom said, 'Just be yourself,' but Ari is still figuring out who that is when everyone is watching.",
+          "buttonText": "Step inside",
+          "connection": {
+            "target": "beat_2",
+            "label": "Enter class"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_2",
+            "label": "Enter class"
+          }
+        ]
+      },
+      {
+        "id": "beat_2",
+        "name": "Introduced to the Class",
+        "type": "dialogTree",
+        "position": {
+          "x": 700,
+          "y": 300
+        },
+        "cluster": "Classroom",
+        "notes": "CHARACTER: Ms. Park welcoming, classmates curious. DESIGN: First friendshipPoints opportunity and first Lena trust affect shift.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Ms. Park",
+            "text": "Class, this is Ari. Ari just moved here, so let's help make Maple Grove feel less gigantic. Ari, would you like to say hello?",
+            "choices": [
+              {
+                "id": "c1",
+                "text": "Hi. I'm Ari. I like drawing maps and I might get lost today, so please be nice.",
+                "target": "beat_3",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": 0.06,
+                    "arousalDelta": -0.02
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "interest",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.1
+                  }
+                ]
+              },
+              {
+                "id": "c2",
+                "text": "I'll just sit down for now, thanks.",
+                "target": "beat_4",
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": -0.03,
+                    "arousalDelta": 0.04
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.03
+                  }
+                ]
+              },
+              {
+                "id": "c3",
+                "text": "I can help Sam hang those crooked posters first.",
+                "target": "beat_5",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 2,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": 0.1,
+                    "arousalDelta": -0.03
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "interest",
+                    "emotionDelta": 0.16
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "joy",
+                    "emotionDelta": 0.08
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.15
+                  }
+                ]
+              }
+            ]
+          },
+          "presentationMode": "positioned"
+        },
+        "connections": [
+          {
+            "targetId": "beat_3"
+          },
+          {
+            "targetId": "beat_4"
+          },
+          {
+            "targetId": "beat_5"
+          }
+        ]
+      },
+      {
+        "id": "beat_3",
+        "name": "A Shaky Hello",
+        "type": "infoText",
+        "position": {
+          "x": 1000,
+          "y": 150
+        },
+        "cluster": "Classroom",
+        "notes": "INTENT: Reward small bravery without making it perfect.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "A few kids laugh kindly at the getting-lost joke. One girl with a sketchbook, Lena, glances up like the word 'maps' lit a tiny lamp in her head. Ari's ears go warm, but the room already feels a little less like a planet with no roads.",
+          "buttonText": "Continue",
+          "connection": {
+            "target": "beat_7",
+            "label": "Go to the welcome table"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7",
+            "label": "Go to the welcome table"
+          }
+        ]
+      },
+      {
+        "id": "beat_4",
+        "name": "Quiet Desk",
+        "type": "infoText",
+        "position": {
+          "x": 1000,
+          "y": 300
+        },
+        "cluster": "Classroom",
+        "notes": "INTENT: Validates nervousness while showing that silence creates distance.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "Ari chooses the empty desk near the window. No one laughs. No one whispers, either. The quiet is safe, but it is also a wall, and Ari can feel the first minutes of the day slipping behind it.",
+          "buttonText": "Continue",
+          "connection": {
+            "target": "beat_7",
+            "label": "Go to the welcome table"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7",
+            "label": "Go to the welcome table"
+          }
+        ]
+      },
+      {
+        "id": "beat_5",
+        "name": "Record Helping Sam",
+        "type": "setVariable",
+        "position": {
+          "x": 1000,
+          "y": 450
+        },
+        "cluster": "Classroom",
+        "notes": "STATE: Sets helpedSam so lunch can react to Ari helping Sam earlier.",
+        "parameters": {
+          "type": "variable",
+          "name": "helpedSam",
+          "value": true,
+          "operation": "set",
+          "connection": {
+            "target": "beat_6",
+            "label": "Help recorded"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_6",
+            "label": "Help recorded"
+          }
+        ]
+      },
+      {
+        "id": "beat_6",
+        "name": "Helping Sam",
+        "type": "infoText",
+        "position": {
+          "x": 1300,
+          "y": 450
+        },
+        "cluster": "Classroom",
+        "notes": "CHARACTER: Sam cheerful and clumsy. AUDIO: Light classroom bustle.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "Sam, a kid with marker on one thumb, grins as Ari straightens the posters. 'Thanks. I was about to invent a new shape called rectangle-ish.' A couple of students smile. Ari has not found a best friend yet, but at least one person knows their name now.",
+          "buttonText": "Continue",
+          "connection": {
+            "target": "beat_7",
+            "label": "Go to the welcome table"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7",
+            "label": "Go to the welcome table"
+          }
+        ]
+      },
+      {
+        "id": "beat_7",
+        "name": "Welcome Table",
+        "type": "pickProp",
+        "position": {
+          "x": 1600,
+          "y": 300
+        },
+        "cluster": "Welcome Table",
+        "notes": "INVENTORY: pickProp auto-adds the selected object. Later, Puzzle Club Flyer is checked by an inventory condition.",
+        "parameters": {
+          "speaker": "Ms. Park",
+          "question": "Before math starts, Ms. Park points to a welcome table. 'Take one thing that might help you today.' What does Ari pick?",
+          "props": [
+            {
+              "id": "prop_flyer",
+              "name": "Puzzle Club Flyer",
+              "displayName": "Puzzle Club Flyer",
+              "description": "A folded lunchtime flyer with a maze printed on the back and the words 'New solvers welcome.'",
+              "target": "beat_8"
+            },
+            {
+              "id": "prop_sticker",
+              "name": "Sun Sticker",
+              "displayName": "Sun Sticker",
+              "description": "A yellow sun sticker that says 'New day, new friend' in cheerful letters.",
+              "target": "beat_9"
+            },
+            {
+              "id": "prop_map",
+              "name": "Cafeteria Map",
+              "displayName": "Cafeteria Map",
+              "description": "A hand-drawn map of the cafeteria, including the tray return, library door, and a mysterious table labeled 'Usually Loud.'",
+              "target": "beat_10"
+            }
+          ]
+        },
+        "connections": [
+          {
+            "targetId": "beat_8"
+          },
+          {
+            "targetId": "beat_9"
+          },
+          {
+            "targetId": "beat_10"
+          }
+        ]
+      },
+      {
+        "id": "beat_8",
+        "name": "Flyer Description",
+        "type": "infoText",
+        "position": {
+          "x": 1900,
+          "y": 120
+        },
+        "cluster": "Welcome Table",
+        "notes": "PAYOFF: Describes item and foreshadows the lunch inventory branch.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The Puzzle Club Flyer is creased from being photocopied too many times, but the maze on the back is full of tiny penciled attempts. Someone has written, 'Ask for Nora if you find the hidden shortcut.' It might be a doorway into a group that already likes getting lost on purpose.",
+          "buttonText": "Fold it into your pocket",
+          "connection": {
+            "target": "beat_11",
+            "label": "Start group work"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_11",
+            "label": "Start group work"
+          }
+        ]
+      },
+      {
+        "id": "beat_9",
+        "name": "Sticker Description",
+        "type": "infoText",
+        "position": {
+          "x": 1900,
+          "y": 300
+        },
+        "cluster": "Welcome Table",
+        "notes": "PAYOFF: Describes item; object can become a personal confidence token.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The Sun Sticker is small, but Ari presses it to the corner of their notebook like a promise. The words 'New day, new friend' look almost too cheerful, yet Ari keeps touching the sticker whenever the room feels too loud.",
+          "buttonText": "Start group work",
+          "connection": {
+            "target": "beat_11",
+            "label": "Start group work"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_11",
+            "label": "Start group work"
+          }
+        ]
+      },
+      {
+        "id": "beat_10",
+        "name": "Map Description",
+        "type": "infoText",
+        "position": {
+          "x": 1900,
+          "y": 480
+        },
+        "cluster": "Welcome Table",
+        "notes": "PAYOFF: Describes item; reinforces Ari's map motif.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The Cafeteria Map is funny and useful. Someone has drawn the milk cooler like a dragon cave and marked one table with 'Ask before sitting unless you enjoy trivia about lizards.' Ari smiles despite themself. Maybe this school has a sense of humor.",
+          "buttonText": "Start group work",
+          "connection": {
+            "target": "beat_11",
+            "label": "Start group work"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_11",
+            "label": "Start group work"
+          }
+        ]
+      },
+      {
+        "id": "beat_11",
+        "name": "Science Group With Lena",
+        "type": "dialogTree",
+        "position": {
+          "x": 2200,
+          "y": 300
+        },
+        "cluster": "Classroom",
+        "notes": "AFFECT THREAD: Lena's trust toward the player changes based on collaboration style.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Lena",
+            "text": "For science, Ms. Park asks pairs to design a tiny city that saves water. Lena, the girl with the sketchbook, slides her paper halfway toward Ari. 'I draw maps. You can do labels if you want.'",
+            "choices": [
+              {
+                "id": "c1",
+                "text": "Your maps are cool. What should we build first?",
+                "target": "beat_12",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 2,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": 0.18,
+                    "arousalDelta": -0.05
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "joy",
+                    "emotionDelta": 0.2
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "interest",
+                    "emotionDelta": 0.2
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.25
+                  }
+                ]
+              },
+              {
+                "id": "c2",
+                "text": "I have lots of ideas. Let me run this.",
+                "target": "beat_13",
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": -0.12,
+                    "arousalDelta": 0.12
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "sadness",
+                    "emotionDelta": 0.15
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.15
+                  }
+                ]
+              },
+              {
+                "id": "c3",
+                "text": "I'm nervous too, but I can write neat labels.",
+                "target": "beat_14",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": 0.08,
+                    "arousalDelta": -0.03
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "interest",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.12
+                  }
+                ]
+              }
+            ]
+          },
+          "presentationMode": "positioned"
+        },
+        "connections": [
+          {
+            "targetId": "beat_12"
+          },
+          {
+            "targetId": "beat_13"
+          },
+          {
+            "targetId": "beat_14"
+          }
+        ]
+      },
+      {
+        "id": "beat_12",
+        "name": "Shared Plan",
+        "type": "infoText",
+        "position": {
+          "x": 2500,
+          "y": 150
+        },
+        "cluster": "Classroom",
+        "notes": "INTENT: Cooperative choice earns strong friendship progress.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "Lena blinks, then pulls the paper fully between them. Together, she and Ari sketch rain barrels, rooftop gardens, and streets that curve like little rivers. When Ms. Park passes by, Lena says, 'We made this,' not 'I made this.'",
+          "buttonText": "Head to lunch",
+          "connection": {
+            "target": "beat_15",
+            "label": "Lunch check"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_15",
+            "label": "Lunch check"
+          }
+        ]
+      },
+      {
+        "id": "beat_13",
+        "name": "Taking Over",
+        "type": "infoText",
+        "position": {
+          "x": 2500,
+          "y": 300
+        },
+        "cluster": "Classroom",
+        "notes": "INTENT: Shows that confidence without listening can push people away.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "Ari fills the page quickly, but Lena's pencil stops moving. The project looks fine. It also looks lonely. When Ms. Park praises the water towers, Lena gives a tiny nod without looking up.",
+          "buttonText": "Head to lunch",
+          "connection": {
+            "target": "beat_15",
+            "label": "Lunch check"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_15",
+            "label": "Lunch check"
+          }
+        ]
+      },
+      {
+        "id": "beat_14",
+        "name": "Quiet Teamwork",
+        "type": "infoText",
+        "position": {
+          "x": 2500,
+          "y": 450
+        },
+        "cluster": "Classroom",
+        "notes": "INTENT: A quieter but still constructive route.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "Ari writes labels in careful block letters while Lena draws. They do not talk much, but every so often Lena nudges the paper so Ari has more space. It is not a sudden friendship, but it is a shared corner of the day.",
+          "buttonText": "Head to lunch",
+          "connection": {
+            "target": "beat_15",
+            "label": "Lunch check"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_15",
+            "label": "Lunch check"
+          }
+        ]
+      },
+      {
+        "id": "beat_15",
+        "name": "Did Ari Help Sam?",
+        "type": "conditionBeat",
+        "position": {
+          "x": 2800,
+          "y": 300
+        },
+        "cluster": "Lunch",
+        "notes": "VARIABLE CHECK: helpedSam changes the lunch setup text without blocking progress.",
+        "parameters": {
+          "condition": {
+            "type": "variable",
+            "variable": "helpedSam",
+            "operator": "==",
+            "value": true
+          },
+          "trueConnection": {
+            "target": "beat_16",
+            "label": "Sam remembers"
+          },
+          "falseConnection": {
+            "target": "beat_17",
+            "label": "No saved seat"
+          }
+        }
+      },
+      {
+        "id": "beat_16",
+        "name": "Sam Saves a Seat",
+        "type": "infoText",
+        "position": {
+          "x": 3100,
+          "y": 180
+        },
+        "cluster": "Lunch",
+        "notes": "PAYOFF: Sam remembers Ari's earlier help.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "At lunch, Sam spots Ari over the noise of trays and chairs. 'Poster hero! I saved you half a bench.' The words are silly, but the bench is real, and so is the relief in Ari's chest.",
+          "buttonText": "Look around",
+          "connection": {
+            "target": "beat_18",
+            "label": "Choose lunch path"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_18",
+            "label": "Choose lunch path"
+          }
+        ]
+      },
+      {
+        "id": "beat_17",
+        "name": "Searching for a Seat",
+        "type": "infoText",
+        "position": {
+          "x": 3100,
+          "y": 420
+        },
+        "cluster": "Lunch",
+        "notes": "INTENT: Keeps false branch recoverable; Ari still has options.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "At lunch, every table seems to have its own weather. Some are loud, some are quiet, and some look impossible to enter. Ari holds their tray and tries to remember that everyone else had a first day once.",
+          "buttonText": "Look around",
+          "connection": {
+            "target": "beat_18",
+            "label": "Choose lunch path"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_18",
+            "label": "Choose lunch path"
+          }
+        ]
+      },
+      {
+        "id": "beat_18",
+        "name": "Has Puzzle Club Flyer?",
+        "type": "conditionBeat",
+        "position": {
+          "x": 3400,
+          "y": 300
+        },
+        "cluster": "Lunch",
+        "notes": "INVENTORY CHECK: Puzzle Club Flyer opens a different lunch scene; false branch still offers social choices.",
+        "parameters": {
+          "condition": {
+            "type": "inventory",
+            "item": "Puzzle Club Flyer",
+            "character": "player",
+            "checkType": "has"
+          },
+          "trueConnection": {
+            "target": "beat_19",
+            "label": "Flyer leads to puzzle table"
+          },
+          "falseConnection": {
+            "target": "beat_20",
+            "label": "Regular cafeteria options"
+          }
+        }
+      },
+      {
+        "id": "beat_19",
+        "name": "Puzzle Club Lunch",
+        "type": "dialogTree",
+        "position": {
+          "x": 3700,
+          "y": 170
+        },
+        "cluster": "Lunch",
+        "notes": "GAMEPLAY: Inventory creates a unique social route. DESIGN: Lunch choices add friendshipPoints and can improve Lena trust.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Narrator",
+            "text": "The flyer leads Ari to the back table, where a few kids are arguing cheerfully over the maze. Sam is laughing at a wrong turn, and Lena is tracing a possible path with one finger.",
+            "choices": [
+              {
+                "id": "c1",
+                "text": "Show the flyer and ask, 'Is there a trick to this maze?'",
+                "target": "beat_21",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": 0.06,
+                    "arousalDelta": 0.02
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "interest",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.08
+                  }
+                ]
+              },
+              {
+                "id": "c2",
+                "text": "Invite Sam and Lena to solve it as a team.",
+                "target": "beat_21",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 2,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": 0.12,
+                    "arousalDelta": -0.04
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "joy",
+                    "emotionDelta": 0.16
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.15
+                  }
+                ]
+              },
+              {
+                "id": "c3",
+                "text": "Watch first until you understand the rules.",
+                "target": "beat_21"
+              }
+            ]
+          },
+          "presentationMode": "positioned"
+        },
+        "connections": [
+          {
+            "targetId": "beat_21"
+          }
+        ]
+      },
+      {
+        "id": "beat_20",
+        "name": "Regular Cafeteria Lunch",
+        "type": "dialogTree",
+        "position": {
+          "x": 3700,
+          "y": 430
+        },
+        "cluster": "Lunch",
+        "notes": "DESIGN: No flyer does not punish the player; it creates a more ordinary social challenge.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Narrator",
+            "text": "By the time trays clatter onto tables, Ari sees a few small openings: Sam's corner of a bench, an art table where Lena sits, and the quiet library door nearby.",
+            "choices": [
+              {
+                "id": "c1",
+                "text": "Ask the art table, 'Is there room for one more?'",
+                "target": "beat_21",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 2,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": 0.14,
+                    "arousalDelta": -0.03
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "joy",
+                    "emotionDelta": 0.14
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.15
+                  }
+                ]
+              },
+              {
+                "id": "c2",
+                "text": "Sit by Sam and trade part of your snack.",
+                "target": "beat_21",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 1
+              },
+              {
+                "id": "c3",
+                "text": "Eat in the library to catch your breath.",
+                "target": "beat_21"
+              }
+            ]
+          },
+          "presentationMode": "positioned"
+        },
+        "connections": [
+          {
+            "targetId": "beat_21"
+          }
+        ]
+      },
+      {
+        "id": "beat_21",
+        "name": "Recess Conflict",
+        "type": "dialogTree",
+        "position": {
+          "x": 4000,
+          "y": 300
+        },
+        "cluster": "Finale",
+        "notes": "CLIMAX: Social courage moment. Strongest late counter opportunity. Lena trust changes significantly.",
+        "parameters": {
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Narrator",
+            "text": "After lunch, the class lines up outside. An older kid points at Lena's science map and snorts, 'Looks like spaghetti.' Lena freezes, clutching the paper. Sam looks uncomfortable. Ari has one second to choose what kind of new kid to be.",
+            "choices": [
+              {
+                "id": "c1",
+                "text": "Say calmly, 'That's not cool. Her map helped our group.'",
+                "target": "beat_22",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 2,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": 0.2,
+                    "arousalDelta": -0.1
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "pride",
+                    "emotionDelta": 0.2
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "joy",
+                    "emotionDelta": 0.14
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.25
+                  }
+                ]
+              },
+              {
+                "id": "c2",
+                "text": "Wave Mr. Ortiz over and say the group needs help.",
+                "target": "beat_22",
+                "counter": "friendshipPoints",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": 0.1,
+                    "arousalDelta": -0.08
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "joy",
+                    "emotionDelta": 0.1
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.12
+                  }
+                ]
+              },
+              {
+                "id": "c3",
+                "text": "Look away and hope it passes quickly.",
+                "target": "beat_22",
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "lena",
+                    "valenceDelta": -0.18,
+                    "arousalDelta": 0.12
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "lena",
+                    "emotion": "sadness",
+                    "emotionDelta": 0.18
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "lena",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.2
+                  }
+                ]
+              }
+            ]
+          },
+          "presentationMode": "positioned"
+        },
+        "connections": [
+          {
+            "targetId": "beat_22"
+          }
+        ]
+      },
+      {
+        "id": "beat_22",
+        "name": "End of Day Assembly",
+        "type": "infoText",
+        "position": {
+          "x": 4300,
+          "y": 300
+        },
+        "cluster": "Finale",
+        "notes": "INTENT: Reconverges all paths before affect and counter checks.",
+        "parameters": {
+          "speaker": "Narrator",
+          "text": "The final assembly bell rings. Chairs scrape, backpacks zip, and the whole first day gathers itself into one heavy question: when Ari comes back tomorrow, will there be someone waiting?",
+          "buttonText": "See what the day became",
+          "connection": {
+            "target": "beat_23",
+            "label": "Check Lena trust"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_23",
+            "label": "Check Lena trust"
+          }
+        ]
+      },
+      {
+        "id": "beat_23",
+        "name": "Did Lena's Trust Grow?",
+        "type": "conditionBeat",
+        "position": {
+          "x": 4600,
+          "y": 300
+        },
+        "cluster": "Finale",
+        "notes": "AFFECT CHECK: Reads Lena's sentiment directly, using baseline initial so the branch means trust improved during the story.",
+        "parameters": {
+          "condition": {
+            "type": "sentiment",
+            "character": "lena",
+            "sentimentTarget": "player",
+            "sentimentEmotion": "trust",
+            "operator": ">=",
+            "value": 0.25,
+            "baseline": "initial"
+          },
+          "trueConnection": {
+            "target": "beat_24",
+            "label": "Lena feels trust"
+          },
+          "falseConnection": {
+            "target": "beat_25",
+            "label": "Trust is still uncertain"
+          },
+          "baseline": "initial",
+          "sentimentTarget": "player",
+          "sentimentEmotion": "trust"
+        }
+      },
+      {
+        "id": "beat_24",
+        "name": "High Friendship Check",
+        "type": "conditionBeat",
+        "position": {
+          "x": 4900,
+          "y": 220
+        },
+        "cluster": "Finale",
+        "notes": "COUNTER CHECK: friendshipPoints max is 8; threshold 5 is reachable through multiple social choices.",
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "friendshipPoints",
+            "operator": ">=",
+            "value": 5
+          },
+          "trueConnection": {
+            "target": "beat_26",
+            "label": "Strong first-day friendships"
+          },
+          "falseConnection": {
+            "target": "beat_25",
+            "label": "Some progress, not enough"
+          }
+        }
+      },
+      {
+        "id": "beat_25",
+        "name": "Growing Friendship Check",
+        "type": "conditionBeat",
+        "position": {
+          "x": 4900,
+          "y": 420
+        },
+        "cluster": "Finale",
+        "notes": "COUNTER CHECK: Routes all non-best paths into a meaningful middle or reflective ending.",
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "friendshipPoints",
+            "operator": ">=",
+            "value": 3
+          },
+          "trueConnection": {
+            "target": "beat_27",
+            "label": "A door left open"
+          },
+          "falseConnection": {
+            "target": "beat_28",
+            "label": "Try again tomorrow"
+          }
+        }
+      },
+      {
+        "id": "beat_26",
+        "name": "Best Ending",
+        "type": "endScreen",
+        "position": {
+          "x": 5200,
+          "y": 140
+        },
+        "cluster": "Endings",
+        "notes": "ENDING: Best outcome requires both accumulated friendshipPoints and Lena trust growth.",
+        "parameters": {
+          "message": "Ending: A Table With Your Name On It\n\nBy dismissal, Sam bumps Ari's shoulder and says, 'Same bench tomorrow?' Lena holds up the science map, now labeled in Ari's careful handwriting, and adds, 'And maybe puzzle club after that.' Ari still feels new, but not alone. Tomorrow has a place to begin.",
+          "showRestart": true,
+          "reset": true,
+          "showCredits": true,
+          "creditsText": "Credits",
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Written and designed by AI Assistant.\nTheme recommendation: Visual Novel.\nThanks for playing.",
+          "creditsCloseText": "Close",
+          "connection": {
+            "target": "beat_0",
+            "label": "Restart"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_0",
+            "label": "Restart"
+          }
+        ]
+      },
+      {
+        "id": "beat_27",
+        "name": "Middle Ending",
+        "type": "endScreen",
+        "position": {
+          "x": 5200,
+          "y": 340
+        },
+        "cluster": "Endings",
+        "notes": "ENDING: Moderate points create a hopeful but not fully settled conclusion.",
+        "parameters": {
+          "message": "Ending: A Door Left Open\n\nThe day was not perfect. Some words came late, and some chances slipped by. But when Ari reaches the bus line, someone from class gives a small wave. It might be Sam. It might be Lena. It is enough for Ari to wave back and think, tomorrow I can try one more brave thing.",
+          "showRestart": true,
+          "reset": true,
+          "showCredits": true,
+          "creditsText": "Credits",
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Written and designed by AI Assistant.\nTheme recommendation: Visual Novel.\nThanks for playing.",
+          "creditsCloseText": "Close",
+          "connection": {
+            "target": "beat_0",
+            "label": "Restart"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_0",
+            "label": "Restart"
+          }
+        ]
+      },
+      {
+        "id": "beat_28",
+        "name": "Reflective Ending",
+        "type": "endScreen",
+        "position": {
+          "x": 5200,
+          "y": 540
+        },
+        "cluster": "Endings",
+        "notes": "ENDING: Low points are not a failure state; they point toward recoverable social growth.",
+        "parameters": {
+          "message": "Ending: Tomorrow Is Another First Day\n\nAri spends more time watching than joining, and the final bell feels heavier than expected. But Mr. Ortiz notices and says, 'First days are practice, not tests.' Ari nods. The school still feels big, but tomorrow the hallways will be a little less unknown.",
+          "showRestart": true,
+          "reset": true,
+          "showCredits": true,
+          "creditsText": "Credits",
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Written and designed by AI Assistant.\nTheme recommendation: Visual Novel.\nThanks for playing.",
+          "creditsCloseText": "Close",
+          "connection": {
+            "target": "beat_0",
+            "label": "Restart"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_0",
+            "label": "Restart"
+          }
+        ]
+      }
+    ],
+    "variables": [
+      {
+        "name": "helpedSam",
+        "initialValue": false,
+        "description": "Tracks whether Ari helped Sam hang posters during the morning introduction. Checked at lunch to change the setup."
+      }
+    ],
+    "characters": [
+      {
+        "id": "ari",
+        "name": "Ari",
+        "displayName": "Ari",
+        "role": "player",
+        "description": "A kid starting at a new school, nervous but capable of small brave choices.",
+        "initialMood": {
+          "valence": -0.15,
+          "arousal": 0.55
+        },
+        "counters": [
+          {
+            "name": "friendshipPoints",
+            "displayName": "Friendship Points",
+            "value": 0,
+            "min": 0,
+            "max": 10
+          }
+        ],
+        "visual": {
+          "type": "static"
+        },
+        "states": [
+          {
+            "id": "default",
+            "name": "default",
+            "displayName": "Default",
+            "visual": {}
+          }
+        ],
+        "defaultState": "default",
+        "inventory": [],
+        "tags": [],
+        "traits": [],
+        "goals": [],
+        "createdAt": "2026-05-08T10:59:54.121Z",
+        "updatedAt": "2026-05-08T10:59:54.121Z"
+      },
+      {
+        "id": "lena",
+        "name": "Lena",
+        "displayName": "Lena",
+        "role": "npc",
+        "description": "A quiet, artistic classmate who loves maps and notices whether Ari listens.",
+        "initialMood": {
+          "valence": -0.1,
+          "arousal": 0.25
+        },
+        "initialSentiments": [
+          {
+            "toEntityRef": "player",
+            "emotion": "trust",
+            "strength": -0.05
+          }
+        ],
+        "visual": {
+          "type": "static"
+        },
+        "states": [
+          {
+            "id": "default",
+            "name": "default",
+            "displayName": "Default",
+            "visual": {}
+          }
+        ],
+        "defaultState": "default",
+        "counters": [],
+        "inventory": [],
+        "tags": [],
+        "traits": [],
+        "goals": [],
+        "createdAt": "2026-05-08T10:59:54.121Z",
+        "updatedAt": "2026-05-08T10:59:54.121Z"
+      },
+      {
+        "id": "sam",
+        "name": "Sam",
+        "displayName": "Sam",
+        "role": "npc",
+        "description": "A friendly, funny classmate who is quick to welcome Ari if given the chance.",
+        "initialMood": {
+          "valence": 0.15,
+          "arousal": 0.35
+        },
+        "visual": {
+          "type": "static"
+        },
+        "states": [
+          {
+            "id": "default",
+            "name": "default",
+            "displayName": "Default",
+            "visual": {}
+          }
+        ],
+        "defaultState": "default",
+        "counters": [],
+        "inventory": [],
+        "tags": [],
+        "traits": [],
+        "goals": [],
+        "createdAt": "2026-05-08T10:59:54.121Z",
+        "updatedAt": "2026-05-08T10:59:54.121Z"
+      },
+      {
+        "id": "ms_park",
+        "name": "Ms. Park",
+        "displayName": "Ms. Park",
+        "role": "npc",
+        "description": "A warm classroom teacher who tries to make the first day gentle.",
+        "initialMood": {
+          "valence": 0.35,
+          "arousal": 0.15
+        },
+        "visual": {
+          "type": "static"
+        },
+        "states": [
+          {
+            "id": "default",
+            "name": "default",
+            "displayName": "Default",
+            "visual": {}
+          }
+        ],
+        "defaultState": "default",
+        "counters": [],
+        "inventory": [],
+        "tags": [],
+        "traits": [],
+        "goals": [],
+        "createdAt": "2026-05-08T10:59:54.121Z",
+        "updatedAt": "2026-05-08T10:59:54.121Z"
+      },
+      {
+        "id": "mr_ortiz",
+        "name": "Mr. Ortiz",
+        "displayName": "Mr. Ortiz",
+        "role": "npc",
+        "description": "A recess teacher who believes first days are practice, not tests.",
+        "initialMood": {
+          "valence": 0.2,
+          "arousal": 0.05
+        },
+        "visual": {
+          "type": "static"
+        },
+        "states": [
+          {
+            "id": "default",
+            "name": "default",
+            "displayName": "Default",
+            "visual": {}
+          }
+        ],
+        "defaultState": "default",
+        "counters": [],
+        "inventory": [],
+        "tags": [],
+        "traits": [],
+        "goals": [],
+        "createdAt": "2026-05-08T10:59:54.121Z",
+        "updatedAt": "2026-05-08T10:59:54.121Z"
+      }
+    ],
+    "reasoning": "This medium-length structure uses a title screen, narration, branching dialogTree choices, one pickProp inventory moment, setVariable state, and multiple conditionBeats. The main procedural systems are: friendshipPoints as an accumulated counter, helpedSam as a variable checked at lunch, Puzzle Club Flyer as inventory checked before a special lunch scene, and Lena's trust as an affect condition using baseline initial. All counter increments route through finale conditionBeats, producing three endings based on accumulated social choices. Branches reconverge after each scene so the story stays manageable while still making early decisions matter.",
+    "clusters": [
+      {
+        "id": "Opening",
+        "name": "Opening",
+        "type": "organizational",
+        "containerPosition": {
+          "x": 20,
+          "y": 220
+        },
+        "containerBounds": {
+          "width": 700,
+          "height": 260
+        },
+        "isExpanded": true
+      },
+      {
+        "id": "Classroom",
+        "name": "Classroom",
+        "type": "organizational",
+        "containerPosition": {
+          "x": 620,
+          "y": 70
+        },
+        "containerBounds": {
+          "width": 2200,
+          "height": 560
+        },
+        "isExpanded": true
+      },
+      {
+        "id": "Welcome Table",
+        "name": "Welcome Table",
+        "type": "organizational",
+        "containerPosition": {
+          "x": 1520,
+          "y": 40
+        },
+        "containerBounds": {
+          "width": 700,
+          "height": 620
+        },
+        "isExpanded": true
+      },
+      {
+        "id": "Lunch",
+        "name": "Lunch",
+        "type": "organizational",
+        "containerPosition": {
+          "x": 2720,
+          "y": 90
+        },
+        "containerBounds": {
+          "width": 1300,
+          "height": 520
+        },
+        "isExpanded": true
+      },
+      {
+        "id": "Finale",
+        "name": "Finale",
+        "type": "organizational",
+        "containerPosition": {
+          "x": 3920,
+          "y": 140
+        },
+        "containerBounds": {
+          "width": 1300,
+          "height": 460
+        },
+        "isExpanded": true
+      },
+      {
+        "id": "Endings",
+        "name": "Endings",
+        "type": "organizational",
+        "containerPosition": {
+          "x": 5120,
+          "y": 60
+        },
+        "containerBounds": {
+          "width": 400,
+          "height": 660
+        },
+        "isExpanded": true
+      }
+    ]
+  }
+}

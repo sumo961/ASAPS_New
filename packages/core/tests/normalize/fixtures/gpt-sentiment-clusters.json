@@ -1,0 +1,1800 @@
+{
+  "title": "The Light at 2:17 AM",
+  "generatedAt": "2026-05-07T22:29:40.784Z",
+  "status": "success",
+  "beatCount": 30,
+  "beatTypes": [
+    "titleScreen",
+    "infoText",
+    "dialogTree",
+    "dialogTree",
+    "setVariable",
+    "setVariable",
+    "infoText",
+    "conditionBeat",
+    "infoText",
+    "infoText",
+    "dialogTree",
+    "addRemoveInventory",
+    "conditionBeat",
+    "infoText",
+    "infoText",
+    "dialogTree",
+    "setVariable",
+    "setVariable",
+    "setVariable",
+    "infoText",
+    "conditionBeat",
+    "infoText",
+    "infoText",
+    "dialogTree",
+    "conditionBeat",
+    "conditionBeat",
+    "conditionBeat",
+    "endScreen",
+    "endScreen",
+    "endScreen"
+  ],
+  "errors": [],
+  "warnings": [
+    "beats[27]: Parameter 'connection' not defined in schema for beat type 'endScreen'",
+    "beats[28]: Parameter 'connection' not defined in schema for beat type 'endScreen'",
+    "beats[29]: Parameter 'connection' not defined in schema for beat type 'endScreen'"
+  ],
+  "story": {
+    "metadata": {
+      "title": "The Light at 2:17 AM",
+      "author": "AI Assistant",
+      "description": "An interactive three-act drama about supporting a friend through a mental health crisis, where trust, safety planning, and accumulated support choices shape the final reflection.",
+      "genre": "drama",
+      "affectDepth": "rich"
+    },
+    "suggestedTheme": {
+      "themeId": "builtin-visual-novel",
+      "reason": "The story is character-driven, emotionally intimate, and dialogue-heavy, so the visual novel theme best supports close conversations and relationship-focused drama."
+    },
+    "beats": [
+      {
+        "id": "beat_0",
+        "name": "Title",
+        "type": "titleScreen",
+        "position": {
+          "x": 100,
+          "y": 300
+        },
+        "cluster": "Act I - The Message",
+        "notes": "ASSET: Dark bedroom lit by a phone screen. AUDIO: Low, quiet night ambience. CONTENT NOTE: Mental health crisis; consider adding local crisis resources in a published version.",
+        "parameters": {
+          "title": "The Light at 2:17 AM",
+          "author": "AI Assistant",
+          "connection": {
+            "target": "beat_1"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_1"
+          }
+        ]
+      },
+      {
+        "id": "beat_1",
+        "name": "The Message",
+        "type": "infoText",
+        "position": {
+          "x": 400,
+          "y": 300
+        },
+        "cluster": "Act I - The Message",
+        "notes": "INTENT: Establish urgency without sensationalizing the crisis.",
+        "parameters": {
+          "speaker": "Narrator",
+          "showSpeaker": false,
+          "text": "At 2:17 A.M., your phone lights up on the floor beside your bed. Mara: 'Are you awake? I don't trust myself tonight.' Outside, the city is all wet pavement and distant sirens. Inside, your thumb hovers over the keyboard.",
+          "buttonText": "Answer Mara",
+          "connection": {
+            "target": "beat_2"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_2"
+          }
+        ]
+      },
+      {
+        "id": "beat_2",
+        "name": "First Response",
+        "type": "dialogTree",
+        "position": {
+          "x": 700,
+          "y": 300
+        },
+        "cluster": "Act I - The Message",
+        "notes": "INTENT: First major trust movement. Gentle presence, shaming pressure, or early outside support all have different safety/trust tradeoffs.",
+        "parameters": {
+          "presentationMode": "chat-bubble",
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Mara",
+            "text": "I don't know why I texted. I just needed someone to see this before I disappeared into it.",
+            "choices": [
+              {
+                "id": "c_gentle_presence",
+                "text": "I'm here. Do you want me to call, text, or just sit with you here?",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": 0.12,
+                    "arousalDelta": -0.12
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "joy",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "interest",
+                    "emotionDelta": 0.1
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.25
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "mara",
+                    "sentimentEmotion": "shame",
+                    "strengthDelta": -0.08
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex answered the late-night message by making room instead of taking control.",
+                    "reflectionSalience": 0.8
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_gentle_presence",
+                  "speaker": "Mara",
+                  "text": "Three dots appear, vanish, then return. Maybe call. But don't make me explain everything at once.",
+                  "choices": [
+                    {
+                      "id": "c_gentle_presence_continue",
+                      "text": "[Continue]",
+                      "target": "beat_3"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_harsh_pressure",
+                "text": "Mara, you promised this wouldn't happen again.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": -1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": -0.18,
+                    "arousalDelta": 0.12
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "shame",
+                    "emotionDelta": 0.22
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "fear",
+                    "emotionDelta": 0.15
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.25
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "mara",
+                    "sentimentEmotion": "shame",
+                    "strengthDelta": 0.15
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex led with disappointment, and Mara felt like a failure before she felt helped.",
+                    "reflectionSalience": 0.75
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_harsh_pressure",
+                  "speaker": "Mara",
+                  "text": "The typing indicator blinks, vanishes, and returns. Forget it. I knew I shouldn't have said anything.",
+                  "choices": [
+                    {
+                      "id": "c_harsh_pressure_continue",
+                      "text": "[Continue]",
+                      "target": "beat_3"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_early_outside_support",
+                "text": "I care about you too much to be the only person awake with this. I'm asking Sam to stay near his phone.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": -0.04,
+                    "arousalDelta": 0.12
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "fear",
+                    "emotionDelta": 0.14
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "anger",
+                    "emotionDelta": 0.08
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.05
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex widened the circle of safety, but Mara felt exposed by the speed of it.",
+                    "reflectionSalience": 0.7
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_early_outside_support",
+                  "speaker": "Mara",
+                  "text": "Don't. Please. I asked you. But she does not hang up.",
+                  "choices": [
+                    {
+                      "id": "c_early_outside_support_continue",
+                      "text": "[Continue]",
+                      "target": "beat_3"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "beat_3",
+        "name": "The Privacy Line",
+        "type": "dialogTree",
+        "position": {
+          "x": 1000,
+          "y": 300
+        },
+        "cluster": "Act I - The Message",
+        "notes": "INTENT: Act I break. Every choice bookmarks affect state as act1_end, then Act II measures trust growth from that snapshot.",
+        "parameters": {
+          "presentationMode": "chat-bubble",
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Mara",
+            "text": "On the call, Mara's voice is thin with exhaustion. Please don't tell anyone. Promise me you'll keep this between us.",
+            "choices": [
+              {
+                "id": "c_boundaried_privacy",
+                "text": "I can protect your privacy, but not a danger secret. If you might hurt yourself, we bring in help together.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": 0.1,
+                    "arousalDelta": -0.08
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "interest",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.25
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "mara",
+                    "sentimentEmotion": "shame",
+                    "strengthDelta": -0.05
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex named a boundary without abandoning Mara's dignity.",
+                    "reflectionSalience": 0.85
+                  },
+                  {
+                    "type": "bookmarkAffectState",
+                    "target": "",
+                    "bookmarkName": "act1_end",
+                    "scope": "all"
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_boundaried_privacy",
+                  "speaker": "Mara",
+                  "text": "Mara is quiet for so long you check the call timer. Then she says, Okay. I hate it, but okay.",
+                  "choices": [
+                    {
+                      "id": "c_boundaried_privacy_continue",
+                      "text": "[Continue]",
+                      "target": "beat_6"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_absolute_secrecy",
+                "text": "I promise. No one else has to know.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": -1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": 0.04,
+                    "arousalDelta": -0.05
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "joy",
+                    "emotionDelta": 0.08
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "shame",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.15
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "mara",
+                    "sentimentEmotion": "shame",
+                    "strengthDelta": 0.1
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex promised secrecy, which felt comforting and dangerous at the same time.",
+                    "reflectionSalience": 0.8
+                  },
+                  {
+                    "type": "bookmarkAffectState",
+                    "target": "",
+                    "bookmarkName": "act1_end",
+                    "scope": "all"
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_absolute_secrecy",
+                  "speaker": "Mara",
+                  "text": "Thank you, she whispers. The relief in her voice is real, but so is the weight you just accepted.",
+                  "choices": [
+                    {
+                      "id": "c_absolute_secrecy_continue",
+                      "text": "[Continue]",
+                      "target": "beat_4"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_forced_help",
+                "text": "I can't agree to that. I'm calling Sam now, even if you hate me.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": -1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": -0.2,
+                    "arousalDelta": 0.18
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "anger",
+                    "emotionDelta": 0.22
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "fear",
+                    "emotionDelta": 0.18
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.35
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex forced outside help before Mara felt included in the decision.",
+                    "reflectionSalience": 0.8
+                  },
+                  {
+                    "type": "bookmarkAffectState",
+                    "target": "",
+                    "bookmarkName": "act1_end",
+                    "scope": "all"
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_forced_help",
+                  "speaker": "Mara",
+                  "text": "She inhales sharply. I knew you'd make me into a problem. Still, the line stays open.",
+                  "choices": [
+                    {
+                      "id": "c_forced_help_continue",
+                      "text": "[Continue]",
+                      "target": "beat_5"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "beat_4",
+        "name": "Track Secrecy Promise",
+        "type": "setVariable",
+        "position": {
+          "x": 1300,
+          "y": 180
+        },
+        "cluster": "Act I - The Message",
+        "notes": "STATE: Records that the player made an unsafe secrecy promise.",
+        "parameters": {
+          "type": "variable",
+          "name": "promisedSecrecy",
+          "value": true,
+          "operation": "set",
+          "connection": {
+            "target": "beat_6"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_6"
+          }
+        ]
+      },
+      {
+        "id": "beat_5",
+        "name": "Track Forced Help",
+        "type": "setVariable",
+        "position": {
+          "x": 1300,
+          "y": 430
+        },
+        "cluster": "Act I - The Message",
+        "notes": "STATE: Records that the player overrode Mara's consent in Act I.",
+        "parameters": {
+          "type": "variable",
+          "name": "forcedOutsideHelp",
+          "value": true,
+          "operation": "set",
+          "connection": {
+            "target": "beat_6"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_6"
+          }
+        ]
+      },
+      {
+        "id": "beat_6",
+        "name": "Act II Opens",
+        "type": "infoText",
+        "position": {
+          "x": 1600,
+          "y": 300
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "ASSET: Overcast community garden or quiet cafe exterior. AUDIO: Morning traffic softened by rain.",
+        "parameters": {
+          "speaker": "Narrator",
+          "showSpeaker": false,
+          "text": "Act II — The Morning After. Sleep never really arrives. By noon, you meet Mara beside the community garden, where rainwater trembles on the leaves and both of you pretend you are not checking how close the exits are.",
+          "buttonText": "Meet Mara",
+          "connection": {
+            "target": "beat_7"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_7"
+          }
+        ]
+      },
+      {
+        "id": "beat_7",
+        "name": "Check Trust Since Story Start",
+        "type": "conditionBeat",
+        "position": {
+          "x": 1900,
+          "y": 300
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "AFFECT CHECK: Reads Mara's trust toward the player using baseline initial, so the branch asks whether trust improved from the story start.",
+        "parameters": {
+          "condition": {
+            "type": "sentiment",
+            "character": "mara",
+            "sentimentTarget": "player",
+            "sentimentEmotion": "trust",
+            "operator": ">=",
+            "value": 0.2,
+            "baseline": "initial"
+          },
+          "trueConnection": {
+            "target": "beat_8",
+            "label": "Trust has grown"
+          },
+          "falseConnection": {
+            "target": "beat_9",
+            "label": "Trust is fragile"
+          }
+        }
+      },
+      {
+        "id": "beat_8",
+        "name": "Mara Lets You Walk Beside Her",
+        "type": "infoText",
+        "position": {
+          "x": 2200,
+          "y": 190
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "INTENT: State-specific text only after an affect gate.",
+        "parameters": {
+          "speaker": "Narrator",
+          "showSpeaker": false,
+          "text": "Mara lets you walk beside her instead of half a step behind. She looks tired, but when you ask if the bench is okay, she nods before you finish the sentence.",
+          "buttonText": "Sit with her",
+          "connection": {
+            "target": "beat_10"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_10"
+          }
+        ]
+      },
+      {
+        "id": "beat_9",
+        "name": "Mara Keeps Distance",
+        "type": "infoText",
+        "position": {
+          "x": 2200,
+          "y": 420
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "INTENT: State-specific text only after an affect gate.",
+        "parameters": {
+          "speaker": "Narrator",
+          "showSpeaker": false,
+          "text": "Mara chooses the far end of the bench. She answers gently enough, but every word has a door behind it, and the door is almost closed.",
+          "buttonText": "Try anyway",
+          "connection": {
+            "target": "beat_10"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_10"
+          }
+        ]
+      },
+      {
+        "id": "beat_10",
+        "name": "The Daylight Conversation",
+        "type": "dialogTree",
+        "position": {
+          "x": 2500,
+          "y": 300
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "INTENT: Major Act II choice. The crisis plan option creates inventory; direct language improves safety; avoidance weakens trust.",
+        "parameters": {
+          "presentationMode": "chat-bubble",
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Mara",
+            "text": "She turns a paper cup between her hands. I keep thinking if I say the worst thought out loud, it becomes real.",
+            "choices": [
+              {
+                "id": "c_make_plan",
+                "text": "Then let's put the thoughts on paper: warning signs, safe places, people to call, steps for tonight.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": 2,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": 0.18,
+                    "arousalDelta": -0.15
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "interest",
+                    "emotionDelta": 0.2
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "joy",
+                    "emotionDelta": 0.1
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.3
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "mara",
+                    "sentimentEmotion": "shame",
+                    "strengthDelta": -0.08
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex helped turn panic into a concrete crisis plan Mara could recognize later.",
+                    "reflectionSalience": 0.95
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_make_plan",
+                  "speaker": "Mara",
+                  "text": "She resists at first, then writes in small block letters. When the card is finished, she lets you keep a copy.",
+                  "choices": [
+                    {
+                      "id": "c_make_plan_continue",
+                      "text": "[Continue]",
+                      "target": "beat_11"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_direct_question",
+                "text": "Saying it won't make it happen. Are you thinking about killing yourself tonight?",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": 0.05,
+                    "arousalDelta": 0.04
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "interest",
+                    "emotionDelta": 0.15
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "fear",
+                    "emotionDelta": 0.08
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.15
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "mara",
+                    "sentimentEmotion": "shame",
+                    "strengthDelta": -0.04
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex used direct language without flinching, and Mara did not have to disguise the danger.",
+                    "reflectionSalience": 0.85
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_direct_question",
+                  "speaker": "Mara",
+                  "text": "She flinches at the bluntness, then exhales. Yes. Not a plan yet. But the thought is there.",
+                  "choices": [
+                    {
+                      "id": "c_direct_question_continue",
+                      "text": "[Continue]",
+                      "target": "beat_12"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_distract",
+                "text": "Let's get through the afternoon first. Tell me about anything else.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": -1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": -0.12,
+                    "arousalDelta": 0.04
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "sadness",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "shame",
+                    "emotionDelta": 0.1
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.2
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex steered away from the frightening truth, and Mara learned to hide it again.",
+                    "reflectionSalience": 0.8
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_distract",
+                  "speaker": "Mara",
+                  "text": "She follows the lighter topic, but the silence underneath it grows heavier.",
+                  "choices": [
+                    {
+                      "id": "c_distract_continue",
+                      "text": "[Continue]",
+                      "target": "beat_12"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "beat_11",
+        "name": "Add Crisis Plan Card",
+        "type": "addRemoveInventory",
+        "position": {
+          "x": 2800,
+          "y": 160
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "INVENTORY: This item is later checked in Act III. It comes from dialogue, not pickProp, so addRemoveInventory is appropriate.",
+        "parameters": {
+          "item": "Crisis Plan Card",
+          "action": "add",
+          "character": "player",
+          "quantity": "1",
+          "connection": {
+            "target": "beat_12"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_12"
+          }
+        ]
+      },
+      {
+        "id": "beat_12",
+        "name": "Check Trust Since Act I",
+        "type": "conditionBeat",
+        "position": {
+          "x": 3100,
+          "y": 300
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "AFFECT CHECK: Pairs with the act1_end bookmark. Reads whether the Act II conversation improved trust after the overnight boundary moment.",
+        "parameters": {
+          "condition": {
+            "type": "sentiment",
+            "character": "mara",
+            "sentimentTarget": "player",
+            "sentimentEmotion": "trust",
+            "operator": ">=",
+            "value": 0.15,
+            "baseline": {
+              "bookmark": "act1_end"
+            }
+          },
+          "trueConnection": {
+            "target": "beat_13",
+            "label": "Trust rebuilt in daylight"
+          },
+          "falseConnection": {
+            "target": "beat_14",
+            "label": "Trust thinned in daylight"
+          }
+        }
+      },
+      {
+        "id": "beat_13",
+        "name": "A Little More Honest",
+        "type": "infoText",
+        "position": {
+          "x": 3400,
+          "y": 190
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "INTENT: Shows consequence of affect growth from the act1_end bookmark.",
+        "parameters": {
+          "speaker": "Narrator",
+          "showSpeaker": false,
+          "text": "By the time the paper cup is empty, Mara is speaking in full sentences again. Not easily, not safely yet, but honestly enough that neither of you has to guess in the dark.",
+          "buttonText": "Walk her home",
+          "connection": {
+            "target": "beat_15"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_15"
+          }
+        ]
+      },
+      {
+        "id": "beat_14",
+        "name": "The Quiet Gets Thicker",
+        "type": "infoText",
+        "position": {
+          "x": 3400,
+          "y": 430
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "INTENT: Shows consequence of insufficient trust growth from act1_end.",
+        "parameters": {
+          "speaker": "Narrator",
+          "showSpeaker": false,
+          "text": "The afternoon passes politely. That is the frightening part: Mara has always been good at sounding reasonable when she is deciding what not to say.",
+          "buttonText": "Walk her home",
+          "connection": {
+            "target": "beat_15"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_15"
+          }
+        ]
+      },
+      {
+        "id": "beat_15",
+        "name": "The Night Agreement",
+        "type": "dialogTree",
+        "position": {
+          "x": 3700,
+          "y": 300
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "INTENT: Act II break. Every route bookmarks act2_end, which the final crisis later compares against.",
+        "parameters": {
+          "presentationMode": "chat-bubble",
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Mara",
+            "text": "At the garden gate, Mara stops. If I get bad again tonight, would you come over? I don't want strangers or sirens.",
+            "choices": [
+              {
+                "id": "c_shared_help",
+                "text": "I'll come over, and we'll use the plan. If danger rises, we choose help together.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": 0.12,
+                    "arousalDelta": -0.1
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "joy",
+                    "emotionDelta": 0.1
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.25
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex framed help as something they would choose together, not something done to Mara.",
+                    "reflectionSalience": 0.9
+                  },
+                  {
+                    "type": "bookmarkAffectState",
+                    "target": "",
+                    "bookmarkName": "act2_end",
+                    "scope": "all"
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_shared_help",
+                  "speaker": "Mara",
+                  "text": "She studies you for a long moment. Together, she repeats, like the word is unfamiliar but not impossible.",
+                  "choices": [
+                    {
+                      "id": "c_shared_help_continue",
+                      "text": "[Continue]",
+                      "target": "beat_16"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_come_alone",
+                "text": "I'll come alone. I won't involve anyone else.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": -1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": 0.03,
+                    "arousalDelta": 0.07
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "fear",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "shame",
+                    "emotionDelta": 0.1
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.05
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "mara",
+                    "sentimentEmotion": "shame",
+                    "strengthDelta": 0.08
+                  },
+                  {
+                    "type": "bookmarkAffectState",
+                    "target": "",
+                    "bookmarkName": "act2_end",
+                    "scope": "all"
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_come_alone",
+                  "speaker": "Mara",
+                  "text": "Relief crosses her face, followed by something like guilt. Good. I just can't be a scene.",
+                  "choices": [
+                    {
+                      "id": "c_come_alone_continue",
+                      "text": "[Continue]",
+                      "target": "beat_17"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_threaten_services",
+                "text": "If you scare me, I'm calling emergency services. End of discussion.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": -1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": -0.16,
+                    "arousalDelta": 0.16
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "anger",
+                    "emotionDelta": 0.18
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "fear",
+                    "emotionDelta": 0.18
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.25
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex named emergency action as a threat, and Mara heard control instead of care.",
+                    "reflectionSalience": 0.85
+                  },
+                  {
+                    "type": "bookmarkAffectState",
+                    "target": "",
+                    "bookmarkName": "act2_end",
+                    "scope": "all"
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_threaten_services",
+                  "speaker": "Mara",
+                  "text": "Her expression closes. Right. So I should sound calm enough for you. Got it.",
+                  "choices": [
+                    {
+                      "id": "c_threaten_services_continue",
+                      "text": "[Continue]",
+                      "target": "beat_18"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "beat_16",
+        "name": "Track Shared Help Agreement",
+        "type": "setVariable",
+        "position": {
+          "x": 4000,
+          "y": 150
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "STATE: Records a collaborative safety agreement.",
+        "parameters": {
+          "type": "variable",
+          "name": "nightAgreement",
+          "value": "sharedHelp",
+          "operation": "set",
+          "connection": {
+            "target": "beat_19"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_19"
+          }
+        ]
+      },
+      {
+        "id": "beat_17",
+        "name": "Track Alone Agreement",
+        "type": "setVariable",
+        "position": {
+          "x": 4000,
+          "y": 300
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "STATE: Records that the player agreed to handle the crisis alone.",
+        "parameters": {
+          "type": "variable",
+          "name": "nightAgreement",
+          "value": "alone",
+          "operation": "set",
+          "connection": {
+            "target": "beat_19"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_19"
+          }
+        ]
+      },
+      {
+        "id": "beat_18",
+        "name": "Track Threat Agreement",
+        "type": "setVariable",
+        "position": {
+          "x": 4000,
+          "y": 450
+        },
+        "cluster": "Act II - The Morning After",
+        "notes": "STATE: Records that the player framed emergency help as a threat.",
+        "parameters": {
+          "type": "variable",
+          "name": "nightAgreement",
+          "value": "threat",
+          "operation": "set",
+          "connection": {
+            "target": "beat_19"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_19"
+          }
+        ]
+      },
+      {
+        "id": "beat_19",
+        "name": "Act III Opens",
+        "type": "infoText",
+        "position": {
+          "x": 4300,
+          "y": 300
+        },
+        "cluster": "Act III - The Roofline",
+        "notes": "ASSET: Apartment stairwell leading toward a roof door. AUDIO: Wind, distant traffic, muffled elevator hum.",
+        "parameters": {
+          "speaker": "Narrator",
+          "showSpeaker": false,
+          "text": "Act III — The Roofline. At 12:41 A.M., Mara texts: 'I'm in the stairwell by the roof. I don't want to be here, but I don't know where else to go.' You run three blocks through rain that turns every streetlamp into a halo.",
+          "buttonText": "Reach the stairwell",
+          "connection": {
+            "target": "beat_20"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_20"
+          }
+        ]
+      },
+      {
+        "id": "beat_20",
+        "name": "Check for Crisis Plan",
+        "type": "conditionBeat",
+        "position": {
+          "x": 4600,
+          "y": 300
+        },
+        "cluster": "Act III - The Roofline",
+        "notes": "INVENTORY CHECK: Uses the Crisis Plan Card if the player created it in Act II. False path remains playable and meaningful.",
+        "parameters": {
+          "condition": {
+            "type": "inventory",
+            "item": "Crisis Plan Card",
+            "character": "player",
+            "checkType": "has"
+          },
+          "trueConnection": {
+            "target": "beat_21",
+            "label": "Has crisis plan"
+          },
+          "falseConnection": {
+            "target": "beat_22",
+            "label": "No written plan"
+          }
+        }
+      },
+      {
+        "id": "beat_21",
+        "name": "Use the Plan",
+        "type": "infoText",
+        "position": {
+          "x": 4900,
+          "y": 190
+        },
+        "cluster": "Act III - The Roofline",
+        "notes": "INTENT: Reward the earlier inventory choice with practical emotional leverage.",
+        "parameters": {
+          "speaker": "Narrator",
+          "showSpeaker": false,
+          "text": "You unfold the Crisis Plan Card before you open the roof door. Mara's own handwriting is there: water, hallway light, call Sam, no roof alone. The words do not fix the night, but they give you something steadier than panic.",
+          "buttonText": "Step inside",
+          "connection": {
+            "target": "beat_23"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_23"
+          }
+        ]
+      },
+      {
+        "id": "beat_22",
+        "name": "No Written Plan",
+        "type": "infoText",
+        "position": {
+          "x": 4900,
+          "y": 430
+        },
+        "cluster": "Act III - The Roofline",
+        "notes": "INTENT: Recoverable false path; player can still make a meaningful final choice.",
+        "parameters": {
+          "speaker": "Narrator",
+          "showSpeaker": false,
+          "text": "You have no written plan to hold onto, so you slow your breathing and hold onto principles instead: be direct, stay present, widen safety if danger rises, do not make shame the loudest voice in the room.",
+          "buttonText": "Step inside",
+          "connection": {
+            "target": "beat_23"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_23"
+          }
+        ]
+      },
+      {
+        "id": "beat_23",
+        "name": "The Final Response",
+        "type": "dialogTree",
+        "position": {
+          "x": 5200,
+          "y": 300
+        },
+        "cluster": "Act III - The Roofline",
+        "notes": "INTENT: Final meaningful choice. All routes go to supportScore gate, then affect gate, then endings.",
+        "parameters": {
+          "presentationMode": "chat-bubble",
+          "dialogTree": {
+            "id": "root",
+            "speaker": "Mara",
+            "text": "I keep thinking everyone would be better if I stepped out of the picture, she says. Her hand is clenched around the railing. Your next words become the shape of the night.",
+            "choices": [
+              {
+                "id": "c_validate_and_stay",
+                "text": "I don't believe we're better without you. I do believe you're in danger, and I'm staying while we take the next safe step together.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": 2,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": 0.2,
+                    "arousalDelta": -0.25
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "joy",
+                    "emotionDelta": 0.14
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "interest",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.35
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "mara",
+                    "sentimentEmotion": "shame",
+                    "strengthDelta": -0.15
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "At the roofline, Alex validated the danger without agreeing with the despair.",
+                    "reflectionSalience": 1
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_validate_and_stay",
+                  "speaker": "Mara",
+                  "text": "She starts to argue, then lets the railing go one finger at a time. Don't leave the line, she whispers.",
+                  "choices": [
+                    {
+                      "id": "c_validate_and_stay_continue",
+                      "text": "[Continue]",
+                      "target": "beat_24"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_panic_guilt",
+                "text": "Don't do this to me. I can't survive losing you.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": -1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": -0.18,
+                    "arousalDelta": 0.16
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "shame",
+                    "emotionDelta": 0.24
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "fear",
+                    "emotionDelta": 0.14
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.25
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "mara",
+                    "sentimentEmotion": "shame",
+                    "strengthDelta": 0.18
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex's fear became another burden Mara felt responsible for carrying.",
+                    "reflectionSalience": 0.9
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_panic_guilt",
+                  "speaker": "Mara",
+                  "text": "Her face folds inward. I'm sorry. I knew I was too much.",
+                  "choices": [
+                    {
+                      "id": "c_panic_guilt_continue",
+                      "text": "[Continue]",
+                      "target": "beat_24"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c_call_emergency",
+                "text": "I'm calling emergency help now. I'm staying on the phone, but I'm not negotiating with death.",
+                "counter": "supportScore",
+                "counterOperation": "add",
+                "counterValue": 1,
+                "effects": [
+                  {
+                    "type": "nudgeMood",
+                    "target": "mara",
+                    "valenceDelta": -0.08,
+                    "arousalDelta": 0.18
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "fear",
+                    "emotionDelta": 0.2
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "mara",
+                    "emotion": "anger",
+                    "emotionDelta": 0.12
+                  },
+                  {
+                    "type": "addSentiment",
+                    "target": "mara",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.2
+                  },
+                  {
+                    "type": "addReflection",
+                    "target": "mara",
+                    "reflectionText": "Alex chose immediate outside safety over consent, while still refusing to leave Mara alone.",
+                    "reflectionSalience": 0.95
+                  }
+                ],
+                "dialogNode": {
+                  "id": "n_call_emergency",
+                  "speaker": "Mara",
+                  "text": "Mara recoils, hurt and frightened, but she stays where you can see her while you call.",
+                  "choices": [
+                    {
+                      "id": "c_call_emergency_continue",
+                      "text": "[Continue]",
+                      "target": "beat_24"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "beat_24",
+        "name": "Check Accumulated Support",
+        "type": "conditionBeat",
+        "position": {
+          "x": 5500,
+          "y": 300
+        },
+        "cluster": "Endings",
+        "notes": "COUNTER CHECK: Mandatory gateway for supportScore. Highest threshold is reachable; max supportScore is 7.",
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "supportScore",
+            "operator": ">=",
+            "value": 4
+          },
+          "trueConnection": {
+            "target": "beat_25",
+            "label": "Strong support pattern"
+          },
+          "falseConnection": {
+            "target": "beat_26",
+            "label": "Mixed or weak support pattern"
+          }
+        }
+      },
+      {
+        "id": "beat_25",
+        "name": "Check Trust Since Act II",
+        "type": "conditionBeat",
+        "position": {
+          "x": 5800,
+          "y": 190
+        },
+        "cluster": "Endings",
+        "notes": "AFFECT CHECK: Pairs with act2_end bookmark. Strong practical support still needs final trust growth to reach the warmest ending.",
+        "parameters": {
+          "condition": {
+            "type": "sentiment",
+            "character": "mara",
+            "sentimentTarget": "player",
+            "sentimentEmotion": "trust",
+            "operator": ">=",
+            "value": 0.15,
+            "baseline": {
+              "bookmark": "act2_end"
+            }
+          },
+          "trueConnection": {
+            "target": "beat_27",
+            "label": "Trust grew in the crisis"
+          },
+          "falseConnection": {
+            "target": "beat_28",
+            "label": "Safety without trust growth"
+          }
+        }
+      },
+      {
+        "id": "beat_26",
+        "name": "Check Minimum Support",
+        "type": "conditionBeat",
+        "position": {
+          "x": 5800,
+          "y": 430
+        },
+        "cluster": "Endings",
+        "notes": "COUNTER CHECK: Second supportScore threshold creates a meaningful middle ending rather than binary success/failure.",
+        "parameters": {
+          "condition": {
+            "type": "counter",
+            "variable": "supportScore",
+            "operator": ">=",
+            "value": 2
+          },
+          "trueConnection": {
+            "target": "beat_28",
+            "label": "Enough support to preserve a line"
+          },
+          "falseConnection": {
+            "target": "beat_29",
+            "label": "Too little support, trust ruptures"
+          }
+        }
+      },
+      {
+        "id": "beat_27",
+        "name": "Ending - Held Light",
+        "type": "endScreen",
+        "position": {
+          "x": 6100,
+          "y": 100
+        },
+        "cluster": "Endings",
+        "notes": "ENDING: Warmest conclusion; safety and trust both hold.",
+        "parameters": {
+          "message": "Ending: Held Light\n\nMara sits on the stairwell floor before the first responder arrives, one shoulder pressed against yours. Sam comes too, quiet and careful, carrying water and a sweatshirt. Mara is not suddenly well. The night does not become simple. But she lets the circle widen without feeling erased by it.\n\nFinal reflection: You did not rescue Mara by finding the perfect sentence. You helped by staying truthful, sharing the weight, and treating her safety and agency as things that could exist together.",
+          "showRestart": true,
+          "reset": true,
+          "showCredits": true,
+          "creditsText": "Credits",
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Written by AI Assistant\nInteractive drama structure using ASAPS beats\nTheme recommendation: Visual Novel",
+          "creditsCloseText": "Close",
+          "connection": {
+            "target": "beat_0"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_0"
+          }
+        ]
+      },
+      {
+        "id": "beat_28",
+        "name": "Ending - Safe Distance",
+        "type": "endScreen",
+        "position": {
+          "x": 6100,
+          "y": 300
+        },
+        "cluster": "Endings",
+        "notes": "ENDING: Middle conclusion; Mara is safe, but trust is strained or incomplete.",
+        "parameters": {
+          "message": "Ending: Safe Distance\n\nBy morning, Mara is alive and no longer alone with the worst of the night. Maybe she speaks to you before the clinician arrives. Maybe she only nods when Sam says your name. The important thing is that the door stayed open long enough for help to enter.\n\nFinal reflection: Safety sometimes arrives awkwardly. Care can be clumsy and still matter. But trust remembers tone, timing, and whether a person was invited into their own rescue.",
+          "showRestart": true,
+          "reset": true,
+          "showCredits": true,
+          "creditsText": "Credits",
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Written by AI Assistant\nInteractive drama structure using ASAPS beats\nTheme recommendation: Visual Novel",
+          "creditsCloseText": "Close",
+          "connection": {
+            "target": "beat_0"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_0"
+          }
+        ]
+      },
+      {
+        "id": "beat_29",
+        "name": "Ending - Broken Line",
+        "type": "endScreen",
+        "position": {
+          "x": 6100,
+          "y": 520
+        },
+        "cluster": "Endings",
+        "notes": "ENDING: Hardest conclusion; avoids fatalism while showing relational consequence.",
+        "parameters": {
+          "message": "Ending: Broken Line\n\nHelp reaches Mara, but not because she trusted you enough to stay close. A neighbor hears the stairwell door slam. Sam calls twice before she answers. By dawn, she is safe, silent, and far away from you in every way that matters.\n\nFinal reflection: Panic can look like care from the inside and control from the outside. Next time, if there is a next time, the work begins earlier: listen sooner, name danger clearly, and do not make one frightened friend carry the whole night alone.",
+          "showRestart": true,
+          "reset": true,
+          "showCredits": true,
+          "creditsText": "Credits",
+          "creditsPageTitle": "Credits",
+          "creditsPageBody": "Written by AI Assistant\nInteractive drama structure using ASAPS beats\nTheme recommendation: Visual Novel",
+          "creditsCloseText": "Close",
+          "connection": {
+            "target": "beat_0"
+          }
+        },
+        "connections": [
+          {
+            "targetId": "beat_0"
+          }
+        ]
+      }
+    ],
+    "variables": [
+      {
+        "name": "supportScore",
+        "initialValue": 0,
+        "description": "Counter tracking accumulated supportive, safety-aware choices. Checked before endings."
+      },
+      {
+        "name": "promisedSecrecy",
+        "initialValue": false,
+        "description": "Tracks whether the player promised absolute secrecy in Act I."
+      },
+      {
+        "name": "forcedOutsideHelp",
+        "initialValue": false,
+        "description": "Tracks whether the player forced outside help in Act I."
+      },
+      {
+        "name": "nightAgreement",
+        "initialValue": "unset",
+        "description": "Tracks the Act II agreement about how to handle another crisis at night."
+      }
+    ],
+    "characters": [
+      {
+        "id": "alex",
+        "name": "Alex",
+        "displayName": "Alex",
+        "role": "player",
+        "description": "Mara's friend, trying to balance care, honesty, fear, and boundaries during a crisis.",
+        "initialMood": {
+          "valence": -0.2,
+          "arousal": 0.45
+        },
+        "traits": {
+          "openness": 0.62,
+          "conscientiousness": 0.64,
+          "extraversion": 0.45,
+          "agreeableness": 0.72,
+          "neuroticism": 0.48
+        },
+        "goals": [
+          {
+            "id": "support_mara",
+            "name": "Support Mara",
+            "description": "Help Mara stay safe without erasing her agency.",
+            "priority": 1
+          }
+        ]
+      },
+      {
+        "id": "mara",
+        "name": "Mara",
+        "displayName": "Mara",
+        "role": "npc",
+        "description": "Alex's close friend, exhausted by depression and frightened by her own thoughts, but still reaching for connection.",
+        "dossierPolicy": "reflection",
+        "initialMood": {
+          "valence": -0.55,
+          "arousal": 0.65
+        },
+        "initialSentiments": [
+          {
+            "toEntityRef": "player",
+            "emotion": "trust",
+            "strength": 0.05
+          },
+          {
+            "toEntityRef": "mara",
+            "emotion": "shame",
+            "strength": 0.35
+          }
+        ],
+        "initialEmotionLevels": {
+          "fear": 0.55,
+          "sadness": 0.58,
+          "shame": 0.45,
+          "interest": 0.15
+        },
+        "traits": {
+          "openness": 0.58,
+          "conscientiousness": 0.42,
+          "extraversion": 0.22,
+          "agreeableness": 0.66,
+          "neuroticism": 0.84
+        },
+        "goals": [
+          {
+            "id": "stay_safe",
+            "name": "Stay Safe Tonight",
+            "description": "Survive the crisis without being left alone with lethal thoughts.",
+            "priority": 1
+          },
+          {
+            "id": "retain_agency",
+            "name": "Retain Agency",
+            "description": "Receive help without feeling controlled, exposed, or reduced to a problem.",
+            "priority": 0.85
+          },
+          {
+            "id": "not_be_burden",
+            "name": "Not Be a Burden",
+            "description": "Avoid making others feel responsible for her pain.",
+            "priority": 0.65
+          }
+        ]
+      },
+      {
+        "id": "sam",
+        "name": "Sam",
+        "displayName": "Sam",
+        "role": "npc",
+        "description": "A mutual friend who can widen the support circle when invited or contacted."
+      }
+    ],
+    "reasoning": "This medium-length story uses a three-act structure with reconvergent branching. Act I establishes the crisis and bookmarks Mara's affect at act1_end. Act II checks whether trust improved from the story start, then uses a second affect condition comparing trust against act1_end. The player can create an inventory item, the Crisis Plan Card, which is checked in Act III. Act II bookmarks act2_end on every path, and the finale checks whether Mara's trust grew after the final crisis response. The supportScore counter is modified by multiple choices, has a reachable maximum of 7, and is checked by conditionBeats before all endings. Endings depend on accumulated support and affective trust, not just the final choice."
+  }
+}
