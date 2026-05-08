@@ -1309,6 +1309,12 @@
           "type": "connection",
           "required": true,
           "description": "Next beat after the affect update"
+        },
+        "effects": {
+          "type": "array",
+          "required": false,
+          "description": "v0.9.45+ canonical shape — an ordered list of Effects (mood nudge, sentiment delta, emotion fire, goal status, variant switch, bookmark, …). When present, this replaces the legacy single-row fields above (moodValenceDelta, sentimentTarget, …). The migration helpers in core promote legacy shapes into this array on load.",
+          "ui": { "hidden": true }
         }
       },
       "transitions": false,
