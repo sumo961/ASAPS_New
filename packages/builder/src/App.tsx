@@ -16,8 +16,9 @@ import { findReferencesByName, relinkReferences } from './components/characters/
 import { AssetManager } from './components/assets/AssetManager';
 import { ImportAsmlDialog } from './components/ImportAsmlDialog';
 import { ImportTwineDialog } from './components/ImportTwineDialog';
-import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
+import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, normalizeStory, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
+import { getAIValidator } from './services/AIValidator';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
@@ -1107,6 +1108,37 @@ function App() {
       // to the current directory project before the new project is created
       pauseAutoSave();
 
+      // Schema-driven normalize pipeline (v0.9.51+). Same pass that
+      // AIService.generateStory uses — gives us flat conditionType,
+      // top-level affect-stack fields, primitive coercion, character
+      // backfill, and auto-created clusters from per-beat strings. The
+      // existing manual condition flattener and character normalize
+      // below now operate on already-normalized data and are no-ops;
+      // they're kept for one release as a safety net and can be
+      // removed in a follow-up.
+      try {
+        const validator = getAIValidator();
+        await validator.ensureSchemaLoaded();
+        const schema = validator.getSchema();
+        if (schema?.beatTypes) {
+          const result = normalizeStory(story, schema);
+          if (result.story) {
+            // Mutate in place so the rest of this function sees normalized data
+            Object.assign(story, result.story);
+          }
+          if (result.report.changes.length > 0) {
+            console.log(
+              `[App.loadStoryData] Pipeline applied ${result.report.changes.length} changes ` +
+                `(${result.report.beatsNormalized} beats, ` +
+                `${result.report.charactersNormalized} characters, ` +
+                `${result.report.clustersCreated.length} clusters auto-created)`
+            );
+          }
+        }
+      } catch (err) {
+        console.warn('[App.loadStoryData] Pipeline failed; continuing with raw story:', err);
+      }
+
       // NOTE: We use loadStoryData for a single batch update instead of:
       // - actions.clearStory() - would trigger a state update
       // - actions.setTitle() - would trigger another state update
@@ -1377,30 +1409,21 @@ function App() {
         characters: storyCharacters,
       });
 
-      // Update characters state separately (for App-level character management).
-      // Normalize: AI generations carry the affect-stack fields (traits,
-      // initialMood, goals, dossierPolicy, …) but skip the editor-only
-      // shape (visual, states, defaultState, timestamps). Without those,
-      // CharacterManager / CharacterEditor crash on first paint
-      // (`character.visual.defaultAssetId`, `character.states.length`).
-      // Backfill the same default shape that "Add Character → Blank"
-      // produces so AI characters open in the editor without a TypeError.
+      // Register pipeline-produced clusters (auto-created from per-beat
+      // cluster strings by the normalize pass at the top of this function).
+      if (Array.isArray(story.clusters) && story.clusters.length > 0) {
+        for (const c of story.clusters) actions.addCluster(c);
+        console.log(`[App.loadStoryData] Registered ${story.clusters.length} cluster(s) from pipeline:`, story.clusters.map((c: any) => c.name));
+      }
+
+      // App-level character state. Pipeline already normalized editor-only
+      // fields (visual / states / defaultState / counters / inventory /
+      // tags / traits / goals / timestamps) above, so we can pass straight
+      // through. Without this setter call, charactersRef.current still
+      // holds the previous project's characters and syncProjectData would
+      // write those stale chars into the new project (the v0.9.50 bug).
       if (story.characters && Array.isArray(story.characters)) {
-        const now = new Date().toISOString();
-        const normalized = story.characters.map((c: any) => ({
-          ...c,
-          visual: c.visual || { type: 'static' },
-          states: c.states && c.states.length > 0
-            ? c.states
-            : [{ id: 'default', name: 'default', displayName: 'Default', visual: {} }],
-          defaultState: c.defaultState || 'default',
-          counters: c.counters || [],
-          inventory: c.inventory || [],
-          tags: c.tags || [],
-          createdAt: c.createdAt || now,
-          updatedAt: c.updatedAt || now,
-        }));
-        setCharacters(normalized);
+        setCharacters(story.characters);
       }
 
       // NOTE: Don't call markChanged() here - we'll save the project immediately

@@ -5,7 +5,7 @@
  * This utility reconstructs proper Beat instances from the stored data.
  */
 
-import { BeatTypeRegistry, Story } from '@asaps/core';
+import { BeatTypeRegistry, Story, normalizeCharacter } from '@asaps/core';
 import type { Beat } from '@asaps/core';
 import type { Project } from '../storage/types';
 
@@ -607,28 +607,17 @@ export function loadProjectData(project: Project): {
   // …) without the editor-only shape (visual, states, defaultState,
   // timestamps). Without those defaults CharacterManager / CharacterEditor
   // crash on first paint with TypeError on character.visual.defaultAssetId
-  // or character.states.length. Backfill the same default shape that
-  // "Add Character → Blank" produces so any character source is editable.
-  let characters: any[] = [];
+  // or character.states.length. The schema-driven pipeline's
+  // normalizeCharacter is the single source of truth for editor-only
+  // backfill — used here, in App.tsx via normalizeStory, and in MCP
+  // injection. Idempotent on already-canonical characters.
+  let rawCharacters: any[] = [];
   if (story.getCharacters && typeof story.getCharacters === 'function') {
-    characters = story.getCharacters();
+    rawCharacters = story.getCharacters();
   } else if (story.characters) {
-    characters = story.characters;
+    rawCharacters = story.characters;
   }
-  const nowIso = new Date().toISOString();
-  characters = characters.map((c: any) => ({
-    ...c,
-    visual: c.visual || { type: 'static' },
-    states: c.states && c.states.length > 0
-      ? c.states
-      : [{ id: 'default', name: 'default', displayName: 'Default', visual: {} }],
-    defaultState: c.defaultState || 'default',
-    counters: c.counters || [],
-    inventory: c.inventory || [],
-    tags: c.tags || [],
-    createdAt: c.createdAt || nowIso,
-    updatedAt: c.updatedAt || nowIso,
-  }));
+  const characters: any[] = rawCharacters.map((c: any) => normalizeCharacter(c).character);
 
   // Extract clusters
   let clusters: any[] = [];
