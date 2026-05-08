@@ -119,6 +119,13 @@ export abstract class BaseAIProvider implements IAIProvider {
           throw error;
         }
 
+        // Don't retry when the user cancelled. AbortError comes through fetch
+        // when the signal fires; rethrow immediately so the caller can show
+        // "cancelled" instead of waiting two more 10-minute retries.
+        if (error instanceof Error && (error.name === 'AbortError' || /aborted|cancel/i.test(error.message))) {
+          throw error;
+        }
+
         // Wait before retry (exponential backoff)
         if (attempt < maxRetries - 1) {
           const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s

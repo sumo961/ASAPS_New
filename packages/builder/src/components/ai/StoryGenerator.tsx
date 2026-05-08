@@ -28,7 +28,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
   onClose,
   onStoryGenerated,
 }) => {
-  const { isConfigured, isGenerating, error, generateStory, clearError, currentProvider } = useAI();
+  const { isConfigured, isGenerating, error, generateStory, clearError, cancelGeneration, currentProvider } = useAI();
 
   const [prompt, setPrompt] = useState('');
   const [genre, setGenre] = useState<string>('');
@@ -310,11 +310,10 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={onClose}
-              disabled={isGenerating}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={isGenerating ? cancelGeneration : onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {isGenerating ? 'Cancel generation' : 'Cancel'}
             </button>
             <button
               onClick={handleGenerate}

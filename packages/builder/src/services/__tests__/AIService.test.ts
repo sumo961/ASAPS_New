@@ -215,7 +215,14 @@ describe('AIService', () => {
     it('should generate story using current provider', async () => {
       const result = await service.generateStory(mockStoryRequest);
 
-      expect(mockProvider.generateStory).toHaveBeenCalledWith(mockStoryRequest);
+      // AIService wraps the request with an AbortSignal for cancel support
+      // — assert all original fields plus a signal are forwarded.
+      expect(mockProvider.generateStory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...mockStoryRequest,
+          signal: expect.any(AbortSignal),
+        })
+      );
       expect(result).toEqual(mockStoryResponse);
     });
 

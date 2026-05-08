@@ -165,7 +165,7 @@ export class ClaudeProvider extends BaseAIProvider {
   /**
    * Make request via proxy for custom baseUrls (to avoid CORS)
    */
-  private async makeProxyRequest(requestBody: any): Promise<any> {
+  private async makeProxyRequest(requestBody: any, signal?: AbortSignal): Promise<any> {
     const response = await fetch(this.proxyEndpoint, {
       method: 'POST',
       headers: {
@@ -176,6 +176,7 @@ export class ClaudeProvider extends BaseAIProvider {
         apiKey: this.config?.apiKey,
         ...requestBody,
       }),
+      signal,
     });
 
     if (!response.ok) {
@@ -247,11 +248,13 @@ export class ClaudeProvider extends BaseAIProvider {
       let response;
 
       if (this.useProxy) {
-        // Use proxy for custom providers
-        response = await this.makeProxyRequest(requestBody);
+        // Use proxy for custom providers; thread signal for cancel support.
+        response = await this.makeProxyRequest(requestBody, request.signal);
       } else {
         // Direct API call for official Anthropic
-        const apiResponse = await this.client!.messages.create(requestBody as any);
+        const apiResponse = await this.client!.messages.create(requestBody as any, {
+          signal: request.signal,
+        });
         response = { content: apiResponse.content };
       }
 

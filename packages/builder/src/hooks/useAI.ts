@@ -332,6 +332,16 @@ export function useAI() {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
+  /**
+   * Cancel any in-flight generateStory call. Aborts the underlying fetch
+   * and short-circuits the retry loop, then clears the spinner state so
+   * the dialog unfreezes immediately.
+   */
+  const cancelGeneration = useCallback(() => {
+    aiService.cancel();
+    setState(prev => ({ ...prev, isGenerating: false }));
+  }, [aiService]);
+
   return {
     ...state,
     configure,
@@ -340,5 +350,6 @@ export function useAI() {
     suggestBeats,
     createBeatFromNL,
     clearError,
+    cancelGeneration,
   };
 }

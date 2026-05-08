@@ -37,6 +37,26 @@ export class AIService {
   private currentProvider: IAIProvider | null = null;
   private options: AIServiceOptions;
   private validator = getAIValidator();
+  /**
+   * Active AbortController for the in-flight `generateStory` call (one at
+   * a time). `cancel()` aborts it, signalling both the provider's fetch
+   * and the retry-between-attempts loop in IProvider.withRetry to bail.
+   */
+  private currentAbortController: AbortController | null = null;
+
+  /**
+   * Cancel the currently-running generateStory call (if any). Causes the
+   * in-flight HTTP request to abort and the retry loop to throw a
+   * cancellation error instead of waiting out further attempts. Safe to
+   * call when nothing is in flight (no-op).
+   */
+  cancel(): void {
+    if (this.currentAbortController) {
+      console.log('[AIService] cancel() — aborting in-flight generation');
+      this.currentAbortController.abort();
+      this.currentAbortController = null;
+    }
+  }
 
   /**
    * Export story + validation details as a downloadable JSON for debugging.
@@ -1367,11 +1387,23 @@ export class AIService {
 
     console.log('[AIService] Generating story:', request.prompt);
 
+    // Set up cancellation. If the caller passed their own signal we chain
+    // to it; otherwise we mint a fresh controller. Either way `cancel()`
+    // can abort. Cleared at the end (success or failure) so a stale
+    // controller can't accidentally abort the next call.
+    const controller = new AbortController();
+    this.currentAbortController = controller;
+    if (request.signal) {
+      if (request.signal.aborted) controller.abort();
+      else request.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+    const requestWithSignal: StoryGenerationRequest = { ...request, signal: controller.signal };
+
     const MAX_REPAIR_ATTEMPTS = 2;
 
     try {
       // Generate with current provider
-      let response = await this.currentProvider!.generateStory(request);
+      let response = await this.currentProvider!.generateStory(requestWithSignal);
 
       // Schema-driven normalize/validate pipeline (v0.9.51+). Single pass
       // covering: condition flattening (incl. all affect-stack + XR fields),
@@ -1578,8 +1610,18 @@ export class AIService {
       return response;
 
     } catch (error) {
+      // Translate AbortError to a clearer message for the UI.
+      if (error instanceof Error && (error.name === 'AbortError' || /aborted|cancel/i.test(error.message))) {
+        console.log('[AIService] Story generation cancelled by user');
+        throw new Error('Story generation cancelled');
+      }
       console.error('[AIService] Story generation failed:', error);
       throw error;
+    } finally {
+      // Clear the controller so a stale one can't abort the next call.
+      if (this.currentAbortController === controller) {
+        this.currentAbortController = null;
+      }
     }
   }
 

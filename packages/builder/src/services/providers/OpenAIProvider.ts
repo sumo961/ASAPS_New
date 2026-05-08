@@ -94,7 +94,7 @@ export class OpenAIProvider extends BaseAIProvider {
   /**
    * Make request via proxy for custom baseUrls (to avoid CORS)
    */
-  private async makeProxyRequest(requestBody: any): Promise<any> {
+  private async makeProxyRequest(requestBody: any, signal?: AbortSignal): Promise<any> {
     console.log('[OpenAIProvider] makeProxyRequest called, endpoint:', this.proxyEndpoint);
     console.log('[OpenAIProvider] baseUrl:', this.config?.baseUrl || '(none - using default)');
 
@@ -110,6 +110,7 @@ export class OpenAIProvider extends BaseAIProvider {
           apiKey: this.config?.apiKey,
           ...requestBody,
         }),
+        signal,
       });
     } catch (error) {
       // Connection refused - proxy server not running
@@ -911,11 +912,14 @@ export class OpenAIProvider extends BaseAIProvider {
 
       console.log('[OpenAIProvider] generateStory useProxy:', this.useProxy);
       if (this.useProxy) {
-        // Use proxy for all non-local endpoints (including default OpenAI)
-        response = await this.makeProxyRequest(requestBody);
+        // Use proxy for all non-local endpoints (including default OpenAI).
+        // Thread through request.signal so the user can cancel.
+        response = await this.makeProxyRequest(requestBody, request.signal);
       } else {
         // Direct API call only for local servers (Ollama, etc.)
-        response = await this.client!.chat.completions.create(requestBody);
+        response = await this.client!.chat.completions.create(requestBody, {
+          signal: request.signal,
+        });
       }
 
       console.log('[OpenAIProvider] Response received:', JSON.stringify(response).substring(0, 500));

@@ -81,6 +81,14 @@ export interface StoryGenerationRequest {
    * tier definitions and AI-facing guidance.
    */
   affectDepth?: 'auto' | 'sparse' | 'standard' | 'rich';
+
+  /**
+   * Optional AbortSignal — providers thread this into their fetch calls
+   * so the user can cancel an in-flight generation. AIService also
+   * checks the signal between retry attempts and bails out instead of
+   * continuing the loop.
+   */
+  signal?: AbortSignal;
 }
 
 /**
