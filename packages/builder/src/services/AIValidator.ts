@@ -107,10 +107,44 @@ export class AIValidator {
       }
     }
 
-    // Validate parameter types
+    // Validate parameter types.
+    //
+    // Two cases get a free pass on the "not defined in schema" warning:
+    // 1. conditionBeat top-level fields (sentimentTarget, baseline, …) are
+    //    declared per-condition-type in the schema's `conditionTypes` registry
+    //    — not in beatDefinition.parameters — and the schema-driven pipeline
+    //    intentionally lifts them to top-level for the inspector.
+    // 2. Aliases declared on a parameter spec (e.g. trueTarget on
+    //    conditionBeat.trueConnection) are valid alternate names.
+    //
+    // Without these passes, every post-pipeline conditionBeat would emit a
+    // dozen false-positive warnings.
+    const conditionFieldsRegistry = new Set<string>();
+    if (beat.type === 'conditionBeat' && this.schema?.conditionTypes) {
+      for (const [, ct] of Object.entries(this.schema.conditionTypes as any)) {
+        if (typeof ct !== 'object' || !ct) continue;
+        for (const f of [...((ct as any).required || []), ...((ct as any).optional || [])]) {
+          conditionFieldsRegistry.add(f);
+        }
+        // Also accept aliased forms registered for any canonical field.
+        const aliases = (ct as any).aliases;
+        if (aliases) for (const list of Object.values(aliases)) {
+          if (Array.isArray(list)) for (const a of list) conditionFieldsRegistry.add(a as string);
+        }
+      }
+      // The discriminator itself.
+      conditionFieldsRegistry.add('conditionType');
+    }
+    const allAliases = new Set<string>();
+    for (const [, ps] of Object.entries(beatDefinition.parameters || {})) {
+      const aliases = (ps as any)?.aliases;
+      if (Array.isArray(aliases)) for (const a of aliases) allAliases.add(a);
+    }
     for (const [paramName, paramValue] of Object.entries(beat.parameters)) {
       const paramDef = beatDefinition.parameters?.[paramName];
       if (!paramDef) {
+        if (conditionFieldsRegistry.has(paramName)) continue;
+        if (allAliases.has(paramName)) continue;
         warnings.push(`Parameter '${paramName}' not defined in schema for beat type '${beat.type}'`);
         continue;
       }
