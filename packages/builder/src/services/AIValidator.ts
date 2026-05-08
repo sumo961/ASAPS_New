@@ -106,9 +106,20 @@ export class AIValidator {
 
     const beatDefinition = this.schema.beatTypes[beat.type];
 
-    // Validate required parameters
+    // Validate required parameters.
+    //
+    // Nested-block parameters (e.g. conditionBeat.condition) are deleted
+    // by the v0.9.51+ schema-driven pipeline after their fields are
+    // flattened to top-level params. The schema still marks them
+    // required because the *contract* is fulfilled by the discriminator
+    // (params.conditionType) plus the per-condition-type required-field
+    // map in the conditionTypes registry — which the pipeline's
+    // validateBeat (in @asaps/core/normalize) already enforces.
+    // So skip any parameter whose name is declared as a nested block.
+    const nestedBlockNames = new Set(Object.keys((beatDefinition as any).nested || {}));
     if (beatDefinition.parameters) {
       for (const [paramName, paramDef] of Object.entries(beatDefinition.parameters as any)) {
+        if (nestedBlockNames.has(paramName)) continue;
         if ((paramDef as any).required && !(paramName in beat.parameters)) {
           errors.push({
             path: `parameters.${paramName}`,
