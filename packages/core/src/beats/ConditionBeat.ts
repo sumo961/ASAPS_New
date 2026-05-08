@@ -450,6 +450,34 @@ export class ConditionBeat extends Beat {
       this.baseline = conditionObj.baseline;
     }
 
+    // Affect-stack discriminator-specific fields. Pre-v0.9.51 these were
+    // only set by the constructor — never persisted through updateParameters.
+    // Result: AI-generated beats with sentimentTarget/sentimentEmotion at
+    // top-level (post-pipeline shape) lost those fields when the App.tsx
+    // beat-creation path did `addBeat()` then `beat.updateParameters(params)`.
+    // The Inspector then read undefined and rendered empty fields even
+    // though the saved debug clearly had the values.
+    if (params.moodAxis !== undefined) {
+      this.moodAxis = params.moodAxis;
+    } else if (conditionObj.moodAxis !== undefined) {
+      this.moodAxis = conditionObj.moodAxis;
+    }
+    if (params.sentimentTarget !== undefined) {
+      this.sentimentTarget = params.sentimentTarget;
+    } else if (conditionObj.sentimentTarget !== undefined) {
+      this.sentimentTarget = conditionObj.sentimentTarget;
+    }
+    if (params.sentimentEmotion !== undefined) {
+      this.sentimentEmotion = params.sentimentEmotion;
+    } else if (conditionObj.sentimentEmotion !== undefined) {
+      this.sentimentEmotion = conditionObj.sentimentEmotion;
+    }
+    if (params.emotionName !== undefined) {
+      this.emotionName = params.emotionName;
+    } else if (conditionObj.emotionName !== undefined) {
+      this.emotionName = conditionObj.emotionName;
+    }
+
     // Rebuild condition object from extracted canonical values
     // This ensures the condition object always reflects the extracted fields
     this.condition = this.buildCondition();
