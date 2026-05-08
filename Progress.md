@@ -1,5 +1,292 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-08: Schema-Driven Normalize/Validate Pipeline + Cancel Button (v0.9.51)
+
+### Overview
+
+Architectural release. The peacemeal AI-input cleanup architecture from
+v0.9.50 (four ad-hoc cleaners scattered across OpenAIProvider, AIService
+×2, and App.tsx) is replaced with a single schema-driven
+normalize/validate pipeline in `@asaps/core/normalize`. New beat types
+and condition variants are now schema-only edits — zero pipeline /
+flattener / validator code changes needed.
+
+Plus a working Cancel button (was a non-functional placeholder),
+robust 5xx error handling for upstream gateway hiccups, and a
+schema-source-of-truth fix that resolved a long-standing problem
+where the desktop app's API server cached stale schema.
+
+This is intentionally a refactor + reliability release — no new
+authoring features. The user-visible wins are: AI generation that
+*always* produces correct condition shapes regardless of the model's
+quirks, a Cancel button that actually works, clearer error messages
+when OpenAI's gateway hiccups, and elimination of false-positive
+validator warnings.
+
+### The piecemeal-cleanup problem
+
+By v0.9.50, four sites in the codebase tried to coerce raw AI output
+into the canonical shape, each with their own hardcoded rules:
+
+  - `OpenAIProvider.cleanupBeatParameters` — strip flat fields when
+    nested condition exists, rebuild connections from choices
+  - `AIService.transformBeatFormat` — flatten nested condition.* to
+    top-level params
+  - `AIService.cleanupBeatParameters` — strip top-level condition
+    fields when nested still present
+  - `App.tsx handleStoryGenerated` — yet another flattener with its
+    own passthrough list, plus duplicate cluster auto-create
+
+Adding a new condition type or aliasing a new param name meant
+touching three or four of these. The v0.9.50 patches added `baseline`,
+`sentimentTarget`, `sentimentEmotion`, etc. to two flatteners but
+missed others; the `quantity` coercion needed its own bespoke pass.
+This shape was unsustainable, and it was the user who flagged it.
+
+### Phase 1: Schema metadata (commit 4891791)
+
+Schema bumped 2.2 → 2.3. Additive only — no existing reader broken.
+
+**New top-level `conditionTypes` registry** (16 condition variants):
+variable, counter, counterCompare, timer, inventory, visitedBeat,
+fictionalTime, mood, emotion, sentiment, trait, goal, characterVariant,
+gpsProximity, indoorProximity, permissionGranted. Each entry declares:
+required-field list, optional-field list, and per-canonical-name
+aliases the AI commonly emits (e.g. `variable.aliases = { variableName:
+['variable', 'left'] }`).
+
+**`conditionBeat.nested.condition` block** declares the discriminator
+(`type`), where it maps at top-level (`conditionType`), the registry
+to consult (`conditionTypes`), and `flattenAll: true` /
+`deleteAfterFlatten: true`. Drives the pipeline's flatten step.
+
+**Per-parameter metadata** on individual params:
+  - `addRemoveInventory.quantity.coerce: "primitiveToString"`
+    (AI emits number, runtime needs `$var` strings, schema declares
+    string — pipeline auto-coerces silently)
+  - `inputText.variable.aliases: ["variableName"]` (AI's preferred name)
+  - `conditionBeat.{trueConnection,falseConnection}.aliases:
+    ["trueTarget"|"falseTarget"]` (AI's preferred names)
+
+### Phase 2: Pipeline implementation in `@asaps/core/normalize/` (commit da33d6a)
+
+Single module, three pure functions, no platform dependencies.
+
+**`normalizeBeat(rawBeat, schema, options?)`** — operates on one beat:
+  1. Flatten nested objects per the `nested` block, copying fields
+     to top-level using the registry to know per-type valid fields,
+     applying registry-level aliases (variable → variableName) IN
+     PLACE on the nested object before flatten copies them up
+  2. Apply parameter aliases (rename to canonical)
+  3. Coerce primitive types per `coerce` metadata
+  4. Fill schema-declared defaults for missing required params
+  Returns `{ beat, changes[] }` for diagnostic logging.
+
+**`validateBeat(beat, schema, refIndex)`** — schema-driven validation:
+  - Required-param check (skipping nested-block fields after flatten)
+  - Type-check post-coercion
+  - Reference resolution against the story's RefIndex (characters,
+    beats, assets, clusters)
+  - Per-condition-type required-field check from `conditionTypes`
+    registry (replaces the hardcoded map in AIValidator.ts)
+
+**`normalizeStory(rawStory, schema, options?)`** — orchestrator:
+  - `buildRefIndex` — collect ids from characters/beats/clusters/assets
+  - `normalizeCharacter` — backfill editor-only fields (visual,
+    states, defaultState, counters/inventory/tags/traits/goals,
+    timestamps) so CharacterManager doesn't crash on first paint
+  - `buildClustersFromBeats` — auto-create Cluster containers from
+    per-beat `cluster` strings, with bbox computed from member beat
+    positions and standard padding; skips clusters already declared
+    on the story
+  - Run `normalizeBeat` over every beat, then `validateBeat`
+  Returns `{ story, report, errors, warnings, valid }`.
+
+### Phase 3a: Wire AI generation entry point (commits d8b8c5a + 133c700)
+
+`AIService.generateStory` now opens with a single `normalizeStory`
+call before any legacy passes. The result is splatted back over the
+response. Existing legacy cleaners now operate on already-normalized
+data and are mostly no-ops.
+
+**Deletions:**
+  - `AIService.autoCoerceParameterPrimitives` (v0.9.50 special-case;
+    fully replaced by schema's `coerce` metadata)
+  - `App.tsx handleStoryGenerated` condition flattener — pipeline
+    already lifted condition.* and ate `params.condition`
+  - `App.tsx handleStoryGenerated` cluster bbox auto-create —
+    pipeline produced `story.clusters`; App now just walks them
+  - `App.tsx handleStoryGenerated` character normalize lambda —
+    pipeline already backfilled `story.characters`
+
+Net: −67 lines in App.tsx alone. The AIValidator's per-condition-type
+required-field map (a hardcoded duplicate of the conditionTypes
+registry, with stale field names like `axis` vs `moodAxis`) was
+deleted entirely; the pipeline's `validateBeat` is the single source.
+
+### Phase 3b: Extend pipeline to MCP + zip-import + project-load (commit 3d15fce)
+
+`App.tsx loadStoryData` (the WebSocket-injection callback that
+receives MCP-pushed stories from Claude Desktop) now runs
+`normalizeStory` at the top, mutating the incoming story in place.
+Cluster registration walks `story.clusters`. Character setter call
+preserved (the setter is still load-bearing — without it,
+`charactersRef.current` retains the previous project's characters
+and `syncProjectData` writes those stale characters into the new
+project, the v0.9.50 character-clobber bug).
+
+`projectDeserializer.loadProjectData` (zip-import + IndexedDB load):
+the hand-rolled 13-line character backfill block is replaced with
+`normalizeCharacter` from `@asaps/core/normalize`. Beats are NOT
+pipeline-normalized on project load — existing projects are either
+post-pipeline canonical (saved through new generation flow) or
+legacy (runtime tolerates both).
+
+The single source of truth for "what does a normalized story shape
+look like" is now `packages/core/src/normalize/`. All four entry
+points (AI generation, MCP injection, zip-import, project-load)
+share one path.
+
+### Phase 4: Golden-file regression suite (commit 10f4620)
+
+Three real AI-generated debug files captured during v0.9.50/v0.9.51
+development, committed as fixtures and run through the pipeline with
+shape assertions. Each fixture exercises a distinct scenario:
+
+  - **kimi-counter-conditions.json** — Kimi K2 generation captured
+    AFTER the pipeline ran. Conditions already flat, characters
+    already backfilled. Pipeline must produce ZERO changes — proves
+    idempotency on real-world canonical data
+  - **gpt-sentiment-clusters.json** — Pre-pipeline raw GPT-5.5: 6
+    nested sentiment conditionBeats, 3 characters lacking editor-only
+    fields, no clusters declared. Exercises affect-stack flatten,
+    character backfill, cluster auto-create
+  - **gpt-mixed-flatten.json** — AI emitted SOME affect-stack fields
+    at BOTH top-level AND nested. Pipeline must flatten without
+    overwriting pre-existing top-level values
+
+Per-fixture invariants: 0 errors, every conditionBeat post-flatten
+(conditionType set, params.condition deleted), per-condition-type
+required fields present (read from registry, generic across all 16
+types), every character backfilled, idempotency.
+
+25 new tests, all passing. Full normalize suite: 60 tests.
+
+### Working Cancel button (commit 8d74128)
+
+The Cancel button in the StoryGenerator dialog was disabled while
+`isGenerating` was true. With OpenAI gateway flakiness, a stuck
+generation could trap the user through 3 retry attempts × 10-minute
+proxy timeout = 30 minutes of forced waiting.
+
+`AbortSignal` plumbed through the stack: `StoryGenerationRequest`
+gains an optional `signal` field; `AIService.generateStory` creates
+a controller and threads the signal to providers; both
+`OpenAIProvider.makeProxyRequest` and `ClaudeProvider.makeProxyRequest`
+forward it to fetch; `IProvider.withRetry` recognizes `AbortError`
+and rethrows immediately instead of waiting more attempts; `useAI`
+exposes `cancelGeneration`; the button always-enabled, reads
+"Cancel generation" while in flight.
+
+### Robust 5xx error handling (commit af7866b)
+
+When OpenAI's gateway returned a 503 with a plaintext body
+("upstream connect error and disconnect/reset before headers..."),
+our error handlers called `response.json()` on it, throwing
+`SyntaxError: Unexpected token 'u'` instead of surfacing the actual
+upstream message. Both providers now read body as text first,
+attempt parse, fall back to clipped raw text.
+
+### Schema-source-of-truth fixes (commits b27a2cc + f22282c + 4faa17c)
+
+A long-standing problem surfaced when the new pipeline started
+consuming the schema's metadata: there were FOUR copies of
+core-beats.json scattered across the repo, drifting independently:
+
+  1. `/beat-definitions/core-beats.json` (root, canonical)
+  2. `/packages/builder/public/beat-definitions/...`
+  3. `/packages/builder/dist/beat-definitions/...` (build artifact)
+  4. `/apps/builder-desktop/builder/beat-definitions/...` (electron
+     build artifact)
+
+Plus the in-memory cache in the Electron desktop app's API server,
+which had baked v2.2 schema during its previous launch.
+
+Fixes:
+  - public copy → symlink to root (Vite dereferences during build,
+    so dist + electron-builder pick up canonical content)
+  - `AIValidator.loadBeatSchema` now prefers the static file (which
+    resolves through the symlink) over the API-server endpoint;
+    API-server demoted to fallback for non-Vite hosts
+  - Both `transformSchemaForAPI` functions (one in
+    `packages/builder/src/api/server.ts`, one in
+    `apps/builder-desktop/src/main/api-server.ts`) now pass through
+    the v2.3 normalize/validate metadata: per-beat `nested`,
+    per-parameter `aliases` / `coerce` / `references`, top-level
+    `conditionTypes` registry. Previous transforms slimmed the
+    schema to a hand-rolled allowlist that dropped everything new
+
+### Validator nested-block awareness (commit 40338f7)
+
+Final blocker found during live testing: the legacy AIValidator's
+outer required-params loop didn't know about `nested`-block
+semantics, so it errored "Required parameter 'condition' is missing"
+on every post-pipeline conditionBeat — failing generation entirely
+even though the actual condition data was correctly present at
+top-level. Fixed by skipping any param whose name appears as a
+nested-block key (the contract is now fulfilled by the discriminator
++ per-type required map, which the pipeline's validateBeat enforces).
+
+### Files modified
+
+**Core normalize pipeline (new):**
+- `packages/core/src/normalize/types.ts` — shared types
+- `packages/core/src/normalize/normalizeBeat.ts` — single-beat pipeline
+- `packages/core/src/normalize/validateBeat.ts` — schema-driven validation
+- `packages/core/src/normalize/normalizeStory.ts` — orchestrator
+- `packages/core/src/normalize/index.ts` — module exports
+- `packages/core/src/index.ts` — wire into core package
+- `packages/core/tests/normalize/normalizeBeat.test.ts` (15 tests)
+- `packages/core/tests/normalize/validateBeat.test.ts` (11 tests)
+- `packages/core/tests/normalize/normalizeStory.test.ts` (9 tests)
+- `packages/core/tests/normalize/goldenFiles.test.ts` (25 tests)
+- `packages/core/tests/normalize/fixtures/{kimi-counter-conditions,gpt-sentiment-clusters,gpt-mixed-flatten}.json`
+
+**Schema metadata:**
+- `beat-definitions/core-beats.json` — v2.2 → v2.3 with conditionTypes
+  registry (16 entries), conditionBeat.nested block, addRemoveInventory.
+  quantity.coerce, inputText.variable.aliases, condition aliases
+
+**AI generation pipeline (wire-in + cleanup):**
+- `packages/builder/src/services/AIService.ts` — pipeline call,
+  AbortController, autoCoerceParameterPrimitives deleted
+- `packages/builder/src/services/AIValidator.ts` — per-condition-type
+  map deleted, nested-block awareness, alias handling
+- `packages/builder/src/services/providers/OpenAIProvider.ts` —
+  signal threading, robust error parsing
+- `packages/builder/src/services/providers/ClaudeProvider.ts` —
+  signal threading, robust error parsing
+- `packages/builder/src/services/providers/IProvider.ts` —
+  AbortError short-circuit
+- `packages/builder/src/types/ai.ts` — signal on StoryGenerationRequest
+- `packages/builder/src/hooks/useAI.ts` — cancelGeneration
+- `packages/builder/src/components/ai/StoryGenerator.tsx` —
+  always-enabled Cancel button
+- `packages/builder/src/services/__tests__/AIService.test.ts` —
+  signal-wrapped request assertion
+- `packages/builder/src/App.tsx` — pipeline wired into both
+  handleStoryGenerated and loadStoryData; legacy flatteners deleted
+- `packages/builder/src/utils/projectDeserializer.ts` — character
+  normalize centralized to `normalizeCharacter`
+
+**Schema serving:**
+- `packages/builder/src/api/server.ts` — pass through v2.3 metadata
+- `apps/builder-desktop/src/main/api-server.ts` — same passthrough
+- `packages/builder/public/beat-definitions/core-beats.json` —
+  symlink to root canonical
+
+---
+
 ## 2026-05-08: AI Generation Fidelity Fixes (v0.9.50)
 
 ### Overview
