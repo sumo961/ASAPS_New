@@ -522,15 +522,23 @@ export class EmbeddedAPIServer {
       if (def.example) {
         beatTypes[beatType].example = def.example;
       }
+      // v0.9.51+ pass through normalize/validate metadata so the
+      // schema-driven pipeline can flatten / alias / coerce when reading
+      // from this endpoint.
+      if (def.nested) beatTypes[beatType].nested = def.nested;
     }
 
     return {
-      version: rawSchema.schema || '2.2.0',
+      version: rawSchema.schema || '2.3.0',
       description: 'ASAPS Beat Types - Use these to create interactive narratives',
       source: 'Loaded from beat-definitions/core-beats.json',
       loadedFrom: sourcePath,
       beatTypes,
       customTypes: rawSchema.customTypes || {},
+      // Per-condition-type required/optional/aliases registry — drives
+      // the pipeline's per-type field validation and aliases like
+      // condition.variable → condition.variableName.
+      conditionTypes: rawSchema.conditionTypes || undefined,
     };
   }
 

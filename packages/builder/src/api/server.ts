@@ -239,6 +239,14 @@ export class APIServer {
       if (def.example) {
         beatTypes[beatType].example = def.example;
       }
+
+      // Preserve v2.3 normalize/validate metadata. Without this, the
+      // schema-driven pipeline (packages/core/src/normalize/) sees the
+      // slimmed view and can't flatten nested condition objects, apply
+      // aliases, or coerce primitives. The web AIValidator falls back
+      // to the static file first, but Claude Desktop and other clients
+      // hitting /api/schema/beats need the full metadata too.
+      if (def.nested) beatTypes[beatType].nested = def.nested;
     }
 
     // Include custom types documentation
@@ -260,6 +268,10 @@ export class APIServer {
 
       beatTypes,
       customTypes,
+
+      // v0.9.51+ — per-condition-type required/optional/aliases used by
+      // the schema-driven normalize pipeline. Pass through verbatim.
+      conditionTypes: rawSchema.conditionTypes || undefined,
 
       connectionFormat: {
         description: 'How to specify connections between beats',
@@ -331,6 +343,18 @@ export class APIServer {
       }
       if (def.enum) {
         result[paramName].enum = def.enum;
+      }
+      // Preserve v2.3 normalize/validate metadata so the schema-driven
+      // pipeline can flatten / alias / coerce when reading from the
+      // API endpoint.
+      if (def.aliases) {
+        result[paramName].aliases = def.aliases;
+      }
+      if (def.coerce) {
+        result[paramName].coerce = def.coerce;
+      }
+      if (def.references) {
+        result[paramName].references = def.references;
       }
     }
 
