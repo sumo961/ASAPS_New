@@ -246,11 +246,22 @@ export function useAI() {
 
     // Wrap any caller-supplied onProgress so we also update hook state.
     // The dialog uses generationProgress to show "Generating... (N chars)".
+    //
+    // Throttle the React state updates to ~10Hz. The streaming loop
+    // calls onProgress once per network chunk (often dozens per second
+    // during fast model output); without throttling React 18's batching
+    // collapses the rapid-fire updates and the UI rarely re-renders.
+    // 100ms is fast enough to feel live, slow enough to actually flush.
     const callerOnProgress = request.onProgress;
+    let lastUiUpdate = 0;
     const wrappedRequest: StoryGenerationRequest = {
       ...request,
       onProgress: (chars: number) => {
-        setState(prev => ({ ...prev, generationProgress: chars }));
+        const now = performance.now();
+        if (now - lastUiUpdate >= 100) {
+          lastUiUpdate = now;
+          setState(prev => ({ ...prev, generationProgress: chars }));
+        }
         callerOnProgress?.(chars);
       },
     };
