@@ -4702,31 +4702,17 @@ function App() {
     translationActionsRef.current?.clearTranslations();
 
     // Inject AI-generated characters into App-level character state.
-    // Without this, charactersRef.current still holds the *previous* project's
-    // characters, and the subsequent syncProjectData() writes those stale
-    // characters into the new project — i.e. the AI's characters are dropped
-    // and prior-project characters appear instead. Backfill the editor-only
-    // shape (visual, states, defaultState, timestamps) the same way
-    // loadStoryData (MCP path) does, otherwise the Character Editor crashes.
+    // The schema-driven pipeline (AIService.generateStory) has already
+    // normalized editor-only fields (visual / states / defaultState /
+    // counters / inventory / tags / traits / goals / timestamps), so we
+    // can pass story.characters straight to setCharacters. Without this
+    // setter call, charactersRef.current still holds the *previous*
+    // project's characters and syncProjectData would write those stale
+    // characters into the new project (the v0.9.50 bug).
     if (story.characters && Array.isArray(story.characters)) {
-      const now = new Date().toISOString();
-      const normalized = story.characters.map((c: any) => ({
-        ...c,
-        visual: c.visual || { type: 'static' },
-        states: c.states && c.states.length > 0
-          ? c.states
-          : [{ id: 'default', name: 'default', displayName: 'Default', visual: {} }],
-        defaultState: c.defaultState || 'default',
-        counters: c.counters || [],
-        inventory: c.inventory || [],
-        tags: c.tags || [],
-        createdAt: c.createdAt || now,
-        updatedAt: c.updatedAt || now,
-      }));
-      console.log('[App] Injecting', normalized.length, 'AI-generated characters:', normalized.map((c: any) => c.id || c.name));
-      setCharacters(normalized);
+      console.log('[App] Injecting', story.characters.length, 'AI-generated characters:', story.characters.map((c: any) => c.id || c.name));
+      setCharacters(story.characters);
     } else {
-      // No characters from AI — clear so prior-project characters don't leak in.
       console.log('[App] No characters in AI response; clearing character state');
       setCharacters([]);
     }
@@ -4844,42 +4830,15 @@ function App() {
       ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections, firstBeatIdForLayout)
       : new Map();
 
-    // Auto-create clusters from the AI's per-beat `cluster` strings.
-    // The AI emits e.g. `cluster: "Act II - The Morning After"` on each beat
-    // but the builder needs Cluster container objects in state.clusters
-    // for them to render in the graph. Group beats by cluster name, compute
-    // a bounding box from their (post-layout) positions, and register a
-    // Cluster with id = name (GraphEditor compares strings).
-    if (story.beats && Array.isArray(story.beats)) {
-      const PADDING = 80;
-      const BEAT_W = 240;
-      const BEAT_H = 100;
-      const buckets = new Map<string, Array<{ x: number; y: number }>>();
-      for (const b of story.beats) {
-        const name = typeof b.cluster === 'string' ? b.cluster.trim() : '';
-        if (!name) continue;
-        const pos = adjustedPositions.get(b.id) || b.position;
-        if (!pos || typeof pos.x !== 'number' || typeof pos.y !== 'number') continue;
-        if (!buckets.has(name)) buckets.set(name, []);
-        buckets.get(name)!.push(pos);
+    // Register the Cluster container objects produced by the schema-driven
+    // pipeline (AIService.generateStory → normalizeStory.buildClustersFromBeats).
+    // Pipeline already grouped beats by cluster name and computed bboxes —
+    // we just walk story.clusters and feed them into the builder's state.
+    if (Array.isArray(story.clusters) && story.clusters.length > 0) {
+      for (const c of story.clusters) {
+        actions.addCluster(c);
       }
-      for (const [name, positions] of buckets.entries()) {
-        const minX = Math.min(...positions.map(p => p.x));
-        const minY = Math.min(...positions.map(p => p.y));
-        const maxX = Math.max(...positions.map(p => p.x + BEAT_W));
-        const maxY = Math.max(...positions.map(p => p.y + BEAT_H));
-        actions.addCluster({
-          id: name,
-          name,
-          type: 'organizational',
-          containerPosition: { x: minX - PADDING, y: minY - PADDING },
-          containerBounds: { width: (maxX - minX) + PADDING * 2, height: (maxY - minY) + PADDING * 2 },
-          isExpanded: true,
-        });
-      }
-      if (buckets.size > 0) {
-        console.log(`[App] Auto-created ${buckets.size} cluster(s) from AI metadata:`, [...buckets.keys()]);
-      }
+      console.log(`[App] Registered ${story.clusters.length} cluster(s) from pipeline:`, story.clusters.map((c: any) => c.name));
     }
 
     // Add all generated beats, preserving AI-generated IDs with adjusted positions
@@ -4909,39 +4868,13 @@ function App() {
         if (beatData.parameters) {
           const params = { ...beatData.parameters };
 
-          // Transform conditionBeat nested format to flat format
+          // ConditionBeat shape: the schema-driven pipeline already
+          // flattened condition.* into top-level params (conditionType,
+          // character, sentimentTarget, baseline, etc.) and applied any
+          // per-condition-type aliases (variable→variableName). We just
+          // need to extract trueConnection/falseConnection target ids,
+          // which the runtime expects as `trueTarget`/`falseTarget`.
           if (beatData.type === 'conditionBeat') {
-            // Flatten nested condition object
-            if (params.condition) {
-              const cond = params.condition;
-              params.conditionType = cond.type || params.conditionType;
-              // AI may generate 'variable', 'variableName', or 'left' - support all
-              params.variableName = cond.variableName || cond.variable || cond.left || params.variableName;
-              params.operator = cond.operator || params.operator;
-              params.value = cond.value ?? cond.right ?? params.value;
-              params.counter1 = cond.counter1 || params.counter1;
-              params.counter2 = cond.counter2 || params.counter2;
-              params.timer = cond.timer || params.timer;
-              params.item = cond.item || params.item;
-              params.character = cond.character || params.character;
-              params.checkType = cond.checkType || params.checkType;
-              params.beatId = cond.beatId || params.beatId;
-              // Affect-stack & XR condition subfields — must copy to top-level
-              // before `delete params.condition` or they're lost on save.
-              const condPassthroughFields = [
-                'baseline', 'sentimentTarget', 'sentimentEmotion', 'moodAxis',
-                'emotionName', 'traitName', 'goalId', 'goalStatus', 'variantId',
-                'targetLat', 'targetLng', 'radiusMeters', 'beaconUuid',
-                'beaconRangeMeters', 'permission', 'quantityCheck', 'compareSource',
-              ];
-              for (const f of condPassthroughFields) {
-                if (cond[f] !== undefined && params[f] === undefined) {
-                  params[f] = cond[f];
-                }
-              }
-              delete params.condition;
-            }
-            // Extract targets from connection objects
             if (params.trueConnection?.target) {
               params.trueTarget = params.trueConnection.target;
               delete params.trueConnection;
