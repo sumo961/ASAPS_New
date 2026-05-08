@@ -147,8 +147,21 @@ function streamingProxyRequest(
 
         let lineBuffer = '';
         let totalChars = 0;
+        // Diagnostic: track upstream chunk timing so we can tell whether
+        // the model truly streams token-by-token or just sends one big
+        // SSE frame at the end. Logs first/last chunk + chunk count to
+        // the dev server console. Tells us if streaming is real-time or
+        // upstream-buffered.
+        const t0 = Date.now();
+        let firstChunkAt: number | null = null;
+        let upstreamChunkCount = 0;
+        let lastChunkAt = 0;
 
         upstreamRes.on('data', (chunk: Buffer) => {
+          const now = Date.now();
+          if (firstChunkAt === null) firstChunkAt = now;
+          upstreamChunkCount++;
+          lastChunkAt = now;
           lineBuffer += chunk.toString('utf-8');
           // SSE framing: chunks are `data: <json>\n\n`. Process complete
           // lines; keep partial.
@@ -179,6 +192,20 @@ function streamingProxyRequest(
 
         upstreamRes.on('end', () => {
           res.end();
+          const totalMs = Date.now() - t0;
+          const ttfbMs = firstChunkAt !== null ? firstChunkAt - t0 : -1;
+          const streamSpanMs = firstChunkAt !== null ? lastChunkAt - firstChunkAt : 0;
+          console.log(
+            `[Vite AI Proxy] Stream timing: first chunk +${ttfbMs}ms, ` +
+              `${upstreamChunkCount} upstream chunks over ${streamSpanMs}ms, ` +
+              `total ${totalMs}ms — ${
+                streamSpanMs > 1000 && upstreamChunkCount > 10
+                  ? 'TRUE STREAMING (incremental)'
+                  : streamSpanMs < 200
+                    ? 'BATCHED (one big frame at end)'
+                    : 'mixed / borderline'
+              }`,
+          );
           resolve({ totalChars, status });
         });
         upstreamRes.on('error', (err) => {
