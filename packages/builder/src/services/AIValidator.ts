@@ -7,35 +7,47 @@
 import type { GeneratedBeat, AIValidationResult, StoryGenerationResponse, DialogGenerationResponse } from '../types/ai';
 
 /**
- * Load beat definitions schema
+ * Load beat definitions schema.
+ *
+ * Priority order:
+ *   1. Static file at /beat-definitions/core-beats.json — this is the
+ *      single source of truth. In the web builder, Vite serves it from
+ *      packages/builder/public/beat-definitions/, which is symlinked to
+ *      the canonical /beat-definitions/core-beats.json at the repo root.
+ *   2. Local API server (http://localhost:3001/api/schema/beats) — only
+ *      consulted if the static fetch fails. Historically used by the
+ *      Electron desktop app, but its in-memory cache can go stale, so
+ *      it must NEVER win against the static file. (This was the
+ *      v0.9.51 schema-divergence bug: the desktop app on 3001 was
+ *      caching v2.2 while the static file was correctly v2.3.)
  */
 async function loadBeatSchema(): Promise<any> {
-  // Try API server first (if running)
-  try {
-    const apiResponse = await fetch('http://localhost:3001/api/schema/beats');
-    if (apiResponse.ok) {
-      console.log('[AIValidator] Schema loaded from API server');
-      return await apiResponse.json();
-    }
-  } catch {
-    // API server not running - this is fine, fall through to static file
-  }
-
-  // Fallback to static asset served from /public/beat-definitions/core-beats.json
+  // 1. Static file — canonical
   try {
     const staticResponse = await fetch('/beat-definitions/core-beats.json');
     if (staticResponse.ok) {
       console.log('[AIValidator] Schema loaded from static file');
       return await staticResponse.json();
     }
-  } catch (error) {
-    console.error('[AIValidator] Failed to load static schema:', error);
+  } catch {
+    // Fall through
   }
 
-  // Last resort fallback
+  // 2. API server fallback (e.g. when running outside Vite without /public)
+  try {
+    const apiResponse = await fetch('http://localhost:3001/api/schema/beats');
+    if (apiResponse.ok) {
+      console.warn('[AIValidator] Static schema unavailable; falling back to API server. This may be stale.');
+      return await apiResponse.json();
+    }
+  } catch {
+    // No API server either
+  }
+
+  // Last resort
   console.error('[AIValidator] All schema sources failed, using empty schema');
   return {
-    schema: 'asaps-beat-definitions-v2.2',
+    schema: 'asaps-beat-definitions-v2.3',
     beatTypes: {}
   };
 }
