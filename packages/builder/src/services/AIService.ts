@@ -18,6 +18,10 @@ import type {
   NaturalLanguageBeatResponse,
   TextTransformationRequest,
   TextTransformationResponse,
+  ConversationTurnRequest,
+  ConversationTurnResponse,
+  ChatWithToolsRequest,
+  ChatWithToolsResponse,
 } from '../types/ai';
 import type {
   HelperCommandRequest,
@@ -1815,6 +1819,63 @@ Return ONLY the corrected JSON, no explanation needed.
       console.error('[AIService] Natural language beat creation failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Generate a single conversation turn.
+   *
+   * Used by AIConversationBeat during playback and by the Ideator ideation
+   * pop-out. Delegates straight to the active provider's
+   * generateConversationTurn — no validation or repair, since the response
+   * is free-form text.
+   */
+  async generateConversationTurn(
+    request: ConversationTurnRequest
+  ): Promise<ConversationTurnResponse> {
+    this.ensureReady();
+
+    const provider = this.currentProvider as IAIProvider & {
+      generateConversationTurn?: (
+        req: ConversationTurnRequest
+      ) => Promise<ConversationTurnResponse>;
+    };
+
+    if (!provider.generateConversationTurn) {
+      throw new Error(
+        `Provider "${provider.name}" does not support conversation turns`
+      );
+    }
+
+    return provider.generateConversationTurn(request);
+  }
+
+  /**
+   * Multi-turn chat that may invoke tools (Ideator + Brave web_search).
+   *
+   * Only Claude implements this for now — other providers either don't
+   * support tool use (Ollama) or use a different schema (OpenAI functions),
+   * neither of which Ideator needs in v1. Throws a clear error if the
+   * active provider can't run it, which Ideator catches and falls back to
+   * plain conversation for.
+   */
+  async generateChatWithTools(
+    request: ChatWithToolsRequest
+  ): Promise<ChatWithToolsResponse> {
+    this.ensureReady();
+
+    const provider = this.currentProvider as IAIProvider & {
+      generateChatWithTools?: (
+        req: ChatWithToolsRequest
+      ) => Promise<ChatWithToolsResponse>;
+    };
+
+    if (!provider.generateChatWithTools) {
+      throw new Error(
+        `Provider "${provider.name}" does not support tool-use chat (only Claude does in this build)`
+      );
+    }
+
+    return provider.generateChatWithTools(request);
   }
 
   // ============================================================================

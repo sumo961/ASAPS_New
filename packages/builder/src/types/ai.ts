@@ -358,6 +358,11 @@ export interface IAIProvider {
   /** Create beat from natural language */
   createBeatFromNL(request: NaturalLanguageBeatRequest): Promise<NaturalLanguageBeatResponse>;
 
+  /** Generate a single conversation turn (used by AIConversationBeat and Ideator) */
+  generateConversationTurn?(
+    request: ConversationTurnRequest
+  ): Promise<ConversationTurnResponse>;
+
   /** Check if provider is configured and ready */
   isReady(): boolean;
 }
@@ -402,6 +407,14 @@ export interface ConversationTurnRequest {
     role: 'user' | 'assistant' | 'system';
     content: string;
   }>;
+
+  /**
+   * Maximum tokens the model may produce in the response. Defaults to 1000
+   * when omitted, which is fine for short chat turns. Long-form callers
+   * (e.g. Ideator's synthesis step, which produces a multi-paragraph JSON
+   * payload) should pass a higher cap to avoid truncation.
+   */
+  maxTokens?: number;
 }
 
 /**
@@ -410,6 +423,48 @@ export interface ConversationTurnRequest {
 export interface ConversationTurnResponse {
   /** The NPC's response text */
   text: string;
+}
+
+// ============================================================================
+// Tool-use chat (used by Ideator with Brave web search)
+// ============================================================================
+
+/** Anthropic-style tool spec sent to the model. */
+export interface ChatToolSpec {
+  name: string;
+  description: string;
+  input_schema: unknown;
+}
+
+/** Single executed tool call recorded during a tool-use chat turn. */
+export interface ChatToolCall {
+  name: string;
+  input: Record<string, unknown>;
+  result: string;
+}
+
+/** Request to run a chat turn that may invoke tools. */
+export interface ChatWithToolsRequest {
+  systemPrompt: string;
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+  tools: ChatToolSpec[];
+  /** Executes a tool by name and returns the string result Claude sees. */
+  executeTool: (
+    name: string,
+    input: Record<string, unknown>
+  ) => Promise<string>;
+  /** Optional pre-execute hook for UI feedback (does not affect the loop). */
+  onToolUse?: (name: string, input: Record<string, unknown>) => void;
+  /** Safety cap on tool-use rounds. Defaults to 5. */
+  maxIterations?: number;
+}
+
+/** Response from a tool-use chat turn. */
+export interface ChatWithToolsResponse {
+  /** Final assistant text after all tool steps complete. */
+  text: string;
+  /** Every tool call executed during this turn, in order. */
+  toolCalls: ChatToolCall[];
 }
 
 // ============================================================================

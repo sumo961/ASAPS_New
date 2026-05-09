@@ -14,7 +14,11 @@ import type {
   BeatSuggestionRequest,
   BeatSuggestionResponse,
   NaturalLanguageBeatRequest,
-  NaturalLanguageBeatResponse
+  NaturalLanguageBeatResponse,
+  ConversationTurnRequest,
+  ConversationTurnResponse,
+  ChatWithToolsRequest,
+  ChatWithToolsResponse,
 } from '../types/ai';
 
 // Storage key for AI configuration
@@ -357,6 +361,66 @@ export function useAI() {
   }, [aiService]);
 
   /**
+   * Generate a single conversation turn (used by Ideator).
+   *
+   * Unlike generateStory, this returns text without JSON validation and does
+   * NOT toggle the global isGenerating flag — Ideator manages its own
+   * status in its store so the conversation UI can show a per-turn spinner
+   * without blocking other AI features in the main window.
+   */
+  const generateConversationTurn = useCallback(
+    async (
+      request: ConversationTurnRequest
+    ): Promise<ConversationTurnResponse | null> => {
+      if (!aiService.isReady()) {
+        setState(prev => ({ ...prev, error: 'AI service not configured' }));
+        return null;
+      }
+
+      try {
+        return await aiService.generateConversationTurn(request);
+      } catch (error) {
+        setState(prev => ({
+          ...prev,
+          error:
+            error instanceof Error ? error.message : 'Conversation turn failed',
+        }));
+        return null;
+      }
+    },
+    [aiService]
+  );
+
+  /**
+   * Multi-turn chat with tools (Ideator + Brave web search).
+   *
+   * Same lifecycle behavior as generateConversationTurn — does not toggle
+   * the global isGenerating flag, since Ideator manages its own status.
+   */
+  const generateChatWithTools = useCallback(
+    async (
+      request: ChatWithToolsRequest
+    ): Promise<ChatWithToolsResponse | null> => {
+      if (!aiService.isReady()) {
+        setState(prev => ({ ...prev, error: 'AI service not configured' }));
+        return null;
+      }
+
+      try {
+        return await aiService.generateChatWithTools(request);
+      } catch (error) {
+        setState(prev => ({
+          ...prev,
+          error:
+            error instanceof Error ? error.message : 'Tool-use chat failed',
+        }));
+        return null;
+      }
+    },
+    [aiService]
+  );
+
+  /**
    * Clear error
    */
   const clearError = useCallback(() => {
@@ -380,6 +444,8 @@ export function useAI() {
     generateDialog,
     suggestBeats,
     createBeatFromNL,
+    generateConversationTurn,
+    generateChatWithTools,
     clearError,
     cancelGeneration,
   };

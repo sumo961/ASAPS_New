@@ -43,6 +43,7 @@ interface HeaderProps {
   onInterceptProjectLibrary?: () => boolean;
   onStoryGenerated?: (story: any) => void;
   onBeatCreated?: (beat: any) => void;
+  onIdeator?: () => void;
   onSaveProject?: () => void;
   onRenameProject?: (projectId: string, newName: string) => Promise<void>;
   isUntitledProject?: boolean;
@@ -94,6 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
   onInterceptProjectLibrary,
   onStoryGenerated,
   onBeatCreated,
+  onIdeator,
   onSaveProject,
   onRenameProject,
   isUntitledProject,
@@ -568,6 +570,19 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={() => setShowAIMenu(false)}
                 />
                 <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                  {onIdeator && (
+                    <button
+                      onClick={() => {
+                        onIdeator();
+                        setShowAIMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                      title="Open Ideator — a conversational ideation tool that helps you shape a complex issue into a prompt before generating the story"
+                    >
+                      <Wand2 className="w-4 h-4" />
+                      Ideate with Ideator
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setShowStoryGenerator(true);

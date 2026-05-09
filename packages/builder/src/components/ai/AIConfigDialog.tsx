@@ -5,8 +5,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Key, Sparkles, CheckCircle, AlertCircle, Server, Trash2 } from 'lucide-react';
+import { X, Key, Sparkles, CheckCircle, AlertCircle, Server, Trash2, Search } from 'lucide-react';
 import { useAI, getSavedAIConfig, clearSavedAIConfig } from '../../hooks/useAI';
+import {
+  getSavedBraveApiKey,
+  saveBraveApiKey,
+  clearSavedBraveApiKey,
+} from './ideator/braveConfig';
 
 // Provider presets for easy configuration
 type ProviderType = 'claude' | 'openai' | 'local';
@@ -92,6 +97,9 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [hasLoadedSaved, setHasLoadedSaved] = useState(false);
+  // Brave Search key — independent of the LLM provider; powers the Ideator
+  // web_search tool. Optional; Ideator falls back to chat-only when unset.
+  const [braveApiKey, setBraveApiKey] = useState('');
 
   const preset = PROVIDER_PRESETS[provider];
 
@@ -110,6 +118,9 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
         setReasoningEffort(savedConfig.reasoningEffort || '');
         console.log('[AIConfigDialog] Loaded saved configuration for:', savedProviderType);
       }
+      // Brave Search key (independent of provider).
+      const savedBrave = getSavedBraveApiKey();
+      if (savedBrave) setBraveApiKey(savedBrave);
       setHasLoadedSaved(true);
     }
   }, [isOpen, hasLoadedSaved]);
@@ -163,6 +174,10 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
         reasoningEffort || undefined,
         provider // Pass the original provider type for UI display
       );
+
+      // Persist (or clear) the Brave Search key alongside the AI config.
+      saveBraveApiKey(braveApiKey);
+
       setSuccess(true);
 
       // Persist non-secret settings to project globalSettings for VCS
@@ -189,11 +204,13 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
 
   const handleClearSavedConfig = () => {
     clearSavedAIConfig();
+    clearSavedBraveApiKey();
     setApiKey('');
     setModel('');
     setBaseUrl('');
     setMaxTokens('');
     setReasoningEffort('');
+    setBraveApiKey('');
     setProvider('claude');
     setSuccess(false);
     setError('');
@@ -409,6 +426,30 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             />
             <p className="mt-1 text-xs text-gray-500">
               Max output tokens for story generation. Default: 32000. Claude supports up to 64K output; Kimi K2 supports up to 256K.
+            </p>
+          </div>
+
+          {/* Brave Search API Key (Optional, used by Ideator's web_search tool) */}
+          <div className="pt-2 border-t border-gray-200">
+            <label htmlFor="braveApiKey" className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+              <Search className="w-4 h-4 text-purple-500" />
+              Brave Search API Key
+              <span className="text-gray-400 font-normal">(Optional — for Ideator)</span>
+            </label>
+            <input
+              id="braveApiKey"
+              type="password"
+              value={braveApiKey}
+              onChange={(e) => setBraveApiKey(e.target.value)}
+              placeholder="Brave Subscription Token (optional)"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              autoComplete="off"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              When set, Ideator can search the web mid-conversation to bring in
+              context on the topic you're discussing. Get a free key at{' '}
+              <span className="font-mono">api.search.brave.com</span>. Leave
+              empty to use Ideator without web search.
             </p>
           </div>
 

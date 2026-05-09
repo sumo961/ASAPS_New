@@ -486,11 +486,12 @@ Respond with JSON in this format:
   }
 
   /**
-   * Generate a single conversation turn for AIConversationBeat
+   * Generate a single conversation turn for AIConversationBeat / Ideator.
    */
   async generateConversationTurn(request: {
     systemPrompt: string;
     messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+    maxTokens?: number;
   }): Promise<{ text: string }> {
     this.ensureReady();
 
@@ -504,7 +505,7 @@ Respond with JSON in this format:
 
     const requestBody = {
       model: this.model,
-      max_tokens: 1000,
+      max_tokens: request.maxTokens ?? 1000,
       temperature: this.config?.temperature ?? 0.8,
       system: request.systemPrompt,
       messages: claudeMessages,
@@ -524,5 +525,120 @@ Respond with JSON in this format:
     }
 
     return { text: content.text.trim() };
+  }
+
+  /**
+   * Multi-turn chat with tool use. Sends `tools` to Claude, executes any
+   * tool_use blocks via the supplied callback, sends tool_result messages
+   * back, and loops until Claude produces a plain-text response (or we hit
+   * maxIterations).
+   *
+   * Used by Ideator to run the conversation with the optional Brave web
+   * search tool. The shape of the request mirrors generateConversationTurn
+   * so callers can switch between the two by feature-flagging on whether
+   * tools are configured.
+   */
+  async generateChatWithTools(request: {
+    systemPrompt: string;
+    messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+    tools: Array<{ name: string; description: string; input_schema: unknown }>;
+    executeTool: (name: string, input: Record<string, unknown>) => Promise<string>;
+    onToolUse?: (name: string, input: Record<string, unknown>) => void;
+    maxIterations?: number;
+  }): Promise<{
+    text: string;
+    toolCalls: Array<{ name: string; input: Record<string, unknown>; result: string }>;
+  }> {
+    this.ensureReady();
+
+    // Build the running messages array in Claude format. user/assistant only
+    // — system content is hoisted to the `system` field on each request.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const messages: any[] = request.messages
+      .filter(m => m.role !== 'system')
+      .map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+
+    const toolCalls: Array<{
+      name: string;
+      input: Record<string, unknown>;
+      result: string;
+    }> = [];
+    const maxIter = request.maxIterations ?? 5;
+
+    for (let iter = 0; iter < maxIter; iter++) {
+      const requestBody = {
+        model: this.model,
+        max_tokens: 1500,
+        system: request.systemPrompt,
+        tools: request.tools,
+        messages,
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let response: any;
+      if (this.useProxy) {
+        response = await this.makeProxyRequest(requestBody);
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const apiResp = await this.client!.messages.create(requestBody as any);
+        response = { content: apiResp.content, stop_reason: apiResp.stop_reason };
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blocks = (response.content ?? []) as any[];
+      const toolUses = blocks.filter(b => b?.type === 'tool_use');
+
+      if (toolUses.length === 0) {
+        // No tools requested — concatenate any text blocks and return.
+        const text = blocks
+          .filter(b => b?.type === 'text')
+          .map(b => String(b.text ?? ''))
+          .join('\n')
+          .trim();
+        return { text, toolCalls };
+      }
+
+      // Echo Claude's full assistant message (including the tool_use blocks)
+      // back into the running history — Anthropic requires this so it can
+      // correlate tool_use_id with tool_result_id on the next turn.
+      messages.push({ role: 'assistant', content: blocks });
+
+      // Run each tool. Doing them in sequence (not parallel) keeps the chat
+      // chip ordering deterministic and avoids racing the UI store.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const toolResults: any[] = [];
+      for (const tu of toolUses) {
+        const name = String(tu.name ?? '');
+        const input = (tu.input ?? {}) as Record<string, unknown>;
+        try {
+          request.onToolUse?.(name, input);
+        } catch {
+          /* host UI errors must never break the loop */
+        }
+        let result: string;
+        try {
+          result = await request.executeTool(name, input);
+        } catch (err) {
+          result = `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        toolCalls.push({ name, input, result });
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: tu.id,
+          content: result,
+        });
+      }
+
+      messages.push({ role: 'user', content: toolResults });
+    }
+
+    return {
+      text:
+        '(Reached the maximum number of tool steps for this turn — let me know what you would like to focus on.)',
+      toolCalls,
+    };
   }
 }
