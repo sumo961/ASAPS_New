@@ -2449,11 +2449,31 @@ export const Inspector: React.FC<InspectorProps> = ({
                             placeholder="player / character id / inventory item / tag"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
                           />
+                          {/*
+                            <datalist> options expose two strings to the
+                            user: the option's `value` (what gets stored
+                            when picked) and its inner text (the label).
+                            Chrome renders both as a stacked two-line
+                            entry, which authors read as "duplicate" when
+                            the value is a lowercase slug ("elena") and
+                            the label is the same word capitalized
+                            ("Elena"). Disambiguate by including the
+                            role / kind in the label so the two strings
+                            are visibly distinct and the entry reads as
+                            ONE option, not two.
+                          */}
                           <datalist id="sentiment-target-suggestions">
-                            <option value="player">Player</option>
-                            {(characters || []).map((c) => (
-                              <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
-                            ))}
+                            <option value="player">Player (built-in)</option>
+                            {(characters || []).map((c) => {
+                              const displayName = c.displayName || c.name || c.id;
+                              const role = c.role === 'player' ? 'player character' : 'NPC';
+                              const label = c.id === displayName
+                                ? `${displayName} (${role})`
+                                : `${displayName} (${role}, id: ${c.id})`;
+                              return (
+                                <option key={c.id} value={c.id}>{label}</option>
+                              );
+                            })}
                           </datalist>
                         </div>
                         <div>
